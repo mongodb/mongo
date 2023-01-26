@@ -44,88 +44,45 @@ uint8_t numDigits(uint32_t num) {
 }
 }  // namespace
 
-Bucket::Bucket(const BucketId& bucketId,
-               StripeNumber stripe,
-               BucketKey::Hash keyHash,
-               BucketStateManager* bucketStateManager)
-    : _lastCheckedEra(bucketStateManager->getEraAndIncrementCount()),
-      _bucketStateManager(bucketStateManager),
-      _bucketId(bucketId),
-      _stripe(stripe),
-      _keyHash(keyHash) {}
+Bucket::Bucket(
+    const BucketId& bId, const BucketKey& k, StringData tf, Date_t mt, BucketStateManager& bsm)
+    : bucketId(bId),
+      key(k),
+      timeField(tf.toString()),
+      minTime(mt),
+      bucketStateManager(bsm),
+      lastChecked(bucketStateManager.getEraAndIncrementCount()) {}
 
 Bucket::~Bucket() {
-    _bucketStateManager->decrementCountForEra(getEra());
+    bucketStateManager.decrementCountForEra(lastChecked);
 }
 
-uint64_t Bucket::getEra() const {
-    return _lastCheckedEra;
+bool allCommitted(const Bucket& bucket) {
+    return bucket.batches.empty() && !bucket.preparedBatch;
 }
 
-void Bucket::setEra(uint64_t era) {
-    _lastCheckedEra = era;
-}
-
-const BucketId& Bucket::bucketId() const {
-    return _bucketId;
-}
-
-const OID& Bucket::oid() const {
-    return _bucketId.oid;
-}
-
-const NamespaceString& Bucket::ns() const {
-    return _bucketId.ns;
-}
-
-Bucket::StripeNumber Bucket::stripe() const {
-    return _stripe;
-}
-
-BucketKey::Hash Bucket::keyHash() const {
-    return _keyHash;
-}
-
-Date_t Bucket::getTime() const {
-    return _minTime;
-}
-
-StringData Bucket::getTimeField() {
-    return _timeField;
-}
-
-bool Bucket::allCommitted() const {
-    return _batches.empty() && !_preparedBatch;
-}
-
-uint32_t Bucket::numMeasurements() const {
-    return _numMeasurements;
-}
-
-void Bucket::setRolloverAction(RolloverAction action) {
-    _rolloverAction = action;
-}
-
-bool Bucket::schemaIncompatible(const BSONObj& input,
-                                boost::optional<StringData> metaField,
-                                const StringData::ComparatorInterface* comparator) {
-    auto result = _schema.update(input, metaField, comparator);
+bool schemaIncompatible(Bucket& bucket,
+                        const BSONObj& input,
+                        boost::optional<StringData> metaField,
+                        const StringData::ComparatorInterface* comparator) {
+    auto result = bucket.schema.update(input, metaField, comparator);
     return (result == Schema::UpdateStatus::Failed);
 }
 
-void Bucket::_calculateBucketFieldsAndSizeChange(const BSONObj& doc,
-                                                 boost::optional<StringData> metaField,
-                                                 NewFieldNames* newFieldNamesToBeInserted,
-                                                 int32_t* sizeToBeAdded) const {
+void calculateBucketFieldsAndSizeChange(const Bucket& bucket,
+                                        const BSONObj& doc,
+                                        boost::optional<StringData> metaField,
+                                        Bucket::NewFieldNames& newFieldNamesToBeInserted,
+                                        int32_t& sizeToBeAdded) {
     // BSON size for an object with an empty object field where field name is empty string.
     // We can use this as an offset to know the size when we have real field names.
     static constexpr int emptyObjSize = 12;
     // Validate in debug builds that this size is correct
     dassert(emptyObjSize == BSON("" << BSONObj()).objsize());
 
-    newFieldNamesToBeInserted->clear();
-    *sizeToBeAdded = 0;
-    auto numMeasurementsFieldLength = numDigits(_numMeasurements);
+    newFieldNamesToBeInserted.clear();
+    sizeToBeAdded = 0;
+    auto numMeasurementsFieldLength = numDigits(bucket.numMeasurements);
     for (const auto& elem : doc) {
         auto fieldName = elem.fieldNameStringData();
         if (fieldName == metaField) {
@@ -134,44 +91,42 @@ void Bucket::_calculateBucketFieldsAndSizeChange(const BSONObj& doc,
         }
 
         auto hashedKey = StringSet::hasher().hashed_key(fieldName);
-        if (!_fieldNames.contains(hashedKey)) {
+        if (!bucket.fieldNames.contains(hashedKey)) {
             // Record the new field name only if it hasn't been committed yet. There could
             // be concurrent batches writing to this bucket with the same new field name,
             // but they're not guaranteed to commit successfully.
-            newFieldNamesToBeInserted->push_back(hashedKey);
+            newFieldNamesToBeInserted.push_back(hashedKey);
 
             // Only update the bucket size once to account for the new field name if it
             // isn't already pending a commit from another batch.
-            if (!_uncommittedFieldNames.contains(hashedKey)) {
+            if (!bucket.uncommittedFieldNames.contains(hashedKey)) {
                 // Add the size of an empty object with that field name.
-                *sizeToBeAdded += emptyObjSize + fieldName.size();
+                sizeToBeAdded += emptyObjSize + fieldName.size();
 
                 // The control.min and control.max summaries don't have any information for
                 // this new field name yet. Add two measurements worth of data to account
                 // for this. As this is the first measurement for this field, min == max.
-                *sizeToBeAdded += elem.size() * 2;
+                sizeToBeAdded += elem.size() * 2;
             }
         }
 
         // Add the element size, taking into account that the name will be changed to its
         // positional number. Add 1 to the calculation since the element's field name size
         // accounts for a null terminator whereas the stringified position does not.
-        *sizeToBeAdded += elem.size() - elem.fieldNameSize() + numMeasurementsFieldLength + 1;
+        sizeToBeAdded += elem.size() - elem.fieldNameSize() + numMeasurementsFieldLength + 1;
     }
 }
 
-bool Bucket::_hasBeenCommitted() const {
-    return _numCommittedMeasurements != 0 || _preparedBatch;
-}
-
-std::shared_ptr<WriteBatch> Bucket::_activeBatch(OperationId opId,
-                                                 ExecutionStatsController& stats) {
-    auto it = _batches.find(opId);
-    if (it == _batches.end()) {
-        it = _batches
-                 .try_emplace(
-                     opId,
-                     std::make_shared<WriteBatch>(BucketHandle{_bucketId, _stripe}, opId, stats))
+std::shared_ptr<WriteBatch> activeBatch(Bucket& bucket,
+                                        OperationId opId,
+                                        std::uint8_t stripe,
+                                        ExecutionStatsController& stats) {
+    auto it = bucket.batches.find(opId);
+    if (it == bucket.batches.end()) {
+        it = bucket.batches
+                 .try_emplace(opId,
+                              std::make_shared<WriteBatch>(
+                                  BucketHandle{bucket.bucketId, stripe}, opId, stats))
                  .first;
     }
     return it->second;

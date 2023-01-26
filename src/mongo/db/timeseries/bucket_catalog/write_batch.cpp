@@ -35,138 +35,33 @@
 
 namespace mongo::timeseries::bucket_catalog {
 
-WriteBatch::WriteBatch(const BucketHandle& bucket,
-                       OperationId opId,
-                       ExecutionStatsController& stats)
-    : _bucket{bucket}, _opId(opId), _stats(stats) {}
-
-bool WriteBatch::claimCommitRights() {
-    return !_commitRights.swap(true);
-}
-
-StatusWith<CommitInfo> WriteBatch::getResult() {
-    if (!_promise.getFuture().isReady()) {
-        _stats.incNumWaits();
-    }
-    return _promise.getFuture().getNoThrow();
-}
-
-const BucketHandle& WriteBatch::bucket() const {
-    return _bucket;
-}
-
-const WriteBatch::BatchMeasurements& WriteBatch::measurements() const {
-    return _measurements;
-}
-
-const BSONObj& WriteBatch::min() const {
-    return _min;
-}
-
-const BSONObj& WriteBatch::max() const {
-    return _max;
-}
-
-const StringMap<std::size_t>& WriteBatch::newFieldNamesToBeInserted() const {
-    return _newFieldNamesToBeInserted;
-}
-
-uint32_t WriteBatch::numPreviouslyCommittedMeasurements() const {
-    return _numPreviouslyCommittedMeasurements;
-}
-
-bool WriteBatch::needToDecompressBucketBeforeInserting() const {
-    return _decompressed.has_value();
-}
-
-const DecompressionResult& WriteBatch::decompressed() const {
-    invariant(_decompressed.has_value());
-    return _decompressed.value();
-}
-
-bool WriteBatch::finished() const {
-    return _promise.getFuture().isReady();
-}
+WriteBatch::WriteBatch(const BucketHandle& b, OperationId o, ExecutionStatsController& s)
+    : bucketHandle{b}, opId(o), stats(s) {}
 
 BSONObj WriteBatch::toBSON() const {
     auto toFieldName = [](const auto& nameHashPair) { return nameHashPair.first; };
-    return BSON("docs" << std::vector<BSONObj>(_measurements.begin(), _measurements.end())
-                       << "bucketMin" << _min << "bucketMax" << _max << "numCommittedMeasurements"
-                       << int(_numPreviouslyCommittedMeasurements) << "newFieldNamesToBeInserted"
-                       << std::set<std::string>(
-                              boost::make_transform_iterator(_newFieldNamesToBeInserted.begin(),
-                                                             toFieldName),
-                              boost::make_transform_iterator(_newFieldNamesToBeInserted.end(),
-                                                             toFieldName)));
+    return BSON("docs" << std::vector<BSONObj>(measurements.begin(), measurements.end())
+                       << "bucketMin" << min << "bucketMax" << max << "numCommittedMeasurements"
+                       << int(numPreviouslyCommittedMeasurements) << "newFieldNamesToBeInserted"
+                       << std::set<std::string>(boost::make_transform_iterator(
+                                                    newFieldNamesToBeInserted.begin(), toFieldName),
+                                                boost::make_transform_iterator(
+                                                    newFieldNamesToBeInserted.end(), toFieldName)));
 }
 
-void WriteBatch::_addMeasurement(const BSONObj& doc) {
-    _measurements.push_back(doc);
+bool claimWriteBatchCommitRights(WriteBatch& batch) {
+    return !batch.commitRights.swap(true);
 }
 
-void WriteBatch::_recordNewFields(Bucket* bucket, NewFieldNames&& fields) {
-    for (auto&& field : fields) {
-        _newFieldNamesToBeInserted[field] = field.hash();
-        bucket->_uncommittedFieldNames.emplace(field);
+StatusWith<CommitInfo> getWriteBatchResult(WriteBatch& batch) {
+    if (!batch.promise.getFuture().isReady()) {
+        batch.stats.incNumWaits();
     }
+    return batch.promise.getFuture().getNoThrow();
 }
 
-void WriteBatch::_prepareCommit(Bucket* bucket) {
-    invariant(_commitRights.load());
-    _numPreviouslyCommittedMeasurements = bucket->_numCommittedMeasurements;
-
-    // Filter out field names that were new at the time of insertion, but have since been committed
-    // by someone else.
-    for (auto it = _newFieldNamesToBeInserted.begin(); it != _newFieldNamesToBeInserted.end();) {
-        StringMapHashedKey fieldName(it->first, it->second);
-        bucket->_uncommittedFieldNames.erase(fieldName);
-        if (bucket->_fieldNames.contains(fieldName)) {
-            _newFieldNamesToBeInserted.erase(it++);
-            continue;
-        }
-
-        bucket->_fieldNames.emplace(fieldName);
-        ++it;
-    }
-
-    for (const auto& doc : _measurements) {
-        bucket->_minmax.update(
-            doc, bucket->_metadata.getMetaField(), bucket->_metadata.getComparator());
-    }
-
-    const bool isUpdate = _numPreviouslyCommittedMeasurements > 0;
-    if (isUpdate) {
-        _min = bucket->_minmax.minUpdates();
-        _max = bucket->_minmax.maxUpdates();
-    } else {
-        _min = bucket->_minmax.min();
-        _max = bucket->_minmax.max();
-
-        // Approximate minmax memory usage by taking sizes of initial commit. Subsequent updates may
-        // add fields but are most likely just to update values.
-        bucket->_memoryUsage += _min.objsize();
-        bucket->_memoryUsage += _max.objsize();
-    }
-
-    if (bucket->_decompressed.has_value()) {
-        _decompressed = std::move(bucket->_decompressed);
-        bucket->_decompressed.reset();
-        bucket->_memoryUsage -=
-            (_decompressed.value().before.objsize() + _decompressed.value().after.objsize());
-    }
-}
-
-void WriteBatch::_finish(const CommitInfo& info) {
-    invariant(_commitRights.load());
-    _promise.emplaceValue(info);
-}
-
-void WriteBatch::_abort(const Status& status) {
-    if (finished()) {
-        return;
-    }
-
-    _promise.setError(status);
+bool isWriteBatchFinished(const WriteBatch& batch) {
+    return batch.promise.getFuture().isReady();
 }
 
 }  // namespace mongo::timeseries::bucket_catalog

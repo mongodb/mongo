@@ -59,12 +59,7 @@ namespace mongo::timeseries::bucket_catalog {
 
 class BucketCatalog {
 protected:
-    // Number of new field names we can hold in NewFieldNames without needing to allocate memory.
-    static constexpr std::size_t kNumStaticNewFields = 10;
-    using NewFieldNames = boost::container::small_vector<StringMapHashedKey, kNumStaticNewFields>;
-
     using StripeNumber = std::uint8_t;
-
     using ShouldClearFn = std::function<bool(const NamespaceString&)>;
 
 public:
@@ -404,12 +399,12 @@ protected:
         OperationContext* opCtx,
         Stripe* stripe,
         WithLock stripeLock,
+        StripeNumber stripeNumber,
         const BSONObj& doc,
         CombineWithInsertsFromOtherClients combine,
         AllowBucketCreation mode,
         CreationInfo* info,
-        Bucket* bucket,
-        ClosedBuckets* closedBuckets);
+        Bucket* bucket);
 
     /**
      * Wait for other batches to finish so we can prepare 'batch'
@@ -518,8 +513,8 @@ protected:
         const BSONObj& doc,
         CreationInfo* info,
         Bucket* bucket,
-        NewFieldNames* newFieldNamesToBeInserted,
-        int32_t* sizeToBeAdded,
+        Bucket::NewFieldNames& newFieldNamesToBeInserted,
+        int32_t& sizeToBeAdded,
         AllowBucketCreation mode);
 
     /**

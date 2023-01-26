@@ -29,6 +29,8 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_manager.h"
 
+#include "mongo/db/timeseries/bucket_catalog/bucket.h"
+
 namespace mongo::timeseries::bucket_catalog {
 
 BucketStateManager::BucketStateManager(Mutex* m) : _mutex(m), _era(0) {}
@@ -89,16 +91,16 @@ void BucketStateManager::_incrementEraCountHelper(uint64_t era) {
 }
 
 bool BucketStateManager::_isMemberOfClearedSet(WithLock catalogLock, Bucket* bucket) {
-    for (auto it = _clearRegistry.lower_bound(bucket->getEra() + 1); it != _clearRegistry.end();
+    for (auto it = _clearRegistry.lower_bound(bucket->lastChecked + 1); it != _clearRegistry.end();
          ++it) {
-        if (it->second(bucket->ns())) {
+        if (it->second(bucket->bucketId.ns)) {
             return true;
         }
     }
-    if (bucket->getEra() != _era) {
-        _decrementEraCountHelper(bucket->getEra());
+    if (bucket->lastChecked != _era) {
+        _decrementEraCountHelper(bucket->lastChecked);
         _incrementEraCountHelper(_era);
-        bucket->setEra(_era);
+        bucket->lastChecked = _era;
     }
 
     return false;
@@ -121,9 +123,9 @@ boost::optional<BucketState> BucketStateManager::getBucketState(Bucket* bucket) 
     stdx::lock_guard catalogLock{*_mutex};
     // If the bucket has been cleared, we will set the bucket state accordingly to reflect that.
     if (_isMemberOfClearedSet(catalogLock, bucket)) {
-        return _markIndividualBucketCleared(catalogLock, bucket->bucketId());
+        return _markIndividualBucketCleared(catalogLock, bucket->bucketId);
     }
-    auto it = _bucketStates.find(bucket->bucketId());
+    auto it = _bucketStates.find(bucket->bucketId);
     return it != _bucketStates.end() ? boost::make_optional(it->second) : boost::none;
 }
 
@@ -137,10 +139,10 @@ boost::optional<BucketState> BucketStateManager::changeBucketState(Bucket* bucke
                                                                    const StateChangeFn& change) {
     stdx::lock_guard catalogLock{*_mutex};
     if (_isMemberOfClearedSet(catalogLock, bucket)) {
-        return _markIndividualBucketCleared(catalogLock, bucket->bucketId());
+        return _markIndividualBucketCleared(catalogLock, bucket->bucketId);
     }
 
-    return _changeBucketStateHelper(catalogLock, bucket->bucketId(), change);
+    return _changeBucketStateHelper(catalogLock, bucket->bucketId, change);
 }
 
 boost::optional<BucketState> BucketStateManager::changeBucketState(const BucketId& bucketId,

@@ -35,6 +35,7 @@
 #include "mongo/db/operation_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_state_manager.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
@@ -45,189 +46,130 @@
 
 namespace mongo::timeseries::bucket_catalog {
 
-class BucketStateManager;
-
 /**
  * The in-memory representation of a time-series bucket document. Maintains all the information
  * needed to add additional measurements, but does not generally store the full contents of the
  * document that have already been committed to disk.
  */
-class Bucket {
-    using StripeNumber = std::uint8_t;
+struct Bucket {
+private:
+    // Number of new field names we can hold in NewFieldNames without needing to allocate memory.
+    static constexpr std::size_t kNumStaticNewFields = 10;
 
 public:
-    friend class BucketCatalog;
-    friend class WriteBatch;
+    using NewFieldNames = boost::container::small_vector<StringMapHashedKey, kNumStaticNewFields>;
 
     Bucket(const BucketId& bucketId,
-           StripeNumber stripe,
-           BucketKey::Hash keyHash,
-           BucketStateManager* bucketStateManager);
+           const BucketKey& bucketKey,
+           StringData timeField,
+           Date_t minTime,
+           BucketStateManager& bucketStateManager);
 
     ~Bucket();
 
-    uint64_t getEra() const;
-
-    void setEra(uint64_t era);
-
-    /**
-     * Returns the BucketId for the bucket.
-     */
-
-    const BucketId& bucketId() const;
-
-    /**
-     * Returns the OID for the underlying bucket.
-     */
-    const OID& oid() const;
-
-    /**
-     * Returns the namespace for the underlying bucket.
-     */
-    const NamespaceString& ns() const;
-
-    /**
-     * Returns the number of the stripe that owns the bucket.
-     */
-    StripeNumber stripe() const;
-
-    /**
-     * Returns the pre-computed hash of the corresponding BucketKey.
-     */
-    BucketKey::Hash keyHash() const;
-
-    /**
-     * Returns the time associated with the bucket (id).
-     */
-    Date_t getTime() const;
-
-    /**
-     * Returns the timefield for the underlying bucket.
-     */
-    StringData getTimeField();
-
-    /**
-     * Returns whether all measurements have been committed.
-     */
-    bool allCommitted() const;
-
-    /**
-     * Returns total number of measurements in the bucket.
-     */
-    uint32_t numMeasurements() const;
-
-    /**
-     * Sets the rollover action, to determine what to do with a bucket when all measurements
-     * have been committed.
-     */
-    void setRolloverAction(RolloverAction action);
-
-    /**
-     * Determines if the schema for an incoming measurement is incompatible with those already
-     * stored in the bucket.
-     *
-     * Returns true if incompatible
-     */
-    bool schemaIncompatible(const BSONObj& input,
-                            boost::optional<StringData> metaField,
-                            const StringData::ComparatorInterface* comparator);
-
-private:
-    /**
-     * Determines the effect of adding 'doc' to this bucket. If adding 'doc' causes this bucket
-     * to overflow, we will create a new bucket and recalculate the change to the bucket size
-     * and data fields.
-     */
-    void _calculateBucketFieldsAndSizeChange(const BSONObj& doc,
-                                             boost::optional<StringData> metaField,
-                                             NewFieldNames* newFieldNamesToBeInserted,
-                                             int32_t* sizeToBeAdded) const;
-
-    /**
-     * Returns whether BucketCatalog::commit has been called at least once on this bucket.
-     */
-    bool _hasBeenCommitted() const;
-
-    /**
-     * Return a pointer to the current, open batch.
-     */
-    std::shared_ptr<WriteBatch> _activeBatch(OperationId opId, ExecutionStatsController& stats);
-
-protected:
-    // The era number of the last log operation the bucket has caught up to
-    uint64_t _lastCheckedEra;
-
-    BucketStateManager* _bucketStateManager;
-
-private:
     // The bucket ID for the underlying document
-    const BucketId _bucketId;
+    const BucketId bucketId;
 
-    // The stripe which owns this bucket.
-    const StripeNumber _stripe;
-
-    // The pre-computed hash of the associated BucketKey
-    const BucketKey::Hash _keyHash;
-
-    // The metadata of the data that this bucket contains.
-    BucketMetadata _metadata;
-
-    // Top-level hashed field names of the measurements that have been inserted into the bucket.
-    StringSet _fieldNames;
-
-    // Top-level hashed new field names that have not yet been committed into the bucket.
-    StringSet _uncommittedFieldNames;
+    // The key (i.e. (namespace, metadata)) for this bucket.
+    const BucketKey key;
 
     // Time field for the measurements that have been inserted into the bucket.
-    std::string _timeField;
+    const std::string timeField;
 
     // Minimum timestamp over contained measurements
-    Date_t _minTime;
+    const Date_t minTime;
+
+    // A reference so we can clean up some linked state from the destructor.
+    BucketStateManager& bucketStateManager;
+
+    // The last era in which this bucket checked whether it was cleared.
+    BucketStateManager::Era lastChecked;
+
+    // Top-level hashed field names of the measurements that have been inserted into the bucket.
+    StringSet fieldNames;
+
+    // Top-level hashed new field names that have not yet been committed into the bucket.
+    StringSet uncommittedFieldNames;
 
     // The minimum and maximum values for each field in the bucket.
-    MinMax _minmax;
+    MinMax minmax;
 
     // The reference schema for measurements in this bucket. May reflect schema of uncommitted
     // measurements.
-    Schema _schema;
+    Schema schema;
 
     // The total size in bytes of the bucket's BSON serialization, including measurements to be
     // inserted.
-    int32_t _size = 0;
+    int32_t size = 0;
 
     // The total number of measurements in the bucket, including uncommitted measurements and
     // measurements to be inserted.
-    uint32_t _numMeasurements = 0;
+    uint32_t numMeasurements = 0;
 
     // The number of committed measurements in the bucket.
-    uint32_t _numCommittedMeasurements = 0;
+    uint32_t numCommittedMeasurements = 0;
 
     // Whether the bucket has been marked for a rollover action. It can be marked for closure
     // due to number of measurements, size, or schema changes, or it can be marked for archival
     // due to time range.
-    RolloverAction _rolloverAction = RolloverAction::kNone;
+    RolloverAction rolloverAction = RolloverAction::kNone;
 
     // Whether this bucket was kept open after exceeding the bucket max size to improve
     // bucketing performance for large measurements.
-    bool _keptOpenDueToLargeMeasurements = false;
+    bool keptOpenDueToLargeMeasurements = false;
 
     // The batch that has been prepared and is currently in the process of being committed, if
     // any.
-    std::shared_ptr<WriteBatch> _preparedBatch;
+    std::shared_ptr<WriteBatch> preparedBatch;
 
     // Batches, per operation, that haven't been committed or aborted yet.
-    stdx::unordered_map<OperationId, std::shared_ptr<WriteBatch>> _batches;
+    stdx::unordered_map<OperationId, std::shared_ptr<WriteBatch>> batches;
 
     // If the bucket is in idleBuckets, then its position is recorded here.
     using IdleList = std::list<Bucket*>;
-    boost::optional<IdleList::iterator> _idleListEntry = boost::none;
+    boost::optional<IdleList::iterator> idleListEntry = boost::none;
 
     // Approximate memory usage of this bucket.
-    uint64_t _memoryUsage = sizeof(*this);
+    uint64_t memoryUsage = sizeof(*this);
 
     // If set, bucket is compressed on disk, and first prepared batch will need to decompress it
     // before updating.
-    boost::optional<DecompressionResult> _decompressed;
+    boost::optional<DecompressionResult> decompressed;
 };
+
+/**
+ * Returns whether all measurements have been committed.
+ */
+bool allCommitted(const Bucket&);
+
+/**
+ * Determines if the schema for an incoming measurement is incompatible with those already
+ * stored in the bucket.
+ *
+ * Returns true if incompatible
+ */
+bool schemaIncompatible(Bucket& bucket,
+                        const BSONObj& input,
+                        boost::optional<StringData> metaField,
+                        const StringData::ComparatorInterface* comparator);
+
+/**
+ * Determines the effect of adding 'doc' to this bucket. If adding 'doc' causes this bucket
+ * to overflow, we will create a new bucket and recalculate the change to the bucket size
+ * and data fields.
+ */
+void calculateBucketFieldsAndSizeChange(const Bucket& bucket,
+                                        const BSONObj& doc,
+                                        boost::optional<StringData> metaField,
+                                        Bucket::NewFieldNames& newFieldNamesToBeInserted,
+                                        int32_t& sizeToBeAdded);
+
+/**
+ * Return a pointer to the current, open batch for the operation. Opens a new batch if none exists.
+ */
+std::shared_ptr<WriteBatch> activeBatch(Bucket& bucket,
+                                        OperationId opId,
+                                        std::uint8_t stripe,
+                                        ExecutionStatsController& stats);
 
 }  // namespace mongo::timeseries::bucket_catalog

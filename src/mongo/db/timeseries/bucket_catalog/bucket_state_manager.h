@@ -31,12 +31,13 @@
 
 #include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo::timeseries::bucket_catalog {
+
+struct Bucket;
 
 /**
  * A helper class to maintain global state about the catalog era used to support asynchronous
@@ -44,16 +45,17 @@ namespace mongo::timeseries::bucket_catalog {
  */
 class BucketStateManager {
 public:
+    using Era = std::uint64_t;
     using ShouldClearFn = std::function<bool(const NamespaceString&)>;
     using StateChangeFn =
-        std::function<boost::optional<BucketState>(boost::optional<BucketState>, std::uint64_t)>;
+        std::function<boost::optional<BucketState>(boost::optional<BucketState>, Era)>;
 
     explicit BucketStateManager(Mutex* m);
 
-    uint64_t getEra();
-    uint64_t getEraAndIncrementCount();
-    void decrementCountForEra(uint64_t value);
-    uint64_t getCountForEra(uint64_t value);
+    Era getEra();
+    Era getEraAndIncrementCount();
+    void decrementCountForEra(Era value);
+    Era getCountForEra(Era value);
 
     /**
      * Asynchronously clears all buckets belonging to namespaces satisfying the 'shouldClear'
@@ -107,8 +109,8 @@ public:
     void appendStats(BSONObjBuilder* builder) const;
 
 protected:
-    void _decrementEraCountHelper(uint64_t era);
-    void _incrementEraCountHelper(uint64_t era);
+    void _decrementEraCountHelper(Era era);
+    void _incrementEraCountHelper(Era era);
     boost::optional<BucketState> _changeBucketStateHelper(WithLock withLock,
                                                           const BucketId& bucketId,
                                                           const StateChangeFn& change);
@@ -137,17 +139,17 @@ protected:
 
     // Global number tracking the current number of eras that have passed. Incremented each time
     // a bucket is cleared.
-    uint64_t _era;
+    Era _era;
 
     // Mapping of era to counts of how many buckets are associated with that era.
-    std::map<uint64_t, uint64_t> _countMap;
+    std::map<Era, uint64_t> _countMap;
 
     // Bucket state for synchronization with direct writes
     stdx::unordered_map<BucketId, BucketState, BucketHasher> _bucketStates;
 
     // Registry storing clear operations. Maps from era to a lambda function which takes in
     // information about a Bucket and returns whether the Bucket has been cleared.
-    std::map<uint64_t, ShouldClearFn> _clearRegistry;
+    std::map<Era, ShouldClearFn> _clearRegistry;
 };
 
 }  // namespace mongo::timeseries::bucket_catalog
