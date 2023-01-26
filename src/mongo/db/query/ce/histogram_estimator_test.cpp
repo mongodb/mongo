@@ -291,8 +291,9 @@ TEST_F(CEHistogramTest, AssertSmallHistogramEstimatesComplexPredicates) {
     ASSERT_MATCH_CE(t, "{a: {$lt: 3}, a: {$gte: 1}, b: {$lt: 100}, b: {$gt: 30}}", 5.66);
 
     // Test conjunctions over multiple fields for which we may not have histograms. This falls back
-    // to heuristic estimation.
-    ASSERT_MATCH_CE(t, "{a: {$eq: 2}, c: {$eq: 1}}", 1.73205);
+    // to heuristic estimation for the non-histogrammable predicates, and fully fallsback to
+    // heuristics if no predicates have a histogram.
+    ASSERT_MATCH_CE(t, "{a: {$eq: 2}, c: {$eq: 1}}", 2.23607);
     ASSERT_MATCH_CE(t, "{c: {$eq: 2}, d: {$eq: 22}}", 1.73205);
 }
 
@@ -1213,30 +1214,47 @@ TEST_F(CEHistogramTest, TestNestedArrayTypeCounterPredicates) {
 
 TEST_F(CEHistogramTest, TestFallbackForNonConstIntervals) {
     // This is a sanity test to validate fallback for an interval with non-const bounds.
+    const auto ah = ArrayHistogram::make();
 
     // Validate we pick a histogram when we can.
     {
         IntervalRequirement interval{BoundRequirement(true /*inclusive*/, Constant::int32(1)),
                                      BoundRequirement(true /*inclusive*/, Constant::int32(2))};
-        const auto [mode, low, high] = analyzeIntervalEstimationMode(interval);
-        ASSERT_EQ(mode, kUseHistogram);
-        ASSERT(low && high);
+        {
+            const auto [mode, low, high] = analyzeIntervalEstimationMode(ah.get(), interval);
+            ASSERT_EQ(mode, kUseHistogram);
+            ASSERT(low && high);
+        }
+
+        // Validate that we fallback to heuristic estimation when we have no histogram.
+        {
+            const auto [mode, low, high] = analyzeIntervalEstimationMode(nullptr, interval);
+            ASSERT_EQ(mode, kFallback);
+            ASSERT(!low && !high);
+        }
     }
 
     // Validate that we use type counts for non-histogrammable types.
     {
         IntervalRequirement interval{BoundRequirement(true /*inclusive*/, Constant::boolean(true)),
                                      BoundRequirement(true /*inclusive*/, Constant::boolean(true))};
-        const auto [mode, low, high] = analyzeIntervalEstimationMode(interval);
+        const auto [mode, low, high] = analyzeIntervalEstimationMode(ah.get(), interval);
         ASSERT_EQ(mode, kUseTypeCounts);
         ASSERT(low && !high);
+
+        // Validate that we fallback to heuristic estimation when we have no histogram.
+        {
+            const auto [mode, low, high] = analyzeIntervalEstimationMode(nullptr, interval);
+            ASSERT_EQ(mode, kFallback);
+            ASSERT(!low && !high);
+        }
     }
 
     // Validate cases where we have non-const bounds.
     {
         IntervalRequirement interval{BoundRequirement(true /*inclusive*/, make<Variable>("v1")),
                                      BoundRequirement::makePlusInf()};
-        const auto [mode, low, high] = analyzeIntervalEstimationMode(interval);
+        const auto [mode, low, high] = analyzeIntervalEstimationMode(ah.get(), interval);
         ASSERT_EQ(mode, kFallback);
         ASSERT(!low && !high);
     }
@@ -1244,7 +1262,7 @@ TEST_F(CEHistogramTest, TestFallbackForNonConstIntervals) {
     {
         IntervalRequirement interval{BoundRequirement::makeMinusInf(),
                                      BoundRequirement(true /*inclusive*/, make<Variable>("v2"))};
-        const auto [mode, low, high] = analyzeIntervalEstimationMode(interval);
+        const auto [mode, low, high] = analyzeIntervalEstimationMode(ah.get(), interval);
         ASSERT_EQ(mode, kFallback);
         ASSERT(!low && !high);
     }
@@ -1252,7 +1270,7 @@ TEST_F(CEHistogramTest, TestFallbackForNonConstIntervals) {
     {
         IntervalRequirement interval{BoundRequirement(true /*inclusive*/, make<Variable>("v3")),
                                      BoundRequirement(true /*inclusive*/, make<Variable>("v3"))};
-        const auto [mode, low, high] = analyzeIntervalEstimationMode(interval);
+        const auto [mode, low, high] = analyzeIntervalEstimationMode(ah.get(), interval);
         ASSERT_EQ(mode, kFallback);
         ASSERT(!low && !high);
     }
@@ -1318,7 +1336,7 @@ TEST_F(CEHistogramTest, TestHistogramNeq) {
     ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$ne: 'charB'}}]}", neNeCE);
     ASSERT_MATCH_CE(t, "{$and: [{a: {$eq: 7}}, {noHist: {$ne: 'charB'}}]}", neEqCE);
     neEqCE = {2.35739};
-    eqEqCE = {2.11474};
+    eqEqCE = {0.945742};
     ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$eq: 'charB'}}]}", neEqCE);
     ASSERT_MATCH_CE(t, "{$and: [{a: {$eq: 7}}, {noHist: {$eq: 'charB'}}]}", eqEqCE);
 }

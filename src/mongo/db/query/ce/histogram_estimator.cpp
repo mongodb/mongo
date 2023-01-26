@@ -130,6 +130,59 @@ SelectivityType estimateIntervalByTypeSel(const stats::ArrayHistogram& ah,
 }
 
 /**
+ * Estimates the selectivity of a given 'interval' according to one of the possible estimation
+ * modes. Note that if 'histogram' is null or if the 'interval' is incompatible with histogram
+ * estimation, we fall back to heuristic estimation.
+ */
+SelectivityType estimateInterval(const stats::ArrayHistogram* histogram,
+                                 const IntervalRequirement& interval,
+                                 bool includeScalar,
+                                 CEType childResult) {
+    if (interval.isFullyOpen()) {
+        // No need to estimate, as we're just going to return all inputs.
+        return {1.0};
+    } else {
+        // Determine how this interval will be estimated.
+        const auto [mode, lowBound, highBound] = analyzeIntervalEstimationMode(histogram, interval);
+        switch (mode) {
+            case IntervalEstimationMode::kUseHistogram: {
+                const auto [lowTag, lowVal] = *getBound(lowBound->get());
+
+                if (interval.isEquality()) {
+                    return estimateSelEq(*histogram, lowTag, lowVal, includeScalar);
+                }
+
+                // This is a range predicate.
+                const auto [highTag, highVal] = *getBound(highBound->get());
+                return estimateSelRange(*histogram,
+                                        lowBound->get().isInclusive(),
+                                        lowTag,
+                                        lowVal,
+                                        highBound->get().isInclusive(),
+                                        highTag,
+                                        highVal,
+                                        includeScalar);
+            }
+            case IntervalEstimationMode::kUseTypeCounts: {
+                const auto bound = lowBound ? *lowBound : *highBound;
+                return estimateIntervalByTypeSel(
+                    *histogram, interval, bound, childResult, includeScalar);
+            }
+            case IntervalEstimationMode::kFallback: {
+                // Fall back to heuristic estimation for this interval.
+                // TODO SERVER-67498: We want to use a per-interval fallback which depends on
+                // _fallbackCE, rather than an explicit call to heuristic estimation here, in order
+                // to parametrize the fallback logic and allow it to be set at the time when the
+                // estimator is constructed. For now, we use this because we need more refactoring
+                // to enable this behavior.
+                return heuristicIntervalSel(interval, childResult);
+            }
+            default: { MONGO_UNREACHABLE; }
+        }
+    }
+}
+
+/**
  * This transport combines chains of PathGets and PathTraverses into an MQL-like string path.
  */
 class PathDescribeTransport {
@@ -164,7 +217,12 @@ std::string serializePath(const ABT& path) {
 
 }  // namespace
 
-IntervalEstimation analyzeIntervalEstimationMode(const IntervalRequirement& interval) {
+IntervalEstimation analyzeIntervalEstimationMode(const stats::ArrayHistogram* histogram,
+                                                 const IntervalRequirement& interval) {
+    if (!histogram) {
+        return {kFallback, boost::none, boost::none};
+    }
+
     const auto& lowBound = interval.getLowBound();
     const auto lowTag = getBoundReqTypeTag(lowBound);
     if (!lowTag) {
@@ -225,8 +283,12 @@ public:
      */
     struct SargableConjunct {
         bool includeScalar;
-        const stats::ArrayHistogram& histogram;
+        const stats::ArrayHistogram* histogram;
         std::vector<std::reference_wrapper<const IntervalReqExpr::Node>> intervals;
+
+        bool isPathArr() const {
+            return histogram && !includeScalar && intervals.empty();
+        }
     };
 
     CEType transport(const ABT& n,
@@ -241,12 +303,6 @@ public:
         if (childResult == 0.0) {
             return {0.0};
         }
-
-        const auto useFallbackEstimator = [&](const std::string& serializedPath) {
-            OPTIMIZER_DEBUG_LOG(
-                7151300, 5, "Falling back to heuristic CE", "path"_attr = serializedPath);
-            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
-        };
 
         // Initial first pass through the requirements map to extract information about each path.
         std::map<std::string, SargableConjunct> conjunctRequirements;
@@ -277,19 +333,12 @@ public:
                 continue;
             }
 
-            // Fallback if there is no histogram.
-            auto histogram = _stats->getHistogram(serializedPath);
-            if (!histogram) {
-                // For now, because of the structure of SargableNode and the implementation of
-                // the fallback (currently HeuristicCE), we can't combine heuristic & histogram
-                // estimates. In this case, default to Heuristic if we don't have a histogram for
-                // any of the predicates.
-                return useFallbackEstimator(serializedPath);
-            }
+            // Get histogram from statistics if it exists, or null if not.
+            const auto* histogram = _stats->getHistogram(serializedPath);
 
             // Add this path to the map. If this is not a 'PathArr' interval, add it to the vector
             // of intervals we will be estimating.
-            SargableConjunct sc{!isPathArrInterval, *histogram, {}};
+            SargableConjunct sc{!isPathArrInterval, histogram, {}};
             if (sc.includeScalar) {
                 sc.intervals.push_back(interval);
             }
@@ -298,13 +347,10 @@ public:
 
         std::vector<SelectivityType> topLevelSelectivities;
         for (const auto& [serializedPath, conjunctReq] : conjunctRequirements) {
-            const auto& histogram = conjunctReq.histogram;
-
-            if (conjunctReq.intervals.empty() && !conjunctReq.includeScalar) {
-                // In this case there is a single 'PathArr' interval for this field.
-                // The selectivity of this interval is: (count of all arrays) / sampleCard
-                const auto pathArrSel = getSelectivity(histogram, {histogram.getArrayCount()});
-                topLevelSelectivities.push_back(pathArrSel);
+            if (conjunctReq.isPathArr()) {
+                // If there is a single 'PathArr' interval for this field, we should estimate this
+                // as the selectivity of array values.
+                topLevelSelectivities.push_back(getArraySelectivity(*conjunctReq.histogram));
             }
 
             // Intervals are in DNF.
@@ -318,63 +364,17 @@ public:
                     std::vector<SelectivityType> conjSelectivities;
                     for (const auto& conjunct : conjuncts) {
                         const auto& interval = conjunct.cast<IntervalReqExpr::Atom>()->getExpr();
-
-                        SelectivityType selectivity;
-                        if (interval.isFullyOpen()) {
-                            // No need to estimate, as we're just going to return all inputs.
-                            selectivity = {1.0};
-                        } else {
-                            // Determine how this interval will be estimated.
-                            const auto [mode, lowBound, highBound] =
-                                analyzeIntervalEstimationMode(interval);
-                            switch (mode) {
-                                case IntervalEstimationMode::kUseHistogram: {
-                                    const auto [lowTag, lowVal] = *getBound(lowBound->get());
-                                    if (interval.isEquality()) {
-                                        selectivity = estimateSelEq(
-                                            histogram, lowTag, lowVal, conjunctReq.includeScalar);
-                                    } else {
-                                        const auto [highTag, highVal] = *getBound(highBound->get());
-                                        selectivity =
-                                            estimateSelRange(histogram,
-                                                             lowBound->get().isInclusive(),
-                                                             lowTag,
-                                                             lowVal,
-                                                             highBound->get().isInclusive(),
-                                                             highTag,
-                                                             highVal,
-                                                             conjunctReq.includeScalar);
-                                    }
-                                    break;
-                                }
-                                case IntervalEstimationMode::kUseTypeCounts: {
-                                    const auto bound = lowBound ? *lowBound : *highBound;
-                                    selectivity =
-                                        estimateIntervalByTypeSel(histogram,
+                        const auto selectivity = estimateInterval(conjunctReq.histogram,
                                                                   interval,
-                                                                  bound,
-                                                                  childResult,
-                                                                  conjunctReq.includeScalar);
-                                    break;
-                                }
-                                case IntervalEstimationMode::kFallback: {
-                                    return useFallbackEstimator(serializedPath);
-                                }
-                                default: { MONGO_UNREACHABLE; }
-                            }
-                        }
-
+                                                                  conjunctReq.includeScalar,
+                                                                  childResult);
                         OPTIMIZER_DEBUG_LOG(7151301,
                                             5,
-                                            "Estimated path and interval using histograms.",
+                                            "Estimated path and interval as:",
                                             "path"_attr = serializedPath,
                                             "interval"_attr =
                                                 ExplainGenerator::explainInterval(interval),
                                             "selectivity"_attr = selectivity._value);
-
-                        // We have to convert the cardinality to a selectivity. The histogram
-                        // returns the cardinality for the entire collection; however, fewer records
-                        // may be expected at the SargableNode.
                         conjSelectivities.push_back(selectivity);
                     }
 

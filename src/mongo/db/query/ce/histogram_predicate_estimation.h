@@ -54,8 +54,15 @@ struct EstimationResult {
     }
 };
 
-// Converts an input cardinality to a selectivity based on the histogram's sample size.
+/**
+ * Converts an input cardinality to a selectivity based on the histogram's sample size.
+ */
 SelectivityType getSelectivity(const stats::ArrayHistogram& ah, CEType cardinality);
+
+/**
+ * Returns the selectivity of arrays according to this histogram.
+ */
+SelectivityType getArraySelectivity(const stats::ArrayHistogram& ah);
 
 /**
  * Returns cumulative total statistics for a histogram.

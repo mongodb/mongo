@@ -1,0 +1,3659 @@
+[
+	{
+		"_id" : 0,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Elizabeth Smith",
+		"date" : ISODate("1950-01-01T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 1,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "William Green",
+		"date" : ISODate("1951-02-02T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 2,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "John Parker",
+		"date" : ISODate("1952-03-03T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 3,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Jane Bennet",
+		"date" : ISODate("1953-04-04T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 4,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Kate Knight",
+		"date" : ISODate("1954-05-05T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 5,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tom Darcy",
+		"date" : ISODate("1955-06-06T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 6,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tim Watson",
+		"date" : ISODate("1956-07-07T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 7,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Bob Holmes",
+		"date" : ISODate("1957-08-08T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 8,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Alice Smith",
+		"date" : ISODate("1958-09-09T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 9,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Elizabeth Green",
+		"date" : ISODate("1959-10-10T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 10,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "William Parker",
+		"date" : ISODate("1960-11-11T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 11,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "John Bennet",
+		"date" : ISODate("1961-12-12T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 12,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Jane Knight",
+		"date" : ISODate("1962-01-13T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 13,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Kate Darcy",
+		"date" : ISODate("1963-02-14T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 14,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tom Watson",
+		"date" : ISODate("1964-03-15T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 15,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tim Holmes",
+		"date" : ISODate("1965-04-16T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 16,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Bob Smith",
+		"date" : ISODate("1966-05-17T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 17,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Alice Green",
+		"date" : ISODate("1967-06-18T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 18,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Elizabeth Parker",
+		"date" : ISODate("1968-07-19T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 19,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "William Bennet",
+		"date" : ISODate("1969-08-20T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 20,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "John Knight",
+		"date" : ISODate("1970-09-21T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 21,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Jane Darcy",
+		"date" : ISODate("1971-10-22T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 22,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Kate Watson",
+		"date" : ISODate("1972-11-23T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 23,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tom Holmes",
+		"date" : ISODate("1973-12-24T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 24,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tim Smith",
+		"date" : ISODate("1974-01-25T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 25,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Bob Green",
+		"date" : ISODate("1975-02-26T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 26,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Alice Parker",
+		"date" : ISODate("1976-03-27T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 27,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Elizabeth Bennet",
+		"date" : ISODate("1977-04-28T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 28,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "William Knight",
+		"date" : ISODate("1978-05-01T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 29,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "John Darcy",
+		"date" : ISODate("1979-06-02T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 30,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Jane Watson",
+		"date" : ISODate("1980-07-03T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 31,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Kate Holmes",
+		"date" : ISODate("1981-08-04T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 32,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tom Smith",
+		"date" : ISODate("1982-09-05T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 33,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tim Green",
+		"date" : ISODate("1983-10-06T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 34,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Bob Parker",
+		"date" : ISODate("1984-11-07T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 35,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Alice Bennet",
+		"date" : ISODate("1985-12-08T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 36,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Elizabeth Knight",
+		"date" : ISODate("1986-01-09T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 37,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "William Darcy",
+		"date" : ISODate("1987-02-10T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 38,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "John Watson",
+		"date" : ISODate("1988-03-11T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 39,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Jane Holmes",
+		"date" : ISODate("1989-04-12T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 40,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Kate Smith",
+		"date" : ISODate("1990-05-13T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 41,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tom Green",
+		"date" : ISODate("1991-06-14T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 42,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tim Parker",
+		"date" : ISODate("1992-07-15T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 43,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Bob Bennet",
+		"date" : ISODate("1993-08-16T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 44,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Alice Knight",
+		"date" : ISODate("1994-09-17T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 45,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Elizabeth Darcy",
+		"date" : ISODate("1995-10-18T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 46,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "William Watson",
+		"date" : ISODate("1996-11-19T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 47,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "John Holmes",
+		"date" : ISODate("1997-12-20T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 48,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Jane Smith",
+		"date" : ISODate("1998-01-21T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 49,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Kate Green",
+		"date" : ISODate("1999-02-22T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 50,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tom Parker",
+		"date" : ISODate("1950-03-23T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 51,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Tim Bennet",
+		"date" : ISODate("1951-04-24T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 52,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Bob Knight",
+		"date" : ISODate("1952-05-25T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 53,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Alice Darcy",
+		"date" : ISODate("1953-06-26T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 54,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Elizabeth Watson",
+		"date" : ISODate("1954-07-27T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 55,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "William Holmes",
+		"date" : ISODate("1955-08-28T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 56,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "John Smith",
+		"date" : ISODate("1956-09-01T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 57,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Jane Green",
+		"date" : ISODate("1957-10-02T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 58,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Kate Parker",
+		"date" : ISODate("1958-11-03T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 59,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Tom Bennet",
+		"date" : ISODate("1959-12-04T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 60,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tim Knight",
+		"date" : ISODate("1960-01-05T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 61,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Bob Darcy",
+		"date" : ISODate("1961-02-06T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 62,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Alice Watson",
+		"date" : ISODate("1962-03-07T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 63,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Elizabeth Holmes",
+		"date" : ISODate("1963-04-08T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 64,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "William Smith",
+		"date" : ISODate("1964-05-09T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 65,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "John Green",
+		"date" : ISODate("1965-06-10T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 66,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Jane Parker",
+		"date" : ISODate("1966-07-11T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 67,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Kate Bennet",
+		"date" : ISODate("1967-08-12T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 68,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tom Knight",
+		"date" : ISODate("1968-09-13T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 69,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Tim Darcy",
+		"date" : ISODate("1969-10-14T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 70,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Bob Watson",
+		"date" : ISODate("1970-11-15T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 71,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Alice Holmes",
+		"date" : ISODate("1971-12-16T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 72,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Elizabeth Smith",
+		"date" : ISODate("1972-01-17T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 73,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "William Green",
+		"date" : ISODate("1973-02-18T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 74,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "John Parker",
+		"date" : ISODate("1974-03-19T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 75,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Jane Bennet",
+		"date" : ISODate("1975-04-20T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 76,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Kate Knight",
+		"date" : ISODate("1976-05-21T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 77,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Tom Darcy",
+		"date" : ISODate("1977-06-22T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 78,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Tim Watson",
+		"date" : ISODate("1978-07-23T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 79,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Bob Holmes",
+		"date" : ISODate("1979-08-24T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 80,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Alice Smith",
+		"date" : ISODate("1980-09-25T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 81,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Elizabeth Green",
+		"date" : ISODate("1981-10-26T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 82,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "William Parker",
+		"date" : ISODate("1982-11-27T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 83,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "John Bennet",
+		"date" : ISODate("1983-12-28T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 84,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Jane Knight",
+		"date" : ISODate("1984-01-01T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 85,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Kate Darcy",
+		"date" : ISODate("1985-02-02T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 86,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Tom Watson",
+		"date" : ISODate("1986-03-03T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 87,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Tim Holmes",
+		"date" : ISODate("1987-04-04T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 88,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Bob Smith",
+		"date" : ISODate("1988-05-05T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 89,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Alice Green",
+		"date" : ISODate("1989-06-06T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 90,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Elizabeth Parker",
+		"date" : ISODate("1990-07-07T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 91,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "William Bennet",
+		"date" : ISODate("1991-08-08T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 92,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "John Knight",
+		"date" : ISODate("1992-09-09T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 93,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Jane Darcy",
+		"date" : ISODate("1993-10-10T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 94,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Kate Watson",
+		"date" : ISODate("1994-11-11T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 95,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Tom Holmes",
+		"date" : ISODate("1995-12-12T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 96,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tim Smith",
+		"date" : ISODate("1996-01-13T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 97,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Bob Green",
+		"date" : ISODate("1997-02-14T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 98,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Alice Parker",
+		"date" : ISODate("1998-03-15T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 99,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Elizabeth Bennet",
+		"date" : ISODate("1999-04-16T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 100,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "William Knight",
+		"date" : ISODate("1950-05-17T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 101,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "John Darcy",
+		"date" : ISODate("1951-06-18T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 102,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Jane Watson",
+		"date" : ISODate("1952-07-19T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 103,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Kate Holmes",
+		"date" : ISODate("1953-08-20T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 104,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tom Smith",
+		"date" : ISODate("1954-09-21T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 105,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Tim Green",
+		"date" : ISODate("1955-10-22T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 106,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Bob Parker",
+		"date" : ISODate("1956-11-23T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 107,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Alice Bennet",
+		"date" : ISODate("1957-12-24T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 108,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Elizabeth Knight",
+		"date" : ISODate("1958-01-25T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 109,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "William Darcy",
+		"date" : ISODate("1959-02-26T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 110,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "John Watson",
+		"date" : ISODate("1960-03-27T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 111,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Jane Holmes",
+		"date" : ISODate("1961-04-28T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 112,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Kate Smith",
+		"date" : ISODate("1962-05-01T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 113,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Tom Green",
+		"date" : ISODate("1963-06-02T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 114,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Tim Parker",
+		"date" : ISODate("1964-07-03T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 115,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Bob Bennet",
+		"date" : ISODate("1965-08-04T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 116,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Alice Knight",
+		"date" : ISODate("1966-09-05T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 117,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Elizabeth Darcy",
+		"date" : ISODate("1967-10-06T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 118,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "William Watson",
+		"date" : ISODate("1968-11-07T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 119,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "John Holmes",
+		"date" : ISODate("1969-12-08T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 120,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Jane Smith",
+		"date" : ISODate("1970-01-09T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 121,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Kate Green",
+		"date" : ISODate("1971-02-10T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 122,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Tom Parker",
+		"date" : ISODate("1972-03-11T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 123,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Tim Bennet",
+		"date" : ISODate("1973-04-12T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 124,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Bob Knight",
+		"date" : ISODate("1974-05-13T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 125,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Alice Darcy",
+		"date" : ISODate("1975-06-14T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 126,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Elizabeth Watson",
+		"date" : ISODate("1976-07-15T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 127,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "William Holmes",
+		"date" : ISODate("1977-08-16T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 128,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "John Smith",
+		"date" : ISODate("1978-09-17T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 129,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Jane Green",
+		"date" : ISODate("1979-10-18T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 130,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Kate Parker",
+		"date" : ISODate("1980-11-19T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 131,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Tom Bennet",
+		"date" : ISODate("1981-12-20T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 132,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tim Knight",
+		"date" : ISODate("1982-01-21T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 133,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Bob Darcy",
+		"date" : ISODate("1983-02-22T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 134,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Alice Watson",
+		"date" : ISODate("1984-03-23T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 135,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Elizabeth Holmes",
+		"date" : ISODate("1985-04-24T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 136,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "William Smith",
+		"date" : ISODate("1986-05-25T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 137,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "John Green",
+		"date" : ISODate("1987-06-26T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 138,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Jane Parker",
+		"date" : ISODate("1988-07-27T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 139,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Kate Bennet",
+		"date" : ISODate("1989-08-28T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 140,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tom Knight",
+		"date" : ISODate("1990-09-01T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 141,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Tim Darcy",
+		"date" : ISODate("1991-10-02T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 142,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Bob Watson",
+		"date" : ISODate("1992-11-03T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 143,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Alice Holmes",
+		"date" : ISODate("1993-12-04T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 144,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Elizabeth Smith",
+		"date" : ISODate("1994-01-05T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 145,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "William Green",
+		"date" : ISODate("1995-02-06T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 146,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "John Parker",
+		"date" : ISODate("1996-03-07T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 147,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Jane Bennet",
+		"date" : ISODate("1997-04-08T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 148,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Kate Knight",
+		"date" : ISODate("1998-05-09T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 149,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Tom Darcy",
+		"date" : ISODate("1999-06-10T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 150,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Tim Watson",
+		"date" : ISODate("1950-07-11T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 151,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Bob Holmes",
+		"date" : ISODate("1951-08-12T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 152,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Alice Smith",
+		"date" : ISODate("1952-09-13T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 153,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Elizabeth Green",
+		"date" : ISODate("1953-10-14T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 154,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "William Parker",
+		"date" : ISODate("1954-11-15T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 155,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "John Bennet",
+		"date" : ISODate("1955-12-16T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 156,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Jane Knight",
+		"date" : ISODate("1956-01-17T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 157,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Kate Darcy",
+		"date" : ISODate("1957-02-18T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 158,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Tom Watson",
+		"date" : ISODate("1958-03-19T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 159,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Tim Holmes",
+		"date" : ISODate("1959-04-20T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 160,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Bob Smith",
+		"date" : ISODate("1960-05-21T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 161,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Alice Green",
+		"date" : ISODate("1961-06-22T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 162,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Elizabeth Parker",
+		"date" : ISODate("1962-07-23T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 163,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "William Bennet",
+		"date" : ISODate("1963-08-24T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 164,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "John Knight",
+		"date" : ISODate("1964-09-25T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 165,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Jane Darcy",
+		"date" : ISODate("1965-10-26T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 166,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Kate Watson",
+		"date" : ISODate("1966-11-27T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 167,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Tom Holmes",
+		"date" : ISODate("1967-12-28T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 168,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tim Smith",
+		"date" : ISODate("1968-01-01T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 169,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Bob Green",
+		"date" : ISODate("1969-02-02T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 170,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Alice Parker",
+		"date" : ISODate("1970-03-03T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 171,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Elizabeth Bennet",
+		"date" : ISODate("1971-04-04T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 172,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "William Knight",
+		"date" : ISODate("1972-05-05T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 173,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "John Darcy",
+		"date" : ISODate("1973-06-06T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 174,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Jane Watson",
+		"date" : ISODate("1974-07-07T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 175,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Kate Holmes",
+		"date" : ISODate("1975-08-08T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 176,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tom Smith",
+		"date" : ISODate("1976-09-09T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 177,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Tim Green",
+		"date" : ISODate("1977-10-10T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 178,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Bob Parker",
+		"date" : ISODate("1978-11-11T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 179,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Alice Bennet",
+		"date" : ISODate("1979-12-12T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 180,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Elizabeth Knight",
+		"date" : ISODate("1980-01-13T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 181,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "William Darcy",
+		"date" : ISODate("1981-02-14T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 182,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "John Watson",
+		"date" : ISODate("1982-03-15T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 183,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Jane Holmes",
+		"date" : ISODate("1983-04-16T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 184,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Kate Smith",
+		"date" : ISODate("1984-05-17T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 185,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Tom Green",
+		"date" : ISODate("1985-06-18T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 186,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Tim Parker",
+		"date" : ISODate("1986-07-19T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 187,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Bob Bennet",
+		"date" : ISODate("1987-08-20T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 188,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Alice Knight",
+		"date" : ISODate("1988-09-21T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 189,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Elizabeth Darcy",
+		"date" : ISODate("1989-10-22T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 190,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "William Watson",
+		"date" : ISODate("1990-11-23T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 191,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "John Holmes",
+		"date" : ISODate("1991-12-24T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 192,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Jane Smith",
+		"date" : ISODate("1992-01-25T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 193,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Kate Green",
+		"date" : ISODate("1993-02-26T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 194,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Tom Parker",
+		"date" : ISODate("1994-03-27T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 195,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Tim Bennet",
+		"date" : ISODate("1995-04-28T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 196,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Bob Knight",
+		"date" : ISODate("1996-05-01T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 197,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Alice Darcy",
+		"date" : ISODate("1997-06-02T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 198,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Elizabeth Watson",
+		"date" : ISODate("1998-07-03T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 199,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "William Holmes",
+		"date" : ISODate("1999-08-04T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 200,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "John Smith",
+		"date" : ISODate("1950-09-05T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 201,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Jane Green",
+		"date" : ISODate("1951-10-06T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 202,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Kate Parker",
+		"date" : ISODate("1952-11-07T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 203,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Tom Bennet",
+		"date" : ISODate("1953-12-08T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 204,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tim Knight",
+		"date" : ISODate("1954-01-09T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 205,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Bob Darcy",
+		"date" : ISODate("1955-02-10T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 206,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Alice Watson",
+		"date" : ISODate("1956-03-11T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 207,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Elizabeth Holmes",
+		"date" : ISODate("1957-04-12T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 208,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "William Smith",
+		"date" : ISODate("1958-05-13T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 209,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "John Green",
+		"date" : ISODate("1959-06-14T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 210,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Jane Parker",
+		"date" : ISODate("1960-07-15T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 211,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Kate Bennet",
+		"date" : ISODate("1961-08-16T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 212,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tom Knight",
+		"date" : ISODate("1962-09-17T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 213,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Tim Darcy",
+		"date" : ISODate("1963-10-18T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 214,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Bob Watson",
+		"date" : ISODate("1964-11-19T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 215,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Alice Holmes",
+		"date" : ISODate("1965-12-20T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 216,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Elizabeth Smith",
+		"date" : ISODate("1966-01-21T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 217,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "William Green",
+		"date" : ISODate("1967-02-22T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 218,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "John Parker",
+		"date" : ISODate("1968-03-23T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 219,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Jane Bennet",
+		"date" : ISODate("1969-04-24T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 220,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Kate Knight",
+		"date" : ISODate("1970-05-25T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 221,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Tom Darcy",
+		"date" : ISODate("1971-06-26T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 222,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Tim Watson",
+		"date" : ISODate("1972-07-27T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 223,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Bob Holmes",
+		"date" : ISODate("1973-08-28T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 224,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Alice Smith",
+		"date" : ISODate("1974-09-01T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 225,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Elizabeth Green",
+		"date" : ISODate("1975-10-02T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 226,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "William Parker",
+		"date" : ISODate("1976-11-03T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 227,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "John Bennet",
+		"date" : ISODate("1977-12-04T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 228,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Jane Knight",
+		"date" : ISODate("1978-01-05T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 229,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Kate Darcy",
+		"date" : ISODate("1979-02-06T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 230,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Tom Watson",
+		"date" : ISODate("1980-03-07T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 231,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Tim Holmes",
+		"date" : ISODate("1981-04-08T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 232,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Bob Smith",
+		"date" : ISODate("1982-05-09T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 233,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Alice Green",
+		"date" : ISODate("1983-06-10T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 234,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Elizabeth Parker",
+		"date" : ISODate("1984-07-11T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 235,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "William Bennet",
+		"date" : ISODate("1985-08-12T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 236,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "John Knight",
+		"date" : ISODate("1986-09-13T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 237,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Jane Darcy",
+		"date" : ISODate("1987-10-14T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 238,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Kate Watson",
+		"date" : ISODate("1988-11-15T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 239,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Tom Holmes",
+		"date" : ISODate("1989-12-16T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 240,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tim Smith",
+		"date" : ISODate("1990-01-17T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 241,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Bob Green",
+		"date" : ISODate("1991-02-18T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 242,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Alice Parker",
+		"date" : ISODate("1992-03-19T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 243,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Elizabeth Bennet",
+		"date" : ISODate("1993-04-20T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 244,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "William Knight",
+		"date" : ISODate("1994-05-21T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 245,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "John Darcy",
+		"date" : ISODate("1995-06-22T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 246,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Jane Watson",
+		"date" : ISODate("1996-07-23T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 247,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Kate Holmes",
+		"date" : ISODate("1997-08-24T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 248,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tom Smith",
+		"date" : ISODate("1998-09-25T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 249,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Tim Green",
+		"date" : ISODate("1999-10-26T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 250,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Bob Parker",
+		"date" : ISODate("1950-11-27T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 251,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Alice Bennet",
+		"date" : ISODate("1951-12-28T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 252,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Elizabeth Knight",
+		"date" : ISODate("1952-01-01T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 253,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "William Darcy",
+		"date" : ISODate("1953-02-02T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 254,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "John Watson",
+		"date" : ISODate("1954-03-03T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 255,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Jane Holmes",
+		"date" : ISODate("1955-04-04T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 256,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Kate Smith",
+		"date" : ISODate("1956-05-05T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 257,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Tom Green",
+		"date" : ISODate("1957-06-06T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 258,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Tim Parker",
+		"date" : ISODate("1958-07-07T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 259,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Bob Bennet",
+		"date" : ISODate("1959-08-08T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 260,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Alice Knight",
+		"date" : ISODate("1960-09-09T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 261,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Elizabeth Darcy",
+		"date" : ISODate("1961-10-10T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 262,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "William Watson",
+		"date" : ISODate("1962-11-11T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 263,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "John Holmes",
+		"date" : ISODate("1963-12-12T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 264,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Jane Smith",
+		"date" : ISODate("1964-01-13T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 265,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Kate Green",
+		"date" : ISODate("1965-02-14T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 266,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Tom Parker",
+		"date" : ISODate("1966-03-15T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 267,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Tim Bennet",
+		"date" : ISODate("1967-04-16T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 268,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Bob Knight",
+		"date" : ISODate("1968-05-17T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 269,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Alice Darcy",
+		"date" : ISODate("1969-06-18T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 270,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Elizabeth Watson",
+		"date" : ISODate("1970-07-19T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 271,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "William Holmes",
+		"date" : ISODate("1971-08-20T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 272,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "John Smith",
+		"date" : ISODate("1972-09-21T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 273,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Jane Green",
+		"date" : ISODate("1973-10-22T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 274,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Kate Parker",
+		"date" : ISODate("1974-11-23T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 275,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Tom Bennet",
+		"date" : ISODate("1975-12-24T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 276,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tim Knight",
+		"date" : ISODate("1976-01-25T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 277,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Bob Darcy",
+		"date" : ISODate("1977-02-26T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 278,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Alice Watson",
+		"date" : ISODate("1978-03-27T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 279,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Elizabeth Holmes",
+		"date" : ISODate("1979-04-28T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 280,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "William Smith",
+		"date" : ISODate("1980-05-01T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 281,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "John Green",
+		"date" : ISODate("1981-06-02T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 282,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Jane Parker",
+		"date" : ISODate("1982-07-03T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 283,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Kate Bennet",
+		"date" : ISODate("1983-08-04T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 284,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Tom Knight",
+		"date" : ISODate("1984-09-05T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 285,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Tim Darcy",
+		"date" : ISODate("1985-10-06T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 286,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Bob Watson",
+		"date" : ISODate("1986-11-07T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 287,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Alice Holmes",
+		"date" : ISODate("1987-12-08T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 288,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Elizabeth Smith",
+		"date" : ISODate("1988-01-09T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 289,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "William Green",
+		"date" : ISODate("1989-02-10T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	},
+	{
+		"_id" : 290,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "John Parker",
+		"date" : ISODate("1990-03-11T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 291,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Jane Bennet",
+		"date" : ISODate("1991-04-12T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms"
+		]
+	},
+	{
+		"_id" : 292,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Kate Knight",
+		"date" : ISODate("1992-05-13T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 293,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Tom Darcy",
+		"date" : ISODate("1993-06-14T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham"
+		]
+	},
+	{
+		"_id" : 294,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "Tim Watson",
+		"date" : ISODate("1994-07-15T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 295,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "Bob Holmes",
+		"date" : ISODate("1995-08-16T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 296,
+		"lastPizzaShopVisited" : "Pacinos",
+		"name" : "Alice Smith",
+		"date" : ISODate("1996-09-17T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 297,
+		"lastPizzaShopVisited" : "Zizzi",
+		"name" : "Elizabeth Green",
+		"date" : ISODate("1997-10-18T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto"
+		]
+	},
+	{
+		"_id" : 298,
+		"lastPizzaShopVisited" : "Milanos",
+		"name" : "William Parker",
+		"date" : ISODate("1998-11-19T00:00:00Z"),
+		"likesPizza" : false,
+		"favPizzaToppings" : [ ]
+	},
+	{
+		"_id" : 299,
+		"lastPizzaShopVisited" : "PI",
+		"name" : "John Bennet",
+		"date" : ISODate("1999-12-20T00:00:00Z"),
+		"likesPizza" : true,
+		"favPizzaToppings" : [
+			"mushrooms",
+			"prosciutto",
+			"ham",
+			"pepperoni"
+		]
+	}
+]
+
+[jsTest] ----
+[jsTest] Query: {  "likesPizza" : true } returned 150 documents.
+[jsTest] ----
+
+Histogram estimate: 150.
+Heuristic estimate: 17.320508075688778.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 150,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 150,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 150
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 17.320508075688778,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 17.320508075688778,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 17.320508075688778,
+			"interval" : "[ true, true ]"
+		},
+		"rightChild" : {
+			"nodeType" : "LimitSkip",
+			"logicalCE" : 300,
+			"child" : {
+				"nodeType" : "Seek",
+				"logicalCE" : 300
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "likesPizza" : false } returned 150 documents.
+[jsTest] ----
+
+Histogram estimate: 150.
+Heuristic estimate: 17.320508075688778.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 150,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 150,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 150
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 17.320508075688778,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 17.320508075688778,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 17.320508075688778,
+			"interval" : "[ false, false ]"
+		},
+		"rightChild" : {
+			"nodeType" : "LimitSkip",
+			"logicalCE" : 300,
+			"child" : {
+				"nodeType" : "Seek",
+				"logicalCE" : 300
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "date" : {  "$gt" : ISODate("1950-01-01T00:00:00Z") } } returned 299 documents.
+[jsTest] ----
+
+Histogram estimate: 299.
+Heuristic estimate: 59.999999999999986.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 299,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 299,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 299
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 59.999999999999986,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 59.999999999999986,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 59.999999999999986,
+			"interval" : "( ISODate(\"1950-01-01T00:00:00Z\"), ISODate(\"0NaN-NaN-NaNTNaN:NaN:NaNZ\") ]"
+		},
+		"rightChild" : {
+			"nodeType" : "LimitSkip",
+			"logicalCE" : 300,
+			"child" : {
+				"nodeType" : "Seek",
+				"logicalCE" : 300
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "date" : {  "$lt" : ISODate("1979-12-06T00:00:00Z") } } returned 179 documents.
+[jsTest] ----
+
+Histogram estimate: 179.33675564681724.
+Heuristic estimate: 59.999999999999986.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 179.33675564681724,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 179.33675564681724,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 179.33675564681724
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 59.999999999999986,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 59.999999999999986,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 59.999999999999986,
+			"interval" : "[ ISODate(\"0NaN-NaN-NaNTNaN:NaN:NaNZ\"), ISODate(\"1979-12-06T00:00:00Z\") )"
+		},
+		"rightChild" : {
+			"nodeType" : "LimitSkip",
+			"logicalCE" : 300,
+			"child" : {
+				"nodeType" : "Seek",
+				"logicalCE" : 300
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "name" : {  "$lte" : "Bob Bennet" } } returned 37 documents.
+[jsTest] ----
+
+Histogram estimate: 61.99999971987415.
+Heuristic estimate: 99.00000000000003.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 61.99999971987415,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 61.99999971987415,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 61.99999971987415,
+			"interval" : "[ \"\", \"Bob Bennet\" ]"
+		},
+		"rightChild" : {
+			"nodeType" : "LimitSkip",
+			"logicalCE" : 300,
+			"child" : {
+				"nodeType" : "Seek",
+				"logicalCE" : 300
+			}
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 99.00000000000003,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 99.00000000000003,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 99.00000000000003
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "favPizzaToppings" : "mushrooms" } returned 120 documents.
+[jsTest] ----
+
+Histogram estimate: 120.
+Heuristic estimate: 17.320508075688778.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 120,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 120,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 120
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 17.320508075688778,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 17.320508075688778,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 17.320508075688778
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi" } returned 62 documents.
+[jsTest] ----
+
+Histogram and heuristic estimates were equal: 17.320508075688778.
+
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 17.320508075688778,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 17.320508075688778,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 17.320508075688778
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 17.320508075688778,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 17.320508075688778,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 17.320508075688778
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "lastPizzaShopVisited" : "Pacinos" } returned 113 documents.
+[jsTest] ----
+
+Histogram and heuristic estimates were equal: 17.320508075688778.
+
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 17.320508075688778,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 17.320508075688778,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 17.320508075688778
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 17.320508075688778,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 17.320508075688778,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 17.320508075688778
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "likesPizza" : true,  "date" : {  "$gt" : ISODate("1950-01-01T00:00:00Z"),  "$lt" : ISODate("1979-12-06T00:00:00Z") } } returned 89 documents.
+[jsTest] ----
+
+Histogram estimate: 115.65144475323812.
+Heuristic estimate: 7.745966692414835.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 115.65144475323812,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 115.65144475323812,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 115.65144475323812,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 115.65144475323812
+			}
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 7.745966692414835,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 7.745966692414835,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 17.320508075688778,
+			"interval" : "[ true, true ]"
+		},
+		"rightChild" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 59.999999999999986,
+			"child" : {
+				"nodeType" : "LimitSkip",
+				"logicalCE" : 59.999999999999986,
+				"child" : {
+					"nodeType" : "Seek",
+					"logicalCE" : 59.999999999999986
+				}
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "likesPizza" : false,  "name" : {  "$lte" : "Bob Bennet" } } returned 17 documents.
+[jsTest] ----
+
+Histogram estimate: 43.84062023548705.
+Heuristic estimate: 9.949874371066203.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 43.84062023548705,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 43.84062023548705,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 61.99999971987415,
+			"interval" : "[ \"\", \"Bob Bennet\" ]"
+		},
+		"rightChild" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 150,
+			"child" : {
+				"nodeType" : "LimitSkip",
+				"logicalCE" : 150,
+				"child" : {
+					"nodeType" : "Seek",
+					"logicalCE" : 150
+				}
+			}
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 9.949874371066203,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 9.949874371066203,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 17.320508075688778,
+			"interval" : "[ false, false ]"
+		},
+		"rightChild" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 99.00000000000003,
+			"child" : {
+				"nodeType" : "LimitSkip",
+				"logicalCE" : 99.00000000000003,
+				"child" : {
+					"nodeType" : "Seek",
+					"logicalCE" : 99.00000000000003
+				}
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "favPizzaToppings" : "mushrooms",  "name" : {  "$lte" : "Bob Bennet" } } returned 16 documents.
+[jsTest] ----
+
+Histogram estimate: 39.21224280892076.
+Heuristic estimate: 9.949874371066203.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 39.21224280892076,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 39.21224280892076,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 61.99999971987415,
+			"interval" : "[ \"\", \"Bob Bennet\" ]"
+		},
+		"rightChild" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 120,
+			"child" : {
+				"nodeType" : "LimitSkip",
+				"logicalCE" : 120,
+				"child" : {
+					"nodeType" : "Seek",
+					"logicalCE" : 120
+				}
+			}
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 9.949874371066203,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 9.949874371066203,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 9.949874371066203,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 9.949874371066203
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "likesPizza" : true } returned 62 documents.
+[jsTest] ----
+
+Histogram estimate: 12.247448713915896.
+Heuristic estimate: 4.1617914502878195.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 12.247448713915896,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 12.247448713915896,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 12.247448713915896,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 12.247448713915896
+			}
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 4.1617914502878195,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 4.1617914502878195,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 17.320508075688778,
+			"interval" : "[ true, true ]"
+		},
+		"rightChild" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 17.320508075688778,
+			"child" : {
+				"nodeType" : "LimitSkip",
+				"logicalCE" : 17.320508075688778,
+				"child" : {
+					"nodeType" : "Seek",
+					"logicalCE" : 17.320508075688778
+				}
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "likesPizza" : false } returned 0 documents.
+[jsTest] ----
+
+Histogram estimate: 12.247448713915896.
+Heuristic estimate: 4.1617914502878195.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 12.247448713915896,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 12.247448713915896,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 12.247448713915896,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 12.247448713915896
+			}
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 4.1617914502878195,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 4.1617914502878195,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 17.320508075688778,
+			"interval" : "[ false, false ]"
+		},
+		"rightChild" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 17.320508075688778,
+			"child" : {
+				"nodeType" : "LimitSkip",
+				"logicalCE" : 17.320508075688778,
+				"child" : {
+					"nodeType" : "Seek",
+					"logicalCE" : 17.320508075688778
+				}
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "date" : {  "$gt" : ISODate("1950-01-01T00:00:00Z") } } returned 62 documents.
+[jsTest] ----
+
+Histogram estimate: 17.29161646579059.
+Heuristic estimate: 7.745966692414835.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 17.29161646579059,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 17.29161646579059,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 17.29161646579059,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 17.29161646579059
+			}
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 7.745966692414835,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 7.745966692414835,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 59.999999999999986,
+			"interval" : "( ISODate(\"1950-01-01T00:00:00Z\"), ISODate(\"0NaN-NaN-NaNTNaN:NaN:NaNZ\") ]"
+		},
+		"rightChild" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 17.320508075688778,
+			"child" : {
+				"nodeType" : "LimitSkip",
+				"logicalCE" : 17.320508075688778,
+				"child" : {
+					"nodeType" : "Seek",
+					"logicalCE" : 17.320508075688778
+				}
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "date" : {  "$lt" : ISODate("1979-12-06T00:00:00Z") } } returned 37 documents.
+[jsTest] ----
+
+Histogram estimate: 13.391667396064515.
+Heuristic estimate: 7.745966692414835.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 13.391667396064515,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 13.391667396064515,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 13.391667396064515,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 13.391667396064515
+			}
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 7.745966692414835,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 7.745966692414835,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 59.999999999999986,
+			"interval" : "[ ISODate(\"0NaN-NaN-NaNTNaN:NaN:NaNZ\"), ISODate(\"1979-12-06T00:00:00Z\") )"
+		},
+		"rightChild" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 17.320508075688778,
+			"child" : {
+				"nodeType" : "LimitSkip",
+				"logicalCE" : 17.320508075688778,
+				"child" : {
+					"nodeType" : "Seek",
+					"logicalCE" : 17.320508075688778
+				}
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "date" : {  "$gt" : ISODate("1950-01-01T00:00:00Z"),  "$lt" : ISODate("1979-12-06T00:00:00Z") } } returned 37 documents.
+[jsTest] ----
+
+Histogram estimate: 13.354278552090237.
+Heuristic estimate: 7.745966692414835.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 13.354278552090237,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 13.354278552090237,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 13.354278552090237,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 13.354278552090237
+			}
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 7.745966692414835,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 7.745966692414835,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 59.999999999999986,
+			"interval" : "( ISODate(\"1950-01-01T00:00:00Z\"), ISODate(\"1979-12-06T00:00:00Z\") )"
+		},
+		"rightChild" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 17.320508075688778,
+			"child" : {
+				"nodeType" : "LimitSkip",
+				"logicalCE" : 17.320508075688778,
+				"child" : {
+					"nodeType" : "Seek",
+					"logicalCE" : 17.320508075688778
+				}
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "lastPizzaShopVisited" : "Pacinos",  "name" : {  "$lte" : "Bob Bennet" } } returned 13 documents.
+[jsTest] ----
+
+Histogram estimate: 7.8740078562238045.
+Heuristic estimate: 9.949874371066203.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 7.8740078562238045,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 7.8740078562238045,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 61.99999971987415,
+			"interval" : "[ \"\", \"Bob Bennet\" ]"
+		},
+		"rightChild" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 17.320508075688778,
+			"child" : {
+				"nodeType" : "LimitSkip",
+				"logicalCE" : 17.320508075688778,
+				"child" : {
+					"nodeType" : "Seek",
+					"logicalCE" : 17.320508075688778
+				}
+			}
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 9.949874371066203,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 9.949874371066203,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 9.949874371066203,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 9.949874371066203
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "lastPizzaShopVisited" : "Pacinos",  "favPizzaToppings" : "mushrooms" } returned 20 documents.
+[jsTest] ----
+
+Histogram estimate: 10.954451150103326.
+Heuristic estimate: 4.1617914502878195.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 10.954451150103326,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 10.954451150103326,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 10.954451150103326,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 10.954451150103326
+			}
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 4.1617914502878195,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 4.1617914502878195,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 4.1617914502878195,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 4.1617914502878195
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "lastPizzaShopVisited" : "Pacinos",  "date" : {  "$gt" : ISODate("1950-01-01T00:00:00Z") },  "favPizzaToppings" : "mushrooms",  "likesPizza" : true } returned 20 documents.
+[jsTest] ----
+
+Histogram estimate: 9.207714944743804.
+Heuristic estimate: 1.6682798577318325.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 9.207714944743804,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 9.207714944743804,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 9.207714944743804,
+			"child" : {
+				"nodeType" : "Filter",
+				"logicalCE" : 9.207714944743804,
+				"child" : {
+					"nodeType" : "Filter",
+					"logicalCE" : 9.207714944743804,
+					"child" : {
+						"nodeType" : "PhysicalScan",
+						"logicalCE" : 9.207714944743804
+					}
+				}
+			}
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 1.6682798577318325,
+	"child" : {
+		"nodeType" : "NestedLoopJoin",
+		"logicalCE" : 1.6682798577318325,
+		"leftChild" : {
+			"nodeType" : "IndexScan",
+			"logicalCE" : 17.320508075688778,
+			"interval" : "[ true, true ]"
+		},
+		"rightChild" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 2.783157683713742,
+			"child" : {
+				"nodeType" : "Filter",
+				"logicalCE" : 2.783157683713742,
+				"child" : {
+					"nodeType" : "Filter",
+					"logicalCE" : 2.783157683713742,
+					"child" : {
+						"nodeType" : "LimitSkip",
+						"logicalCE" : 2.783157683713742,
+						"child" : {
+							"nodeType" : "Seek",
+							"logicalCE" : 2.783157683713742
+						}
+					}
+				}
+			}
+		}
+	}
+}

@@ -55,6 +55,10 @@ SelectivityType getSelectivity(const ArrayHistogram& ah, CEType cardinality) {
     return cardinality / sampleSize;
 }
 
+SelectivityType getArraySelectivity(const ArrayHistogram& ah) {
+    return getSelectivity(ah, {ah.getArrayCount()});
+}
+
 EstimationResult getTotals(const ScalarHistogram& h) {
     if (h.empty()) {
         return {0.0, 0.0};

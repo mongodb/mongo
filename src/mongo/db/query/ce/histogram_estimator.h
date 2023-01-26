@@ -44,7 +44,8 @@ using IntervalEstimation =
  * Analyzes an interval to define an estimation mode and summarize the bounds. This method is in the
  * header for unit tests to use.
  */
-IntervalEstimation analyzeIntervalEstimationMode(const IntervalRequirement& interval);
+IntervalEstimation analyzeIntervalEstimationMode(const stats::ArrayHistogram* histogram,
+                                                 const IntervalRequirement& interval);
 
 class HistogramTransport;
 

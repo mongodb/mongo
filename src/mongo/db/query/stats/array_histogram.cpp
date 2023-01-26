@@ -143,13 +143,14 @@ private:
 };
 
 /**
- * Validates the type counts per type bracket compared to those in the scalar histogram. If
- * 'lowBound' is set to false, these frequencies must be equal; otherwise, the type counts must be a
- * lower bound on the counts in the histogram.
+ * Validates the type counts per type bracket compared to those in the scalar histogram according to
+ * the comparison function isValid(). It takes a type-bracket count from 'tc' as the left argument
+ * and one from 's' as a right argument and returns whether or not the two counts are valid relative
+ * to each other.
  */
 void validateHistogramTypeCounts(const TypeCounts& tc,
                                  const ScalarHistogram& s,
-                                 bool lowBound = false) {
+                                 std::function<bool(double /*tc*/, double /*s*/)> isValid) {
     // Ensure that all histogrammable type brackets are accounted for in the histogram.
     TypeBracketFrequencyIterator it{s};
     sbe::value::TypeTags tag;
@@ -157,11 +158,7 @@ void validateHistogramTypeCounts(const TypeCounts& tc,
     while (it.hasNext()) {
         std::tie(tag, freq) = it.getNext();
         const double tcFreq = getTypeBracketTypeCount(tc, tag);
-
-        // If 'lowBound' is set, having more entries in the histogram than in the type counts is
-        // considered valid.
-        const bool invalid = lowBound ? (tcFreq > freq) : (tcFreq != freq);
-        if (invalid) {
+        if (!isValid(tcFreq, freq)) {
             uasserted(7105700,
                       str::stream() << "Type count frequency " << tcFreq << " of type bracket for "
                                     << tag << " did not match histogram frequency " << freq);
@@ -171,8 +168,7 @@ void validateHistogramTypeCounts(const TypeCounts& tc,
     // Ensure that all histogrammable type counts are accounted for in the type counters.
     const double totalTC = getTotalCount(tc, true /* histogrammable*/);
     const double totalCard = s.getCardinality();
-    const bool invalid = lowBound ? (totalTC > totalCard) : (totalTC != totalCard);
-    if (invalid) {
+    if (!isValid(totalTC, totalCard)) {
         uasserted(7105701,
                   str::stream() << "The type counters count " << totalTC
                                 << " values, but the histogram frequency is " << totalCard);
@@ -180,18 +176,17 @@ void validateHistogramTypeCounts(const TypeCounts& tc,
 }
 
 /**
- * Validates the bucket counts per type bracket compared to those in the scalar histogram. If
- * 'lowBound' is set to false, these frequencies must be equal; otherwise, the frequencies of 'ls'
- * must be a lower bound of the counts in the 'rs' histogram.
+ * Validates the relationship between two histograms according to the funciton isValid(). It takes a
+ * type-bracket count from 'ls' as the left argument and one from 'rs' as a right argument and
+ * returns whether or not the two counts are valid relative to each other.
  */
 void validateHistogramFrequencies(const ScalarHistogram& ls,
                                   const ScalarHistogram& rs,
-                                  bool lowBound = false) {
+                                  std::function<bool(double /*ls*/, double /*rs*/)> isValid) {
     // Ensure that the total cardinality of the histograms is comparatively correct.
     const double cardL = ls.getCardinality();
     const double cardR = rs.getCardinality();
-    const bool invalid = lowBound ? (cardL > cardR) : (cardL != cardR);
-    if (invalid) {
+    if (!isValid(cardL, cardR)) {
         uasserted(7105702,
                   str::stream() << "The histogram cardinalities " << cardL << " and " << cardR
                                 << " did not match.");
@@ -206,18 +201,15 @@ void validateHistogramFrequencies(const ScalarHistogram& ls,
         std::tie(tagL, freqL) = itL.getNext();
         std::tie(tagR, freqR) = itR.getNext();
 
-        if (tagL != tagR) {
-            // Regardless of whether or not 'ls' has fewer entries than 'rs', both must have the
-            // same number of type-brackets.
+        if (!sameTypeBracket(tagL, tagR)) {
+            // Regardless of whether or not 'ls' is valid relative to 'rs', both must have the same
+            // number of type-brackets.
             uasserted(7105703,
                       str::stream() << "Histograms had different type-brackets " << tagL << " and "
                                     << tagR << " at the same bound position.");
         }
 
-        // If 'lowBound' is set, having more entries in the histogram than in the type counts is
-        // considered valid.
-        const bool invalid = lowBound ? (freqL > freqR) : (freqL != freqR);
-        if (invalid) {
+        if (!isValid(freqL, freqR)) {
             uasserted(7105704,
                       str::stream()
                           << "Histogram frequencies frequencies " << freqL << " and " << freqR
@@ -262,22 +254,32 @@ void validate(const ScalarHistogram& scalar,
 
         // Validate array histograms based on array type counters. Since there is one entry per type
         // bracket per array in the min/max histograms, ensure that there are at least as many
-        // histogrammable entries in the array type counts. Since we first validate that min & max
-        // are equivalent, we only compare min type brackets with the type counters.
-        validateHistogramFrequencies(arrayFields->arrayMax, arrayFields->arrayMin);
+        // histogrammable entries in the array type counts.
+        // Note that min/max histograms may have different type-brackets.
         validateHistogramTypeCounts(arrayFields->typeCounts,
                                     arrayFields->arrayMin,
-                                    true /* Type counts are a lower bound. */);
+                                    // Type counts are an upper bound on ArrayMin.
+                                    std::greater_equal<double>());
+        validateHistogramTypeCounts(arrayFields->typeCounts,
+                                    arrayFields->arrayMax,
+                                    // Type counts are an upper bound on ArrayMax.
+                                    std::greater_equal<double>());
 
-        // This is similarly true for unique histograms, only their counts are larger. Furthermore,
-        // the min/max histograms are a "lower bound" on the scalar histograms. Only check the min
-        // histogram since it has already been dteermined to be equivalent to the max histogram.
+        // Conversely, unique histograms are an upper bound on type counts, since they may count
+        // multiple values per type bracket. Furthermore, the min/max histograms are a "lower bound"
+        // on the unique histogram.
         validateHistogramTypeCounts(arrayFields->typeCounts,
                                     arrayFields->arrayUnique,
-                                    true /* Type counts are a lower bound. */);
+                                    // Type counts are a lower bound on ArrayUnique.
+                                    std::less_equal<double>());
         validateHistogramFrequencies(arrayFields->arrayMin,
                                      arrayFields->arrayUnique,
-                                     true /* Type counts are a lower bound. */);
+                                     // ArrayMin is a lower bound on ArrayUnique.
+                                     std::less_equal<double>());
+        validateHistogramFrequencies(arrayFields->arrayMax,
+                                     arrayFields->arrayUnique,
+                                     // ArrayMax is a lower bound on ArrayUnique.
+                                     std::less_equal<double>());
 
     } else if (numArrays > 0) {
         uasserted(7131000, "A scalar ArrayHistogram should not have any arrays in its counters.");
@@ -293,7 +295,10 @@ void validate(const ScalarHistogram& scalar,
     }
 
     // Validate scalar type counts.
-    validateHistogramTypeCounts(typeCounts, scalar);
+    validateHistogramTypeCounts(typeCounts,
+                                scalar,
+                                // Type-bracket type counts should equal scalar type-bracket counts.
+                                std::equal_to<double>());
 
     // Validate total count.
     const auto totalCard = getTotalCount(typeCounts);
