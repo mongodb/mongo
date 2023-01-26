@@ -271,7 +271,14 @@ class FileService:
         :param files: list of paths
         :return: Non-empty files
         """
-        return [f for f in files if not os.stat(f).st_size == 0]
+        filtered_files = []
+        for file in files:
+            try:
+                if not os.stat(file).st_size == 0:
+                    filtered_files.append(file)
+            except FileNotFoundError:
+                pass
+        return filtered_files
 
     @staticmethod
     def check_path_exists(path: str) -> bool:

@@ -196,6 +196,11 @@ class TestFileService(unittest.TestCase):
             self.assertEqual(
                 set(self.file_service.filter_out_empty_files(abs_file_paths)), set(abs_file_paths))
 
+    def test_do_not_panic_when_file_does_not(self):
+        non_existing_files = ["this-does-not-exist.file", "my.cat"]
+        # non-existing files should be filtered out, instead of causing errors
+        self.assertListEqual(self.file_service.filter_out_empty_files(non_existing_files), [])
+
     def test_filter_out_empty_files_if_partly_empty(self):
         with TemporaryDirectory() as tmpdir:
             abs_dir_paths = [os.path.join(tmpdir, d) for d in self.relative_dir_paths]
