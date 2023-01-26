@@ -110,21 +110,19 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
             }
         } else {  // Case 4: availBytes == 0; do a block read
             _bufBegin = 0;
-            _bufEnd = 0;
-            readBytes = _streamReader->readBytes(_blockReadSize, _buffer.get());
-            if (readBytes == 0) {  // EOF: okay here as the pipe ended at an object boundary
+            _bufEnd = _streamReader->readBytes(_blockReadSize, _buffer.get());
+            if (_bufEnd == 0) {  // EOF: okay here as the pipe ended at an object boundary
                 return boost::none;
             }
-            if (MONGO_unlikely(readBytes < kSizeSize)) {
+            if (MONGO_unlikely(_bufEnd < kSizeSize)) {
                 uasserted(6968305, "Truncated file: {}"_format(_vopts.dataSources[_streamIdx].url));
                 return boost::none;
             }
-            _bufEnd += readBytes;
-            // Not used again: availBytes += readBytes;
-            bsonSize = ConstDataView(_buffer.get() + _bufBegin).read<LittleEndian<int32_t>>();
+            // Not used again: availBytes += _bufEnd;
+            bsonSize = ConstDataView(_buffer.get()).read<LittleEndian<int32_t>>();
 
-            if (MONGO_unlikely(readBytes < bsonSize)) {
-                if (MONGO_likely(readBytes == _blockReadSize)) {  // got all the bytes we requested
+            if (MONGO_unlikely(_bufEnd < bsonSize)) {
+                if (MONGO_likely(_bufEnd == _blockReadSize)) {  // got all the bytes we requested
                     expandBuffer(bsonSize);
                     continue;
                 }
