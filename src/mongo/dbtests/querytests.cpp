@@ -914,13 +914,13 @@ public:
         index();
     }
     void run() {
-        _client.dropDatabase("unittests");
+        _client.dropDatabase({boost::none, "unittests"});
         noIndex();
         checkIndex();
         _client.dropCollection(ns());
         noIndex();
         checkIndex();
-        _client.dropDatabase("unittests");
+        _client.dropDatabase({boost::none, "unittests"});
         noIndex();
         checkIndex();
     }

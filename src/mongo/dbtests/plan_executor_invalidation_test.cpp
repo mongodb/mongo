@@ -122,7 +122,7 @@ public:
     }
 
     bool dropDatabase(const std::string& dbname) {
-        bool res = _client.dropDatabase(dbname);
+        bool res = _client.dropDatabase({boost::none, dbname});
         _refreshCollection();
         return res;
     }

@@ -403,16 +403,14 @@ public:
     /**
      * Drops an entire database.
      */
-    virtual bool dropDatabase(const std::string& dbname,
+    virtual bool dropDatabase(const DatabaseName& dbName,
                               const WriteConcernOptions& writeConcern = WriteConcernOptions(),
                               BSONObj* info = nullptr) {
         BSONObj o;
         if (info == nullptr)
             info = &o;
-        // TODO SERVER-72944: Use dbname which is DatabaseName object already.
-        return runCommand(DatabaseName(boost::none, dbname),
-                          BSON("dropDatabase" << 1 << "writeConcern" << writeConcern.toBSON()),
-                          *info);
+        return runCommand(
+            dbName, BSON("dropDatabase" << 1 << "writeConcern" << writeConcern.toBSON()), *info);
     }
 
     /**
