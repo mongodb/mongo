@@ -17,6 +17,7 @@
 load('jstests/concurrency/fsm_libs/extend_workload.js');
 load('jstests/concurrency/fsm_workloads/internal_transactions_sharded.js');
 load('jstests/libs/fail_point_util.js');
+load("jstests/libs/feature_flag_util.js");
 
 var $config = extendWorkload($config, function($config, $super) {
     // reshardingMinimumOperationDurationMillis is set to 30 seconds when there are stepdowns.
@@ -87,10 +88,14 @@ var $config = extendWorkload($config, function($config, $super) {
                         return true;
                     }
                     assert(res.hasOwnProperty("code"));
-                    // Expected error.
-                    if (res.code === ErrorCodes.SnapshotUnavailable) {
-                        return true;
+
+                    if (!FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
+                        // Expected error prior to the PointInTimeCatalogLookups project.
+                        if (res.code === ErrorCodes.SnapshotUnavailable) {
+                            return true;
+                        }
                     }
+
                     // Race to retry.
                     if (res.code === ErrorCodes.ReshardCollectionInProgress) {
                         return false;

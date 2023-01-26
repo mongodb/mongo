@@ -79,6 +79,11 @@ public:
         return RecordId(_lowestUncommittedRecord.getLong() - 1);
     }
 
+    bool hasUncommittedRecords() {
+        return !_lowestUncommittedRecord.isNull();
+    }
+
+private:
     RecordId _highestRecord;
     RecordId _lowestUncommittedRecord;
 };

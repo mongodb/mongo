@@ -23,11 +23,13 @@
  *
  * @tags: [
  *   requires_majority_read_concern,
+ *   multiversion_incompatible, # TODO(SERVER-73276): Remove this tag.
  * ]
  */
 
 load("jstests/libs/parallelTester.js");  // For Thread.
 load("jstests/libs/write_concern_util.js");
+load("jstests/libs/feature_flag_util.js");
 
 (function() {
 "use strict";
@@ -249,6 +251,14 @@ assert.commandWorked(primary.adminCommand(
 replTest.awaitReplication();
 // This is the DB that all of the tests will use.
 var mainDB = primary.getDB('mainDB');
+
+// TODO(SERVER-72960): Adjust this test to work properly with point-in-time reads. When
+// point-in-time catalog reads are enabled, reads no longer block waiting for the majority
+// commit point to advance, which breaks the assumptions of the test.
+if (FeatureFlagUtil.isEnabled(primary.getDB('mainDB'), "PointInTimeCatalogLookups")) {
+    replTest.stopSet();
+    return;
+}
 
 // This DB won't be used by any tests so it should always be unblocked.
 var otherDB = primary.getDB('otherDB');

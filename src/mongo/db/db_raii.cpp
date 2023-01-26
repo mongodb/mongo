@@ -202,11 +202,9 @@ std::vector<NamespaceString> resolveNamespaceStringOrUUIDs(
 void assertAllNamespacesAreCompatibleForReadTimestamp(
     OperationContext* opCtx,
     const CollectionCatalog* catalog,
-    const std::vector<NamespaceString>& resolvedNamespaces) {
-    // Note that calling getPointInTimeReadTimestamp may open a snapshot if one is not already
-    // open, depending on the current read source.
-    const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
-    for (auto&& nss : resolvedNamespaces) {
+    const std::vector<NamespaceString>& namespaces,
+    const boost::optional<Timestamp>& readTimestamp) {
+    for (auto&& nss : namespaces) {
         auto collection = catalog->lookupCollectionByNamespace(opCtx, nss);
         // Check that the collection has not had a DDL operation since readTimestamp.
         assertCollectionChangesCompatibleWithReadTimestamp(opCtx, collection, readTimestamp);
@@ -237,6 +235,23 @@ boost::optional<std::vector<NamespaceString>> resolveSecondaryNamespacesOrUUIDs(
         return boost::none;
     } else {
         return std::move(resolvedNamespaces);
+    }
+}
+
+/*
+ * Establish a capped snapshot if necessary on the provided namespace.
+ */
+void establishCappedSnapshotIfNeeded(OperationContext* opCtx,
+                                     const std::shared_ptr<const CollectionCatalog>& catalog,
+                                     const NamespaceStringOrUUID& nsOrUUID,
+                                     const NamespaceString& resolvedNss) {
+    // Lookup the collection by UUID if one was provided - otherwise look it up by namespace.
+    // TODO(SERVER-73353): Use lookupCollection function that takes NamespaceStringOrUUID
+    // directly once it exists.
+    auto coll = (nsOrUUID.uuid() ? catalog->lookupCollectionByUUID(opCtx, *nsOrUUID.uuid())
+                                 : catalog->lookupCollectionByNamespace(opCtx, resolvedNss));
+    if (coll && coll->usesCappedSnapshots()) {
+        CappedSnapshots::get(opCtx).establish(opCtx, coll);
     }
 }
 
@@ -320,8 +335,11 @@ auto acquireCollectionAndConsistentSnapshot(
             resolveSecondaryNamespacesOrUUIDs(opCtx, catalog.get(), secondaryNssOrUUIDs);
 
         if (resolvedSecondaryNamespaces) {
+            // Note that calling getPointInTimeReadTimestamp may open a snapshot if one is not
+            // already open, depending on the current read source.
+            const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
             assertAllNamespacesAreCompatibleForReadTimestamp(
-                opCtx, catalog.get(), *resolvedSecondaryNamespaces);
+                opCtx, catalog.get(), *resolvedSecondaryNamespaces, readTimestamp);
         }
 
         // A lock request does not always find a collection to lock. But if we found a view abort
@@ -470,33 +488,17 @@ CollectionPtr fetchOrCreatePITCollection(OperationContext* opCtx,
                                          const NamespaceString nss,
                                          boost::optional<Timestamp> readTimestamp,
                                          bool isPrimaryNs) {
-    CollectionPtr coll = catalog->lookupCollectionByNamespace(opCtx, nss);
-
-    // Return the latest collection information if there's no readTimestamp set.
-    if (!readTimestamp) {
-        return coll;
+    if (catalog->needsOpenCollection(opCtx, nss, readTimestamp)) {
+        // Getting this far means that either the collection is not present in the catalog (it may
+        // have been dropped) or the read timestamp is earlier than the last DDL operation
+        // (minValidSnapshot). So try to create a valid past Collection instance for the
+        // readTimestamp.
+        (void)catalog->openCollection(opCtx, nss, readTimestamp);
     }
 
-    if (coll && *readTimestamp >= coll->getMinimumValidSnapshot()) {
-        return coll;
-    }
-
-    // Getting this far means that either the collection is not present in the catalog (it may have
-    // been dropped) or the read timestamp is earlier than the last DDL operation
-    // (minValidSnapshot). So try to create a valid past Collection instance for the
-    // readTimestamp.
-
-    [[maybe_unused]] auto collPtr = catalog->openCollection(opCtx, nss, readTimestamp);
-
-    // TODO SERVER-70846: openCollection does not set a yield handler on the CollectionPtr returned.
-    // Therefore, it is necessary to lookup the collection again via a different lookup fn to fetch
-    // a yielding-aware CollectionPtr from the catalog. Only the primary namespace must be yield
-    // aware.
-
-    if (!isPrimaryNs) {
-        return collPtr;
-    }
-
+    // TODO SERVER-70846: openCollection does not set a yield handler on the CollectionPtr
+    // returned. Therefore, it is necessary to lookup the collection again via a different
+    // lookup fn to fetch a yielding-aware CollectionPtr from the catalog.
     return catalog->lookupCollectionByNamespace(opCtx, nss);
 }
 
@@ -712,8 +714,11 @@ AutoGetCollectionForReadLegacy::AutoGetCollectionForReadLegacy(
         // If no secondary namespace is a view or is sharded, resolve namespaces and check their
         // that their minVisible timestamps are compatible with the read timestamp.
         if (resolvedNamespaces) {
+            // Note that calling getPointInTimeReadTimestamp may open a snapshot if one is not
+            // already open, depending on the current read source.
+            const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
             assertAllNamespacesAreCompatibleForReadTimestamp(
-                opCtx, catalog.get(), *resolvedNamespaces);
+                opCtx, catalog.get(), *resolvedNamespaces, readTimestamp);
         }
     }
 }
@@ -1047,6 +1052,401 @@ AutoGetCollectionForReadLockFreeLegacy::AutoGetCollectionForReadLockFreeLegacy(
             _secondaryNssIsAViewOrSharded = isAnySecondaryNamespaceAViewOrSharded;
         },
         options._secondaryNssOrUUIDs);
+}
+
+namespace {
+
+void openSnapshot(OperationContext* opCtx, bool isForOplogRead) {
+    if (isForOplogRead) {
+        opCtx->recoveryUnit()->preallocateSnapshotForOplogRead();
+    } else {
+        opCtx->recoveryUnit()->preallocateSnapshot();
+    }
+}
+
+/**
+ * Used as a return value for the following function.
+ */
+struct ConsistentCatalogAndSnapshot {
+    std::shared_ptr<const CollectionCatalog> catalog;
+    bool isAnySecondaryNamespaceAViewOrSharded;
+    RecoveryUnit::ReadSource readSource;
+    boost::optional<Timestamp> readTimestamp;
+};
+
+/**
+ * This function is responsible for acquiring an in-memory version of the CollectionCatalog and
+ * opening a snapshot such that the data contained in the in-memory CollectionCatalog matches the
+ * data in the durable catalog in that snapshot.
+ *
+ * It is used by readers who do not have any collection locks (a.k.a lock-free readers), and so
+ * there may be ongoing DDL operations concurrent with this function being called. This means we
+ * must take care to handle cases where the state of the catalog changes during the course of
+ * execution of this function.
+ *
+ * The high-level algorithm here is:
+ *  * Get the latest version of the catalog
+ *  * Open a snapshot
+ *  * Get the latest version of the catalog and check if it changed since opening the snapshot. If
+ *    it did, we need to retry, because that means that the version of the durable catalog that
+ *    would be read from the snapshot would be different from the in-memory CollectionCatalog.
+ *
+ * Note that it is still possible for the version of the CollectionCatalog obtained to be
+ * different from the durable catalog if there's a DDL operation pending commit at precisely the
+ * right time. This is okay because the CollectionCatalog tracks DDL entries pending commit and
+ * lock-free readers will check this state for the namespace they care about before deciding whether
+ * to use an entry from the CollectionCatalog or whether to read catalog information directly from
+ * the durable catalog instead.
+ *
+ * Also note that this retry algorithm is only necessary for readers who are not reading with a
+ * timestamp. Readers at points in time in the past (e.g. readers with the kProvided ReadSource)
+ * always will read directly from the durable catalog, and so it is not important for the in-memory
+ * CollectionCatalog to match the durable catalog for these readers. In the future, we may want to
+ * consider separating the code paths for timestamped and untimestamped writes, but for now, both
+ * cases flow through this same function.
+ *
+ * We also check for replication state changes before and after opening a snapshot, since the
+ * replication state determines the whether readers without a timestamp must read from the storage
+ * engine without a timestamp or whether they should read at the last applied timestamp. If the
+ * replication state changes, the opened snapshot is abandoned and the process is retried.
+ */
+ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
+    OperationContext* opCtx,
+    NamespaceStringOrUUID nsOrUUID,
+    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs,
+    const repl::ReadConcernArgs& readConcernArgs,
+    bool callerExpectedToConflictWithSecondaryBatchApplication) {
+    // Loop until we get a consistent catalog and snapshot or throw an exception.
+    while (true) {
+        // The read source used can change depending on replication state, so we must fetch the repl
+        // state beforehand, to compare with afterwards.
+        const auto replTermBeforeSnapshot = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+
+        const auto catalogBeforeSnapshot = CollectionCatalog::get(opCtx);
+
+        // TODO (SERVER-71222): This is broken if the UUID doesn't exist in the latest catalog.
+        const auto nss = catalogBeforeSnapshot->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
+
+        // This may modify the read source on the recovery unit for opCtx if the current read source
+        // is either kNoTimestamp or kLastApplied.
+        const bool shouldReadAtLastApplied = SnapshotHelper::changeReadSourceIfNeeded(opCtx, nss);
+
+        const auto resolvedSecondaryNamespaces = resolveSecondaryNamespacesOrUUIDs(
+            opCtx, catalogBeforeSnapshot.get(), secondaryNssOrUUIDs);
+
+        // If the collection requires capped snapshots (i.e. it is unreplicated, capped, not the
+        // oplog, and not clustered), establish a capped snapshot. This must happen before opening
+        // the storage snapshot to ensure a reader using tailable cursors would not miss any writes.
+        // See comments in getCollectionFromCatalog for why it is safe to establish the capped
+        // snapshot here, on the Collection object in the latest version of the catalog, even if
+        // openCollection is eventually called to construct a Collection object from the durable
+        // catalog.
+        establishCappedSnapshotIfNeeded(opCtx, catalogBeforeSnapshot, nsOrUUID, nss);
+
+        openSnapshot(opCtx, nss.isOplog());
+
+        const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
+        const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+
+        checkInvariantsForReadOptions(nss,
+                                      readConcernArgs.getArgsAfterClusterTime(),
+                                      readSource,
+                                      readTimestamp,
+                                      callerExpectedToConflictWithSecondaryBatchApplication,
+                                      shouldReadAtLastApplied);
+
+        if (resolvedSecondaryNamespaces) {
+            assertAllNamespacesAreCompatibleForReadTimestamp(
+                opCtx, catalogBeforeSnapshot.get(), *resolvedSecondaryNamespaces, readTimestamp);
+        }
+
+        // TODO (SERVER-71660): Use a catalog version instead of pointer comparison for catalog
+        // before and after snapshot.
+        const auto catalogAfterSnapshot = CollectionCatalog::get(opCtx);
+
+        const auto replTermAfterSnapshot = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+
+        if (haveAcquiredConsistentCatalogAndSnapshot(opCtx,
+                                                     catalogBeforeSnapshot.get(),
+                                                     catalogAfterSnapshot.get(),
+                                                     replTermBeforeSnapshot,
+                                                     replTermAfterSnapshot,
+                                                     resolvedSecondaryNamespaces)) {
+            bool isAnySecondaryNssShardedOrAView = !resolvedSecondaryNamespaces.has_value();
+            return {
+                catalogBeforeSnapshot, isAnySecondaryNssShardedOrAView, readSource, readTimestamp};
+        } else {
+            opCtx->recoveryUnit()->abandonSnapshot();
+
+            CurOp::get(opCtx)->yielded();
+        }
+    }
+}
+
+std::shared_ptr<const ViewDefinition> lookupView(
+    OperationContext* opCtx,
+    const std::shared_ptr<const CollectionCatalog>& catalog,
+    const NamespaceString& nss,
+    auto_get_collection::ViewMode viewMode) {
+    auto view = catalog->lookupView(opCtx, nss);
+    uassert(ErrorCodes::CommandNotSupportedOnView,
+            str::stream() << "Taking " << nss.ns() << " lock for timeseries is not allowed",
+            !view || viewMode == auto_get_collection::ViewMode::kViewsPermitted ||
+                !view->timeseries());
+    uassert(ErrorCodes::CommandNotSupportedOnView,
+            str::stream() << "Namespace " << nss.ns() << " is a view, not a collection",
+            !view || viewMode == auto_get_collection::ViewMode::kViewsPermitted);
+    return view;
+}
+
+const Collection* getCollectionFromCatalog(OperationContext* opCtx,
+                                           const std::shared_ptr<const CollectionCatalog>& catalog,
+                                           const NamespaceStringOrUUID& nsOrUUID,
+                                           const boost::optional<Timestamp>& readTimestamp) {
+    if (catalog->needsOpenCollection(opCtx, nsOrUUID, readTimestamp)) {
+        auto coll = catalog->openCollection(opCtx, nsOrUUID, readTimestamp).get();
+        if (coll) {
+            if (auto capSnap =
+                    CappedSnapshots::get(opCtx).getSnapshot(coll->getRecordStore()->getIdent())) {
+                // The only way openCollection can be required for a collection that uses capped
+                // snapshots (i.e. a collection that is unreplicated and capped) is:
+                //  * The present read operation is reading without a timestamp (since unreplicated
+                //    collections don't support timestamped reads), and
+                //  * When opening the storage snapshot (and thus when establishing the capped
+                //    snapshot), there was a DDL operation pending on the namespace or UUID
+                //    requested for this read (because this is the only time openCollection is
+                //    called for an untimestamped read).
+                //
+                // Because DDL operations require a collection X lock, there cannot have been any
+                // ongoing concurrent writes to the collection while establishing the capped
+                // snapshot. This means that if there was a capped snapshot, it should not have
+                // contained any uncommitted writes, and so the _lowestUncommittedRecord must be
+                // null.
+                invariant(!capSnap->hasUncommittedRecords());
+            }
+        }
+        return coll;
+    } else {
+        // It's safe to extract the raw pointer from the shared_ptr returned by
+        // lookupCollectionByNamespaceForRead, because the shared_ptr is owned by the catalog, which
+        // will remain valid for as long as we're using the collection returned here.
+        //
+        // TODO(SERVER-65011): It would be good to clean this up once the lookup APIs are unified.
+        if (nsOrUUID.nss()) {
+            return catalog->lookupCollectionByNamespaceForRead(opCtx, *nsOrUUID.nss()).get();
+        } else {
+            return catalog->lookupCollectionByUUIDForRead(opCtx, *nsOrUUID.uuid()).get();
+        }
+    }
+}
+
+std::tuple<NamespaceString, const Collection*, std::shared_ptr<const ViewDefinition>>
+getCollectionForLockFreeRead(OperationContext* opCtx,
+                             const std::shared_ptr<const CollectionCatalog>& catalog,
+                             boost::optional<Timestamp> readTimestamp,
+                             const NamespaceStringOrUUID& nsOrUUID,
+                             AutoGetCollection::Options options) {
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, nsOrUUID.db());
+
+    auto& hangBeforeAutoGetCollectionLockFreeShardedStateAccess =
+        *globalFailPointRegistry().find("hangBeforeAutoGetCollectionLockFreeShardedStateAccess");
+
+    hangBeforeAutoGetCollectionLockFreeShardedStateAccess.executeIf(
+        [&](auto&) { hangBeforeAutoGetCollectionLockFreeShardedStateAccess.pauseWhileSet(opCtx); },
+        [&](const BSONObj& data) {
+            return opCtx->getLogicalSessionId() &&
+                opCtx->getLogicalSessionId()->getId() == UUID::fromCDR(data["lsid"].uuid());
+        });
+
+    auto coll = getCollectionFromCatalog(opCtx, catalog, nsOrUUID, readTimestamp);
+
+    // TODO (SERVER-71222): This is broken if the UUID doesn't exist in the latest catalog.
+    //
+    // Note: This call to resolveNamespaceStringOrUUID must happen after getCollectionFromCatalog
+    // above, since getCollectionFromCatalog may call openCollection, which could change the result
+    // of namespace resolution.
+    const auto nss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
+    checkCollectionUUIDMismatch(opCtx, catalog, nss, coll, options._expectedUUID);
+
+    return {nss, coll, coll ? nullptr : lookupView(opCtx, catalog, nss, options._viewMode)};
+}
+
+static const Lock::GlobalLockSkipOptions kLockFreeReadsGlobalLockOptions{[] {
+    Lock::GlobalLockSkipOptions options;
+    options.skipRSTLLock = true;
+    return options;
+}()};
+
+CollectionPtr makeCollectionPtrForLockFreeReadSubOperation(OperationContext* opCtx,
+                                                           const Collection* coll) {
+    return {opCtx, coll, [](OperationContext*, UUID) -> const Collection* {
+                // A sub-operation should never yield because it would break the consistent
+                // in-memory and on-disk view of the higher level operation.
+                MONGO_UNREACHABLE;
+            }};
+}
+
+struct CatalogStateForNamespace {
+    std::shared_ptr<const CollectionCatalog> catalog;
+    bool isAnySecondaryNssShardedOrAView;
+    NamespaceString resolvedNss;
+    const Collection* collection;
+    std::shared_ptr<const ViewDefinition> view;
+};
+
+CatalogStateForNamespace acquireCatalogStateForNamespace(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    const repl::ReadConcernArgs& readConcernArgs,
+    bool callerExpectedToConflictWithSecondaryBatchApplication,
+    AutoGetCollection::Options options) {
+
+    auto [catalog, isAnySecondaryNssShardedOrAView, readSource, readTimestamp] =
+        getConsistentCatalogAndSnapshot(opCtx,
+                                        nsOrUUID,
+                                        options._secondaryNssOrUUIDs,
+                                        readConcernArgs,
+                                        callerExpectedToConflictWithSecondaryBatchApplication);
+
+    auto [resolvedNss, collection, view] =
+        getCollectionForLockFreeRead(opCtx, catalog, readTimestamp, nsOrUUID, options);
+
+    return CatalogStateForNamespace{
+        catalog, isAnySecondaryNssShardedOrAView, resolvedNss, collection, view};
+}
+
+boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
+makeShouldNotConflictWithSecondaryBatchApplicationBlock(OperationContext* opCtx,
+                                                        bool isLockFreeReadSubOperation) {
+    if (!isLockFreeReadSubOperation &&
+        allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx).value_or(true) &&
+        opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
+        return boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>(
+            opCtx->lockState());
+    } else {
+        return boost::none;
+    }
+}
+
+}  // namespace
+
+CollectionPtr::RestoreFn AutoGetCollectionForReadLockFreePITCatalog::_makeRestoreFromYieldFn(
+    const AutoGetCollection::Options& options,
+    bool callerExpectedToConflictWithSecondaryBatchApplication,
+    const DatabaseName& dbName) {
+    return [this, options, callerExpectedToConflictWithSecondaryBatchApplication, dbName](
+               OperationContext* opCtx, UUID uuid) -> const Collection* {
+        _catalogStasher.reset();
+
+        auto nsOrUUID = NamespaceStringOrUUID(dbName, uuid);
+        try {
+            auto catalogStateForNamespace = acquireCatalogStateForNamespace(
+                opCtx,
+                nsOrUUID,
+                repl::ReadConcernArgs::get(opCtx),
+                callerExpectedToConflictWithSecondaryBatchApplication,
+                options);
+
+            _resolvedNss = catalogStateForNamespace.resolvedNss;
+            _view = catalogStateForNamespace.view;
+            _catalogStasher.stash(std::move(catalogStateForNamespace.catalog));
+
+            return catalogStateForNamespace.collection;
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            // Calls to CollectionCatalog::resolveNamespaceStringOrUUID (called from
+            // acquireCatalogStateForNamespace) will result in a NamespaceNotFound error if the
+            // collection corresponding to the UUID passed as a parameter no longer exists. This can
+            // happen if this collection was dropped while the query was yielding.
+            //
+            // In this case, the query subsystem expects that this CollectionPtr::RestoreFn will
+            // result in a nullptr, so NamespaceNotFound errors are converted to nullptr here.
+            return nullptr;
+        }
+    };
+}
+
+AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITCatalog(
+    OperationContext* opCtx, NamespaceStringOrUUID nsOrUUID, AutoGetCollection::Options options)
+    : _originalReadSource(opCtx->recoveryUnit()->getTimestampReadSource()),
+      _isLockFreeReadSubOperation(opCtx->isLockFreeReadsOp()),  // This has to come before LFRBlock.
+      _catalogStasher(opCtx),
+      _callerExpectedToConflictWithSecondaryBatchApplication(
+          opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()),
+      _shouldNotConflictWithSecondaryBatchApplicationBlock(
+          makeShouldNotConflictWithSecondaryBatchApplicationBlock(opCtx,
+                                                                  _isLockFreeReadSubOperation)),
+      _lockFreeReadsBlock(opCtx),
+      _globalLock(opCtx,
+                  MODE_IS,
+                  options._deadline,
+                  Lock::InterruptBehavior::kThrow,
+                  kLockFreeReadsGlobalLockOptions) {
+
+    catalog_helper::setAutoGetCollectionWaitFailpointExecute(
+        [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); });
+
+    // Supported lock-free reads should only ever have an open storage snapshot prior to
+    // calling this helper if it is a nested lock-free operation. The storage snapshot and
+    // in-memory state used across lock=free reads must be consistent.
+    invariant(supportsLockFreeRead(opCtx) &&
+              (!opCtx->recoveryUnit()->isActive() || _isLockFreeReadSubOperation));
+
+    auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    if (_isLockFreeReadSubOperation) {
+        // If this instance is nested and lock-free, then we do not want to adjust any setting, but
+        // we do need to set up the Collection reference.
+        auto catalog = CollectionCatalog::get(opCtx);
+
+        auto [resolvedNss, collection, view] =
+            getCollectionForLockFreeRead(opCtx,
+                                         catalog,
+                                         opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx),
+                                         nsOrUUID,
+                                         options);
+        _resolvedNss = resolvedNss;
+        _view = view;
+
+        if (_view) {
+            _lockFreeReadsBlock.reset();
+        }
+        _collectionPtr = makeCollectionPtrForLockFreeReadSubOperation(opCtx, collection);
+    } else {
+        auto catalogStateForNamespace =
+            acquireCatalogStateForNamespace(opCtx,
+                                            nsOrUUID,
+                                            readConcernArgs,
+                                            _callerExpectedToConflictWithSecondaryBatchApplication,
+                                            options);
+
+        _resolvedNss = catalogStateForNamespace.resolvedNss;
+        _view = catalogStateForNamespace.view;
+
+        if (_view) {
+            _lockFreeReadsBlock.reset();
+        }
+        _catalogStasher.stash(std::move(catalogStateForNamespace.catalog));
+        _secondaryNssIsAViewOrSharded = catalogStateForNamespace.isAnySecondaryNssShardedOrAView;
+
+        _collectionPtr = CollectionPtr(
+            opCtx,
+            catalogStateForNamespace.collection,
+            _makeRestoreFromYieldFn(options,
+                                    _callerExpectedToConflictWithSecondaryBatchApplication,
+                                    _resolvedNss.dbName()));
+    }
+
+    if (_collectionPtr) {
+        assertReadConcernSupported(
+            _collectionPtr, readConcernArgs, opCtx->recoveryUnit()->getTimestampReadSource());
+
+        auto scopedCss = CollectionShardingState::acquire(opCtx, _collectionPtr->ns());
+        auto collDesc = scopedCss->getCollectionDescription(opCtx);
+        if (collDesc.isSharded()) {
+            _collectionPtr.setShardKeyPattern(collDesc.getKeyPattern());
+        }
+    } else {
+        invariant(!options._expectedUUID);
+    }
 }
 
 AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(

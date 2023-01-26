@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
@@ -63,18 +64,32 @@ ReadyIndexesIterator::ReadyIndexesIterator(OperationContext* const opCtx,
     : _opCtx(opCtx), _iterator(beginIterator), _endIterator(endIterator) {}
 
 const IndexCatalogEntry* ReadyIndexesIterator::_advance() {
+    auto pitFeatureEnabled = feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV();
     while (_iterator != _endIterator) {
         IndexCatalogEntry* entry = _iterator->get();
         ++_iterator;
 
-        if (auto minSnapshot = entry->getMinimumVisibleSnapshot()) {
-            auto mySnapshot =
-                _opCtx->recoveryUnit()->getPointInTimeReadTimestamp(_opCtx).get_value_or(
-                    _opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
+        // When the PointInTimeCatalogLookups feature flag is not enabled, it is necessary to check
+        // whether the operation's read timestamp is before or after the most recent index
+        // modification (indicated by the minimum visible snapshot on the IndexCatalogEntry). If the
+        // read timestamp is before the most recent index modification, we must not include this
+        // entry in the iterator.
+        //
+        // When the PointInTimeCatalogLookups feature flag is enabled, the index catalog entry will
+        // be constructed from the durable catalog for reads with a read timestamp older than the
+        // minimum valid snapshot for the collection (which reflects the most recent catalog
+        // modification for that collection, including index modifications), so there's no need to
+        // check the minimum visible snapshot of the entry here.
+        if (!pitFeatureEnabled) {
+            if (auto minSnapshot = entry->getMinimumVisibleSnapshot()) {
+                auto mySnapshot =
+                    _opCtx->recoveryUnit()->getPointInTimeReadTimestamp(_opCtx).get_value_or(
+                        _opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
 
-            if (!mySnapshot.isNull() && mySnapshot < minSnapshot.value()) {
-                // This index isn't finished in my snapshot.
-                continue;
+                if (!mySnapshot.isNull() && mySnapshot < minSnapshot.value()) {
+                    // This index isn't finished in my snapshot.
+                    continue;
+                }
             }
         }
 

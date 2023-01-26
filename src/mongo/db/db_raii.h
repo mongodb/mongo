@@ -360,32 +360,95 @@ private:
  *
  * This implementation uses the point-in-time (PIT) catalog.
  */
-class AutoGetCollectionForReadLockFreePITCatalog {
+class AutoGetCollectionForReadLockFreePITCatalog final {
 public:
     AutoGetCollectionForReadLockFreePITCatalog(OperationContext* opCtx,
-                                               const NamespaceStringOrUUID& nsOrUUID,
-                                               AutoGetCollection::Options options = {})
-        : _impl(opCtx, nsOrUUID, std::move(options)) {}
+                                               NamespaceStringOrUUID nsOrUUID,
+                                               AutoGetCollection::Options options = {});
 
     const CollectionPtr& getCollection() const {
-        return _impl.getCollection();
+        return _collectionPtr;
     }
 
     const ViewDefinition* getView() const {
-        return _impl.getView();
+        return _view.get();
     }
 
     const NamespaceString& getNss() const {
-        return _impl.getNss();
+        return _resolvedNss;
     }
 
     bool isAnySecondaryNamespaceAViewOrSharded() const {
-        return _impl.isAnySecondaryNamespaceAViewOrSharded();
+        return _secondaryNssIsAViewOrSharded;
     }
 
 private:
-    // TODO (SERVER-68271): Replace with new implementation using the PIT catalog.
-    AutoGetCollectionForReadLockFreeLegacy _impl;
+    /**
+     * Creates the std::function object used by CollectionPtrs to restore state for this
+     * AutoGetCollectionForReadLockFreePITCatalog object after having yielded.
+     */
+    CollectionPtr::RestoreFn _makeRestoreFromYieldFn(
+        const AutoGetCollection::Options& options,
+        bool callerExpectedToConflictWithSecondaryBatchApplication,
+        const DatabaseName& dbName);
+
+    // Used so that we can reset the read source back to the original read source when this instance
+    // of AutoGetCollectionForReadLockFreePITCatalog is destroyed.
+    RecoveryUnit::ReadSource _originalReadSource;
+
+    // Whether or not this AutoGetCollectionForReadLockFreePITCatalog is being constructed while
+    // there's already a lock-free read in progress.
+    bool _isLockFreeReadSubOperation;
+
+    // The CollectionCatalogStasher must outlive the LockFreeReadsBlock below. ~LockFreeReadsBlock
+    // clears a flag that the ~CollectionCatalogStasher checks.
+    //
+    // Is not assigned-to after construction, but will have reset/stash called on yield/restore.
+    CollectionCatalogStasher _catalogStasher;
+
+    // Whether or not the calling context expects to conflict with secondary batch application. This
+    // is just used for invariant checking.
+    bool _callerExpectedToConflictWithSecondaryBatchApplication;
+
+    // If this field is set, the reader will not take the ParallelBatchWriterMode lock and conflict
+    // with secondary batch application.
+    boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
+        _shouldNotConflictWithSecondaryBatchApplicationBlock;
+
+    // Increments a counter on the OperationContext for the number of lock-free reads when
+    // constructed, and decrements on destruction.
+    //
+    // Doesn't change after construction, but only set if it's a collection and not a view.
+    boost::optional<LockFreeReadsBlock> _lockFreeReadsBlock;
+
+    // This must be constructed after LockFreeReadsBlock since LockFreeReadsBlock sets a flag that
+    // GlobalLock uses in its constructor.
+    Lock::GlobalLock _globalLock;
+
+    // Holds the collection that was acquired from the catalog and logic for refetching the
+    // collection state from the catalog when restoring from yield.
+    //
+    // Doesn't change after construction.
+    CollectionPtr _collectionPtr;
+
+    // Tracks whether any secondary collection namespace is a view or is sharded.
+    //
+    // Doesn't change after construction, see comment in "EmplaceHelper".  Should NOT invariant that
+    // this is true when restoring from yield, because changing to be sharded is allowed, but
+    // changing to a view is not.
+    bool _secondaryNssIsAViewOrSharded{false};
+
+    // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it is
+    // the same as the input namespace string.
+    //
+    // May change after construction, when restoring from yield.
+    NamespaceString _resolvedNss;
+
+    // Only set if _collectionPtr does not contain a nullptr and if the requested namesapce is a
+    // view.
+    //
+    // May change after construction, when restoring from yield.
+    std::shared_ptr<const ViewDefinition> _view;
 };
 
 /**

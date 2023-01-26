@@ -769,6 +769,22 @@ void CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseName&
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
 }
 
+bool CollectionCatalog::needsOpenCollection(OperationContext* opCtx,
+                                            const NamespaceStringOrUUID& nsOrUUID,
+                                            boost::optional<Timestamp> readTimestamp) const {
+    if (readTimestamp) {
+        auto coll = (nsOrUUID.nss() ? lookupCollectionByNamespace(opCtx, *nsOrUUID.nss())
+                                    : lookupCollectionByUUID(opCtx, *nsOrUUID.uuid()));
+        return !coll || *readTimestamp < coll->getMinimumValidSnapshot();
+    } else {
+        if (nsOrUUID.nss()) {
+            return _pendingCommitNamespaces.find(*nsOrUUID.nss()) != _pendingCommitNamespaces.end();
+        } else {
+            return _pendingCommitUUIDs.find(*nsOrUUID.uuid()) != _pendingCommitUUIDs.end();
+        }
+    }
+}
+
 CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
                                                 const NamespaceStringOrUUID& nssOrUUID,
                                                 boost::optional<Timestamp> readTimestamp) const {

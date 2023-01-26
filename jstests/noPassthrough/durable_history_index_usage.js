@@ -11,6 +11,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/noPassthrough/libs/index_build.js");
+load("jstests/libs/feature_flag_util.js");
 
 const replTest = new ReplSetTest({
     nodes: 1,
@@ -48,7 +49,7 @@ const insert = function(document) {
         .operationTime;
 };
 
-const findWithIndex = function(atClusterTime, shouldSucceed) {
+const findWithIndex = function(atClusterTime, expectedErrCode) {
     let res = {};
     if (atClusterTime == undefined) {
         res = testDB().runCommand({find: jsTestName(), hint: indexSpec});
@@ -60,27 +61,30 @@ const findWithIndex = function(atClusterTime, shouldSucceed) {
         });
     }
 
-    if (shouldSucceed) {
+    if (expectedErrCode) {
+        assert.commandFailedWithCode(res, expectedErrCode);
+    } else {
         return assert.commandWorked(res);
     }
-
-    assert.commandFailedWithCode(res, [ErrorCodes.BadValue, ErrorCodes.SnapshotUnavailable]);
 };
+
+const pointInTimeCatalogLookupsAreEnabled =
+    FeatureFlagUtil.isEnabled(testDB(), "PointInTimeCatalogLookups");
 
 const oldestTS = insert({a: 0});
 jsTestLog("Oldest timestamp: " + tojson(oldestTS));
 
 // The index does not exist yet.
-findWithIndex(undefined, /*shouldSucceed=*/false);
-findWithIndex(oldestTS, /*shouldSucceed=*/false);
+findWithIndex(undefined, ErrorCodes.BadValue);
+findWithIndex(oldestTS, ErrorCodes.BadValue);
 
 const createIndexTS = assert.commandWorked(coll().createIndex(indexSpec)).operationTime;
 jsTestLog("Initial index creation timestamp: " + tojson(createIndexTS));
 
 // The index is only available for use as of the 'createIndexTS'.
-findWithIndex(oldestTS, /*shouldSucceed=*/false);
-assert.eq(1, findWithIndex(createIndexTS, /*shouldSucceed=*/true)["cursor"]["firstBatch"].length);
-assert.eq(1, findWithIndex(undefined, /*shouldSucceed=*/true)["cursor"]["firstBatch"].length);
+findWithIndex(oldestTS, ErrorCodes.BadValue);
+assert.eq(1, findWithIndex(createIndexTS)["cursor"]["firstBatch"].length);
+assert.eq(1, findWithIndex(undefined)["cursor"]["firstBatch"].length);
 
 // Rebuild the index without finishing it.
 assert.commandWorked(coll().dropIndex(indexSpec));
@@ -125,10 +129,33 @@ const checkLogs = function() {
 checkLogs();
 
 // The index is being re-created.
-findWithIndex(oldestTS, /*shouldSucceed=*/false);
-findWithIndex(createIndexTS, /*shouldSucceed=*/false);
-findWithIndex(preIndexCommitTS, /*shouldSucceed=*/false);
-findWithIndex(undefined, /*shouldSucceed=*/false);
+
+// When the PointInTimeCatalogLookups feature flag is enabled, it's possible to read prior to the
+// most recent DDL operation for the collection.
+//
+// At oldestTs, the index did not exist, so queries for the index at that timestamp will return
+// BadValue.
+//
+// At createIndexTS, the index did exist, so queries for the index at that timestamp will be
+// successful.
+//
+// At preIndexCommitTS, the new index has not finished being created yet, so queries for the index
+// at that timestamp will return BadValue.
+//
+// Etc.
+//
+// Generally speaking when the PointInTimeCatalogLookups feature flag is enabled, find queries
+// should all return the result one would expect based on the state of the catalog at that point in
+// time. When the feature flag is disabled, these find queries will instead return
+// SnapshotUnavailable.
+
+findWithIndex(
+    oldestTS,
+    pointInTimeCatalogLookupsAreEnabled ? ErrorCodes.BadValue : ErrorCodes.SnapshotUnavailable);
+findWithIndex(createIndexTS,
+              pointInTimeCatalogLookupsAreEnabled ? null : ErrorCodes.SnapshotUnavailable);
+findWithIndex(preIndexCommitTS, ErrorCodes.BadValue);
+findWithIndex(undefined, ErrorCodes.BadValue);
 
 const restartInsertTS = insert({a: 2});
 
@@ -156,32 +183,43 @@ checkLog.containsJson(primary(), 20663, {
 });
 IndexBuildTest.assertIndexes(coll(), 2, ["_id_", "a_1"]);
 
-// We can't use the index at earlier times than the index builds commit timestamp.
-findWithIndex(oldestTS, /*shouldSucceed=*/false);
-findWithIndex(createIndexTS, /*shouldSucceed=*/false);
-findWithIndex(preIndexCommitTS, /*shouldSucceed=*/false);
-findWithIndex(restartInsertTS, /*shouldSucceed=*/false);
+findWithIndex(
+    oldestTS,
+    pointInTimeCatalogLookupsAreEnabled ? ErrorCodes.BadValue : ErrorCodes.SnapshotUnavailable);
+findWithIndex(createIndexTS,
+              pointInTimeCatalogLookupsAreEnabled ? null : ErrorCodes.SnapshotUnavailable);
+findWithIndex(
+    preIndexCommitTS,
+    pointInTimeCatalogLookupsAreEnabled ? ErrorCodes.BadValue : ErrorCodes.SnapshotUnavailable);
+findWithIndex(restartInsertTS, ErrorCodes.BadValue);
 
-assert.eq(3, findWithIndex(undefined, /*shouldSucceed=*/true)["cursor"]["firstBatch"].length);
+assert.eq(3, findWithIndex(undefined)["cursor"]["firstBatch"].length);
 
 const finalInsertTS = insert({a: 3});
-assert.eq(4, findWithIndex(finalInsertTS, /*shouldSucceed=*/true)["cursor"]["firstBatch"].length);
-assert.eq(4, findWithIndex(undefined, /*shouldSucceed=*/true)["cursor"]["firstBatch"].length);
+assert.eq(4, findWithIndex(finalInsertTS)["cursor"]["firstBatch"].length);
+assert.eq(4, findWithIndex(undefined)["cursor"]["firstBatch"].length);
 
 // Demonstrate that durable history can be used across a restart with a finished index.
 assert.commandWorked(testDB().adminCommand({fsync: 1}));
 replTest.restart(primary());
 
-assert.eq(4, findWithIndex(undefined, /*shouldSucceed=*/true)["cursor"]["firstBatch"].length);
-assert.eq(5, findWithIndex(insert({a: 4}), /*shouldSucceed=*/true)["cursor"]["firstBatch"].length);
-assert.eq(5, findWithIndex(undefined, /*shouldSucceed=*/true)["cursor"]["firstBatch"].length);
+assert.eq(4, findWithIndex(undefined)["cursor"]["firstBatch"].length);
+assert.eq(5, findWithIndex(insert({a: 4}))["cursor"]["firstBatch"].length);
+assert.eq(5, findWithIndex(undefined)["cursor"]["firstBatch"].length);
 
-findWithIndex(oldestTS, /*shouldSucceed=*/false);
-findWithIndex(createIndexTS, /*shouldSucceed=*/false);
-findWithIndex(preIndexCommitTS, /*shouldSucceed=*/false);
-findWithIndex(restartInsertTS, /*shouldSucceed=*/false);
+findWithIndex(
+    oldestTS,
+    pointInTimeCatalogLookupsAreEnabled ? ErrorCodes.BadValue : ErrorCodes.SnapshotUnavailable);
+findWithIndex(createIndexTS,
+              pointInTimeCatalogLookupsAreEnabled ? null : ErrorCodes.SnapshotUnavailable);
+findWithIndex(
+    preIndexCommitTS,
+    pointInTimeCatalogLookupsAreEnabled ? ErrorCodes.BadValue : ErrorCodes.SnapshotUnavailable);
+findWithIndex(
+    restartInsertTS,
+    pointInTimeCatalogLookupsAreEnabled ? ErrorCodes.BadValue : ErrorCodes.SnapshotUnavailable);
 
-assert.eq(4, findWithIndex(finalInsertTS, /*shouldSucceed=*/true)["cursor"]["firstBatch"].length);
+assert.eq(4, findWithIndex(finalInsertTS)["cursor"]["firstBatch"].length);
 
 replTest.stopSet();
 })();

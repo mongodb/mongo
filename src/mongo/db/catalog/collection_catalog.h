@@ -216,6 +216,21 @@ public:
     void reloadViews(OperationContext* opCtx, const DatabaseName& dbName) const;
 
     /**
+     * Returns true if catalog information about this namespace or UUID should be looked up from the
+     * durable catalog rather than using the in-memory state of the catalog.
+     *
+     * This is true when either:
+     *  - The readTimestamp is prior to the minimum valid timestamp for the collection corresponding
+     *    to this namespace, or
+     *  - There's no read timestamp provided and this namespace has a pending DDL operation that has
+     *    not completed yet (which would imply that the latest version of the catalog may or may not
+     *    match the state of the durable catalog for this collection).
+     */
+    bool needsOpenCollection(OperationContext* opCtx,
+                             const NamespaceStringOrUUID& nsOrUUID,
+                             boost::optional<Timestamp> readTimestamp) const;
+
+    /**
      * Returns the collection pointer representative of 'nssOrUUID' at the provided read timestamp.
      * If no timestamp is provided, returns instance of the latest collection. The returned
      * collection instance is only valid while the storage snapshot is open and becomes invalidated

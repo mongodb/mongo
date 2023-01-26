@@ -17,6 +17,7 @@
  */
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/feature_flag_util.js");
 
 (function() {
 "use strict";
@@ -39,6 +40,14 @@ function testReadConcernLevel(level) {
         replTest.getPrimary().getDB("test").getMongo().startSession({causalConsistency: false});
     const db = session.getDatabase("test");
     const t = db.coll;
+
+    // TODO(SERVER-72959): Adjust this test to work properly with point-in-time reads. When
+    // point-in-time catalog reads are enabled, reads no longer block waiting for the majority
+    // commit point to advance, which breaks the assumptions of the test.
+    if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
+        replTest.stopSet();
+        return;
+    }
 
     function assertNoSnapshotAvailableForReadConcernLevel() {
         var res =

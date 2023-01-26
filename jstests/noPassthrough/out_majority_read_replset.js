@@ -6,6 +6,7 @@
 "use strict";
 
 load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries.
+load("jstests/libs/feature_flag_util.js");
 
 const rst = new ReplSetTest({nodes: 2, nodeOptions: {enableMajorityReadConcern: ""}});
 
@@ -14,6 +15,14 @@ rst.initiate();
 
 const name = "out_majority_read";
 const db = rst.getPrimary().getDB(name);
+
+// TODO(SERVER-72958): Adjust this test to work properly with point-in-time reads. When
+// point-in-time catalog reads are enabled, reads no longer block waiting for the majority
+// commit point to advance, which breaks the assumptions of the test.
+if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
+    rst.stopSet();
+    return;
+}
 
 const sourceColl = db.sourceColl;
 

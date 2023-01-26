@@ -215,13 +215,18 @@ StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opC
                                                            StorageEngine* storageEngine,
                                                            Collection* collection,
                                                            RecordId catalogId,
-                                                           const StringData& indexName) {
+                                                           StringData indexName) {
+    // TODO(SERVER-72111): Remove the need for this durable catalog lookup.
+    const std::string ident =
+        DurableCatalog::get(opCtx)->getIndexIdent(opCtx, catalogId, indexName);
+
     // First check the index catalog of the existing collection for the index entry.
     auto latestEntry = [&]() -> std::shared_ptr<IndexCatalogEntry> {
         if (!collection)
             return nullptr;
 
-        auto desc = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
+        auto desc = collection->getIndexCatalog()->findIndexByIdent(
+            opCtx, nullptr /*unused parameter*/, ident);
         if (!desc)
             return nullptr;
         return collection->getIndexCatalog()->getEntryShared(desc);
@@ -230,10 +235,6 @@ StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opC
     if (latestEntry) {
         return latestEntry->getSharedIdent();
     }
-
-    // TODO(SERVER-72111): Remove the need for this durable catalog lookup.
-    const std::string ident =
-        DurableCatalog::get(opCtx)->getIndexIdent(opCtx, catalogId, indexName);
 
     // Next check the CollectionCatalog for a compatible drop pending index.
     auto dropPendingEntry = CollectionCatalog::get(opCtx)->findDropPendingIndex(ident);

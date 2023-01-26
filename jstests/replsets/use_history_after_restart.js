@@ -12,10 +12,14 @@
  * @tags: [
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   multiversion_incompatible, # TODO(SERVER-73055): Remove this tag.
  * ]
  */
+
 (function() {
 "use strict";
+
+load("jstests/libs/feature_flag_util.js");
 
 let replTest = new ReplSetTest({
     name: "use_history_after_restart",
@@ -119,7 +123,14 @@ assert.eq(2, result["cursor"]["firstBatch"].length);
 result = primary.getDB("test").runCommand(
     {find: "dneAtOldestTs", readConcern: {level: "snapshot", atClusterTime: oldestTimestamp}});
 jsTestLog({"SnapshotUnavailable on dneAtOldestTs": result});
-assert.commandFailedWithCode(result, ErrorCodes.SnapshotUnavailable);
+
+if (FeatureFlagUtil.isEnabled(primary.getDB("test"), "PointInTimeCatalogLookups")) {
+    // The collection does not exist at this time so find will return an empty result set.
+    assert.commandWorked(result);
+    assert.eq(0, result["cursor"]["firstBatch"].length);
+} else {
+    assert.commandFailedWithCode(result, ErrorCodes.SnapshotUnavailable);
+}
 
 // Querying `dneAtOldestTs` at the stable timestamp should succeed with a correct result.
 result = primary.getDB("test").runCommand(

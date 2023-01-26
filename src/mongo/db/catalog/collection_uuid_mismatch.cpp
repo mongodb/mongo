@@ -34,15 +34,24 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 
 namespace mongo {
+
 void checkCollectionUUIDMismatch(OperationContext* opCtx,
                                  const NamespaceString& ns,
                                  const CollectionPtr& coll,
+                                 const boost::optional<UUID>& uuid) {
+    checkCollectionUUIDMismatch(opCtx, CollectionCatalog::get(opCtx), ns, coll.get(), uuid);
+}
+
+void checkCollectionUUIDMismatch(OperationContext* opCtx,
+                                 const std::shared_ptr<const CollectionCatalog>& catalog,
+                                 const NamespaceString& ns,
+                                 const Collection* coll,
                                  const boost::optional<UUID>& uuid) {
     if (!uuid) {
         return;
     }
 
-    auto actualNamespace = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *uuid);
+    auto actualNamespace = catalog->lookupNSSByUUID(opCtx, *uuid);
     uassert(
         (CollectionUUIDMismatchInfo{ns.dbName(),
                                     *uuid,
@@ -53,4 +62,5 @@ void checkCollectionUUIDMismatch(OperationContext* opCtx,
         "Collection UUID does not match that specified",
         coll && coll->uuid() == *uuid);
 }
+
 }  // namespace mongo
