@@ -52,7 +52,7 @@ class _SingleJSTestCase(interface.ProcessTestCase):
             # dataPath property is the dataDir property with a trailing slash.
             data_path = os.path.join(data_dir, "")
         else:
-            data_path = global_vars["MongoRunner.dataPath"]
+            data_path = os.path.join(os.path.abspath(global_vars["MongoRunner.dataPath"]), "")
 
         global_vars["MongoRunner.dataDir"] = data_dir
         global_vars["MongoRunner.dataPath"] = data_path
@@ -104,8 +104,9 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         data_dir_prefix = utils.default_if_none(config.DBPATH_PREFIX,
                                                 global_vars.get("MongoRunner.dataDir"))
         data_dir_prefix = utils.default_if_none(data_dir_prefix, config.DEFAULT_DBPATH_PREFIX)
-        return os.path.join(data_dir_prefix, "job%d" % self.fixture.job_num,
-                            config.MONGO_RUNNER_SUBDIR)
+        return os.path.abspath(
+            os.path.join(data_dir_prefix, "job%d" % self.fixture.job_num,
+                         config.MONGO_RUNNER_SUBDIR))
 
     def _make_process(self):
         return core.programs.mongo_shell_program(
