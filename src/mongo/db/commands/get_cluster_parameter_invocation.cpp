@@ -32,6 +32,7 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/commands/get_cluster_parameter_invocation.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -42,7 +43,10 @@ namespace mongo {
 
 std::pair<std::vector<std::string>, std::vector<BSONObj>>
 GetClusterParameterInvocation::retrieveRequestedParameters(
-    OperationContext* opCtx, const CmdBody& cmdBody, const boost::optional<TenantId>& tenantId) {
+    OperationContext* opCtx,
+    const CmdBody& cmdBody,
+    const boost::optional<TenantId>& tenantId,
+    bool excludeClusterParameterTime) {
     ServerParameterSet* clusterParameters = ServerParameterSet::getClusterParameterSet();
     std::vector<std::string> parameterNames;
     std::vector<BSONObj> parameterValues;
@@ -55,7 +59,13 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
         if (requestedParameter->isEnabled()) {
             BSONObjBuilder bob;
             requestedParameter->append(opCtx, &bob, requestedParameter->name(), tenantId);
-            parameterValues.push_back(bob.obj().getOwned());
+            auto paramObj = bob.obj().getOwned();
+            if (excludeClusterParameterTime) {
+                parameterValues.push_back(
+                    paramObj.filterFieldsUndotted(BSON("clusterParameterTime" << true), false));
+            } else {
+                parameterValues.push_back(paramObj);
+            }
             parameterNames.push_back(requestedParameter->name());
         }
     };
@@ -109,8 +119,13 @@ GetClusterParameterInvocation::Reply GetClusterParameterInvocation::getCachedPar
     OperationContext* opCtx, const GetClusterParameter& request) {
     const CmdBody& cmdBody = request.getCommandParameter();
 
+    auto* repl = repl::ReplicationCoordinator::get(opCtx);
+    bool isStandalone = repl &&
+        repl->getReplicationMode() == repl::ReplicationCoordinator::modeNone &&
+        serverGlobalParams.clusterRole == ClusterRole::None;
+
     auto [parameterNames, parameterValues] =
-        retrieveRequestedParameters(opCtx, cmdBody, request.getDbName().tenantId());
+        retrieveRequestedParameters(opCtx, cmdBody, request.getDbName().tenantId(), isStandalone);
 
     LOGV2_DEBUG(6226100,
                 2,
@@ -134,8 +149,8 @@ GetClusterParameterInvocation::Reply GetClusterParameterInvocation::getDurablePa
     BSONObjBuilder inObjBuilder = queryDocBuilder.subobjStart("_id"_sd);
     BSONArrayBuilder parameterNameBuilder = inObjBuilder.subarrayStart("$in"_sd);
 
-    auto [requestedParameterNames, parameterValues] =
-        retrieveRequestedParameters(opCtx, cmdBody, request.getDbName().tenantId());
+    auto [requestedParameterNames, parameterValues] = retrieveRequestedParameters(
+        opCtx, cmdBody, request.getDbName().tenantId(), false /* excludeClusterParameterTime */);
 
     for (const auto& parameterValue : parameterValues) {
         parameterNameBuilder.append(parameterValue["_id"_sd].String());

@@ -34,12 +34,21 @@
 #include "mongo/base/status.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/change_streams_cluster_parameter_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
 
 namespace mongo {
 
 Status validateChangeStreamsClusterParameter(
     const ChangeStreamsClusterParameterStorage& clusterParameter,
     const boost::optional<TenantId>& tenantId) {
+    auto* repl = repl::ReplicationCoordinator::get(getGlobalServiceContext());
+    bool isStandalone = repl &&
+        repl->getReplicationMode() == repl::ReplicationCoordinator::modeNone &&
+        serverGlobalParams.clusterRole == ClusterRole::None;
+    if (isStandalone) {
+        return {ErrorCodes::IllegalOperation,
+                "The 'changeStreams' parameter is unsupported in standalone."};
+    }
     if (!change_stream_serverless_helpers::canRunInTargetEnvironment()) {
         return Status(
             ErrorCodes::CommandNotSupported,

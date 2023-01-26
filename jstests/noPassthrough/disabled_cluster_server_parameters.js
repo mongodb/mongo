@@ -15,6 +15,17 @@ load('jstests/libs/cluster_server_parameter_utils.js');
 
 // Verifies that test-only parameters are disabled and excluded when enableTestCommands is false.
 TestData.enableTestCommands = false;
+// If feature flag enabling standalone cluster parameters is enabled, test on standalone.
+const mongo = MongoRunner.runMongod({});
+if (FeatureFlagUtil.isEnabled(mongo.getDB('admin'), 'AuditConfigClusterParameter')) {
+    setupNode(mongo);
+    // Assert that turning off enableTestCommands prevents test-only cluster server parameters
+    // from being directly set/retrieved and filters them from the output of
+    // getClusterParameter: '*'.
+    testDisabledClusterParameters(mongo);
+}
+MongoRunner.stopMongod(mongo);
+
 const rst = new ReplSetTest({
     nodes: 3,
 });
@@ -23,10 +34,6 @@ rst.initiate();
 
 // Setup the necessary logging level for the test.
 setupReplicaSet(rst);
-
-// Assert that turning off enableTestCommands prevents test-only cluster server parameters
-// from being directly set/retrieved and filters them from the output of
-// getClusterParameter: '*'.
 testDisabledClusterParameters(rst);
 rst.stopSet();
 

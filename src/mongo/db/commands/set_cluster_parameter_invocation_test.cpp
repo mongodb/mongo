@@ -216,7 +216,7 @@ TEST(SetClusterParameterCommand, ThrowsWithNonObjectParameter) {
 
     ASSERT_THROWS_CODE(fixture.invoke(&spyCtx, testCmd, boost::none, kMajorityWriteConcern),
                        DBException,
-                       ErrorCodes::IllegalOperation);
+                       ErrorCodes::BadValue);
 }
 
 TEST(SetClusterParameterCommand, ThrowsWhenServerParameterValidationFails) {

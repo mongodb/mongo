@@ -84,11 +84,11 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
     const boost::optional<TenantId>& tenantId,
     bool skipValidation) {
     BSONElement commandElement = cmdParamObj.firstElement();
-    uassert(ErrorCodes::IllegalOperation,
+    uassert(ErrorCodes::BadValue,
             "Cluster parameter value must be an object",
             BSONType::Object == commandElement.type());
 
-    uassert(ErrorCodes::IllegalOperation,
+    uassert(ErrorCodes::BadValue,
             str::stream() << "Server parameter: '" << sp->name() << "' is disabled",
             skipValidation || sp->isEnabled());
 

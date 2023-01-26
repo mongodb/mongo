@@ -36,6 +36,7 @@
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/get_cluster_parameter_invocation.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/logv2/log.h"
 
@@ -69,12 +70,13 @@ public:
         using InvocationBase::InvocationBase;
 
         Reply typedRun(OperationContext* opCtx) {
-            // TODO SERVER-65249: This will eventually be made specific to the parameter being set
-            // so that some parameters will be able to use getClusterParameter even on standalones.
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << Request::kCommandName << " cannot be run on standalones",
-                    repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
-                        repl::ReplicationCoordinator::modeNone);
+            if (!feature_flags::gFeatureFlagAuditConfigClusterParameter.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                uassert(ErrorCodes::IllegalOperation,
+                        str::stream() << Request::kCommandName << " cannot be run on standalones",
+                        repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
+                            repl::ReplicationCoordinator::modeNone);
+            }
 
             GetClusterParameterInvocation invocation;
             return invocation.getCachedParameters(opCtx, request());

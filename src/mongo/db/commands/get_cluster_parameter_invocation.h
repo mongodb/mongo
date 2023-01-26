@@ -55,7 +55,10 @@ private:
     // Parses the command body and retrieves the BSON representation and names of the requested
     // cluster parameters for the given tenant.
     std::pair<std::vector<std::string>, std::vector<BSONObj>> retrieveRequestedParameters(
-        OperationContext* opCtx, const CmdBody& cmdBody, const boost::optional<TenantId>& tenantId);
+        OperationContext* opCtx,
+        const CmdBody& cmdBody,
+        const boost::optional<TenantId>& tenantId,
+        bool excludeClusterParameterTime);
 };
 
 }  // namespace mongo

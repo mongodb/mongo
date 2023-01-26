@@ -26,6 +26,7 @@ const kNonTestOnlyClusterParameters = {
             {preAndPostImages: {expireAfterSeconds: 20}}
         ],
         featureFlag: '!ServerlessChangeStreams',
+        standaloneIncompatible: true,
     },
     changeStreams: {
         default: {expireAfterSeconds: NumberLong(3600)},
@@ -33,6 +34,7 @@ const kNonTestOnlyClusterParameters = {
         featureFlag: 'ServerlessChangeStreams',
         setParameters: {'multitenancySupport': true},
         serverless: true,
+        standaloneIncompatible: true,
     },
 };
 
@@ -108,8 +110,19 @@ function considerParameter(paramName, conn) {
         return true;
     }
 
+    // Check if the current CWSP should be run in standalone.
+    function validateStandalone(cp) {
+        if (cp.hasOwnProperty("standaloneIncompatible")) {
+            const hello = conn.getDB("admin").runCommand({hello: 1});
+            const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
+            return !isStandalone;
+        }
+        return true;
+    }
+
     const cp = kAllClusterParameters[paramName] || {};
-    return validateFeatureFlag(cp) && validateSetParameter(cp) && validateServerless(cp);
+    return validateFeatureFlag(cp) && validateSetParameter(cp) && validateServerless(cp) &&
+        validateStandalone(cp);
 }
 
 function tenantCommand(command, tenantId) {
@@ -278,7 +291,7 @@ function testValidClusterParameterCommands(conn) {
         runGetClusterParameterReplicaSet(
             conn, kAllClusterParameterNames, kAllClusterParameterValues2);
         runGetClusterParameterReplicaSet(conn, '*', kAllClusterParameterValues2);
-    } else {
+    } else if (conn instanceof ShardingTest) {
         // Run getClusterParameter in list format and '*' and ensure it returns all default values
         // on all nodes in the sharded cluster.
         runGetClusterParameterSharded(
@@ -302,6 +315,30 @@ function testValidClusterParameterCommands(conn) {
         // return updated values.
         runGetClusterParameterSharded(conn, kAllClusterParameterNames, kAllClusterParameterValues2);
         runGetClusterParameterSharded(conn, '*', kAllClusterParameterValues2);
+    } else {  // Standalone
+        // Run getClusterParameter in list format and '*' and ensure it returns all default values.
+        assert(runGetClusterParameterNode(
+            conn, kAllClusterParameterNames, kAllClusterParameterDefaults));
+        assert(runGetClusterParameterNode(conn, '*', kAllClusterParameterDefaults));
+
+        // For each parameter, run setClusterParameter and verify that getClusterParameter
+        // returns the updated value.
+        for (let i = 0; i < kAllClusterParameterNames.length; i++) {
+            runSetClusterParameter(conn, kAllClusterParameterValues1[i]);
+            assert(runGetClusterParameterNode(
+                conn, kAllClusterParameterNames[i], [kAllClusterParameterValues1[i]]));
+
+            // Verify that document updates are also handled properly.
+            runSetClusterParameter(conn, kAllClusterParameterValues2[i]);
+            assert(runGetClusterParameterNode(
+                conn, kAllClusterParameterNames[i], [kAllClusterParameterValues2[i]]));
+        }
+
+        // Finally, run getClusterParameter in list format and '*' and ensure that they now return
+        // updated values.
+        assert(runGetClusterParameterNode(
+            conn, kAllClusterParameterNames, kAllClusterParameterValues2));
+        assert(runGetClusterParameterNode(conn, '*', kAllClusterParameterValues2));
     }
 }
 
@@ -396,7 +433,7 @@ function testDisabledClusterParameters(conn, tenantId) {
         assert.commandFailedWithCode(
             adminDB.runCommand(tenantCommand(
                 {setClusterParameter: {testIntClusterParameter: {intData: 5}}}, tenantId)),
-            ErrorCodes.IllegalOperation);
+            ErrorCodes.BadValue);
 
         // Assert that explicitly getting a disabled cluster server parameter fails on the primary.
         testExplicitDisabledGetClusterParameter(conn.getPrimary(), tenantId);
@@ -409,13 +446,13 @@ function testDisabledClusterParameters(conn, tenantId) {
         // Assert that getClusterParameter: '*' succeeds but only returns enabled cluster
         // parameters.
         runGetClusterParameterReplicaSet(conn, '*', kNonTestOnlyClusterParameterDefaults, tenantId);
-    } else {
+    } else if (conn instanceof ShardingTest) {
         // Assert that explicitly setting a disabled cluster server parameter fails.
         const adminDB = conn.s0.getDB('admin');
         assert.commandFailedWithCode(
             adminDB.runCommand(tenantCommand(
                 {setClusterParameter: {testIntClusterParameter: {intData: 5}}}, tenantId)),
-            ErrorCodes.IllegalOperation);
+            ErrorCodes.BadValue);
 
         // Assert that explicitly getting a disabled cluster server parameter fails on mongos.
         testExplicitDisabledGetClusterParameter(conn.s0, tenantId);
@@ -439,6 +476,21 @@ function testDisabledClusterParameters(conn, tenantId) {
         // Assert that getClusterParameter: '*' succeeds but only returns enabled cluster
         // parameters.
         runGetClusterParameterSharded(conn, '*', kNonTestOnlyClusterParameterDefaults, tenantId);
+    } else {  // Standalone
+        // Assert that explicitly setting a disabled cluster server parameter fails.
+        const adminDB = conn.getDB('admin');
+        assert.commandFailedWithCode(
+            adminDB.runCommand(tenantCommand(
+                {setClusterParameter: {testIntClusterParameter: {intData: 5}}}, tenantId)),
+            ErrorCodes.BadValue);
+
+        // Assert that explicitly getting a disabled cluster server parameter fails.
+        testExplicitDisabledGetClusterParameter(conn, tenantId);
+
+        // Assert that getClusterParameter: '*' succeeds but only returns enabled cluster
+        // parameters.
+        assert(
+            runGetClusterParameterNode(conn, '*', kNonTestOnlyClusterParameterDefaults, tenantId));
     }
 }
 
@@ -487,7 +539,7 @@ function testInvalidClusterParameterCommands(conn, tenantId) {
             // Assert that invalid uses of getClusterParameter fail on secondaries.
             testInvalidGetClusterParameter(secondary, tenantId);
         });
-    } else {
+    } else if (conn instanceof ShardingTest) {
         const adminDB = conn.s0.getDB('admin');
 
         // Assert that invalid uses of getClusterParameter fail on mongos.
@@ -542,5 +594,18 @@ function testInvalidClusterParameterCommands(conn, tenantId) {
             // Assert that invalid forms of getClusterParameter fail on configsvr secondaries.
             testInvalidGetClusterParameter(secondary, tenantId);
         });
+    } else {  // Standalone
+        const adminDB = conn.getDB('admin');
+
+        // Assert that invalid uses of getClusterParameter fail.
+        testInvalidGetClusterParameter(conn, tenantId);
+
+        // Assert that setting a nonexistent parameter returns an error.
+        assert.commandFailed(adminDB.runCommand(
+            tenantCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}, tenantId)));
+
+        // Assert that running setClusterParameter with a scalar value fails.
+        assert.commandFailed(adminDB.runCommand(
+            tenantCommand({setClusterParameter: {testIntClusterParameter: 5}}, tenantId)));
     }
 }

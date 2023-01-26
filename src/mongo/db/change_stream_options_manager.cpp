@@ -33,6 +33,7 @@
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_options_parameter_gen.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -97,6 +98,14 @@ Status ChangeStreamOptionsParameter::set(const BSONElement& newValueElement,
 
 Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement,
                                               const boost::optional<TenantId>& tenantId) const {
+    auto* repl = repl::ReplicationCoordinator::get(getGlobalServiceContext());
+    bool isStandalone = repl &&
+        repl->getReplicationMode() == repl::ReplicationCoordinator::modeNone &&
+        serverGlobalParams.clusterRole == ClusterRole::None;
+    if (isStandalone) {
+        return {ErrorCodes::IllegalOperation,
+                "The 'changeStreamOptions' parameter is unsupported in standalone."};
+    }
     try {
         BSONObj changeStreamOptionsObj = newValueElement.Obj();
         Status validateStatus = Status::OK();

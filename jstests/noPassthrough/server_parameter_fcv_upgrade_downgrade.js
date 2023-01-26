@@ -3,6 +3,8 @@
 (function() {
 'use strict';
 
+load("jstests/libs/feature_flag_util.js");
+
 function assertParamExistenceInGetParamStar(output, param, expected) {
     if (output.hasOwnProperty('clusterParameters')) {
         const findRes = output.clusterParameters.find(cp => cp._id === param);
@@ -65,11 +67,28 @@ function runDowngradeUpgradeTestForSP(conn, isMongod) {
     }
 }
 
-function runDowngradeUpgradeTestForCWSP(conn, isMongod, verifyStateCallback) {
+function runDowngradeUpgradeTestForCWSP(conn, isMongod, isStandalone, verifyStateCallback) {
     for (let sp of ['cwspTestNeedsLatestFCV', 'cwspTestNeedsFeatureFlagBlender']) {
-        function assertCPFailed(cmd) {
+        const admin = conn.getDB('admin');
+
+        function assertGetFailed(cmd) {
             const err = assert.commandFailed(cmd).errmsg;
-            assert.eq(err, "Server parameter: '" + sp + "' is disabled");
+            if (isStandalone && !FeatureFlagUtil.isEnabled(admin, 'AuditConfigClusterParameter')) {
+                // In this case, we fail earlier with a different error at the command level.
+                assert.eq(err, "getClusterParameter cannot be run on standalones");
+            } else {
+                assert.eq(err, "Server parameter: '" + sp + "' is disabled");
+            }
+        }
+
+        function assertSetFailed(cmd) {
+            const err = assert.commandFailed(cmd).errmsg;
+            if (isStandalone && !FeatureFlagUtil.isEnabled(admin, 'AuditConfigClusterParameter')) {
+                // In this case, we fail earlier with a different error at the command level.
+                assert.eq(err, "setClusterParameter cannot be run on standalones");
+            } else {
+                assert.eq(err, "Server parameter: '" + sp + "' is disabled");
+            }
         }
 
         function val(res) {
@@ -78,7 +97,6 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, verifyStateCallback) {
             return (obj === undefined) ? 0 : obj.intData;
         }
 
-        const admin = conn.getDB('admin');
         const initial = assert.commandWorked(admin.runCommand({getClusterParameter: sp}));
         const initval = val(initial);
 
@@ -95,17 +113,22 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, verifyStateCallback) {
 
         // Downgrade FCV and ensure we can't set, and get either fails (if FCV is known by the
         // server) or gets the default value (if it is not).
+        // If our downgrade takes us below the minimum FCV for
+        // featureFlagAuditConfigClusterParameter, we expect all cluster parameter commands to fail
+        // for standalone.
         assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
         if (isMongod) {
-            assertCPFailed(admin.runCommand({getClusterParameter: sp}));
+            assertGetFailed(admin.runCommand({getClusterParameter: sp}));
         } else {
             const afterDowngrade =
                 assert.commandWorked(admin.runCommand({getClusterParameter: sp}));
             assert.eq(val(afterDowngrade), initval);
         }
-        assertCPFailed(admin.runCommand({setClusterParameter: {[sp]: {intData: updateVal + 1}}}));
-        assertParamExistenceInGetParamStar(
-            assert.commandWorked(admin.runCommand({getClusterParameter: "*"})), sp, !isMongod);
+        assertSetFailed(admin.runCommand({setClusterParameter: {[sp]: {intData: updateVal + 1}}}));
+        if (!(isStandalone && !FeatureFlagUtil.isEnabled(admin, 'AuditConfigClusterParameter'))) {
+            assertParamExistenceInGetParamStar(
+                assert.commandWorked(admin.runCommand({getClusterParameter: "*"})), sp, !isMongod);
+        }
         if (verifyStateCallback !== undefined) {
             verifyStateCallback(sp, false);
         }
@@ -128,7 +151,11 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, verifyStateCallback) {
 {
     jsTest.log('START standalone');
     const standalone = MongoRunner.runMongod({setParameter: {featureFlagBlender: true}});
-    runDowngradeUpgradeTestForSP(standalone, true);
+    runDowngradeUpgradeTestForSP(standalone, true /* isMongod */);
+    if (FeatureFlagUtil.isEnabled(standalone.getDB('admin'), 'AuditConfigClusterParameter')) {
+        // This feature flag enables standalone cluster parameters.
+        runDowngradeUpgradeTestForCWSP(standalone, true /* isMongod */, true /* isStandalone */);
+    }
     MongoRunner.stopMongod(standalone);
     jsTest.log('END standalone');
 }
@@ -139,8 +166,8 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, verifyStateCallback) {
         new ReplSetTest({nodes: 3, nodeOptions: {setParameter: {featureFlagBlender: true}}});
     rst.startSet();
     rst.initiate();
-    runDowngradeUpgradeTestForSP(rst.getPrimary(), true);
-    runDowngradeUpgradeTestForCWSP(rst.getPrimary(), true);
+    runDowngradeUpgradeTestForSP(rst.getPrimary(), true /* isMongod */);
+    runDowngradeUpgradeTestForCWSP(rst.getPrimary(), true /* isMongod */, false /* isStandalone */);
     rst.stopSet();
     jsTest.log('END replset');
 }
@@ -166,8 +193,9 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, verifyStateCallback) {
         }
     }
     // mongos is unaware of FCV
-    runDowngradeUpgradeTestForSP(s.s0, false);
-    runDowngradeUpgradeTestForCWSP(s.s0, false, verifyParameterState);
+    runDowngradeUpgradeTestForSP(s.s0, false /* isMongod */);
+    runDowngradeUpgradeTestForCWSP(
+        s.s0, false /* isMongod */, false /* isStandalone */, verifyParameterState);
     s.stop();
     jsTest.log('END sharding');
 }

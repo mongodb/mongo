@@ -454,8 +454,10 @@ env.Library(
         'change_stream_options_parameter.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         'change_stream_options',
         'change_stream_serverless_helpers',
+        'server_options_core',
         'service_context',
     ],
 )
@@ -467,6 +469,7 @@ env.Library(
         'change_streams_cluster_parameter.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
         'change_stream_serverless_helpers',
         'server_base',
