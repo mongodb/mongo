@@ -84,6 +84,7 @@ commands:
         api_version: "1"
         access_check:
             complex:
+                - check: check_cursor_session_privilege
                 - check: is_coauthorized_with_client
                 - check: is_coauthorized_with
                 - check: should_ignore_auth_checks

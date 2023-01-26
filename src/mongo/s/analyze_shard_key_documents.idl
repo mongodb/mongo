@@ -104,3 +104,11 @@ structs:
       expireAt:
         type: date
         description: "The time at which the document should be deleted by the TTL monitor."
+
+  AnalyzeShardKeySplitPointDocument:
+    description: "Represents a document storing one of the split points created by an
+                  analyzeShardKey command."
+    strict: false
+    fields:
+      splitPoint:
+        type: object

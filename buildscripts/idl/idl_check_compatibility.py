@@ -345,7 +345,10 @@ RENAMED_COMPLEX_ACCESS_CHECKS = dict(
 ALLOWED_NEW_COMPLEX_ACCESS_CHECKS = dict(
     # Do not add any command other the aggregate command or any access check that is not required
     # only by an aggregation stage not present in previously released versions.
-    aggregate={},
+    aggregate={
+        # Added in 6.3 due to the new $_analyzeShardKeyReadWriteDistribution stage.
+        "check_cursor_session_privilege"
+    },
 
     # This list is only used in unit-tests.
     complexChecksSupersetAllowed={'checkTwo', 'checkThree'},
