@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/storage/ticketholder_manager.h"
+#include "mongo/db/storage/storage_engine_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/priority_ticketholder.h"
 #include "mongo/util/concurrency/semaphore_ticketholder.h"
@@ -41,6 +42,25 @@ const auto ticketHolderManagerDecoration =
 }
 
 namespace mongo {
+
+TicketHolderManager::TicketHolderManager(ServiceContext* svcCtx,
+                                         std::unique_ptr<TicketHolder> readTicketHolder,
+                                         std::unique_ptr<TicketHolder> writeTicketHolder)
+    : _readTicketHolder(std::move(readTicketHolder)),
+      _writeTicketHolder(std::move(writeTicketHolder)),
+      _monitor([] {
+          switch (StorageEngineConcurrencyAdjustmentAlgorithm_parse(
+              IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"},
+              gStorageEngineConcurrencyAdjustmentAlgorithm)) {
+              case StorageEngineConcurrencyAdjustmentAlgorithmEnum::kNone:
+                  return nullptr;
+          }
+          MONGO_UNREACHABLE;
+      }()) {
+    if (_monitor && feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV()) {
+        _monitor->start();
+    }
+}
 
 Status TicketHolderManager::updateConcurrentWriteTransactions(const int& newWriteTransactions) {
     if (auto client = Client::getCurrent()) {
@@ -171,5 +191,14 @@ void TicketHolderManager::appendStats(BSONObjBuilder& b) {
         _readTicketHolder->appendStats(bbb);
         bbb.done();
     }
+}
+
+Status TicketHolderManager::validateConcurrencyAdjustmentAlgorithm(
+    const std::string& name, const boost::optional<TenantId>&) try {
+    StorageEngineConcurrencyAdjustmentAlgorithm_parse(
+        IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"}, name);
+    return Status::OK();
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 }  // namespace mongo

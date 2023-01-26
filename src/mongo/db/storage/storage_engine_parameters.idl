@@ -31,6 +31,14 @@ global:
   cpp_includes:
     - "mongo/db/storage/ticketholder_manager.h"
 
+enums:
+  # TODO (SERVER-73342): Remove this enum once there is only one algorithm.
+  StorageEngineConcurrencyAdjustmentAlgorithm:
+    description: "Algorithm for adjusting the number of concurrent storage engine transactions"
+    type: string
+    values:
+      kNone: ""
+
 server_parameters:
 
   storageEngineConcurrentWriteTransactions:
@@ -74,6 +82,19 @@ server_parameters:
     default: 5000
     validator:
       gte: 0
+
+  # TODO (SERVER-73342): Remove this parameter once there is only one algorithm.
+  storageEngineConcurrencyAdjustmentAlgorithm:
+    description: >-
+      The algorithm to be used for adjusting the number of concurrent storage engine transactions.
+      This is gated behind featureFlagExecutionControl and will have no effect if that feature is
+      not enabled.
+    set_at: startup
+    cpp_vartype: std::string
+    cpp_varname: gStorageEngineConcurrencyAdjustmentAlgorithm
+    default: ""
+    validator:
+      callback: TicketHolderManager::validateConcurrencyAdjustmentAlgorithm
 
 feature_flags:
   featureFlagExecutionControl:

@@ -79,6 +79,7 @@ public:
             auto lowPriorityAdmissionsBypassThreshold = 0;
 
             auto ticketHolderManager = std::make_unique<TicketHolderManager>(
+                _svcCtx,
                 std::make_unique<PriorityTicketHolder>(
                     numTickets, lowPriorityAdmissionsBypassThreshold, _svcCtx),
                 std::make_unique<PriorityTicketHolder>(
@@ -87,6 +88,7 @@ public:
         } else {
             LOGV2(7130101, "Using SemaphoreTicketHolder for Reader/Writer global throttling");
             auto ticketHolderManager = std::make_unique<TicketHolderManager>(
+                _svcCtx,
                 std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx),
                 std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx));
             TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
@@ -94,6 +96,7 @@ public:
 #else
         LOGV2(7207205, "Using SemaphoreTicketHolder for Reader/Writer global throttling");
         auto ticketHolderManager = std::make_unique<TicketHolderManager>(
+            _svcCtx,
             std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx),
             std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx));
         TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));

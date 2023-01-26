@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/ticketholder_monitor.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
@@ -49,10 +50,9 @@ class TicketHolder;
  */
 class TicketHolderManager {
 public:
-    TicketHolderManager(std::unique_ptr<TicketHolder> readTicketHolder,
-                        std::unique_ptr<TicketHolder> writeTicketHolder)
-        : _readTicketHolder(std::move(readTicketHolder)),
-          _writeTicketHolder(std::move(writeTicketHolder)){};
+    TicketHolderManager(ServiceContext* svcCtx,
+                        std::unique_ptr<TicketHolder> readTicketHolder,
+                        std::unique_ptr<TicketHolder> writeTicketHolder);
 
     ~TicketHolderManager(){};
 
@@ -72,6 +72,12 @@ public:
                     std::unique_ptr<TicketHolderManager> newTicketHolderManager);
 
     /**
+     * Validates whether whether the given name is a valid concurrency adjustment algorithm name.
+     */
+    static Status validateConcurrencyAdjustmentAlgorithm(const std::string& name,
+                                                         const boost::optional<TenantId>&);
+
+    /**
      * Given the 'mode' a user requests for a GlobalLock, returns the corresponding TicketHolder.
      */
     TicketHolder* getTicketHolder(LockMode mode);
@@ -88,5 +94,10 @@ private:
      * Holds tickets for MODE_X/MODE_IX global lock requests.
      */
     std::unique_ptr<TicketHolder> _writeTicketHolder;
+
+    /**
+     * Task which adjusts the number of concurrent read/write transactions.
+     */
+    std::unique_ptr<TicketHolderMonitor> _monitor;
 };
 }  // namespace mongo

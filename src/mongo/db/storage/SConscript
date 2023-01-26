@@ -208,6 +208,7 @@ env.Library(
     target='storage_engine_parameters',
     source=[
         'ticketholder_manager.cpp',
+        'ticketholder_monitor.cpp',
         'storage_engine_parameters.idl',
     ],
     LIBDEPS=[

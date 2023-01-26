@@ -168,6 +168,7 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
 
             auto lowPriorityBypassThreshold = gLowPriorityAdmissionBypassThreshold.load();
             ticketHolderManager = std::make_unique<TicketHolderManager>(
+                svcCtx,
                 std::make_unique<PriorityTicketHolder>(
                     readTransactions, lowPriorityBypassThreshold, svcCtx),
                 std::make_unique<PriorityTicketHolder>(
@@ -183,12 +184,14 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
             // TODO SERVER-72616: Remove the ifdefs once TicketBroker is implemented with atomic
             // wait.
             ticketHolderManager = std::make_unique<TicketHolderManager>(
+                svcCtx,
                 std::make_unique<SemaphoreTicketHolder>(readTransactions, svcCtx),
                 std::make_unique<SemaphoreTicketHolder>(writeTransactions, svcCtx));
 #endif
             TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
         } else {
             auto ticketHolderManager = std::make_unique<TicketHolderManager>(
+                svcCtx,
                 std::make_unique<SemaphoreTicketHolder>(readTransactions, svcCtx),
                 std::make_unique<SemaphoreTicketHolder>(writeTransactions, svcCtx));
             TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
