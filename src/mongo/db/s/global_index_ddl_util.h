@@ -80,6 +80,12 @@ void replaceGlobalIndexes(OperationContext* opCtx,
                           const std::vector<IndexCatalogType>& indexes);
 
 /**
+ * Drops all indexes and the collection entry.
+ */
+void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx,
+                                         const NamespaceString& userCollectionNss);
+
+/**
  * Removes all the indexes and unset the current index version.
  */
 void clearGlobalIndexes(OperationContext* opCtx,

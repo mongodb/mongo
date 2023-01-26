@@ -34,7 +34,9 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/range_deletion_util.h"
+#include "mongo/db/s/sharded_index_catalog_commands_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
@@ -43,6 +45,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -67,9 +70,14 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
             return boost::none;
         }();
 
-        // Clear CollectionShardingRuntime entry
+        // Clear CollectionShardingRuntime entry.
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
             ->clearFilteringMetadataForDroppedCollection(opCtx);
+    }
+
+    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        dropCollectionGlobalIndexesMetadata(opCtx, nss);
     }
 
     // Remove all range deletion task documents present on disk for the collection to drop. This is
@@ -220,6 +228,7 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                 // We need to send the drop to all the shards because both movePrimary and
                 // moveChunk leave garbage behind for sharded collections.
                 auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+
                 // Remove primary shard from participants
                 participants.erase(
                     std::remove(participants.begin(), participants.end(), primaryShardId),

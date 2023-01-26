@@ -44,7 +44,6 @@
 namespace mongo {
 
 namespace {
-
 /**
  * Remove all indexes by uuid.
  */
@@ -107,7 +106,9 @@ void renameGlobalIndexesMetadata(OperationContext* opCtx,
                 // Replace the _id in the 'From' entry.
                 BSONObj collectionFromDoc;
                 auto queryFrom = BSON(CollectionType::kNssFieldName << fromNss.ns());
-                Helpers::findOne(opCtx, collsColl.getCollection(), queryFrom, collectionFromDoc);
+                fassert(7082801,
+                        Helpers::findOne(
+                            opCtx, collsColl.getCollection(), queryFrom, collectionFromDoc));
                 auto finalDoc = collectionFromDoc.addField(
                     BSON(CollectionType::kNssFieldName << toNss.ns()).firstElement());
 
@@ -363,6 +364,52 @@ void replaceGlobalIndexes(OperationContext* opCtx,
                 ->getOpObserver()
                 ->onModifyShardedCollectionGlobalIndexCatalogEntry(
                     opCtx, nss, idxColl->uuid(), entryObj);
+            wunit.commit();
+        });
+}
+
+void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx,
+                                         const NamespaceString& userCollectionNss) {
+    writeConflictRetry(
+        opCtx, "DropIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
+            boost::optional<UUID> collectionUUID;
+            WriteUnitOfWork wunit(opCtx);
+            AutoGetCollection collsColl(
+                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
+            {
+                const auto query = BSON(CollectionType::kNssFieldName << userCollectionNss.ns());
+                BSONObj collectionDoc;
+                // Return if there is nothing to clear.
+                if (!Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc)) {
+                    return;
+                }
+                collectionUUID.emplace(
+                    uassertStatusOK(UUID::parse(collectionDoc[CollectionType::kUuidFieldName])));
+                repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
+                mongo::deleteObjects(opCtx,
+                                     collsColl.getCollection(),
+                                     NamespaceString::kShardCollectionCatalogNamespace,
+                                     query,
+                                     true);
+            }
+
+            AutoGetCollection idxColl(opCtx, NamespaceString::kShardIndexCatalogNamespace, MODE_IX);
+
+            {
+                repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
+                deleteGlobalIndexes(opCtx, idxColl.getCollection(), *collectionUUID);
+            }
+            auto entryObj = BSON("op"
+                                 << "o"
+                                 << "entry"
+                                 << BSON(IndexCatalogType::kCollectionUUIDFieldName
+                                         << *collectionUUID << CollectionType::kNssFieldName
+                                         << userCollectionNss.toString()));
+
+            opCtx->getServiceContext()
+                ->getOpObserver()
+                ->onModifyShardedCollectionGlobalIndexCatalogEntry(
+                    opCtx, userCollectionNss, idxColl->uuid(), entryObj);
             wunit.commit();
         });
 }

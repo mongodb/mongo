@@ -602,6 +602,15 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             });
 
             break;
+        case 'o': {
+            opCtx->recoveryUnit()->onCommit([opCtx, nss](auto _) {
+                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                    opCtx, nss);
+                scsr->clearIndexes(opCtx);
+            });
+            break;
+        }
         case 'm': {
             auto indexVersion = indexDoc["entry"][IndexCatalogType::kLastmodFieldName].timestamp();
             auto fromNss = NamespaceString(indexDoc["entry"]["fromNss"].String());
@@ -618,13 +627,6 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
                     auto fromCSR =
                         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                             opCtx, fromNss);
-                    uassert(
-                        7079504,
-                        format(FMT_STRING("The critical section for collection {} must be taken in "
-                                          "order to execute this command"),
-                               fromNss.toString()),
-                        fromCSR->getCriticalSectionSignal(
-                            opCtx, ShardingMigrationCriticalSection::kWrite));
                     auto indexCache = fromCSR->getIndexes(opCtx, true);
                     indexCache->forEachGlobalIndex([&](const auto& index) {
                         fromIndexes.push_back(index);

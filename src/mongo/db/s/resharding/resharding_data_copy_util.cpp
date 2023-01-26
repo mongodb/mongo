@@ -39,6 +39,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -113,12 +115,20 @@ void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
     // It is safe for resharding to drop and reacquire locks when checking for collection existence
     // because the coordinator will prevent two resharding operations from running for the same
     // namespace at the same time.
+
+    boost::optional<Timestamp> indexVersion;
     auto tempReshardingNssExists = [&] {
         AutoGetCollection tempReshardingColl(opCtx, metadata.getTempReshardingNss(), MODE_IS);
         uassert(ErrorCodes::InvalidUUID,
                 "Temporary resharding collection exists but doesn't have a UUID matching the"
                 " resharding operation",
                 !tempReshardingColl || tempReshardingColl->uuid() == metadata.getReshardingUUID());
+        auto gii = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
+                       opCtx, metadata.getTempReshardingNss())
+                       ->getIndexes(opCtx);
+        indexVersion = gii
+            ? boost::make_optional<Timestamp>(gii->getCollectionIndexes().indexVersion())
+            : boost::none;
         return bool(tempReshardingColl);
     }();
 
@@ -130,6 +140,11 @@ void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
         uassert(
             ErrorCodes::InvalidUUID, errmsg, sourceColl->uuid() == metadata.getReshardingUUID());
         return;
+    }
+
+    if (indexVersion) {
+        renameGlobalIndexesMetadata(
+            opCtx, metadata.getTempReshardingNss(), metadata.getSourceNss(), *indexVersion);
     }
 
     RenameCollectionOptions options;

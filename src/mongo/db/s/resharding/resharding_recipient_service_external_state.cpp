@@ -30,6 +30,7 @@
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/write_concern_options.h"
@@ -38,6 +39,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
@@ -87,6 +89,24 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
                                     std::move(indexes),
                                     std::move(idIndex),
                                     std::move(collOptions)});
+
+    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        auto optGii = getCollectionIndexInfoWithRefresh(opCtx, metadata.getTempReshardingNss());
+
+        if (optGii) {
+            std::vector<IndexCatalogType> indexes;
+            optGii->forEachIndex([&](const auto& index) {
+                indexes.push_back(index);
+                return true;
+            });
+            replaceGlobalIndexes(opCtx,
+                                 metadata.getTempReshardingNss(),
+                                 metadata.getReshardingUUID(),
+                                 optGii->getCollectionIndexes().indexVersion(),
+                                 indexes);
+        }
+    }
 
     AutoGetCollection autoColl(opCtx, metadata.getTempReshardingNss(), MODE_IX);
     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
@@ -153,6 +173,13 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
             cri,
             afterClusterTime);
     });
+}
+
+boost::optional<GlobalIndexesCache>
+RecipientStateMachineExternalStateImpl::getCollectionIndexInfoWithRefresh(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    auto catalogCache = Grid::get(opCtx)->catalogCache();
+    return catalogCache->getCollectionIndexInfoWithRefresh(opCtx, nss);
 }
 
 void RecipientStateMachineExternalStateImpl::withShardVersionRetry(

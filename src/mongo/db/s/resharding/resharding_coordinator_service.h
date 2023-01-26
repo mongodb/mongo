@@ -50,7 +50,8 @@ CollectionType createTempReshardingCollectionType(
     OperationContext* opCtx,
     const ReshardingCoordinatorDocument& coordinatorDoc,
     const ChunkVersion& chunkVersion,
-    const BSONObj& collation);
+    const BSONObj& collation,
+    boost::optional<CollectionIndexes> indexVersion);
 
 void cleanupSourceConfigCollections(OperationContext* opCtx,
                                     const ReshardingCoordinatorDocument& coordinatorDoc);
@@ -72,7 +73,8 @@ void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
                                            ReshardingMetrics* metrics,
                                            const ReshardingCoordinatorDocument& coordinatorDoc,
                                            std::vector<ChunkType> initialChunks,
-                                           std::vector<BSONObj> zones);
+                                           std::vector<BSONObj> zones,
+                                           boost::optional<CollectionIndexes> indexVersion);
 
 void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
     OperationContext* opCtx,
@@ -99,6 +101,10 @@ public:
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
 
     ChunkVersion calculateChunkVersionForInitialChunks(OperationContext* opCtx);
+
+    boost::optional<CollectionIndexes> getCatalogIndexVersion(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              const UUID& uuid);
 
     virtual void sendCommandToShards(OperationContext* opCtx,
                                      StringData dbName,

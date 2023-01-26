@@ -47,6 +47,8 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/stale_exception.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 namespace mongo {
 namespace {
 
@@ -267,7 +269,6 @@ public:
 
 TEST_F(RecipientServiceExternalStateTest, ReshardingConfigServerUpdatesHaveNoTimeout) {
     RecipientStateMachineExternalStateImpl externalState;
-
     auto future = launchAsync([&] {
         externalState.updateCoordinatorDocument(operationContext(),
                                                 BSON("query"
@@ -330,6 +331,8 @@ TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) 
                                      << "_id_"))},
             HostAndPort(shards[1].getHost()));
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
+        expectCollectionAndIndexesAggregation(
+            kReshardingNss, kReshardingEpoch, kReshardingTimestamp, kReshardingUUID, kShardKey, {});
     });
 
     verifyTempReshardingCollectionAndMetadata();
@@ -391,6 +394,8 @@ TEST_F(RecipientServiceExternalStateTest,
         expectRefreshReturnForOriginalColl(
             kOrigNss, kShardKey, kOrigUUID, kOrigEpoch, kOrigTimestamp);
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
+        expectCollectionAndIndexesAggregation(
+            kReshardingNss, kReshardingEpoch, kReshardingTimestamp, kReshardingUUID, kShardKey, {});
     });
 
     verifyTempReshardingCollectionAndMetadata();
@@ -461,6 +466,8 @@ TEST_F(RecipientServiceExternalStateTest,
                                      << "_id_"))},
             HostAndPort(shards[1].getHost()));
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
+        expectCollectionAndIndexesAggregation(
+            kReshardingNss, kReshardingEpoch, kReshardingTimestamp, kReshardingUUID, kShardKey, {});
     });
 
     verifyTempReshardingCollectionAndMetadata();
@@ -533,6 +540,8 @@ TEST_F(RecipientServiceExternalStateTest,
                                      << "_id_"))},
             HostAndPort(shards[1].getHost()));
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
+        expectCollectionAndIndexesAggregation(
+            kReshardingNss, kReshardingEpoch, kReshardingTimestamp, kReshardingUUID, kShardKey, {});
     });
 
     verifyTempReshardingCollectionAndMetadata();
@@ -595,6 +604,8 @@ TEST_F(RecipientServiceExternalStateTest,
                                      << "_id_"))},
             HostAndPort(shards[1].getHost()));
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
+        expectCollectionAndIndexesAggregation(
+            kReshardingNss, kReshardingEpoch, kReshardingTimestamp, kReshardingUUID, kShardKey, {});
     });
 
     verifyTempReshardingCollectionAndMetadata();

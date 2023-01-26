@@ -134,6 +134,11 @@ public:
         return {std::vector<BSONObj>{}, BSONObj()};
     }
 
+    boost::optional<GlobalIndexesCache> getCollectionIndexInfoWithRefresh(
+        OperationContext* opCtx, const NamespaceString& nss) {
+        return boost::none;
+    }
+
     void withShardVersionRetry(OperationContext* opCtx,
                                const NamespaceString& nss,
                                StringData reason,

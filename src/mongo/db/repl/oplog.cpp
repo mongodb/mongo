@@ -1224,6 +1224,10 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                          uassertStatusOK(UUID::parse(
                              entryObj["entry"][IndexCatalogType::kCollectionUUIDFieldName])));
                      break;
+                 case 'o': {
+                     dropCollectionGlobalIndexesMetadata(opCtx, entry.getNss());
+                     break;
+                 }
                  case 'm': {
                      auto fromNss = NamespaceString(entryObj["entry"]["fromNss"].String());
                      auto toNss = NamespaceString(entryObj["entry"]["toNss"].String());

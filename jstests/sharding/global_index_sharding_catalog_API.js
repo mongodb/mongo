@@ -7,6 +7,29 @@
 (function() {
 'use strict';
 
+function registerIndex(rs, nss, pattern, name, uuid) {
+    rs.getPrimary().adminCommand({
+        _shardsvrRegisterIndex: nss,
+        keyPattern: pattern,
+        options: {global: true},
+        name: name,
+        collectionUUID: uuid,
+        indexCollectionUUID: UUID(),
+        lastmod: Timestamp(0, 0), /* Placeholder value, a cluster time will be set by the API. */
+        writeConcern: {w: 'majority'}
+    });
+}
+
+function unregisterIndex(rs, nss, name, uuid) {
+    rs.getPrimary().adminCommand({
+        _shardsvrUnregisterIndex: nss,
+        name: name,
+        collectionUUID: uuid,
+        lastmod: Timestamp(0, 0), /* Placeholder value, a cluster time will be set by the API. */
+        writeConcern: {w: 'majority'}
+    });
+}
+
 const st = new ShardingTest({mongos: 1, shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
 
 const shard0 = st.shard0.shardName;
@@ -16,10 +39,14 @@ const collectionName = 'test';
 const collection2Name = 'test2';
 const collection3Name = 'test3';
 const collection4Name = 'test4';
+const collection5Name = 'test5';
+const collection6Name = 'test6';
 const nss = dbName + '.' + collectionName;
 const nss2 = dbName + '.' + collection2Name;
 const nss3 = dbName + '.' + collection3Name;
 const nss4 = dbName + '.' + collection4Name;
+const nss5 = dbName + '.' + collection5Name;
+const nss6 = dbName + '.' + collection6Name;
 const index1Pattern = {
     x: 1
 };
@@ -46,16 +73,7 @@ st.s.adminCommand({shardCollection: nss, key: {_id: 1}});
 
 const collectionUUID = st.s.getCollection('config.collections').findOne({_id: nss}).uuid;
 
-st.rs0.getPrimary().adminCommand({
-    _shardsvrRegisterIndex: nss,
-    keyPattern: index1Pattern,
-    options: {global: true},
-    name: index1Name,
-    collectionUUID: collectionUUID,
-    indexCollectionUUID: UUID(),
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
+registerIndex(st.rs0, nss, index1Pattern, index1Name, collectionUUID);
 
 jsTestLog(
     "Check that we created the index on the config server and on shard0, which is the only shard with data.");
@@ -126,16 +144,7 @@ const indexVersionRS1 = st.rs1.getPrimary()
                             .indexVersion;
 assert.eq(indexVersionRS0, indexVersionRS1);
 
-st.rs0.getPrimary().adminCommand({
-    _shardsvrRegisterIndex: 'foo.test',
-    keyPattern: index2Pattern,
-    options: {global: true},
-    name: index2Name,
-    collectionUUID: collectionUUID,
-    indexCollectionUUID: UUID(),
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
+registerIndex(st.rs0, nss, index2Pattern, index2Name, collectionUUID);
 
 jsTestLog(
     "Check that we created the index on the config server and on both shards because there is data everywhere.");
@@ -179,13 +188,7 @@ assert.eq(0, st.rs1.getPrimary().getCollection(configsvrIndexCatalog).countDocum
 }));
 
 jsTestLog("Drop index test.");
-st.rs0.getPrimary().adminCommand({
-    _shardsvrUnregisterIndex: 'foo.test',
-    name: index2Name,
-    collectionUUID: collectionUUID,
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
+unregisterIndex(st.rs0, nss, index2Name, collectionUUID);
 
 assert.eq(0, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
     collectionUUID: collectionUUID,
@@ -226,13 +229,7 @@ assert.eq(1, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
 }));
 
 st.s.adminCommand({moveChunk: nss, find: {_id: 0}, to: shard0});
-st.rs0.getPrimary().adminCommand({
-    _shardsvrUnregisterIndex: 'foo.test',
-    name: index1Name,
-    collectionUUID: collectionUUID,
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
+unregisterIndex(st.rs0, nss, index1Name, collectionUUID);
 
 jsTestLog("Check that there is leftover data.");
 assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
@@ -256,16 +253,7 @@ assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
 }));
 
 jsTestLog("Case 2: 1 leftover index dropped, and another index created. Add one index.");
-st.rs0.getPrimary().adminCommand({
-    _shardsvrRegisterIndex: nss,
-    keyPattern: index1Pattern,
-    options: {global: true},
-    name: index1Name,
-    collectionUUID: collectionUUID,
-    indexCollectionUUID: UUID(),
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
+registerIndex(st.rs0, nss, index1Pattern, index1Name, collectionUUID);
 
 jsTestLog("Move only chunk to shard0, leaving 'garbage'.");
 st.s.adminCommand({moveChunk: nss, find: {_id: 0}, to: shard0});
@@ -275,23 +263,9 @@ assert.eq(1, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
 }));
 
 jsTestLog("Drop and create another index.");
-st.rs0.getPrimary().adminCommand({
-    _shardsvrUnregisterIndex: 'foo.test',
-    name: index1Name,
-    collectionUUID: collectionUUID,
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
-st.rs0.getPrimary().adminCommand({
-    _shardsvrRegisterIndex: nss,
-    keyPattern: index2Pattern,
-    options: {global: true},
-    name: index2Name,
-    collectionUUID: collectionUUID,
-    indexCollectionUUID: UUID(),
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
+
+unregisterIndex(st.rs0, nss, index1Name, collectionUUID);
+registerIndex(st.rs0, nss, index2Pattern, index2Name, collectionUUID);
 
 jsTestLog("We'll find leftover index info.");
 assert.eq(1, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
@@ -331,33 +305,13 @@ assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
 }));
 
 jsTestLog("Case 3: Multi-index consolidation test. Create index1 again.");
-st.rs0.getPrimary().adminCommand({
-    _shardsvrRegisterIndex: nss,
-    keyPattern: index1Pattern,
-    options: {global: true},
-    name: index1Name,
-    collectionUUID: collectionUUID,
-    indexCollectionUUID: UUID(),
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
+registerIndex(st.rs0, nss, index1Pattern, index1Name, collectionUUID);
 
 jsTestLog("Move the chunk back and clear the indexes.");
 st.s.adminCommand({moveChunk: nss, find: {_id: 0}, to: shard0});
-st.rs0.getPrimary().adminCommand({
-    _shardsvrUnregisterIndex: 'foo.test',
-    name: index1Name,
-    collectionUUID: collectionUUID,
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
-st.rs0.getPrimary().adminCommand({
-    _shardsvrUnregisterIndex: 'foo.test',
-    name: index2Name,
-    collectionUUID: collectionUUID,
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
+
+unregisterIndex(st.rs0, nss, index1Name, collectionUUID);
+unregisterIndex(st.rs0, nss, index2Name, collectionUUID);
 
 jsTestLog("Check for leftover data.");
 assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
@@ -368,26 +322,8 @@ assert.eq(2, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
 }));
 
 jsTestLog("Create the new indexes.");
-st.rs0.getPrimary().adminCommand({
-    _shardsvrRegisterIndex: nss,
-    keyPattern: index3Pattern,
-    options: {global: true},
-    name: index3Name,
-    collectionUUID: collectionUUID,
-    indexCollectionUUID: UUID(),
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
-st.rs0.getPrimary().adminCommand({
-    _shardsvrRegisterIndex: nss,
-    keyPattern: index4Pattern,
-    options: {global: true},
-    name: index4Name,
-    collectionUUID: collectionUUID,
-    indexCollectionUUID: UUID(),
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
+registerIndex(st.rs0, nss, index3Pattern, index3Name, collectionUUID);
+registerIndex(st.rs0, nss, index4Pattern, index4Name, collectionUUID);
 
 jsTestLog("Move chunk, it should consolidate the indexes.");
 st.s.adminCommand({moveChunk: nss, find: {_id: 0}, to: shard1});
@@ -564,6 +500,87 @@ assert.commandWorked(
 let nss3Metadata =
     st.configRS.getPrimary().getCollection(configsvrCollectionCatalog).findOne({_id: nss3});
 assert(!nss3Metadata.indexVersion);
+
+jsTestLog("Drop collection test. Create a sharded collection and some indexes");
+st.s.adminCommand({shardCollection: nss4, key: {_id: 1}});
+
+const collection4UUID = st.s.getCollection('config.collections').findOne({_id: nss4}).uuid;
+
+registerIndex(st.rs0, nss4, index1Pattern, index1Name, collection4UUID);
+registerIndex(st.rs0, nss4, index2Pattern, index2Name, collection4UUID);
+
+assert.eq(2, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection4UUID
+}));
+assert.eq(2, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
+    collectionUUID: collection4UUID,
+}));
+jsTestLog("Drop collection, should eliminate indexes everywhere.");
+assert.commandWorked(st.s.getDB(dbName).runCommand({drop: collection4Name}));
+assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection4UUID
+}));
+assert.eq(0, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
+    collectionUUID: collection4UUID,
+}));
+
+jsTestLog("Drop database test. Create a sharded collection and some indexes");
+st.s.adminCommand({shardCollection: nss5, key: {_id: 1}});
+
+const collection5UUID = st.s.getCollection('config.collections').findOne({_id: nss5}).uuid;
+
+registerIndex(st.rs0, nss5, index3Pattern, index3Name, collection5UUID);
+registerIndex(st.rs0, nss5, index4Pattern, index4Name, collection5UUID);
+
+assert.eq(2, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection5UUID
+}));
+assert.eq(2, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
+    collectionUUID: collection5UUID,
+}));
+jsTestLog("Drop database, should eliminate indexes everywhere.");
+assert.commandWorked(st.s.getDB(dbName).dropDatabase());
+assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection5UUID
+}));
+assert.eq(0, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
+    collectionUUID: collection5UUID,
+}));
+
+jsTestLog(
+    "Resharding, should create the indexes at least in the config server for the new collection.");
+assert.eq(0, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({}));
+assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({}));
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: nss6, key: {_id: 1}, primaryShard: shard0}));
+
+const collection6UUID = st.s.getCollection('config.collections').findOne({_id: nss6}).uuid;
+registerIndex(st.rs0, nss6, index1Pattern, index1Name, collection6UUID);
+registerIndex(st.rs0, nss6, index2Pattern, index2Name, collection6UUID);
+
+assert.commandWorked(st.s.getDB(dbName).runCommand(
+    {createIndexes: collection6Name, indexes: [{key: {x: 1}, name: 'x_1'}]}));
+
+assert.commandWorked(st.s.adminCommand({reshardCollection: nss6, key: {x: 1}}));
+const collection6UUIDAfterResharding =
+    st.s.getCollection('config.collections').findOne({_id: nss6}).uuid;
+
+assert.neq(collection6UUID, collection6UUIDAfterResharding);
+
+assert.eq(0, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
+    collectionUUID: collection6UUID
+}));
+assert.eq(2, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
+    collectionUUID: collection6UUIDAfterResharding
+}));
+
+assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection6UUID
+}));
+
+assert.eq(2, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection6UUIDAfterResharding
+}));
 
 st.stop();
 })();

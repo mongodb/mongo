@@ -221,8 +221,12 @@ protected:
             opCtx->getServiceContext()->getPreciseClockSource()->now());
         client.insert(CollectionType::ConfigNS.ns(), originalNssCatalogEntry.toBSON());
 
-        auto tempNssCatalogEntry = createTempReshardingCollectionType(
-            opCtx, coordinatorDoc, ChunkVersion({OID::gen(), Timestamp(1, 2)}, {1, 1}), BSONObj());
+        auto tempNssCatalogEntry =
+            createTempReshardingCollectionType(opCtx,
+                                               coordinatorDoc,
+                                               ChunkVersion({OID::gen(), Timestamp(1, 2)}, {1, 1}),
+                                               BSONObj(),
+                                               boost::none);
         client.insert(CollectionType::ConfigNS.ns(), tempNssCatalogEntry.toBSON());
 
         return coordinatorDoc;
@@ -519,7 +523,8 @@ protected:
                 opCtx,
                 expectedCoordinatorDoc,
                 ChunkVersion({OID::gen(), Timestamp(1, 2)}, {1, 1}),
-                BSONObj());
+                BSONObj(),
+                boost::none);
 
             // It's necessary to add the userCanceled field because the call into
             // createTempReshardingCollectionType assumes that the collection entry is
@@ -596,7 +601,7 @@ protected:
         expectedCoordinatorDoc.setPresetReshardedChunks(boost::none);
 
         writeParticipantShardsAndTempCollInfo(
-            opCtx, _metrics.get(), expectedCoordinatorDoc, initialChunks, zones);
+            opCtx, _metrics.get(), expectedCoordinatorDoc, initialChunks, zones, boost::none);
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
