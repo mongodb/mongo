@@ -87,6 +87,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
@@ -571,17 +572,20 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createAdditionalPipeline
 }
 
 /**
- * Performs validations related to API versioning and time-series stages.
+ * Performs validations related to API versioning, time-series stages, and general command
+ * validation.
  * Throws UserAssertion if any of the validations fails
  *     - validation of API versioning on each stage on the pipeline
  *     - validation of API versioning on 'AggregateCommandRequest' request
  *     - validation of time-series related stages
+ *     - validation of command parameters
  */
 void performValidationChecks(const OperationContext* opCtx,
                              const AggregateCommandRequest& request,
                              const LiteParsedPipeline& liteParsedPipeline) {
     liteParsedPipeline.validate(opCtx);
     aggregation_request_helper::validateRequestForAPIVersion(opCtx, request);
+    aggregation_request_helper::validateRequestFromClusterQueryWithoutShardKey(request);
 }
 
 std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyExecutor(
@@ -670,6 +674,22 @@ Status runAggregate(OperationContext* opCtx,
     // Perform some validations on the LiteParsedPipeline and request before continuing with the
     // aggregation command.
     performValidationChecks(opCtx, request, liteParsedPipeline);
+
+    // If we are running a retryable write without shard key, check if the write was applied on this
+    // shard, and if so, return early with an empty cursor with $_wasStatementExecuted
+    // set to true.
+    auto isClusterQueryWithoutShardKeyCmd = request.getIsClusterQueryWithoutShardKeyCmd();
+    auto stmtId = request.getStmtId();
+    if (isClusterQueryWithoutShardKeyCmd && stmtId) {
+        if (TransactionParticipant::get(opCtx).checkStatementExecuted(opCtx, *stmtId)) {
+            CursorResponseBuilder::Options options;
+            options.isInitialResponse = true;
+            CursorResponseBuilder responseBuilder(result, options);
+            responseBuilder.setWasStatementExecuted(true);
+            responseBuilder.done(0LL, origNss);
+            return Status::OK();
+        }
+    }
 
     // For operations on views, this will be the underlying namespace.
     NamespaceString nss = request.getNamespace();

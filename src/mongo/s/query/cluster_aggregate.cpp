@@ -218,17 +218,20 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
 }
 
 /**
- * Performs validations related to API versioning and time-series stages.
+ * Performs validations related to API versioning, time-series stages, and general command
+ * validation.
  * Throws UserAssertion if any of the validations fails
  *     - validation of API versioning on each stage on the pipeline
  *     - validation of API versioning on 'AggregateCommandRequest' request
  *     - validation of time-series related stages
+ *     - validation of command parameters
  */
 void performValidationChecks(const OperationContext* opCtx,
                              const AggregateCommandRequest& request,
                              const LiteParsedPipeline& liteParsedPipeline) {
     liteParsedPipeline.validate(opCtx);
     aggregation_request_helper::validateRequestForAPIVersion(opCtx, request);
+    aggregation_request_helper::validateRequestFromClusterQueryWithoutShardKey(request);
 }
 
 /**

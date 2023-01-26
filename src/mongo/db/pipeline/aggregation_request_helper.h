@@ -121,6 +121,11 @@ BSONObj serializeToCommandObj(const AggregateCommandRequest& request);
  */
 void validateRequestForAPIVersion(const OperationContext* opCtx,
                                   const AggregateCommandRequest& request);
+/**
+ * Validates if 'AggregateCommandRequest' sets the "isClusterQueryWithoutShardKeyCmd" field then the
+ * request must have been fromMongos.
+ */
+void validateRequestFromClusterQueryWithoutShardKey(const AggregateCommandRequest& request);
 
 /**
  * Returns the type of resumable scan required by this aggregation, if applicable. Otherwise returns

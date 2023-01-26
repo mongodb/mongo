@@ -15,7 +15,8 @@ var WriteWithoutShardKeyTestUtil = (function() {
     const OperationType = {
         updateOne: 1,
         deleteOne: 2,
-        findAndModify: 3,
+        findAndModifyUpdate: 3,
+        findAndModifyRemove: 4,
     };
 
     function setupShardedCollection(st, nss, shardKey, splitPoints, chunksToMove) {
@@ -85,8 +86,13 @@ var WriteWithoutShardKeyTestUtil = (function() {
      * Inserts a batch of documents and runs a write without shard key and returns all of the
      * documents inserted.
      */
-    function insertDocsAndRunCommand(
-        conn, collName, docsToInsert, cmdObj, operationType, expectedResponse) {
+    function insertDocsAndRunCommand(conn,
+                                     collName,
+                                     docsToInsert,
+                                     cmdObj,
+                                     operationType,
+                                     expectedResponse,
+                                     expectedRetryResponse) {
         assert.commandWorked(conn.getCollection(collName).insert(docsToInsert));
         let res = assert.commandWorked(conn.runCommand(cmdObj));
         if (operationType === OperationType.updateOne) {
@@ -95,15 +101,48 @@ var WriteWithoutShardKeyTestUtil = (function() {
         } else if (operationType === OperationType.deleteOne) {
             assert.eq(expectedResponse.n, res.n);
         } else {
-            // TODO: SERVER-71850 Add in findAndModify support.
+            assert.eq(expectedResponse.lastErrorObject.n, res.lastErrorObject.n);
+            assert.eq(expectedResponse.lastErrorObject.updateExisting,
+                      res.lastErrorObject.updateExisting);
+            assert((typeof res.value) !== "undefined");
+
+            // For findAndModify, get the pre/post image document to compare for retryability tests
+            Object.assign(expectedRetryResponse, {value: res.value});
         }
         return conn.getCollection(collName).find({}).toArray();
+    }
+
+    /*
+     * Retry a retryable write and expect to get the retried response back.
+     */
+    function retryableWriteTest(conn, cmdObj, operationType, expectedRetryResponse) {
+        let res = assert.commandWorked(conn.runCommand(cmdObj));
+        if (operationType === OperationType.updateOne) {
+            assert.eq(expectedRetryResponse.n, res.n);
+            assert.eq(expectedRetryResponse.nModified, res.nModified);
+            assert.eq(expectedRetryResponse.retriedStmtIds, res.retriedStmtIds);
+        } else if (operationType === OperationType.deleteOne) {
+            assert.eq(expectedRetryResponse.n, res.n);
+            assert.eq(expectedRetryResponse.retriedStmtIds, res.retriedStmtIds);
+        } else {
+            assert.eq(expectedRetryResponse.lastErrorObject.n, res.lastErrorObject.n);
+            assert.eq(expectedRetryResponse.lastErrorObject.updateExisting,
+                      res.lastErrorObject.updateExisting);
+            assert.eq(expectedRetryResponse.retriedStmtId, res.retriedStmtId);
+            assert.eq(expectedRetryResponse.value, res.value);
+        }
     }
 
     /*
      * Runs a test using a cmdObj with multiple configurations e.g. with/without a session etc.
      */
     function runTestWithConfig(conn, testCase, config, operationType) {
+        // If a test case does not specify distinct options, we can run the test case as is
+        // just once.
+        if (!testCase.options) {
+            testCase.options = [{}];
+        }
+
         testCase.options.forEach(option => {
             jsTestLog(testCase.logMessage + "\n" +
                       "For option: " + tojson(option) + "\n" + config);
@@ -119,7 +158,8 @@ var WriteWithoutShardKeyTestUtil = (function() {
                                                          testCase.docsToInsert,
                                                          newCmdObj,
                                                          operationType,
-                                                         testCase.expectedResponse);
+                                                         testCase.expectedResponse,
+                                                         testCase.expectedRetryResponse);
                 conn.commitTransaction_forTesting();
             } else {
                 switch (config) {
@@ -143,11 +183,19 @@ var WriteWithoutShardKeyTestUtil = (function() {
                                                          testCase.docsToInsert,
                                                          newCmdObj,
                                                          operationType,
-                                                         testCase.expectedResponse);
+                                                         testCase.expectedResponse,
+                                                         testCase.expectedRetryResponse);
+            }
+
+            // Test that the retryable write response is recovered.
+            if (testCase.retryableWriteTest) {
+                retryableWriteTest(
+                    dbConn, newCmdObj, operationType, testCase.expectedRetryResponse);
             }
 
             switch (operationType) {
                 case OperationType.updateOne:
+                case OperationType.findAndModifyUpdate:
                     validateResultUpdate(
                         allMatchedDocs, testCase.expectedMods, testCase.replacementDocTest);
                     break;
@@ -156,8 +204,10 @@ var WriteWithoutShardKeyTestUtil = (function() {
                         allMatchedDocs.length,
                         testCase.docsToInsert.length - testCase.expectedResponse.n);
                     break;
-                case OperationType.findAndModify:
-                    // TODO: SERVER-71850 Add in findAndModify support.
+                case OperationType.findAndModifyRemove:
+                    validateResultDelete(
+                        allMatchedDocs.length,
+                        testCase.docsToInsert.length - testCase.expectedResponse.lastErrorObject.n);
                     break;
                 default:
                     throw 'Invalid OperationType.';
@@ -165,6 +215,13 @@ var WriteWithoutShardKeyTestUtil = (function() {
 
             // Clean up the collection for the next test case without dropping the collection.
             assert.commandWorked(dbConn.getCollection(testCase.collName).remove({}));
+
+            // Check that the retryable write response is still recoverable even if the document was
+            // removed.
+            if (testCase.retryableWriteTest) {
+                retryableWriteTest(
+                    dbConn, newCmdObj, operationType, testCase.expectedRetryResponse);
+            }
 
             // Killing the session after the command is done using it to not excessively leave
             // unused sessions around.
@@ -177,7 +234,8 @@ var WriteWithoutShardKeyTestUtil = (function() {
     }
 
     /*
-     * Returns a connection with or without a session started based on the provided configuration.
+     * Returns a connection with or without a session started based on the provided
+     * configuration.
      */
     function getClusterConnection(st, config) {
         switch (config) {
@@ -197,8 +255,8 @@ var WriteWithoutShardKeyTestUtil = (function() {
      * Checks if the write without shard key feature is enabled.
      */
     function isWriteWithoutShardKeyFeatureEnabled(conn) {
-        // The feature flag spans 6.2 and current master, while the actual logic only exists on 6.3
-        // and later.
+        // The feature flag spans 6.2 and current master, while the actual logic only exists
+        // on 6.3 and later.
         return (jsTestOptions().mongosBinVersion !== "last-lts" &&
                 jsTestOptions().mongosBinVersion !== "last-continuous" &&
                 assert

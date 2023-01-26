@@ -296,3 +296,15 @@ commands:
                 type: uuid
                 optional: true
                 stability: unstable
+            stmtId:
+                description: "The statement id of the write in the original write batch for a write
+                              without shard key."
+                type: int
+                optional: true
+                stability: internal
+            $_isClusterQueryWithoutShardKeyCmd:
+                description: "True if a _clusterQueryWithoutShardKey command is running a broadcast 
+                              aggregate."
+                type: optionalBool
+                cpp_name: isClusterQueryWithoutShardKeyCmd
+                stability: internal

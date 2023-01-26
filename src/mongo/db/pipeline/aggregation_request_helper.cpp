@@ -222,6 +222,14 @@ void validateRequestForAPIVersion(const OperationContext* opCtx,
     }
 }
 
+void validateRequestFromClusterQueryWithoutShardKey(const AggregateCommandRequest& request) {
+    if (request.getIsClusterQueryWithoutShardKeyCmd()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Only mongos can set the isClusterQueryWithoutShardKeyCmd field",
+                request.getFromMongos());
+    }
+}
+
 PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateCommandRequest& request,
                                                              bool isChangeStream) {
     // $changeStream cannot be run on the oplog, and $_requestReshardingResumeToken can only be run

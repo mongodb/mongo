@@ -76,6 +76,15 @@ structs:
                 description: "Boolean represents if the cursor has been invalidated."
                 type: optionalBool
                 stability: stable
+            $_wasStatementExecuted:
+                description: "An optional field set to true if a write without shard key had already
+                              applied the write. To provide some context, this internal field is 
+                              used by the two phase write without shard key protocol introduced in 
+                              PM-1632 to support retryable writes for updateOne without shard key, 
+                              deleteOne without shard key, and findAndModify without shard key."
+                type: optionalBool
+                cpp_name: wasStatementExecuted
+                stability: internal
 
     InitialResponseCursor:
         description: "A struct representing an initial response cursor."

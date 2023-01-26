@@ -5,6 +5,8 @@
 (function() {
 "use strict";
 
+load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+
 const st = new ShardingTest({shards: 2, rs: {nodes: 1, enableMajorityReadConcern: ''}});
 
 const mongosDB = st.s0.getDB(jsTestName());
@@ -31,6 +33,29 @@ assert.commandFailedWithCode(
     mongosDB.runCommand(
         {aggregate: mongosColl.getName(), pipeline: [], cursor: {}, needsMerge: true}),
     ErrorCodes.FailedToParse);
+
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(mongosDB)) {
+    // Test that the command fails if we have 'isClusterQueryWithoutShardKeyCmd: true' without
+    // 'fromMongos'.
+    assert.commandFailedWithCode(mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [],
+        cursor: {},
+        $_isClusterQueryWithoutShardKeyCmd: true
+    }),
+                                 ErrorCodes.InvalidOptions);
+
+    // Test that the command fails if we have 'isClusterQueryWithoutShardKeyCmd: true' with
+    // 'fromMongos: false'.
+    assert.commandFailedWithCode(mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [],
+        cursor: {},
+        fromMongos: false,
+        $_isClusterQueryWithoutShardKeyCmd: true
+    }),
+                                 ErrorCodes.InvalidOptions);
+}
 
 // Test that 'fromMongos: true' cannot be specified in a command sent to mongoS.
 assert.commandFailedWithCode(

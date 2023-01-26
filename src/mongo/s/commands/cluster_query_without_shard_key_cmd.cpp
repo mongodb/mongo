@@ -47,8 +47,18 @@ namespace {
 struct ParsedCommandInfo {
     BSONObj query;
     BSONObj collation;
+    int stmtId;
 
-    ParsedCommandInfo(BSONObj query, BSONObj collation) : query(query), collation(collation) {}
+    ParsedCommandInfo(BSONObj query, BSONObj collation, int stmtId)
+        : query(query), collation(collation), stmtId(stmtId) {}
+};
+
+struct AsyncRequestSenderResponseData {
+    ShardId shardId;
+    CursorResponse cursorResponse;
+
+    AsyncRequestSenderResponseData(ShardId shardId, CursorResponse cursorResponse)
+        : shardId(shardId), cursorResponse(std::move(cursorResponse)) {}
 };
 
 std::set<ShardId> getShardsToTarget(OperationContext* opCtx,
@@ -85,6 +95,12 @@ BSONObj createAggregateCmdObj(OperationContext* opCtx,
                                        BSON("$limit" << 1),
                                        BSON("$project" << BSON("_id" << 1))});
     aggregate.setCollation(parsedInfo.collation);
+    aggregate.setIsClusterQueryWithoutShardKeyCmd(true);
+    aggregate.setFromMongos(true);
+
+    if (parsedInfo.stmtId != kUninitializedStmtId) {
+        aggregate.setStmtId(parsedInfo.stmtId);
+    }
     return aggregate.toBSON({});
 }
 
@@ -110,17 +126,29 @@ public:
             const NamespaceString nss(
                 CommandHelpers::parseNsCollectionRequired(ns().dbName(), request().getWriteCmd()));
             const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+
             auto parsedInfoFromRequest = [&] {
                 const auto commandName = request().getWriteCmd().firstElementFieldNameStringData();
+
                 BSONObjBuilder bob(request().getWriteCmd());
                 bob.appendElementsUnique(BSON("$db" << ns().dbName().toString()));
                 auto writeCmdObj = bob.obj();
+
                 BSONObj query;
                 BSONObj collation;
+                int stmtId = kUninitializedStmtId;
+
                 if (commandName == "update") {
                     auto updateRequest = write_ops::UpdateCommandRequest::parse(
                         IDLParserContext("_clusterQueryWithoutShardKey"), writeCmdObj);
                     query = updateRequest.getUpdates().front().getQ();
+
+                    // In the batch write path, when the request is reconstructed to be passed to
+                    // the two phase write protocol, only the stmtIds field is used.
+                    if (auto stmtIds = updateRequest.getStmtIds()) {
+                        stmtId = stmtIds->front();
+                    }
+
                     if (auto parsedCollation = updateRequest.getUpdates().front().getCollation()) {
                         collation = *parsedCollation;
                     }
@@ -128,6 +156,13 @@ public:
                     auto deleteRequest = write_ops::DeleteCommandRequest::parse(
                         IDLParserContext("_clusterQueryWithoutShardKey"), writeCmdObj);
                     query = deleteRequest.getDeletes().front().getQ();
+
+                    // In the batch write path, when the request is reconstructed to be passed to
+                    // the two phase write protocol, only the stmtIds field is used.
+                    if (auto stmtIds = deleteRequest.getStmtIds()) {
+                        stmtId = stmtIds->front();
+                    }
+
                     if (auto parsedCollation = deleteRequest.getDeletes().front().getCollation()) {
                         collation = *parsedCollation;
                     }
@@ -135,13 +170,15 @@ public:
                     auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
                         IDLParserContext("_clusterQueryWithoutShardKey"), writeCmdObj);
                     query = findAndModifyRequest.getQuery();
+                    stmtId = findAndModifyRequest.getStmtId().value_or(kUninitializedStmtId);
+
                     if (auto parsedCollation = findAndModifyRequest.getCollation()) {
                         collation = *parsedCollation;
                     }
                 } else {
                     uasserted(ErrorCodes::InvalidOptions, "Not a supported batch write command");
                 }
-                return ParsedCommandInfo(query.getOwned(), collation.getOwned());
+                return ParsedCommandInfo(query.getOwned(), collation.getOwned(), stmtId);
             }();
 
             auto allShardsContainingChunksForNs =
@@ -162,24 +199,35 @@ public:
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kNoRetry);
 
-            std::vector<AsyncRequestsSender::Response> results;
+            BSONObj targetDoc;
+            Response res;
+            std::vector<AsyncRequestSenderResponseData> responses;
             while (!ars.done()) {
                 auto response = ars.next();
                 uassertStatusOK(response.swResponse);
-                results.push_back(response);
+                responses.emplace_back(
+                    AsyncRequestSenderResponseData(response.shardId,
+                                                   uassertStatusOK(CursorResponse::parseFromBSON(
+                                                       response.swResponse.getValue().data))));
             }
 
-            BSONObj targetDoc;
-            Response res;
-            for (const auto& arsRes : results) {
-                auto cursorResponse = uassertStatusOK(
-                    CursorResponse::parseFromBSON(arsRes.swResponse.getValue().data));
+            for (auto& responseData : responses) {
+                auto shardId = responseData.shardId;
+                auto cursorResponse = std::move(responseData.cursorResponse);
 
-                // Return the first response that contains a matching document.
+                // Return the first target doc/shard id pair that has already applied the write
+                // for a retryable write.
+                if (cursorResponse.getWasStatementExecuted()) {
+                    // Since the retryable write history check happens before a write is executed,
+                    // we can just use an empty BSONObj for the target doc.
+                    res.setTargetDoc(BSONObj::kEmptyObject);
+                    res.setShardId(boost::optional<mongo::StringData>(shardId));
+                    break;
+                }
+
                 if (cursorResponse.getBatch().size() > 0) {
                     res.setTargetDoc(cursorResponse.releaseBatch().front().getOwned());
-                    res.setShardId(boost::optional<mongo::StringData>(arsRes.shardId));
-                    break;
+                    res.setShardId(boost::optional<mongo::StringData>(shardId));
                 }
             }
             return res;

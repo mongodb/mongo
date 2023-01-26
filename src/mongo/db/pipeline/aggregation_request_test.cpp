@@ -66,7 +66,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
         "collation: {locale: 'en_US'}, cursor: {batchSize: 10}, hint: {a: 1}, maxTimeMS: 100, "
         "readConcern: {level: 'linearizable'}, $queryOptions: {$readPreference: 'nearest'}, "
         "exchange: {policy: 'roundrobin', consumers:NumberInt(2)}, isMapReduceCommand: true, $db: "
-        "'local'}");
+        "'local', $_isClusterQueryWithoutShardKeyCmd: true}");
     auto uuid = UUID::gen();
     BSONObjBuilder uuidBob;
     uuid.appendToBuilder(&uuidBob, AggregateCommandRequest::kCollectionUUIDFieldName);
@@ -80,6 +80,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     ASSERT_TRUE(request.getNeedsMerge());
     ASSERT_TRUE(request.getBypassDocumentValidation().value_or(false));
     ASSERT_TRUE(request.getRequestReshardingResumeToken());
+    ASSERT_TRUE(request.getIsClusterQueryWithoutShardKeyCmd());
     ASSERT_EQ(
         request.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
         10);
@@ -215,6 +216,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     request.setLet(letParamsObj);
     auto uuid = UUID::gen();
     request.setCollectionUUID(uuid);
+    request.setIsClusterQueryWithoutShardKeyCmd(true);
 
     auto expectedSerialization = Document{
         {AggregateCommandRequest::kCommandName, nss.coll()},
@@ -232,7 +234,8 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
         {query_request_helper::kUnwrappedReadPrefField, readPrefObj},
         {AggregateCommandRequest::kRequestReshardingResumeTokenFieldName, true},
         {AggregateCommandRequest::kIsMapReduceCommandFieldName, true},
-        {AggregateCommandRequest::kCollectionUUIDFieldName, uuid}};
+        {AggregateCommandRequest::kCollectionUUIDFieldName, uuid},
+        {AggregateCommandRequest::kIsClusterQueryWithoutShardKeyCmdFieldName, true}};
     ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
                        expectedSerialization);
 }

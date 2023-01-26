@@ -57,6 +57,7 @@ const char kBatchDocSequenceFieldInitial[] = "cursor.firstBatch";
 const char kPostBatchResumeTokenField[] = "postBatchResumeToken";
 const char kPartialResultsReturnedField[] = "partialResultsReturned";
 const char kInvalidatedField[] = "invalidated";
+const char kWasStatementExecuted[] = "$_wasStatementExecuted";
 
 }  // namespace
 
@@ -82,6 +83,10 @@ void CursorResponseBuilder::done(CursorId cursorId, const NamespaceString& curso
 
     if (_invalidated) {
         _cursorObject->append(kInvalidatedField, _invalidated);
+    }
+
+    if (_wasStatementExecuted) {
+        _cursorObject->append(kWasStatementExecuted, _wasStatementExecuted);
     }
 
     _cursorObject->append(kIdField, cursorId);
@@ -140,7 +145,8 @@ CursorResponse::CursorResponse(NamespaceString nss,
                                boost::optional<BSONObj> varsField,
                                boost::optional<std::string> cursorType,
                                bool partialResultsReturned,
-                               bool invalidated)
+                               bool invalidated,
+                               bool wasStatementExecuted)
     : _nss(std::move(nss)),
       _cursorId(cursorId),
       _batch(std::move(batch)),
@@ -150,7 +156,8 @@ CursorResponse::CursorResponse(NamespaceString nss,
       _varsField(std::move(varsField)),
       _cursorType(std::move(cursorType)),
       _partialResultsReturned(partialResultsReturned),
-      _invalidated(invalidated) {}
+      _invalidated(invalidated),
+      _wasStatementExecuted(wasStatementExecuted) {}
 
 std::vector<StatusWith<CursorResponse>> CursorResponse::parseFromBSONMany(
     const BSONObj& cmdResponse) {
@@ -299,6 +306,16 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
         }
     }
 
+    auto wasStatementExecuted = cursorObj[kWasStatementExecuted];
+    if (wasStatementExecuted) {
+        if (wasStatementExecuted.type() != BSONType::Bool) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << kWasStatementExecuted
+                                  << " format is invalid; expected Bool, but found: "
+                                  << wasStatementExecuted.type()};
+        }
+    }
+
     auto writeConcernError = cmdResponse["writeConcernError"];
 
     if (writeConcernError && writeConcernError.type() != BSONType::Object) {
@@ -317,7 +334,8 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
              varsElt ? varsElt.Obj().getOwned() : boost::optional<BSONObj>{},
              typeElt ? boost::make_optional<std::string>(typeElt.String()) : boost::none,
              partialResultsReturned.trueValue(),
-             invalidatedElem.trueValue()}};
+             invalidatedElem.trueValue(),
+             wasStatementExecuted.trueValue()}};
 }
 
 void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
@@ -349,6 +367,10 @@ void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
 
     if (_invalidated) {
         cursorBuilder.append(kInvalidatedField, _invalidated);
+    }
+
+    if (_wasStatementExecuted) {
+        cursorBuilder.append(kWasStatementExecuted, _wasStatementExecuted);
     }
 
     cursorBuilder.doneFast();

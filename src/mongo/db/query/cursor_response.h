@@ -99,6 +99,10 @@ public:
         _invalidated = true;
     }
 
+    void setWasStatementExecuted(bool wasStatementExecuted) {
+        _wasStatementExecuted = true;
+    }
+
     long long numDocs() const {
         return _numDocs;
     }
@@ -135,6 +139,7 @@ private:
     BSONObj _postBatchResumeToken;
     bool _partialResultsReturned = false;
     bool _invalidated = false;
+    bool _wasStatementExecuted = false;
 };
 
 /**
@@ -216,7 +221,8 @@ public:
                    boost::optional<BSONObj> varsField = boost::none,
                    boost::optional<std::string> cursorType = boost::none,
                    bool partialResultsReturned = false,
-                   bool invalidated = false);
+                   bool invalidated = false,
+                   bool wasStatementExecuted = false);
 
     CursorResponse(CursorResponse&& other) = default;
     CursorResponse& operator=(CursorResponse&& other) = default;
@@ -269,6 +275,10 @@ public:
         return _invalidated;
     }
 
+    bool getWasStatementExecuted() const {
+        return _wasStatementExecuted;
+    }
+
     /**
      * Converts this response to its raw BSON representation.
      */
@@ -289,6 +299,7 @@ private:
     boost::optional<std::string> _cursorType;
     bool _partialResultsReturned = false;
     bool _invalidated = false;
+    bool _wasStatementExecuted = false;
 };
 
 }  // namespace mongo
