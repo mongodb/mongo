@@ -2225,13 +2225,13 @@ public:
         auto start = _context->popABTExpr();
 
         auto rangeExpr = optimizer::make<optimizer::Let>(
-            std::move(startName),
+            startName,
             std::move(start),
             optimizer::make<optimizer::Let>(
-                std::move(endName),
+                endName,
                 std::move(end),
                 optimizer::make<optimizer::Let>(
-                    std::move(stepName),
+                    stepName,
                     std::move(step),
                     buildABTMultiBranchConditional(
                         ABTCaseValuePair{
@@ -2246,19 +2246,19 @@ public:
                             makeABTFail(ErrorCodes::Error{7157713},
                                         "$range only supports numeric types for step")},
                         optimizer::make<optimizer::Let>(
-                            std::move(convertedStartName),
+                            convertedStartName,
                             makeABTFunction("convert",
                                             makeVariable(startName),
                                             optimizer::Constant::int32(static_cast<int32_t>(
                                                 sbe::value::TypeTags::NumberInt32))),
                             optimizer::make<optimizer::Let>(
-                                std::move(convertedEndName),
+                                convertedEndName,
                                 makeABTFunction("convert",
                                                 makeVariable(endName),
                                                 optimizer::Constant::int32(static_cast<int32_t>(
                                                     sbe::value::TypeTags::NumberInt32))),
                                 optimizer::make<optimizer::Let>(
-                                    std::move(convertedStepName),
+                                    convertedStepName,
                                     makeABTFunction("convert",
                                                     makeVariable(stepName),
                                                     optimizer::Constant::int32(static_cast<int32_t>(
