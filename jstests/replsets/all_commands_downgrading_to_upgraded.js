@@ -468,6 +468,9 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({dropRole: "foo"}));
         }
     },
+    createSearchIndex: {
+        skip: isNotImplementedYet,
+    },
     createUser: {
         command: {createUser: "foo", pwd: "bar", roles: []},
         teardown: function(conn) {
@@ -552,6 +555,9 @@ const allCommands = {
                 conn.getDB(dbName).runCommand({createRole: "foo", privileges: [], roles: []}));
         },
         command: {dropRole: "foo"},
+    },
+    dropSearchIndex: {
+        skip: isNotImplementedYet,
     },
     dropUser: {
         setUp: function(conn) {
@@ -839,6 +845,9 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
     },
+    listSearchIndexes: {
+        skip: isNotImplementedYet,
+    },
     lockInfo: {skip: isNotImplementedYet, isAdminCommand: 1, command: {lockInfo: 1}},
     logApplicationMessage: {
         skip: isNotImplementedYet,
@@ -894,6 +903,9 @@ const allCommands = {
         //     assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         // },
         // command: {mergeChunks: fullNs, bounds: [{_id: MinKey}, {_id: MaxKey}]}
+    },
+    modifySearchIndex: {
+        skip: isNotImplementedYet,
     },
     moveChunk: {
         skip: isNotImplementedYet,

@@ -349,6 +349,7 @@ let testCases = {
         shardedTargetsConfigServer: true,
         useLogs: true,
     },
+    createSearchIndex: {skip: "does not accept read or write concern"},
     createUser: {
         command: {createUser: "foo", pwd: "bar", roles: []},
         checkReadConcern: false,
@@ -444,6 +445,7 @@ let testCases = {
         shardedTargetsConfigServer: true,
         useLogs: true,
     },
+    dropSearchIndex: {skip: "does not accept read or write concern"},
     dropUser: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(db).runCommand(
@@ -565,6 +567,7 @@ let testCases = {
     listDatabases: {skip: "does not accept read or write concern"},
     listDatabasesForAllTenants: {skip: "does not accept read or write concern"},
     listIndexes: {skip: "does not accept read or write concern"},
+    listSearchIndexes: {skip: "does not accept read or write concern"},
     listShards: {skip: "does not accept read or write concern"},
     lockInfo: {skip: "does not accept read or write concern"},
     logApplicationMessage: {skip: "does not accept read or write concern"},
@@ -575,6 +578,7 @@ let testCases = {
     mapReduce: {skip: "does not accept read or write concern"},
     mergeAllChunksOnShard: {skip: "does not accept read or write concern"},
     mergeChunks: {skip: "does not accept read or write concern"},
+    modifySearchIndex: {skip: "does not accept read or write concern"},
     moveChunk: {
         skip:
             "does not accept read or write concern (accepts writeConcern, but only explicitly and when _secondaryThrottle is true)"
