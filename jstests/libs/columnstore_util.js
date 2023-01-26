@@ -25,17 +25,16 @@ function fullyEnableColumnScan(nodes) {
 }
 
 /**
- * Checks if the test is eligible to run and sets the appropriate parameters to use column store
- * indexes. Returns true if set up was successful.
+ * Returns true if the current testing environment is one where column store index creation is
+ * expected to succeed. Otherwise, logs the reason why the test will not create column store indexes
+ * and returns false.
  */
-function setUpServerForColumnStoreIndexTest(db) {
-    if (!checkSBEEnabled(db)) {
-        jsTestLog("Skipping columnstore index test since SBE is disabled");
-        return false;
-    }
+function safeToCreateColumnStoreIndex(db) {
+    return safeToCreateColumnStoreIndexInCluster(
+        DiscoverTopology.findNonConfigNodes(db.getMongo()));
+}
 
-    let nodes = DiscoverTopology.findNonConfigNodes(db.getMongo());
-
+function safeToCreateColumnStoreIndexInCluster(nodes) {
     for (const node of nodes) {
         const conn = new Mongo(node);
         if (FixtureHelpers.isMongos(conn.getDB("admin"))) {
@@ -45,20 +44,41 @@ function setUpServerForColumnStoreIndexTest(db) {
         const createColumnIndexParameter =
             getParameter(conn, "failpoint.createColumnIndexOnAllCollections");
         if (createColumnIndexParameter.mode) {
-            // Test is already configured to create columnstore indexes on all collections, skip
+            // Test is already configured to create column store indexes on all collections; skip
             // it so that we don't create double indexes.
-            jsTestLog(
-                "Skipping columnstore index test since column indexes are already on all collections.");
+            jsTestLog("Note: declining to create column store index, because they are already " +
+                      "on all collections.");
             return false;
         }
 
         if (ClusteredCollectionUtil.areAllCollectionsClustered(conn)) {
             // Columnstore indexes are incompatible with clustered collections.
-            jsTestLog("Skipping columnstore index test since all collections are clustered.");
+            jsTestLog("Note: declining to create column store index, because all collections " +
+                      "are clustered.");
             return false;
         }
 
         break;
+    }
+
+    return true;
+}
+
+/**
+ * Checks if the test is eligible to run and sets the appropriate parameters to use column store
+ * indexes. Returns true if setup was successful.
+ */
+function setUpServerForColumnStoreIndexTest(db) {
+    if (!checkSBEEnabled(db)) {
+        jsTestLog("Skipping column store index test since SBE is disabled");
+        return false;
+    }
+
+    let nodes = DiscoverTopology.findNonConfigNodes(db.getMongo());
+    if (!safeToCreateColumnStoreIndexInCluster(nodes)) {
+        jsTestLog(
+            "Skipping column store index test in suite where column store index creation may fail");
+        return false;
     }
 
     // Parallel tests cannot set these server parameters during execution due to the side effect of

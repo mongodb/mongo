@@ -14,6 +14,7 @@ load('jstests/libs/collection_drop_recreate.js');  // For 'assertDropAndRecreate
                                                    // 'assertDropCollection'.
 load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
                                                    // 'assertChangeStreamEventEq'.
+load("jstests/libs/columnstore_util.js");          // For setUpServerForColumnStoreIndexTest.
 
 const testDB = db.getSiblingDB(jsTestName());
 
@@ -26,11 +27,6 @@ const ns = {
 
 const pipeline = [{$changeStream: {showExpandedEvents: true}}];
 const cst = new ChangeStreamTest(testDB);
-
-function getCollectionUuid(coll) {
-    const collInfo = testDB.getCollectionInfos({name: coll})[0];
-    return collInfo.info.uuid;
-}
 
 function assertNextChangeEvent(cursor, expectedEvent) {
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expectedEvent});
@@ -107,6 +103,13 @@ function runTest(startChangeStream, insertDataBeforeCreateIndex) {
     // followed by dropIndex().
     options = {name: "wi", wildcardProjection: {a: true, b: true, _id: false}};
     testCreateIndexAndDropIndex({"$**": 1}, options);
+
+    // Test createIndex() for a column store index on all fields with the columnstoreProjection
+    // option, followed by dropIndex().
+    if (safeToCreateColumnStoreIndex(db)) {
+        options = {columnstoreProjection: {a: true, b: true, _id: false}};
+        testCreateIndexAndDropIndex({"$**": "columnstore"}, options);
+    }
 
     // Test createIndex() for a text index with various options, followed by dropIndex().
     options = {

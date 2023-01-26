@@ -92,6 +92,38 @@ let explain = coll.find({}, {a: 1, b: 1}).explain();
 assert(planHasStage(db, explain, "COLUMN_SCAN"));
 assert.sameMembers(coll.find({}, {a: 1, b: 1}).toArray(), allDocs);
 
-// Test dropping the index.
+// Verify that column store indexes appear in listIndexes output.
+assert.commandWorked(coll.createIndex({"x.$**": "columnstore"}));
+function isIndexSpecInIndexList(expectedIndexSpec, indexList) {
+    // The expected specification should appear in the listIndexes output exactly once.
+    return indexList.filter(indexSpec => !bsonUnorderedFieldsCompare(indexSpec, expectedIndexSpec))
+               .length === 1;
+}
+let listIndexesResult =
+    assert.commandWorked(db.runCommand({listIndexes: coll.getName()})).cursor.firstBatch;
+assert(isIndexSpecInIndexList({v: 2, key: {"$**": "columnstore"}, name: "$**_columnstore"},
+                              listIndexesResult),
+       listIndexesResult);
+assert(isIndexSpecInIndexList({v: 2, key: {"x.$**": "columnstore"}, name: "x.$**_columnstore"},
+                              listIndexesResult),
+       listIndexesResult);
+
+// Test dropping column store indexes.
 assert.commandWorked(coll.dropIndex({"$**": "columnstore"}));
+assert.commandWorked(coll.dropIndex({"x.$**": "columnstore"}));
+
+// All column store indexes should now be gone.
+listIndexesResult =
+    assert.commandWorked(db.runCommand({listIndexes: coll.getName()})).cursor.firstBatch;
+assert(!tojson(listIndexesResult).includes("columnstore"), listIndexesResult);
+
+// Test that listIndexes shows the columnstoreProjection in indexes that have one.
+assert.commandWorked(coll.createIndex({"$**": "columnstore"}, {columnstoreProjection: {x: 1}}));
+listIndexesResult =
+    assert.commandWorked(db.runCommand({listIndexes: coll.getName()})).cursor.firstBatch;
+assert(
+    isIndexSpecInIndexList(
+        {v: 2, key: {"$**": "columnstore"}, name: "$**_columnstore", columnstoreProjection: {x: 1}},
+        listIndexesResult),
+    listIndexesResult);
 }());
