@@ -41,7 +41,6 @@
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
-#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/split_chunk_request_type.h"
 #include "mongo/logv2/log.h"

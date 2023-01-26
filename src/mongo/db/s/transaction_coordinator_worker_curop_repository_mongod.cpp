@@ -26,15 +26,37 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/s/transaction_coordinator_worker_curop_info.h"
 
 #include "mongo/base/shim.h"
+#include "mongo/db/s/transaction_coordinator_worker_curop_repository.h"
 
 namespace mongo {
+namespace {
+
+class TransactionCoordinatorWorkerCurOpInfo {
+public:
+    using CoordinatorAction = TransactionCoordinatorWorkerCurOpRepository::CoordinatorAction;
+
+    TransactionCoordinatorWorkerCurOpInfo(LogicalSessionId lsid,
+                                          TxnNumberAndRetryCounter txnNumberAndRetryCounter,
+                                          Date_t startTime,
+                                          CoordinatorAction action);
+
+    TransactionCoordinatorWorkerCurOpInfo() = delete;
+
+    void reportState(BSONObjBuilder* parent) const;
+
+private:
+    static std::string toString(CoordinatorAction action);
+
+    LogicalSessionId _lsid;
+    TxnNumberAndRetryCounter _txnNumberAndRetryCounter;
+    Date_t _startTime;
+    CoordinatorAction _action;
+};
+
 const auto getTransactionCoordinatorWorkerCurOpInfo =
     OperationContext::declareDecoration<boost::optional<TransactionCoordinatorWorkerCurOpInfo>>();
-
-namespace {
 
 class MongoDTransactionCoordinatorWorkerCurOpRepository final
     : public TransactionCoordinatorWorkerCurOpRepository {
@@ -73,8 +95,6 @@ getTransactionCoordinatorWorkerCurOpRepositoryImpl() {
 auto getTransactionCoordinatorWorkerCurOpRepositoryRegistration =
     MONGO_WEAK_FUNCTION_REGISTRATION(getTransactionCoordinatorWorkerCurOpRepository,
                                      getTransactionCoordinatorWorkerCurOpRepositoryImpl);
-
-}  // namespace
 
 TransactionCoordinatorWorkerCurOpInfo::TransactionCoordinatorWorkerCurOpInfo(
     LogicalSessionId lsid,
@@ -119,4 +139,6 @@ void TransactionCoordinatorWorkerCurOpInfo::reportState(BSONObjBuilder* parent) 
     twoPhaseCoordinatorBuilder.append("startTime", dateToISOStringUTC(_startTime));
     parent->append("twoPhaseCommitCoordinator", twoPhaseCoordinatorBuilder.obj());
 }
+
+}  // namespace
 }  // namespace mongo

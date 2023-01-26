@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/feature_flag.h"
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/sharding_statistics.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/sharding_feature_flags_gen.h"

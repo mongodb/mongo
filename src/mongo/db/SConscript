@@ -83,8 +83,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
-    ],
-    LIBDEPS_PRIVATE=[
         'server_options_core',
     ],
 )
@@ -153,6 +151,7 @@ env.Library(
         'dbmessage.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/bson_validate',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/util/net/network',
@@ -208,7 +207,7 @@ env.Library(
 env.Library(
     target='mongohasher',
     source=[
-        "hasher.cpp",
+        'hasher.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -283,13 +282,12 @@ env.Library(
 # has the structure for storing the server options, while libserver_options.a has the code to set
 # them via the command line.
 env.Library(
-    target="server_options_core",
+    target='server_options_core',
     source=[
-        "server_options.cpp",
+        'server_options.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/bson_validate',
     ],
 )
 
@@ -831,6 +829,26 @@ env.Library(
 )
 
 env.Library(
+    target='shard_role_api',
+    source=[
+        's/database_sharding_state.cpp',
+        's/operation_sharding_state.cpp',
+        's/shard_key_index_util.cpp',
+        's/sharding_api_d_params.idl',
+        's/sharding_state.cpp',
+    ],
+    LIBDEPS=[
+        'catalog/collection',
+        'catalog/index_catalog',
+        'concurrency/lock_manager',
+        'index/index_access_method',
+    ],
+    LIBDEPS_PRIVATE=[
+        'server_base',
+    ],
+)
+
+env.Library(
     target='shard_role',
     source=[
         'catalog_raii.cpp',
@@ -841,10 +859,9 @@ env.Library(
         'transaction_resources.cpp',
     ],
     LIBDEPS=[
-        'catalog/collection',
         'catalog/collection_catalog',
         'catalog/database_holder',
-        'concurrency/lock_manager',
+        'shard_role_api',
         'stats/top',
         'storage/write_unit_of_work',
         'views/views',

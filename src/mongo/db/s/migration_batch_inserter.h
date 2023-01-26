@@ -40,7 +40,6 @@
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
-#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"

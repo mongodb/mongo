@@ -85,7 +85,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/timeseries/timeseries_collmod.h"

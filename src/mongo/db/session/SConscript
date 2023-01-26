@@ -134,8 +134,8 @@ env.Library(
         'sessions_collection',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/internal_transactions_feature_flag',
+        '$BUILD_DIR/mongo/db/shard_role_api',
     ],
 )
 

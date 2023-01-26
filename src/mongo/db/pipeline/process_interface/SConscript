@@ -97,7 +97,7 @@ env.Library(
         'mongod_process_interface_factory.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/s/sharding_api',
         'mongod_process_interfaces',
         'shardsvr_process_interface',

@@ -63,7 +63,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/bson/bson_validate',
         '$BUILD_DIR/mongo/util/processinfo',
         '$BUILD_DIR/mongo/util/secure_zero_memory',
     ],

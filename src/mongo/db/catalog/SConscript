@@ -599,14 +599,13 @@ env.Library(
         '$BUILD_DIR/mongo/db/update_index_data',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/collection_index_usage_tracker',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/fts/base_fts',
         '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/db/query/query_planner',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
-        'collection',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         'index_catalog',
     ],
 )

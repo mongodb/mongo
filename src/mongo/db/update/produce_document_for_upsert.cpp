@@ -28,14 +28,13 @@
  */
 
 #include "mongo/db/update/produce_document_for_upsert.h"
+
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/update/storage_validation.h"
 
 namespace mongo {
-
 namespace update {
 
 const char idFieldName[] = "_id";
@@ -208,5 +207,4 @@ void ensureIdFieldIsFirst(mutablebson::Document* doc, bool generateOIDIfMissing)
 }
 
 }  // namespace update
-
 }  // namespace mongo

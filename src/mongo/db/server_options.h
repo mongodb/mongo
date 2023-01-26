@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/logv2/log_format.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
@@ -247,4 +247,5 @@ struct TraitNamedDomain {
         return ret;
     }
 };
+
 }  // namespace mongo

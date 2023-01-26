@@ -51,9 +51,7 @@ if get_option('ssl') == 'on':
             'sasl_aws_protocol_common.idl',
         ],
         LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/server_options_core',  # For object_check.h
-            '$BUILD_DIR/mongo/idl/idl_parser',
+            '$BUILD_DIR/mongo/db/server_base',
         ],
     )
 
@@ -71,8 +69,8 @@ if get_option('ssl') == 'on':
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/server_options_core',  # For object_check.h
-            '$BUILD_DIR/mongo/idl/idl_parser',
+            '$BUILD_DIR/mongo/bson/bson_validate',
+            '$BUILD_DIR/mongo/db/server_base',
             '$BUILD_DIR/third_party/shim_libmongocrypt',
             'sasl_aws_common',
         ],
@@ -128,7 +126,6 @@ saslClientEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/server_options_core',  # For object_check.h
         '$BUILD_DIR/mongo/shell/program_runner',
         '$BUILD_DIR/mongo/util/net/http_client',
     ],

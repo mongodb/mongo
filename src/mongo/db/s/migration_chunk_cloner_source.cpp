@@ -27,13 +27,10 @@
  *    it in the license file.
  */
 
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
@@ -46,7 +43,6 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_source_manager.h"
-#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
@@ -67,7 +63,6 @@
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {

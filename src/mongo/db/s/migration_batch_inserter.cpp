@@ -29,6 +29,8 @@
 
 #include "mongo/db/s/migration_batch_inserter.h"
 
+#include "mongo/db/s/sharding_statistics.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 
 namespace mongo {

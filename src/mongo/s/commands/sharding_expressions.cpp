@@ -31,7 +31,6 @@
 
 #include "mongo/client/index_spec.h"
 #include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index/2d_common.h"

@@ -4,20 +4,15 @@ Import("env")
 
 env = env.Clone()
 
-# TODO (SERVER-73238): This library is about to be decommissioned, use `catalog/collection` in the meantime
+# This library is about to be decommissioned. Use `db/shard_role_api` instead.
 env.Library(
     target='sharding_api_d_DO_NOT_ADD_MORE_USAGES',
     source=[
         'collection_metadata.cpp',
         'collection_sharding_state_factory_standalone.cpp',
         'collection_sharding_state.cpp',
-        'database_sharding_state.cpp',
         'global_user_write_block_state.cpp',
-        'operation_sharding_state.cpp',
-        'shard_key_index_util.cpp',
-        'sharding_api_d_params.idl',
         'sharding_migration_critical_section.cpp',
-        'sharding_state.cpp',
         'sharding_statistics.cpp',
         'sharding_write_router.cpp',
         'transaction_coordinator_curop.cpp',
@@ -29,9 +24,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/grid',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/write_block_bypass',
     ],
@@ -299,7 +292,6 @@ env.Library(
         'transaction_coordinators_stats.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
         '$BUILD_DIR/mongo/db/dbdirectclient',
@@ -307,6 +299,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/not_primary_error_tracker',
         '$BUILD_DIR/mongo/db/repl/wait_for_majority_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/transaction/transaction',
         '$BUILD_DIR/mongo/db/vector_clock_mongod',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
@@ -621,7 +614,7 @@ env.Library(
         'sharding_logging.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
     ],
 )

@@ -39,11 +39,11 @@ protoEnv.Library(
         '$BUILD_DIR/mongo/db/wire_version',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/bson/bson_validate',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/auth/security_token',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         '$BUILD_DIR/third_party/wiredtiger/wiredtiger_checksum' if wiredtiger else [],
     ],

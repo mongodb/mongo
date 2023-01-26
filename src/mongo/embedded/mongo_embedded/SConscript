@@ -86,8 +86,9 @@ if get_option('link-model') != 'dynamic-sdk':
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/bson/bson_validate',
             '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-            '$BUILD_DIR/mongo/db/server_options_core',
+            '$BUILD_DIR/mongo/db/server_base',
             '$BUILD_DIR/mongo/rpc/message',
             '$BUILD_DIR/mongo/unittest/unittest',
             '$BUILD_DIR/mongo/util/net/network',

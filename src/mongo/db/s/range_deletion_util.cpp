@@ -51,7 +51,6 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/balancer_stats_registry.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/service_context.h"

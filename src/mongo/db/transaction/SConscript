@@ -71,7 +71,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/operation_time_tracker',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/query_request',
@@ -80,6 +79,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/session/logical_session_id',
         '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/session/session_catalog',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/shared_request_handling',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/rpc/command_status',

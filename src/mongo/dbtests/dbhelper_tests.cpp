@@ -39,7 +39,6 @@
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_impl.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/range_arithmetic.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/write_concern_options.h"

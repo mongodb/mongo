@@ -34,8 +34,8 @@
 #include "mongo/util/safe_num.h"
 
 namespace mongo {
-
 namespace update {
+
 /**
  * Use an UpdateDriver and UpdateRequest to produce the document to insert.
  **/
@@ -49,6 +49,6 @@ BSONObj produceDocumentForUpsert(OperationContext* opCtx,
 
 void ensureIdFieldIsFirst(mutablebson::Document* doc, bool generateOIDIfMissing);
 void assertPathsNotArray(const mutablebson::Document& document, const FieldRefSet& paths);
-}  // namespace update
 
+}  // namespace update
 }  // namespace mongo

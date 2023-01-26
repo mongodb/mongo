@@ -26,8 +26,8 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/base/shim.h"
 
+#include "mongo/base/shim.h"
 #include "mongo/db/s/transaction_coordinator_worker_curop_repository.h"
 
 namespace mongo {
