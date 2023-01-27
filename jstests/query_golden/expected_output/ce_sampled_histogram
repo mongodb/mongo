@@ -1,4 +1,10 @@
 setting random seed: 6345
+
+[jsTest] ----
+[jsTest] Settings before: internalQueryCardinalityEstimatorMode: sampling, internalQueryFrameworkControl: forceBonsai
+[jsTest] ----
+
+
 Inserting collection: ce_data_100
 Inserting collection: ce_data_1000
 Indexing collection: ce_data_100
@@ -16437,3 +16443,8 @@ Sample error: { "absError" : -3, "relError" : -1, "selError" : -0.3 }
 
 Average base error: { "absError" : 23.33, "relError" : 0.12, "selError" : 2.33 }
 Average sample error: { "absError" : 40.57, "relError" : -0.03, "selError" : 4.06 }
+
+[jsTest] ----
+[jsTest] Settings after: { "internalQueryFrameworkControl" : "forceBonsai", "ok" : 1 }
+[jsTest] ----
+

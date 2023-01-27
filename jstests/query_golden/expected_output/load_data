@@ -856,10 +856,22 @@ Metadata: [
 ]
 Loading 2 collections.
 
+
+[jsTest] ----
+[jsTest] Settings before: internalQueryCardinalityEstimatorMode: sampling, internalQueryFrameworkControl: forceBonsai
+[jsTest] ----
+
+
 Inserting collection: ce_data_100
 Inserting collection: ce_data_1000
 Indexing collection: ce_data_100
 Indexing collection: ce_data_1000
+
+[jsTest] ----
+[jsTest] Settings after: { "internalQueryFrameworkControl" : "forceBonsai", "ok" : 1 }
+[jsTest] ----
+
+
 Testing collection ce_data_100
 Expected cardinality: 100
 Actual cardinality: 100

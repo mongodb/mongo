@@ -25,8 +25,8 @@ assert.commandWorked(coll.insert([
 // Generate enough documents for index to be preferable.
 assert.commandWorked(coll.insert(Array.from({length: 100}, (_, i) => ({a: {b: i + 10}}))));
 
+const pipeline = [{$match: {'a.b': null}}];
 {
-    const pipeline = [{$match: {'a.b': null}}];
     jsTestLog(`No indexes. Query: ${tojsononeline(pipeline)}`);
     const explain = coll.explain("executionStats").aggregate(pipeline);
     print(`nReturned: ${explain.executionStats.nReturned}\n`);
@@ -35,11 +35,10 @@ assert.commandWorked(coll.insert(Array.from({length: 100}, (_, i) => ({a: {b: i 
 }
 
 {
-    const pipeline = [{$match: {'a.b': null}}];
     const index = {'a.b': 1};
     jsTestLog(`Index on ${tojsononeline(index)}. Query: ${tojson(pipeline)}`);
     assert.commandWorked(coll.createIndex(index));
-    const explain = coll.explain("executionStats").aggregate([{$match: {'a.b': null}}]);
+    const explain = coll.explain("executionStats").aggregate(pipeline);
     print(`nReturned: ${explain.executionStats.nReturned}\n`);
     print(`Plan skeleton: `);
     printjson(getPlanSkeleton(explain));

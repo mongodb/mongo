@@ -119,6 +119,9 @@ function runHistogramsTest(test) {
         internalQueryCardinalityEstimatorMode: 1,
         internalQueryFrameworkControl: 1,
     });
+    jsTestLog(`Settings before: internalQueryCardinalityEstimatorMode: ${
+        internalQueryCardinalityEstimatorMode}, internalQueryFrameworkControl: ${
+        internalQueryFrameworkControl}`);
 
     try {
         test();
@@ -129,6 +132,8 @@ function runHistogramsTest(test) {
             internalQueryCardinalityEstimatorMode,
             internalQueryFrameworkControl
         }));
+        let cqfControlAfter = db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
+        jsTestLog(`Settings after: ${tojson(cqfControlAfter)}`);
     }
 }
 

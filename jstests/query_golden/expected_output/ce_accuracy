@@ -1,6 +1,12 @@
 
 
 [jsTest] ----
+[jsTest] Settings before: internalQueryCardinalityEstimatorMode: sampling, internalQueryFrameworkControl: forceBonsai
+[jsTest] ----
+
+
+
+[jsTest] ----
 [jsTest] Populating collection
 [jsTest] ----
 
@@ -2832,3 +2838,9 @@ Id: 228: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 16, 
 Id: 218: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 15, "$lte" : 18 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 218,  "nReturned" : 7,  "heuristic" : 4.43,  "histogram" : 12.25 } - Histogram errors {  "absError" : 5.25,  "relError" : 0.75,  "selError" : 26.25 }
 Id: 236: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 17, "$lt" : 20 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 236,  "nReturned" : 8,  "heuristic" : 4.43,  "histogram" : 13.07 } - Histogram errors {  "absError" : 5.07,  "relError" : 0.63,  "selError" : 25.35 }
 Id: 226: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 16, "$lte" : 19 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 226,  "nReturned" : 8,  "heuristic" : 4.43,  "histogram" : 13.07 } - Histogram errors {  "absError" : 5.07,  "relError" : 0.63,  "selError" : 25.35 }
+
+
+[jsTest] ----
+[jsTest] Settings after: { "internalQueryFrameworkControl" : "forceBonsai", "ok" : 1 }
+[jsTest] ----
+

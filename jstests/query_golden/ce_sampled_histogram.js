@@ -17,36 +17,8 @@ const collData = 'ce_accuracy_test';
 const dataDir = 'jstests/query_golden/libs/data/';
 const sampleRate = 0.1;
 
-const sampleDB = db.getSiblingDB("ce_sampled_histogram");
-const baseDB = db.getSiblingDB("ce_base_histogram");
-
 load(`${dataDir}${collData}.schema`);  // For 'dbMetadata'.
 load(`${dataDir}${collData}.data`);    // For 'dataSet'.
-
-const collMetadata = dbMetadata[1];
-const collName = collMetadata.collectionName;
-assert.eq(collName, "ce_data_1000");
-
-const sampleColl = sampleDB[collName];
-const baseColl = baseDB[collName];
-
-const fields = [
-    "uniform_int_1000_1",
-    "normal_int_1000_1",
-    "chi2_int_1000_1",
-    "mixed_int_uniform_1",
-    "mixed_int_unf_norm_1",
-    "mixed_int_unf_norm_chi_1",
-    "mixed_int_unf_norm_chi_2",
-    "choice_str_set_1112_33_norm_s",
-    "choice_str_set_1112_33_norm_l",
-    "choice_str_set_1112_1000_chi2_s",
-    "choice_str_set_1112_1000_chi2_l"
-];
-
-// Initialize base collection.
-loadJSONDataset(baseDB, dataSet, dbMetadata);
-const collSize = baseColl.count();
 
 /**
  * Main testing function. Initializes histograms and sample collection, and then executes a series
@@ -54,6 +26,34 @@ const collSize = baseColl.count();
  * collection, whose histograms include only 10% of values.
  */
 runHistogramsTest(function testSampleHistogram() {
+    const sampleDB = db.getSiblingDB("ce_sampled_histogram");
+    const baseDB = db.getSiblingDB("ce_base_histogram");
+
+    const collMetadata = dbMetadata[1];
+    const collName = collMetadata.collectionName;
+    assert.eq(collName, "ce_data_1000");
+
+    const sampleColl = sampleDB[collName];
+    const baseColl = baseDB[collName];
+
+    const fields = [
+        "uniform_int_1000_1",
+        "normal_int_1000_1",
+        "chi2_int_1000_1",
+        "mixed_int_uniform_1",
+        "mixed_int_unf_norm_1",
+        "mixed_int_unf_norm_chi_1",
+        "mixed_int_unf_norm_chi_2",
+        "choice_str_set_1112_33_norm_s",
+        "choice_str_set_1112_33_norm_l",
+        "choice_str_set_1112_1000_chi2_s",
+        "choice_str_set_1112_1000_chi2_l"
+    ];
+
+    // Initialize base collection.
+    loadJSONDataset(baseDB, dataSet, dbMetadata);
+    const collSize = baseColl.count();
+
     // Build histograms on the base collection.
     let projection = {_id: 0};
     for (const field of fields) {

@@ -21,7 +21,9 @@ print(`Metadata: ${tojson(dbMetadata)}\n`);
 load(`${dataDir}${dbName}.data`);
 
 print(`Loading ${dataSet.length} collections.\n`);
-loadJSONDataset(testDB, dataSet, dbMetadata);
+runHistogramsTest(function() {
+    loadJSONDataset(testDB, dataSet, dbMetadata);
+});
 
 for (const collMetadata of dbMetadata) {
     const collName = collMetadata.collectionName;
