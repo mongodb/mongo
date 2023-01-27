@@ -105,8 +105,8 @@ int_distributions['mixed_int_unf_norm_chi_2'] = RandomDistribution.mixed(
 
 # String distributions
 
-PRINTED_CHAR_MIN_CODE = 32
-PRINTED_CHAR_MAX_CODE = 126
+PRINTED_CHAR_MIN_CODE = ord('0')
+PRINTED_CHAR_MAX_CODE = ord('~')
 
 ascii_printable_chars = [
     chr(code) for code in range(PRINTED_CHAR_MIN_CODE, PRINTED_CHAR_MAX_CODE + 1)
@@ -115,10 +115,12 @@ ascii_printable_chars = [
 
 def next_char(char: str, distance: int, min_char_code: int, max_char_code: int):
     char_code = ord(char)
-    assert (min_char_code <= char_code <= max_char_code), "char is out of range"
+    assert (min_char_code <= char_code <= max_char_code
+            ), f'char_code "{char_code}" is out of range ({min_char_code}, {max_char_code})'
     number_of_chars = max_char_code - min_char_code + 1
     new_char_code = ((char_code - min_char_code + distance) % number_of_chars) + min_char_code
-    assert (min_char_code <= new_char_code <= max_char_code), "new char is out of range"
+    assert (min_char_code <= new_char_code <=
+            max_char_code), f'new char code "{new_char_code}" is out of range'
     return chr(new_char_code)
 
 
@@ -173,11 +175,11 @@ d4 = RandomDistribution.uniform(range_int_20_30)
 string_sets = {}
 # 33 unique strings
 string_sets['set_1112_33'] = generate_str_by_distance(33, 'xxxx', d1, d1, d1, d2)
-string_sets['set_2221_33'] = generate_str_by_distance(33, 'aZa3', d2, d2, d3, d1)
+string_sets['set_2221_33'] = generate_str_by_distance(33, 'azay', d2, d2, d3, d1)
 string_sets['set_5555_33'] = generate_str_by_distance(33, 'axbz', d4, d4, d4, d4)
 # 1000 unique strings
 string_sets['set_1112_1000'] = generate_str_by_distance(1000, 'xxxx', d1, d1, d1, d2)
-string_sets['set_2221_1000'] = generate_str_by_distance(1000, 'aZa3', d2, d2, d3, d1)
+string_sets['set_2221_1000'] = generate_str_by_distance(1000, 'azay', d2, d2, d3, d1)
 string_sets['set_5555_1000'] = generate_str_by_distance(1000, 'axbz', d4, d4, d4, d4)
 
 # Weights with different variance. For instance if the smallest weight is 1, and the biggest weight is 5
@@ -191,11 +193,11 @@ weight_range_s = RangeGenerator(DataType.INTEGER, 95, 101, 1)
 weight_range_l = RangeGenerator(DataType.INTEGER, 25, 101, 2)
 
 weights = {}
+weights['unif_s'] = RandomDistribution.uniform(weight_range_s)
+weights['unif_l'] = RandomDistribution.uniform(weight_range_l)
 weights['norm_s'] = RandomDistribution.normal(weight_range_s)
-#weights['norm_m'] = RandomDistribution.normal(weight_range_m)
 weights['norm_l'] = RandomDistribution.normal(weight_range_l)
 weights['chi2_s'] = RandomDistribution.noncentral_chisquare(weight_range_s)
-#weights['chi2_m'] = RandomDistribution.noncentral_chisquare(weight_range_m)
 weights['chi2_l'] = RandomDistribution.noncentral_chisquare(weight_range_l)
 
 
@@ -211,6 +213,76 @@ for set_name, cur_set in string_sets.items():
     for weight_name, weight in weights.items():
         str_distributions[f'choice_str_{set_name}_{weight_name}'] = make_choice_distr(
             cur_set, weight)
+
+# Array distributions
+
+# array lenght distributions - they are all uniform
+arr_zero_size = RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 0, 1, 1))
+arr_len_dist_s = RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 1, 6, 1))
+arr_len_dist_m = RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 90, 110, 3))
+arr_len_dist_l = RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 900, 1100, 10))
+
+arr_empty_distr = ArrayRandomDistribution(arr_zero_size, int_distributions['uniform_int_1000_1'])
+
+arr_distributions = {}
+
+# Arrays with integers
+arr_distributions["uniform_arr_int_10000_10_s"] = ArrayRandomDistribution(
+    arr_len_dist_s, int_distributions['uniform_int_10000_10'])
+arr_distributions["uniform_arr_int_10000_10_m"] = ArrayRandomDistribution(
+    arr_len_dist_m, int_distributions['uniform_int_10000_10'])
+arr_distributions["uniform_arr_int_10000_10_l"] = ArrayRandomDistribution(
+    arr_len_dist_l, int_distributions['uniform_int_10000_10'])
+arr_distributions["mixed_arr_int_s"] = ArrayRandomDistribution(
+    arr_len_dist_s, int_distributions['mixed_int_unf_norm_chi_2'])
+arr_distributions["mixed_arr_int_m"] = ArrayRandomDistribution(
+    arr_len_dist_m, int_distributions['mixed_int_unf_norm_chi_2'])
+arr_distributions["mixed_arr_int_l"] = ArrayRandomDistribution(
+    arr_len_dist_l, int_distributions['mixed_int_unf_norm_chi_2'])
+
+# Arrays with strings
+arr_distributions["choice_arr_str_set_1112_33_norm_l_s"] = ArrayRandomDistribution(
+    arr_len_dist_s, str_distributions['choice_str_set_1112_33_norm_l'])
+arr_distributions["choice_arr_str_set_1112_33_norm_l_m"] = ArrayRandomDistribution(
+    arr_len_dist_m, str_distributions['choice_str_set_1112_33_norm_l'])
+arr_distributions["choice_arr_str_set_1112_33_norm_l_l"] = ArrayRandomDistribution(
+    arr_len_dist_l, str_distributions['choice_str_set_1112_33_norm_l'])
+arr_distributions["choice_arr_str_set_5555_1000_norm_l_s"] = ArrayRandomDistribution(
+    arr_len_dist_s, str_distributions['choice_str_set_5555_1000_norm_l'])
+arr_distributions["choice_arr_str_set_5555_1000_norm_l_m"] = ArrayRandomDistribution(
+    arr_len_dist_m, str_distributions['choice_str_set_5555_1000_norm_l'])
+arr_distributions["choice_arr_str_set_5555_1000_norm_l_l"] = ArrayRandomDistribution(
+    arr_len_dist_l, str_distributions['choice_str_set_5555_1000_norm_l'])
+
+# 30% scalars, 70% arrays
+arr_distributions["mixed_arr_int_30_70_s"] = RandomDistribution.mixed(
+    [int_distributions['uniform_int_10000_10'], arr_distributions["uniform_arr_int_10000_10_s"]],
+    [0.3, 0.7])
+arr_distributions["mixed_arr_int_30_70_l"] = RandomDistribution.mixed(
+    [int_distributions['uniform_int_10000_10'], arr_distributions["uniform_arr_int_10000_10_l"]],
+    [0.3, 0.7])
+arr_distributions["mixed_arr_str_30_70"] = RandomDistribution.mixed([
+    str_distributions['choice_str_set_2221_33_norm_l'],
+    arr_distributions["choice_arr_str_set_1112_33_norm_l_s"]
+], [0.3, 0.7])
+# 70% scalars, 30% arrays
+arr_distributions["mixed_arr_int_70_30_s"] = RandomDistribution.mixed(
+    [int_distributions['uniform_int_10000_10'], arr_distributions["uniform_arr_int_10000_10_s"]],
+    [0.7, 0.3])
+arr_distributions["mixed_arr_int_70_30_l"] = RandomDistribution.mixed(
+    [int_distributions['uniform_int_10000_10'], arr_distributions["uniform_arr_int_10000_10_l"]],
+    [0.7, 0.3])
+arr_distributions["mixed_arr_str_70_30"] = RandomDistribution.mixed([
+    str_distributions['choice_str_set_2221_33_norm_l'],
+    arr_distributions["choice_arr_str_set_1112_33_norm_l_s"]
+], [0.7, 0.3])
+
+# 20% empty arrays
+arr_distributions["uniform_arr_int_10000_10_s_empty_20"] = RandomDistribution.mixed(
+    [arr_empty_distr, arr_distributions["uniform_arr_int_10000_10_s"]], [0.2, 0.8])
+# 80% empty arrays
+arr_distributions["uniform_arr_int_10000_10_s_empty_80"] = RandomDistribution.mixed(
+    [arr_empty_distr, arr_distributions["uniform_arr_int_10000_10_s"]], [0.8, 0.2])
 
 ################################################################################
 # Collection templates
@@ -230,6 +302,10 @@ field_templates = [
 field_templates += [
     config.FieldTemplate(name=f'{dist_name}', data_type=config.DataType.STRING, distribution=dist,
                          indexed=False) for dist_name, dist in str_distributions.items()
+]
+field_templates += [
+    config.FieldTemplate(name=f'{dist_name}', data_type=config.DataType.ARRAY, distribution=dist,
+                         indexed=False) for dist_name, dist in arr_distributions.items()
 ]
 
 ce_data = config.CollectionTemplate(name="ce_data", fields=field_templates, compound_indexes=[],

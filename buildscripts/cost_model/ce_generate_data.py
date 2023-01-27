@@ -111,12 +111,17 @@ async def generate_histograms(coll_template, coll, dump_path):
             field_val = doc[field.name]
             if isinstance(field_val, str):
                 field_val = re.escape(field_val)
+            if isinstance(field_val, list):
+                # TODO Currently array data breaks distplot, so we skip arrays
+                continue
             field_data.append(field_val)
-        fig_file_name = f'{dump_path}/{coll.name}_{field.name}.png'
-        print(f'Generating histogram {fig_file_name}')
-        hist = sns.displot(data=field_data, kind="hist", bins=round(math.sqrt(doc_count))).figure
-        hist.savefig(fig_file_name)
-        plt.close(hist)
+        if len(field_data) > 0:
+            fig_file_name = f'{dump_path}/{coll.name}_{field.name}.png'
+            print(f'Generating histogram {fig_file_name}')
+            hist = sns.displot(data=field_data, kind="hist",
+                               bins=round(math.sqrt(doc_count))).figure
+            hist.savefig(fig_file_name)
+            plt.close(hist)
 
 
 async def main():

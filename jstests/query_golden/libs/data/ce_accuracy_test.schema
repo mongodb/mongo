@@ -144,6 +144,16 @@ const dbMetadata = [
                 "indexed": false
             },
             {
+                "fieldName": "choice_str_set_1112_33_unif_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_33_unif_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
                 "fieldName": "choice_str_set_1112_33_norm_s",
                 "dataType": "string",
                 "indexed": false
@@ -160,6 +170,16 @@ const dbMetadata = [
             },
             {
                 "fieldName": "choice_str_set_1112_33_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_33_unif_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_33_unif_l",
                 "dataType": "string",
                 "indexed": false
             },
@@ -184,6 +204,16 @@ const dbMetadata = [
                 "indexed": false
             },
             {
+                "fieldName": "choice_str_set_5555_33_unif_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_33_unif_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
                 "fieldName": "choice_str_set_5555_33_norm_s",
                 "dataType": "string",
                 "indexed": false
@@ -200,6 +230,16 @@ const dbMetadata = [
             },
             {
                 "fieldName": "choice_str_set_5555_33_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_1000_unif_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_1000_unif_l",
                 "dataType": "string",
                 "indexed": false
             },
@@ -224,6 +264,16 @@ const dbMetadata = [
                 "indexed": false
             },
             {
+                "fieldName": "choice_str_set_2221_1000_unif_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_1000_unif_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
                 "fieldName": "choice_str_set_2221_1000_norm_s",
                 "dataType": "string",
                 "indexed": false
@@ -240,6 +290,16 @@ const dbMetadata = [
             },
             {
                 "fieldName": "choice_str_set_2221_1000_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_1000_unif_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_1000_unif_l",
                 "dataType": "string",
                 "indexed": false
             },
@@ -261,6 +321,106 @@ const dbMetadata = [
             {
                 "fieldName": "choice_str_set_5555_1000_chi2_l",
                 "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_arr_int_10000_10_s",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_arr_int_10000_10_m",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_arr_int_10000_10_l",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_int_s",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_int_m",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_int_l",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_arr_str_set_1112_33_norm_l_s",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_arr_str_set_1112_33_norm_l_m",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_arr_str_set_1112_33_norm_l_l",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_arr_str_set_5555_1000_norm_l_s",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_arr_str_set_5555_1000_norm_l_m",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_arr_str_set_5555_1000_norm_l_l",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_int_30_70_s",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_int_30_70_l",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_str_30_70",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_int_70_30_s",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_int_70_30_l",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_str_70_30",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_arr_int_10000_10_s_empty_20",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_arr_int_10000_10_s_empty_80",
+                "dataType": "array",
                 "indexed": false
             }
         ],
@@ -411,6 +571,16 @@ const dbMetadata = [
                 "indexed": false
             },
             {
+                "fieldName": "choice_str_set_1112_33_unif_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_33_unif_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
                 "fieldName": "choice_str_set_1112_33_norm_s",
                 "dataType": "string",
                 "indexed": false
@@ -427,6 +597,16 @@ const dbMetadata = [
             },
             {
                 "fieldName": "choice_str_set_1112_33_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_33_unif_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_33_unif_l",
                 "dataType": "string",
                 "indexed": false
             },
@@ -451,6 +631,16 @@ const dbMetadata = [
                 "indexed": false
             },
             {
+                "fieldName": "choice_str_set_5555_33_unif_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_33_unif_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
                 "fieldName": "choice_str_set_5555_33_norm_s",
                 "dataType": "string",
                 "indexed": false
@@ -467,6 +657,16 @@ const dbMetadata = [
             },
             {
                 "fieldName": "choice_str_set_5555_33_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_1000_unif_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_1000_unif_l",
                 "dataType": "string",
                 "indexed": false
             },
@@ -491,6 +691,16 @@ const dbMetadata = [
                 "indexed": false
             },
             {
+                "fieldName": "choice_str_set_2221_1000_unif_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_1000_unif_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
                 "fieldName": "choice_str_set_2221_1000_norm_s",
                 "dataType": "string",
                 "indexed": false
@@ -507,6 +717,16 @@ const dbMetadata = [
             },
             {
                 "fieldName": "choice_str_set_2221_1000_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_1000_unif_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_1000_unif_l",
                 "dataType": "string",
                 "indexed": false
             },
@@ -528,6 +748,106 @@ const dbMetadata = [
             {
                 "fieldName": "choice_str_set_5555_1000_chi2_l",
                 "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_arr_int_10000_10_s",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_arr_int_10000_10_m",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_arr_int_10000_10_l",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_int_s",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_int_m",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_int_l",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_arr_str_set_1112_33_norm_l_s",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_arr_str_set_1112_33_norm_l_m",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_arr_str_set_1112_33_norm_l_l",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_arr_str_set_5555_1000_norm_l_s",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_arr_str_set_5555_1000_norm_l_m",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_arr_str_set_5555_1000_norm_l_l",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_int_30_70_s",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_int_30_70_l",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_str_30_70",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_int_70_30_s",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_int_70_30_l",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixed_arr_str_70_30",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_arr_int_10000_10_s_empty_20",
+                "dataType": "array",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_arr_int_10000_10_s_empty_80",
+                "dataType": "array",
                 "indexed": false
             }
         ],
