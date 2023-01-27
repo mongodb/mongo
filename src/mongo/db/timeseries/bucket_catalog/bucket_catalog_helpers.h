@@ -33,6 +33,7 @@
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 
@@ -89,30 +90,22 @@ void normalizeMetadata(BSONObjBuilder* builder,
                        boost::optional<StringData> as);
 
 /**
- * Generates filters that can be used to run a 'find' query on the timeseries bucket collection to
- * find a bucket eligible to receive a new measurement specified by a document's metadata and
- * timestamp (measurementTs).
+ * Generates an aggregation pipeline to identify a bucket eligible to receive a new measurement
+ * specified by a document's metadata and timestamp (measurementTs).
  *
  * A bucket is deemed suitable for the new measurement iff:
  * i.   the bucket is uncompressed and not closed
  * ii.  the meta fields match
  * iii. the measurementTs is within the allowed time span for the bucket
- *
- * {$and:
- *       [{"control.version":1},
- *       {$or: [{"control.closed":{$exists:false}},
- *              {"control.closed":false}]
- *       },
- *       {"meta":<metaValue>},
- *       {$and: [{"control.min.time":{$lte:<measurementTs>}},
- *               {"control.min.time":{$gt:<measurementTs - maxSpanSeconds>}}]
- *       }]
- * }
+ * iv.  the bucket has less than the max number of measurements and is below the max bucket size
  */
-BSONObj generateReopeningFilters(const Date_t& time,
-                                 boost::optional<BSONElement> metadata,
-                                 const std::string& controlMinTimePath,
-                                 int64_t bucketMaxSpanSeconds);
+std::vector<BSONObj> generateReopeningPipeline(OperationContext* opCtx,
+                                               const Date_t& time,
+                                               boost::optional<BSONElement> metadata,
+                                               const std::string& controlMinTimePath,
+                                               const std::string& maxDataTimeFieldPath,
+                                               int64_t bucketMaxSpanSeconds,
+                                               int32_t bucketMaxSize);
 
 /**
  * Notify the BucketCatalog of a direct write to a given bucket document.
@@ -120,5 +113,4 @@ BSONObj generateReopeningFilters(const Date_t& time,
  * To be called from an OpObserver, e.g. in aboutToDelete and onUpdate.
  */
 void handleDirectWrite(OperationContext* opCtx, const NamespaceString& ns, const OID& bucketId);
-
 }  // namespace mongo::timeseries::bucket_catalog

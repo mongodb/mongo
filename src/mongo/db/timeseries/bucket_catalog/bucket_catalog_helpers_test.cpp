@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -90,8 +91,6 @@ BSONObj BucketCatalogHelpersTest::_findSuitableBucket(OperationContext* opCtx,
         metadata = swDocTimeAndMeta.getValue().second;
     }
 
-    auto controlMinTimePath = kControlMinFieldNamePrefix.toString() + options.getTimeField();
-
     boost::optional<BSONObj> normalizedMetadata;
     if (metadata.ok()) {
         BSONObjBuilder builder;
@@ -99,15 +98,30 @@ BSONObj BucketCatalogHelpersTest::_findSuitableBucket(OperationContext* opCtx,
         normalizedMetadata = builder.obj();
     }
 
-    // Generate all the filters we need to add to our 'find' query for a suitable bucket.
-    auto fullFilterExpression =
-        generateReopeningFilters(time,
-                                 normalizedMetadata ? normalizedMetadata->firstElement() : metadata,
-                                 controlMinTimePath,
-                                 *options.getBucketMaxSpanSeconds());
+    auto controlMinTimePath = kControlMinFieldNamePrefix.toString() + options.getTimeField();
+    auto maxDataTimeFieldPath = kDataFieldNamePrefix.toString() + options.getTimeField() + "." +
+        std::to_string(gTimeseriesBucketMaxCount - 1);
 
+    // Generate an aggregation request to find a suitable bucket to reopen.
+    auto aggregationPipeline = generateReopeningPipeline(
+        opCtx,
+        time,
+        normalizedMetadata ? normalizedMetadata->firstElement() : metadata,
+        controlMinTimePath,
+        maxDataTimeFieldPath,
+        *options.getBucketMaxSpanSeconds(),
+        /* numberOfActiveBuckets */ gTimeseriesBucketMaxCount);
+    AggregateCommandRequest aggRequest(bucketNss, aggregationPipeline);
+
+    // Run an aggregation to find a suitable bucket to reopen.
     DBDirectClient client(opCtx);
-    return client.findOne(bucketNss, fullFilterExpression);
+    auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
+        &client, aggRequest, false /* secondaryOk */, false /* useExhaust*/));
+    if (cursor->more()) {
+        return cursor->next();
+    }
+
+    return BSONObj();
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxBadBucketDocumentsTest) {

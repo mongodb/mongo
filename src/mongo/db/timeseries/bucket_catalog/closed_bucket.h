@@ -49,8 +49,10 @@ class ClosedBucket {
 public:
     ClosedBucket() = default;
     ~ClosedBucket();
-    ClosedBucket(
-        BucketStateManager*, const BucketId&, const std::string&, boost::optional<uint32_t>, bool);
+    ClosedBucket(BucketStateManager*,
+                 const BucketId&,
+                 const std::string&,
+                 boost::optional<uint32_t>);
     ClosedBucket(ClosedBucket&&);
     ClosedBucket& operator=(ClosedBucket&&);
     ClosedBucket(const ClosedBucket&) = delete;
@@ -59,7 +61,6 @@ public:
     BucketId bucketId;
     std::string timeField;
     boost::optional<uint32_t> numMeasurements;
-    bool eligibleForReopening = false;
 
 private:
     BucketStateManager* _bucketStateManager = nullptr;

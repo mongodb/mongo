@@ -110,7 +110,6 @@ TEST_F(WriteOpsExecTest, TestDeleteSizeEstimationLogic) {
     ASSERT(write_ops::verifySizeEstimate(deleteOpEntry));
 }
 
-
 TEST_F(WriteOpsExecTest, PerformAtomicTimeseriesWritesWithTransform) {
     NamespaceString ns{"db_write_ops_exec_test", "ts"};
     auto opCtx = operationContext();
@@ -132,7 +131,7 @@ TEST_F(WriteOpsExecTest, PerformAtomicTimeseriesWritesWithTransform) {
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
     OID bucketId = OID::createFromString("629e1e680958e279dc29a517"_sd);
-    auto compressionResult = timeseries::compressBucket(bucketDoc, "time", ns, true, false);
+    auto compressionResult = timeseries::compressBucket(bucketDoc, "time", ns, false);
     ASSERT_TRUE(compressionResult.compressedBucket.has_value());
     const BSONObj compressedBucket = compressionResult.compressedBucket.value();
 

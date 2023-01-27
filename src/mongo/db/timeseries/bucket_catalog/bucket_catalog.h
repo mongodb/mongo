@@ -81,7 +81,7 @@ public:
 
         std::shared_ptr<WriteBatch> batch;
         ClosedBuckets closedBuckets;
-        stdx::variant<std::monostate, OID, BSONObj> candidate;
+        stdx::variant<std::monostate, OID, std::vector<BSONObj>> candidate;
         uint64_t catalogEra = 0;
     };
 
@@ -447,7 +447,8 @@ protected:
      * Identifies a previously archived bucket that may be able to accomodate the measurement
      * represented by 'info', if one exists.
      */
-    stdx::variant<std::monostate, OID, BSONObj> _getReopeningCandidate(
+    stdx::variant<std::monostate, OID, std::vector<BSONObj>> _getReopeningCandidate(
+        OperationContext* opCtx,
         Stripe* stripe,
         WithLock stripeLock,
         const CreationInfo& info,

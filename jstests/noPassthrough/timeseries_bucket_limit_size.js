@@ -85,14 +85,8 @@ TimeseriesTest.run((insert) => {
                   bucketDocs[0].control.version,
                   'unexpected control.version in first bucket: ' + tojson(bucketDocs));
 
-        if (areTimeseriesScalabilityImprovementsEnabled) {
-            assert.eq(true,
-                      bucketDocs[0].control.closed,
-                      'unexpected control.closed in first bucket: ' + tojson(bucketDocs));
-        } else {
-            assert(!bucketDocs[0].control.hasOwnProperty("closed"),
-                   'unexpected control.closed in first bucket: ' + tojson(bucketDocs));
-        }
+        assert(!bucketDocs[0].control.hasOwnProperty("closed"),
+               'unexpected control.closed in first bucket: ' + tojson(bucketDocs));
 
         // Second bucket should contain the remaining document.
         assert.eq(numDocs - 1,
@@ -111,14 +105,8 @@ TimeseriesTest.run((insert) => {
                   bucketDocs[1].control.version,
                   'unexpected control.version in second bucket: ' + tojson(bucketDocs));
 
-        if (areTimeseriesScalabilityImprovementsEnabled) {
-            assert.eq(false,
-                      bucketDocs[1].control.closed,
-                      'unexpected control.closed in second bucket: ' + tojson(bucketDocs));
-        } else {
-            assert(!bucketDocs[1].control.hasOwnProperty("closed"),
-                   'unexpected control.closed in second bucket: ' + tojson(bucketDocs));
-        }
+        assert(!bucketDocs[1].control.hasOwnProperty("closed"),
+               'unexpected control.closed in second bucket: ' + tojson(bucketDocs));
     };
 
     runTest(1);

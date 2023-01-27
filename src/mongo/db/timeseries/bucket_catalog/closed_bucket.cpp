@@ -44,13 +44,8 @@ ClosedBucket::~ClosedBucket() {
 ClosedBucket::ClosedBucket(BucketStateManager* bsm,
                            const BucketId& bucketId,
                            const std::string& tf,
-                           boost::optional<uint32_t> nm,
-                           bool efr)
-    : bucketId{bucketId},
-      timeField{tf},
-      numMeasurements{nm},
-      eligibleForReopening{efr},
-      _bucketStateManager{bsm} {
+                           boost::optional<uint32_t> nm)
+    : bucketId{bucketId}, timeField{tf}, numMeasurements{nm}, _bucketStateManager{bsm} {
     invariant(_bucketStateManager);
     _bucketStateManager->changeBucketState(
         bucketId,
@@ -64,7 +59,6 @@ ClosedBucket::ClosedBucket(ClosedBucket&& other)
     : bucketId{std::move(other.bucketId)},
       timeField{std::move(other.timeField)},
       numMeasurements{other.numMeasurements},
-      eligibleForReopening{other.eligibleForReopening},
       _bucketStateManager{other._bucketStateManager} {
     other._bucketStateManager = nullptr;
 }
@@ -74,7 +68,6 @@ ClosedBucket& ClosedBucket::operator=(ClosedBucket&& other) {
         bucketId = std::move(other.bucketId);
         timeField = std::move(other.timeField);
         numMeasurements = other.numMeasurements;
-        eligibleForReopening = other.eligibleForReopening;
         _bucketStateManager = other._bucketStateManager;
         other._bucketStateManager = nullptr;
     }

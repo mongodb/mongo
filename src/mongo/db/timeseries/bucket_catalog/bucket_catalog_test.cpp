@@ -1369,7 +1369,6 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
     CompressionResult compressionResult = compressBucket(bucketDoc,
                                                          _timeField,
                                                          _ns1,
-                                                         /*eligibleForReopening*/ true,
                                                          /*validateDecompression*/ true);
     const BSONObj& compressedBucketDoc = compressionResult.compressedBucket.value();
 
@@ -1431,7 +1430,6 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
     CompressionResult compressionResult = compressBucket(bucketDoc,
                                                          _timeField,
                                                          _ns1,
-                                                         /*eligibleForReopening*/ true,
                                                          /*validateDecompression*/ true);
     const BSONObj& compressedBucketDoc = compressionResult.compressedBucket.value();
 
@@ -1563,7 +1561,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     ASSERT_OK(result.getStatus());
     ASSERT(result.getValue().closedBuckets.empty());
     ASSERT(!result.getValue().batch);
-    ASSERT_TRUE(stdx::holds_alternative<BSONObj>(result.getValue().candidate));
+    ASSERT_TRUE(stdx::holds_alternative<std::vector<BSONObj>>(result.getValue().candidate));
 
     // Actually insert so we do have an open bucket to test against.
     result = _bucketCatalog->insert(
@@ -1593,7 +1591,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     ASSERT_OK(result.getStatus());
     ASSERT(result.getValue().closedBuckets.empty());
     ASSERT(!result.getValue().batch);
-    ASSERT_TRUE(stdx::holds_alternative<BSONObj>(result.getValue().candidate));
+    ASSERT_TRUE(stdx::holds_alternative<std::vector<BSONObj>>(result.getValue().candidate));
 
     // Time forward should not hint to re-open.
     result = _bucketCatalog->tryInsert(
@@ -1742,7 +1740,6 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
     ASSERT_EQ(1, _getExecutionStat(_ns1, kNumClosedDueToReopening));
     ASSERT_EQ(1, _getExecutionStat(_ns1, kNumBucketsReopened));
     ASSERT_FALSE(result.getValue().closedBuckets.empty());
-    ASSERT_TRUE(result.getValue().closedBuckets[0].eligibleForReopening);
 
     // Verify that if we try another insert for the soft-closed bucket, we get a query-based
     // reopening candidate.
@@ -1756,7 +1753,7 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(result.getValue().closedBuckets.empty());
     ASSERT(!result.getValue().batch);
-    ASSERT_TRUE(stdx::holds_alternative<BSONObj>(result.getValue().candidate));
+    ASSERT_TRUE(stdx::holds_alternative<std::vector<BSONObj>>(result.getValue().candidate));
 }
 
 TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {

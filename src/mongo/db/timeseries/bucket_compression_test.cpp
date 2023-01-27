@@ -78,7 +78,7 @@ const BSONObj sampleBucket = mongo::fromjson(R"({
 
 TEST(TimeseriesBucketCompression, BasicRoundtrip) {
     auto compressed =
-        timeseries::compressBucket(sampleBucket, "t"_sd, NamespaceString{"test.foo"}, true, false);
+        timeseries::compressBucket(sampleBucket, "t"_sd, NamespaceString{"test.foo"}, false);
     ASSERT_TRUE(compressed.compressedBucket.has_value());
     auto decompressed = timeseries::decompressBucket(compressed.compressedBucket.value());
     ASSERT_TRUE(decompressed.has_value());

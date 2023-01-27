@@ -47,8 +47,7 @@ protected:
         test(obj);
 
         NamespaceString nss{"test"};
-        auto compressionResult =
-            timeseries::compressBucket(obj, "time", nss, /*eligibleForReopening=*/false, true);
+        auto compressionResult = timeseries::compressBucket(obj, "time", nss, true);
         ASSERT_TRUE(compressionResult.compressedBucket.has_value());
         ASSERT_FALSE(compressionResult.decompressionFailed);
 

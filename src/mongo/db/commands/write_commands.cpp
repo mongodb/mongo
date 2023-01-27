@@ -273,11 +273,6 @@ BSONObj makeTimeseriesInsertDocument(std::shared_ptr<timeseries::bucket_catalog:
                                     kTimeseriesControlDefaultVersion);
         bucketControlBuilder.append(kBucketControlMinFieldName, batch->min);
         bucketControlBuilder.append(kBucketControlMaxFieldName, batch->max);
-
-        if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            bucketControlBuilder.append(kBucketControlClosedFieldName, false);
-        }
     }
     if (metadataElem) {
         builder.appendAs(metadataElem, kBucketMetaFieldName);
@@ -731,11 +726,8 @@ public:
                 beforeSize = bucketDoc.objsize();
                 // Reset every time we run to ensure we never use a stale value
                 compressionStats = {};
-                auto compressed = timeseries::compressBucket(bucketDoc,
-                                                             closedBucket.timeField,
-                                                             ns(),
-                                                             closedBucket.eligibleForReopening,
-                                                             validateCompression);
+                auto compressed = timeseries::compressBucket(
+                    bucketDoc, closedBucket.timeField, ns(), validateCompression);
                 if (compressed.compressedBucket) {
                     // If compressed object size is larger than uncompressed, skip compression
                     // update.
@@ -1170,14 +1162,13 @@ public:
                                 BSONObj suitableBucket;
 
                                 if (auto* bucketId = stdx::get_if<OID>(&insertResult.candidate)) {
-                                    // Look up archived bucket by _id.
                                     DBDirectClient client{opCtx};
                                     hangTimeseriesInsertBeforeReopeningQuery.pauseWhileSet();
                                     suitableBucket =
                                         client.findOne(bucketsColl->ns(), BSON("_id" << *bucketId));
                                     bucketFindResult.fetchedBucket = true;
-                                } else if (auto* filter =
-                                               stdx::get_if<BSONObj>(&insertResult.candidate)) {
+                                } else if (auto* pipeline = stdx::get_if<std::vector<BSONObj>>(
+                                               &insertResult.candidate)) {
                                     // Resort to Query-Based reopening approach.
                                     DBDirectClient client{opCtx};
 
@@ -1190,8 +1181,25 @@ public:
                                             bucketsColl->getIndexCatalog(),
                                             timeSeriesOptions)) {
                                         hangTimeseriesInsertBeforeReopeningQuery.pauseWhileSet();
-                                        // Run a query to find a suitable bucket to reopen.
-                                        suitableBucket = client.findOne(bucketsColl->ns(), *filter);
+
+                                        // Run an aggregation to find a suitable bucket to reopen.
+                                        AggregateCommandRequest aggRequest(bucketsColl->ns(),
+                                                                           *pipeline);
+
+                                        // TODO (SERVER-73189): Remove manually setting of the
+                                        // Tenant ID.
+                                        aggRequest.setDollarTenant(bucketsColl->ns().tenantId());
+
+                                        auto cursor =
+                                            uassertStatusOK(DBClientCursor::fromAggregationRequest(
+                                                &client,
+                                                aggRequest,
+                                                false /* secondaryOk */,
+                                                false /* useExhaust*/));
+
+                                        if (cursor->more()) {
+                                            suitableBucket = cursor->next();
+                                        }
                                         bucketFindResult.queriedBucket = true;
                                     }
                                 }

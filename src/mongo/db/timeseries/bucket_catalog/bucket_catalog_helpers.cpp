@@ -128,13 +128,26 @@ void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj) {
     }
 }
 
-}  // namespace
-
-
-BSONObj generateReopeningFilters(const Date_t& time,
-                                 boost::optional<BSONElement> metadata,
-                                 const std::string& controlMinTimePath,
-                                 int64_t bucketMaxSpanSeconds) {
+/**
+ * Generates a match filter used to identify suitable buckets for reopening, represented by:
+ *
+ * {$and:
+ *       [{"control.version":1},
+ *       {$or: [{"control.closed":{$exists:false}},
+ *              {"control.closed":false}]
+ *       },
+ *       {"meta":<metaValue>},
+ *       {$and: [{"control.min.time":{$lte:<measurementTs>}},
+ *               {"control.min.time":{$gt:<measurementTs - maxSpanSeconds>}}]
+ *       },
+         {"data.<timeField>.999":{$exists:false}}]
+ * }
+ */
+BSONObj generateReopeningMatchFilter(const Date_t& time,
+                                     boost::optional<BSONElement> metadata,
+                                     const std::string& controlMinTimePath,
+                                     const std::string& maxDataTimeFieldPath,
+                                     int64_t bucketMaxSpanSeconds) {
     // The bucket must be uncompressed.
     auto versionFilter = BSON(kControlVersionPath << kTimeseriesControlDefaultVersion);
 
@@ -145,7 +158,6 @@ BSONObj generateReopeningFilters(const Date_t& time,
 
     // The measurement meta field must match the bucket 'meta' field. If the field is not specified
     // we can only insert into buckets which also do not have a meta field.
-
     BSONObj metaFieldFilter;
     if (metadata && (*metadata).ok()) {
         BSONObjBuilder builder;
@@ -161,8 +173,45 @@ BSONObj generateReopeningFilters(const Date_t& time,
     auto upperBound = BSON(controlMinTimePath << BSON("$gt" << measurementMaxDifference));
     auto timeRangeFilter = BSON("$and" << BSON_ARRAY(lowerBound << upperBound));
 
+    // If the "data.<timeField>.999" field exists, it means the bucket is full and we do not want to
+    // insert future measurements into it.
+    auto measurementSizeFilter = BSON(maxDataTimeFieldPath << BSON("$exists" << false));
+
     return BSON("$and" << BSON_ARRAY(versionFilter << closedFlagFilter << timeRangeFilter
-                                                   << metaFieldFilter));
+                                                   << metaFieldFilter << measurementSizeFilter));
+}
+
+}  // namespace
+
+std::vector<BSONObj> generateReopeningPipeline(OperationContext* opCtx,
+                                               const Date_t& time,
+                                               boost::optional<BSONElement> metadata,
+                                               const std::string& controlMinTimePath,
+                                               const std::string& maxDataTimeFieldPath,
+                                               int64_t bucketMaxSpanSeconds,
+                                               int32_t bucketMaxSize) {
+    std::vector<BSONObj> pipeline;
+
+    // Stage 1: Match stage with suitable bucket requirements.
+    pipeline.push_back(
+        BSON("$match" << generateReopeningMatchFilter(
+                 time, metadata, controlMinTimePath, maxDataTimeFieldPath, bucketMaxSpanSeconds)));
+
+    // Stage 2: Add an observable field for the bucket document size.
+    pipeline.push_back(BSON("$set" << BSON("object_size" << BSON("$bsonSize"
+                                                                 << "$$ROOT"))));
+
+    // Stage 3: Restrict bucket documents exceeding the max bucket size.
+    pipeline.push_back(BSON("$match" << BSON("object_size" << BSON("$lt" << bucketMaxSize))));
+
+    // Stage 4: Unset the document size field.
+    pipeline.push_back(BSON("$unset"
+                            << "object_size"));
+
+    // Stage 5: Restrict the aggregation to one document.
+    pipeline.push_back(BSON("$limit" << 1));
+
+    return pipeline;
 }
 
 StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,

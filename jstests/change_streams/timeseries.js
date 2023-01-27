@@ -145,8 +145,7 @@ let expectedChanges = [
             "control": {
                 "version": 1,
                 "min": {"_id": 1, "ts": ISODate("1970-01-01T00:00:00Z")},
-                "max": {"_id": 1, "ts": ISODate("1970-01-01T00:00:01Z")},
-                "closed": false  // Only seen if time series scalability improvements enabled
+                "max": {"_id": 1, "ts": ISODate("1970-01-01T00:00:01Z")}
             },
             "meta": {"a": 1},
             "data": {"_id": {"0": 1}, "ts": {"0": ISODate("1970-01-01T00:00:01Z")}}
@@ -292,9 +291,6 @@ let expectedChanges = [
 ];
 
 if (!FeatureFlagUtil.isEnabled(db, "TimeseriesScalabilityImprovements")) {
-    // Under this feature flag, buckets are created with the closed field set to false.
-    // Remove closed field if the feature flag is not enabled.
-    delete expectedChanges[4].fullDocument.control.closed;
     // Remove implicitly create index
     expectedChanges = [expectedChanges[0], ...expectedChanges.slice(2)];
 }
