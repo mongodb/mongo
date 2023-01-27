@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <fmt/format.h>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -147,6 +148,110 @@ std::string StrDistribution::genRandomString(size_t len, std::mt19937_64& gen) {
     }
 
     return randStr;
+}
+
+DateDistribution::DateDistribution(MixedDistributionDescriptor distrDescriptor,
+                                   double weight,
+                                   size_t ndv,
+                                   Date_t minDate,
+                                   Date_t maxDate,
+                                   double nullsRatio)
+    : DataTypeDistrNew(distrDescriptor, value::TypeTags::Date, weight, ndv, nullsRatio),
+      _minDate(minDate),
+      _maxDate(maxDate) {
+    uassert(
+        7169301,
+        "minDate: {} must be before maxDate: {}"_format(_minDate.toString(), _maxDate.toString()),
+        _minDate <= _maxDate);
+}
+
+void DateDistribution::init(DatasetDescriptorNew*, std::mt19937_64& gen) {
+    const auto min = _minDate.toMillisSinceEpoch();
+    const auto max = _maxDate.toMillisSinceEpoch();
+    std::set<long long> tmpRandSet;
+    std::uniform_int_distribution<long long> uniformIntDist{min, max};
+    while (tmpRandSet.size() < _ndv) {
+        long long rand = uniformIntDist(gen);
+        tmpRandSet.insert(rand);
+    }
+    _valSet.reserve(tmpRandSet.size());
+    for (const auto rand : tmpRandSet) {
+        const auto [tag, val] = makeDateValue(Date_t::fromMillisSinceEpoch(rand));
+        _valSet.emplace_back(tag, val);
+    }
+    _idxDist = MixedDistribution::make(_mixedDistrDescriptor, 0, _valSet.size() - 1);
+}
+
+DoubleDistribution::DoubleDistribution(MixedDistributionDescriptor distrDescriptor,
+                                       double weight,
+                                       size_t ndv,
+                                       double min,
+                                       double max,
+                                       double nullsRatio)
+    : DataTypeDistrNew(distrDescriptor, value::TypeTags::NumberDouble, weight, ndv, nullsRatio),
+      _min(min),
+      _max(max) {
+    uassert(7169302,
+            "min double: {} must be less than max double: {}"_format(_min, _max),
+            _min <= _max);
+}
+
+void DoubleDistribution::init(DatasetDescriptorNew*, std::mt19937_64& gen) {
+    std::set<double> tmpRandSet;
+    std::uniform_real_distribution<double> uniformDist{_min, _max};
+    while (tmpRandSet.size() < _ndv) {
+        tmpRandSet.insert(uniformDist(gen));
+    }
+    _valSet.reserve(tmpRandSet.size());
+    for (const auto rand : tmpRandSet) {
+        const auto [tag, val] = makeDoubleValue(rand);
+        _valSet.emplace_back(tag, val);
+    }
+    _idxDist = MixedDistribution::make(_mixedDistrDescriptor, 0, _valSet.size() - 1);
+}
+
+ObjectIdDistribution::ObjectIdDistribution(MixedDistributionDescriptor distrDescriptor,
+                                           double weight,
+                                           size_t ndv,
+                                           double nullsRatio)
+    : DataTypeDistrNew(distrDescriptor, value::TypeTags::ObjectId, weight, ndv, nullsRatio) {}
+
+/**
+ * Helper to construct a 12-byte ObjectId from three 4-byte integers.
+ */
+sbe::value::ObjectIdType createObjectId(uint32_t a, uint32_t b, uint32_t c) {
+    return {
+        static_cast<uint8_t>((a << 24) & 0xff),
+        static_cast<uint8_t>((a << 16) & 0xff),
+        static_cast<uint8_t>((a << 8) & 0xff),
+        static_cast<uint8_t>(a & 0xff),
+        static_cast<uint8_t>((b << 24) & 0xff),
+        static_cast<uint8_t>((b << 16) & 0xff),
+        static_cast<uint8_t>((b << 8) & 0xff),
+        static_cast<uint8_t>(b & 0xff),
+        static_cast<uint8_t>((c << 24) & 0xff),
+        static_cast<uint8_t>((c << 16) & 0xff),
+        static_cast<uint8_t>((c << 8) & 0xff),
+        static_cast<uint8_t>(c & 0xff),
+    };
+}
+
+void ObjectIdDistribution::init(DatasetDescriptorNew*, std::mt19937_64& gen) {
+    // An ObjectId is an array of 12 one byte integers.
+    // To generate N random ObjectIds, we generate 3*N random four byte integers and use every 3 of
+    // those integers to create N ObjectIds.
+    std::vector<uint32_t> tmpRandSet;
+    std::uniform_int_distribution<uint32_t> uniformDist{0, std::numeric_limits<uint32_t>::max()};
+    for (size_t i = 0; i < _ndv * 3; ++i) {
+        tmpRandSet.push_back(uniformDist(gen));
+    }
+    _valSet.reserve(tmpRandSet.size() / 3);
+    for (size_t i = 0; i < tmpRandSet.size(); i += 3) {
+        const auto [tag, val] = sbe::value::makeCopyObjectId(
+            createObjectId(tmpRandSet[i], tmpRandSet[i + 1], tmpRandSet[i + 2]));
+        _valSet.emplace_back(tag, val);
+    }
+    _idxDist = MixedDistribution::make(_mixedDistrDescriptor, 0, _valSet.size() - 1);
 }
 
 ArrDistribution::ArrDistribution(MixedDistributionDescriptor distrDescriptor,

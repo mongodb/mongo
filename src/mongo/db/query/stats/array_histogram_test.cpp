@@ -32,6 +32,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/max_diff.h"
+#include "mongo/db/query/stats/rand_utils_new.h"
 #include "mongo/db/query/stats/value_utils.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
@@ -133,6 +134,212 @@ TEST(ArrayHistogram, BSONEdgeValues) {
 
     // Ensure we fail to build a histrogram when we have more types than buckets.
     ASSERT_THROWS_CODE(createArrayEstimator(values, 4), DBException, 6660504);
+}
+
+TEST(ArrayHistograms, MixedTypedHistrogram) {
+    std::mt19937_64 seed(42);
+    MixedDistributionDescriptor uniform{{DistrType::kUniform, 1.0}};
+    TypeDistrVector td;
+    td.push_back(std::make_unique<IntDistribution>(uniform, 0.2, 100, -100, 100));
+    td.push_back(std::make_unique<StrDistribution>(uniform, 0.2, 100, 0, 20));
+    td.push_back(std::make_unique<DateDistribution>(
+        uniform,
+        0.2,
+        100,
+        dateFromISOString("1985-10-26T09:00:00+0000").getValue(),
+        dateFromISOString("2015-10-21T07:28:00+0000").getValue()));
+    td.push_back(std::make_unique<DoubleDistribution>(uniform, 0.2, 100, -100, 100));
+    td.push_back(std::make_unique<ObjectIdDistribution>(uniform, 0.2, 100));
+    DatasetDescriptorNew desc{std::move(td), seed};
+    const std::vector<SBEValue> values = desc.genRandomDataset(10'000);
+    ASSERT_EQ(10'000, values.size());
+    auto ah = createArrayEstimator(values, ScalarHistogram::kMaxBuckets);
+    ASSERT_EQ(10'000, ah->getScalar().getCardinality());
+}
+
+TEST(ArrayHistograms, LargeNumberOfScalarValuesBucketRanges) {
+    std::mt19937_64 seed(42);
+    MixedDistributionDescriptor uniform{{DistrType::kUniform, 1.0}};
+    TypeDistrVector td;
+    td.push_back(std::make_unique<IntDistribution>(uniform, 0.5, 1'000'000, 0, 1'000'000));
+    DatasetDescriptorNew desc{std::move(td), seed};
+    const std::vector<SBEValue> values = desc.genRandomDataset(1'000'000);
+    ASSERT_EQ(1'000'000, values.size());
+    auto ah = createArrayEstimator(values, ScalarHistogram::kMaxBuckets);
+
+    ASSERT_EQ(1'000'000, ah->getScalar().getCardinality());
+    // Assert that each bucket except the first has more than one entry.
+    std::for_each(++ah->getScalar().getBuckets().begin(),
+                  ah->getScalar().getBuckets().end(),
+                  [](auto&& bucket) { ASSERT_GT(bucket._rangeFreq, 1); });
+}
+
+TEST(ArrayHistograms, LargeArraysHistrogram) {
+    std::mt19937_64 seed(42);
+    MixedDistributionDescriptor uniform{{DistrType::kUniform, 1.0}};
+
+    TypeDistrVector arrayData;
+    arrayData.push_back(std::make_unique<IntDistribution>(uniform, 1.0, 1'000'000, 0, 1'000'000));
+    auto arrayDataDesc = std::make_unique<DatasetDescriptorNew>(std::move(arrayData), seed);
+
+    TypeDistrVector arrayDataset;
+    arrayDataset.push_back(std::make_unique<ArrDistribution>(
+        uniform, 1.0, 100, 80'000, 100'000, std::move(arrayDataDesc)));
+    DatasetDescriptorNew arrayDatasetDesc{std::move(arrayDataset), seed};
+
+    // Build 10 values where each value is an array of length 80-100k.
+    const auto values = arrayDatasetDesc.genRandomDataset(10);
+    ASSERT_EQ(10, values.size());
+
+    auto ah = createArrayEstimator(values, ScalarHistogram::kMaxBuckets);
+
+    ASSERT_TRUE(ah->getScalar().empty());
+    ASSERT_EQ(100, ah->getArrayUnique().getBuckets().size());
+    ASSERT_FALSE(ah->getArrayMin().empty());
+    ASSERT_FALSE(ah->getArrayMax().empty());
+}
+
+TEST(ArrayHistrograms, LargeNumberOfArraysHistrogram) {
+    std::mt19937_64 seed(42);
+    MixedDistributionDescriptor uniform{{DistrType::kUniform, 1.0}};
+
+    TypeDistrVector arrayData;
+    arrayData.push_back(std::make_unique<IntDistribution>(uniform, 1.0, 1'000'000, 0, 1'000'000));
+    auto arrayDataDesc = std::make_unique<DatasetDescriptorNew>(std::move(arrayData), seed);
+
+    TypeDistrVector arrayDataset;
+    arrayDataset.push_back(
+        std::make_unique<ArrDistribution>(uniform, 1.0, 100, 5, 10, std::move(arrayDataDesc)));
+    DatasetDescriptorNew arrayDatasetDesc{std::move(arrayDataset), seed};
+
+    // Build 100k values where each value is an array of length 5-10.
+    const auto values = arrayDatasetDesc.genRandomDataset(100'000);
+    ASSERT_EQ(100'000, values.size());
+
+    auto ah = createArrayEstimator(values, ScalarHistogram::kMaxBuckets);
+
+    ASSERT_TRUE(ah->getScalar().empty());
+    ASSERT_EQ(100, ah->getArrayUnique().getBuckets().size());
+    ASSERT_EQ(100, ah->getArrayMin().getBuckets().size());
+    ASSERT_EQ(100, ah->getArrayMax().getBuckets().size());
+}
+
+std::vector<SBEValue> generateValuesVector(std::vector<int> vals) {
+    std::vector<SBEValue> ret;
+    ret.reserve(vals.size());
+    std::transform(vals.cbegin(), vals.cend(), std::back_inserter(ret), [](int v) {
+        return makeInt64Value(v);
+    });
+    return ret;
+}
+
+void assertBounds(const std::vector<int>& expectedBounds, const ScalarHistogram& histogram) {
+    std::vector<int> gotBounds;
+    for (size_t i = 0; i < histogram.getBounds().size(); ++i) {
+        [[maybe_unused]] auto [_, v] = histogram.getBounds().getAt(i);
+        gotBounds.push_back(sbe::value::bitcastTo<int>(v));
+    }
+    ASSERT_EQ(expectedBounds, gotBounds);
+}
+
+TEST(ArrayHistograms, MaxDiffIntegerBounds) {
+    auto values = generateValuesVector({3, 6, 9});
+    auto ah = createArrayEstimator(values, 3);
+    assertBounds({3, 6, 9}, ah->getScalar());
+
+    // Recall that area = (distance to next value - current value) * freqency of current value
+
+    // Data distribution -> Area
+    // 3 -> inf
+    // 6 -> (7-6) * 1 = 1
+    // 7 -> (9-7) * 1 = 2
+    // 9 -> inf
+    // We'd expect the top 3 buckets to be {3, 7, 9}.
+    values = generateValuesVector({3, 6, 7, 9});
+    ah = createArrayEstimator(values, 3);
+    assertBounds({3, 7, 9}, ah->getScalar());
+
+    // Data distribution -> Area
+    // 1 -> inf
+    // 2 -> (3-2) * 1 = 1
+    // 3 -> (4-3) * 10 = 10
+    // 4 -> (10-4) * 1 = 6
+    // 10 -> (12-10) * 1 = 2
+    // 12 -> inf
+    values = generateValuesVector({1, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 10, 12});
+    ah = createArrayEstimator(values, 3);
+    assertBounds({1, 3, 12}, ah->getScalar());
+}
+
+TEST(ArrayHistograms, Golden) {
+    const std::vector<SBEValue> values = {
+        makeInt64Value(3),
+        makeInt64Value(4),
+        makeInt64Value(4),
+        makeInt64Value(6),
+        sbe::value::makeNewString("delorean"),
+        sbe::value::makeNewString("delorean"),
+        sbe::value::makeNewString("marty"),
+        sbe::value::makeNewString("mcfly"),
+        makeDateValue(dateFromISOString("1985-10-26T09:00:00+0000").getValue()),
+        makeDateValue(dateFromISOString("2000-01-01T01:00:00+0000").getValue()),
+        makeDateValue(dateFromISOString("2015-10-21T07:28:00+0000").getValue()),
+        sbe::value::makeCopyArray([] {
+            sbe::value::Array arr;
+            arr.push_back(sbe::value::TypeTags::NumberInt64, 8);
+            arr.push_back(sbe::value::TypeTags::NumberInt64, 8);
+            arr.push_back(sbe::value::TypeTags::NumberInt64, 9);
+            arr.push_back(sbe::value::TypeTags::NumberInt64, 10);
+            return arr;
+        }()),
+    };
+    auto ah = createArrayEstimator(values, 8);
+    auto expected = fromjson(R"(
+    {
+        trueCount: 0.0,
+        falseCount: 0.0,
+        emptyArrayCount: 0.0,
+        typeCount: [
+            { typeName: "NumberInt64", count: 4.0 },
+            { typeName: "Date", count: 3.0 },
+            { typeName: "StringSmall", count: 2.0 },
+            { typeName: "StringBig", count: 2.0 },
+            { typeName: "Array", count: 1.0 }
+        ],
+        scalarHistogram: {
+            buckets: [
+                { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 1.0, cumulativeDistincts: 1.0 },
+                { boundaryCount: 2.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 3.0, cumulativeDistincts: 2.0 },
+                { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 4.0, cumulativeDistincts: 3.0 },
+                { boundaryCount: 2.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 6.0, cumulativeDistincts: 4.0 },
+                { boundaryCount: 1.0, rangeCount: 1.0, rangeDistincts: 1.0, cumulativeCount: 8.0, cumulativeDistincts: 6.0 },
+                { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 9.0, cumulativeDistincts: 7.0 },
+                { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 10.0, cumulativeDistincts: 8.0 },
+                { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 11.0, cumulativeDistincts: 9.0 }
+            ],
+            bounds: [ 3, 4, 6, "delorean", "mcfly", new Date(499165200000), new Date(946688400000), new Date(1445412480000) ]
+        },
+        arrayStatistics: {
+            minHistogram: {
+                buckets: [ { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 1.0, cumulativeDistincts: 1.0 } ],
+                bounds: [ 8 ]
+            },
+            maxHistogram: {
+                buckets: [ { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 1.0, cumulativeDistincts: 1.0 } ],
+                bounds: [ 10 ]
+            },
+            uniqueHistogram: {
+                buckets: [
+                    { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 1.0, cumulativeDistincts: 1.0 },
+                    { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 2.0, cumulativeDistincts: 2.0 },
+                    { boundaryCount: 1.0, rangeCount: 0.0, rangeDistincts: 0.0, cumulativeCount: 3.0, cumulativeDistincts: 3.0 }
+                ],
+                bounds: [ 8, 9, 10 ]
+            },
+            typeCount: [ { typeName: "NumberInt64", count: 1.0 } ]
+        }
+    })");
+    ASSERT_BSONOBJ_EQ(expected, ah->serialize());
 }
 
 }  // namespace mongo::stats

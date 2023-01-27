@@ -298,6 +298,57 @@ protected:
 };
 
 /**
+ * Date data distribution.
+ */
+class DateDistribution : public DataTypeDistrNew {
+public:
+    DateDistribution(MixedDistributionDescriptor distrDescriptor,
+                     double weight,
+                     size_t ndv,
+                     Date_t minDate,
+                     Date_t maxDate,
+                     double nullsRatio = 0);
+
+    void init(DatasetDescriptorNew*, std::mt19937_64& gen) override;
+
+protected:
+    Date_t _minDate;
+    Date_t _maxDate;
+};
+
+/**
+ * Double data distribution.
+ */
+class DoubleDistribution : public DataTypeDistrNew {
+public:
+    DoubleDistribution(MixedDistributionDescriptor distrDescriptor,
+                       double weight,
+                       size_t ndv,
+                       double min,
+                       double max,
+                       double nullsRatio = 0);
+
+    void init(DatasetDescriptorNew*, std::mt19937_64& gen) override;
+
+protected:
+    double _min;
+    double _max;
+};
+
+/**
+ * ObjectId data distribution.
+ */
+class ObjectIdDistribution : public DataTypeDistrNew {
+public:
+    ObjectIdDistribution(MixedDistributionDescriptor distrDescriptor,
+                         double weight,
+                         size_t ndv,
+                         double nullsRatio = 0);
+
+    void init(DatasetDescriptorNew*, std::mt19937_64& gen) override;
+};
+
+/**
  * SBE array data distribution.
  */
 class ArrDistribution : public DataTypeDistrNew {
