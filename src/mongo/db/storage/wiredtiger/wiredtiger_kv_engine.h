@@ -509,13 +509,6 @@ private:
     bool _ephemeral;  // whether we are using the in-memory mode of the WT engine
     const bool _inRepairMode;
 
-    // If _keepDataHistory is true, then the storage engine keeps all history after the stable
-    // timestamp, and WiredTigerKVEngine is responsible for advancing the oldest timestamp. If
-    // _keepDataHistory is false (i.e. majority reads are disabled), then we only keep history after
-    // the "no holes point", and WiredTigerOplogManager is responsible for advancing the oldest
-    // timestamp.
-    const bool _keepDataHistory = true;
-
     std::unique_ptr<WiredTigerSessionSweeper> _sessionSweeper;
 
     std::string _rsOptions;
