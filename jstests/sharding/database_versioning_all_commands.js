@@ -121,13 +121,11 @@ function testCommandAfterMovePrimary(testCase, st, dbName, collName) {
     assertShardDatabaseVersion(primaryShardAfter, dbName, dbVersionBefore);
 
     // Run the test case's command.
-    if (testCase.runsAgainstAdminDb) {
-        assert.commandWorked(st.s0.adminCommand(command));
-    } else if (testCase.expectedFailureCode) {
-        assert.commandFailedWithCode(st.s0.getDB(dbName).runCommand(command),
-                                     testCase.expectedFailureCode);
+    const res = st.s0.getDB(testCase.runsAgainstAdminDb ? "admin" : dbName).runCommand(command);
+    if (testCase.expectedFailureCode) {
+        assert.commandFailedWithCode(res, testCase.expectedFailureCode);
     } else {
-        assert.commandWorked(st.s0.getDB(dbName).runCommand(command));
+        assert.commandWorked(res);
     }
 
     if (testCase.sendsDbVersion) {
@@ -213,13 +211,11 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
     assertShardDatabaseVersion(primaryShardAfter, dbName, {});
 
     // Run the test case's command.
-    if (testCase.runsAgainstAdminDb) {
-        assert.commandWorked(st.s0.adminCommand(command));
-    } else if (testCase.expectedFailureCode) {
-        assert.commandFailedWithCode(st.s0.getDB(dbName).runCommand(command),
-                                     testCase.expectedFailureCode);
+    const res = st.s0.getDB(testCase.runsAgainstAdminDb ? "admin" : dbName).runCommand(command);
+    if (testCase.expectedFailureCode) {
+        assert.commandFailedWithCode(res, testCase.expectedFailureCode);
     } else {
-        assert.commandWorked(st.s0.getDB(dbName).runCommand(command));
+        assert.commandWorked(res);
     }
 
     if (testCase.sendsDbVersion) {
@@ -292,6 +288,10 @@ let testCases = {
             sendsDbVersion: true,
             explicitlyCreateCollection: true,
             expectNonEmptyCollection: true,
+            // The command should fail while calculating the read and write distribution metrics
+            // since the cardinality of the shard key is less than analyzeShardKeyNumRanges which
+            // defaults to 100.
+            expectedFailureCode: 4952606,
             command: function(dbName, collName) {
                 return {analyzeShardKey: dbName + "." + collName, key: {_id: 1}};
             },

@@ -35,7 +35,7 @@ imports:
     - "mongo/db/basic_types.idl"
 
 server_parameters:
-    monotonicityCorrelationCoefficientThreshold:
+    analyzeShardKeyMonotonicityCorrelationCoefficientThreshold:
         description: The correlation coefficient threshold used to determine if a shard key is
                      monotonically changing.
         set_at: [startup, runtime]
@@ -45,6 +45,25 @@ server_parameters:
         validator:
             gt: 0
             lte: 1
+    analyzeShardKeyNumRanges:
+        description: The number of ranges to partition the shard key space into when calculating
+                     the hotness of shard key ranges.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gNumShardKeyRanges
+        default: 100
+        validator:
+            gt: 0
+            lte: 10000
+    analyzeShardKeyNumSamplesPerRange:
+        description: The number of documents to sample per shard key range.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gNumSamplesPerShardKeyRange
+        default: 10
+        validator:
+            gt: 0
+            lte: 10000
     queryAnalysisQueryStatsSmoothingFactor:
         description: The smoothing factor for the exponential moving average of the number
                      of queries that a sampler executes per second. The average determines the share

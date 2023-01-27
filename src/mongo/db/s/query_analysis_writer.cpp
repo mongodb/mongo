@@ -391,11 +391,18 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx,
         LOGV2_DEBUG(
             6876102, 2, "Persisting samples", "ns"_attr = ns, "count"_attr = docsToInsert.size());
 
-        insertDocuments(opCtx, ns, docsToInsert, [&](const BatchedCommandResponse& response) {
-            if (response.isErrDetailsSet() && response.sizeErrDetails() > 0) {
+        insertDocuments(opCtx, ns, docsToInsert, [&](const BSONObj& resObj) {
+            BatchedCommandResponse res;
+            std::string errMsg;
+
+            if (!res.parseBSON(resObj, &errMsg)) {
+                uasserted(ErrorCodes::FailedToParse, errMsg);
+            }
+
+            if (res.isErrDetailsSet() && res.sizeErrDetails() > 0) {
                 boost::optional<write_ops::WriteError> firstWriteErr;
 
-                for (const auto& err : response.getErrDetails()) {
+                for (const auto& err : res.getErrDetails()) {
                     if (err.getStatus() == ErrorCodes::DuplicateKey ||
                         err.getStatus() == ErrorCodes::BadValue) {
                         LOGV2(7075402,
@@ -414,7 +421,7 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx,
                     uassertStatusOK(firstWriteErr->getStatus());
                 }
             } else {
-                uassertStatusOK(response.toStatus());
+                uassertStatusOK(res.toStatus());
             }
         });
 

@@ -44,5 +44,11 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
                                                              const NamespaceString& nss,
                                                              const KeyPattern& shardKey);
 
+/**
+ * Returns metrics about the read and write distribution based on sampled queries.
+ */
+std::pair<ReadDistributionMetrics, WriteDistributionMetrics> calculateReadWriteDistributionMetrics(
+    OperationContext* opCtx, const NamespaceString& nss, const KeyPattern& shardKey);
+
 }  // namespace analyze_shard_key
 }  // namespace mongo

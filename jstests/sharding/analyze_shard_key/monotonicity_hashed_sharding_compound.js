@@ -61,7 +61,16 @@ const numDocsRange = {
 };
 
 {
-    const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
+    const st = new ShardingTest({
+        shards: 2,
+        rs: {
+            nodes: 2,
+            setParameter: {
+                "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
+                    tojson({mode: "alwaysOn"})
+            }
+        }
+    });
 
     testAnalyzeShardKeysUnshardedCollection(st.s, testCases, numDocsRange);
     testAnalyzeShardKeysShardedCollection(st, testCases, numDocsRange);

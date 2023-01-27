@@ -67,7 +67,7 @@ assert.commandWorked(st.s.adminCommand({split: sampledNsSharded, middle: {x: 100
 assert.commandWorked(
     st.s.adminCommand({moveChunk: sampledNsSharded, find: {x: 0}, to: st.shard1.shardName}));
 assert.commandWorked(
-    st.s.adminCommand({moveChunk: sampledNsSharded, find: {x: 1000}, to: st.shard2.name}));
+    st.s.adminCommand({moveChunk: sampledNsSharded, find: {x: 1000}, to: st.shard2.shardName}));
 
 // Set up the non sampled collection. It needs to have at least one document. Otherwise, no nested
 // aggregate queries would be issued.

@@ -37,6 +37,16 @@ var QuerySamplingUtil = (function() {
     }
 
     /**
+     * Waits for the given node to have no active collections for query sampling.
+     */
+    function waitForInactiveSampling(node) {
+        assert.soon(() => {
+            const res = assert.commandWorked(node.adminCommand({serverStatus: 1}));
+            return res.queryAnalyzers.activeCollections == 0;
+        });
+    }
+
+    /**
      * Waits for all shard nodes to have one active collection for query sampling.
      */
     function waitForActiveSamplingOnAllShards(st) {
@@ -294,6 +304,7 @@ var QuerySamplingUtil = (function() {
         generateRandomCollation,
         makeCmdObjIgnoreSessionInfo,
         waitForActiveSampling,
+        waitForInactiveSampling,
         waitForActiveSamplingOnAllShards,
         assertSoonSampledQueryDocuments,
         assertSoonSampledQueryDocumentsAcrossShards,

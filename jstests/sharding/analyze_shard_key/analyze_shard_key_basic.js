@@ -169,7 +169,16 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
 }
 
 {
-    const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
+    const st = new ShardingTest({
+        shards: 2,
+        rs: {
+            nodes: 2,
+            setParameter: {
+                "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
+                    tojson({mode: "alwaysOn"})
+            }
+        }
+    });
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
     st.ensurePrimaryShard(dbName, st.shard0.name);

@@ -180,9 +180,11 @@ MONGO_FAIL_POINT_DEFINE(analyzeShardKeyHangBeforeWritingLocally);
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeyHangBeforeWritingRemotely);
 
 const int kMaxRetriesOnRetryableErrors = 5;
-const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                WriteConcernOptions::kWriteConcernTimeoutSystem};
+
+// The write concern for writes done as part of query sampling or analyzing a shard key.
+const Seconds writeConcernTimeout{60};
+const WriteConcernOptions kMajorityWriteConcern{
+    WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, writeConcernTimeout};
 
 /*
  * Returns true if this mongod can accept writes to the collection 'nss'. Unless the collection is
@@ -324,11 +326,10 @@ void runAggregate(OperationContext* opCtx,
     return runAggregateTargetLocal(opCtx, aggRequest, callbackFn);
 }
 
-void insertDocuments(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const std::vector<BSONObj>& docs,
-    const std::function<void(const BatchedCommandResponse&)>& uassertWriteStatusFn) {
+void insertDocuments(OperationContext* opCtx,
+                     const NamespaceString& nss,
+                     const std::vector<BSONObj>& docs,
+                     const std::function<void(const BSONObj&)>& uassertWriteStatusFn) {
     write_ops::InsertCommandRequest insertCmd(nss);
     insertCmd.setDocuments(docs);
     insertCmd.setWriteCommandRequestBase([&] {
@@ -341,13 +342,27 @@ void insertDocuments(
         {BSON(WriteConcernOptions::kWriteConcernField << kMajorityWriteConcern.toBSON())});
 
     executeWriteCommand(opCtx, nss, std::move(insertCmdObj), [&](const BSONObj& resObj) {
+        uassertWriteStatusFn(resObj);
+    });
+}
+
+void dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    auto dropCollectionCmdObj =
+        BSON("drop" << nss.coll().toString() << WriteConcernOptions::kWriteConcernField
+                    << kMajorityWriteConcern.toBSON());
+    executeWriteCommand(opCtx, nss, std::move(dropCollectionCmdObj), [&](const BSONObj& resObj) {
         BatchedCommandResponse res;
         std::string errMsg;
 
         if (!res.parseBSON(resObj, &errMsg)) {
             uasserted(ErrorCodes::FailedToParse, errMsg);
         }
-        uassertWriteStatusFn(res);
+
+        auto status = res.toStatus();
+        if (status == ErrorCodes::NamespaceNotFound) {
+            return;
+        }
+        uassertStatusOK(status);
     });
 }
 

@@ -119,6 +119,11 @@ public:
     // database.
     static constexpr StringData kGlobalIndexCollectionPrefix = "globalIndex."_sd;
 
+    // Prefix for the temporary collection used by an analyzeShardKey command to store the split
+    // points for the shard key being analyzed.
+    static constexpr StringData kAnalyzeShardKeySplitPointsCollectionPrefix =
+        "analyzeShardKey.splitPoints."_sd;
+
     // Namespace for storing configuration data, which needs to be replicated if the server is
     // running as a replica set. Documents in this collection should represent some configuration
     // state of the server, which needs to be recovered/consulted at startup. Each document in this

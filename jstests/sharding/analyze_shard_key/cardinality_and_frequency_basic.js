@@ -571,7 +571,16 @@ function testAnalyzeCurrentShardKeys(st, mongodConns) {
 }
 
 {
-    const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
+    const st = new ShardingTest({
+        shards: 2,
+        rs: {
+            nodes: 2,
+            setParameter: {
+                "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
+                    tojson({mode: "alwaysOn"})
+            }
+        }
+    });
     const mongodConns = [];
     st.rs0.nodes.forEach(node => mongodConns.push(node));
     st.rs1.nodes.forEach(node => mongodConns.push(node));

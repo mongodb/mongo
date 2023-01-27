@@ -143,6 +143,8 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
         other: {
             rsOptions: {
                 setParameter: {
+                    "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
+                        tojson({mode: "alwaysOn"}),
                     internalDocumentSourceGroupMaxMemoryBytes:
                         kInternalDocumentSourceGroupMaxMemoryBytes
                 }

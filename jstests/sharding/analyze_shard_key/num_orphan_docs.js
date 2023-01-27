@@ -100,7 +100,16 @@ function testAnalyzeShardKeyShardedCollection(st) {
 }
 
 {
-    const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
+    const st = new ShardingTest({
+        shards: 2,
+        rs: {
+            nodes: 2,
+            setParameter: {
+                "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
+                    tojson({mode: "alwaysOn"})
+            }
+        }
+    });
 
     testAnalyzeShardKeyUnshardedCollection(st.s);
     testAnalyzeShardKeyShardedCollection(st);

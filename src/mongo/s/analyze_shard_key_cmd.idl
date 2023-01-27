@@ -267,6 +267,13 @@ structs:
     inline_chained_structs: true
     chained_structs:
       KeyCharacteristicsMetrics: keyCharacteristics
+    fields:
+      readDistribution:
+        type: ReadDistributionMetrics
+        optional: true
+      writeDistribution:
+        type: WriteDistributionMetrics
+        optional: true
 
 commands:
   analyzeShardKey:

@@ -37,10 +37,15 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/s/analyze_shard_key_cmd_util.h"
+#include "mongo/db/s/analyze_shard_key_read_write_distribution.h"
+#include "mongo/db/s/config/initial_split_policy.h"
+#include "mongo/db/s/document_source_analyze_shard_key_read_write_distribution.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/shard_key_index_util.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
+#include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/grid.h"
@@ -378,6 +383,92 @@ boost::optional<int64_t> getNumOrphanDocuments(OperationContext* opCtx,
     return numOrphanDocs;
 }
 
+/**
+ * Generates the namespace for the temporary collection storing the split points.
+ */
+NamespaceString makeSplitPointsNss(const UUID& origCollUuid, const UUID& tempCollUuid) {
+    return NamespaceString(NamespaceString::kConfigDb,
+                           fmt::format("{}{}.{}",
+                                       NamespaceString::kAnalyzeShardKeySplitPointsCollectionPrefix,
+                                       origCollUuid.toString(),
+                                       tempCollUuid.toString()));
+}
+
+/**
+ * Generates split points that partition the data for the given collection into N number of ranges
+ * with roughly equal number of documents, where N is equal to 'gNumShardKeyRanges', and then
+ * persists the split points to a temporary config collection. Returns the namespace for the
+ * temporary collection and the afterClusterTime to use in order to find all split point documents
+ * (note that this corresponds to the 'operationTime' in the response for the last insert command).
+ */
+std::pair<NamespaceString, Timestamp> generateSplitPoints(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          const KeyPattern& shardKey) {
+    auto origCollUuid = CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss);
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Cannot analyze a shard key for a non-existing collection",
+            origCollUuid);
+
+    auto tempCollUuid = UUID::gen();
+    auto splitPointsNss = makeSplitPointsNss(*origCollUuid, tempCollUuid);
+
+    auto shardKeyPattern = ShardKeyPattern(shardKey);
+    auto initialSplitter = SamplingBasedSplitPolicy::make(opCtx,
+                                                          nss,
+                                                          shardKeyPattern,
+                                                          gNumShardKeyRanges.load(),
+                                                          boost::none,
+                                                          gNumSamplesPerShardKeyRange.load());
+    const SplitPolicyParams splitParams{tempCollUuid, ShardingState::get(opCtx)->shardId()};
+    auto splitPoints = [&] {
+        try {
+            return initialSplitter.createFirstSplitPoints(opCtx, shardKeyPattern, splitParams);
+        } catch (DBException& ex) {
+            ex.addContext(str::stream()
+                          << "Failed to find split points that partition the data into "
+                          << gNumShardKeyRanges.load()
+                          << " chunks with roughly equal number of documents using the shard key "
+                             "being analyzed");
+            throw;
+        }
+    }();
+
+    Timestamp splitPointsAfterClusterTime;
+    auto uassertWriteStatusFn = [&](const BSONObj& resObj) {
+        BatchedCommandResponse res;
+        std::string errMsg;
+
+        if (!res.parseBSON(resObj, &errMsg)) {
+            uasserted(ErrorCodes::FailedToParse, errMsg);
+        }
+
+        uassertStatusOK(res.toStatus());
+        splitPointsAfterClusterTime = LogicalTime::fromOperationTime(resObj).asTimestamp();
+    };
+
+    std::vector<BSONObj> splitPointsToInsert;
+    long long objSize = 0;
+
+    for (const auto& splitPoint : splitPoints) {
+        if (splitPoint.objsize() + objSize >= BSONObjMaxUserSize ||
+            splitPointsToInsert.size() >= write_ops::kMaxWriteBatchSize) {
+            insertDocuments(opCtx, splitPointsNss, splitPointsToInsert, uassertWriteStatusFn);
+            splitPointsToInsert.clear();
+        }
+        AnalyzeShardKeySplitPointDocument doc;
+        doc.setSplitPoint(splitPoint);
+        splitPointsToInsert.push_back(doc.toBSON());
+        objSize += splitPoint.objsize();
+    }
+    if (!splitPointsToInsert.empty()) {
+        insertDocuments(opCtx, splitPointsNss, splitPointsToInsert, uassertWriteStatusFn);
+        splitPointsToInsert.clear();
+    }
+
+    invariant(!splitPointsAfterClusterTime.isNull());
+    return std::make_pair(splitPointsNss, splitPointsAfterClusterTime);
+}
+
 }  // namespace
 
 KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* opCtx,
@@ -422,6 +513,43 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
     metrics.setNumOrphanDocs(getNumOrphanDocuments(opCtx, nss));
 
     return metrics;
+}
+
+std::pair<ReadDistributionMetrics, WriteDistributionMetrics> calculateReadWriteDistributionMetrics(
+    OperationContext* opCtx, const NamespaceString& nss, const KeyPattern& shardKey) {
+    ReadDistributionMetrics readDistributionMetrics;
+    WriteDistributionMetrics writeDistributionMetrics;
+
+    auto splitPointsShardId = ShardingState::get(opCtx)->shardId();
+    auto [splitPointsNss, splitPointsAfterClusterTime] = generateSplitPoints(opCtx, nss, shardKey);
+
+    std::vector<BSONObj> pipeline;
+    DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec spec(
+        shardKey, splitPointsShardId, splitPointsNss, splitPointsAfterClusterTime);
+    pipeline.push_back(
+        BSON(DocumentSourceAnalyzeShardKeyReadWriteDistribution::kStageName << spec.toBSON()));
+    AggregateCommandRequest aggRequest(nss, pipeline);
+    runAggregate(opCtx, nss, aggRequest, [&](const BSONObj& doc) {
+        const auto response = DocumentSourceAnalyzeShardKeyReadWriteDistributionResponse::parse(
+            IDLParserContext("calculateReadWriteDistributionMetrics"), doc);
+        readDistributionMetrics = readDistributionMetrics + response.getReadDistribution();
+        writeDistributionMetrics = writeDistributionMetrics + response.getWriteDistribution();
+    });
+
+    // Keep only the percentages.
+    readDistributionMetrics.setNumTargetedOneShard(boost::none);
+    readDistributionMetrics.setNumTargetedMultipleShards(boost::none);
+    readDistributionMetrics.setNumTargetedAllShards(boost::none);
+    writeDistributionMetrics.setNumTargetedOneShard(boost::none);
+    writeDistributionMetrics.setNumTargetedMultipleShards(boost::none);
+    writeDistributionMetrics.setNumTargetedAllShards(boost::none);
+    writeDistributionMetrics.setNumShardKeyUpdates(boost::none);
+    writeDistributionMetrics.setNumSingleWritesWithoutShardKey(boost::none);
+    writeDistributionMetrics.setNumMultiWritesWithoutShardKey(boost::none);
+
+    dropCollection(opCtx, splitPointsNss);
+
+    return std::make_pair(readDistributionMetrics, writeDistributionMetrics);
 }
 
 }  // namespace analyze_shard_key

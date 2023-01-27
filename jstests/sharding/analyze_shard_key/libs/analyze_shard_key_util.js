@@ -104,6 +104,19 @@ var AnalyzeShardKeyUtil = (function() {
         });
     }
 
+    function calculatePercentage(part, whole) {
+        assert.gte(part, 0);
+        assert.gt(whole, 0);
+        assert.lte(part, whole);
+        return (part * 100.0 / whole);
+    }
+
+    // The analyzeShardKey command rounds the percentages two decimal places. The epsilon is chosen
+    // to account for that.
+    function assertApprox(actual, expected, msg, epsilon = 0.015) {
+        return assert.lte(Math.abs(actual - expected), epsilon, {actual, expected, msg});
+    }
+
     return {
         isHashedKeyPattern,
         isIdKeyPattern,
@@ -113,6 +126,8 @@ var AnalyzeShardKeyUtil = (function() {
         getRandomElement,
         getRandomFieldName,
         enableProfiler,
-        disableProfiler
+        disableProfiler,
+        calculatePercentage,
+        assertApprox
     };
 })();

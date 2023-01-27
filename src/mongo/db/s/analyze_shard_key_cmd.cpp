@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics);
+
 namespace {
 
 void validateCommandOptions(OperationContext* opCtx,
@@ -85,6 +87,19 @@ public:
             auto keyCharacteristics =
                 analyze_shard_key::calculateKeyCharacteristicsMetrics(opCtx, nss, key);
             response.setKeyCharacteristics(keyCharacteristics);
+
+            if (!serverGlobalParams.clusterRole.isShardRole() ||
+                MONGO_unlikely(
+                    analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics.shouldFail())) {
+                // Currently, query sampling is only supported on sharded clusters.
+                return response;
+            }
+
+            // Metrics about the read and write distribution.
+            auto [readDistribution, writeDistribution] =
+                analyze_shard_key::calculateReadWriteDistributionMetrics(opCtx, nss, key);
+            response.setReadDistribution(readDistribution);
+            response.setWriteDistribution(writeDistribution);
 
             return response;
         }

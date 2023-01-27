@@ -235,7 +235,9 @@ template <typename T>
 std::vector<T> addElements(const std::vector<T>& l, const std::vector<T>& r) {
     invariant(!l.empty());
     invariant(!r.empty());
-    invariant(l.size() == r.size());
+    invariant(l.size() == r.size(),
+              str::stream() << "Cannot add elements in vector of length " << l.size()
+                            << " to elements in vector of length " << r.size());
 
     std::vector<T> result;
     result.reserve(l.size());
