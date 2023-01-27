@@ -33,6 +33,18 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     let lastResult;
     for (let run = 0; run < numberOfRuns; run++) {
         lastResult = clientFunction.apply(conn, makeFuncArgs(cmdObj));
+        if (run < numberOfRuns - 1) {
+            // Close any cursor the command might have returned.
+            if (lastResult.cursor) {
+                const {id, ns} = lastResult.cursor;
+                const respDbName = ns.split('.')[0];
+                const respCollName = ns.split('.').slice(1).join('.');
+                // It's ok if the cursor ID is 0 or otherwise invalid:
+                // killCursors will succeed and report it under "cursorsNotFound".
+                assert.commandWorked(
+                    conn.getDB(respDbName).runCommand({killCursors: respCollName, cursors: [id]}));
+            }
+        }
     }
 
     return lastResult;
