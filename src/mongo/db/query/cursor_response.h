@@ -100,7 +100,7 @@ public:
     }
 
     void setWasStatementExecuted(bool wasStatementExecuted) {
-        _wasStatementExecuted = true;
+        _wasStatementExecuted = wasStatementExecuted;
     }
 
     long long numDocs() const {
