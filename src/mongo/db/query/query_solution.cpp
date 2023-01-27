@@ -296,10 +296,9 @@ void QuerySolution::extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot)
 }
 
 void QuerySolution::setRoot(std::unique_ptr<QuerySolutionNode> root) {
+    uassert(6882300, "QuerySolutionNode must be non null", root);
     _root = std::move(root);
-    if (_root) {
-        _enumeratorExplainInfo.hitScanLimit = _root->getScanLimit();
-    }
+    _enumeratorExplainInfo.hitScanLimit = _root->getScanLimit();
 
     QsnIdGenerator idGenerator;
     assignNodeIds(idGenerator, *_root);
