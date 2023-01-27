@@ -120,8 +120,8 @@ DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_increme
     auto shardKey = uassertStatusOK(
         _getShardKeyPattern().extractShardKeyFromQuery(opCtx, _targeter.getNS(), primaryFilter));
     if (shardKey.isEmpty() && !secondaryFilter.isEmpty()) {
-        filter = secondaryFilter;
         shardKey = _getShardKeyPattern().extractShardKeyFromDoc(secondaryFilter);
+        filter = shardKey;
     }
 
     // Increment metrics about range targeting.
