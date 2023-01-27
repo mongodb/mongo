@@ -274,6 +274,9 @@ structs:
       writeDistribution:
         type: WriteDistributionMetrics
         optional: true
+      note:
+        description: "The note about how to interpret the metrics."
+        type: string
 
 commands:
   analyzeShardKey:

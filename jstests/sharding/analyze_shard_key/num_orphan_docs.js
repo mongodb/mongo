@@ -25,6 +25,7 @@ function testAnalyzeShardKeyUnshardedCollection(conn) {
     assert.eq(res.numDistinctValues, 1, res);
     assert.eq(bsonWoCompare(res.frequency, {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}), 0, res);
     assert(!res.hasOwnProperty("numOrphanDocs"), res);
+    assert(res.hasOwnProperty("note"), res);
 
     assert(coll.drop());
 }
@@ -93,6 +94,7 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert.eq(bsonWoCompare(res.frequency, {p99: 2, p95: 2, p90: 2, p80: 2, p50: 2}), 0, res);
     assert(res.hasOwnProperty("numOrphanDocs"), res);
     assert.eq(res.numOrphanDocs, 3, res);
+    assert(res.hasOwnProperty("note"), res);
 
     suspendRangeDeletionFp0.off();
     suspendRangeDeletionFp1.off();

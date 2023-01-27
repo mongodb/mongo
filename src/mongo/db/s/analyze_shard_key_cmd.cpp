@@ -47,6 +47,16 @@ MONGO_FAIL_POINT_DEFINE(analyzeShardKeySkipCalcalutingReadWriteDistributionMetri
 
 namespace {
 
+std::string makeCommandNote() {
+    return str::stream() << "If \"" << KeyCharacteristicsMetrics::kNumOrphanDocsFieldName
+                         << "\" is large relative to \""
+                         << KeyCharacteristicsMetrics::kNumDocsFieldName
+                         << "\", you may want to rerun the command at some other time to get more "
+                            "accurate \""
+                         << KeyCharacteristicsMetrics::kNumDistinctValuesFieldName << "\" and \""
+                         << KeyCharacteristicsMetrics::kFrequencyFieldName << "\" metrics.";
+}
+
 void validateCommandOptions(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const KeyPattern& key) {
@@ -87,6 +97,7 @@ public:
             auto keyCharacteristics =
                 analyze_shard_key::calculateKeyCharacteristicsMetrics(opCtx, nss, key);
             response.setKeyCharacteristics(keyCharacteristics);
+            response.setNote(makeCommandNote());
 
             if (!serverGlobalParams.clusterRole.isShardRole() ||
                 MONGO_unlikely(
