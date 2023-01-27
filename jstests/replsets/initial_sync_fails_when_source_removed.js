@@ -1,7 +1,6 @@
 /**
  * Tests that initial sync will abort an attempt if the sync source is removed during cloning.
  * This test will timeout if the attempt is not aborted.
- * @tags: [live_record_incompatible]
  */
 (function() {
 "use strict";

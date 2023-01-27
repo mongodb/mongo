@@ -9,7 +9,6 @@
  * 4) That the default unix socket doesn't get created if --nounixsocket is specified
  */
 // @tags: [
-//   live_record_incompatible,
 //   requires_sharding,
 // ]
 (function() {

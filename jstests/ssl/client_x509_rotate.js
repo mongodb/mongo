@@ -1,5 +1,4 @@
 // Check that rotation works for the cluster certificate in a sharded cluster
-// @tags: [live_record_incompatible]
 
 (function() {
 "use strict";

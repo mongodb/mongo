@@ -1,6 +1,5 @@
 /**
  * Test that mongos getShardVersion returns the correct version and chunks.
- * @tags: [live_record_incompatible]
  */
 (function() {
 'use strict';

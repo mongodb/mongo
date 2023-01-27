@@ -1,5 +1,4 @@
 // Test for logging of certificate information
-// @tags: [live_record_incompatible]
 
 (function() {
 'use strict';

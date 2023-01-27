@@ -1,5 +1,5 @@
 // Validate rotate certificates works with ocsp
-// @tags: [live_record_incompatible, requires_http_client, requires_ocsp_stapling]
+// @tags: [requires_http_client, requires_ocsp_stapling]
 (function() {
 "use strict";
 

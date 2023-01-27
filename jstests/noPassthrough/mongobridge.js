@@ -2,7 +2,6 @@
  * Test that mongobridge's *From commands work
  *
  * @tags: [
- *   live_record_incompatible,
  *   requires_replication,
  *   requires_sharding,
  * ]

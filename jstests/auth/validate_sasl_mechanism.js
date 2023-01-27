@@ -1,5 +1,4 @@
 // Test for invalid sasl auth mechanisms
-// @tags: [live_record_incompatible]
 
 (function() {
 'use strict';

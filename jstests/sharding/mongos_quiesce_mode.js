@@ -3,9 +3,6 @@
  * During quiesce mode, existing operations are allowed to continue and new operations are
  * accepted. However, hello requests return a ShutdownInProgress error, so that clients can
  * begin re-routing operations.
- * @tags: [
- *   live_record_incompatible,
- * ]
  */
 
 (function() {

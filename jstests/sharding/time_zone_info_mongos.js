@@ -1,7 +1,7 @@
 // Test that mongoS accepts --timeZoneInfo <timezoneDBPath> as a command-line argument and that an
 // aggregation pipeline with timezone expressions executes correctly on mongoS.
 // Requires FCV 5.3 since $mergeCursors was added to explain output in 5.3.
-// @tags: [live_record_incompatible, requires_fcv_53]
+// @tags: [requires_fcv_53]
 (function() {
 const tzGoodInfoFat = "jstests/libs/config_files/good_timezone_info_fat";
 const tzGoodInfoSlim = "jstests/libs/config_files/good_timezone_info_slim";

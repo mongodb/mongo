@@ -2,9 +2,6 @@
  * Tests the behavior of quiesce mode: the period during secondary shutdown where existing
  * operations are allowed to continue and new operations are accepted, but hello requests return
  * a ShutdownInProgress error, so that clients begin routing operations elsewhere.
- * @tags: [
- *   live_record_incompatible,
- * ]
  */
 (function() {
 "use strict";

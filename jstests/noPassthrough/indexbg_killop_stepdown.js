@@ -3,7 +3,6 @@
  * the node in an inconsistent state.
  *
  * @tags: [
- *   live_record_incompatible,
  *   requires_replication,
  * ]
  */

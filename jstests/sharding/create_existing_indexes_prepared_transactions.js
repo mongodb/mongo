@@ -3,7 +3,6 @@
 // aware of the existing index fails.
 //
 // @tags: [
-//   live_record_incompatible,
 //   requires_sharding,
 //   uses_multi_shard_transaction,
 //   uses_transactions,

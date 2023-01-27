@@ -1,8 +1,6 @@
 /**
  * This test verifies that replica sets of different
  * mixed modes can still function
- *
- * @tags: [live_record_incompatible]
  */
 
 load("jstests/ssl/libs/ssl_helpers.js");

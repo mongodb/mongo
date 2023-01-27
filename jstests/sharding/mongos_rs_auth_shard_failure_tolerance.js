@@ -26,7 +26,6 @@ TestData.skipCheckShardFilteringMetadata = true;
 //
 
 // Multiple users cannot be authenticated on one connection within a session.
-// @tags: [live_record_incompatible]
 TestData.disableImplicitSessions = true;
 
 (function() {

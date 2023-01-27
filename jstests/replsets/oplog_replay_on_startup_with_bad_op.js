@@ -4,7 +4,6 @@
 //
 // @tags: [
 //   requires_persistence,
-//   live_record_incompatible,
 // ]
 (function() {
 "use strict";

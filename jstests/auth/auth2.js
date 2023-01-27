@@ -1,5 +1,4 @@
 // test read/write permissions
-// @tags: [live_record_incompatible]
 
 m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
 db = m.getDB("admin");

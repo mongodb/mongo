@@ -3,7 +3,6 @@
  * enabled, and fail when disabled.
  *
  * @tags: [
- *   live_record_incompatible,
  *   requires_replication,
  *   requires_sharding,
  * ]

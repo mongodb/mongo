@@ -1,5 +1,4 @@
 // test that "show log dbname" and "show logs" have good err messages when unauthorized
-// @tags: [live_record_incompatible]
 
 var baseName = "jstests_show_log_auth";
 
