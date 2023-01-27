@@ -42,7 +42,6 @@
 #include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/global_settings.h"
-#include "mongo/db/index/index_access_method_factory_impl.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -127,7 +126,6 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
     StorageControl::startStorageControls(serviceContext, true /*forTestOnly*/);
 
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
-    IndexAccessMethodFactory::set(serviceContext, std::make_unique<IndexAccessMethodFactoryImpl>());
     Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
     CollectionShardingStateFactory::set(

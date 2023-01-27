@@ -32,8 +32,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_impl',
         '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/index/index_access_method_factory',
-        '$BUILD_DIR/mongo/db/index/index_access_methods',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
         '$BUILD_DIR/mongo/db/op_observer',
         '$BUILD_DIR/mongo/db/service_context_d',
@@ -148,7 +147,7 @@ env.Program(
         "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
         "$BUILD_DIR/mongo/db/concurrency/deferred_writer",
         "$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util",
-        "$BUILD_DIR/mongo/db/index/index_access_methods",
+        "$BUILD_DIR/mongo/db/index/index_access_method",
         "$BUILD_DIR/mongo/db/logical_time_metadata_hook",
         "$BUILD_DIR/mongo/db/mongohasher",
         "$BUILD_DIR/mongo/db/multitenancy",

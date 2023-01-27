@@ -184,7 +184,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/exec/sort_executor',
-        '$BUILD_DIR/mongo/db/index/key_generator',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
@@ -353,7 +353,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/exec/scoped_timer',
         '$BUILD_DIR/mongo/db/exec/sort_executor',
         '$BUILD_DIR/mongo/db/generic_cursor',
-        '$BUILD_DIR/mongo/db/index/key_generator',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/logical_session_cache',
         '$BUILD_DIR/mongo/db/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/matcher/expressions',

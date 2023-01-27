@@ -39,7 +39,6 @@
 #include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/client.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_access_method_factory_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -113,8 +112,6 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
         _serviceContext,
         std::make_unique<CollectionShardingStateFactoryStandalone>(_serviceContext));
     DatabaseHolder::set(_serviceContext, std::make_unique<DatabaseHolderImpl>());
-    IndexAccessMethodFactory::set(_serviceContext,
-                                  std::make_unique<IndexAccessMethodFactoryImpl>());
     Collection::Factory::set(_serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
 
     // Setup the repl coordinator in standalone mode so we don't need an oplog etc.

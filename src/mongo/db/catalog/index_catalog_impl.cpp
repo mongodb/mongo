@@ -555,7 +555,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
         opCtx, collection->ns(), collOptions, ident, desc);
 
     std::unique_ptr<IndexAccessMethod> accessMethod =
-        IndexAccessMethodFactory::get(opCtx)->make(entry.get(), std::move(sdi));
+        IndexAccessMethod::make(entry.get(), std::move(sdi));
 
     entry->init(std::move(accessMethod));
 

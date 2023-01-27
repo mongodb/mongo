@@ -3018,6 +3018,7 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
     return resultSpecs;
 }
 
+// Returns normalized versions of 'indexSpecs' for the catalog.
 std::vector<BSONObj> IndexBuildsCoordinator::normalizeIndexSpecs(
     OperationContext* opCtx,
     const CollectionPtr& collection,
@@ -3039,26 +3040,13 @@ std::vector<BSONObj> IndexBuildsCoordinator::normalizeIndexSpecs(
     // for clients to validate (via the listIndexes output) whether a given partialFilterExpression
     // is equivalent to the filter that they originally submitted. Omitting this normalization does
     // not impact our internal index comparison semantics, since we compare based on the parsed
-    // MatchExpression trees rather than the serialized BSON specs. See SERVER-54357.
+    // MatchExpression trees rather than the serialized BSON specs.
+    //
+    // For similar reasons we do not normalize index projection objects here, if any, so their
+    // original forms get persisted in the catalog. Projection normalization to detect whether a
+    // candidate new index would duplicate an existing index is done only in the memory-only
+    // 'IndexDescriptor._normalizedProjection' field.
 
-    // If any of the specs describe wildcard indexes, normalize the wildcard projections if present.
-    // This will change all specs of the form {"a.b.c": 1} to normalized form {a: {b: {c : 1}}}.
-    std::transform(normalSpecs.begin(), normalSpecs.end(), normalSpecs.begin(), [](auto& spec) {
-        const auto kProjectionName = IndexDescriptor::kPathProjectionFieldName;
-        const auto pathProjectionSpec = spec.getObjectField(kProjectionName);
-        static const auto kWildcardKeyPattern = BSON("$**" << 1);
-        // It's illegal for the user to explicitly specify an empty wildcardProjection for creating
-        // a {"$**":1} index, and specify any wildcardProjection for a {"field.$**": 1} index. If
-        // the projection is empty, then it means that there is no projection to normalize.
-        if (pathProjectionSpec.isEmpty()) {
-            return spec;
-        }
-        auto wildcardProjection =
-            WildcardKeyGenerator::createProjectionExecutor(kWildcardKeyPattern, pathProjectionSpec);
-        auto normalizedProjection =
-            wildcardProjection.exec()->serializeTransformation(boost::none).toBson();
-        return spec.addField(BSON(kProjectionName << normalizedProjection).firstElement());
-    });
     return normalSpecs;
 }
 

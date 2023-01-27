@@ -738,7 +738,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/servers',
         '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/index/index_access_methods',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongod_process_interface_factory',
         '$BUILD_DIR/mongo/db/query/map_reduce_output_format',

@@ -38,6 +38,8 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/index/column_key_generator.h"
+#include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/server_options.h"
@@ -109,6 +111,11 @@ constexpr StringData IndexDescriptor::kHiddenFieldName;
 constexpr StringData IndexDescriptor::kWeightsFieldName;
 constexpr StringData IndexDescriptor::kPrepareUniqueFieldName;
 
+/**
+ * Constructs an IndexDescriptor object. Arguments:
+ *   accessMethodName - one of the 'IndexNames::XXX' constants from index_names.cpp
+ *   infoObj          - options information
+ */
 IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj infoObj)
     : _accessMethodName(accessMethodName),
       _indexType(IndexNames::nameToType(accessMethodName)),
@@ -143,6 +150,16 @@ IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj in
             feature_flags::gCollModIndexUnique.isEnabled(serverGlobalParams.featureCompatibility));
         _prepareUnique = prepareUniqueElement.trueValue();
     }
+
+    // If there is a wildcardProjection, compute and store the normalized version in
+    // '_normalizedProjection'.
+    BSONElement wildcardProjection = infoObj[IndexDescriptor::kPathProjectionFieldName];
+    if (wildcardProjection) {
+        WildcardProjection indexPathProjection = WildcardKeyGenerator::createProjectionExecutor(
+            BSON("$**" << 1), wildcardProjection.Obj());
+        _normalizedProjection =
+            indexPathProjection.exec()->serializeTransformation(boost::none).toBson();
+    }
 }
 
 bool IndexDescriptor::isIndexVersionSupported(IndexVersion indexVersion) {
@@ -162,10 +179,6 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     OperationContext* opCtx,
     const NamespaceString& ns,
     const IndexCatalogEntry* existingIndex) const {
-    // The compareIndexOptions method can only be reliably called on a candidate index which is
-    // being compared against an index that already exists in the catalog.
-    tassert(4765900, "This object must be a candidate index", !getEntry());
-
     auto existingIndexDesc = existingIndex->descriptor();
 
     // We first check whether the key pattern is identical for both indexes.
@@ -174,8 +187,15 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
         return Comparison::kDifferent;
     }
 
+    // If the candidate has a wildcardProjection, we must compare the normalized versions, not the
+    // versions from the catalog which are kept as the user gave them and thus may be semantically
+    // identical to but syntactically different from the normalized form. There are no other types
+    // of index projections. Thus, if there is no projection, both the original and normalized
+    // projections will be empty BSON objects, so we can still do the comparison based on the
+    // normalized projection.
     static const UnorderedFieldsBSONObjComparator kUnorderedBSONCmp;
-    if (kUnorderedBSONCmp.evaluate(_projection != existingIndexDesc->_normalizedProjection)) {
+    if (kUnorderedBSONCmp.evaluate(_normalizedProjection !=
+                                   existingIndexDesc->_normalizedProjection)) {
         return Comparison::kDifferent;
     }
 

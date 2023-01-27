@@ -109,7 +109,7 @@ env.Library(
         'stagedebug_cmd.cpp'
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/index/index_access_methods",
+        "$BUILD_DIR/mongo/db/index/index_access_method",
         "$BUILD_DIR/mongo/db/query_exec",
     ],
     LIBDEPS_PRIVATE=[
