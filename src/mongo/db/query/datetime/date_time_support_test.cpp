@@ -1036,6 +1036,17 @@ TEST(DateFromString, CorrectlyParsesStringThatMatchesFormat) {
     ASSERT_EQ(input, result.getValue());
 }
 
+TEST(DateFromString, CorrectlyParsesStringWithDayFromYearFormat) {
+    auto input = "2017-302";
+    auto expected = "2017, Day 303";
+    auto inputFormat = "%Y-%j"_sd;
+    auto outputFormat = "%Y, Day %j"_sd;
+    auto date = kDefaultTimeZoneDatabase.fromString(input, kDefaultTimeZone, inputFormat);
+    auto result = TimeZoneDatabase::utcZone().formatDate(outputFormat, date);
+    ASSERT_OK(result);
+    ASSERT_EQ(expected, result.getValue());
+}
+
 TEST(DateFromString, RejectsStringWithInvalidYearFormat) {
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("201", kDefaultTimeZone, "%Y"_sd),
                        AssertionException,

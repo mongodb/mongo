@@ -553,6 +553,7 @@ testCases = [
     {inputString: "2017, Day 5", format: "%G, Day %u", expect: "2017-01-06T00:00:00Z"},
     {inputString: "53.7.2017", format: "%V.%u.%G", expect: "2018-01-07T00:00:00Z"},
     {inputString: "1.1.1", format: "%V.%u.%G", expect: "0001-01-01T00:00:00Z"},
+    {inputString: "2017, Day 5", format: "%Y, Day %j", expect: "2017-01-06T00:00:00Z"},
 ];
 testCases.forEach(function(testCase) {
     assert.eq(

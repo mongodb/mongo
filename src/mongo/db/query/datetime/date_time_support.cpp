@@ -81,6 +81,7 @@ const std::vector<timelib_format_specifier> kDateFromStringFormatMap = {
     {'d', TIMELIB_FORMAT_DAY_TWO_DIGIT},
     {'G', TIMELIB_FORMAT_YEAR_ISO},
     {'H', TIMELIB_FORMAT_HOUR_TWO_DIGIT_24_MAX},
+    {'j', TIMELIB_FORMAT_DAY_OF_YEAR},
     {'L', TIMELIB_FORMAT_MILLISECOND_THREE_DIGIT},
     {'m', TIMELIB_FORMAT_MONTH_TWO_DIGIT},
     {'M', TIMELIB_FORMAT_MINUTE_TWO_DIGIT},
