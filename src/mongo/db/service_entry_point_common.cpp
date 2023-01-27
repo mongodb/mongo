@@ -1538,7 +1538,7 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     if (CommandHelpers::isHelpRequest(helpField)) {
-        CurOp::get(opCtx)->ensureStarted();
+        CurOp::get(opCtx)->ensureStarted(opCtx);
         // We disable not-primary-error tracker for help requests due to SERVER-11492, because
         // config servers use help requests to determine which commands are database writes, and so
         // must be forwarded to all config servers.
@@ -1742,7 +1742,7 @@ void ExecCommandDatabase::_initiateCommand() {
         uassertStatusOK(status);
     }
 
-    CurOp::get(opCtx)->ensureStarted();
+    CurOp::get(opCtx)->ensureStarted(opCtx);
 
     command->incrementCommandsExecuted();
 

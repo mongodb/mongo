@@ -367,7 +367,9 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->enter_inlock(
-            nsString, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.dbName()));
+            opCtx,
+            nsString,
+            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.dbName()));
     }
 
     assertCanWrite_inlock(opCtx, nsString);
@@ -431,7 +433,9 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->enter_inlock(
-            nsString, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.dbName()));
+            opCtx,
+            nsString,
+            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.dbName()));
     }
 
     assertCanWrite_inlock(opCtx, nsString);

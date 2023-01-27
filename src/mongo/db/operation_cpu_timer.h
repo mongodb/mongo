@@ -29,11 +29,43 @@
 
 #pragma once
 
+#include <list>
+
 #include "mongo/util/duration.h"
 
 namespace mongo {
 
 class OperationContext;
+class OperationCPUTimer;
+
+/**
+ * Allocates and tracks CPU timers for an OperationContext.
+ */
+class OperationCPUTimers {
+public:
+    friend class OperationCPUTimer;
+
+    /**
+     * Returns `nullptr` if the platform does not support tracking of CPU consumption.
+     */
+    static OperationCPUTimers* get(OperationContext*);
+
+    std::unique_ptr<OperationCPUTimer> makeTimer();
+
+    void onThreadAttach();
+    void onThreadDetach();
+
+    size_t count() const;
+
+private:
+    using Iterator = std::list<mongo::OperationCPUTimer*>::iterator;
+    Iterator _add(OperationCPUTimer* timer);
+    void _remove(Iterator it);
+
+    // List of active timers on this OperationContext. When an OperationCPUTimer is constructed, it
+    // will add itself to this list and remove itself on destruction.
+    std::list<OperationCPUTimer*> _timers;
+};
 
 /**
  * Implements the CPU timer for platforms that support CPU consumption tracking. Consider the
@@ -54,10 +86,8 @@ class OperationContext;
  */
 class OperationCPUTimer {
 public:
-    /**
-     * Returns `nullptr` if the platform does not support tracking of CPU consumption.
-     */
-    static OperationCPUTimer* get(OperationContext*);
+    OperationCPUTimer(OperationCPUTimers* timers);
+    virtual ~OperationCPUTimer();
 
     virtual Nanoseconds getElapsed() const = 0;
 
@@ -66,6 +96,13 @@ public:
 
     virtual void onThreadAttach() = 0;
     virtual void onThreadDetach() = 0;
+
+private:
+    // Reference to OperationContext-owned tracked list of timers.
+    OperationCPUTimers* _timers;
+
+    // Iterator position to speed up deletion from the list of timers for this operation.
+    OperationCPUTimers::Iterator _it;
 };
 
 }  // namespace mongo

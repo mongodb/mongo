@@ -124,7 +124,7 @@ void HandleRequest::setupEnvironment() {
     NotPrimaryErrorTracker::get(client).startRequest();
     AuthorizationSession::get(client)->startRequest(opCtx);
 
-    CurOp::get(opCtx)->ensureStarted();
+    CurOp::get(opCtx)->ensureStarted(opCtx);
 }
 
 struct HandleRequest::CommandOpRunner {

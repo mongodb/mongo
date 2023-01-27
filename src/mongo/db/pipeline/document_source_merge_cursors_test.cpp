@@ -115,7 +115,7 @@ public:
 
         setupShards(shards);
 
-        CurOp::get(operationContext())->ensureStarted();
+        CurOp::get(operationContext())->ensureStarted(operationContext());
     }
 
     boost::intrusive_ptr<ExpressionContext> getExpCtx() {
