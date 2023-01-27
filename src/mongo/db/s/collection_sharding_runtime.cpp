@@ -102,10 +102,17 @@ CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(OperationConte
     return ScopedSharedCollectionShardingRuntime(
         ScopedCollectionShardingState::acquireScopedCollectionShardingState(opCtx, nss, MODE_IS));
 }
+
 CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime
 CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(OperationContext* opCtx,
                                                                      const NamespaceString& nss) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
+    return ScopedExclusiveCollectionShardingRuntime(
+        ScopedCollectionShardingState::acquireScopedCollectionShardingState(opCtx, nss, MODE_X));
+}
+
+CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime
+CollectionShardingRuntime::acquireExclusive(OperationContext* opCtx, const NamespaceString& nss) {
     return ScopedExclusiveCollectionShardingRuntime(
         ScopedCollectionShardingState::acquireScopedCollectionShardingState(opCtx, nss, MODE_X));
 }

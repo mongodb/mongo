@@ -109,9 +109,9 @@ public:
         OperationContext* opCtx, const NamespaceString& nss);
     static ScopedExclusiveCollectionShardingRuntime assertCollectionLockedAndAcquireExclusive(
         OperationContext* opCtx, const NamespaceString& nss);
+    static ScopedExclusiveCollectionShardingRuntime acquireExclusive(OperationContext* opCtx,
+                                                                     const NamespaceString& nss);
 
-    // Delete inherited acquire methods, only assertCollectionLockedAndAcquireShared and
-    // assertCollectionLockedAndAcquireExclusive should be used
     static ScopedCollectionShardingState assertCollectionLockedAndAcquire(
         OperationContext* opCtx, const NamespaceString& nss) = delete;
     static ScopedCollectionShardingState acquire(OperationContext* opCtx,
