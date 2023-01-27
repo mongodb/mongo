@@ -469,8 +469,11 @@ The \c upgrade command has no command-specific options.
 @section util_verify wt verify
 Check the structural integrity of a table.
 
-The \c verify command verifies the specified table, exiting success if
-the data source is correct, and failure if the data source is corrupted.
+The \c verify command verifies the specified table if a URI argument is provided,
+exiting success if the data source is correct, and failure if the data source is corrupted.
+If no URI argument is provided, it verifies each table in the database, reporting on any
+that are damaged. Currently, the verify operation is not supported with tiered tables
+and the history store file.
 
 @subsection util_verify_synopsis Synopsis
 `wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] verify [-cstu] [-d dump_address | dump_blocks | dump_layout | dump_offsets=#,# | dump_pages ] [uri]`

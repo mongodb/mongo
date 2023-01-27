@@ -288,5 +288,19 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         # does not exist. Ignore that.
         self.ignoreStderrPatternIfExists('No such file or directory')
 
+    def test_verify_all(self):
+        """
+        Test verify in a 'wt' process without a specific table URI argument.
+        """
+        params = 'key_format=S,value_format=S'
+        ntables = 3
+
+        for i in range(ntables):
+            self.session.create('table:' + self.tablename + str(i), params)
+            self.populate(self.tablename + str(i))
+        self.session.checkpoint()
+
+        self.runWt(["verify"])
+
 if __name__ == '__main__':
     wttest.run()
