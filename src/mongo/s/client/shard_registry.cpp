@@ -196,7 +196,6 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
         _removeReplicaSet(name);
         for (auto& callback : _shardRemovalHooks) {
             // Run callbacks asynchronously.
-            // TODO SERVER-50906: Consider running these callbacks synchronously.
             ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
                 .getAsync([=](const Status&) { callback(shardId); });
         }
