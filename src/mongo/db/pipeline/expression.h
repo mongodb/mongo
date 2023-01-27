@@ -750,7 +750,7 @@ public:
     virtual ~DateExpressionAcceptingTimeZone() {}
 
     Value evaluate(const Document& root, Variables* variables) const final {
-        auto dateVal = _date->evaluate(root, variables);
+        auto dateVal = _children[_kDate]->evaluate(root, variables);
         if (dateVal.nullish()) {
             return Value(BSONNULL);
         }
@@ -758,7 +758,7 @@ public:
 
         boost::optional<TimeZone> timeZone = _parsedTimeZone;
         if (!timeZone) {
-            timeZone = makeTimeZone(_timeZone, root, variables);
+            timeZone = makeTimeZone(_children[_kTimeZone], root, variables);
             if (!timeZone) {
                 return Value(BSONNULL);
             }
@@ -771,25 +771,25 @@ public:
      * off the timezone if not specified.
      */
     Value serialize(bool explain) const final {
-        auto timezone = _timeZone ? _timeZone->serialize(explain) : Value();
-        return Value(Document{
-            {_opName,
-             Document{{"date", _date->serialize(explain)}, {"timezone", std::move(timezone)}}}});
+        auto timezone = _children[_kTimeZone] ? _children[_kTimeZone]->serialize(explain) : Value();
+        return Value(Document{{_opName,
+                               Document{{"date", _children[_kDate]->serialize(explain)},
+                                        {"timezone", std::move(timezone)}}}});
     }
 
     boost::intrusive_ptr<Expression> optimize() final {
-        _date = _date->optimize();
-        if (_timeZone) {
-            _timeZone = _timeZone->optimize();
+        _children[_kDate] = _children[_kDate]->optimize();
+        if (_children[_kTimeZone]) {
+            _children[_kTimeZone] = _children[_kTimeZone]->optimize();
         }
-        if (ExpressionConstant::allNullOrConstant({_date, _timeZone})) {
+        if (ExpressionConstant::allNullOrConstant({_children[_kDate], _children[_kTimeZone]})) {
             // Everything is a constant, so we can turn into a constant.
             return ExpressionConstant::create(
                 getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
         }
-        if (ExpressionConstant::isNullOrConstant(_timeZone)) {
-            _parsedTimeZone =
-                makeTimeZone(_timeZone, Document{}, &(getExpressionContext()->variables));
+        if (ExpressionConstant::isNullOrConstant(_children[_kTimeZone])) {
+            _parsedTimeZone = makeTimeZone(
+                _children[_kTimeZone], Document{}, &(getExpressionContext()->variables));
         }
         return this;
     }
@@ -853,10 +853,7 @@ protected:
                                              const StringData opName,
                                              boost::intrusive_ptr<Expression> date,
                                              boost::intrusive_ptr<Expression> timeZone)
-        : Expression(expCtx, {date, timeZone}),
-          _opName(opName),
-          _date(_children[0]),
-          _timeZone(_children[1]) {}
+        : Expression(expCtx, {date, timeZone}), _opName(opName) {}
 
     /**
      * Subclasses should implement this to do their actual date-related logic. Uses 'timezone' to
@@ -888,14 +885,14 @@ protected:
     }
 
 private:
+    // The position of the expression representing the date argument.
+    static constexpr size_t _kDate = 0;
+
+    // The position of the expression representing the timezone argument.
+    static constexpr size_t _kTimeZone = 1;
+
     // The name of this expression, e.g. $week or $month.
     StringData _opName;
-
-    // The expression representing the date argument.
-    boost::intrusive_ptr<Expression>& _date;
-
-    // The expression representing the timezone argument.
-    boost::intrusive_ptr<Expression>& _timeZone;
 
     // Pre-parsed timezone, if the above expression is a constant.
     boost::optional<TimeZone> _parsedTimeZone;
@@ -1242,7 +1239,7 @@ public:
 private:
     ExpressionCoerceToBool(ExpressionContext* expCtx, boost::intrusive_ptr<Expression> pExpression);
 
-    boost::intrusive_ptr<Expression>& pExpression;
+    static constexpr size_t _kExpression = 0;
 };
 
 
@@ -1403,15 +1400,14 @@ public:
     }
 
 private:
-    boost::intrusive_ptr<Expression>& _dateString;
-    boost::intrusive_ptr<Expression>& _timeZone;
+    static constexpr size_t _kDateString = 0;
+    static constexpr size_t _kTimeZone = 1;
+    static constexpr size_t _kFormat = 2;
+    static constexpr size_t _kOnNull = 3;
+    static constexpr size_t _kOnError = 4;
 
     // Pre-parsed timezone, if the above expression is a constant.
     boost::optional<TimeZone> _parsedTimeZone;
-
-    boost::intrusive_ptr<Expression>& _format;
-    boost::intrusive_ptr<Expression>& _onNull;
-    boost::intrusive_ptr<Expression>& _onError;
 };
 
 class ExpressionDateFromParts final : public Expression {
@@ -1477,17 +1473,17 @@ private:
                                             long long* returnValue,
                                             Variables* variables) const;
 
-    boost::intrusive_ptr<Expression>& _year;
-    boost::intrusive_ptr<Expression>& _month;
-    boost::intrusive_ptr<Expression>& _day;
-    boost::intrusive_ptr<Expression>& _hour;
-    boost::intrusive_ptr<Expression>& _minute;
-    boost::intrusive_ptr<Expression>& _second;
-    boost::intrusive_ptr<Expression>& _millisecond;
-    boost::intrusive_ptr<Expression>& _isoWeekYear;
-    boost::intrusive_ptr<Expression>& _isoWeek;
-    boost::intrusive_ptr<Expression>& _isoDayOfWeek;
-    boost::intrusive_ptr<Expression>& _timeZone;
+    static constexpr size_t _kYear = 0;
+    static constexpr size_t _kMonth = 1;
+    static constexpr size_t _kDay = 2;
+    static constexpr size_t _kHour = 3;
+    static constexpr size_t _kMinute = 4;
+    static constexpr size_t _kSecond = 5;
+    static constexpr size_t _kMillisecond = 6;
+    static constexpr size_t _kIsoWeekYear = 7;
+    static constexpr size_t _kIsoWeek = 8;
+    static constexpr size_t _kIsoDayOfWeek = 9;
+    static constexpr size_t _kTimeZone = 10;
 
     // Pre-parsed timezone, if the above expression is a constant.
     boost::optional<TimeZone> _parsedTimeZone;
@@ -1528,13 +1524,12 @@ public:
 private:
     boost::optional<int> evaluateIso8601Flag(const Document& root, Variables* variables) const;
 
-    boost::intrusive_ptr<Expression>& _date;
-    boost::intrusive_ptr<Expression>& _timeZone;
+    static constexpr size_t _kDate = 0;
+    static constexpr size_t _kTimeZone = 1;
+    static constexpr size_t _kIso8601 = 2;
 
     // Pre-parsed timezone, if the above expression is a constant.
     boost::optional<TimeZone> _parsedTimeZone;
-
-    boost::intrusive_ptr<Expression>& _iso8601;
 };
 
 class ExpressionDateToString final : public Expression {
@@ -1561,14 +1556,13 @@ public:
     }
 
 private:
-    boost::intrusive_ptr<Expression>& _format;
-    boost::intrusive_ptr<Expression>& _date;
-    boost::intrusive_ptr<Expression>& _timeZone;
+    static constexpr size_t _kFormat = 0;
+    static constexpr size_t _kDate = 1;
+    static constexpr size_t _kTimeZone = 2;
+    static constexpr size_t _kOnNull = 3;
 
     // Pre-parsed timezone, if the above expression is a constant.
     boost::optional<TimeZone> _parsedTimeZone;
-
-    boost::intrusive_ptr<Expression>& _onNull;
 };
 
 class ExpressionDayOfMonth final : public DateExpressionAcceptingTimeZone<ExpressionDayOfMonth> {
@@ -1675,14 +1669,14 @@ public:
      * Returns true if this expression has parameter 'timezone' specified, otherwise false.
      */
     bool isTimezoneSpecified() const {
-        return static_cast<bool>(_timeZone);
+        return static_cast<bool>(_children[_kTimeZone]);
     }
 
     /**
      * Returns true if this expression has parameter 'startOfWeek' specified, otherwise false.
      */
     bool isStartOfWeekSpecified() const {
-        return static_cast<bool>(_startOfWeek);
+        return static_cast<bool>(_children[_kStartOfWeek]);
     }
 
 private:
@@ -1694,28 +1688,28 @@ private:
     monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final;
 
     // Starting time instant expression. Accepted types: Date_t, Timestamp, OID.
-    boost::intrusive_ptr<Expression>& _startDate;
+    static constexpr size_t _kStartDate = 0;
 
     // Ending time instant expression. Accepted types the same as for '_startDate'.
-    boost::intrusive_ptr<Expression>& _endDate;
+    static constexpr size_t _kEndDate = 1;
 
     // Length of time interval to measure the difference. Accepted type: std::string. Accepted
     // values: enumerators from TimeUnit enumeration.
-    boost::intrusive_ptr<Expression>& _unit;
+    static constexpr size_t _kUnit = 2;
+
+    // Timezone to use for the difference calculation. Accepted type: std::string. If not specified,
+    // UTC is used.
+    static constexpr size_t _kTimeZone = 3;
+
+    // First/start day of the week to use for the date difference calculation when time unit is the
+    // week. Accepted type: std::string. If not specified, "sunday" is used.
+    static constexpr size_t _kStartOfWeek = 4;
 
     // Pre-parsed time unit, if the above expression is a constant.
     boost::optional<TimeUnit> _parsedUnit;
 
-    // Timezone to use for the difference calculation. Accepted type: std::string. If not specified,
-    // UTC is used.
-    boost::intrusive_ptr<Expression>& _timeZone;
-
     // Pre-parsed timezone, if the above expression is a constant.
     boost::optional<TimeZone> _parsedTimeZone;
-
-    // First/start day of the week to use for the date difference calculation when time unit is the
-    // week. Accepted type: std::string. If not specified, "sunday" is used.
-    boost::intrusive_ptr<Expression>& _startOfWeek;
 
     // Pre-parsed start of week, if the above expression is a constant.
     boost::optional<DayOfWeek> _parsedStartOfWeek;
@@ -1929,16 +1923,17 @@ public:
     }
 
 private:
+    // The array to iterate over.
+    static constexpr size_t _kInput = 0;
+    // The expression determining whether each element should be present in the result array.
+    static constexpr size_t _kCond = 1;
+
     // The name of the variable to set to each element in the array.
     std::string _varName;
     // The id of the variable to set.
     Variables::Id _varId;
-    // The array to iterate over.
-    boost::intrusive_ptr<Expression>& _input;
-    // The expression determining whether each element should be present in the result array.
-    boost::intrusive_ptr<Expression>& _cond;
     // The optional expression determining how many elements should be present in the result array.
-    boost::optional<boost::intrusive_ptr<Expression>&> _limit;
+    boost::optional<size_t> _limit;
 };
 
 
@@ -2168,13 +2163,13 @@ private:
                   std::vector<boost::intrusive_ptr<Expression>> children,
                   std::vector<Variables::Id> orderedVariableIds);
 
+    // Index of the last element in the '_children' list.
+    const size_t _kSubExpression;
+
     VariableMap _variables;
 
     // These ids are ordered to match their corresponding _children expressions.
     std::vector<Variables::Id> _orderedVariableIds;
-
-    // Reference to the last element in the '_children' list.
-    boost::intrusive_ptr<Expression>& _subExpression;
 };
 
 class ExpressionLn final : public ExpressionSingleNumericArg<ExpressionLn> {
@@ -2323,10 +2318,10 @@ public:
     }
 
 private:
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kEach = 1;
     std::string _varName;
     Variables::Id _varId;
-    boost::intrusive_ptr<Expression>& _input;
-    boost::intrusive_ptr<Expression>& _each;
 };
 
 class ExpressionMeta final : public Expression {
@@ -2650,9 +2645,6 @@ public:
                      Variables::Id thisVar,
                      Variables::Id valueVar)
         : Expression(expCtx, {std::move(input), std::move(initial), std::move(in)}),
-          _input(_children[0]),
-          _initial(_children[1]),
-          _in(_children[2]),
           _thisVar(thisVar),
           _valueVar(valueVar) {
         expCtx->sbeCompatible = false;
@@ -2674,9 +2666,9 @@ public:
     }
 
 private:
-    boost::intrusive_ptr<Expression>& _input;
-    boost::intrusive_ptr<Expression>& _initial;
-    boost::intrusive_ptr<Expression>& _in;
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kInitial = 1;
+    static constexpr size_t _kIn = 2;
 
     Variables::Id _thisVar;
     Variables::Id _valueVar;
@@ -2689,10 +2681,7 @@ public:
                           boost::intrusive_ptr<Expression> input,
                           boost::intrusive_ptr<Expression> find,
                           boost::intrusive_ptr<Expression> replacement)
-        : Expression(expCtx, {std::move(input), std::move(find), std::move(replacement)}),
-          _input(_children[0]),
-          _find(_children[1]),
-          _replacement(_children[2]) {}
+        : Expression(expCtx, {std::move(input), std::move(find), std::move(replacement)}) {}
 
     virtual const char* getOpName() const = 0;
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -2705,9 +2694,9 @@ protected:
     // These are owned by this->Expression::_children. They are references to intrusive_ptr instead
     // of direct references to Expression because we need to be able to replace each child in
     // optimize() without invalidating the references.
-    boost::intrusive_ptr<Expression>& _input;
-    boost::intrusive_ptr<Expression>& _find;
-    boost::intrusive_ptr<Expression>& _replacement;
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kFind = 1;
+    static constexpr size_t _kReplacement = 2;
 };
 
 
@@ -2967,7 +2956,7 @@ public:
     ExpressionSortArray(ExpressionContext* const expCtx,
                         boost::intrusive_ptr<Expression> input,
                         const PatternValueCmp& sortBy)
-        : Expression(expCtx, {std::move(input)}), _input(_children[0]), _sortBy(sortBy) {}
+        : Expression(expCtx, {std::move(input)}), _sortBy(sortBy) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     boost::intrusive_ptr<Expression> optimize() final;
@@ -2991,7 +2980,7 @@ public:
     }
 
 private:
-    boost::intrusive_ptr<Expression>& _input;
+    static constexpr size_t _kInput = 0;
     PatternValueCmp _sortBy;
 };
 
@@ -3437,9 +3426,7 @@ public:
                    boost::intrusive_ptr<Expression> charactersToTrim)
         : Expression(expCtx, {std::move(input), std::move(charactersToTrim)}),
           _trimType(trimType),
-          _name(name.toString()),
-          _input(_children[0]),
-          _characters(_children[1]) {
+          _name(name.toString()) {
         expCtx->sbeCompatible = false;
     }
 
@@ -3485,10 +3472,11 @@ private:
      */
     StringData doTrim(StringData input, const std::vector<StringData>& trimCPs) const;
 
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kCharacters = 1;  // Optional, null if not specified.
+
     TrimType _trimType;
     std::string _name;  // "$trim", "$ltrim", or "$rtrim".
-    boost::intrusive_ptr<Expression>& _input;
-    boost::intrusive_ptr<Expression>& _characters;  // Optional, null if not specified.
 };
 
 
@@ -3747,10 +3735,10 @@ private:
     BSONType computeTargetType(Value typeName) const;
     Value performConversion(BSONType targetType, Value inputValue) const;
 
-    boost::intrusive_ptr<Expression>& _input;
-    boost::intrusive_ptr<Expression>& _to;
-    boost::intrusive_ptr<Expression>& _onError;
-    boost::intrusive_ptr<Expression>& _onNull;
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kTo = 1;
+    static constexpr size_t _kOnError = 2;
+    static constexpr size_t _kOnNull = 3;
 };
 
 class ExpressionRegex : public Expression {
@@ -3825,7 +3813,7 @@ public:
     }
 
     bool hasOptions() const {
-        return (_options.get() != nullptr);
+        return (_children[_kOptions].get() != nullptr);
     }
 
     /**
@@ -3847,9 +3835,6 @@ public:
                     boost::intrusive_ptr<Expression> options,
                     const StringData opName)
         : Expression(expCtx, {std::move(input), std::move(regex), std::move(options)}),
-          _input(_children[0]),
-          _regex(_children[1]),
-          _options(_children[2]),
           _opName(opName) {}
 
 private:
@@ -3864,9 +3849,9 @@ private:
      * Expressions which, when evaluated for a given document, produce the the regex pattern, the
      * regex option flags, and the input text to which the regex should be applied.
      */
-    boost::intrusive_ptr<Expression>& _input;
-    boost::intrusive_ptr<Expression>& _regex;
-    boost::intrusive_ptr<Expression>& _options;
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kRegex = 1;
+    static constexpr size_t _kOptions = 2;
 
     /**
      * This variable will be set when the $regex* expressions have constant values for their 'regex'
@@ -4007,10 +3992,6 @@ public:
         : Expression(
               expCtx,
               {std::move(startDate), std::move(unit), std::move(amount), std::move(timezone)}),
-          _startDate(_children[0]),
-          _unit(_children[1]),
-          _amount(_children[2]),
-          _timeZone(_children[3]),
           _opName(opName) {}
 
     boost::intrusive_ptr<Expression> optimize() final;
@@ -4032,19 +4013,19 @@ protected:
 
 private:
     // The expression representing the startDate argument.
-    boost::intrusive_ptr<Expression>& _startDate;
+    static constexpr size_t _kStartDate = 0;
 
     // Unit of time: year, quarter, week, etc.
-    boost::intrusive_ptr<Expression>& _unit;
+    static constexpr size_t _kUnit = 1;
+
+    // Amount of units to be added or subtracted.
+    static constexpr size_t _kAmount = 2;
+
+    // The expression representing the timezone argument.
+    static constexpr size_t _kTimeZone = 3;
 
     // Pre-parsed time unit, if the above expression is a constant.
     boost::optional<TimeUnit> _parsedUnit;
-
-    // Amount of units to be added or subtracted.
-    boost::intrusive_ptr<Expression>& _amount;
-
-    // The expression representing the timezone argument.
-    boost::intrusive_ptr<Expression>& _timeZone;
 
     // Pre-parsed timezone, if the above expression is a constant.
     boost::optional<TimeZone> _parsedTimeZone;
@@ -4160,21 +4141,21 @@ public:
      * Returns true if this expression has parameter 'timezone' specified, otherwise false.
      */
     bool isTimezoneSpecified() const {
-        return static_cast<bool>(_timeZone);
+        return static_cast<bool>(_children[_kTimeZone]);
     }
 
     /**
      * Returns true if this expression has parameter 'startOfWeek' specified, otherwise false.
      */
     bool isStartOfWeekSpecified() const {
-        return static_cast<bool>(_startOfWeek);
+        return static_cast<bool>(_children[_kStartOfWeek]);
     }
 
     /**
      * Returns true if this expression has parameter 'binSize' specified, otherwise false.
      */
     bool isBinSizeSpecified() const {
-        return static_cast<bool>(_binSize);
+        return static_cast<bool>(_children[_kBinSize]);
     }
 
 private:
@@ -4192,33 +4173,33 @@ private:
 
     // Expression that evaluates to a date to truncate. Accepted BSON types: Date, bsonTimestamp,
     // jstOID.
-    boost::intrusive_ptr<Expression>& _date;
+    static constexpr size_t _kDate = 0;
 
     // Time units used to describe the size of bins. Accepted BSON type: String. Accepted values:
     // enumerators from TimeUnit enumeration.
-    boost::intrusive_ptr<Expression>& _unit;
-
-    // Pre-parsed time unit, if the above expression is a constant.
-    boost::optional<TimeUnit> _parsedUnit;
+    static constexpr size_t _kUnit = 1;
 
     // Size of bins in time units '_unit'. Accepted BSON types: NumberInt, NumberLong, NumberDouble,
     // NumberDecimal. Accepted are only values that can be coerced to a 64-bit integer without loss.
     // If not specified, 1 is used.
-    boost::intrusive_ptr<Expression>& _binSize;
-
-    // Pre-parsed bin size, if the above expression is a constant.
-    boost::optional<long long> _parsedBinSize;
+    static constexpr size_t _kBinSize = 2;
 
     // Timezone to use for the truncation operation. Accepted BSON type: String. If not specified,
     // UTC is used.
-    boost::intrusive_ptr<Expression>& _timeZone;
+    static constexpr size_t _kTimeZone = 3;
+
+    // First/start day of the week to use for date truncation when the time unit is the week.
+    // Accepted BSON type: String. If not specified, "sunday" is used.
+    static constexpr size_t _kStartOfWeek = 4;
 
     // Pre-parsed timezone, if the above expression is a constant.
     boost::optional<TimeZone> _parsedTimeZone;
 
-    // First/start day of the week to use for date truncation when the time unit is the week.
-    // Accepted BSON type: String. If not specified, "sunday" is used.
-    boost::intrusive_ptr<Expression>& _startOfWeek;
+    // Pre-parsed time unit, if the above expression is a constant.
+    boost::optional<TimeUnit> _parsedUnit;
+
+    // Pre-parsed bin size, if the above expression is a constant.
+    boost::optional<long long> _parsedBinSize;
 
     // Pre-parsed start of week, if the above expression is a constant.
     boost::optional<DayOfWeek> _parsedStartOfWeek;
@@ -4240,9 +4221,7 @@ public:
     ExpressionGetField(ExpressionContext* const expCtx,
                        boost::intrusive_ptr<Expression> field,
                        boost::intrusive_ptr<Expression> input)
-        : Expression(expCtx, {std::move(field), std::move(input)}),
-          _field(_children[0]),
-          _input(_children[1]) {
+        : Expression(expCtx, {std::move(field), std::move(input)}) {
         expCtx->sbeCompatible = false;
     }
 
@@ -4263,8 +4242,8 @@ public:
     static constexpr auto kExpressionName = "$getField"_sd;
 
 private:
-    boost::intrusive_ptr<Expression>& _field;
-    boost::intrusive_ptr<Expression>& _input;
+    static constexpr size_t _kField = 0;
+    static constexpr size_t _kInput = 1;
 };
 
 class ExpressionSetField final : public Expression {
@@ -4281,10 +4260,7 @@ public:
                        boost::intrusive_ptr<Expression> field,
                        boost::intrusive_ptr<Expression> input,
                        boost::intrusive_ptr<Expression> value)
-        : Expression(expCtx, {std::move(field), std::move(input), std::move(value)}),
-          _field(_children[0]),
-          _input(_children[1]),
-          _value(_children[2]) {
+        : Expression(expCtx, {std::move(field), std::move(input), std::move(value)}) {
         expCtx->sbeCompatible = false;
     }
 
@@ -4305,9 +4281,9 @@ public:
     static constexpr auto kExpressionName = "$setField"_sd;
 
 private:
-    boost::intrusive_ptr<Expression>& _field;
-    boost::intrusive_ptr<Expression>& _input;
-    boost::intrusive_ptr<Expression>& _value;
+    static constexpr size_t _kField = 0;
+    static constexpr size_t _kInput = 1;
+    static constexpr size_t _kValue = 2;
 };
 
 class ExpressionTsSecond final : public ExpressionFixedArity<ExpressionTsSecond, 1> {
