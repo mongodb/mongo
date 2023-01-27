@@ -39,6 +39,13 @@ azure_connection::azure_connection(const std::string &bucket_name, const std::st
         std::getenv("AZURE_STORAGE_CONNECTION_STRING"), bucket_name)),
       _bucket_name(bucket_name), _object_prefix(obj_prefix)
 {
+    // Confirm that we can access the bucket, else fail.
+    bool exists;
+    int ret = bucket_exists(exists);
+    if (ret != 0)
+        throw std::runtime_error(_bucket_name + " : Unable to access bucket.");
+    if (exists == false)
+        throw std::runtime_error(_bucket_name + " : No such bucket.");
 }
 
 // Build a list of all of the objects in the bucket.
@@ -93,5 +100,52 @@ azure_connection::delete_object(const std::string &object_key) const
 int
 azure_connection::get_object(const std::string &path) const
 {
+    return 0;
+}
+
+int
+azure_connection::object_exists(const std::string &object_key, bool &exists) const
+{
+    exists = false;
+    std::string obj = _object_prefix + object_key;
+
+    auto list_blob_response = _azure_client.ListBlobs();
+
+    for (const auto blob_item : list_blob_response.Blobs) {
+        // Check if object exists.
+        if (blob_item.Name.compare(obj) == 0) {
+            // Check if object is deleted and has not been cleared by garbage collection.
+            if (blob_item.IsDeleted) {
+                return -1;
+            }
+            exists = true;
+            break;
+        }
+    }
+    return 0;
+}
+
+int
+azure_connection::bucket_exists(bool &exists) const
+{
+    exists = false;
+
+    auto service_client = Azure::Storage::Blobs::BlobServiceClient::CreateFromConnectionString(
+      std::getenv("AZURE_STORAGE_CONNECTION_STRING"));
+
+    // Get list of containers associated with the class Azure client.
+    auto list_container_response = service_client.ListBlobContainers();
+
+    for (const auto container_item : list_container_response.BlobContainers) {
+        // Check if bucket exists.
+        if (container_item.Name.compare(_bucket_name) == 0) {
+            // Check if bucket is deleted and has not been cleared by garbage collection.
+            if (container_item.IsDeleted) {
+                return -1;
+            }
+            exists = true;
+            break;
+        }
+    }
     return 0;
 }
