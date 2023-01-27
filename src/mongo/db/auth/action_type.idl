@@ -78,6 +78,7 @@ enums:
            createDatabase :  "createDatabase"  # ID only
            createIndex :  "createIndex"     # ID only
            createRole :  "createRole"
+           createSearchIndex : "createSearchIndex"
            createUser :  "createUser"
            dbCheck :  "dbCheck"
            dbHash :  "dbHash"
@@ -89,6 +90,7 @@ enums:
            dropDatabase :  "dropDatabase"
            dropIndex :  "dropIndex"
            dropRole :  "dropRole"
+           dropSearchIndex : "dropSearchIndex"
            dropUser :  "dropUser"
            emptycapped :  "emptycapped"
            enableProfiler :  "enableProfiler"
@@ -127,9 +129,11 @@ enums:
            listCursors :  "listCursors"
            listDatabases :  "listDatabases"
            listIndexes :  "listIndexes"
+           listSearchIndexes : "listSearchIndexes"
            listSessions :  "listSessions"
            listShards :  "listShards"
            logRotate :  "logRotate"
+           modifySearchIndex : "modifySearchIndex"
            moveChunk :  "moveChunk"
            netstat :  "netstat"
            oidcListKeys :  "oidcListKeys"
@@ -238,11 +242,13 @@ enums:
                         - convertToCapped
                         - createCollection
                         - createIndex
+                        - createSearchIndex
                         - dbCheck
                         - dbHash
                         - dbStats
                         - dropCollection
                         - dropIndex
+                        - dropSearchIndex
                         - enableProfiler
                         - exportCollection
                         - find
@@ -252,6 +258,8 @@ enums:
                         - killCursors
                         - listCollections
                         - listIndexes
+                        - listSearchIndexes
+                        - modifySearchIndex
                         - planCacheIndexFilter
                         - planCacheRead
                         - planCacheWrite
@@ -282,11 +290,13 @@ enums:
                         - convertToCapped
                         - createCollection
                         - createIndex
+                        - createSearchIndex
                         - dbCheck
                         - dbHash
                         - dbStats
                         - dropCollection
                         - dropIndex
+                        - dropSearchIndex
                         - enableProfiler
                         - exportCollection
                         - find
@@ -296,6 +306,8 @@ enums:
                         - killCursors
                         - listCollections
                         - listIndexes
+                        - listSearchIndexes
+                        - modifySearchIndex
                         - planCacheIndexFilter
                         - planCacheRead
                         - planCacheWrite
@@ -350,12 +362,14 @@ enums:
                         - convertToCapped
                         - createCollection
                         - createIndex
+                        - createSearchIndex
                         - dbCheck
                         - dbHash
                         - dbStats
                         - dropCollection
                         - dropDatabase
                         - dropIndex
+                        - dropSearchIndex
                         - enableProfiler
                         - exportCollection
                         - find
@@ -365,6 +379,8 @@ enums:
                         - killCursors
                         - listCollections
                         - listIndexes
+                        - listSearchIndexes
+                        - modifySearchIndex
                         - planCacheIndexFilter
                         - planCacheRead
                         - planCacheWrite

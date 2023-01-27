@@ -40,6 +40,7 @@ roles:
                 - killCursors
                 - listCollections
                 - listIndexes
+                - listSearchIndexes
                 - planCacheRead
             - matchType: exact_namespace
               collection: 'system.js'
@@ -54,8 +55,10 @@ roles:
                 - convertToCapped # db admin gets this also
                 - createCollection # db admin gets this also
                 - createIndex
+                - createSearchIndex
                 - dropCollection
                 - dropIndex
+                - dropSearchIndex
                 - insert
                 - remove
                 - renameCollectionSameDB # db admin gets this also
@@ -95,10 +98,14 @@ roles:
                 - dropCollection
                 - dropDatabase # clusterAdmin gets this also TODO(spencer): shold readWriteAnyDatabase?
                 - dropIndex
+                - dropSearchIndex
                 - createIndex
+                - createSearchIndex
                 - enableProfiler
                 - listCollections
                 - listIndexes
+                - listSearchIndexes
+                - modifySearchIndex
                 - planCacheIndexFilter
                 - planCacheRead
                 - planCacheWrite
@@ -178,7 +185,9 @@ roles:
               actions: &readRoleAndIndexActions
                   - *readRoleActions
                   - createIndex
+                  - createSearchIndex
                   - dropIndex
+                  - dropSearchIndex
             - matchType: exact_namespace
               db: 'admin'
               collection: 'system.roles'
@@ -412,6 +421,7 @@ roles:
                   - collStats
                   - listCollections
                   - listIndexes
+                  - listSearchIndexes
             - matchType: any_normal
               actions:
                   - find
@@ -499,8 +509,10 @@ roles:
                   - convertToCapped
                   - createCollection
                   - createIndex
+                  - createSearchIndex
                   - dropCollection
                   - insert
+                  - modifySearchIndex
             - matchType: database
               db: 'config'
               actions: *restoreRoleWriteActions

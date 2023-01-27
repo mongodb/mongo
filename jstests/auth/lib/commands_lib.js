@@ -3650,6 +3650,26 @@ export const authCommandsLib = {
           }]
         },
         {
+          testname: "createSearchIndex",
+          command: {createSearchIndex: "x", indexDefinition: {"testBlob": "blob"}},
+          skipSharded: true,  // TODO (SERVER-73274): add mongos cmds
+          testcases: [{
+              runOnDb: firstDbName,
+              roles: Object.extend({
+                  readWrite: 1,
+                  readWriteAnyDatabase: 1,
+                  dbAdmin: 1,
+                  dbAdminAnyDatabase: 1,
+                  dbOwner: 1,
+                  restore: 1,
+                  root: 1,
+                  __system: 1
+              }),
+              privileges:
+                  [{resource: {db: firstDbName, collection: "x"}, actions: ["createSearchIndex"]}],
+          }]
+        },
+        {
           testname: "currentOp_$ownOps_false",
           command: {currentOp: 1, $all: true, $ownOps: false},
           testcases: [
@@ -4004,6 +4024,25 @@ export const authCommandsLib = {
                 privileges:
                     [{resource: {db: secondDbName, collection: "x"}, actions: ["dropIndex"]}]
               }
+          ]
+        },
+        {
+          testname: "dropSearchIndex",
+          command: {dropSearchIndex: "x", indexDefinition: {"testBlob": "blob"}},
+          skipSharded: true,  // TODO (SERVER-73274): add mongos cmds
+          testcases: [
+            {
+              runOnDb: firstDbName,
+              roles: roles_writeDbAdmin,
+              privileges:
+                  [{resource: {db: firstDbName, collection: "x"}, actions: ["dropSearchIndex"]}],
+            },
+            {
+              runOnDb: secondDbName,
+              roles: roles_writeDbAdminAny,
+              privileges:
+                  [{resource: {db: secondDbName, collection: "x"}, actions: ["dropSearchIndex"]}],
+            }
           ]
         },
         {
@@ -5095,6 +5134,28 @@ export const authCommandsLib = {
         },
 
         {
+          testname: "listSearchIndexes",
+          command: {listSearchIndexes: "x"},
+          skipSharded: true,  // TODO (SERVER-73274): add mongos cmds
+          testcases: [{
+              runOnDb: firstDbName,
+              roles: {
+                  read: 1,
+                  readAnyDatabase: 1,
+                  readWrite: 1,
+                  readWriteAnyDatabase: 1,
+                  dbAdmin: 1,
+                  dbAdminAnyDatabase: 1,
+                  dbOwner: 1,
+                  backup: 1,
+                  root: 1,
+                  __system: 1,
+              },
+              privileges:
+                  [{resource: {db: firstDbName, collection: ""}, actions: ["listSearchIndexes"]}],
+          }]
+        },
+        {
           testname: "listShards",
           command: {listShards: 1},
           skipUnlessSharded: true,
@@ -5225,6 +5286,26 @@ export const authCommandsLib = {
               },
               {runOnDb: firstDbName, roles: {}},
               {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
+          testname: "modifySearchIndex",
+          command: {modifySearchIndex: "foo", indexDefinition: {"textBlob": "blob"}},
+          skipSharded: true,  // TODO (SERVER-73274): add mongos cmds
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdmin),
+                privileges:
+                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["modifySearchIndex"]}],
+                expectFail: true,
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdminAny),
+                privileges:
+                    [{resource: {db: secondDbName, collection: "foo"}, actions: ["modifySearchIndex"]}],
+              }
           ]
         },
         {
