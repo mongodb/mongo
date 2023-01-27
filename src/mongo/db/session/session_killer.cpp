@@ -56,15 +56,27 @@ SessionKiller::SessionKiller(ServiceContext* sc, KillFunc killer)
         // While we're not in shutdown
         while (!_inShutdown) {
             // Wait until we're woken up, and should either shutdown, or have something new to reap.
-            _killerCV.wait(lk, [&] { return _inShutdown || _nextToReap.size(); });
+            _killerCV.wait(lk, [&] { return _inShutdown || !_nextToReap.empty(); });
 
             // If we're in shutdown we're done
             if (_inShutdown) {
                 return;
             }
 
-            // Otherwise make an opctx and head into kill
+            // Otherwise make an opctx and head into kill.
+            //
+            // We must unlock around making an operation context, because making an opCtx can block
+            // waiting for all old opCtx's to be killed, and elsewhere we hold this mutex while we
+            // have an opCtx.
+            lk.unlock();
             auto opCtx = cc().makeOperationContext();
+            lk.lock();
+
+            // Double-check shutdown since we released the lock.  We don't have to worry about
+            // _nextToReap becoming empty because only this thread can empty it.
+            if (_inShutdown) {
+                return;
+            }
             _periodicKill(opCtx.get(), lk);
         }
     });
