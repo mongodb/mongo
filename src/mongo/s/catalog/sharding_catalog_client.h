@@ -360,6 +360,19 @@ public:
     virtual std::vector<ShardId> getShardsThatOwnDataAtClusterTime(
         OperationContext* opCtx, const Timestamp& clusterTime) = 0;
 
+    /**
+     * Queries config.placementHistory to retrieve placement metadata on the requested namespace at
+     * a specific point in time. When no namespace is specified, placement metadata on the whole
+     * cluster will be returned. This function is meant to be exclusively invoked by config server
+     * nodes.
+     *
+     * TODO (SERVER-73029): convert to private method of ShardingCatalogClientImpl
+     */
+    virtual std::vector<ShardId> getHistoricalPlacement(
+        OperationContext* opCtx,
+        const Timestamp& atClusterTime,
+        const boost::optional<NamespaceString>& nss) = 0;
+
 protected:
     ShardingCatalogClient() = default;
 

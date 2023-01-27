@@ -220,6 +220,7 @@ env.Library(
         'request_types/flush_resharding_state_change.idl',
         'request_types/flush_routing_table_cache_updates.idl',
         'request_types/get_database_version.idl',
+        'request_types/get_historical_placement_info.idl',
         'request_types/shardsvr_join_migrations_request.idl',
         'request_types/merge_chunk_request.idl',
         'request_types/migration_secondary_throttle_options.cpp',

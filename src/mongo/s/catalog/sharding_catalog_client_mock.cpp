@@ -223,4 +223,11 @@ std::vector<ShardId> ShardingCatalogClientMock::getShardsThatOwnDataAtClusterTim
     OperationContext* opCtx, const Timestamp& clusterTime) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
+
+std::vector<ShardId> ShardingCatalogClientMock::getHistoricalPlacement(
+    OperationContext* opCtx,
+    const Timestamp& atClusterTime,
+    const boost::optional<NamespaceString>& nss) {
+    uasserted(ErrorCodes::InternalError, "Method not implemented");
+}
 }  // namespace mongo
