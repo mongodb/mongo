@@ -27,7 +27,8 @@ assert.eq(getParameter(adminDb, "diagnosticDataCollectionStatsNamespaces"), ["lo
 let doc;
 assert.soon(() => {
     doc = verifyGetDiagnosticData(adminDb);
-    return doc.collectionStats["local.startup_log"].ns == "local.startup_log";
+    return doc.collectionStats.hasOwnProperty("local.startup_log") &&
+        db.collectionStats["local.startup_log"].ns == "local.startup_log";
 });
 
 // Validate that incorrect changes have no effect
