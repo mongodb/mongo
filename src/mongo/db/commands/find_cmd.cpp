@@ -490,19 +490,18 @@ public:
             // ignoring interrupt.
             InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
 
+            const auto& collection = ctx->getCollection();
+
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "UUID " << findCommand->getNamespaceOrUUID().uuid().value()
                                   << " specified in query request not found",
-                    ctx || !findCommand->getNamespaceOrUUID().uuid());
+                    collection || !findCommand->getNamespaceOrUUID().uuid());
 
-            // Set the namespace if a collection was found, as opposed to nothing or a view.
-            if (ctx) {
-                query_request_helper::refreshNSS(ctx->getNss(), findCommand.get());
-            }
-
-            // Tailing a replicated capped clustered collection requires majority read concern.
-            const auto& collection = ctx->getCollection();
             if (collection) {
+                // Set the namespace if a collection was found, as opposed to nothing or a view.
+                query_request_helper::refreshNSS(ctx->getNss(), findCommand.get());
+
+                // Tailing a replicated capped clustered collection requires majority read concern.
                 const bool isTailable = findCommand->getTailable();
                 const bool isMajorityReadConcern = repl::ReadConcernArgs::get(opCtx).getLevel() ==
                     repl::ReadConcernLevel::kMajorityReadConcern;
