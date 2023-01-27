@@ -373,10 +373,10 @@ void WiredTigerRecordStore::OplogStones::updateCurrentStoneAfterInsertOnCommit(
 
 void WiredTigerRecordStore::OplogStones::clearStonesOnCommit(OperationContext* opCtx) {
     opCtx->recoveryUnit()->onCommit([this](boost::optional<Timestamp>) {
+        stdx::lock_guard<Latch> lk(_mutex);
+
         _currentRecords.store(0);
         _currentBytes.store(0);
-
-        stdx::lock_guard<Latch> lk(_mutex);
         _stones.clear();
     });
 }
