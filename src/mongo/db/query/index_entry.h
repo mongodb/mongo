@@ -172,7 +172,7 @@ struct IndexEntry : CoreIndexInfo {
           unique(unq),
           infoObj(io) {
         // The caller must not supply multikey metadata in two different formats.
-        invariant(multikeyPaths.empty() || multikeyPathSet.empty());
+        invariant(this->multikeyPaths.empty() || this->multikeyPathSet.empty());
     }
 
     IndexEntry(const IndexEntry&) = default;
