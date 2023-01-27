@@ -5,6 +5,7 @@ import argparse
 import datetime
 import json
 import os
+import re
 import subprocess
 import sys
 import locale
@@ -95,13 +96,28 @@ def _combine_errors(fixes_filename: str, files_to_parse: List[str]) -> int:
 
 
 def __dedup_errors(clang_tidy_errors_threads: List[str]) -> str:
-    #use dict as an 'ordered set'(in python 3.6+), set value to dummy value(true here)
-    error_to_dummy_value = dict()
+    unique_single_errors = set()
     for errs in clang_tidy_errors_threads:
         if errs:
-            for val in errs.splitlines():
-                error_to_dummy_value[val] = True
-    return os.linesep.join(error_to_dummy_value.keys())
+            lines = errs.splitlines()
+            single_error_start_line = 0
+            for i, line in enumerate(lines):
+                if line:
+                    # the first line of one single error message like:
+                    # ......./d_concurrency.h:175:13: error: .........
+                    # trying to match  :lineNumber:colomnNumber:
+                    matched_regex = re.match("(.+:[0-9]+:[0-9]+:)", line)
+
+                    # Collect a full single error message
+                    # when we find another match or reach the last line of the text
+                    if matched_regex and i != single_error_start_line:
+                        unique_single_errors.add(tuple(lines[single_error_start_line:i]))
+                        single_error_start_line = i
+                    elif i == len(lines) - 1:
+                        unique_single_errors.add(tuple(lines[single_error_start_line:i + 1]))
+
+    unique_single_error_flatten = [item for sublist in unique_single_errors for item in sublist]
+    return os.linesep.join(unique_single_error_flatten)
 
 
 def main():
