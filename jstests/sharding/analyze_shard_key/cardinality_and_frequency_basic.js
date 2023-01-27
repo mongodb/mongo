@@ -131,15 +131,15 @@ for (let testCaseBase of noIndexTestCases) {
 function assertNoMetrics(res) {
     assert(!res.hasOwnProperty("numDocs"), res);
     assert(!res.hasOwnProperty("isUnique"), res);
-    assert(!res.hasOwnProperty("cardinality"), res);
+    assert(!res.hasOwnProperty("numDistinctValues"), res);
     assert(!res.hasOwnProperty("frequency"), res);
     assert(!res.hasOwnProperty("monotonicity"), res);
 }
 
-function assertMetrics(res, {numDocs, isUnique, cardinality, frequency}) {
+function assertMetrics(res, {numDocs, isUnique, numDistinctValues, frequency}) {
     assert.eq(res.numDocs, numDocs, res);
     assert.eq(res.isUnique, isUnique, res);
-    assert.eq(res.cardinality, cardinality, res);
+    assert.eq(res.numDistinctValues, numDistinctValues, res);
     assert.eq(bsonWoCompare(res.frequency, frequency), 0, res);
     assert(res.hasOwnProperty("monotonicity"), res);
 }
@@ -226,7 +226,7 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
         assertMetrics(res, {
             numDocs: 2,
             isUnique: false,
-            cardinality: 2,
+            numDistinctValues: 2,
             frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
         });
     } else {
@@ -252,7 +252,7 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
         assertMetrics(res, {
             numDocs: 5,
             isUnique: false,
-            cardinality: 5,
+            numDistinctValues: 5,
             frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
         });
     } else {
@@ -278,14 +278,14 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
             assertMetrics(res, {
                 numDocs: 5050,
                 isUnique: false,
-                cardinality: 5050,
+                numDistinctValues: 5050,
                 frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
             });
         } else {
             assertMetrics(res, {
                 numDocs: 5050,
                 isUnique: false,
-                cardinality: 100,
+                numDistinctValues: 100,
                 frequency: {p99: 99, p95: 95, p90: 90, p80: 80, p50: 50}
             });
         }
@@ -312,14 +312,14 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
             assertMetrics(res, {
                 numDocs: 11325,
                 isUnique: false,
-                cardinality: 11325,
+                numDistinctValues: 11325,
                 frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
             });
         } else {
             assertMetrics(res, {
                 numDocs: 11325,
                 isUnique: false,
-                cardinality: 150,
+                numDistinctValues: 150,
                 frequency: {p99: 149, p95: 143, p90: 135, p80: 120, p50: 75}
             });
         }
@@ -356,7 +356,7 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
     assertMetrics(res, {
         numDocs: 2,
         isUnique: testCase.expectUnique,
-        cardinality: 2,
+        numDistinctValues: 2,
         frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
     });
 
@@ -378,7 +378,7 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
     assertMetrics(res, {
         numDocs: 5,
         isUnique: testCase.expectUnique,
-        cardinality: 5,
+        numDistinctValues: 5,
         frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
     });
 
@@ -396,7 +396,7 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
     assertMetrics(res, {
         numDocs: 100,
         isUnique: testCase.expectUnique,
-        cardinality: 100,
+        numDistinctValues: 100,
         frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
     });
 
@@ -414,7 +414,7 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
     assertMetrics(res, {
         numDocs: 150,
         isUnique: testCase.expectUnique,
-        cardinality: 150,
+        numDistinctValues: 150,
         frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
     });
 

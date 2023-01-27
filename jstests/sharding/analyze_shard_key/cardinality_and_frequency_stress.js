@@ -79,7 +79,7 @@ function testAnalyzeShardKeysUnshardedCollection(conn, mongodConns) {
         conn.adminCommand({analyzeShardKey: ns, key: candidateShardKey, comment}));
     assert.eq(res.numDocs, numDocs, res);
     assert.eq(res.isUnique, false, res);
-    assert.eq(res.cardinality, numDocs, res);
+    assert.eq(res.numDistinctValues, numDocs, res);
     assert.eq(bsonWoCompare(res.frequency, {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}), 0, res);
 
     AnalyzeShardKeyUtil.disableProfiler(mongodConns, dbName);
@@ -127,7 +127,7 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
         st.s.adminCommand({analyzeShardKey: ns, key: candidateShardKey, comment}));
     assert.eq(res.numDocs, numDocs, res);
     assert.eq(res.isUnique, false, res);
-    assert.eq(res.cardinality, numDocs, res);
+    assert.eq(res.numDistinctValues, numDocs, res);
     assert.eq(bsonWoCompare(res.frequency, {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}), 0, res);
 
     AnalyzeShardKeyUtil.disableProfiler(mongodConns, dbName);

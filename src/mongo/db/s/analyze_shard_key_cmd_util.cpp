@@ -507,7 +507,7 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
     auto bundle = calculateCardinalityAndFrequency(
         opCtx, nss, shardKeyBson, indexKeyBson, *metrics.getIsUnique());
     metrics.setNumDocs(bundle.numDocs);
-    metrics.setCardinality(bundle.cardinality);
+    metrics.setNumDistinctValues(bundle.cardinality);
     metrics.setFrequency(bundle.frequency);
 
     metrics.setNumOrphanDocs(getNumOrphanDocuments(opCtx, nss));

@@ -76,7 +76,7 @@ structs:
         type: bool
         description: "Whether the shard key index enforces a uniqueness constraint."
         optional: true
-      cardinality:
+      numDistinctValues:
         type: long
         description: "The number of distinct shard key values in the collection."
         validator: { gte: 0 }
