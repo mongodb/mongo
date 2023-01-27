@@ -270,6 +270,18 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
 #endif
 }
 
+bool CurOp::currentOpBelongsToTenant(Client* client, TenantId tenantId) {
+    invariant(client);
+
+    OperationContext* clientOpCtx = client->getOperationContext();
+
+    if (!clientOpCtx || (CurOp::get(clientOpCtx))->getNSS().tenantId() != tenantId) {
+        return false;
+    }
+
+    return true;
+}
+
 void CurOp::setOpDescription_inlock(const BSONObj& opDescription) {
     _opDescription = serializeDollarDbInOpDescription(_nss.tenantId(), opDescription);
 }

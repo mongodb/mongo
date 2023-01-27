@@ -71,23 +71,14 @@ selector:
   # In a multitenancy environment the catalog will always return tenant-prefixed entries, so the
   # list_catalog test will be broken as it checks for non-tenant-prefixed entries.
   - jstests/core/**/list_catalog.js
-  # TODO SERVER-72285: currentOp requests with dollar tenant cannot get operations being executed by the tenant.
-  - jstests/core/**/crud_ops_do_not_throw_locktimeout.js
-  - jstests/core/**/currentop.js
-  - jstests/core/**/currentop_waiting_for_latch.js
-  - jstests/core/**/failcommand_failpoint.js
-  - jstests/core/**/fsync.js
-  - jstests/core/**/killop_drop_collection.js
-  - jstests/core/administrative/profile/profile_hide_index.js
-  - jstests/core/comment_field.js
-  - jstests/core/txns/kill_cursors_in_transaction.js
-  - jstests/core/txns/kill_sessions_kills_transaction.js
-  - jstests/core/txns/transactions_block_ddl.js
-  - jstests/core/txns/currentop_blocked_operations.js
-  - jstests/core/txns/new_transactions_on_session_with_prepared_txn_block_behind_prepare.js
-  - jstests/core/txns/write_conflicts_with_non_txns.js
+  # These tests create a new thread, so $tenant won't be properly injected.
+  - jstests/core/txns/txns/transactions_block_ddl.js
+  - jstests/core/txns/txns/write_conflicts_with_non_txns.js
   # TODO SERVER-72357: cannot get the expected error due to an authorization contract issue.
   - jstests/core/txns/multi_statement_transaction_command_args.js
+  # TODO SERVER-73023 The tenantId is not attached to the namespace provided to failcommand
+  # failpoint
+  - jstests/core/failcommand_failpoint.js
 
 executor:
   archive:

@@ -13,82 +13,84 @@ const kOtherTenant = ObjectId();
 const kDbName = 'myDb';
 const kNewCollectionName = "currOpColl";
 
-function assertCurrentOpAggOutput(
-    tokenConn, rootConn, tenantId, dbName, expectedBatchSize, featureFlagRequireTenantId) {
-    // Check for the 'insert' op in the currOp output for 'tenantId' when issuing '$currentOp' in
-    // aggregation pipeline with a security token.
-    const aggTokenTenant = tokenConn.getDB("admin").runCommand({
+// Check for the 'insert' op(s) in the currOp output for 'tenantId' when issuing '$currentOp' in
+// aggregation pipeline with a security token.
+function assertCurrentOpAggOutputToken(
+    tokenConn, tenantId, dbName, expectedBatchSize, featureFlagRequireTenantId) {
+    // Security token users are not allowed to pass "allUsers: true" because it requires having the
+    // "inprog" action type, which is only available to the "clusterMonitor" role. Security token
+    // users should not be allowed this role.
+    const res = tokenConn.getDB("admin").runCommand({
         aggregate: 1,
         pipeline: [{$currentOp: {allUsers: false}}, {$match: {op: "insert"}}],
         cursor: {}
     });
-    assert.eq(aggTokenTenant.cursor.firstBatch.length, expectedBatchSize, tojson(aggTokenTenant));
-    if (expectedBatchSize > 0) {
-        checkNsSerializedCorrectly(featureFlagRequireTenantId,
-                                   tenantId,
-                                   dbName,
-                                   kNewCollectionName,
-                                   aggTokenTenant.cursor.firstBatch[0]);
-    }
+    assert.eq(res.cursor.firstBatch.length, expectedBatchSize, tojson(res));
+    checkNsSerializedCorrectly(
+        featureFlagRequireTenantId, tenantId, dbName, kNewCollectionName, res.cursor.firstBatch);
+}
 
-    // Check for the 'insert' op in the currOp output for 'tenantId' when issuing '$currentOp' in
-    // aggregation pipeline and passing '$tenant' to it.
-    const aggDollarTenant = rootConn.runCommand({
+// Check for the 'insert' op(s) in the currOp output for 'tenantId' when issuing '$currentOp' in
+// aggregation pipeline and passing '$tenant' to it.
+function assertCurrentOpAggOutputDollarTenant(
+    rootConn, tenantId, dbName, expectedBatchSize, featureFlagRequireTenantId) {
+    // We pass "allUsers: true" in order to see ops run by other users, including the security token
+    // user. Passing $tenant will filter for only ops which belong to this tenant.
+    const res = rootConn.runCommand({
         aggregate: 1,
         pipeline: [{$currentOp: {allUsers: true}}, {$match: {op: "insert"}}],
         cursor: {},
         '$tenant': tenantId
     });
-    assert.eq(aggDollarTenant.cursor.firstBatch.length, expectedBatchSize, tojson(aggDollarTenant));
-    if (expectedBatchSize > 0) {
-        checkNsSerializedCorrectly(featureFlagRequireTenantId,
-                                   tenantId,
-                                   dbName,
-                                   kNewCollectionName,
-                                   aggDollarTenant.cursor.firstBatch[0]);
-    }
+    assert.eq(res.cursor.firstBatch.length, expectedBatchSize, tojson(res));
+    checkNsSerializedCorrectly(
+        featureFlagRequireTenantId, tenantId, dbName, kNewCollectionName, res.cursor.firstBatch);
 }
 
-function assertCurrentOpCommandOutput(
-    tokenConn, rootConn, tenantId, dbName, expectedBatchSize, featureFlagRequireTenantId) {
-    // Check for the 'insert' op in the currOp output for 'tenantId' when issuing the currentOp
-    // command with a security token.
-    const cmdTokenTenant = tokenConn.getDB("admin").runCommand(
+// Check for the 'insert' op(s) in the currOp output for 'tenantId' when issuing the currentOp
+// command with a security token.
+function assertCurrentOpCommandOutputToken(
+    tokenConn, tenantId, dbName, expectedBatchSize, featureFlagRequireTenantId) {
+    const res = tokenConn.getDB("admin").runCommand(
         {currentOp: 1, $ownOps: true, $all: true, op: "insert"});
-    assert.eq(cmdTokenTenant.inprog.length, expectedBatchSize, tojson(cmdTokenTenant));
-    if (expectedBatchSize > 0) {
-        const cmdOp = cmdTokenTenant.inprog[0];
-        assert.eq(cmdOp.command.insert, kNewCollectionName);
-        checkNsSerializedCorrectly(
-            featureFlagRequireTenantId, tenantId, dbName, kNewCollectionName, cmdOp);
-    }
+    assert.eq(res.inprog.length, expectedBatchSize, tojson(res));
+    checkNsSerializedCorrectly(
+        featureFlagRequireTenantId, tenantId, dbName, kNewCollectionName, res.inprog);
+    res.inprog.forEach(op => {
+        assert.eq(op.command.insert, kNewCollectionName);
+    });
+}
 
-    // Check for the 'insert' op in the currOp output for 'tenantId' when issuing the currentOp
-    // command with $tenant.
-    const cmdDollarTenant = rootConn.runCommand(
+// Check for the 'insert' op in the currOp output for 'tenantId' when issuing the currentOp
+// command with $tenant.
+function assertCurrentOpCommandOutputDollarTenant(
+    rootConn, tenantId, dbName, expectedBatchSize, featureFlagRequireTenantId) {
+    const res = rootConn.runCommand(
         {currentOp: 1, $ownOps: false, $all: true, op: "insert", '$tenant': tenantId});
-    assert.eq(cmdDollarTenant.inprog.length, expectedBatchSize, tojson(cmdDollarTenant));
-    if (expectedBatchSize > 0) {
-        const cmdOp = cmdDollarTenant.inprog[0];
-        assert.eq(cmdOp.command.insert, kNewCollectionName);
-        checkNsSerializedCorrectly(
-            featureFlagRequireTenantId, tenantId, dbName, kNewCollectionName, cmdOp);
-    }
+    assert.eq(res.inprog.length, expectedBatchSize, tojson(res));
+    checkNsSerializedCorrectly(
+        featureFlagRequireTenantId, tenantId, dbName, kNewCollectionName, res.inprog);
+    res.inprog.forEach(op => {
+        assert.eq(op.command.insert, kNewCollectionName);
+    });
 }
 
 function checkNsSerializedCorrectly(
-    featureFlagRequireTenantId, kTenantId, dbName, collectionName, op) {
-    if (featureFlagRequireTenantId) {
-        // This case represents the upgraded state where we will not include the tenantId as the
-        // db prefix.
-        assert.eq(op.ns, dbName + "." + collectionName);
-        assert.eq(op.command.$db, dbName);
-    } else {
-        // This case represents the downgraded state where we will continue to prefix namespaces.
-        const prefixedDb = kTenant + "_" + kDbName;
-        assert.eq(op.ns, prefixedDb + "." + collectionName);
-        assert.eq(op.command.$db, kTenantId + "_" + dbName);
-    }
+    featureFlagRequireTenantId, kTenantId, dbName, collectionName, cursorRes) {
+    cursorRes.forEach(op => {
+        if (featureFlagRequireTenantId) {
+            // This case represents the upgraded state where we will not include the tenantId as the
+            // db prefix.
+            assert.eq(op.ns, dbName + "." + collectionName);
+            assert.eq(op.command.$db, dbName);
+        } else {
+            // This case represents the downgraded state where we will continue to prefix
+            // namespaces.
+            const prefixedDb = kTenant + "_" + kDbName;
+            assert.eq(op.ns, prefixedDb + "." + collectionName);
+            assert.eq(op.command.$db, kTenantId + "_" + dbName);
+        }
+    });
 }
 
 const rst = new ReplSetTest({
@@ -136,79 +138,140 @@ assert.commandWorked(primary.getDB('$external').runCommand({
 const tokenConn = new Mongo(primary.host);
 tokenConn._setSecurityToken(securityToken);
 
-// Run an insert for kTenant that will implicitly create a collection, and force the collection
-// creation to hang so that we'll capture it in the currentOp output. Turn on a failpoint to
-// force the create to hang, and wait to hit the failpoint.
-const createCollFP = configureFailPoint(primary, "hangBeforeLoggingCreateCollection");
-function runCreate(securityToken, dbName, kNewCollectionName) {
-    db.getMongo()._setSecurityToken(securityToken);
+// Run an insert for kTenant using a security token that will implicitly create a collection. We
+// force the collection creation to hang so that we'll capture the insert in the currentOp output.
+{
+    const createCollFP = configureFailPoint(primary, "hangBeforeLoggingCreateCollection");
+    function runCreateToken(securityToken, dbName, kNewCollectionName) {
+        db.getMongo()._setSecurityToken(securityToken);
+        assert.commandWorked(db.getSiblingDB(dbName).runCommand(
+            {insert: kNewCollectionName, documents: [{_id: 0}]}));
+    }
+    const createShell = startParallelShell(
+        funWithArgs(runCreateToken, securityToken, kDbName, kNewCollectionName), primary.port);
+    createCollFP.wait();
+
+    // Check that the 'insert' op shows up in the currOp output for 'kTenant' when issuing
+    // '$currentOp' in aggregation pipeline using both a security token and $tenant.
+    assertCurrentOpAggOutputToken(
+        tokenConn, kTenant, kDbName, 1 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpAggOutputDollarTenant(
+        adminDb, kTenant, kDbName, 1 /* expectedBatchSize */, featureFlagRequireTenantId);
+
+    // Check that the 'insert' op shows up in the currOp output for 'kTenant' when issuing
+    // the currentOp command using both a security token and $tenant.
+    assertCurrentOpCommandOutputToken(
+        tokenConn, kTenant, kDbName, 1 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpCommandOutputDollarTenant(
+        adminDb, kTenant, kDbName, 1 /* expectedBatchSize */, featureFlagRequireTenantId);
+
+    // Check that the other tenant does not see the op in any currentOp output.
+    tokenConn._setSecurityToken(securityTokenOtherTenant);
+    assertCurrentOpAggOutputToken(
+        tokenConn, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpAggOutputDollarTenant(
+        adminDb, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+
+    assertCurrentOpCommandOutputToken(
+        tokenConn, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpCommandOutputDollarTenant(
+        adminDb, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+
+    createCollFP.off();
+    createShell();
+
+    // Drop the collection so we can re-create it below.
     assert.commandWorked(
-        db.getSiblingDB(dbName).runCommand({insert: kNewCollectionName, documents: [{_id: 0}]}));
+        adminDb.getSiblingDB(kDbName).runCommand({drop: kNewCollectionName, $tenant: kTenant}));
 }
-const createShell = startParallelShell(
-    funWithArgs(runCreate, securityToken, kDbName, kNewCollectionName), primary.port);
-createCollFP.wait();
 
-// Check that the 'insert' op shows up in the currOp output for 'kTenant' when issuing
-// '$currentOp' in aggregation pipeline.
-assertCurrentOpAggOutput(
-    tokenConn, adminDb, kTenant, kDbName, 1 /* expectedBatchSize */, featureFlagRequireTenantId);
+// Now, run an insert for kTenant using $tenant. It will also implicitly create a collection, and we
+// similarly force the collection creation to hang so that we'll capture the insert in the currentOp
+// output.
+{
+    const createCollFP = configureFailPoint(primary, "hangBeforeLoggingCreateCollection");
 
-// Check that the 'insert' op shows up in the currOp output for 'kTenant' when issuing
-// the currentOp command.
-assertCurrentOpCommandOutput(
-    tokenConn, adminDb, kTenant, kDbName, 1 /* expectedBatchSize */, featureFlagRequireTenantId);
+    function runCreateDollarTenant(tenantId, dbName, kNewCollectionName) {
+        assert(db.getSiblingDB('admin').auth({user: 'admin', pwd: 'pwd'}));
+        assert.commandWorked(db.getSiblingDB(dbName).runCommand(
+            {insert: kNewCollectionName, documents: [{_id: 0}], $tenant: tenantId}));
+    }
 
-// Check that the other tenant does not see the op in currentOp output.
-tokenConn._setSecurityToken(securityTokenOtherTenant);
-assertCurrentOpAggOutput(tokenConn,
-                         adminDb,
-                         kOtherTenant,
-                         kDbName,
-                         0 /* expectedBatchSize */,
-                         featureFlagRequireTenantId);
-assertCurrentOpCommandOutput(tokenConn,
-                             adminDb,
-                             kOtherTenant,
-                             kDbName,
-                             0 /* expectedBatchSize */,
-                             featureFlagRequireTenantId);
+    const createShell = startParallelShell(
+        funWithArgs(runCreateDollarTenant, kTenant, kDbName, kNewCollectionName), primary.port);
+    createCollFP.wait();
 
-// Now check that a privileged user can see this op using both $currentOp and the currentOp
-// command when no tenantId is provided.
-const currOpAggResPrivilegedUser = adminDb.runCommand({
-    aggregate: 1,
-    pipeline: [{$currentOp: {allUsers: true}}, {$match: {op: "insert"}}],
-    cursor: {}
-});
-assert.eq(
-    currOpAggResPrivilegedUser.cursor.firstBatch.length, 1, tojson(currOpAggResPrivilegedUser));
+    // Check that the 'insert' op does NOT show up in the currOp output for 'kTenant' when issuing
+    // '$currentOp' in aggregation pipeline using a security token. A security token user is not
+    // authorized to pass ""allUsers: true", so it can only see ops that it has actually run itself.
+    // In this case, the insert was issued by the "admin" user.
+    assertCurrentOpAggOutputToken(
+        tokenConn, kTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
 
-const currOpCmdResPrivilegedUser =
-    adminDb.runCommand({currentOp: 1, $ownOps: false, $all: true, op: "insert"});
-assert.eq(currOpCmdResPrivilegedUser.inprog.length, 1, tojson(currOpCmdResPrivilegedUser));
+    // Check that the 'insert' op shows up in the currOp output for 'kTenant' when issuing
+    // '$currentOp' in aggregation pipeline using $tenant.
+    assertCurrentOpAggOutputDollarTenant(
+        adminDb, kTenant, kDbName, 1 /* expectedBatchSize */, featureFlagRequireTenantId);
 
-// Check that a user without required privileges, i.e. not associated with kTenant, is not
-// authorized to issue '$currentOp' for other users.
-const nonPrivilegedConn = new Mongo(primary.host);
-assert(nonPrivilegedConn.getDB("admin").auth('dbAdmin', 'pwd'));
+    // Check that the 'insert' op also does NOT show up in the currOp output for 'kTenant' when
+    // issuing the currentOp command, for the same reason as above.
+    assertCurrentOpCommandOutputToken(
+        tokenConn, kTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
 
-assert.commandFailedWithCode(nonPrivilegedConn.getDB("admin").runCommand({
-    aggregate: 1,
-    pipeline: [{$currentOp: {allUsers: true}}, {$match: {op: "insert"}}],
-    cursor: {}
-}),
-                             ErrorCodes.Unauthorized);
+    // Check that the 'insert' op shows up in the currOp output for 'kTenant' when issuing
+    // the currentOp command using $tenant.
+    assertCurrentOpCommandOutputDollarTenant(
+        adminDb, kTenant, kDbName, 1 /* expectedBatchSize */, featureFlagRequireTenantId);
 
-// Check that a user without required privileges, i.e. not associated with kTenant, is not
-// authorized to issue the currentOp command for other users.
-assert.commandFailedWithCode(nonPrivilegedConn.getDB("admin").runCommand(
-                                 {currentOp: 1, $ownOps: false, $all: true, op: "insert"}),
-                             ErrorCodes.Unauthorized);
+    // Now, check that the other tenant does not see the op in any currentOp output.
+    tokenConn._setSecurityToken(securityTokenOtherTenant);
+    assertCurrentOpAggOutputToken(
+        tokenConn, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpAggOutputDollarTenant(
+        adminDb, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
 
-// Turn the failpoint off and wait for the create to finish.
-createCollFP.off();
-createShell();
+    assertCurrentOpCommandOutputToken(
+        tokenConn, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpCommandOutputDollarTenant(
+        adminDb, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+
+    // Now check that a privileged user can see this op using both $currentOp and the currentOp
+    // command when no tenantId is provided. The user currently authenticated on the adminDb
+    // connection has the "root" role.
+    const currOpAggResPrivilegedUser = adminDb.runCommand({
+        aggregate: 1,
+        pipeline: [{$currentOp: {allUsers: true}}, {$match: {op: "insert"}}],
+        cursor: {}
+    });
+    assert.eq(
+        currOpAggResPrivilegedUser.cursor.firstBatch.length, 1, tojson(currOpAggResPrivilegedUser));
+
+    const currOpCmdResPrivilegedUser =
+        adminDb.runCommand({currentOp: 1, $ownOps: false, $all: true, op: "insert"});
+    assert.eq(currOpCmdResPrivilegedUser.inprog.length, 1, tojson(currOpCmdResPrivilegedUser));
+
+    // Check that a user without required privileges, i.e. not associated with kTenant, is not
+    // authorized to issue '$currentOp' for other users.
+    const nonPrivilegedConn = new Mongo(primary.host);
+    assert(nonPrivilegedConn.getDB("admin").auth('dbAdmin', 'pwd'));
+
+    assert.commandFailedWithCode(nonPrivilegedConn.getDB("admin").runCommand({
+        aggregate: 1,
+        pipeline: [{$currentOp: {allUsers: true}}, {$match: {op: "insert"}}],
+        cursor: {}
+    }),
+                                 ErrorCodes.Unauthorized);
+
+    // Check that a user without required privileges, i.e. not associated with kTenant, is not
+    // authorized to issue the currentOp command for other users.
+    assert.commandFailedWithCode(nonPrivilegedConn.getDB("admin").runCommand(
+                                     {currentOp: 1, $ownOps: false, $all: true, op: "insert"}),
+                                 ErrorCodes.Unauthorized);
+
+    // Turn the failpoint off and wait for the create to finish.
+    createCollFP.off();
+    createShell();
+}
 
 rst.stopSet();
 })();

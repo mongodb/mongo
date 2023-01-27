@@ -397,6 +397,8 @@ public:
                                          bool backtraceMode,
                                          BSONObjBuilder* infoBuilder);
 
+    static bool currentOpBelongsToTenant(Client* client, TenantId tenantId);
+
     /**
      * Serializes the fields of a GenericCursor which do not appear elsewhere in the currentOp
      * output. If 'maxQuerySize' is given, truncates the cursor's originatingCommand but preserves

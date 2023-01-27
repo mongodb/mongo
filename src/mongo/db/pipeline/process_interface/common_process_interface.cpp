@@ -91,9 +91,12 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
 
             // If currOp is being run for a particular tenant, ignore any ops that don't belong to
             // it.
-            if (expCtx->ns.tenantId()) {
+            if (auto expCtxTenantId = expCtx->ns.tenantId()) {
                 auto userName = AuthorizationSession::get(client)->getAuthenticatedUserName();
-                if (userName && userName->getTenant() != expCtx->ns.tenantId()) {
+                if ((userName && userName->getTenant() &&
+                     userName->getTenant() != expCtxTenantId) ||
+                    (userName && !userName->getTenant() &&
+                     !CurOp::currentOpBelongsToTenant(client, *expCtxTenantId))) {
                     continue;
                 }
             }
