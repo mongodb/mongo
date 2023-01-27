@@ -76,6 +76,7 @@ typedef struct {
      * Configuration values are set at startup.
      */
     uint32_t delay_ms;    /* Average length of delay when simulated */
+    uint32_t error_ms;    /* Average length of sleep when simulated */
     uint32_t force_delay; /* Force a simulated network delay every N operations */
     uint32_t force_error; /* Force a simulated network error every N operations */
     uint32_t verbose;     /* Verbose level */
@@ -197,6 +198,8 @@ dir_store_configure(DIR_STORE *dir_store, WT_CONFIG_ARG *config)
 
     if ((ret = dir_store_configure_int(dir_store, config, "delay_ms", &dir_store->delay_ms)) != 0)
         return (ret);
+    if ((ret = dir_store_configure_int(dir_store, config, "error_ms", &dir_store->error_ms)) != 0)
+        return (ret);
     if ((ret = dir_store_configure_int(
            dir_store, config, "force_delay", &dir_store->force_delay)) != 0)
         return (ret);
@@ -237,13 +240,27 @@ dir_store_configure_int(
 }
 
 /*
+ * sleep_ms --
+ *     Sleep for the specified milliseconds.
+ */
+static void
+sleep_ms(uint32_t ms)
+{
+    struct timeval tv;
+
+    /* Cast needed for some compilers that suspect the calculation can overflow (it can't). */
+    tv.tv_sec = ms / 1000;
+    tv.tv_usec = (suseconds_t)(ms % 1000) * 1000;
+    (void)select(0, NULL, NULL, NULL, &tv);
+}
+
+/*
  * dir_store_delay --
  *     Add any artificial delay or simulated network error during an object transfer.
  */
 static int
 dir_store_delay(DIR_STORE *dir_store)
 {
-    struct timeval tv;
     int ret;
 
     ret = 0;
@@ -253,21 +270,16 @@ dir_store_delay(DIR_STORE *dir_store)
           "Artificial delay %" PRIu32 " milliseconds after %" PRIu64 " object reads, %" PRIu64
           " object writes\n",
           dir_store->delay_ms, dir_store->object_reads, dir_store->object_writes);
-        /*
-         * tv_usec has type suseconds_t, which is signed (hence the s), but ->delay_ms is unsigned.
-         * In both gcc8 and gcc10 with -Wsign-conversion enabled (as we do) this causes a spurious
-         * warning about the implicit conversion possibly changing the value. Hence the explicit
-         * cast. (both struct timeval and suseconds_t are POSIX)
-         */
-        tv.tv_sec = dir_store->delay_ms / 1000;
-        tv.tv_usec = (suseconds_t)(dir_store->delay_ms % 1000) * 1000;
-        (void)select(0, NULL, NULL, NULL, &tv);
+        sleep_ms(dir_store->delay_ms);
     }
     if (dir_store->force_error != 0 &&
       (dir_store->object_reads + dir_store->object_writes) % dir_store->force_error == 0) {
         VERBOSE_LS(dir_store,
-          "Artificial error returned after %" PRIu64 " object reads, %" PRIu64 " object writes\n",
-          dir_store->object_reads, dir_store->object_writes);
+          "Artificial error returned after %" PRIu32 " milliseconds sleep, %" PRIu64
+          " object reads, %" PRIu64 " object writes\n",
+          dir_store->error_ms, dir_store->object_reads, dir_store->object_writes);
+
+        sleep_ms(dir_store->error_ms);
         ret = ENETUNREACH;
     }
 
