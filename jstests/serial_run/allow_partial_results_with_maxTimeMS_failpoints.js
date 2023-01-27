@@ -3,6 +3,9 @@
  * with 'maxTimeMS' and only a subset of the shards provide data before the timeout.
  * Uses three methods to simulate MaxTimeMSExpired: failpoints, MongoBridge, and $where + sleep.
  *
+ * This is in the serial_run suite because the tests using MongoBridge and $where + sleep depend on
+ * certain work being completed before a maxTimeMS timeout.
+ *
  *  @tags: [
  *   requires_sharding,
  *   requires_replication,
@@ -280,8 +283,6 @@ const shard0SleepFailure = new FindWhereSleepController(st.shard0);
 const shard1SleepFailure = new FindWhereSleepController(st.shard1);
 const allShardsSleepFailure = new MultiController([shard0SleepFailure, shard1SleepFailure]);
 
-const allshardsMixedFailures = new MultiController([shard0NetworkFailure, shard1Failpoint]);
-
 // Due to the hack with sleepFailures below, this has to be the innermost parameterizing function.
 function withEachSingleShardFailure(callback) {
     callback(shard0Failpoint);
@@ -302,7 +303,6 @@ function withEachAllShardFailure(callback) {
     callback(allShardsFailpoint);
     callback(allshardsNetworkFailure);
     callback(allShardsSleepFailure);
-    callback(allshardsMixedFailures);
 }
 
 function getMoreShardTimeout(allowPartialResults, failureController, batchSize) {
@@ -375,7 +375,7 @@ function partialResultsTrueFirstBatch(failureController) {
     assert.eq(0, res.cursor.id);
     failureController.disable();
 }
-withEachSingleShardFailure(failure => partialResultsTrueFirstBatch(failure));
+withEachSingleShardFailure(partialResultsTrueFirstBatch);
 
 // With 'allowPartialResults: false', if one shard times out then return a timeout error.
 function partialResultsFalseOneFailure(failureController) {
@@ -383,7 +383,7 @@ function partialResultsFalseOneFailure(failureController) {
     assert.commandFailedWithCode(runQuery(false), ErrorCodes.MaxTimeMSExpired);
     failureController.disable();
 }
-withEachSingleShardFailure(failure => partialResultsFalseOneFailure(failure));
+withEachSingleShardFailure(partialResultsFalseOneFailure);
 
 // With 'allowPartialResults: false', if both shards time out then return a timeout error.
 function allowPartialResultsFalseAllFailed(failureController) {
@@ -391,7 +391,7 @@ function allowPartialResultsFalseAllFailed(failureController) {
     assert.commandFailedWithCode(runQuery(false), ErrorCodes.MaxTimeMSExpired);
     failureController.disable();
 }
-withEachAllShardFailure(failure => allowPartialResultsFalseAllFailed(failure));
+withEachAllShardFailure(allowPartialResultsFalseAllFailed);
 
 // With 'allowPartialResults: true', if both shards time out then return empty "partial" results.
 function allowPartialResultsTrueAllFailed(failureController) {
@@ -402,7 +402,7 @@ function allowPartialResultsTrueAllFailed(failureController) {
     assert.eq(res.cursor.firstBatch.length, 0);
     failureController.disable();
 }
-withEachAllShardFailure(failure => allowPartialResultsTrueAllFailed(failure));
+withEachAllShardFailure(allowPartialResultsTrueAllFailed);
 
 st.stop();
 }());

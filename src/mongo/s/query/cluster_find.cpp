@@ -314,7 +314,28 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
 
     try {
         // Establish the cursors with a consistent shardVersion across shards.
-        params.remotes = establishCursorsOnShards(shardIds);
+
+        // If we have maxTimeMS and allowPartialResults, then leave some spare time in the opCtx
+        // deadline so that we have time to return partial results before the opCtx is killed.
+        auto deadline = opCtx->getDeadline();
+        if (findCommand.getAllowPartialResults() && findCommand.getMaxTimeMS()) {
+            // Reserve 10% of the time budget (up to 100,000 microseconds max) for processing
+            // buffered partial results.
+            deadline -= Microseconds{std::min(1000 * (*findCommand.getMaxTimeMS()) / 10, 100000)};
+            LOGV2_DEBUG(
+                5746901,
+                0,
+                "Setting an earlier artificial deadline because the find allows partial results.",
+                "deadline"_attr = deadline);
+        }
+
+        // The call to establishCursorsOnShards has its own timeout mechanism that is controlled
+        // by the opCtx, so we don't expect runWithDeadline to throw a timeout at this level. We
+        // use runWithDeadline because it has the side effect of pushing a temporary
+        // (artificial) deadline onto the opCtx used by establishCursorsOnShards.
+        opCtx->runWithDeadline(deadline, ErrorCodes::MaxTimeMSExpired, [&]() -> void {
+            params.remotes = establishCursorsOnShards(shardIds);
+        });
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::CollectionUUIDMismatch &&
             !ex.extraInfo<CollectionUUIDMismatchInfo>()->actualCollection() &&
@@ -352,15 +373,10 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
 
     FindCommon::waitInFindBeforeMakingBatch(opCtx, query);
 
-    // If we're allowing partial results and we got MaxTimeMSExpired, then temporarily disable
-    // interrupts in the opCtx so that we can pull already-fetched data from ClusterClientCursor.
-    bool ignoringInterrupts = false;
     if (findCommand.getAllowPartialResults() &&
         opCtx->checkForInterruptNoAssert().code() == ErrorCodes::MaxTimeMSExpired) {
-        // MaxTimeMS is expired, but perhaps remotes not have expired their requests yet.
-        // Wait for all remote cursors to be exhausted so that we can safely disable interrupts
-        // in the opCtx.  We want to be sure that later calls to ccc->next() do not block on
-        // more data.
+        // MaxTimeMS is expired in the router, but some remotes may still have outsanding requests.
+        // Wait for all remotes to expire their requests.
 
         // Maximum number of 1ms sleeps to wait for remote cursors to be exhausted.
         constexpr int kMaxAttempts = 10;
@@ -377,18 +393,6 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
             }
             stdx::this_thread::sleep_for(stdx::chrono::milliseconds(1));
         }
-
-        // The first MaxTimeMSExpired will have called opCtx->markKilled() so any later
-        // call to opCtx->checkForInterruptNoAssert() will return an error.  We need to
-        // temporarily ignore this while we pull data from the ClusterClientCursor.
-        LOGV2_DEBUG(
-            5746901,
-            0,
-            "Attempting to return partial results because MaxTimeMS expired and the query set "
-            "AllowPartialResults. Temporarily disabling interrupts on the OperationContext "
-            "while partial results are pulled from the ClusterClientCursor.");
-        opCtx->setIgnoreInterruptsExceptForReplStateChange(true);
-        ignoringInterrupts = true;
     }
 
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
@@ -398,20 +402,13 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // results come from the initial batches that were obtained when establishing cursors, but
     // ClusterClientCursor::next will fetch further results if necessary.
     while (!FindCommon::enoughForFirstBatch(findCommand, results->size())) {
-        auto nextWithStatus = ccc->next();
-        if (findCommand.getAllowPartialResults() &&
-            (nextWithStatus.getStatus() == ErrorCodes::MaxTimeMSExpired)) {
+        auto next = uassertStatusOK(ccc->next());
+        if (findCommand.getAllowPartialResults()) {
             if (ccc->remotesExhausted()) {
                 cursorState = ClusterCursorManager::CursorState::Exhausted;
-                break;
             }
-            // Continue because there may be results waiting from other remotes.
-            continue;
-        } else {
-            // all error statuses besides permissible remote timeouts should be returned to the user
-            uassertStatusOK(nextWithStatus);
         }
-        if (nextWithStatus.getValue().isEOF()) {
+        if (next.isEOF()) {
             // We reached end-of-stream. If the cursor is not tailable, then we mark it as
             // exhausted. If it is tailable, usually we keep it open (i.e. "NotExhausted") even
             // when we reach end-of-stream. However, if all the remote cursors are exhausted, there
@@ -422,7 +419,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
             break;
         }
 
-        auto nextObj = *(nextWithStatus.getValue().getResult());
+        auto nextObj = *next.getResult();
 
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.
@@ -435,19 +432,6 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         // inside a BSON array.
         bytesBuffered += (nextObj.objsize() + kPerDocumentOverheadBytesUpperBound);
         results->push_back(std::move(nextObj));
-    }
-
-    if (ignoringInterrupts) {
-        opCtx->setIgnoreInterruptsExceptForReplStateChange(false);
-        ignoringInterrupts = false;
-        LOGV2_DEBUG(5746902, 0, "Re-enabled interrupts on the OperationContext.");
-    }
-
-    // Surface any opCtx interrupts, except ignore MaxTimeMSExpired with allowPartialResults.
-    auto interruptStatus = opCtx->checkForInterruptNoAssert();
-    if (!(interruptStatus.code() == ErrorCodes::MaxTimeMSExpired &&
-          findCommand.getAllowPartialResults())) {
-        uassertStatusOK(interruptStatus);
     }
 
     ccc->detachFromOperationContext();

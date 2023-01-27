@@ -155,9 +155,6 @@ function searchForAndAssertPartialResults(initialTimeoutMS, queryFunc) {
 
 // Try to get partial results, while nudging timeout value around the expected time.
 // This first case will try to get all the results in one big batch.
-// Start with half of the full runtime of the query.
-
-// Fetch one big batch of results.
 searchForAndAssertPartialResults(Math.round(fullQueryTimeoutMS), runBigBatchQuery);
 
 // Try to get partial results in a getMore.

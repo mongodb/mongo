@@ -220,10 +220,6 @@ bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
 }  // namespace
 
 Status OperationContext::checkForInterruptNoAssert() noexcept {
-    if (_noReplStateChangeWhileIgnoringOtherInterrupts()) {
-        return Status::OK();
-    }
-
     // TODO: Remove the MONGO_likely(hasClientAndServiceContext) once all operation contexts are
     // constructed with clients.
     const auto hasClientAndServiceContext = getClient() && getServiceContext();
@@ -313,8 +309,7 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
     // maxTimeNeverTimeOut is set) then we assume that the incongruity is due to a clock mismatch
     // and return _timeoutError regardless. To prevent this behaviour, only consider the op's
     // deadline in the event that the maxTimeNeverTimeOut failpoint is not set.
-    bool opHasDeadline = (hasDeadline() && !_noReplStateChangeWhileIgnoringOtherInterrupts() &&
-                          !MONGO_unlikely(maxTimeNeverTimeOut.shouldFail()));
+    bool opHasDeadline = (hasDeadline() && !MONGO_unlikely(maxTimeNeverTimeOut.shouldFail()));
 
     if (opHasDeadline) {
         deadline = std::min(deadline, getDeadline());
