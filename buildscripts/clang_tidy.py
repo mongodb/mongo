@@ -137,6 +137,8 @@ def main():
                         help="Log errors to console")
     parser.add_argument("-l", "--log-file", type=str, default="clang_tidy",
                         help="clang tidy log from evergreen")
+    parser.add_argument("--disable-reporting", action='store_true', default=False,
+                        help="Disable generating the report file for evergreen perf.send")
     parser.add_argument("-m", "--check-module", type=str,
                         default="build/install/lib/libmongo_tidy_checks.so",
                         help="Path to load the custom mongo checks module.")
@@ -221,10 +223,11 @@ def main():
     subprocess.run(["tar", "-czvf", args.output_dir + ".tgz", args.output_dir], check=False)
 
     # create report and dump to report.json
-    error_file_contents = __dedup_errors(clang_tidy_errors_futures)
-    report = make_report(args.log_file, error_file_contents, 1 if failed_files > 0 else 0)
-    try_combine_reports(report)
-    put_report(report)
+    if not args.disable_reporting:
+        error_file_contents = __dedup_errors(clang_tidy_errors_futures)
+        report = make_report(args.log_file, error_file_contents, 1 if failed_files > 0 else 0)
+        try_combine_reports(report)
+        put_report(report)
 
     return failed_files
 

@@ -51,7 +51,7 @@ class MongoTidyTests(unittest.TestCase):
             else:
                 print(msg)
                 self.fail()
-                
+
             with open(f'{os.path.splitext(self.compile_db)[0]}.results', 'w') as results:
                 results.write(msg)
 
@@ -65,12 +65,13 @@ class MongoTidyTests(unittest.TestCase):
             self.cmd = [
                 sys.executable,
                 'buildscripts/clang_tidy.py',
+                '--disable-reporting',
                 f'--check-module={self.TIDY_MODULE}',
                 f'--output-dir={os.path.join(os.path.dirname(compiledb), self._testMethodName + "_out")}',
                 f'--compile-commands={self.compile_db}',
             ]
         else:
-            raise(f"ERROR: did not findh matching compiledb for {self._testMethodName}")
+            raise (f"ERROR: did not findh matching compiledb for {self._testMethodName}")
 
     def tearDown(self):
         if self.config_file:
@@ -84,7 +85,7 @@ class MongoTidyTests(unittest.TestCase):
                 Checks: '-*,mongo-test-check'
                 WarningsAsErrors: '*'
                 """))
-        
+
         self.expected_output = "ran mongo-test-check!"
 
         self.run_clang_tidy()
