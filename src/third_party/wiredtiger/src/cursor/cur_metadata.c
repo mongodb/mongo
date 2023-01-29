@@ -73,10 +73,13 @@ __schema_create_collapse(WT_SESSION_IMPL *session, WT_CURSOR_METADATA *mdc, cons
     WT_CURSOR *c;
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
-    const char *_cfg[5] = {NULL, NULL, NULL, value, NULL};
+    int i, ncolgroups;
+    const char *_cfg[7] = {NULL, NULL, NULL, NULL, NULL, value, NULL};
     const char **cfg, **firstcfg, **lastcfg, *v;
+    bool tiered_shared;
 
-    lastcfg = cfg = &_cfg[3]; /* position on value */
+    lastcfg = cfg = &_cfg[5]; /* position on value */
+    tiered_shared = false;
     c = NULL;
     if (key != NULL && WT_PREFIX_SKIP(key, "table:")) {
         /*
@@ -93,20 +96,36 @@ __schema_create_collapse(WT_SESSION_IMPL *session, WT_CURSOR_METADATA *mdc, cons
         }
         WT_RET_NOTFOUND_OK(ret);
 
+        if (((ret = __wt_config_getones(session, value, "shared", &cval)) == 0) && cval.val)
+            tiered_shared = true;
+        WT_RET_NOTFOUND_OK(ret);
+
+        /*
+         * A simple table have default one column group except the tiered storage shared table that
+         * will have default 2 column groups.
+         */
+        ncolgroups = tiered_shared ? 2 : 1;
         c = mdc->create_cursor;
         WT_ERR(__wt_scr_alloc(session, 0, &buf));
-        /*
-         * When a table is created without column groups, we create one without a name.
-         */
-        WT_ERR(__wt_buf_fmt(session, buf, "colgroup:%s", key));
-        c->set_key(c, buf->data);
-        if ((ret = c->search(c)) != 0)
-            WT_ERR_MSG(session, ret,
-              "metadata information for source configuration \"%s\" not found",
-              (const char *)buf->data);
-        WT_ERR(c->get_value(c, &v));
-        WT_ERR(__wt_strdup(session, v, --cfg));
-        WT_ERR(__schema_source_config(session, c, v, --cfg));
+
+        for (i = 0; i < ncolgroups; i++) {
+            if (tiered_shared)
+                /* When a tiered storage shared table is created, we create two column groups. */
+                WT_ERR(__wt_schema_tiered_shared_colgroup_name(
+                  session, key, i == 0 ? true : false, buf));
+            else
+                /* When a table is created without column groups, we create one without a name. */
+                WT_ERR(__wt_buf_fmt(session, buf, "colgroup:%s", key));
+
+            c->set_key(c, buf->data);
+            if ((ret = c->search(c)) != 0)
+                WT_ERR_MSG(session, ret,
+                  "metadata information for source configuration \"%s\" not found",
+                  (const char *)buf->data);
+            WT_ERR(c->get_value(c, &v));
+            WT_ERR(__wt_strdup(session, v, --cfg));
+            WT_ERR(__schema_source_config(session, c, v, --cfg));
+        }
     } else if (key != NULL && (WT_PREFIX_SKIP(key, "colgroup:") || WT_PREFIX_SKIP(key, "index:"))) {
         if (strchr(key, ':') != NULL) {
             c = mdc->create_cursor;

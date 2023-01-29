@@ -39,7 +39,7 @@ class test_tiered18(wttest.WiredTigerTestCase, TieredConfigMixin):
     storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered18', tiered_only=True, tiered_shared=True)
     scenarios = make_scenarios(storage_sources)
 
-    uri_non_shared = "table:test_tiered18_non_shared"
+    uri_non_shared = "table:test_tiered18_shared_default"
     uri_shared = "table:test_tiered18_shared"
     uri_local = "table:test_tiered18_local"
     uri_fail = "table:test_tiered18_fail"
@@ -67,22 +67,27 @@ class test_tiered18(wttest.WiredTigerTestCase, TieredConfigMixin):
 
     # Test calling the create API with shared enabled.
     def test_tiered_shared(self):
-        self.pr("create tiered")
+        self.pr("create tiered shared with default")
         base_create = 'key_format=S,value_format=S'
         self.session.create(self.uri_non_shared, base_create)
         self.check_metadata(self.uri_non_shared, 'key_format=S')
-        #self.session.drop(self.uri_non_shared)
+        self.check_metadata("colgroup:test_tiered18_shared_default.active", 'file:test_tiered18_shared_default.wt')
+        self.check_metadata("colgroup:test_tiered18_shared_default.shared", 'tiered:test_tiered18_shared_default')
+        self.session.drop(self.uri_non_shared)
 
         self.pr("create non tiered/local")
         conf = ',tiered_storage=(name=none)'
         self.session.create(self.uri_local, base_create + conf)
         self.check_metadata(self.uri_local, 'name=none')
-        #self.session.drop(self.uri_local)
+        self.session.drop(self.uri_local)
 
         self.pr("create tiered shared")
         conf = ',tiered_storage=(shared=true)'
         self.session.create(self.uri_shared, base_create + conf)
-        #self.session.drop(self.uri_shared)
+        self.check_metadata(self.uri_shared, 'key_format=S')
+        self.check_metadata("colgroup:test_tiered18_shared.active", 'file:test_tiered18_shared.wt')
+        self.check_metadata("colgroup:test_tiered18_shared.shared", 'tiered:test_tiered18_shared')
+        self.session.drop(self.uri_shared)
 
         self.reopen_conn(config = self.saved_conn + ',tiered_storage=(shared=false)')
 
