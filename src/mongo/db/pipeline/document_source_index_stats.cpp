@@ -51,7 +51,10 @@ const char* DocumentSourceIndexStats::getSourceName() const {
 DocumentSource::GetNextResult DocumentSourceIndexStats::doGetNext() {
     if (_indexStats.empty()) {
         _indexStats = pExpCtx->mongoProcessInterface->getIndexStats(
-            pExpCtx->opCtx, pExpCtx->ns, _processName, pExpCtx->fromMongos);
+            pExpCtx->opCtx,
+            pExpCtx->ns,
+            _processName,
+            serverGlobalParams.clusterRole != ClusterRole::None);
         _indexStatsIter = _indexStats.cbegin();
     }
 

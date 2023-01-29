@@ -68,6 +68,7 @@ let shardsFound = [];
 db.getSiblingDB("config").shards.find().forEach(function(shard) {
     allShards.push(shard._id);
 });
+const isShardedCluster = !!allShards.length;
 
 for (const indexStats of pausedOutput) {
     assert.hasFields(indexStats, ["building", "spec"]);
@@ -83,6 +84,8 @@ for (const indexStats of pausedOutput) {
     // names of known shards.
     if (indexStats.hasOwnProperty("shard")) {
         shardsFound.push(indexStats["shard"]);
+    } else {
+        assert(!isShardedCluster);
     }
 }
 
