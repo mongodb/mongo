@@ -32,30 +32,30 @@ for (let i = 0; i < 5; i++) {
 
 // The collection has not been checkpointed yet, so there is nothing to validate.
 let res = assert.commandWorked(db.runCommand({validate: collName, background: true}));
-assert.eq(true, res.valid);
-assert.eq(false, res.hasOwnProperty("nrecords"));
-assert.eq(false, res.hasOwnProperty("nIndexes"));
+assert.eq(true, res.valid, res);
+assert.eq(false, res.hasOwnProperty("nrecords"), res);
+assert.eq(false, res.hasOwnProperty("nIndexes"), res);
 
 forceCheckpoint();
 
 res = assert.commandWorked(db.runCommand({validate: collName, background: true}));
-assert.eq(true, res.valid);
-assert.eq(true, res.hasOwnProperty("nrecords"));
-assert.eq(true, res.hasOwnProperty("nIndexes"));
+assert.eq(true, res.valid, res);
+assert.eq(true, res.hasOwnProperty("nrecords"), res);
+assert.eq(true, res.hasOwnProperty("nIndexes"), res);
 
 assert.commandWorked(coll.createIndex({x: 1}));
 
 // Shouldn't validate the newly created index here as it wasn't checkpointed yet.
 res = assert.commandWorked(db.runCommand({validate: collName, background: true}));
-assert.eq(true, res.valid);
-assert.eq(1, res.nIndexes);
+assert.eq(true, res.valid, res);
+assert.eq(1, res.nIndexes, res);
 
 forceCheckpoint();
 
 // Validating after the checkpoint should validate the newly created index.
 res = assert.commandWorked(db.runCommand({validate: collName, background: true}));
-assert.eq(true, res.valid);
-assert.eq(2, res.nIndexes);
+assert.eq(true, res.valid, res);
+assert.eq(2, res.nIndexes, res);
 
 MongoRunner.stopMongod(conn);
 }());

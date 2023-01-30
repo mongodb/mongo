@@ -37,6 +37,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(WTCompactIndexEBUSY);
+MONGO_FAIL_POINT_DEFINE(WTValidateIndexStructuralDamage);
 
 bool WiredTigerIndexUtil::appendCustomStats(OperationContext* opCtx,
                                             BSONObjBuilder* output,
@@ -122,6 +123,15 @@ void WiredTigerIndexUtil::validateStructure(OperationContext* opCtx,
                                             const std::string& uri,
                                             IndexValidateResults& results) {
     if (WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->isEphemeral()) {
+        return;
+    }
+
+    if (WTValidateIndexStructuralDamage.shouldFail()) {
+        std::string msg = str::stream() << "verify() returned an error. "
+                                        << "This indicates structural damage. "
+                                        << "Not examining individual index entries.";
+        results.errors.push_back(msg);
+        results.valid = false;
         return;
     }
 

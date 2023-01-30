@@ -55,8 +55,7 @@ const primary = replTest.getPrimary();
 // Run validate as a replica set, which will expect the tables to not be logged.
 let res = assert.commandWorked(primary.getDB(dbName).runCommand({validate: collName}));
 assert(!res.valid);
-// TODO (SERVER-72677): The validate results should report three errors.
-assert.eq(res.errors.length, 1);
+assert.eq(res.errors.length, 3);
 checkLog.containsJson(primary, 6898101, {uri: collUri(primary), expected: false});
 checkLog.containsJson(
     primary, 6898101, {index: '_id_', uri: indexUri(primary, '_id_'), expected: false});
@@ -75,8 +74,7 @@ conn = MongoRunner.runMongod(nodeOptions);
 // Run validate as a standalone, which will expect the tables to be logged.
 res = assert.commandWorked(conn.getDB(dbName).runCommand({validate: collName}));
 assert(!res.valid);
-// TODO (SERVER-72677): The validate results should report three errors.
-assert.eq(res.errors.length, 1);
+assert.eq(res.errors.length, 3);
 checkLog.containsJson(conn, 6898101, {uri: collUri(conn), expected: true});
 checkLog.containsJson(conn, 6898101, {index: '_id_', uri: indexUri(conn, '_id_'), expected: true});
 checkLog.containsJson(

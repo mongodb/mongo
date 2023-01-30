@@ -286,6 +286,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
                   "checkpoint.",
                   "desc_indexName"_attr = desc->indexName(),
                   "nss"_attr = _nss);
+            _skippedIndexes.emplace(desc->indexName());
             continue;
         }
 
@@ -303,6 +304,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
                   "yet in a checkpoint.",
                   "desc_indexName"_attr = desc->indexName(),
                   "nss"_attr = _nss);
+            _skippedIndexes.emplace(desc->indexName());
             continue;
         }
 
@@ -323,6 +325,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
                     "consistent in the checkpoint.",
                     "desc_indexName"_attr = desc->indexName(),
                     "nss"_attr = _nss);
+                _skippedIndexes.emplace(desc->indexName());
                 continue;
             }
         } else {
@@ -331,6 +334,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
                 LOGV2(6325100,
                       "[Debugging] skipping index {index_name} because it isn't SortedData",
                       "index_name"_attr = desc->indexName());
+                _skippedIndexes.emplace(desc->indexName());
                 continue;
             }
 
@@ -349,6 +353,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
                     "consistent in the checkpoint.",
                     "desc_indexName"_attr = desc->indexName(),
                     "nss"_attr = _nss);
+                _skippedIndexes.emplace(desc->indexName());
                 continue;
             }
         }

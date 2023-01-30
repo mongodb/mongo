@@ -673,6 +673,20 @@ TEST_F(CollectionValidationTest, ValidateEnforceFastCount) {
                        {CollectionValidation::ValidateMode::kForegroundFullEnforceFastCount});
 }
 
+TEST_F(CollectionValidationDiskTest, ValidateIndexDetailResultsSurfaceVerifyErrors) {
+    FailPointEnableBlock fp{"WTValidateIndexStructuralDamage"};
+    auto opCtx = operationContext();
+    insertDataRange(opCtx, 0, 5);  // initialize collection
+    foregroundValidate(
+        kNss,
+        opCtx,
+        /*valid*/ false,
+        /*numRecords*/ std::numeric_limits<int32_t>::min(),           // uninitialized
+        /*numInvalidDocuments*/ std::numeric_limits<int32_t>::min(),  // uninitialized
+        /*numErrors*/ 1,
+        {CollectionValidation::ValidateMode::kForegroundFull});
+}
+
 /**
  * Waits for a parallel running collection validation operation to start and then hang at a
  * failpoint.
