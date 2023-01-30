@@ -1035,8 +1035,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
             return coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
         }();
 
-        if (serverGlobalParams.featureCompatibility.isLessThan(
-                multiversion::FeatureCompatibilityVersion::kVersion_6_0)) {
+        if (migrateInfo.maxKey.has_value()) {
             // TODO SERVER-65322 only use `moveRange` once v6.0 branches out
             MoveChunkSettings settings(maxChunkSizeBytes,
                                        balancerConfig->getSecondaryThrottle(),
