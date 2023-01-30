@@ -604,7 +604,7 @@ Future<void> AsioSession::opportunisticRead(Stream& stream,
 
 #ifdef MONGO_CONFIG_SSL
 boost::optional<std::string> AsioSession::getSniName() const {
-    return SSLPeerInfo::forSession(shared_from_this()).sniName;
+    return SSLPeerInfo::forSession(shared_from_this()).sniName();
 }
 #endif
 
@@ -738,7 +738,7 @@ Future<bool> AsioSession::maybeHandshakeSSLForIngress(const MutableBufferSequenc
                   "durationMillis"_attr = handshakeDurationMillis);
             totalIngressTLSConnections.increment(1);
             totalIngressTLSHandshakeTimeMillis.increment(handshakeDurationMillis);
-            if (SSLPeerInfo::forSession(shared_from_this()).subjectName.empty()) {
+            if (SSLPeerInfo::forSession(shared_from_this()).subjectName().empty()) {
                 return getSSLManager()
                     ->parseAndValidatePeerCertificate(
                         _sslSocket->native_handle(), _sslSocket->get_sni(), "", _remote, nullptr)

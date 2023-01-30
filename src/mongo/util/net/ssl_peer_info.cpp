@@ -36,6 +36,7 @@ namespace {
 const transport::Session::Decoration<SSLPeerInfo> peerInfoForSession =
     transport::Session::declareDecoration<SSLPeerInfo>();
 }
+
 SSLPeerInfo& SSLPeerInfo::forSession(const transport::SessionHandle& session) {
     return peerInfoForSession(session.get());
 }

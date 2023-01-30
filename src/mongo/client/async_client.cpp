@@ -274,7 +274,7 @@ Future<void> AsyncDBClient::_call(Message request, int32_t msgId, const BatonHan
     request.header().setId(msgId);
     request.header().setResponseToMsgId(0);
 #ifdef MONGO_CONFIG_SSL
-    if (!SSLPeerInfo::forSession(_session).isTLS) {
+    if (!SSLPeerInfo::forSession(_session).isTLS()) {
         OpMsg::appendChecksum(&request);
     }
 #else

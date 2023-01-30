@@ -150,16 +150,15 @@ UserRequest getX509UserRequest(OperationContext* opCtx, UserRequest request) {
     }
 
     auto& sslPeerInfo = SSLPeerInfo::forSession(session);
-    if (sslPeerInfo.roles.empty() ||
-        (sslPeerInfo.subjectName.toString() != request.name.getUser())) {
+    auto&& peerRoles = sslPeerInfo.roles();
+    if (peerRoles.empty() || (sslPeerInfo.subjectName().toString() != request.name.getUser())) {
         return request;
     }
 
     // In order to be hashable, the role names must be converted from unordered_set to a set.
     request.roles = std::set<RoleName>();
-    std::copy(sslPeerInfo.roles.begin(),
-              sslPeerInfo.roles.end(),
-              std::inserter(*request.roles, request.roles->begin()));
+    std::copy(
+        peerRoles.begin(), peerRoles.end(), std::inserter(*request.roles, request.roles->begin()));
     return request;
 }
 
@@ -182,7 +181,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
     auto client = opCtx->getClient();
 
     auto& sslPeerInfo = SSLPeerInfo::forSession(client->session());
-    auto clientName = sslPeerInfo.subjectName;
+    auto clientName = sslPeerInfo.subjectName();
     uassert(ErrorCodes::AuthenticationFailed,
             "No verified subject name available from client",
             !clientName.empty());

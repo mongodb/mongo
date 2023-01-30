@@ -646,7 +646,7 @@ void DBClientConnection::say(Message& toSend, bool isRetry, string* actualServer
     toSend.header().setResponseToMsgId(0);
     if (!MONGO_unlikely(dbClientConnectionDisableChecksum.shouldFail())) {
 #ifdef MONGO_CONFIG_SSL
-        if (!SSLPeerInfo::forSession(_session).isTLS) {
+        if (!SSLPeerInfo::forSession(_session).isTLS()) {
             OpMsg::appendChecksum(&toSend);
         }
 #else
@@ -686,7 +686,7 @@ void DBClientConnection::_call(Message& toSend, Message& response, string* actua
     toSend.header().setResponseToMsgId(0);
     if (!MONGO_unlikely(dbClientConnectionDisableChecksum.shouldFail())) {
 #ifdef MONGO_CONFIG_SSL
-        if (!SSLPeerInfo::forSession(_session).isTLS) {
+        if (!SSLPeerInfo::forSession(_session).isTLS()) {
             OpMsg::appendChecksum(&toSend);
         }
 #else
@@ -764,7 +764,7 @@ bool DBClientConnection::isUsingTransientSSLParams() const {
 }
 
 bool DBClientConnection::isTLS() {
-    return SSLPeerInfo::forSession(_session).isTLS;
+    return SSLPeerInfo::forSession(_session).isTLS();
 }
 
 #endif

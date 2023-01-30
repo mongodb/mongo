@@ -63,7 +63,7 @@ namespace mongo {
 class SSLManagerInterface;
 class SSLConnectionInterface;
 #endif
-struct SSLPeerInfo;
+class SSLPeerInfo;
 
 extern const int portSendFlags;
 extern const int portRecvFlags;
