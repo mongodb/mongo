@@ -205,3 +205,7 @@ feature_flags:
         description: "Enable support for arbitrary updates and deletes on time-series collections"
         cpp_varname: feature_flags::gTimeseriesUpdatesDeletesSupport
         default: false
+    featureFlagIndexBuildGracefulErrorHandling:
+        description: "Enable index build error handling improvements"
+        cpp_varname: feature_flags::gIndexBuildGracefulErrorHandling
+        default: false
