@@ -94,9 +94,9 @@ modules:
     prefix: ${workdir}/src
     branch: master
   - name: tsbs
-    repo: git@github.com:gregorynoma/tsbs.git
+    repo: git@github.com:mongodb-forks/tsbs.git
     prefix: ${workdir}/src
-    branch: production
+    branch: main
   - name: mongo-perf
     repo: git@github.com:mongodb/mongo-perf.git
     prefix: ${workdir}/src
