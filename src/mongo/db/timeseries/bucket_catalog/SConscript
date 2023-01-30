@@ -13,7 +13,7 @@ env.Library(
         'bucket_identifiers.cpp',
         'bucket_metadata.cpp',
         'bucket_state.cpp',
-        'bucket_state_manager.cpp',
+        'bucket_state_registry.cpp',
         'closed_bucket.cpp',
         'execution_stats.cpp',
         'flat_bson.cpp',
@@ -40,8 +40,8 @@ env.CppUnitTest(
     target='db_bucket_catalog_test',
     source=[
         'bucket_catalog_helpers_test.cpp',
-        'bucket_catalog_state_manager_test.cpp',
         'bucket_catalog_test.cpp',
+        'bucket_state_registry_test.cpp',
         'minmax_test.cpp',
     ],
     LIBDEPS=[

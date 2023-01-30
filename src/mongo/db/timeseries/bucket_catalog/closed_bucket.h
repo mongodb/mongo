@@ -35,7 +35,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_state_manager.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -49,7 +49,7 @@ class ClosedBucket {
 public:
     ClosedBucket() = default;
     ~ClosedBucket();
-    ClosedBucket(BucketStateManager*,
+    ClosedBucket(BucketStateRegistry*,
                  const BucketId&,
                  const std::string&,
                  boost::optional<uint32_t>);
@@ -63,7 +63,7 @@ public:
     boost::optional<uint32_t> numMeasurements;
 
 private:
-    BucketStateManager* _bucketStateManager = nullptr;
+    BucketStateRegistry* _bucketStateRegistry = nullptr;
 };
 using ClosedBuckets = std::vector<ClosedBucket>;
 

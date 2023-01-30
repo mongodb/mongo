@@ -273,7 +273,7 @@ Status BucketCatalog::reopenBucket(OperationContext* opCtx,
                          stats,
                          key,
                          std::move(bucket),
-                         _bucketStateManager.getEra(),
+                         getCurrentEra(_bucketStateRegistry),
                          &closedBuckets)
         .getStatus();
 }
@@ -410,7 +410,7 @@ boost::optional<ClosedBucket> BucketCatalog::finish(std::shared_ptr<WriteBatch> 
         switch (bucket->rolloverAction) {
             case RolloverAction::kHardClose:
             case RolloverAction::kSoftClose: {
-                closedBucket = boost::in_place(&_bucketStateManager,
+                closedBucket = boost::in_place(&_bucketStateRegistry,
                                                bucket->bucketId,
                                                bucket->timeField,
                                                bucket->numMeasurements);
@@ -450,7 +450,8 @@ void BucketCatalog::abort(std::shared_ptr<WriteBatch> batch, const Status& statu
 
 void BucketCatalog::directWriteStart(const NamespaceString& ns, const OID& oid) {
     invariant(!ns.isTimeseriesBucketsCollection());
-    auto result = _bucketStateManager.changeBucketState(
+    auto result = changeBucketState(
+        _bucketStateRegistry,
         BucketId{ns, oid},
         [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
             if (input.has_value()) {
@@ -473,7 +474,8 @@ void BucketCatalog::directWriteStart(const NamespaceString& ns, const OID& oid) 
 void BucketCatalog::directWriteFinish(const NamespaceString& ns, const OID& oid) {
     invariant(!ns.isTimeseriesBucketsCollection());
     hangTimeseriesDirectModificationBeforeFinish.pauseWhileSet();
-    (void)_bucketStateManager.changeBucketState(
+    (void)changeBucketState(
+        _bucketStateRegistry,
         BucketId{ns, oid},
         [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
             if (!input.has_value()) {
@@ -496,7 +498,7 @@ void BucketCatalog::directWriteFinish(const NamespaceString& ns, const OID& oid)
 void BucketCatalog::clear(ShouldClearFn&& shouldClear) {
     if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        _bucketStateManager.clearSetOfBuckets(std::move(shouldClear));
+        clearSetOfBuckets(_bucketStateRegistry, std::move(shouldClear));
         return;
     }
     for (auto& stripe : _stripes) {
@@ -593,7 +595,7 @@ void BucketCatalog::appendGlobalExecutionStats(BSONObjBuilder* builder) const {
 }
 
 void BucketCatalog::appendStateManagementStats(BSONObjBuilder* builder) const {
-    _bucketStateManager.appendStats(builder);
+    appendStats(_bucketStateRegistry, builder);
 }
 
 long long BucketCatalog::memoryUsage() const {
@@ -648,7 +650,7 @@ const Bucket* BucketCatalog::_findBucket(const Stripe& stripe,
             return it->second.get();
         }
 
-        if (auto state = _bucketStateManager.getBucketState(it->second.get());
+        if (auto state = getBucketState(_bucketStateRegistry, it->second.get());
             state && !state.value().conflictsWithInsertion()) {
             return it->second.get();
         }
@@ -666,10 +668,10 @@ Bucket* BucketCatalog::_useBucket(Stripe* stripe,
 Bucket* BucketCatalog::_useBucketAndChangeState(Stripe* stripe,
                                                 WithLock stripeLock,
                                                 const BucketId& bucketId,
-                                                const BucketStateManager::StateChangeFn& change) {
+                                                const BucketStateRegistry::StateChangeFn& change) {
     auto it = stripe->allBuckets.find(bucketId);
     if (it != stripe->allBuckets.end()) {
-        if (auto state = _bucketStateManager.changeBucketState(it->second.get(), change);
+        if (auto state = changeBucketState(_bucketStateRegistry, it->second.get(), change);
             state && !state.value().conflictsWithInsertion()) {
             return it->second.get();
         }
@@ -701,7 +703,7 @@ Bucket* BucketCatalog::_useBucket(Stripe* stripe,
                                                  : nullptr;
     }
 
-    if (auto state = _bucketStateManager.getBucketState(bucket);
+    if (auto state = getBucketState(_bucketStateRegistry, bucket);
         state && !state.value().conflictsWithInsertion()) {
         _markBucketNotIdle(stripe, stripeLock, bucket);
         return bucket;
@@ -743,7 +745,7 @@ Bucket* BucketCatalog::_useAlternateBucket(Stripe* stripe,
             continue;
         }
 
-        auto state = _bucketStateManager.getBucketState(potentialBucket);
+        auto state = getBucketState(_bucketStateRegistry, potentialBucket);
         invariant(state);
         if (!state.value().conflictsWithInsertion()) {
             invariant(!potentialBucket->idleListEntry.has_value());
@@ -774,7 +776,7 @@ StatusWith<std::unique_ptr<Bucket>> BucketCatalog::_rehydrateBucket(
     invariant(feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
         serverGlobalParams.featureCompatibility));
     const auto& [bucketDoc, validator, catalogEra] = bucketToReopen;
-    if (catalogEra < _bucketStateManager.getEra()) {
+    if (catalogEra < getCurrentEra(_bucketStateRegistry)) {
         return {ErrorCodes::WriteConflict, "Bucket is from an earlier era, may be outdated"};
     }
 
@@ -815,7 +817,7 @@ StatusWith<std::unique_ptr<Bucket>> BucketCatalog::_rehydrateBucket(
                        .Date();
     BucketId bucketId{key.ns, bucketIdElem.OID()};
     std::unique_ptr<Bucket> bucket = std::make_unique<Bucket>(
-        bucketId, key, options.getTimeField(), minTime, _bucketStateManager);
+        bucketId, key, options.getTimeField(), minTime, _bucketStateRegistry);
 
     const bool isCompressed = isCompressedBucket(bucketDoc);
 
@@ -905,7 +907,7 @@ StatusWith<Bucket*> BucketCatalog::_reopenBucket(Stripe* stripe,
         return input.has_value() ? input.value() : BucketState{};
     };
 
-    auto state = _bucketStateManager.changeBucketState(bucket->bucketId, initializeStateFn);
+    auto state = changeBucketState(_bucketStateRegistry, bucket->bucketId, initializeStateFn);
     if (conflicts) {
         return {ErrorCodes::WriteConflict, "Bucket may be stale"};
     }
@@ -941,7 +943,7 @@ StatusWith<Bucket*> BucketCatalog::_reopenBucket(Stripe* stripe,
             if (existingBucket->rolloverAction == RolloverAction::kNone) {
                 stats.incNumBucketsClosedDueToReopening();
                 if (allCommitted(*existingBucket)) {
-                    closedBuckets->emplace_back(ClosedBucket{&_bucketStateManager,
+                    closedBuckets->emplace_back(ClosedBucket{&_bucketStateRegistry,
                                                              existingBucket->bucketId,
                                                              existingBucket->timeField,
                                                              existingBucket->numMeasurements});
@@ -977,7 +979,8 @@ StatusWith<Bucket*> BucketCatalog::_reuseExistingBucket(Stripe* stripe,
     // cleared as part of a set since the last time it was used. If we were to just check by
     // OID, we may miss if e.g. there was a move chunk operation.
     bool conflicts = false;
-    auto state = _bucketStateManager.changeBucketState(
+    auto state = changeBucketState(
+        _bucketStateRegistry,
         existingBucket,
         [targetEra, &conflicts](boost::optional<BucketState> input,
                                 std::uint64_t currentEra) -> boost::optional<BucketState> {
@@ -1042,7 +1045,7 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::_insert(
     auto stripeNumber = _getStripeNumber(key);
 
     InsertResult result;
-    result.catalogEra = _bucketStateManager.getEra();
+    result.catalogEra = getCurrentEra(_bucketStateRegistry);
     CreationInfo info{key, stripeNumber, time, options, stats, &result.closedBuckets};
     boost::optional<BucketToReopen> bucketToReopen = std::move(bucketFindResult.bucketToReopen);
 
@@ -1265,22 +1268,22 @@ void BucketCatalog::_removeBucket(Stripe* stripe,
     // we can remove the state from the catalog altogether.
     switch (mode) {
         case RemovalMode::kClose: {
-            auto state = _bucketStateManager.getBucketState(bucket->bucketId);
+            auto state = getBucketState(_bucketStateRegistry, bucket->bucketId);
             invariant(state.has_value());
             invariant(state.value().isSet(BucketStateFlag::kPendingCompression));
             break;
         }
         case RemovalMode::kAbort:
-            _bucketStateManager.changeBucketState(
-                bucket->bucketId,
-                [](boost::optional<BucketState> input,
-                   std::uint64_t) -> boost::optional<BucketState> {
-                    invariant(input.has_value());
-                    if (input->conflictsWithReopening()) {
-                        return input.value().setFlag(BucketStateFlag::kUntracked);
-                    }
-                    return boost::none;
-                });
+            changeBucketState(_bucketStateRegistry,
+                              bucket->bucketId,
+                              [](boost::optional<BucketState> input,
+                                 std::uint64_t) -> boost::optional<BucketState> {
+                                  invariant(input.has_value());
+                                  if (input->conflictsWithReopening()) {
+                                      return input.value().setFlag(BucketStateFlag::kUntracked);
+                                  }
+                                  return boost::none;
+                              });
             break;
         case RemovalMode::kArchive:
             // No state change
@@ -1319,7 +1322,7 @@ void BucketCatalog::_archiveBucket(Stripe* stripe,
         // keep the one that's already archived and just plain close this one.
         mode = RemovalMode::kClose;
         closedBuckets->emplace_back(ClosedBucket{
-            &_bucketStateManager, bucket->bucketId, bucket->timeField, bucket->numMeasurements});
+            &_bucketStateRegistry, bucket->bucketId, bucket->timeField, bucket->numMeasurements});
     }
 
     _removeBucket(stripe, stripeLock, bucket, mode);
@@ -1349,21 +1352,21 @@ boost::optional<OID> BucketCatalog::_findArchivedCandidate(Stripe* stripe,
     // We need to make sure our measurement can fit without violating max span. If not, we
     // can't use this bucket.
     if (info.time - candidateTime < Seconds(*info.options.getBucketMaxSpanSeconds())) {
-        auto state = _bucketStateManager.getBucketState(candidateBucket.bucketId);
+        auto state = getBucketState(_bucketStateRegistry, candidateBucket.bucketId);
         if (state && !state.value().conflictsWithReopening()) {
             return candidateBucket.bucketId.oid;
         } else {
             if (state) {
-                _bucketStateManager.changeBucketState(
-                    candidateBucket.bucketId,
-                    [](boost::optional<BucketState> input,
-                       std::uint64_t) -> boost::optional<BucketState> {
-                        if (!input.has_value()) {
-                            return boost::none;
-                        }
-                        invariant(input.value().conflictsWithReopening());
-                        return input.value().setFlag(BucketStateFlag::kUntracked);
-                    });
+                changeBucketState(_bucketStateRegistry,
+                                  candidateBucket.bucketId,
+                                  [](boost::optional<BucketState> input,
+                                     std::uint64_t) -> boost::optional<BucketState> {
+                                      if (!input.has_value()) {
+                                          return boost::none;
+                                      }
+                                      invariant(input.value().conflictsWithReopening());
+                                      return input.value().setFlag(BucketStateFlag::kUntracked);
+                                  });
             }
             long long memory =
                 _marginalMemoryUsageForArchivedBucket(candidateBucket, archivedSet.size() == 1);
@@ -1463,7 +1466,8 @@ void BucketCatalog::_abort(Stripe* stripe,
     if (doRemove) {
         _removeBucket(stripe, stripeLock, bucket, RemovalMode::kAbort);
     } else {
-        _bucketStateManager.changeBucketState(
+        changeBucketState(
+            _bucketStateRegistry,
             bucket->bucketId,
             [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
                 invariant(input.has_value());
@@ -1473,11 +1477,10 @@ void BucketCatalog::_abort(Stripe* stripe,
 }
 
 void BucketCatalog::_compressionDone(const BucketId& bucketId) {
-    _bucketStateManager.changeBucketState(
-        bucketId,
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            return boost::none;
-        });
+    changeBucketState(_bucketStateRegistry,
+                      bucketId,
+                      [](boost::optional<BucketState> input,
+                         std::uint64_t) -> boost::optional<BucketState> { return boost::none; });
 }
 
 void BucketCatalog::_markBucketIdle(Stripe* stripe, WithLock stripeLock, Bucket* bucket) {
@@ -1511,7 +1514,7 @@ void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
            numExpired <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
         Bucket* bucket = stripe->idleBuckets.back();
 
-        auto state = _bucketStateManager.getBucketState(bucket);
+        auto state = getBucketState(_bucketStateRegistry, bucket);
         if (canArchive && state && !state.value().conflictsWithInsertion()) {
             // Can archive a bucket if it's still eligible for insertions.
             _archiveBucket(stripe, stripeLock, bucket, closedBuckets);
@@ -1520,7 +1523,7 @@ void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
             // Bucket was cleared and just needs to be removed from catalog.
             _removeBucket(stripe, stripeLock, bucket, RemovalMode::kAbort);
         } else {
-            closedBuckets->emplace_back(ClosedBucket{&_bucketStateManager,
+            closedBuckets->emplace_back(ClosedBucket{&_bucketStateRegistry,
                                                      bucket->bucketId,
                                                      bucket->timeField,
                                                      bucket->numMeasurements});
@@ -1540,7 +1543,7 @@ void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
 
         auto& [timestamp, bucket] = *archivedSet.begin();
         closedBuckets->emplace_back(
-            ClosedBucket{&_bucketStateManager, bucket.bucketId, bucket.timeField, boost::none});
+            ClosedBucket{&_bucketStateRegistry, bucket.bucketId, bucket.timeField, boost::none});
 
         long long memory = _marginalMemoryUsageForArchivedBucket(bucket, archivedSet.size() == 1);
         if (archivedSet.size() == 1) {
@@ -1569,12 +1572,13 @@ Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
     auto [it, inserted] = stripe->allBuckets.try_emplace(
         bucketId,
         std::make_unique<Bucket>(
-            bucketId, info.key, info.options.getTimeField(), roundedTime, _bucketStateManager));
+            bucketId, info.key, info.options.getTimeField(), roundedTime, _bucketStateRegistry));
     tassert(6130900, "Expected bucket to be inserted", inserted);
     Bucket* bucket = it->second.get();
     stripe->openBuckets[info.key].emplace(bucket);
 
-    auto state = _bucketStateManager.changeBucketState(
+    auto state = changeBucketState(
+        _bucketStateRegistry,
         bucketId,
         [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
             invariant(!input.has_value());
@@ -1703,7 +1707,7 @@ Bucket* BucketCatalog::_rollover(Stripe* stripe,
         if (action == RolloverAction::kArchive) {
             _archiveBucket(stripe, stripeLock, bucket, info.closedBuckets);
         } else {
-            info.closedBuckets->emplace_back(ClosedBucket{&_bucketStateManager,
+            info.closedBuckets->emplace_back(ClosedBucket{&_bucketStateRegistry,
                                                           bucket->bucketId,
                                                           bucket->timeField,
                                                           bucket->numMeasurements});

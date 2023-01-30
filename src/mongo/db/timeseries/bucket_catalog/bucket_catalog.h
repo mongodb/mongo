@@ -42,7 +42,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_state_manager.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 #include "mongo/db/timeseries/bucket_catalog/closed_bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
@@ -315,7 +315,7 @@ protected:
     Bucket* _useBucketAndChangeState(Stripe* stripe,
                                      WithLock stripeLock,
                                      const BucketId& bucketId,
-                                     const BucketStateManager::StateChangeFn& change);
+                                     const BucketStateRegistry::StateChangeFn& change);
 
     /**
      * Mode enum to control whether the bucket retrieval methods below will create new buckets if no
@@ -554,7 +554,7 @@ protected:
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BucketCatalog::_mutex");
 
-    BucketStateManager _bucketStateManager{&_mutex};
+    BucketStateRegistry _bucketStateRegistry{_mutex};
 
     static constexpr std::size_t kNumberOfStripes = 32;
     std::array<Stripe, kNumberOfStripes> _stripes;

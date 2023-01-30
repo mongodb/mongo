@@ -29,8 +29,6 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
 
-#include "mongo/db/timeseries/bucket_catalog/bucket_state_manager.h"
-
 namespace mongo::timeseries::bucket_catalog {
 
 namespace {
@@ -45,16 +43,16 @@ uint8_t numDigits(uint32_t num) {
 }  // namespace
 
 Bucket::Bucket(
-    const BucketId& bId, const BucketKey& k, StringData tf, Date_t mt, BucketStateManager& bsm)
+    const BucketId& bId, const BucketKey& k, StringData tf, Date_t mt, BucketStateRegistry& bsr)
     : bucketId(bId),
       key(k),
       timeField(tf.toString()),
       minTime(mt),
-      bucketStateManager(bsm),
-      lastChecked(bucketStateManager.getEraAndIncrementCount()) {}
+      bucketStateRegistry(bsr),
+      lastChecked(getCurrentEraAndIncrementBucketCount(bucketStateRegistry)) {}
 
 Bucket::~Bucket() {
-    bucketStateManager.decrementCountForEra(lastChecked);
+    decrementBucketCountForEra(bucketStateRegistry, lastChecked);
 }
 
 bool allCommitted(const Bucket& bucket) {

@@ -35,9 +35,9 @@
 namespace mongo::timeseries::bucket_catalog {
 namespace {
 
-class BucketCatalogStateManagerTest : public BucketCatalog, public unittest::Test {
+class BucketStateRegistryTest : public BucketCatalog, public unittest::Test {
 public:
-    BucketCatalogStateManagerTest() {}
+    BucketStateRegistryTest() {}
 
     void clearById(const NamespaceString& ns, const OID& oid) {
         directWriteStart(ns, oid);
@@ -45,7 +45,7 @@ public:
     }
 
     bool hasBeenCleared(Bucket* bucket) {
-        auto state = _bucketStateManager.getBucketState(bucket);
+        auto state = getBucketState(_bucketStateRegistry, bucket);
         return (state && state.value().isSet(BucketStateFlag::kCleared));
     }
 
@@ -101,7 +101,7 @@ public:
         bucketKey3, _getStripeNumber(bucketKey3), date, options, stats, &closedBuckets};
 };
 
-TEST_F(BucketCatalogStateManagerTest, BucketStateSetUnsetFlag) {
+TEST_F(BucketStateRegistryTest, BucketStateSetUnsetFlag) {
     BucketState state;
     auto testFlags = [&state](std::initializer_list<BucketStateFlag> set,
                               std::initializer_list<BucketStateFlag> unset) {
@@ -210,7 +210,7 @@ TEST_F(BucketCatalogStateManagerTest, BucketStateSetUnsetFlag) {
               });
 }
 
-TEST_F(BucketCatalogStateManagerTest, BucketStateReset) {
+TEST_F(BucketStateRegistryTest, BucketStateReset) {
     BucketState state;
 
     state.setFlag(BucketStateFlag::kPrepared);
@@ -231,7 +231,7 @@ TEST_F(BucketCatalogStateManagerTest, BucketStateReset) {
     ASSERT_FALSE(state.isSet(BucketStateFlag::kPendingDirectWrite));
 }
 
-TEST_F(BucketCatalogStateManagerTest, BucketStateIsPrepared) {
+TEST_F(BucketStateRegistryTest, BucketStateIsPrepared) {
     BucketState state;
 
     ASSERT_FALSE(state.isPrepared());
@@ -248,7 +248,7 @@ TEST_F(BucketCatalogStateManagerTest, BucketStateIsPrepared) {
     ASSERT_FALSE(state.isPrepared());
 }
 
-TEST_F(BucketCatalogStateManagerTest, BucketStateConflictsWithInsert) {
+TEST_F(BucketStateRegistryTest, BucketStateConflictsWithInsert) {
     BucketState state;
     ASSERT_FALSE(state.conflictsWithInsertion());
 
@@ -275,7 +275,7 @@ TEST_F(BucketCatalogStateManagerTest, BucketStateConflictsWithInsert) {
     ASSERT_TRUE(state.conflictsWithInsertion());
 }
 
-TEST_F(BucketCatalogStateManagerTest, BucketStateConflictsWithReopening) {
+TEST_F(BucketStateRegistryTest, BucketStateConflictsWithReopening) {
     BucketState state;
     ASSERT_FALSE(state.conflictsWithReopening());
 
@@ -302,54 +302,54 @@ TEST_F(BucketCatalogStateManagerTest, BucketStateConflictsWithReopening) {
     ASSERT_TRUE(state.conflictsWithReopening());
 }
 
-TEST_F(BucketCatalogStateManagerTest, EraAdvancesAsExpected) {
+TEST_F(BucketStateRegistryTest, EraAdvancesAsExpected) {
 
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
     // When allocating new buckets, we expect their era value to match the BucketCatalog's era.
-    ASSERT_EQ(_bucketStateManager.getEra(), 0);
+    ASSERT_EQ(getCurrentEra(_bucketStateRegistry), 0);
     auto bucket1 = createBucket(info1);
-    ASSERT_EQ(_bucketStateManager.getEra(), 0);
+    ASSERT_EQ(getCurrentEra(_bucketStateRegistry), 0);
     ASSERT_EQ(bucket1->lastChecked, 0);
 
     // When clearing buckets, we expect the BucketCatalog's era value to increase while the cleared
     // bucket era values should remain unchanged.
     clear(ns1);
-    ASSERT_EQ(_bucketStateManager.getEra(), 1);
+    ASSERT_EQ(getCurrentEra(_bucketStateRegistry), 1);
     ASSERT_EQ(bucket1->lastChecked, 0);
 
     // When clearing buckets of one namespace, we expect the era of buckets of any other namespace
     // to not change.
     auto bucket2 = createBucket(info1);
     auto bucket3 = createBucket(info2);
-    ASSERT_EQ(_bucketStateManager.getEra(), 1);
+    ASSERT_EQ(getCurrentEra(_bucketStateRegistry), 1);
     ASSERT_EQ(bucket2->lastChecked, 1);
     ASSERT_EQ(bucket3->lastChecked, 1);
     clear(ns1);
-    ASSERT_EQ(_bucketStateManager.getEra(), 2);
+    ASSERT_EQ(getCurrentEra(_bucketStateRegistry), 2);
     ASSERT_EQ(bucket3->lastChecked, 1);
     ASSERT_EQ(bucket1->lastChecked, 0);
     ASSERT_EQ(bucket2->lastChecked, 1);
 
     // Era also advances when clearing by OID
     clearById(ns1, OID());
-    ASSERT_EQ(_bucketStateManager.getEra(), 4);
+    ASSERT_EQ(getCurrentEra(_bucketStateRegistry), 4);
 }
 
-TEST_F(BucketCatalogStateManagerTest, EraCountMapUpdatedCorrectly) {
+TEST_F(BucketStateRegistryTest, EraCountMapUpdatedCorrectly) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
     // Creating a bucket in a new era should add a counter for that era to the map.
     auto bucket1 = createBucket(info1);
     ASSERT_EQ(bucket1->lastChecked, 0);
-    ASSERT_EQ(_bucketStateManager.getCountForEra(0), 1);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 0), 1);
     clear(ns1);
     checkAndRemoveClearedBucket(bucket1);
 
     // When the last bucket in an era is destructed, the counter in the map should be removed.
-    ASSERT_EQ(_bucketStateManager.getCountForEra(0), 0);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 0), 0);
 
     // If there are still buckets in the era, however, the counter should still exist in the
     // map.
@@ -357,23 +357,23 @@ TEST_F(BucketCatalogStateManagerTest, EraCountMapUpdatedCorrectly) {
     auto bucket3 = createBucket(info2);
     ASSERT_EQ(bucket2->lastChecked, 1);
     ASSERT_EQ(bucket3->lastChecked, 1);
-    ASSERT_EQ(_bucketStateManager.getCountForEra(1), 2);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 1), 2);
     clear(ns2);
     checkAndRemoveClearedBucket(bucket3);
-    ASSERT_EQ(_bucketStateManager.getCountForEra(1), 1);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 1), 1);
 
     // A bucket in one era being destroyed and the counter decrementing should not affect a
     // different era's counter.
     auto bucket4 = createBucket(info2);
     ASSERT_EQ(bucket4->lastChecked, 2);
-    ASSERT_EQ(_bucketStateManager.getCountForEra(2), 1);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 2), 1);
     clear(ns2);
     checkAndRemoveClearedBucket(bucket4);
-    ASSERT_EQ(_bucketStateManager.getCountForEra(2), 0);
-    ASSERT_EQ(_bucketStateManager.getCountForEra(1), 1);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 2), 0);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 1), 1);
 }
 
-TEST_F(BucketCatalogStateManagerTest, HasBeenClearedFunctionReturnsAsExpected) {
+TEST_F(BucketStateRegistryTest, HasBeenClearedFunctionReturnsAsExpected) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
@@ -386,10 +386,10 @@ TEST_F(BucketCatalogStateManagerTest, HasBeenClearedFunctionReturnsAsExpected) {
     // cleared or not. It also advances the bucket's era up to the most recent era.
     ASSERT_FALSE(cannotAccessBucket(bucket1));
     ASSERT_FALSE(cannotAccessBucket(bucket2));
-    ASSERT_EQ(_bucketStateManager.getCountForEra(0), 2);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 0), 2);
     clear(ns2);
     ASSERT_FALSE(cannotAccessBucket(bucket1));
-    ASSERT_EQ(_bucketStateManager.getCountForEra(0), 1);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 0), 1);
     ASSERT_EQ(bucket1->lastChecked, 1);
     ASSERT(cannotAccessBucket(bucket2));
 
@@ -407,27 +407,27 @@ TEST_F(BucketCatalogStateManagerTest, HasBeenClearedFunctionReturnsAsExpected) {
     ASSERT(cannotAccessBucket(bucket5));
     // _isMemberOfClearedSet should be able to advance a bucket by multiple eras.
     ASSERT_EQ(bucket1->lastChecked, 1);
-    ASSERT_EQ(_bucketStateManager.getCountForEra(1), 1);
-    ASSERT_EQ(_bucketStateManager.getCountForEra(3), 0);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 1), 1);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 3), 0);
     ASSERT_FALSE(cannotAccessBucket(bucket1));
     ASSERT_EQ(bucket1->lastChecked, 3);
-    ASSERT_EQ(_bucketStateManager.getCountForEra(1), 0);
-    ASSERT_EQ(_bucketStateManager.getCountForEra(3), 1);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 1), 0);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 3), 1);
 
     // _isMemberOfClearedSet works even if the bucket wasn't cleared in the most recent clear.
     clear(ns1);
     auto bucket6 = createBucket(info2);
     ASSERT_EQ(bucket6->lastChecked, 4);
     clear(ns2);
-    ASSERT_EQ(_bucketStateManager.getCountForEra(3), 1);
-    ASSERT_EQ(_bucketStateManager.getCountForEra(4), 1);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 3), 1);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 4), 1);
     ASSERT(cannotAccessBucket(bucket1));
     ASSERT(cannotAccessBucket(bucket6));
-    ASSERT_EQ(_bucketStateManager.getCountForEra(3), 0);
-    ASSERT_EQ(_bucketStateManager.getCountForEra(4), 0);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 3), 0);
+    ASSERT_EQ(getBucketCountForEra(_bucketStateRegistry, 4), 0);
 }
 
-TEST_F(BucketCatalogStateManagerTest, ClearRegistryGarbageCollection) {
+TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
@@ -435,16 +435,16 @@ TEST_F(BucketCatalogStateManagerTest, ClearRegistryGarbageCollection) {
     auto bucket2 = createBucket(info2);
     ASSERT_EQ(bucket1->lastChecked, 0);
     ASSERT_EQ(bucket2->lastChecked, 0);
-    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 0);
+    ASSERT_EQUALS(getClearedSetsCount(_bucketStateRegistry), 0);
     clear(ns1);
     checkAndRemoveClearedBucket(bucket1);
     // Era 0 still has non-zero count after this clear because bucket2 is still in era 0.
-    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 1);
+    ASSERT_EQUALS(getClearedSetsCount(_bucketStateRegistry), 1);
     clear(ns2);
     checkAndRemoveClearedBucket(bucket2);
     // Bucket2 gets deleted, which makes era 0's count decrease to 0, then clear registry gets
     // cleaned.
-    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 0);
+    ASSERT_EQUALS(getClearedSetsCount(_bucketStateRegistry), 0);
 
     auto bucket3 = createBucket(info1);
     auto bucket4 = createBucket(info2);
@@ -453,7 +453,7 @@ TEST_F(BucketCatalogStateManagerTest, ClearRegistryGarbageCollection) {
     clear(ns1);
     checkAndRemoveClearedBucket(bucket3);
     // Era 2 still has bucket4 in it, so its count remains non-zero.
-    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 1);
+    ASSERT_EQUALS(getClearedSetsCount(_bucketStateRegistry), 1);
     auto bucket5 = createBucket(info1);
     auto bucket6 = createBucket(info2);
     ASSERT_EQ(bucket5->lastChecked, 3);
@@ -462,13 +462,13 @@ TEST_F(BucketCatalogStateManagerTest, ClearRegistryGarbageCollection) {
     checkAndRemoveClearedBucket(bucket5);
     // Eras 2 and 3 still have bucket4 and bucket6 in them respectively, so their counts remain
     // non-zero.
-    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 2);
+    ASSERT_EQUALS(getClearedSetsCount(_bucketStateRegistry), 2);
     clear(ns2);
     checkAndRemoveClearedBucket(bucket4);
     checkAndRemoveClearedBucket(bucket6);
     // Eras 2 and 3 have their counts become 0 because bucket4 and bucket6 are cleared. The clear
     // registry is emptied.
-    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 0);
+    ASSERT_EQUALS(getClearedSetsCount(_bucketStateRegistry), 0);
 
     auto bucket7 = createBucket(info1);
     auto bucket8 = createBucket(info3);
@@ -477,37 +477,37 @@ TEST_F(BucketCatalogStateManagerTest, ClearRegistryGarbageCollection) {
     clear(ns3);
     checkAndRemoveClearedBucket(bucket8);
     // Era 5 still has bucket7 in it so its count remains non-zero.
-    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 1);
+    ASSERT_EQUALS(getClearedSetsCount(_bucketStateRegistry), 1);
     auto bucket9 = createBucket(info2);
     ASSERT_EQ(bucket9->lastChecked, 6);
     clear(ns2);
     checkAndRemoveClearedBucket(bucket9);
     // Era 6's count becomes 0. Since era 5 is the smallest era with non-zero count, no clear ops
     // are removed.
-    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 2);
+    ASSERT_EQUALS(getClearedSetsCount(_bucketStateRegistry), 2);
     auto bucket10 = createBucket(info3);
     ASSERT_EQ(bucket10->lastChecked, 7);
     clear(ns3);
     checkAndRemoveClearedBucket(bucket10);
     // Era 7's count becomes 0. Since era 5 is the smallest era with non-zero count, no clear ops
     // are removed.
-    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 3);
+    ASSERT_EQUALS(getClearedSetsCount(_bucketStateRegistry), 3);
     clear(ns1);
     checkAndRemoveClearedBucket(bucket7);
     // Era 5's count becomes 0. No eras with non-zero counts remain, so all clear ops are removed.
-    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 0);
+    ASSERT_EQUALS(getClearedSetsCount(_bucketStateRegistry), 0);
 }
 
-TEST_F(BucketCatalogStateManagerTest, HasBeenClearedToleratesGapsInRegistry) {
+TEST_F(BucketStateRegistryTest, HasBeenClearedToleratesGapsInRegistry) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
     auto bucket1 = createBucket(info1);
     ASSERT_EQ(bucket1->lastChecked, 0);
     clearById(ns1, OID());
-    ASSERT_EQ(_bucketStateManager.getEra(), 2);
+    ASSERT_EQ(getCurrentEra(_bucketStateRegistry), 2);
     clear(ns1);
-    ASSERT_EQ(_bucketStateManager.getEra(), 3);
+    ASSERT_EQ(getCurrentEra(_bucketStateRegistry), 3);
     ASSERT_TRUE(hasBeenCleared(bucket1));
 
     auto bucket2 = createBucket(info2);
@@ -515,16 +515,16 @@ TEST_F(BucketCatalogStateManagerTest, HasBeenClearedToleratesGapsInRegistry) {
     clearById(ns1, OID());
     clearById(ns1, OID());
     clearById(ns1, OID());
-    ASSERT_EQ(_bucketStateManager.getEra(), 9);
+    ASSERT_EQ(getCurrentEra(_bucketStateRegistry), 9);
     ASSERT_TRUE(hasBeenCleared(bucket1));
     ASSERT_FALSE(hasBeenCleared(bucket2));
     clear(ns2);
-    ASSERT_EQ(_bucketStateManager.getEra(), 10);
+    ASSERT_EQ(getCurrentEra(_bucketStateRegistry), 10);
     ASSERT_TRUE(hasBeenCleared(bucket1));
     ASSERT_TRUE(hasBeenCleared(bucket2));
 }
 
-TEST_F(BucketCatalogStateManagerTest, ArchivingBucketPreservesState) {
+TEST_F(BucketStateRegistryTest, ArchivingBucketPreservesState) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
@@ -533,12 +533,12 @@ TEST_F(BucketCatalogStateManagerTest, ArchivingBucketPreservesState) {
 
     ClosedBuckets closedBuckets;
     _archiveBucket(&_stripes[info1.stripe], WithLock::withoutLock(), bucket, &closedBuckets);
-    auto state = _bucketStateManager.getBucketState(bucketId);
+    auto state = getBucketState(_bucketStateRegistry, bucketId);
     ASSERT_TRUE(state.has_value());
     ASSERT_TRUE(state == BucketState{});
 }
 
-TEST_F(BucketCatalogStateManagerTest, AbortingBatchRemovesBucketState) {
+TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
@@ -549,23 +549,23 @@ TEST_F(BucketCatalogStateManagerTest, AbortingBatchRemovesBucketState) {
     auto batch = std::make_shared<WriteBatch>(BucketHandle{bucketId, info1.stripe}, 0, stats);
 
     _abort(&_stripes[info1.stripe], WithLock::withoutLock(), batch, Status::OK());
-    ASSERT(_bucketStateManager.getBucketState(bucketId) == boost::none);
+    ASSERT(getBucketState(_bucketStateRegistry, bucketId) == boost::none);
 }
 
-TEST_F(BucketCatalogStateManagerTest, ClosingBucketGoesThroughPendingCompressionState) {
+TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
     auto bucket = createBucket(info1);
     auto bucketId = bucket->bucketId;
 
-    ASSERT(_bucketStateManager.getBucketState(bucketId).value() == BucketState{});
+    ASSERT(getBucketState(_bucketStateRegistry, bucketId).value() == BucketState{});
 
     auto stats = _getExecutionStats(info1.key.ns);
     auto batch = std::make_shared<WriteBatch>(BucketHandle{bucketId, info1.stripe}, 0, stats);
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(batch));
-    ASSERT(_bucketStateManager.getBucketState(bucketId).value() ==
+    ASSERT(getBucketState(_bucketStateRegistry, bucketId).value() ==
            BucketState{}.setFlag(BucketStateFlag::kPrepared));
 
     {
@@ -578,39 +578,39 @@ TEST_F(BucketCatalogStateManagerTest, ClosingBucketGoesThroughPendingCompression
         ASSERT_EQ(closedBucket.value().bucketId.oid, bucketId.oid);
 
         // Bucket should now be in pending compression state.
-        ASSERT(_bucketStateManager.getBucketState(bucketId).has_value());
-        ASSERT(_bucketStateManager.getBucketState(bucketId).value() ==
+        ASSERT(getBucketState(_bucketStateRegistry, bucketId).has_value());
+        ASSERT(getBucketState(_bucketStateRegistry, bucketId).value() ==
                BucketState{}.setFlag(BucketStateFlag::kPendingCompression));
     }
 
     // Destructing the 'ClosedBucket' struct should report it compressed should remove it from the
     // catalog.
-    ASSERT(_bucketStateManager.getBucketState(bucketId) == boost::none);
+    ASSERT(getBucketState(_bucketStateRegistry, bucketId) == boost::none);
 }
 
-TEST_F(BucketCatalogStateManagerTest, DirectWriteStartInitializesBucketState) {
+TEST_F(BucketStateRegistryTest, DirectWriteStartInitializesBucketState) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
     auto bucketId = BucketId{ns1, OID()};
     directWriteStart(ns1, bucketId.oid);
-    auto state = _bucketStateManager.getBucketState(bucketId);
+    auto state = getBucketState(_bucketStateRegistry, bucketId);
     ASSERT_TRUE(state.has_value());
     ASSERT_TRUE(state.value().isSet(BucketStateFlag::kPendingDirectWrite));
 }
 
-TEST_F(BucketCatalogStateManagerTest, DirectWriteFinishRemovesBucketState) {
+TEST_F(BucketStateRegistryTest, DirectWriteFinishRemovesBucketState) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
     auto bucketId = BucketId{ns1, OID()};
     directWriteStart(ns1, bucketId.oid);
-    auto state = _bucketStateManager.getBucketState(bucketId);
+    auto state = getBucketState(_bucketStateRegistry, bucketId);
     ASSERT_TRUE(state.has_value());
     ASSERT_TRUE(state.value().isSet(BucketStateFlag::kPendingDirectWrite));
 
     directWriteFinish(ns1, bucketId.oid);
-    state = _bucketStateManager.getBucketState(bucketId);
+    state = getBucketState(_bucketStateRegistry, bucketId);
     ASSERT_FALSE(state.has_value());
 }
 

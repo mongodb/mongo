@@ -32,8 +32,9 @@
 namespace mongo::timeseries::bucket_catalog {
 
 ClosedBucket::~ClosedBucket() {
-    if (_bucketStateManager) {
-        _bucketStateManager->changeBucketState(
+    if (_bucketStateRegistry) {
+        changeBucketState(
+            *_bucketStateRegistry,
             bucketId,
             [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
                 return boost::none;
@@ -41,13 +42,14 @@ ClosedBucket::~ClosedBucket() {
     }
 }
 
-ClosedBucket::ClosedBucket(BucketStateManager* bsm,
+ClosedBucket::ClosedBucket(BucketStateRegistry* bsr,
                            const BucketId& bucketId,
                            const std::string& tf,
                            boost::optional<uint32_t> nm)
-    : bucketId{bucketId}, timeField{tf}, numMeasurements{nm}, _bucketStateManager{bsm} {
-    invariant(_bucketStateManager);
-    _bucketStateManager->changeBucketState(
+    : bucketId{bucketId}, timeField{tf}, numMeasurements{nm}, _bucketStateRegistry{bsr} {
+    invariant(_bucketStateRegistry);
+    changeBucketState(
+        *_bucketStateRegistry,
         bucketId,
         [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
             invariant(input.has_value());
@@ -59,8 +61,8 @@ ClosedBucket::ClosedBucket(ClosedBucket&& other)
     : bucketId{std::move(other.bucketId)},
       timeField{std::move(other.timeField)},
       numMeasurements{other.numMeasurements},
-      _bucketStateManager{other._bucketStateManager} {
-    other._bucketStateManager = nullptr;
+      _bucketStateRegistry{other._bucketStateRegistry} {
+    other._bucketStateRegistry = nullptr;
 }
 
 ClosedBucket& ClosedBucket::operator=(ClosedBucket&& other) {
@@ -68,8 +70,8 @@ ClosedBucket& ClosedBucket::operator=(ClosedBucket&& other) {
         bucketId = std::move(other.bucketId);
         timeField = std::move(other.timeField);
         numMeasurements = other.numMeasurements;
-        _bucketStateManager = other._bucketStateManager;
-        other._bucketStateManager = nullptr;
+        _bucketStateRegistry = other._bucketStateRegistry;
+        other._bucketStateRegistry = nullptr;
     }
     return *this;
 }

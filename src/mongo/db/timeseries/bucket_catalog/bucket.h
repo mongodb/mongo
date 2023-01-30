@@ -35,7 +35,7 @@
 #include "mongo/db/operation_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_state_manager.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
@@ -63,7 +63,7 @@ public:
            const BucketKey& bucketKey,
            StringData timeField,
            Date_t minTime,
-           BucketStateManager& bucketStateManager);
+           BucketStateRegistry& bucketStateRegistry);
 
     ~Bucket();
 
@@ -80,10 +80,10 @@ public:
     const Date_t minTime;
 
     // A reference so we can clean up some linked state from the destructor.
-    BucketStateManager& bucketStateManager;
+    BucketStateRegistry& bucketStateRegistry;
 
     // The last era in which this bucket checked whether it was cleared.
-    BucketStateManager::Era lastChecked;
+    BucketStateRegistry::Era lastChecked;
 
     // Top-level hashed field names of the measurements that have been inserted into the bucket.
     StringSet fieldNames;
