@@ -539,6 +539,7 @@ private:
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion);
             _createSchemaOnConfigSettings(opCtx, requestedVersion);
+            _initializePlacementHistory(opCtx, requestedVersion);
             _setOnCurrentShardSinceFieldOnChunks(opCtx, requestedVersion);
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         } else {
@@ -610,6 +611,15 @@ private:
                 return entry;
             }()});
             client.update(update);
+        }
+    }
+
+    // TODO SERVER-69106 remove once v7.0 becomes last-lts
+    void _initializePlacementHistory(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        if (feature_flags::gHistoricalPlacementShardingCatalog.isEnabledOnVersion(
+                requestedVersion)) {
+            ShardingCatalogManager::get(opCtx)->initializePlacementHistory(opCtx);
         }
     }
 

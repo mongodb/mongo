@@ -565,6 +565,13 @@ public:
      */
     ShardingCatalogClient* localCatalogClient();
 
+    /**
+     * Initializes the config.placementHistory collection:
+        - one entry per collection and its placement information at the current timestamp
+        - one entry per database with the current primary shard at the current timestamp
+     */
+    void initializePlacementHistory(OperationContext* opCtx);
+
 private:
     /**
      * Performs the necessary checks for version compatibility and creates a new config.version

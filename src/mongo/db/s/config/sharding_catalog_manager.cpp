@@ -41,6 +41,13 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_merge.h"
+#include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_union_with.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -236,6 +243,24 @@ Status createIndexesForConfigChunks(OperationContext* opCtx) {
     return Status::OK();
 }
 
+Status createIndexForConfigPlacementHistory(OperationContext* opCtx, bool waitForMajority) {
+    auto status = createIndexOnConfigCollection(
+        opCtx,
+        NamespaceString::kConfigsvrPlacementHistoryNamespace,
+        BSON(NamespacePlacementType::kNssFieldName
+             << 1 << NamespacePlacementType::kTimestampFieldName << -1),
+        true /*unique*/);
+    if (status.isOK() && waitForMajority) {
+        auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+        WriteConcernResult unusedResult;
+        status = waitForWriteConcern(opCtx,
+                                     replClient.getLastOp(),
+                                     ShardingCatalogClient::kMajorityWriteConcern,
+                                     &unusedResult);
+    }
+    return status;
+}
+
 // creates a vector of a vector of BSONObj (one for each batch) from the docs vector
 // each batch can only be as big as the maximum BSON Object size and be below the maximum
 // document count
@@ -270,6 +295,222 @@ std::vector<std::vector<BSONObj>> createBulkWriteBatches(const std::vector<BSONO
 
     return out;
 };
+
+class PipelineBuilder {
+
+public:
+    PipelineBuilder(OperationContext* opCtx,
+                    const NamespaceString& nss,
+                    std::vector<NamespaceString>&& resolvedNamespaces)
+        : _expCtx{make_intrusive<ExpressionContext>(opCtx, nullptr /*collator*/, nss)} {
+
+        StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespacesMap;
+
+        for (const auto& collNs : resolvedNamespaces) {
+            resolvedNamespacesMap[collNs.coll()] = {collNs, std::vector<BSONObj>() /* pipeline */};
+        }
+
+        _expCtx->setResolvedNamespaces(resolvedNamespacesMap);
+    }
+
+    PipelineBuilder(const boost::intrusive_ptr<ExpressionContext>& expCtx) : _expCtx(expCtx) {}
+
+    template <typename T>
+    PipelineBuilder& addStage(mongo::BSONObj&& bsonObj) {
+        _stages.emplace_back(_toStage<T>(_expCtx, std::move(bsonObj)));
+        return *this;
+    }
+
+    std::vector<BSONObj> toBson() {
+        return build()->serializeToBson();
+    }
+
+    AggregateCommandRequest toAggregateCommandRequest() {
+        return AggregateCommandRequest(_expCtx->ns, toBson());
+    }
+
+    std::unique_ptr<Pipeline, PipelineDeleter> build() {
+        return Pipeline::create(std::move(_stages), _expCtx);
+    }
+
+    boost::intrusive_ptr<ExpressionContext>& getExpCtx() {
+        return _expCtx;
+    }
+
+private:
+    template <typename T>
+    boost::intrusive_ptr<DocumentSource> _toStage(boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                                  mongo::BSONObj&& bsonObj) {
+        return T::createFromBson(Document{{T::kStageName, bsonObj}}.toBson().firstElement(),
+                                 expCtx);
+    }
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
+    Pipeline::SourceContainer _stages;
+};
+
+AggregateCommandRequest createInitPlacementHistoryAggregationRequest(
+    OperationContext* opCtx, const Timestamp& initTimestamp) {
+    // Compose the pipeline to generate a NamespacePlacementType for every collection and database
+    // in the cluster.
+    // 1. Join config.collections and config.chunks using the collection UUID. This will create
+    // an array of docs called chunk_docs that contains all the chunk entries for the
+    // collection. As a part of the join, run a pipeline on every chunk_docs that pushes the
+    // chunk.shard into a a set. This will create a field called shardsSet that contains a
+    // unique set of shards for the collection.
+    // 2. Translate the output to a config.placementHistory entry format.
+    // 3. Concatenate the result of the join with config.databases and convert the output to a
+    // config.placementHistory entry format.
+    // 4. Insert the result into config.placementHistory.
+    /* config.collections.aggregate([
+    {
+        "$lookup": {
+        "from": "chunks",
+        "localField": "uuid",
+        "foreignField": "uuid",
+        "as": "chunk_docs",
+        "pipeline":
+        [
+            {
+                "$project":
+                {
+                    "shard": 1
+                }
+            },
+            {
+                "$group":
+                {
+                    _id: "",
+                    shardsSet:
+                    {
+                        $addToSet: "$shard"
+                    }
+                }
+            }
+        ]
+        }
+    },
+    {
+        $unwind: {
+            path: "$chunk_docs"
+        }
+    },
+    {
+        "$project":
+        {
+            "_id": 0,
+            "nss": "$_id",
+            "shards": "$chunk_docs.shardsSet"
+        }
+    },
+    {
+        "$unionWith":
+        {
+            "coll": "databases",
+            "pipeline":
+            [
+                {
+                    "$project":
+                    {
+                        "_id": 0,
+                        "nss": "$_id",
+                        "shards": [ "$primary"]
+                    }
+                }
+            ]
+         }
+
+    },
+    {
+        "$set"
+        {
+            "timestamp": "<configTimeOfSnapshotRead>"
+        }
+    }
+    //insertion to placementHistory
+    {
+        "$merge":
+        {
+            "into": "config.placementHistory",
+            "on": ["nss", "timestamp"],
+            "whenMatched": "replace",
+            "whenNotMatched": "insert"
+        }
+    }
+])
+*/
+    using Lookup = DocumentSourceLookUp;
+    using UnionWith = DocumentSourceUnionWith;
+    using Merge = DocumentSourceMerge;
+    using Set = DocumentSourceAddFields;
+    using Group = DocumentSourceGroup;
+    using Project = DocumentSourceProject;
+    using Unwind = DocumentSourceUnwind;
+
+    const auto kNss = NamespacePlacementType::kNssFieldName.toString();
+    const auto kUuid = NamespacePlacementType::kUuidFieldName.toString();
+    const auto kShards = NamespacePlacementType::kShardsFieldName.toString();
+    const auto kTimestamp = NamespacePlacementType::kTimestampFieldName.toString();
+    const auto kUuidChunks = ChunkType::collectionUUID.name();
+
+    auto pipeline = PipelineBuilder(opCtx,
+                                    CollectionType::ConfigNS,
+                                    {ChunkType::ConfigNS,
+                                     CollectionType::ConfigNS,
+                                     NamespaceString::kConfigDatabasesNamespace,
+                                     NamespaceString::kConfigsvrPlacementHistoryNamespace});
+
+    // Stage 1. Join config.collections and config.chunks using the collection UUID and create a set
+    // of shards
+    pipeline.addStage<Lookup>(
+        BSON("from" << ChunkType::ConfigNS.coll() << "localField" << CollectionType::kUuidFieldName
+                    << "foreignField" << ChunkType::collectionUUID.name() << "as"
+                    << "chunk_docs"
+                    << "pipeline"
+                    << PipelineBuilder(pipeline.getExpCtx())
+                           // Stage 1. Project the shard field
+                           .addStage<Project>(BSON(ChunkType::shard << 1))
+                           // Stage 2. Group by shard and push the document's shard field
+                           // into an array called "shards"
+                           .addStage<Group>(BSON("_id"
+                                                 << ""
+                                                 << "shardSet"
+                                                 << BSON("$addToSet"
+                                                         << "$" + ChunkType::shard.name())))
+                           .toBson()));
+
+    // Stage 2. Unwind the chunk_docs array (which after the pipeline is of size 1)
+    pipeline.addStage<Unwind>(BSON("path"
+                                   << "$chunk_docs"));
+
+    // Stage 3. Adapt the output to the config.placementHistory schema
+    pipeline.addStage<Project>(BSON("_id" << 0 << kShards << "$chunk_docs.shardSet" << kNss
+                                          << "$_id" << kUuid << "$" + kUuidChunks));
+
+    // Stage 4. Union with the databases collection
+    pipeline.addStage<UnionWith>(
+        BSON("coll" << NamespaceString::kConfigDatabasesNamespace.coll() <<
+             // unionWith pipeline to convert the output to a placementHistory entry format
+             "pipeline"
+                    << PipelineBuilder(pipeline.getExpCtx())
+                           .addStage<DocumentSourceProject>(BSON(
+                               "_id" << 0 << kNss << "$_id" << kShards << BSON_ARRAY("$primary")))
+                           .toBson()));
+
+    // Stage 5. Set the timestamp
+    pipeline.addStage<Set>(BSON(kTimestamp << initTimestamp));
+
+    // Stage 6. Merge into the placementHistory collection
+    pipeline.addStage<Merge>(BSON("into"
+                                  << NamespaceString::kConfigsvrPlacementHistoryNamespace.coll()
+                                  << "on" << BSON_ARRAY(kNss << kTimestamp) << "whenMatched"
+                                  << "replace"
+                                  << "whenNotMatched"
+                                  << "insert"));
+
+    return pipeline.toAggregateCommandRequest();
+}
+
 }  // namespace
 
 void ShardingCatalogManager::create(ServiceContext* serviceContext,
@@ -464,12 +705,7 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
 
     if (feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        result = createIndexOnConfigCollection(
-            opCtx,
-            NamespaceString::kConfigsvrPlacementHistoryNamespace,
-            BSON(NamespacePlacementType::kNssFieldName
-                 << 1 << NamespacePlacementType::kTimestampFieldName << -1),
-            unique);
+        result = createIndexForConfigPlacementHistory(opCtx, false /*waitForMajority*/);
         if (!result.isOK()) {
             return result;
         }
@@ -847,6 +1083,48 @@ void ShardingCatalogManager::withTransaction(
         guard.dismiss();
         return;
     }
+}
+
+
+void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx) {
+    uassertStatusOK(createIndexForConfigPlacementHistory(opCtx, true /*waitForMajority*/));
+
+    // Building a initial state/snapshot for the placementHistory.
+    // The initial state is composed by a set of entries: one for each collection and one for each
+    // database. Since the initial snapshot represents the current state of the cluster, the
+    // timestamp of all the entries is the same. Any other migration or ddl happening in the
+    // background could change the catalog. We don't need to serialize the insert in the
+    // placementhistory since we can order the entries by timestamp.
+    const auto now = VectorClock::get(opCtx)->getTime();
+    const auto initTime = now.configTime().asTimestamp();
+
+    // We need to perform this operation with internal permissions to add an aggregation
+    // $merge stage targeting the catalog.
+    const bool wasInternalClient = isInternalClient(opCtx->getClient());
+    if (!wasInternalClient) {
+        opCtx->getClient()->session()->setTags(transport::Session::kInternalClient);
+    }
+
+    // We must reset the internal flag.
+    ON_BLOCK_EXIT([&] {
+        if (!wasInternalClient) {
+            opCtx->getClient()->session()->unsetTags(transport::Session::kInternalClient);
+        }
+    });
+
+    auto aggRequest = createInitPlacementHistoryAggregationRequest(opCtx, initTime);
+    aggRequest.setUnwrappedReadPref({});
+    repl::ReadConcernArgs readConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+    readConcernArgs.setArgsAtClusterTimeForSnapshot(initTime);
+    aggRequest.setReadConcern(readConcernArgs.toBSONInner());
+    aggRequest.setWriteConcern({});
+
+    // no-op callback
+    auto callback = [](const std::vector<BSONObj>& batch,
+                       const boost::optional<BSONObj>& postBatchResumeToken) { return true; };
+
+    const Status status = _localConfigShard->runAggregation(opCtx, aggRequest, callback);
+    uassertStatusOK(status);
 }
 
 }  // namespace mongo

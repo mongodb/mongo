@@ -109,6 +109,23 @@ protected:
                                                   const NamespaceString& ns,
                                                   const BSONObj& filter,
                                                   const BSONObj& sort = {});
+    /**
+     * Reads a single document from a collection living on the config server and parses it into the
+     * specified type.
+     * Note: T must be a valid IDL type or any type that provides a static parse() method as defined
+     * for IDL types.
+     */
+    template <typename T>
+    T findOneOnConfigCollection(OperationContext* opCtx,
+                                const NamespaceString& ns,
+                                const BSONObj& filter,
+                                const BSONObj& sort = {}) {
+        auto result = findOneOnConfigCollection(opCtx, ns, filter, sort);
+        uassertStatusOK(result.getStatus());
+
+        IDLParserContext ctx("");
+        return T::parse(ctx, result.getValue());
+    }
 
     /**
      * Setup the config.shards collection to contain the given shards.

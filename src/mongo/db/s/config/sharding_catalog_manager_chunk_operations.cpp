@@ -2316,7 +2316,7 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
                    &donorToBeRemoved,
                    &recipientToBeAdded](const std::vector<BSONObj>& queryResponse) {
                 /*
-                 * TODO SERVER-70687 replace the block below with a
+                 * TODO SERVER-72870 replace the block below with a
                  * tassert(queryResponse.size() == 1)
                  */
                 if (queryResponse.size() != 1) {

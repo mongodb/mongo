@@ -584,7 +584,7 @@ void shardedRenameMetadata(OperationContext* opCtx,
                 .docs;
 
         /*
-         * TODO SERVER-70687 Replace the if block below with
+         * TODO SERVER-72870 Replace the if block below with
          * uassert(RetriableErrorCode,queryResponse.size() == 1)
          */
         if (queryResponse.empty()) {

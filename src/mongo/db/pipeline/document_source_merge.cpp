@@ -438,7 +438,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
 
     uassert(31320,
             "Cannot {} to internal database: {}"_format(kStageName, outputNs.db()),
-            !outputNs.isOnInternalDb());
+            !outputNs.isOnInternalDb() || isInternalClient(expCtx->opCtx->getClient()));
 
     if (whenMatched == WhenMatched::kPipeline) {
         // If unspecified, 'letVariables' defaults to {new: "$$ROOT"}.
