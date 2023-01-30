@@ -83,6 +83,14 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                                 OperationSource source);
 
 /**
+ * Generates a WriteError for a given Status.
+ */
+boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
+                                                     const Status& status,
+                                                     int index,
+                                                     size_t numErrors);
+
+/**
  * Performs a batch of inserts, updates, or deletes.
  *
  * These functions handle all of the work of doing the writes, including locking, incrementing

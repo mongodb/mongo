@@ -397,6 +397,12 @@ public:
     static NamespaceString makeClusterParametersNSS(const boost::optional<TenantId>& tenantId);
 
     /**
+     * Constructs a NamespaceString representing a BulkWrite namespace. The format for this
+     * namespace is admin.$cmd.bulkWrite".
+     */
+    static NamespaceString makeBulkWriteNSS();
+
+    /**
      * NOTE: DollarInDbNameBehavior::allow is deprecated.
      *
      * Please use DollarInDbNameBehavior::disallow and check explicitly for any DB names that must

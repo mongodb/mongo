@@ -99,7 +99,7 @@ structs:
                               For update: number of documents that matched the query predicate.
                               For delete: number of documents deleted."
                 type: int
-                default: 0
+                optional: true
                 stability: unstable
             nModified:
                 description: "Number of updated documents."
@@ -114,10 +114,17 @@ structs:
                 type: IDLAnyTypeOwned
                 optional: true
                 stability: unstable
+            code:
+                type: int
+                optional: true
+                stability: unstable
+            errmsg:
+                type: string
+                optional: true
+                stability: unstable
 
     BulkWriteCommandResponseCursor:
         description: "Cursor holding results for a successful 'bulkWrite' command."
-        strict: true
         fields:
             id:
                 type: long

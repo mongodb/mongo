@@ -61,8 +61,6 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -96,7 +94,6 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(hangWriteBeforeWaitingForMigrationDecision);
 MONGO_FAIL_POINT_DEFINE(hangInsertBeforeWrite);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeCommit);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeWrite);
@@ -336,62 +333,6 @@ boost::optional<std::pair<Status, bool>> checkFailUnorderedTimeseriesInsertFailP
     return boost::none;
 }
 
-boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
-                                                     const Status& status,
-                                                     int index,
-                                                     size_t numErrors) {
-    if (status.isOK()) {
-        return boost::none;
-    }
-
-    boost::optional<Status> overwrittenStatus;
-
-    if (status == ErrorCodes::TenantMigrationConflict) {
-        hangWriteBeforeWaitingForMigrationDecision.pauseWhileSet(opCtx);
-
-        overwrittenStatus.emplace(
-            tenant_migration_access_blocker::handleTenantMigrationConflict(opCtx, status));
-
-        // Interruption errors encountered during batch execution fail the entire batch, so throw on
-        // such errors here for consistency.
-        if (ErrorCodes::isInterruption(*overwrittenStatus)) {
-            uassertStatusOK(*overwrittenStatus);
-        }
-
-        // Tenant migration errors, similarly to migration errors consume too much space in the
-        // ordered:false responses and get truncated. Since the call to
-        // 'handleTenantMigrationConflict' above replaces the original status, we need to manually
-        // truncate the new reason if the original 'status' was also truncated.
-        if (status.reason().empty()) {
-            overwrittenStatus = overwrittenStatus->withReason("");
-        }
-    }
-
-    constexpr size_t kMaxErrorReasonsToReport = 1;
-    constexpr size_t kMaxErrorSizeToReportAfterMaxReasonsReached = 1024 * 1024;
-
-    if (numErrors > kMaxErrorReasonsToReport) {
-        size_t errorSize =
-            overwrittenStatus ? overwrittenStatus->reason().size() : status.reason().size();
-        if (errorSize > kMaxErrorSizeToReportAfterMaxReasonsReached)
-            overwrittenStatus =
-                overwrittenStatus ? overwrittenStatus->withReason("") : status.withReason("");
-    }
-
-    if (overwrittenStatus)
-        return write_ops::WriteError(index, std::move(*overwrittenStatus));
-    else
-        return write_ops::WriteError(index, status);
-}
-
-template <typename T>
-boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
-                                                     const StatusWith<T>& result,
-                                                     int index,
-                                                     size_t numErrors) {
-    return generateError(opCtx, result.getStatus(), index, numErrors);
-}
-
 /**
  * Contains hooks that are used by 'populateReply' method.
  */
@@ -439,7 +380,8 @@ void populateReply(OperationContext* opCtx,
     long long nVal = 0;
     std::vector<write_ops::WriteError> errors;
     for (size_t i = 0; i < result.results.size(); ++i) {
-        if (auto error = generateError(opCtx, result.results[i], i, errors.size())) {
+        if (auto error = write_ops_exec::generateError(
+                opCtx, result.results[i].getStatus(), i, errors.size())) {
             errors.emplace_back(std::move(*error));
             continue;
         }
@@ -837,8 +779,8 @@ public:
             if (performInsert) {
                 const auto output =
                     _performTimeseriesInsert(opCtx, batch, metadata, std::move(stmtIds));
-                if (auto error =
-                        generateError(opCtx, output.result, start + index, errors->size())) {
+                if (auto error = write_ops_exec::generateError(
+                        opCtx, output.result.getStatus(), start + index, errors->size())) {
                     errors->emplace_back(std::move(*error));
                     bucketCatalog.abort(batch, output.result.getStatus());
                     return output.canContinue;
@@ -865,8 +807,8 @@ public:
                     docsToRetry->push_back(index);
                     opCtx->recoveryUnit()->abandonSnapshot();
                     return true;
-                } else if (auto error =
-                               generateError(opCtx, output.result, start + index, errors->size())) {
+                } else if (auto error = write_ops_exec::generateError(
+                               opCtx, output.result.getStatus(), start + index, errors->size())) {
                     errors->emplace_back(std::move(*error));
                     bucketCatalog.abort(batch, output.result.getStatus());
                     return output.canContinue;
@@ -881,8 +823,8 @@ public:
             if (closedBucket) {
                 // If this write closed a bucket, compress the bucket
                 auto output = _performTimeseriesBucketCompression(opCtx, *closedBucket);
-                if (auto error =
-                        generateError(opCtx, output.result, start + index, errors->size())) {
+                if (auto error = write_ops_exec::generateError(
+                        opCtx, output.result.getStatus(), start + index, errors->size())) {
                     errors->emplace_back(std::move(*error));
                     return output.canContinue;
                 }
@@ -1117,8 +1059,8 @@ public:
                 invariant(start + index < request().getDocuments().size());
 
                 if (rebuildOptionsError) {
-                    const auto error{
-                        generateError(opCtx, *rebuildOptionsError, start + index, errors->size())};
+                    const auto error{write_ops_exec::generateError(
+                        opCtx, *rebuildOptionsError, start + index, errors->size())};
                     errors->emplace_back(std::move(*error));
                     return false;
                 }
@@ -1245,7 +1187,8 @@ public:
                 } while (!swResult.isOK() &&
                          (swResult.getStatus().code() == ErrorCodes::WriteConflict));
 
-                if (auto error = generateError(opCtx, swResult, start + index, errors->size())) {
+                if (auto error = write_ops_exec::generateError(
+                        opCtx, swResult.getStatus(), start + index, errors->size())) {
                     invariant(swResult.getStatus().code() != ErrorCodes::WriteConflict);
                     errors->emplace_back(std::move(*error));
                     return false;
@@ -1267,8 +1210,8 @@ public:
 
                     // If this write closed a bucket, compress the bucket
                     auto ret = _performTimeseriesBucketCompression(opCtx, closedBucket);
-                    if (auto error =
-                            generateError(opCtx, ret.result, start + index, errors->size())) {
+                    if (auto error = write_ops_exec::generateError(
+                            opCtx, ret.result.getStatus(), start + index, errors->size())) {
                         // Bucket compression only fail when we may not try to perform any other
                         // write operation. When handleError() inside write_ops_exec.cpp return
                         // false.
@@ -1339,7 +1282,7 @@ public:
                     opCtx->recoveryUnit()->abandonSnapshot();
                     continue;
                 }
-                if (auto error = generateError(
+                if (auto error = write_ops_exec::generateError(
                         opCtx, swCommitInfo.getStatus(), start + index, errors->size())) {
                     errors->emplace_back(std::move(*error));
                     continue;

@@ -5,7 +5,6 @@
  * @tags: [
  *   assumes_against_mongod_not_mongos,
  *   not_allowed_with_security_token,
- *   requires_fastcount,
  *   # Until bulkWrite is compatible with retryable writes.
  *   requires_non_retryable_writes,
  *   # Command is not yet compatible with tenant migration.
@@ -31,8 +30,8 @@ coll1.drop();
 assert.commandWorked(db.adminCommand(
     {bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}], nsInfo: [{ns: "test.coll"}]}));
 
-assert.eq(coll.count(), 1);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 1);
+assert.eq(coll1.find().itcount(), 0);
 coll.drop();
 
 // Make sure non-adminDB request fails
@@ -43,8 +42,8 @@ assert.commandFailedWithCode(db.runCommand({
 }),
                              [ErrorCodes.Unauthorized]);
 
-assert.eq(coll.count(), 0);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 0);
+assert.eq(coll1.find().itcount(), 0);
 
 // Make sure optional fields are accepted
 assert.commandWorked(db.adminCommand({
@@ -56,8 +55,8 @@ assert.commandWorked(db.adminCommand({
     ordered: false
 }));
 
-assert.eq(coll.count(), 1);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 1);
+assert.eq(coll1.find().itcount(), 0);
 coll.drop();
 
 // Make sure invalid fields are not accepted
@@ -72,8 +71,8 @@ assert.commandFailedWithCode(db.adminCommand({
 }),
                              [40415]);
 
-assert.eq(coll.count(), 0);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 0);
+assert.eq(coll1.find().itcount(), 0);
 
 // Make sure ops and nsInfo can take arrays properly
 assert.commandWorked(db.adminCommand({
@@ -82,8 +81,8 @@ assert.commandWorked(db.adminCommand({
     nsInfo: [{ns: "test.coll"}, {ns: "test.coll1"}]
 }));
 
-assert.eq(coll.count(), 1);
-assert.eq(coll1.count(), 1);
+assert.eq(coll.find().itcount(), 1);
+assert.eq(coll1.find().itcount(), 1);
 coll.drop();
 coll1.drop();
 
@@ -94,8 +93,8 @@ assert.commandWorked(db.adminCommand({
     nsInfo: [{ns: "test.coll"}]
 }));
 
-assert.eq(coll.count(), 2);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 2);
+assert.eq(coll1.find().itcount(), 0);
 coll.drop();
 
 // Make sure we fail if index out of range of nsInfo
@@ -106,21 +105,21 @@ assert.commandFailedWithCode(db.adminCommand({
 }),
                              [ErrorCodes.BadValue]);
 
-assert.eq(coll.count(), 0);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 0);
+assert.eq(coll1.find().itcount(), 0);
 
 // Missing ops
 assert.commandFailedWithCode(db.adminCommand({bulkWrite: 1, nsInfo: [{ns: "mydb.coll"}]}), [40414]);
 
-assert.eq(coll.count(), 0);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 0);
+assert.eq(coll1.find().itcount(), 0);
 
 // Missing nsInfo
 assert.commandFailedWithCode(
     db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}]}), [40414]);
 
-assert.eq(coll.count(), 0);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 0);
+assert.eq(coll1.find().itcount(), 0);
 
 // Test valid arguments with invalid values
 assert.commandFailedWithCode(db.adminCommand({
@@ -130,39 +129,39 @@ assert.commandFailedWithCode(db.adminCommand({
 }),
                              [ErrorCodes.TypeMismatch]);
 
-assert.eq(coll.count(), 0);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 0);
+assert.eq(coll1.find().itcount(), 0);
 
 assert.commandFailedWithCode(
     db.adminCommand(
         {bulkWrite: 1, ops: [{insert: 0, document: "test"}], nsInfo: [{ns: "test.coll"}]}),
     [ErrorCodes.TypeMismatch]);
 
-assert.eq(coll.count(), 0);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 0);
+assert.eq(coll1.find().itcount(), 0);
 
 assert.commandFailedWithCode(
     db.adminCommand(
         {bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}], nsInfo: ["test"]}),
     [ErrorCodes.TypeMismatch]);
 
-assert.eq(coll.count(), 0);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 0);
+assert.eq(coll1.find().itcount(), 0);
 
 assert.commandFailedWithCode(
     db.adminCommand({bulkWrite: 1, ops: "test", nsInfo: [{ns: "test.coll"}]}),
     [ErrorCodes.TypeMismatch]);
 
-assert.eq(coll.count(), 0);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 0);
+assert.eq(coll1.find().itcount(), 0);
 
 assert.commandFailedWithCode(
     db.adminCommand(
         {bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}], nsInfo: "test"}),
     [ErrorCodes.TypeMismatch]);
 
-assert.eq(coll.count(), 0);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 0);
+assert.eq(coll1.find().itcount(), 0);
 
 // Test 2 inserts into the same namespace
 assert.commandWorked(db.adminCommand({
@@ -171,8 +170,8 @@ assert.commandWorked(db.adminCommand({
     nsInfo: [{ns: "test.coll"}]
 }));
 
-assert.eq(coll.count(), 2);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 2);
+assert.eq(coll1.find().itcount(), 0);
 coll.drop();
 
 // Test that a write can fail part way through a write and the write partially executes.
@@ -186,8 +185,8 @@ assert.commandWorked(db.adminCommand({
     nsInfo: [{ns: "test.coll"}, {ns: "test.coll1"}]
 }));
 
-assert.eq(coll.count(), 1);
-assert.eq(coll1.count(), 0);
+assert.eq(coll.find().itcount(), 1);
+assert.eq(coll1.find().itcount(), 0);
 coll.drop();
 coll1.drop();
 
@@ -202,8 +201,8 @@ assert.commandWorked(db.adminCommand({
     ordered: false
 }));
 
-assert.eq(coll.count(), 1);
-assert.eq(coll1.count(), 1);
+assert.eq(coll.find().itcount(), 1);
+assert.eq(coll1.find().itcount(), 1);
 coll.drop();
 coll1.drop();
 

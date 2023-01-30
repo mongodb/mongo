@@ -61,6 +61,8 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -98,6 +100,7 @@ MONGO_FAIL_POINT_DEFINE(failAllRemoves);
 MONGO_FAIL_POINT_DEFINE(hangBeforeChildRemoveOpFinishes);
 MONGO_FAIL_POINT_DEFINE(hangBeforeChildRemoveOpIsPopped);
 MONGO_FAIL_POINT_DEFINE(hangAfterAllChildRemoveOpsArePopped);
+MONGO_FAIL_POINT_DEFINE(hangWriteBeforeWaitingForMigrationDecision);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchInsert);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchUpdate);
 MONGO_FAIL_POINT_DEFINE(hangAfterBatchUpdate);
@@ -547,6 +550,54 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     }
 
     return true;
+}
+
+boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
+                                                     const Status& status,
+                                                     int index,
+                                                     size_t numErrors) {
+    if (status.isOK()) {
+        return boost::none;
+    }
+
+    boost::optional<Status> overwrittenStatus;
+
+    if (status == ErrorCodes::TenantMigrationConflict) {
+        hangWriteBeforeWaitingForMigrationDecision.pauseWhileSet(opCtx);
+
+        overwrittenStatus.emplace(
+            tenant_migration_access_blocker::handleTenantMigrationConflict(opCtx, status));
+
+        // Interruption errors encountered during batch execution fail the entire batch, so throw on
+        // such errors here for consistency.
+        if (ErrorCodes::isInterruption(*overwrittenStatus)) {
+            uassertStatusOK(*overwrittenStatus);
+        }
+
+        // Tenant migration errors, similarly to migration errors consume too much space in the
+        // ordered:false responses and get truncated. Since the call to
+        // 'handleTenantMigrationConflict' above replaces the original status, we need to manually
+        // truncate the new reason if the original 'status' was also truncated.
+        if (status.reason().empty()) {
+            overwrittenStatus = overwrittenStatus->withReason("");
+        }
+    }
+
+    constexpr size_t kMaxErrorReasonsToReport = 1;
+    constexpr size_t kMaxErrorSizeToReportAfterMaxReasonsReached = 1024 * 1024;
+
+    if (numErrors > kMaxErrorReasonsToReport) {
+        size_t errorSize =
+            overwrittenStatus ? overwrittenStatus->reason().size() : status.reason().size();
+        if (errorSize > kMaxErrorSizeToReportAfterMaxReasonsReached)
+            overwrittenStatus =
+                overwrittenStatus ? overwrittenStatus->withReason("") : status.withReason("");
+    }
+
+    if (overwrittenStatus)
+        return write_ops::WriteError(index, std::move(*overwrittenStatus));
+    else
+        return write_ops::WriteError(index, status);
 }
 
 WriteResult performInserts(OperationContext* opCtx,

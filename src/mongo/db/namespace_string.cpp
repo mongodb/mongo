@@ -43,6 +43,7 @@ namespace mongo {
 namespace {
 
 constexpr auto listCollectionsCursorCol = "$cmd.listCollections"_sd;
+constexpr auto bulkWriteCursorCol = "$cmd.bulkWrite"_sd;
 constexpr auto collectionlessAggregateCursorCol = "$cmd.aggregate"_sd;
 constexpr auto dropPendingNSPrefix = "system.drop."_sd;
 
@@ -319,6 +320,10 @@ bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
         _ns == kTenantMigrationDonorsNamespace.ns() ||
         _ns == kTenantMigrationRecipientsNamespace.ns() || _ns == kShardSplitDonorsNamespace.ns() ||
         _ns == kConfigsvrShardsNamespace.ns();
+}
+
+NamespaceString NamespaceString::makeBulkWriteNSS() {
+    return NamespaceString(kAdminDb, bulkWriteCursorCol);
 }
 
 NamespaceString NamespaceString::makeClusterParametersNSS(
