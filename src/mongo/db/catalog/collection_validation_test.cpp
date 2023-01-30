@@ -47,6 +47,9 @@ namespace {
 const NamespaceString kNss = NamespaceString("test.t");
 
 class CollectionValidationTest : public CatalogTestFixture {
+protected:
+    CollectionValidationTest(Options options = {}) : CatalogTestFixture(std::move(options)) {}
+
 private:
     void setUp() override {
         CatalogTestFixture::setUp();
@@ -56,6 +59,11 @@ private:
         ASSERT_OK(storageInterface()->createCollection(
             operationContext(), kNss, defaultCollectionOptions));
     };
+};
+
+class CollectionValidationDiskTest : public CollectionValidationTest {
+protected:
+    CollectionValidationDiskTest() : CollectionValidationTest(Options{}.ephemeral(false)) {}
 };
 
 /**
@@ -268,6 +276,19 @@ TEST_F(CollectionValidationTest, ValidateEnforceFastCount) {
                        /*numInvalidDocuments*/ 0,
                        /*numErrors*/ 0,
                        {CollectionValidation::ValidateMode::kForegroundFullEnforceFastCount});
+}
+
+TEST_F(CollectionValidationDiskTest, ValidateIndexDetailResultsSurfaceVerifyErrors) {
+    FailPointEnableBlock fp{"WTValidateIndexStructuralDamage"};
+    auto opCtx = operationContext();
+    insertDataRange(opCtx, 0, 5);  // initialize collection
+    foregroundValidate(
+        opCtx,
+        /*valid*/ false,
+        /*numRecords*/ std::numeric_limits<int32_t>::min(),           // uninitialized
+        /*numInvalidDocuments*/ std::numeric_limits<int32_t>::min(),  // uninitialized
+        /*numErrors*/ 1,
+        {CollectionValidation::ValidateMode::kForegroundFull});
 }
 
 /**

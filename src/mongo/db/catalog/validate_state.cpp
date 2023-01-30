@@ -245,8 +245,10 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
         const IndexDescriptor* desc = entry->descriptor();
 
         auto iam = entry->accessMethod()->asSortedData();
-        if (!iam)
+        if (!iam) {
+            _skippedIndexes.emplace(desc->indexName());
             continue;
+        }
 
         _indexCursors.emplace(
             desc->indexName(),
