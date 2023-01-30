@@ -4,6 +4,8 @@
  * collection.
  *
  * @tags: [
+ *   # TODO (SERVER-73321): remove
+ *   assumes_against_mongod_not_mongos,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
  *   # Time series geo functionality requires optimization.

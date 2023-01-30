@@ -547,7 +547,7 @@ function getExplainPipelineFromAggregationResult(db, result, {
 } = {}) {
     // We proceed by cases based on topology.
     if (!FixtureHelpers.isMongos(db)) {
-        assert(Array.isArray(result.stages), result);
+        assert(Array.isArray(result.stages) || result.queryPlanner, result);
         // The first two stages should be the .find() cursor and the inhibit-optimization stage (if
         // enabled); the rest of the stages are what the user's 'stage' expanded to.
         assert(result.stages[0].$cursor, result);
@@ -563,8 +563,22 @@ function getExplainPipelineFromAggregationResult(db, result, {
             if (!postPlanningResults) {
                 shardsPart = result.splitPipeline.shardsPart;
             } else {
-                assert(Array.isArray(result.shards["shard-rs0"].stages), result);
-                shardsPart = result.shards["shard-rs0"].stages;
+                assert.lt(0, Object.keys(result.shards).length, result);
+                // Pick an arbitrary shard to look at.
+                const shardName = Object.keys(result.shards)[0];
+                const shardResult = result.shards[shardName];
+                // The shardsPart is either a pipeline or a find-like plan. If it's a find-like
+                // plan, wrap it in a $cursor stage so we can combine it into one big pipeline with
+                // mergerPart.
+                if (Array.isArray(shardResult.stages)) {
+                    shardsPart = shardResult.stages;
+                } else {
+                    assert(shardResult.queryPlanner,
+                           `Expected result.shards[${
+                               tojson(shardName)}] to be a pipeline, or find-like plan: ` +
+                               tojson(result));
+                    shardsPart = [{$cursor: shardResult}];
+                }
             }
             if (inhibitOptimization) {
                 assert(result.splitPipeline.shardsPart[0].$_internalInhibitOptimization, result);
@@ -587,13 +601,15 @@ function getExplainPipelineFromAggregationResult(db, result, {
             }
         } else {
             // Required for aggregation_one_shard_sharded_collections.
-            assert(Array.isArray(result.shards["shard-rs0"].stages), result);
-            assert(result.shards["shard-rs0"].stages[0].$cursor, result);
+            assert.lt(0, Object.keys(result.shards).length, result);
+            const shardResult = result.shards[Object.keys(result.shards)[0]];
+            assert(Array.isArray(shardResult.stages), result);
+            assert(shardResult.stages[0].$cursor, result);
             if (inhibitOptimization) {
-                assert(result.shards["shard-rs0"].stages[1].$_internalInhibitOptimization, result);
-                return result.shards["shard-rs0"].stages.slice(2);
+                assert(shardResult.stages[1].$_internalInhibitOptimization, result);
+                return shardResult.stages.slice(2);
             } else {
-                return result.shards["shard-rs0"].stages.slice(1);
+                return shardResult.stages.slice(1);
             }
         }
     }

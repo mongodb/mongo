@@ -3,6 +3,8 @@
  * collections.
  *
  * @tags: [
+ *   # TODO (SERVER-73322): remove
+ *   assumes_against_mongod_not_mongos,
  *   requires_non_retryable_writes,
  *   requires_pipeline_optimization,
  *   does_not_support_stepdowns,

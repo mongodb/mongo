@@ -292,7 +292,7 @@ selector:
   # startParallelShell()"
   - uses_parallel_shell
   - does_not_support_causal_consistency
-  - requires_timeseries # Implicit collection creation, transactions not supported
+  - requires_timeseries # Transactions not supported
 
 executor:
   archive:

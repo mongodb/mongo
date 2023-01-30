@@ -15,6 +15,7 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
 if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
     jsTestLog(
@@ -699,31 +700,38 @@ const reopenBucketsWhenSuitableIndexExistsNoMeta = function() {
     });
     assert(metaTimeIndex.length == 0);
 
-    // Create a partial index on time.
-    assert.commandWorked(coll.createIndex(
-        {[timeField]: 1}, {name: "partialTimeIndex", partialFilterExpression: {b: {$lt: 12}}}));
+    // If the collection is sharded, there will be an index on control.min.time that can satisfy the
+    // reopening query, otherwise we can do some further tests.
+    if (!FixtureHelpers.isSharded(bucketsColl)) {
+        // Create a partial index on time.
+        assert.commandWorked(coll.createIndex(
+            {[timeField]: 1}, {name: "partialTimeIndex", partialFilterExpression: {b: {$lt: 12}}}));
 
-    assert.commandWorked(bucketsColl.insert(closedBucketDoc1));
-    // We expect no buckets to be reopened because a partial index on time cannot be used  for query
-    // based reopening.
-    checkIfBucketReopened(measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
+        assert.commandWorked(bucketsColl.insert(closedBucketDoc1));
+        // We expect no buckets to be reopened because a partial index on time cannot be used  for
+        // query based reopening.
+        checkIfBucketReopened(
+            measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
-    // Create an index on an arbitrary field.
-    assert.commandWorked(coll.createIndex({"a": 1, [timeField]: 1}, {name: "arbitraryIndex"}));
+        // Create an index on an arbitrary field.
+        assert.commandWorked(coll.createIndex({"a": 1, [timeField]: 1}, {name: "arbitraryIndex"}));
 
-    assert.commandWorked(bucketsColl.insert(closedBucketDoc2));
-    // We expect no buckets to be reopened because the index created cannot be used for query-based
-    // reopening.
-    checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
+        assert.commandWorked(bucketsColl.insert(closedBucketDoc2));
+        // We expect no buckets to be reopened because the index created cannot be used for
+        // query-based reopening.
+        checkIfBucketReopened(
+            measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
-    // Create an index on time.
-    assert.commandWorked(coll.createIndex({[timeField]: 1}, {name: "timeIndex"}));
+        // Create an index on time.
+        assert.commandWorked(coll.createIndex({[timeField]: 1}, {name: "timeIndex"}));
 
-    assert.commandWorked(bucketsColl.insert(closedBucketDoc3));
-    // We expect to be able to reopen the suitable bucket when inserting the measurement because as
-    // long as an index covers time field (when the collection has no metaField), it can have
-    // additional keys.
-    checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
+        assert.commandWorked(bucketsColl.insert(closedBucketDoc3));
+        // We expect to be able to reopen the suitable bucket when inserting the measurement because
+        // as long as an index covers time field (when the collection has no metaField), it can have
+        // additional keys.
+        checkIfBucketReopened(
+            measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
+    }
 
     jsTestLog("Exiting reopenBucketsWhenSuitableIndexExistsNoMeta.");
 }();

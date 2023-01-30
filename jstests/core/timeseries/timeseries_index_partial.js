@@ -2,6 +2,8 @@
  * Test creating and using partial indexes, on a time-series collection.
  *
  * @tags: [
+ *   # TODO (SERVER-73316): remove
+ *   assumes_against_mongod_not_mongos,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
  *   # Refusing to run a test that issues an aggregation command with explain because it may return

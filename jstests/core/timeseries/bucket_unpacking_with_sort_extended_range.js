@@ -3,6 +3,8 @@
  *  [1970-01-01 00:00:00 UTC - 2038-01-29 03:13:07 UTC], when a collection scan is used.
  *
  * @tags: [
+ *     # TODO (SERVER-73110): remove
+ *     assumes_against_mongod_not_mongos,
  *     # Explain of a resolved view must be executed by mongos.
  *     directly_against_shardsvrs_incompatible,
  *     # This complicates aggregation extraction.

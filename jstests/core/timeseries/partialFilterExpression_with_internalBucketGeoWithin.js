@@ -13,6 +13,7 @@
 
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/feature_flag_util.js");
+load("jstests/libs/fixture_helpers.js");  // For isSharded.
 load('jstests/noPassthrough/libs/index_build.js');
 
 (function() {
@@ -26,6 +27,8 @@ if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     assert.commandWorked(
         db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
     assert.contains(bucketsColl.getName(), db.getCollectionNames());
+
+    const shardKeyIndexCount = FixtureHelpers.isSharded(bucketsColl) ? 1 : 0;
 
     assert.commandWorked(coll.insert({
         timestamp: ISODate(),
@@ -116,7 +119,7 @@ if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
         }
     }));
 
-    IndexBuildTest.assertIndexes(bucketsColl, 1, ["a_1"]);
+    IndexBuildTest.assertIndexes(bucketsColl, 1 + shardKeyIndexCount, ["a_1"]);
 
     var findAndExplain = assert.commandWorked(bucketsColl
                                                   .find({
@@ -164,7 +167,7 @@ if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
             }
         }
     }));
-    IndexBuildTest.assertIndexes(bucketsColl, 1, ["a_1"]);
+    IndexBuildTest.assertIndexes(bucketsColl, 1 + shardKeyIndexCount, ["a_1"]);
 
     findAndExplain = assert.commandWorked(bucketsColl
                                               .find({
