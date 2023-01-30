@@ -483,10 +483,16 @@ public:
      * intended for spilling key values used in the HashAgg stage. The format is not guaranteed to
      * be stable between versions, so it should not be used for long-term storage or communication
      * between instances.
+     *
+     * If 'numPrefixValsToRead' is provided, then only the given number of values from 'keyString'
+     * are decoded into the resulting 'MaterializedRow'. The remaining suffix values in the
+     * 'keyString' are ignored.
      */
-    static MaterializedRow deserializeFromKeyString(const KeyString::Value& keyString,
+    static MaterializedRow deserializeFromKeyString(
+        const KeyString::Value& keyString,
+        BufBuilder* valueBufferBuilder,
+        boost::optional<size_t> numPrefixValsToRead = boost::none);
 
-                                                    BufBuilder* valueBufferBuilder);
     void serializeIntoKeyString(KeyString::Builder& builder) const;
 
 private:
@@ -577,9 +583,9 @@ private:
 };
 
 struct MaterializedRowEq {
-    using ComparatorType = StringData::ComparatorInterface*;
+    using ComparatorType = StringData::ComparatorInterface;
 
-    explicit MaterializedRowEq(const ComparatorType comparator = nullptr)
+    explicit MaterializedRowEq(const ComparatorType* comparator = nullptr)
         : _comparator(comparator) {}
 
     bool operator()(const MaterializedRow& lhs, const MaterializedRow& rhs) const {
@@ -597,7 +603,7 @@ struct MaterializedRowEq {
     }
 
 private:
-    const ComparatorType _comparator = nullptr;
+    const ComparatorType* _comparator = nullptr;
 };
 
 struct MaterializedRowLess {

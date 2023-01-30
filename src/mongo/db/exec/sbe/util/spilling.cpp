@@ -85,7 +85,6 @@ int upsertToRecordStore(OperationContext* opCtx,
                         BufBuilder& buf,
                         const KeyString::TypeBits& typeBits,  // recover type of value.
                         bool update) {
-
     // Append the 'typeBits' to the end of the val's buffer so the 'key' can be reconstructed when
     // draining HashAgg.
     buf.appendBuf(typeBits.getBuffer(), typeBits.getSize());

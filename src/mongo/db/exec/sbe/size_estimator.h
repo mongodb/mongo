@@ -92,6 +92,11 @@ inline size_t estimate(const S& stats) {
     return stats.estimateObjectSizeInBytes() - sizeof(S);
 }
 
+template <typename A, typename B>
+inline size_t estimate(const std::pair<A, B>& pair) {
+    return estimate(pair.first) + estimate(pair.second);
+}
+
 // Calculate the size of the inlined vector's elements.
 template <typename T, size_t N, typename A>
 size_t estimate(const absl::InlinedVector<T, N, A>& vector) {

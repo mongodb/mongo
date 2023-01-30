@@ -323,7 +323,10 @@ public:
         auto bufferLen = _valueBufferBuilder->len();
         size_t bufIdx = 0;
         size_t rowIdx = 0;
-        while (bufIdx < _numValues) {
+        // The 'row' output parameter might be smaller than the number of values owned by this
+        // builder. Be careful to only read as many values into 'row' as this output 'row' has space
+        // for.
+        while (rowIdx < row.size()) {
             invariant(rowIdx < row.size());
             auto [_, tagNothing, valNothing] = getValue(bufIdx++, bufferLen);
             tassert(6136200, "sbe tag must be 'Boolean'", tagNothing == TypeTags::Boolean);

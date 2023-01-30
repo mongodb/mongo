@@ -1238,9 +1238,13 @@ public:
         auto finalGroupStage =
             makeHashAgg(std::move(unwindEvalStage),
                         sbe::makeSV(),
-                        sbe::makeEM(finalGroupSlot, std::move(finalAddToArrayExpr)),
+                        sbe::makeSlotExprPairVec(finalGroupSlot, std::move(finalAddToArrayExpr)),
                         collatorSlot,
-                        _context->state.allowDiskUse,
+                        // Never allow this HashAgg stage to spill.
+                        false,
+                        // Merging exprs are not needed since this stage is prohibited from
+                        // spilling.
+                        {},
                         _context->planNodeId);
 
         // Returns true if any of our input expressions return null.

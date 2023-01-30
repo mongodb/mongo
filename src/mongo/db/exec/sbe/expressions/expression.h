@@ -348,6 +348,8 @@ private:
     std::string toString() const;
 };
 
+using SlotExprPairVector = std::vector<std::pair<value::SlotId, std::unique_ptr<EExpression>>>;
+
 template <typename T, typename... Args>
 inline std::unique_ptr<EExpression> makeE(Args&&... args) {
     return std::make_unique<T>(std::forward<Args>(args)...);
@@ -364,20 +366,30 @@ inline auto makeEs(Ts&&... pack) {
 
 namespace detail {
 // base case
-inline void makeEM_unwind(value::SlotMap<std::unique_ptr<EExpression>>& result,
-                          value::SlotId slot,
-                          std::unique_ptr<EExpression> expr) {
-    result.emplace(slot, std::move(expr));
+template <typename R>
+inline void makeSlotExprPairHelper(R& result,
+                                   value::SlotId slot,
+                                   std::unique_ptr<EExpression> expr) {
+    if constexpr (std::is_same_v<R, value::SlotMap<std::unique_ptr<EExpression>>>) {
+        result.emplace(slot, std::move(expr));
+    } else {
+        result.push_back({slot, std::move(expr)});
+    }
 }
 
 // recursive case
-template <typename... Ts>
-inline void makeEM_unwind(value::SlotMap<std::unique_ptr<EExpression>>& result,
-                          value::SlotId slot,
-                          std::unique_ptr<EExpression> expr,
-                          Ts&&... rest) {
-    result.emplace(slot, std::move(expr));
-    makeEM_unwind(result, std::forward<Ts>(rest)...);
+template <typename R, typename... Ts>
+inline void makeSlotExprPairHelper(R& result,
+                                   value::SlotId slot,
+                                   std::unique_ptr<EExpression> expr,
+                                   Ts&&... rest) {
+    if constexpr (std::is_same_v<R, value::SlotMap<std::unique_ptr<EExpression>>>) {
+        result.emplace(slot, std::move(expr));
+    } else {
+        static_assert(std::is_same_v<R, SlotExprPairVector>);
+        result.push_back({slot, std::move(expr)});
+    }
+    makeSlotExprPairHelper(result, std::forward<Ts>(rest)...);
 }
 }  // namespace detail
 
@@ -386,7 +398,7 @@ auto makeEM(Ts&&... pack) {
     value::SlotMap<std::unique_ptr<EExpression>> result;
     if constexpr (sizeof...(pack) > 0) {
         result.reserve(sizeof...(Ts) / 2);
-        detail::makeEM_unwind(result, std::forward<Ts>(pack)...);
+        detail::makeSlotExprPairHelper(result, std::forward<Ts>(pack)...);
     }
     return result;
 }
@@ -396,6 +408,16 @@ auto makeSV(Args&&... args) {
     value::SlotVector v;
     v.reserve(sizeof...(Args));
     (v.push_back(std::forward<Args>(args)), ...);
+    return v;
+}
+
+template <typename... Ts>
+auto makeSlotExprPairVec(Ts&&... pack) {
+    SlotExprPairVector v;
+    if constexpr (sizeof...(pack) > 0) {
+        v.reserve(sizeof...(Ts) / 2);
+        detail::makeSlotExprPairHelper(v, std::forward<Ts>(pack)...);
+    }
     return v;
 }
 

@@ -470,14 +470,20 @@ EvalStage makeUnion(std::vector<EvalStage> inputStages,
 
 EvalStage makeHashAgg(EvalStage stage,
                       sbe::value::SlotVector gbs,
-                      sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> aggs,
+                      sbe::SlotExprPairVector aggs,
                       boost::optional<sbe::value::SlotId> collatorSlot,
                       bool allowDiskUse,
+                      sbe::SlotExprPairVector mergingExprs,
                       PlanNodeId planNodeId) {
     stage.outSlots = gbs;
     for (auto& [slot, _] : aggs) {
         stage.outSlots.push_back(slot);
     }
+
+    // In debug builds, we artificially force frequent spilling. This makes sure that our tests
+    // exercise the spilling algorithm and the associated logic for merging partial aggregates which
+    // otherwise would require large data sizes to exercise.
+    const bool forceIncreasedSpilling = kDebugBuild && allowDiskUse;
     stage.stage = sbe::makeS<sbe::HashAggStage>(std::move(stage.stage),
                                                 std::move(gbs),
                                                 std::move(aggs),
@@ -485,7 +491,9 @@ EvalStage makeHashAgg(EvalStage stage,
                                                 true /* optimized close */,
                                                 collatorSlot,
                                                 allowDiskUse,
-                                                planNodeId);
+                                                std::move(mergingExprs),
+                                                planNodeId,
+                                                forceIncreasedSpilling);
     return stage;
 }
 

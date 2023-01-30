@@ -342,12 +342,15 @@ std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildK
     // Re-pack the individual key values into a set. We don't cap "addToSet" here because its size
     // is bounded by the size of the record.
     SlotId keyValuesSetSlot = slotIdGenerator.generate();
+    SlotId spillSlot = slotIdGenerator.generate();
     EvalStage packedKeyValuesStage = makeHashAgg(
         EvalStage{std::move(keyValuesStage), SlotVector{}},
         makeSV(), /* groupBy slots - "none" means creating a single group */
-        makeEM(keyValuesSetSlot, makeFunction("addToSet"_sd, makeVariable(keyValueSlot))),
+        makeSlotExprPairVec(keyValuesSetSlot,
+                            makeFunction("addToSet"_sd, makeVariable(keyValueSlot))),
         boost::none /* we group _all_ key values into a single set, so collator is irrelevant */,
         allowDiskUse,
+        makeSlotExprPairVec(spillSlot, makeFunction("aggSetUnion"_sd, makeVariable(spillSlot))),
         nodeId);
 
     // The set in 'keyValuesSetSlot' might end up empty if the localField contained only missing and
@@ -403,15 +406,20 @@ std::pair<SlotId /* resultSlot */, std::unique_ptr<sbe::PlanStage>> buildForeign
     // are no matches, return an empty array.
     const int sizeCap = internalLookupStageIntermediateDocumentMaxSizeBytes.load();
     SlotId accumulatorSlot = slotIdGenerator.generate();
+    SlotId spillSlot = slotIdGenerator.generate();
     innerBranch = makeHashAgg(
         std::move(innerBranch),
         makeSV(), /* groupBy slots */
-        makeEM(accumulatorSlot,
-               makeFunction("addToArrayCapped"_sd,
-                            makeVariable(foreignRecordSlot),
-                            makeConstant(TypeTags::NumberInt32, sizeCap))),
+        makeSlotExprPairVec(accumulatorSlot,
+                            makeFunction("addToArrayCapped"_sd,
+                                         makeVariable(foreignRecordSlot),
+                                         makeConstant(TypeTags::NumberInt32, sizeCap))),
         {} /* collatorSlot, no collation here because we want to return all matches "as is" */,
         allowDiskUse,
+        makeSlotExprPairVec(spillSlot,
+                            makeFunction("aggConcatArraysCapped",
+                                         makeVariable(spillSlot),
+                                         makeConstant(TypeTags::NumberInt32, sizeCap))),
         nodeId);
 
     // 'accumulatorSlot' is either Nothing or contains an array of size two, where the front element

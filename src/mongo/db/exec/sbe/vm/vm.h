@@ -556,6 +556,8 @@ enum class Builtin : uint8_t {
     // specified size.
     aggSetUnionCapped,
     aggCollSetUnionCapped,
+    // Agg function for a simple set union (with no size cap or collation).
+    aggSetUnion,
 
     acos,
     acosh,
@@ -1186,6 +1188,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinRound(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinConcat(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAggConcatArraysCapped(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAggSetUnion(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAggSetUnionCapped(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAggCollSetUnionCapped(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> aggSetUnionCappedImpl(

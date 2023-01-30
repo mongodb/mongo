@@ -141,14 +141,16 @@ TEST_F(TrialRunTrackerTest, TrialEndsDuringOpenPhaseOfBlockingStage) {
     auto hashAggStage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeEM(countsSlot,
-               stage_builder::makeFunction(
-                   "sum",
-                   makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
-        makeSV(),  // Seek slot
+        makeSlotExprPairVec(
+            countsSlot,
+            stage_builder::makeFunction(
+                "sum",
+                makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
+        makeSV(), /* Seek slot */
         true,
         boost::none,
         false /* allowDiskUse */,
+        makeSlotExprPairVec(), /* mergingExprs */
         kEmptyPlanNodeId);
 
     auto tracker = std::make_unique<TrialRunTracker>(numResultsLimit, size_t{0});
@@ -210,14 +212,16 @@ TEST_F(TrialRunTrackerTest, OnlyDeepestNestedBlockingStageHasTrialRunTracker) {
     auto hashAggStage = makeS<HashAggStage>(
         std::move(unionStage),
         makeSV(unionSlot),
-        makeEM(countsSlot,
-               stage_builder::makeFunction(
-                   "sum",
-                   makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
-        makeSV(),  // Seek slot
+        makeSlotExprPairVec(
+            countsSlot,
+            stage_builder::makeFunction(
+                "sum",
+                makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
+        makeSV(), /* Seek slot */
         true,
         boost::none,
         false /* allowDiskUse */,
+        makeSlotExprPairVec(), /* mergingExprs */
         kEmptyPlanNodeId);
 
     hashAggStage->prepare(*ctx);
@@ -277,14 +281,16 @@ TEST_F(TrialRunTrackerTest, SiblingBlockingStagesBothGetTrialRunTracker) {
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(scanSlot),
-            makeEM(countsSlot,
-                   stage_builder::makeFunction("sum",
-                                               makeE<EConstant>(value::TypeTags::NumberInt64,
-                                                                value::bitcastFrom<int64_t>(1)))),
-            makeSV(),  // Seek slot
+            makeSlotExprPairVec(
+                countsSlot,
+                stage_builder::makeFunction("sum",
+                                            makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                             value::bitcastFrom<int64_t>(1)))),
+            makeSV(), /* Seek slot */
             true,
             boost::none,
             false /* allowDiskUse */,
+            makeSlotExprPairVec(), /* mergingExprs */
             kEmptyPlanNodeId);
 
         return std::make_pair(countsSlot, std::move(hashAggStage));
@@ -407,14 +413,16 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(scanSlot),
-            makeEM(countsSlot,
-                   stage_builder::makeFunction("sum",
-                                               makeE<EConstant>(value::TypeTags::NumberInt64,
-                                                                value::bitcastFrom<int64_t>(1)))),
-            makeSV(),  // Seek slot
+            makeSlotExprPairVec(
+                countsSlot,
+                stage_builder::makeFunction("sum",
+                                            makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                             value::bitcastFrom<int64_t>(1)))),
+            makeSV(), /* Seek slot */
             true,
             boost::none,
             false /* allowDiskUse */,
+            makeSlotExprPairVec(), /* mergingExprs */
             kEmptyPlanNodeId);
 
         return std::make_pair(countsSlot, std::move(hashAggStage));

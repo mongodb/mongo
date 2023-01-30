@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::sbe {
 
@@ -90,6 +91,35 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetUnion) {
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
     slotAccessor1.reset(arrTag1, arrVal1);
     slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(189));
+    runAndAssertNothing(compiledExpr.get());
+}
+
+TEST_F(SBEBuiltinSetOpTest, AggSetUnion) {
+    value::OwnedValueAccessor aggAccessor, inputAccessor;
+    auto inputSlot = bindAccessor(&inputAccessor);
+    auto setUnionExpr =
+        stage_builder::makeFunction("aggSetUnion", stage_builder::makeVariable(inputSlot));
+    auto compiledExpr = compileAggExpression(*setUnionExpr, &aggAccessor);
+
+    auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
+    inputAccessor.reset(arrTag1, arrVal1);
+    auto [resTag1, resVal1] = makeArraySet(BSON_ARRAY(1 << 2));
+    runAndAssertExpression(compiledExpr.get(), {resTag1, resVal1});
+    aggAccessor.reset(resTag1, resVal1);
+
+    auto [arrTag2, arrVal2] = makeArraySet(BSON_ARRAY(1 << 3 << 2 << 6));
+    inputAccessor.reset(arrTag2, arrVal2);
+    auto [resTag2, resVal2] = makeArraySet(BSON_ARRAY(1 << 2 << 3 << 6));
+    runAndAssertExpression(compiledExpr.get(), {resTag2, resVal2});
+    aggAccessor.reset(resTag2, resVal2);
+
+    auto [arrTag3, arrVal3] = makeArray(BSONArray{});
+    inputAccessor.reset(arrTag3, arrVal3);
+    auto [resTag3, resVal3] = makeArraySet(BSON_ARRAY(1 << 2 << 3 << 6));
+    runAndAssertExpression(compiledExpr.get(), {resTag3, resVal3});
+    aggAccessor.reset(resTag3, resVal3);
+
+    inputAccessor.reset(value::TypeTags::Nothing, 0);
     runAndAssertNothing(compiledExpr.get());
 }
 
