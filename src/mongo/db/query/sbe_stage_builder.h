@@ -29,6 +29,12 @@
 
 #pragma once
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/hash/hash.h>
+#include <absl/strings/string_view.h>
+#include <functional>
+#include <utility>
+
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
@@ -42,7 +48,6 @@
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/stage_builder.h"
-#include "mongo/util/pair_map.h"
 
 namespace mongo::stage_builder {
 /**
@@ -208,8 +213,23 @@ public:
 
     inline void clearNonRequiredSlots(const PlanStageReqs& reqs);
 
+    struct NameMapHasher {
+        using is_transparent = void;
+        size_t operator()(const Name& p) const noexcept {
+            auto h{std::pair{p.first, absl::string_view{p.second.rawData(), p.second.size()}}};
+            return absl::Hash<decltype(h)>{}(h);
+        }
+    };
+
+    struct NameMapKeyEq : std::equal_to<Name> {
+        using is_transparent = void;
+    };
+
+    template <typename V>
+    using NameMap = absl::flat_hash_map<OwnedName, V, NameMapHasher, NameMapKeyEq>;
+
 private:
-    PairMap<Type, std::string, sbe::value::SlotId> _slots;
+    NameMap<sbe::value::SlotId> _slots;
 };
 
 /**
@@ -368,7 +388,7 @@ public:
     friend void PlanStageSlots::clearNonRequiredSlots(const PlanStageReqs& reqs);
 
 private:
-    PairMap<Type, std::string, bool> _slots;
+    PlanStageSlots::NameMap<bool> _slots;
 
     // When we're in the middle of building a special union sub-tree implementing a tailable cursor
     // collection scan, this flag will be set to true. Otherwise this flag will be false.
