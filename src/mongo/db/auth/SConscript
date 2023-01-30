@@ -42,11 +42,9 @@ env.Library(
         'auth_decorations.cpp',
         'role_name_or_string.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
         'auth_options',
         'cluster_auth_mode',
         'sasl_options',
@@ -308,13 +306,12 @@ env.Library(
         'authorization_manager_global_parameters.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/service_context',
         'auth',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/authentication',
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         '$BUILD_DIR/mongo/util/net/ssl_parameters_auth',
         'cluster_auth_mode',

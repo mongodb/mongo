@@ -15,9 +15,6 @@ env.Library(
         'sharding_migration_critical_section.cpp',
         'sharding_statistics.cpp',
         'sharding_write_router.cpp',
-        'transaction_coordinator_curop.cpp',
-        'transaction_coordinator_factory.cpp',
-        'transaction_coordinator_worker_curop_repository.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/grid',
@@ -49,13 +46,13 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/ops/write_ops',
         '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/db/shard_role',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/s/common_s',
     ],
 )
@@ -268,10 +265,10 @@ env.Library(
         'user_writes_recoverable_critical_section_service.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
+        '$BUILD_DIR/mongo/db/shard_role_api',
     ],
 )
 
@@ -858,7 +855,7 @@ env.Benchmark(
         'chunk_manager_refresh_bm.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/shard_role_api',
     ],
 )
 

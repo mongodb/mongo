@@ -24,6 +24,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/dns_query',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
 )
 
@@ -68,7 +69,6 @@ if get_option('ssl') == 'on':
             'sasl_aws_client_protocol.idl',
         ],
         LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/bson/bson_validate',
             '$BUILD_DIR/mongo/db/server_base',
             '$BUILD_DIR/third_party/shim_libmongocrypt',

@@ -219,34 +219,17 @@ env.Library(
         'collection_write_path.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/storage/capped_snapshots',
         '$BUILD_DIR/mongo/db/storage/record_store_base',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
         '$BUILD_DIR/mongo/util/fail_point',
-        'collection',
         'document_validation',
         'local_oplog_info',
-    ],
-)
-
-# TODO (SERVER-73238): DO NOT ADD TO OR CHANGE THE LINKING DEPENDENCIES OF THIS LIBRARY WITHOUT
-# CONSULTING WITH A MEMBER OF THE PM-2144 PROJECT
-env.Library(
-    target='collection',
-    source=[
-        'collection.cpp',
-        'collection_operation_source.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/s/sharding_api_d_DO_NOT_ADD_MORE_USAGES',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -258,7 +241,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
-        'collection',
+        '$BUILD_DIR/mongo/db/shard_role_api',
     ],
 )
 
@@ -301,7 +284,7 @@ env.Library(
         'views_for_database.cpp',
     ],
     LIBDEPS=[
-        'collection',
+        '$BUILD_DIR/mongo/db/shard_role_api',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',
@@ -523,10 +506,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/storage/flow_control',
         '$BUILD_DIR/mongo/db/storage/record_store_base',
         '$BUILD_DIR/mongo/db/vector_clock_mutable',
-        'collection',
     ],
 )
 
