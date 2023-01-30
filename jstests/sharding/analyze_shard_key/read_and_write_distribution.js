@@ -35,28 +35,27 @@ function assertReadMetricsNonEmptySampleSize(actual, expected, isHashed) {
     assert.eq(actual.sampleSize.count, expected.sampleSize.count, {actual, expected});
     assert.eq(actual.sampleSize.distinct, expected.sampleSize.distinct, {actual, expected});
 
-    assertApprox(actual.percentageOfReadsTargetedOneShard,
-                 calculatePercentage(expected.numTargetedOneShard, expected.sampleSize.total),
+    assertApprox(actual.percentageOfSingleShardReads,
+                 calculatePercentage(expected.numSingleShard, expected.sampleSize.total),
                  {actual, expected});
-    assertApprox(actual.percentageOfReadsTargetedMultipleShards,
-                 calculatePercentage(expected.numTargetedMultipleShards, expected.sampleSize.total),
+    assertApprox(actual.percentageOfVariableShardReads,
+                 calculatePercentage(expected.numVariableShard, expected.sampleSize.total),
                  {actual, expected});
-    assertApprox(actual.percentageOfReadsTargetedAllShards,
-                 calculatePercentage(expected.numTargetedAllShards, expected.sampleSize.total),
+    assertApprox(actual.percentageOfScatterGatherReads,
+                 calculatePercentage(expected.numScatterGather, expected.sampleSize.total),
                  {actual, expected});
 
     assert.eq(
         actual.numDispatchedReadsByRange.length, analyzeShardKeyNumRanges, {actual, expected});
     if (isHashed) {
-        assert.eq(actual.percentageOfReadsTargetedMultipleShards, 0, {actual, expected});
-        assert.eq(
-            sum(actual.numDispatchedReadsByRange),
-            expected.numTargetedOneShard + expected.numTargetedAllShards * analyzeShardKeyNumRanges,
-            {actual, expected});
+        assert.eq(actual.percentageOfVariableShardReads, 0, {actual, expected});
+        assert.eq(sum(actual.numDispatchedReadsByRange),
+                  expected.numSingleShard + expected.numScatterGather * analyzeShardKeyNumRanges,
+                  {actual, expected});
     } else {
         assert.gte(sum(actual.numDispatchedReadsByRange),
-                   expected.numTargetedOneShard + expected.numTargetedMultipleShards +
-                       expected.numTargetedAllShards * analyzeShardKeyNumRanges,
+                   expected.numSingleShard + expected.numVariableShard +
+                       expected.numScatterGather * analyzeShardKeyNumRanges,
                    {actual, expected});
     }
 }
@@ -68,28 +67,27 @@ function assertWriteMetricsNonEmptySampleSize(actual, expected, isHashed) {
     assert.eq(
         actual.sampleSize.findAndModify, expected.sampleSize.findAndModify, {actual, expected});
 
-    assertApprox(actual.percentageOfWritesTargetedOneShard,
-                 calculatePercentage(expected.numTargetedOneShard, expected.sampleSize.total),
+    assertApprox(actual.percentageOfSingleShardWrites,
+                 calculatePercentage(expected.numSingleShard, expected.sampleSize.total),
                  {actual, expected});
-    assertApprox(actual.percentageOfWritesTargetedMultipleShards,
-                 calculatePercentage(expected.numTargetedMultipleShards, expected.sampleSize.total),
+    assertApprox(actual.percentageOfVariableShardWrites,
+                 calculatePercentage(expected.numVariableShard, expected.sampleSize.total),
                  {actual, expected});
-    assertApprox(actual.percentageOfWritesTargetedAllShards,
-                 calculatePercentage(expected.numTargetedAllShards, expected.sampleSize.total),
+    assertApprox(actual.percentageOfScatterGatherWrites,
+                 calculatePercentage(expected.numScatterGather, expected.sampleSize.total),
                  {actual, expected});
 
     assert.eq(
         actual.numDispatchedWritesByRange.length, analyzeShardKeyNumRanges, {actual, expected});
     if (isHashed) {
-        assert.eq(actual.percentageOfWritesTargetedMultipleShards, 0, {actual, expected});
-        assert.eq(
-            sum(actual.numDispatchedWritesByRange),
-            expected.numTargetedOneShard + expected.numTargetedAllShards * analyzeShardKeyNumRanges,
-            {actual, expected});
+        assert.eq(actual.percentageOfVariableShardWrites, 0, {actual, expected});
+        assert.eq(sum(actual.numDispatchedWritesByRange),
+                  expected.numSingleShard + expected.numScatterGather * analyzeShardKeyNumRanges,
+                  {actual, expected});
     } else {
         assert.gte(sum(actual.numDispatchedWritesByRange),
-                   expected.numTargetedOneShard + expected.numTargetedMultipleShards +
-                       expected.numTargetedAllShards * analyzeShardKeyNumRanges,
+                   expected.numSingleShard + expected.numVariableShard +
+                       expected.numScatterGather * analyzeShardKeyNumRanges,
                    {actual, expected});
     }
 
@@ -147,15 +145,15 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
 
     const readDistribution = {
         sampleSize: {total: 0, find: 0, aggregate: 0, count: 0, distinct: 0},
-        numTargetedOneShard: 0,
-        numTargetedMultipleShards: 0,
-        numTargetedAllShards: 0
+        numSingleShard: 0,
+        numVariableShard: 0,
+        numScatterGather: 0
     };
     const writeDistribution = {
         sampleSize: {total: 0, update: 0, delete: 0, findAndModify: 0},
-        numTargetedOneShard: 0,
-        numTargetedMultipleShards: 0,
-        numTargetedAllShards: 0,
+        numSingleShard: 0,
+        numVariableShard: 0,
+        numScatterGather: 0,
         numShardKeyUpdates: 0,
         numSingleWritesWithoutShardKey: 0,
         numMultiWritesWithoutShardKey: 0
@@ -167,7 +165,7 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
         cmdObjs.push({find: collName, filter: {[shardKeyField]: getNextVal()}});
         readDistribution.sampleSize.find++;
         readDistribution.sampleSize.total++;
-        readDistribution.numTargetedOneShard++;
+        readDistribution.numSingleShard++;
     }
 
     for (let i = 0; i < getRandomCount(); i++) {
@@ -178,21 +176,21 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
         });
         readDistribution.sampleSize.aggregate++;
         readDistribution.sampleSize.total++;
-        readDistribution.numTargetedOneShard++;
+        readDistribution.numSingleShard++;
     }
 
     for (let i = 0; i < getRandomCount(); i++) {
         cmdObjs.push({count: collName, query: {[shardKeyField]: getNextVal()}});
         readDistribution.sampleSize.count++;
         readDistribution.sampleSize.total++;
-        readDistribution.numTargetedOneShard++;
+        readDistribution.numSingleShard++;
     }
 
     for (let i = 0; i < getRandomCount(); i++) {
         cmdObjs.push({distinct: collName, key: "x", query: {[shardKeyField]: getNextVal()}});
         readDistribution.sampleSize.distinct++;
         readDistribution.sampleSize.total++;
-        readDistribution.numTargetedOneShard++;
+        readDistribution.numSingleShard++;
     }
 
     // Below are reads targeting a variable number of shards.
@@ -203,9 +201,9 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
         readDistribution.sampleSize.total++;
         if (isHashed) {
             // For hashed sharding, range queries on the shard key target all shards.
-            readDistribution.numTargetedAllShards++;
+            readDistribution.numScatterGather++;
         } else {
-            readDistribution.numTargetedMultipleShards++;
+            readDistribution.numVariableShard++;
         }
     }
 
@@ -219,9 +217,9 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
         readDistribution.sampleSize.total++;
         if (isHashed) {
             // For hashed sharding, range queries on the shard key target all shards.
-            readDistribution.numTargetedAllShards++;
+            readDistribution.numScatterGather++;
         } else {
-            readDistribution.numTargetedMultipleShards++;
+            readDistribution.numVariableShard++;
         }
     }
 
@@ -231,9 +229,9 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
         readDistribution.sampleSize.total++;
         if (isHashed) {
             // For hashed sharding, range queries on the shard key target all shards.
-            readDistribution.numTargetedAllShards++;
+            readDistribution.numScatterGather++;
         } else {
-            readDistribution.numTargetedMultipleShards++;
+            readDistribution.numVariableShard++;
         }
     }
 
@@ -243,7 +241,7 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
         cmdObjs.push({find: collName, filter: {}});
         readDistribution.sampleSize.find++;
         readDistribution.sampleSize.total++;
-        readDistribution.numTargetedAllShards++;
+        readDistribution.numScatterGather++;
     }
 
     // Below are writes targeting a single shard.
@@ -258,7 +256,7 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
         });
         writeDistribution.sampleSize.update += 2;
         writeDistribution.sampleSize.total += 2;
-        writeDistribution.numTargetedOneShard += 2;
+        writeDistribution.numSingleShard += 2;
     }
 
     for (let i = 0; i < getRandomCount(); i++) {
@@ -271,7 +269,7 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
         });
         writeDistribution.sampleSize.delete += 2;
         writeDistribution.sampleSize.total += 2;
-        writeDistribution.numTargetedOneShard += 2;
+        writeDistribution.numSingleShard += 2;
     }
 
     for (let i = 0; i < getRandomCount(); i++) {
@@ -283,7 +281,7 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
         });
         writeDistribution.sampleSize.findAndModify++;
         writeDistribution.sampleSize.total++;
-        writeDistribution.numTargetedOneShard++;
+        writeDistribution.numSingleShard++;
         writeDistribution.numShardKeyUpdates++;
     }
 
@@ -301,9 +299,9 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
             writeDistribution.sampleSize.total++;
             if (isHashed) {
                 // For hashed sharding, range queries on the shard key target all shards.
-                writeDistribution.numTargetedAllShards++;
+                writeDistribution.numScatterGather++;
             } else {
-                writeDistribution.numTargetedMultipleShards++;
+                writeDistribution.numVariableShard++;
             }
             writeDistribution.numSingleWritesWithoutShardKey++;
         }
@@ -315,9 +313,9 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
             writeDistribution.sampleSize.total++;
             if (isHashed) {
                 // For hashed sharding, range queries on the shard key target all shards.
-                writeDistribution.numTargetedAllShards++;
+                writeDistribution.numScatterGather++;
             } else {
-                writeDistribution.numTargetedMultipleShards++;
+                writeDistribution.numVariableShard++;
             }
             writeDistribution.numMultiWritesWithoutShardKey++;
         }
@@ -332,9 +330,9 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
             writeDistribution.sampleSize.total++;
             if (isHashed) {
                 // For hashed sharding, range queries on the shard key target all shards.
-                writeDistribution.numTargetedAllShards++;
+                writeDistribution.numScatterGather++;
             } else {
-                writeDistribution.numTargetedMultipleShards++;
+                writeDistribution.numVariableShard++;
             }
             writeDistribution.numSingleWritesWithoutShardKey++;
         }
@@ -345,7 +343,7 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
             cmdObjs.push({findAndModify: collName, query: {}, update: {$set: {z: 0}}});
             writeDistribution.sampleSize.findAndModify++;
             writeDistribution.sampleSize.total++;
-            writeDistribution.numTargetedAllShards++;
+            writeDistribution.numScatterGather++;
             writeDistribution.numSingleWritesWithoutShardKey++;
         }
     }

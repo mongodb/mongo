@@ -72,16 +72,16 @@ protected:
 
     DistributionMetricsType _getMetrics() const;
 
-    void _incrementTargetedOneShard() {
-        _numTargetedOneShard++;
+    void _incrementSingleShard() {
+        _numSingleShard++;
     }
 
-    void _incrementTargetedMultipleShards() {
-        _numTargetedMultipleShards++;
+    void _incrementVariableShard() {
+        _numVariableShard++;
     }
 
-    void _incrementTargetedAllShards() {
-        _numTargetedAllShards++;
+    void _incrementScatterGather() {
+        _numScatterGather++;
     }
 
     void _incrementTargetedRanges(const std::set<ChunkRange>& chunkRanges) {
@@ -123,9 +123,9 @@ protected:
     const CollectionRoutingInfoTargeter& _targeter;
     const StringData _firstShardKeyFieldName;
 
-    int64_t _numTargetedOneShard = 0;
-    int64_t _numTargetedMultipleShards = 0;
-    int64_t _numTargetedAllShards = 0;
+    int64_t _numSingleShard = 0;
+    int64_t _numVariableShard = 0;
+    int64_t _numScatterGather = 0;
 
     std::map<ChunkRange, int64_t> _numDispatchedByRange;
 };
@@ -252,22 +252,19 @@ DistributionMetricsType addDistributionMetricsBase(DistributionMetricsType l,
     DistributionMetricsType metrics;
     metrics.setSampleSize(l.getSampleSize() + r.getSampleSize());
     if (auto numTotal = metrics.getSampleSize().getTotal(); numTotal > 0) {
-        auto numTargetedOneShard =
-            l.getNumTargetedOneShard().value_or(0) + r.getNumTargetedOneShard().value_or(0);
-        metrics.setNumTargetedOneShard(numTargetedOneShard);
-        metrics.setPercentageOfTargetedOneShard(calculatePercentage(numTargetedOneShard, numTotal));
+        auto numSingleShard = l.getNumSingleShard().value_or(0) + r.getNumSingleShard().value_or(0);
+        metrics.setNumSingleShard(numSingleShard);
+        metrics.setPercentageOfSingleShard(calculatePercentage(numSingleShard, numTotal));
 
-        auto numTargetedMultipleShards = l.getNumTargetedMultipleShards().value_or(0) +
-            r.getNumTargetedMultipleShards().value_or(0);
-        metrics.setNumTargetedMultipleShards(numTargetedMultipleShards);
-        metrics.setPercentageOfTargetedMultipleShards(
-            calculatePercentage(numTargetedMultipleShards, numTotal));
+        auto numVariableShard =
+            l.getNumVariableShard().value_or(0) + r.getNumVariableShard().value_or(0);
+        metrics.setNumVariableShard(numVariableShard);
+        metrics.setPercentageOfVariableShard(calculatePercentage(numVariableShard, numTotal));
 
-        auto numTargetedAllShards =
-            l.getNumTargetedAllShards().value_or(0) + r.getNumTargetedAllShards().value_or(0);
-        metrics.setNumTargetedAllShards(numTargetedAllShards);
-        metrics.setPercentageOfTargetedAllShards(
-            calculatePercentage(numTargetedAllShards, numTotal));
+        auto numScatterGather =
+            l.getNumScatterGather().value_or(0) + r.getNumScatterGather().value_or(0);
+        metrics.setNumScatterGather(numScatterGather);
+        metrics.setPercentageOfScatterGather(calculatePercentage(numScatterGather, numTotal));
 
         if (l.getNumDispatchedByRange() && r.getNumDispatchedByRange()) {
             metrics.setNumDispatchedByRange(
@@ -285,12 +282,12 @@ template <typename DistributionMetricsType>
 inline bool areEqualDistributionMetricsBase(const DistributionMetricsType& l,
                                             const DistributionMetricsType& r) {
     return l.getSampleSize() == r.getSampleSize() &&
-        l.getNumTargetedOneShard() == r.getNumTargetedOneShard() &&
-        l.getPercentageOfTargetedOneShard() == r.getPercentageOfTargetedOneShard() &&
-        l.getNumTargetedMultipleShards() == r.getNumTargetedMultipleShards() &&
-        l.getPercentageOfTargetedMultipleShards() == r.getPercentageOfTargetedMultipleShards() &&
-        l.getNumTargetedAllShards() == r.getNumTargetedAllShards() &&
-        l.getPercentageOfTargetedAllShards() == r.getPercentageOfTargetedAllShards();
+        l.getNumSingleShard() == r.getNumSingleShard() &&
+        l.getPercentageOfSingleShard() == r.getPercentageOfSingleShard() &&
+        l.getNumVariableShard() == r.getNumVariableShard() &&
+        l.getPercentageOfVariableShard() == r.getPercentageOfVariableShard() &&
+        l.getNumScatterGather() == r.getNumScatterGather() &&
+        l.getPercentageOfScatterGather() == r.getPercentageOfScatterGather();
 }
 
 inline ReadDistributionMetrics operator+(const ReadDistributionMetrics& l,

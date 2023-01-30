@@ -139,38 +139,38 @@ structs:
     fields:
       sampleSize:
         type: ReadSampleSize
-      numReadsTargetedOneShard:
+      numSingleShardReads:
         type: long
-        cpp_name: numTargetedOneShard
+        cpp_name: numSingleShard
         validator: { gte: 0 }
         optional: true
-      percentageOfReadsTargetedOneShard:
+      percentageOfSingleShardReads:
         type: double
-        cpp_name: percentageOfTargetedOneShard
+        cpp_name: percentageOfSingleShard
         validator:
           gte: 0
           lte: 100
         optional: true
-      numReadsTargetedMultipleShards:
+      numVariableShardReads:
         type: long
-        cpp_name: numTargetedMultipleShards
+        cpp_name: numVariableShard
         validator: { gte: 0 }
         optional: true
-      percentageOfReadsTargetedMultipleShards:
+      percentageOfVariableShardReads:
         type: double
-        cpp_name: percentageOfTargetedMultipleShards
+        cpp_name: percentageOfVariableShard
         validator:
           gte: 0
           lte: 100
         optional: true
-      numReadsTargetedAllShards:
+      numScatterGatherReads:
         type: long
-        cpp_name: numTargetedAllShards
+        cpp_name: numScatterGather
         validator: { gte: 0 }
         optional: true
-      percentageOfReadsTargetedAllShards:
+      percentageOfScatterGatherReads:
         type: double
-        cpp_name: percentageOfTargetedAllShards
+        cpp_name: percentageOfScatterGather
         validator:
           gte: 0
           lte: 100
@@ -188,38 +188,38 @@ structs:
     fields:
       sampleSize:
         type: WriteSampleSize
-      numWritesTargetedOneShard:
+      numSingleShardWrites:
         type: long
-        cpp_name: numTargetedOneShard
+        cpp_name: numSingleShard
         validator: { gte: 0 }
         optional: true
-      percentageOfWritesTargetedOneShard:
+      percentageOfSingleShardWrites:
         type: double
-        cpp_name: percentageOfTargetedOneShard
+        cpp_name: percentageOfSingleShard
         validator:
           gte: 0
           lte: 100
         optional: true
-      numWritesTargetedMultipleShards:
+      numVariableShardWrites:
         type: long
-        cpp_name: numTargetedMultipleShards
+        cpp_name: numVariableShard
         validator: { gte: 0 }
         optional: true
-      percentageOfWritesTargetedMultipleShards:
+      percentageOfVariableShardWrites:
         type: double
-        cpp_name: percentageOfTargetedMultipleShards
+        cpp_name: percentageOfVariableShard
         validator:
           gte: 0
           lte: 100
         optional: true
-      numWritesTargetedAllShards:
+      numScatterGatherWrites:
         type: long
-        cpp_name: numTargetedAllShards
+        cpp_name: numScatterGather
         validator: { gte: 0 }
         optional: true
-      percentageOfWritesTargetedAllShards:
+      percentageOfScatterGatherWrites:
         type: double
-        cpp_name: percentageOfTargetedAllShards
+        cpp_name: percentageOfScatterGather
         validator:
           gte: 0
           lte: 100
