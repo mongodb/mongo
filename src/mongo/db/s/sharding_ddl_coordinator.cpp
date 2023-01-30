@@ -266,7 +266,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             return _acquireLockAsync(executor, token, originalNss().db());
         })
         .then([this, executor, token, anchor = shared_from_this()] {
-            if (!originalNss().isConfigDB() && !_recoveredFromDisk) {
+            if (!originalNss().isConfigDB() && !originalNss().isAdminDB() && !_recoveredFromDisk) {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 invariant(metadata().getDatabaseVersion());

@@ -263,7 +263,7 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx, BSON
     auto coorMetadata = extractShardingDDLCoordinatorMetadata(coorDoc);
     const auto& nss = coorMetadata.getId().getNss();
 
-    if (!nss.isConfigDB()) {
+    if (!nss.isConfigDB() && !nss.isAdminDB()) {
         // Check that the operation context has a database version for this namespace
         const auto clientDbVersion = OperationShardingState::get(opCtx).getDbVersion(nss.db());
         uassert(ErrorCodes::IllegalOperation,

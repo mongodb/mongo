@@ -35,6 +35,9 @@ namespace mongo {
 
 const ShardId ShardId::kConfigServerId("config");
 
+// TODO SERVER-XXXXX: Use "config" shard id instead.
+const ShardId ShardId::kCatalogShardId("catalogShard");
+
 bool ShardId::isValid() const {
     return !_shardId.empty();
 }

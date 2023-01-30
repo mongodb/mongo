@@ -13,6 +13,13 @@ const dbName = "foo";
 const collName = "bar";
 const ns = dbName + "." + collName;
 
+function flushRoutingAndDBCacheUpdates(conn) {
+    assert.commandWorked(conn.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+    assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: dbName}));
+    assert.commandWorked(conn.adminCommand({_flushRoutingTableCacheUpdates: "does.not.exist"}));
+    assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: "notRealDB"}));
+}
+
 const st = new ShardingTest({shards: 0, config: 3});
 
 const configCS = st.configRS.getURL();
@@ -21,9 +28,8 @@ const configCS = st.configRS.getURL();
 // Dedicated config server mode tests (pre addShard).
 //
 {
-    // Can't create user namespaces.
-    assert.commandFailedWithCode(st.configRS.getPrimary().getCollection(ns).insert({_id: 1, x: 1}),
-                                 ErrorCodes.InvalidNamespace);
+    // Can create user namespaces via direct writes.
+    assert.commandWorked(st.configRS.getPrimary().getCollection(ns).insert({_id: 1, x: 1}));
 
     // Failover works.
     st.configRS.stepUp(st.configRS.getSecondary());
@@ -34,6 +40,9 @@ const configCS = st.configRS.getURL();
         st.configRS.restart(node, undefined, undefined, false /* wait */);
     });
     st.configRS.getPrimary();  // Waits for a stable primary.
+
+    // Flushing routing / db cache updates works.
+    flushRoutingAndDBCacheUpdates(st.configRS.getPrimary());
 }
 
 //
@@ -48,6 +57,9 @@ const configCS = st.configRS.getURL();
     // More than once works.
     assert.commandWorked(st.s.adminCommand({addShard: configCS}));
     assert.commandWorked(st.s.adminCommand({addShard: configCS}));
+
+    // Flushing routing / db cache updates works.
+    flushRoutingAndDBCacheUpdates(st.configRS.getPrimary());
 }
 
 // Refresh the logical session cache now that we have a shard to create the sessions collection to

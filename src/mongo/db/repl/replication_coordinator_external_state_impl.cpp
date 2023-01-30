@@ -43,6 +43,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/local_oplog_info.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
@@ -836,11 +837,9 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
     if (ShardingState::get(_service)->enabled()) {
         ChunkSplitter::get(_service).onStepDown();
         PeriodicBalancerConfigRefresher::get(_service).onStepDown();
+        CatalogCacheLoader::get(_service).onStepDown();
 
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            // Config shards don't use a loader that requires this.
-            CatalogCacheLoader::get(_service).onStepDown();
-
             // Called earlier for config servers.
             TransactionCoordinatorService::get(_service)->onStepDown();
         }
@@ -945,6 +944,10 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepUp(_service);
         TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
+
+        if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+            CatalogCacheLoader::get(_service).onStepUp();
+        }
     }
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         if (ShardingState::get(opCtx)->enabled()) {
@@ -962,11 +965,9 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
             ChunkSplitter::get(_service).onStepUp();
             PeriodicBalancerConfigRefresher::get(_service).onStepUp(_service);
+            CatalogCacheLoader::get(_service).onStepUp();
 
             if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-                // Config shards don't use a loader that requires this.
-                CatalogCacheLoader::get(_service).onStepUp();
-
                 // Called earlier for config servers.
                 TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
             }
@@ -1058,6 +1059,17 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         if (auto validator = LogicalTimeValidator::get(_service)) {
             validator->enableKeyGenerator(opCtx, true);
         }
+    }
+
+    if (gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility) &&
+        serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        !ShardingState::get(opCtx)->enabled()) {
+        // Note this must be called after the config server has created the cluster ID and also
+        // after the onStepUp logic for the shard role because this triggers sharding state
+        // initialization which will transition some components into the "primary" state, like the
+        // TransactionCoordinatorService, and they would fail if the onStepUp logic attempted the
+        // same transition.
+        ShardingCatalogManager::get(opCtx)->installConfigShardIdentityDocument(opCtx);
     }
 }
 

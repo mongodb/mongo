@@ -43,6 +43,7 @@ namespace mongo {
 class ShardId {
 public:
     static const ShardId kConfigServerId;
+    static const ShardId kCatalogShardId;
 
     ShardId(std::string shardId) : _shardId(std::move(shardId)) {}
 

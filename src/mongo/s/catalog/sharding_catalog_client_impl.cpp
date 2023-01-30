@@ -732,12 +732,6 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
     const NamespaceString& nss,
     const ChunkVersion& sinceVersion,
     const repl::ReadConcernArgs& readConcern) {
-    // The config.collections collection is always unsharded. Attempting to run the aggregation
-    // pipeline on it will trigger recursive refreshes, so return NamespaceNotFound right away.
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Collection " << nss.ns() << " not found",
-            nss != NamespaceString::kConfigsvrCollectionsNamespace);
-
     auto aggRequest = makeCollectionAndChunksAggregation(opCtx, nss, sinceVersion);
 
     std::vector<BSONObj> aggResult =

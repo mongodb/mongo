@@ -1518,8 +1518,13 @@ StatusWith<CollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* op
     // a collection before its enclosing database is created. However, if there are no shards
     // present, then $changeStream should immediately return an empty cursor just as other
     // aggregations do when the database does not exist.
+    //
+    // Note despite config.collections always being unsharded, to support $shardedDataDistribution
+    // we always take the shard targeting path. The collection must only exist on the config server,
+    // so even if there are no shards, the query can still succeed and we shouldn't return
+    // ShardNotFound.
     const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    if (shardIds.empty()) {
+    if (shardIds.empty() && execNss != NamespaceString::kConfigsvrCollectionsNamespace) {
         return {ErrorCodes::ShardNotFound, "No shards are present in the cluster"};
     }
 

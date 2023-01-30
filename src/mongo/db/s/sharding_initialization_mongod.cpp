@@ -41,6 +41,7 @@
 #include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_client_sharded.h"
@@ -557,7 +558,23 @@ void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCt
         return {ConnectionString::forLocal()};
     }();
 
-    CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
+    if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+        CatalogCacheLoader::set(service,
+                                std::make_unique<ShardServerCatalogCacheLoader>(
+                                    std::make_unique<ConfigServerCatalogCacheLoader>()));
+
+        // This is only called in startup when there shouldn't be replication state changes, but to
+        // be safe we take the RSTL anyway.
+        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        bool isReplSet =
+            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+        bool isStandaloneOrPrimary =
+            !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
+        CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
+    } else {
+        CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
+    }
 
     initializeGlobalShardingStateForMongoD(opCtx, configCS);
 

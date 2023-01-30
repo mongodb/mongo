@@ -160,14 +160,22 @@
 
     const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
 
-    // Check that the command fails when attempting to run on the config server.
-    assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
-        _shardsvrCloneCatalogData: 'test',
-        from: fromShard.host,
-        writeConcern: {w: "majority"}
-    }),
-                                 isCatalogShardEnabled ? ErrorCodes.ShardingStateNotInitialized
-                                                       : ErrorCodes.NoShardingEnabled);
+    // Check that the command fails when attempting to run on a config server that doesn't support
+    // catalog shard mode.
+    if (isCatalogShardEnabled) {
+        assert.commandWorked(st.configRS.getPrimary().adminCommand({
+            _shardsvrCloneCatalogData: 'test',
+            from: fromShard.host,
+            writeConcern: {w: "majority"}
+        }));
+    } else {
+        assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
+            _shardsvrCloneCatalogData: 'test',
+            from: fromShard.host,
+            writeConcern: {w: "majority"}
+        }),
+                                     ErrorCodes.NoShardingEnabled);
+    }
 
     // Check that the command fails when failing to specify a source.
     assert.commandFailedWithCode(

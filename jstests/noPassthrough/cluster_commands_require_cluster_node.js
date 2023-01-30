@@ -101,9 +101,15 @@ function runTestCaseExpectSuccess(conn, testCase) {
 
     const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
     for (let testCase of clusterCommandsCases) {
-        const expectedErrCode = isCatalogShardEnabled ? ErrorCodes.ShardingStateNotInitialized
-                                                      : ErrorCodes.NoShardingEnabled;
-        runTestCaseExpectFail(st.configRS.getPrimary(), testCase, expectedErrCode);
+        if (isCatalogShardEnabled) {
+            if (testCase.expectedErr) {
+                runTestCaseExpectFail(st.rs0.getPrimary(), testCase, testCase.expectedErr);
+            } else {
+                runTestCaseExpectSuccess(st.rs0.getPrimary(), testCase);
+            }
+        } else {
+            runTestCaseExpectFail(st.configRS.getPrimary(), testCase, ErrorCodes.NoShardingEnabled);
+        }
     }
 
     //

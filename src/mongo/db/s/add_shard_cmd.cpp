@@ -72,15 +72,15 @@ public:
                          .containsCustomizedGetLastErrorDefaults());
 
             auto addShardCmd = request();
-            auto shardIdUpsertCmd =
-                add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);
+            auto shardIdUpsertCmd = add_shard_util::createShardIdentityUpsertForAddShard(
+                addShardCmd, ShardingCatalogClient::kMajorityWriteConcern);
             DBDirectClient localClient(opCtx);
             BSONObj res;
 
             localClient.runCommand(
                 DatabaseName(boost::none, NamespaceString::kAdminDb), shardIdUpsertCmd, res);
 
-            uassertStatusOK(getStatusFromCommandResult(res));
+            uassertStatusOK(getStatusFromWriteCommandReply(res));
 
             const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
             invariant(balancerConfig);

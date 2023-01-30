@@ -310,7 +310,7 @@ assert.commandFailedWithCode(
 const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
 assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: "config.collections", key: {_id: 1, aKey: 1}}),
-    isCatalogShardEnabled ? ErrorCodes.ShardingStateNotInitialized : ErrorCodes.NoShardingEnabled);
+    isCatalogShardEnabled ? ErrorCodes.NamespaceNotSharded : ErrorCodes.NoShardingEnabled);
 
 enableShardingAndShardColl({_id: 1});
 

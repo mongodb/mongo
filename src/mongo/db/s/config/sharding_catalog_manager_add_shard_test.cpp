@@ -50,6 +50,7 @@
 #include "mongo/idl/cluster_server_parameter_common.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_database_gen.h"
@@ -370,7 +371,8 @@ protected:
         using namespace add_shard_util;
         // Create the expected upsert shardIdentity command for this shardType.
         auto upsertCmdObj = createShardIdentityUpsertForAddShard(
-            createAddShardCmd(operationContext(), expectedShardName));
+            createAddShardCmd(operationContext(), expectedShardName),
+            ShardingCatalogClient::kMajorityWriteConcern);
 
         const auto opMsgRequest =
             OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, upsertCmdObj);
@@ -385,7 +387,8 @@ protected:
         using namespace add_shard_util;
         // Create the expected upsert shardIdentity command for this shardType.
         auto upsertCmdObj = createShardIdentityUpsertForAddShard(
-            createAddShardCmd(operationContext(), expectedShardName));
+            createAddShardCmd(operationContext(), expectedShardName),
+            ShardingCatalogClient::kMajorityWriteConcern);
 
         const auto opMsgRequest =
             OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, upsertCmdObj);
@@ -414,8 +417,8 @@ protected:
             auto addShardCmd =
                 AddShard::parse(IDLParserContext(AddShard::kCommandName), addShardOpMsgRequest);
 
-            const auto& updateOpField =
-                add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);
+            const auto& updateOpField = add_shard_util::createShardIdentityUpsertForAddShard(
+                addShardCmd, ShardingCatalogClient::kMajorityWriteConcern);
 
             const auto updateOpMsgRequest =
                 OpMsgRequest::fromDBAndBody(request.dbname, updateOpField);
@@ -566,7 +569,8 @@ TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
                      << "majority"
                      << "wtimeout" << 60000));
     auto addShardCmd = add_shard_util::createAddShardCmd(operationContext(), shardName);
-    auto actualBSON = add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);
+    auto actualBSON = add_shard_util::createShardIdentityUpsertForAddShard(
+        addShardCmd, ShardingCatalogClient::kMajorityWriteConcern);
     ASSERT_BSONOBJ_EQ(expectedBSON, actualBSON);
 }
 

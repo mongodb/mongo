@@ -483,6 +483,12 @@ public:
                                      const ConnectionString& shardConnectionString);
 
     /**
+     * Inserts the config server shard identity document using a sentinel shard id. Requires the
+     * config server's ShardingState has not already been enabled. Throws on errors.
+     */
+    void installConfigShardIdentityDocument(OperationContext* opCtx);
+
+    /**
      * Tries to remove a shard. To completely remove a shard from a sharded cluster,
      * the data residing in that shard must be moved to the remaining shards in the
      * cluster by "draining" chunks from that shard.

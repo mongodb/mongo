@@ -63,6 +63,7 @@
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/sharding_logging.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
@@ -604,6 +605,26 @@ StatusWith<std::vector<std::string>> ShardingCatalogManager::_getDBNamesListFrom
     return dbNames;
 }
 
+void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext* opCtx) {
+    invariant(!ShardingState::get(opCtx)->enabled());
+
+    // Insert a shard identity document. Note we insert with local write concern, so the shard
+    // identity may roll back, which will trigger an fassert to clear the in-memory sharding state.
+    {
+        auto addShardCmd = add_shard_util::createAddShardCmd(opCtx, ShardId::kCatalogShardId);
+
+        auto shardIdUpsertCmd = add_shard_util::createShardIdentityUpsertForAddShard(
+            addShardCmd, ShardingCatalogClient::kLocalWriteConcern);
+        DBDirectClient localClient(opCtx);
+        BSONObj res;
+
+        localClient.runCommand(
+            DatabaseName(boost::none, NamespaceString::kAdminDb), shardIdUpsertCmd, res);
+
+        uassertStatusOK(getStatusFromWriteCommandReply(res));
+    }
+}
+
 StatusWith<std::string> ShardingCatalogManager::addShard(
     OperationContext* opCtx,
     const std::string* shardProposedName,
@@ -708,13 +729,18 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         return Shard::CommandResponse::processBatchWriteResponse(commandResponse, &batchResponse);
     };
 
-    AddShard addShardCmd = add_shard_util::createAddShardCmd(opCtx, shardType.getName());
+    // The catalog shard will already have a ShardIdentity document on the config server, so skip
+    // adding it here.
+    if (!gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility) ||
+        shardType.getName() != ShardId::kCatalogShardId) {
+        AddShard addShardCmd = add_shard_util::createAddShardCmd(opCtx, shardType.getName());
 
-    // Use the _addShard command to add the shard, which in turn inserts a shardIdentity document
-    // into the shard and triggers sharding state initialization.
-    auto addShardStatus = runCmdOnNewShard(addShardCmd.toBSON({}));
-    if (!addShardStatus.isOK()) {
-        return addShardStatus;
+        // Use the _addShard command to add the shard, which in turn inserts a shardIdentity
+        // document into the shard and triggers sharding state initialization.
+        auto addShardStatus = runCmdOnNewShard(addShardCmd.toBSON({}));
+        if (!addShardStatus.isOK()) {
+            return addShardStatus;
+        }
     }
 
     // Set the user-writes blocking state on the new shard.
@@ -974,7 +1000,10 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // set monitor is removed, otherwise the shard would be referencing a dropped RSM.
     Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 
-    ReplicaSetMonitor::remove(name);
+    if (shardId != ShardId::kCatalogShardId) {
+        // Don't remove the catalog shard's RSM because it is used to target the config server.
+        ReplicaSetMonitor::remove(name);
+    }
 
     // Record finish in changelog
     ShardingLogging::get(opCtx)->logChange(

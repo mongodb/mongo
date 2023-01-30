@@ -1811,13 +1811,19 @@ var ShardingTest = function(params) {
             var testName = this._testName;
             var admin = this.admin;
 
-            this._connections.forEach(function(z) {
+            this._connections.forEach(function(z, idx) {
                 var n = z.name || z.host || z;
+
+                var name;
+                if (isCatalogShardMode && idx == 0) {
+                    name = "catalogShard";
+                }
 
                 print("ShardingTest " + testName + " going to add shard : " + n);
 
-                var result = assert.commandWorked(admin.runCommand({addshard: n}),
-                                                  "Failed to add shard " + n);
+                var result = assert.commandWorked(
+                    admin.runCommand(name ? {addshard: n, name: name} : {addshard: n}),
+                    "Failed to add shard " + n);
                 z.shardName = result.shardAdded;
             });
         }

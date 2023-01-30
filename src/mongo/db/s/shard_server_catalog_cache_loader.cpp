@@ -298,17 +298,24 @@ StatusWith<CollectionAndChangedChunks> getIncompletePersistedMetadataSinceVersio
     }
 }
 
+ShardId getSelfShardId(OperationContext* opCtx) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        return ShardId::kConfigServerId;
+    }
+
+    auto const shardingState = ShardingState::get(opCtx);
+    invariant(shardingState->enabled());
+    return shardingState->shardId();
+}
+
 /**
  * Sends _flushRoutingTableCacheUpdates to the primary to force it to refresh its routing table for
  * collection 'nss' and then waits for the refresh to replicate to this node.
  */
 void forcePrimaryCollectionRefreshAndWaitForReplication(OperationContext* opCtx,
                                                         const NamespaceString& nss) {
-    auto const shardingState = ShardingState::get(opCtx);
-    invariant(shardingState->enabled());
-
-    auto selfShard = uassertStatusOK(
-        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardingState->shardId()));
+    auto selfShard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, getSelfShardId(opCtx)));
 
     auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
         opCtx,
@@ -329,11 +336,8 @@ void forcePrimaryCollectionRefreshAndWaitForReplication(OperationContext* opCtx,
  * database 'dbName' and then waits for the refresh to replicate to this node.
  */
 void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx, StringData dbName) {
-    auto const shardingState = ShardingState::get(opCtx);
-    invariant(shardingState->enabled());
-
-    auto selfShard = uassertStatusOK(
-        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardingState->shardId()));
+    auto selfShard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, getSelfShardId(opCtx)));
 
     auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
         opCtx,
@@ -424,6 +428,14 @@ void ShardServerCatalogCacheLoader::shutDown() {
 
 SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::getChunksSince(
     const NamespaceString& nss, ChunkVersion version) {
+    // There's no need to refresh if a collection is always unsharded. Further, attempting to refesh
+    // config.collections or config.chunks would trigger recursive refreshes, and, if this is
+    // running on a config server secondary, the refresh would not succeed if the primary is
+    // unavailable, unnecessarily reducing availability.
+    if (nss.isNamespaceAlwaysUnsharded()) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Collection " << nss.ns() << " not found");
+    }
 
     bool isPrimary;
     long long term;
