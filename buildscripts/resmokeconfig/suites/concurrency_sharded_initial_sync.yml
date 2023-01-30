@@ -186,6 +186,11 @@ selector:
   # TODO(SERVER-71510): Un-denylist this test.
   - jstests/concurrency/fsm_workloads/snapshot_read_catalog_operations.js
 
+  # These tests run large commands which can sometimes trigger IncompleteTransactionHistory
+  # if the initial sync node stepup happens at a specific timing.
+  - jstests/concurrency/fsm_workloads/create_capped_collection.js
+  - jstests/concurrency/fsm_workloads/rename_capped_collection_droptarget.js
+
   exclude_with_any_tags:
   - requires_non_retryable_writes
   - assumes_balancer_off
@@ -225,7 +230,7 @@ executor:
   hooks:
   - class: ContinuousInitialSync
     use_action_permitted_file: true
-    sync_interval_secs: 10
+    sync_interval_secs: 15
   - class: CheckReplDBHash
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency
