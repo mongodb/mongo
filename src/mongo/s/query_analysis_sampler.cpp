@@ -186,7 +186,13 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
         return;
     }
 
-    if (!_queryStats.getLastAvgCount()) {
+    boost::optional<double> lastAvgCount;
+    {
+        stdx::lock_guard<Latch> lk(_mutex);
+        lastAvgCount = _queryStats.getLastAvgCount();
+    }
+
+    if (!lastAvgCount) {
         // The average number of queries executed per second has not been calculated yet.
         return;
     }
@@ -194,7 +200,7 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
     RefreshQueryAnalyzerConfiguration cmd;
     cmd.setDbName(NamespaceString::kAdminDb);
     cmd.setName(getHostNameCached() + ":" + std::to_string(serverGlobalParams.port));
-    cmd.setNumQueriesExecutedPerSecond(*_queryStats.getLastAvgCount());
+    cmd.setNumQueriesExecutedPerSecond(*lastAvgCount);
 
     const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto swResponse = configShard->runCommandWithFixedRetryAttempts(
@@ -216,9 +222,15 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
     auto response = RefreshQueryAnalyzerConfigurationResponse::parse(
         IDLParserContext("configurationRefresher"), swResponse.getValue().response);
 
+    LOGV2_DEBUG(6876103,
+                2,
+                "Refreshed query analyzer configurations",
+                "numQueriesExecutedPerSecond"_attr = lastAvgCount,
+                "response"_attr = response);
+
     stdx::lock_guard<Latch> lk(_mutex);
     std::map<NamespaceString, SampleRateLimiter> sampleRateLimiters;
-    LOGV2_DEBUG(6876103, 2, "Getting query analyzer configurations.");
+
     for (const auto& configuration : response.getConfigurations()) {
         auto it = _sampleRateLimiters.find(configuration.getNs());
         if (it == _sampleRateLimiters.end() ||
