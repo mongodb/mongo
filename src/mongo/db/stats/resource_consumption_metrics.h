@@ -230,7 +230,7 @@ public:
         WriteMetrics writeMetrics;
 
         // Records CPU time consumed by this operation.
-        std::unique_ptr<OperationCPUTimer> cpuTimer;
+        OperationCPUTimer* cpuTimer = nullptr;
     };
 
     /**
@@ -333,6 +333,11 @@ public:
         const OperationMetrics& getMetrics() const {
             invariant(!_dbName.empty(), "observing Metrics before a dbName has been set");
             return _metrics;
+        }
+
+        void reset() {
+            invariant(!isInScope());
+            *this = {};
         }
 
         /**

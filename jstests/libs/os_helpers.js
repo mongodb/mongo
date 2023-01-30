@@ -2,10 +2,6 @@
  * Test helpers for identifying OS
  */
 
-function isLinux() {
-    return getBuildInfo().buildEnvironment.target_os == "linux";
-}
-
 function isRHEL8() {
     if (_isWindows()) {
         return false;

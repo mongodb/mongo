@@ -1,14 +1,11 @@
 /**
  * Tests command output from the $operationMetrics aggregation stage.
  * @tags: [
- *   requires_fcv_63,
  *   requires_replication,
  * ]
  */
 (function() {
 'use strict';
-
-load("jstests/libs/os_helpers.js");  // For isLinux().
 
 var rst = new ReplSetTest({
     nodes: 2,
@@ -16,6 +13,8 @@ var rst = new ReplSetTest({
 });
 rst.startSet();
 rst.initiate();
+
+const isLinux = getBuildInfo().buildEnvironment.target_os == "linux";
 
 let assertMetricsExist = function(metrics) {
     try {
@@ -164,7 +163,7 @@ const secondary = rst.getSecondary();
     }
 
     // CPU time aggregation is only supported on Linux.
-    if (isLinux()) {
+    if (isLinux) {
         // Ensure the CPU time is increasing.
         let lastCpuTime = getServerStatusMetrics(adminDB).cpuNanos;
         assert.gt(lastCpuTime, initialCpuTime);
@@ -229,7 +228,7 @@ const secondary = rst.getSecondary();
     ssMetrics = getServerStatusMetrics(adminDB);
     assert.eq(0, ssMetrics.numMetrics);
     assert.eq(0, ssMetrics.memUsage);
-    if (isLinux()) {
+    if (isLinux) {
         assert.neq(0, ssMetrics.cpuNanos);
     } else {
         assert.eq(0, ssMetrics.cpuNanos);

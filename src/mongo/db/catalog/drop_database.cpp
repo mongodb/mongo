@@ -138,8 +138,9 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
             str::stream() << "Dropping the '" << dbName << "' database is prohibited.",
             dbName != NamespaceString::kAdminDb);
 
+    // TODO (Kal): OldClientContext legacy, needs to be removed
     {
-        CurOp::get(opCtx)->ensureStarted(opCtx);
+        CurOp::get(opCtx)->ensureStarted();
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setNS_inlock(dbName);
     }

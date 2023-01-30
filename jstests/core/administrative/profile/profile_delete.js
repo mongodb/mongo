@@ -4,7 +4,6 @@
 //   # Asserts on the number of index keys deleted.
 //   assumes_no_implicit_index_creation,
 //   does_not_support_stepdowns,
-//   requires_fcv_63,
 //   requires_non_retryable_writes,
 //   requires_profiling,
 // ]
@@ -15,8 +14,7 @@
 "use strict";
 
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/libs/os_helpers.js");  // For isLinux().
-load("jstests/libs/profiler.js");    // For getLatestProfilerEntry.
+load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
 
 // Setup test db and collection.
 var testDB = db.getSiblingDB("profile_delete");
@@ -52,9 +50,6 @@ assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
 assert.eq(profileObj.keysDeleted, expectedKeysDeleted, tojson(profileObj));
 assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
 assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
-if (isLinux()) {
-    assert(profileObj.hasOwnProperty("cpuNanos"), tojson(profileObj));
-}
 assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));

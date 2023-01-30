@@ -149,6 +149,10 @@ public:
         return retval;
     }
 
+    const OperationContext* opCtx() {
+        return _opCtx;
+    }
+
 private:
     OperationContext* _opCtx = nullptr;
 
@@ -370,16 +374,19 @@ void CurOp::setNS_inlock(const DatabaseName& dbName) {
     _nss = NamespaceString(dbName);
 }
 
-TickSource::Tick CurOp::startTime(OperationContext* opCtx) {
+TickSource::Tick CurOp::startTime() {
+    // It is legal for this function to get called multiple times, but all of those calls should be
+    // from the same thread, which should be the thread that "owns" this CurOp object. We define
+    // ownership here in terms of the Client object: each thread is associated with a Client
+    // (accessed by 'Client::getCurrent()'), which should be the same as the Client associated with
+    // this CurOp (by way of the OperationContext). Note that, if this is the "base" CurOp on the
+    // CurOpStack, then we don't yet hava an initialized pointer to the OperationContext, and we
+    // cannot perform this check. That is a rare case, however.
+    invariant(!_stack->opCtx() || Client::getCurrent() == _stack->opCtx()->getClient());
+
     auto start = _start.load();
     if (start != 0) {
         return start;
-    }
-
-    // Start the CPU timer if this system supports it.
-    if (auto cpuTimers = OperationCPUTimers::get(opCtx)) {
-        _cpuTimer = cpuTimers->makeTimer();
-        _cpuTimer->start();
     }
 
     // The '_start' value is initialized to 0 and gets assigned on demand the first time it gets
@@ -392,11 +399,12 @@ TickSource::Tick CurOp::startTime(OperationContext* opCtx) {
 }
 
 void CurOp::done() {
-    _end = _tickSource->getTicks();
+    // As documented in the 'CurOp::startTime()' member function, it is legal for this function to
+    // be called multiple times, but all calls must be in in the thread that "owns" this CurOp
+    // object.
+    invariant(!_stack->opCtx() || Client::getCurrent() == _stack->opCtx()->getClient());
 
-    if (_cpuTimer) {
-        _debug.cpuTime = _cpuTimer->getElapsed();
-    }
+    _end = _tickSource->getTicks();
 }
 
 Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
@@ -411,14 +419,14 @@ Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
     return _tickSource->ticksTo<Microseconds>(endTime - startTime);
 }
 
-void CurOp::enter_inlock(OperationContext* opCtx, NamespaceString nss, int dbProfileLevel) {
-    ensureStarted(opCtx);
+void CurOp::enter_inlock(NamespaceString nss, int dbProfileLevel) {
+    ensureStarted();
     _nss = std::move(nss);
     raiseDbProfileLevel(dbProfileLevel);
 }
 
-void CurOp::enter_inlock(OperationContext* opCtx, const DatabaseName& dbName, int dbProfileLevel) {
-    enter_inlock(opCtx, NamespaceString(dbName), dbProfileLevel);
+void CurOp::enter_inlock(const DatabaseName& dbName, int dbProfileLevel) {
+    enter_inlock(NamespaceString(dbName), dbProfileLevel);
 }
 
 void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
@@ -1011,10 +1019,6 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("operationMetrics", builder.obj());
     }
 
-    if (cpuTime > Nanoseconds::zero()) {
-        pAttrs->add("cpuNanos", durationCount<Nanoseconds>(cpuTime));
-    }
-
     if (client && client->session()) {
         pAttrs->add("remote", client->session()->remote());
     }
@@ -1194,10 +1198,6 @@ void OpDebug::append(OperationContext* opCtx,
 
     if (remoteOpWaitTime) {
         b.append("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
-    }
-
-    if (cpuTime > Nanoseconds::zero()) {
-        b.appendNumber("cpuNanos", durationCount<Nanoseconds>(cpuTime));
     }
 
     b.appendNumber("millis", durationCount<Milliseconds>(executionTime));
@@ -1502,12 +1502,6 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     addIfNeeded("remoteOpWaitMillis", [](auto field, auto args, auto& b) {
         if (args.op.remoteOpWaitTime) {
             b.append(field, durationCount<Milliseconds>(*args.op.remoteOpWaitTime));
-        }
-    });
-
-    addIfNeeded("cpuNanos", [](auto field, auto args, auto& b) {
-        if (args.op.cpuTime > Nanoseconds::zero()) {
-            b.appendNumber(field, durationCount<Nanoseconds>(args.op.cpuTime));
         }
     });
 

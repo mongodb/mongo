@@ -254,7 +254,7 @@ TEST(CurOpTest, ElapsedTimeReflectsTickSource) {
 
     ASSERT_FALSE(curop->isStarted());
 
-    curop->ensureStarted(opCtx.get());
+    curop->ensureStarted();
     ASSERT_TRUE(curop->isStarted());
 
     tickSourceMock->advance(Milliseconds{20});

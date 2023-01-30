@@ -297,11 +297,6 @@ public:
 
     // response info
     Microseconds executionTime{0};
-
-    // Amount of CPU time used by this thread. Will remain zero if this platform does not support
-    // this feature.
-    Nanoseconds cpuTime{0};
-
     long long nreturned{-1};
     int responseLength{-1};
 
@@ -458,8 +453,8 @@ public:
         return _originatingCommand;
     }
 
-    void enter_inlock(OperationContext* opCtx, NamespaceString nss, int dbProfileLevel);
-    void enter_inlock(OperationContext* opCtx, const DatabaseName& dbName, int dbProfileLevel);
+    void enter_inlock(NamespaceString nss, int dbProfileLevel);
+    void enter_inlock(const DatabaseName& dbName, int dbProfileLevel);
 
     /**
      * Sets the type of the current network operation.
@@ -580,8 +575,8 @@ public:
     // negative, if the system time has been reset during the course of this operation.
     //
 
-    void ensureStarted(OperationContext* opCtx) {
-        static_cast<void>(startTime(opCtx));
+    void ensureStarted() {
+        static_cast<void>(startTime());
     }
     bool isStarted() const {
         return _start.load() != 0;
@@ -886,7 +881,7 @@ public:
 private:
     class CurOpStack;
 
-    TickSource::Tick startTime(OperationContext* opCtx);
+    TickSource::Tick startTime();
     Microseconds computeElapsedTimeTotal(TickSource::Tick startTime,
                                          TickSource::Tick endTime) const;
 
@@ -914,10 +909,6 @@ private:
 
     // The time at which this CurOp instance was marked as done or 0 if the CurOp is not yet done.
     std::atomic<TickSource::Tick> _end{0};  // NOLINT
-
-    // This CPU timer tracks the CPU time spent for this operation. Will be nullptr on unsupported
-    // platforms.
-    std::unique_ptr<OperationCPUTimer> _cpuTimer;
 
     // The time at which this CurOp instance had its timer paused, or 0 if the timer is not
     // currently paused.

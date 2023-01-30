@@ -3,8 +3,8 @@
 //   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   requires_getmore,
-//   requires_fcv_63,
 //   requires_profiling,
+//   requires_fcv_51,
 // ]
 
 // Confirms that profiled getMore execution contains all expected metrics with proper values.
@@ -12,8 +12,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/os_helpers.js");  // For isLinux().
-load("jstests/libs/profiler.js");    // For getLatestProfilerEntry.
+load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
 
 const testDB = db.getSiblingDB("profile_getmore");
 assert.commandWorked(testDB.dropDatabase());
@@ -55,9 +54,6 @@ assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", profileObj);
 assert(profileObj.hasOwnProperty("execStats"), profileObj);
 assert(profileObj.execStats.hasOwnProperty("stage"), profileObj);
 assert(profileObj.hasOwnProperty("responseLength"), profileObj);
-if (isLinux()) {
-    assert(profileObj.hasOwnProperty("cpuNanos"), tojson(profileObj));
-}
 assert(profileObj.hasOwnProperty("numYield"), profileObj);
 assert(profileObj.hasOwnProperty("locks"), profileObj);
 assert(profileObj.locks.hasOwnProperty("Global"), profileObj);

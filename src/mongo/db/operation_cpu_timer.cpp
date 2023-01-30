@@ -73,9 +73,6 @@ MONGO_FAIL_POINT_DEFINE(hangCPUTimerAfterOnThreadDetach);
 
 class PosixTimer final : public OperationCPUTimer {
 public:
-    PosixTimer(OperationCPUTimers* timers) : OperationCPUTimer(timers) {}
-    ~PosixTimer() = default;
-
     Nanoseconds getElapsed() const override;
 
     void start() override;
@@ -160,12 +157,14 @@ Nanoseconds PosixTimer::_getThreadTime() const try {
     LOGV2_FATAL(4744601, "Failed to read the CPU time for the current thread", "error"_attr = ex);
 }
 
-// Set of timers created by this OperationContext.
-static auto getCPUTimers = OperationContext::declareDecoration<OperationCPUTimers>();
+static auto getCPUTimer = OperationContext::declareDecoration<PosixTimer>();
 
 }  // namespace
 
-OperationCPUTimers* OperationCPUTimers::get(OperationContext* opCtx) {
+OperationCPUTimer* OperationCPUTimer::get(OperationContext* opCtx) {
+    invariant(Client::getCurrent() && Client::getCurrent()->getOperationContext() == opCtx,
+              "Operation not attached to the current thread");
+
     // Checks for time support on POSIX platforms. In particular, it checks for support in presence
     // of SMP systems.
     static bool isTimeSupported = [] {
@@ -185,56 +184,15 @@ OperationCPUTimers* OperationCPUTimers::get(OperationContext* opCtx) {
 
     if (!isTimeSupported)
         return nullptr;
-
-    return &getCPUTimers(opCtx);
-}
-
-std::unique_ptr<OperationCPUTimer> OperationCPUTimers::makeTimer() {
-    return std::make_unique<PosixTimer>(this);
+    return &getCPUTimer(opCtx);
 }
 
 #else  // not defined(__linux__)
 
-OperationCPUTimers* OperationCPUTimers::get(OperationContext*) {
+OperationCPUTimer* OperationCPUTimer::get(OperationContext*) {
     return nullptr;
 }
 
-std::unique_ptr<OperationCPUTimer> OperationCPUTimers::makeTimer() {
-    MONGO_UNREACHABLE;
-}
-
 #endif  // defined(__linux__)
-
-OperationCPUTimer::OperationCPUTimer(OperationCPUTimers* timers) : _timers(timers) {
-    _it = _timers->_add(this);
-}
-
-OperationCPUTimer::~OperationCPUTimer() {
-    _timers->_remove(_it);
-}
-
-OperationCPUTimers::Iterator OperationCPUTimers::_add(OperationCPUTimer* timer) {
-    return _timers.insert(_timers.end(), timer);
-}
-
-void OperationCPUTimers::_remove(OperationCPUTimers::Iterator it) {
-    _timers.erase(it);
-}
-
-size_t OperationCPUTimers::count() const {
-    return _timers.size();
-}
-
-void OperationCPUTimers::onThreadAttach() {
-    for (auto& timer : _timers) {
-        timer->onThreadAttach();
-    }
-}
-
-void OperationCPUTimers::onThreadDetach() {
-    for (auto& timer : _timers) {
-        timer->onThreadDetach();
-    }
-}
 
 }  // namespace mongo

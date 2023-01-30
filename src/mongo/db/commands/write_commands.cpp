@@ -1524,7 +1524,7 @@ public:
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
                 curOp.setNS_inlock(ns());
                 curOp.setLogicalOp_inlock(LogicalOp::opInsert);
-                curOp.ensureStarted(opCtx);
+                curOp.ensureStarted();
                 curOp.debug().additiveMetrics.ninserted = 0;
             }
 

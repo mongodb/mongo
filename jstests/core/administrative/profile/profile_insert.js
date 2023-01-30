@@ -7,16 +7,15 @@
 //   assumes_no_implicit_index_creation,
 //   assumes_write_concern_unchanged,
 //   does_not_support_stepdowns,
-//   requires_fcv_63,
 //   requires_profiling,
 // ]
 
 (function() {
 "use strict";
 
+// For 'getLatestProfilerEntry()'.
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/libs/os_helpers.js");  // For isLinux().
-load("jstests/libs/profiler.js");    // For 'getLatestProfilerEntry()'.
+load("jstests/libs/profiler.js");
 
 var testDB = db.getSiblingDB("profile_insert");
 assert.commandWorked(testDB.dropDatabase());
@@ -43,9 +42,7 @@ assert.eq(profileObj.keysInserted, expectedKeysInserted, tojson(profileObj));
 assert.eq(profileObj.command.ordered, true, tojson(profileObj));
 assert.eq(profileObj.protocol, "op_msg", tojson(profileObj));
 assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
-if (isLinux()) {
-    assert(profileObj.hasOwnProperty("cpuNanos"), tojson(profileObj));
-}
+
 assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));

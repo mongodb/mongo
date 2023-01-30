@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   requires_capped,
- *   requires_fcv_63,
  *   requires_replication,
  *   requires_wiredtiger,
  *   # TODO SERVER-71170: docBytesRead for read operations using cqf are reported are higher than
@@ -16,11 +15,11 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
 load("jstests/libs/fixture_helpers.js");             // For isReplSet().
-load("jstests/libs/os_helpers.js");                  // For isLinux().
 
 const dbName = jsTestName();
 const collName = 'coll';
 
+const isLinux = getBuildInfo().buildEnvironment.target_os == "linux";
 const isDebugBuild = (db) => {
     return db.adminCommand('buildInfo').debug;
 };
@@ -49,7 +48,7 @@ const assertMetricsExist = (profilerEntry) => {
     // the OS may occasionally return the same CPU time between two different reads of the timer,
     // resulting in the server calculating zero elapsed time.
     // The CPU time metrics are only collected on Linux.
-    if (isLinux()) {
+    if (isLinux) {
         assert.gte(metrics.cpuNanos, 0);
     }
     assert.gte(metrics.docBytesWritten, 0);

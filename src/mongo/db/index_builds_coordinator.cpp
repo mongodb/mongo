@@ -355,7 +355,7 @@ void updateCurOpForCommitOrAbort(OperationContext* opCtx, StringData fieldName, 
     auto opDescObj = builder.obj();
     curOp->setLogicalOp_inlock(LogicalOp::opCommand);
     curOp->setOpDescription_inlock(opDescObj);
-    curOp->ensureStarted(opCtx);
+    curOp->ensureStarted();
 }
 
 /**
@@ -1907,7 +1907,7 @@ void IndexBuildsCoordinator::updateCurOpOpDescription(OperationContext* opCtx,
     curOp->setLogicalOp_inlock(LogicalOp::opCommand);
     curOp->setOpDescription_inlock(opDescObj);
     curOp->setNS_inlock(nss);
-    curOp->ensureStarted(opCtx);
+    curOp->ensureStarted();
 }
 
 Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(

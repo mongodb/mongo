@@ -5,7 +5,6 @@
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,
 //   does_not_support_stepdowns,
-//   requires_fcv_63,
 //   requires_profiling,
 //   uses_map_reduce_with_temp_collections,
 // ]
@@ -15,8 +14,8 @@
 (function() {
 "use strict";
 
-load("jstests/libs/os_helpers.js");  // For isLinux().
-load("jstests/libs/profiler.js");    // For 'getLatestProfilerEntry()'.
+// For 'getLatestProfilerEntry()'.
+load("jstests/libs/profiler.js");
 
 const testDB = db.getSiblingDB("profile_mapreduce");
 assert.commandWorked(testDB.dropDatabase());
@@ -56,9 +55,6 @@ assert.eq(profileObj.protocol, "op_msg", tojson(profileObj));
 assert.eq(coll.getName(), profileObj.command.mapreduce, tojson(profileObj));
 assert.eq({locale: "fr"}, profileObj.command.collation, tojson(profileObj));
 assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
-if (isLinux()) {
-    assert(profileObj.hasOwnProperty("cpuNanos"), tojson(profileObj));
-}
 assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));

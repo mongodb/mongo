@@ -148,8 +148,8 @@ bool haveClient() {
 ServiceContext::UniqueClient Client::releaseCurrent() {
     invariant(haveClient(), "No client to release");
     if (auto opCtx = currentClient->_opCtx)
-        if (auto timers = OperationCPUTimers::get(opCtx))
-            timers->onThreadDetach();
+        if (auto timer = OperationCPUTimer::get(opCtx))
+            timer->onThreadDetach();
     return std::move(currentClient);
 }
 
@@ -157,8 +157,8 @@ void Client::setCurrent(ServiceContext::UniqueClient client) {
     invariantNoCurrentClient();
     currentClient = std::move(client);
     if (auto opCtx = currentClient->_opCtx)
-        if (auto timers = OperationCPUTimers::get(opCtx))
-            timers->onThreadAttach();
+        if (auto timer = OperationCPUTimer::get(opCtx))
+            timer->onThreadAttach();
 }
 
 /**
