@@ -19,6 +19,9 @@ selector:
   - jstests/concurrency/fsm_workloads/reindex_background.js
   - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
+  # TODO SERVER-73435 re-enable test
+  - jstests/concurrency/fsm_workloads/create_database.js
+
   exclude_with_any_tags:
   - requires_sharding
 

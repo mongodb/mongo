@@ -9,10 +9,6 @@ selector:
   - jstests/concurrency/fsm_workloads/distinct_noindex.js
   - jstests/concurrency/fsm_workloads/distinct_projection.js
 
-  # SERVER-17397 Drops of sharded namespaces may not fully succeed
-  - jstests/concurrency/fsm_workloads/create_database.js
-  - jstests/concurrency/fsm_workloads/map_reduce_drop.js
-
   # SERVER-14669 Multi-removes that use $where miscount removed documents
   - jstests/concurrency/fsm_workloads/remove_where.js
 
