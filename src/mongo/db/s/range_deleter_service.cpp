@@ -475,7 +475,7 @@ void RangeDeleterService::onShutdown() {
 }
 
 BSONObj RangeDeleterService::dumpState() {
-    auto lock = _acquireMutexUnconditionally();
+    auto lock = _acquireMutexFailIfServiceNotUp();
 
     BSONObjBuilder builder;
     for (const auto& [collUUID, chunkRanges] : _rangeDeletionTasks) {
@@ -488,7 +488,7 @@ BSONObj RangeDeleterService::dumpState() {
 }
 
 long long RangeDeleterService::totalNumOfRegisteredTasks() {
-    auto lock = _acquireMutexUnconditionally();
+    auto lock = _acquireMutexFailIfServiceNotUp();
 
     long long counter = 0;
     for (const auto& [collUUID, ranges] : _rangeDeletionTasks) {

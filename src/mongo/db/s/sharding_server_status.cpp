@@ -129,7 +129,13 @@ public:
             ShardingStatistics::get(opCtx).report(&result);
             catalogCache->report(&result);
             if (mongo::feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
-                auto nRangeDeletions = RangeDeleterService::get(opCtx)->totalNumOfRegisteredTasks();
+                auto nRangeDeletions = [&]() {
+                    try {
+                        return RangeDeleterService::get(opCtx)->totalNumOfRegisteredTasks();
+                    } catch (const ExceptionFor<ErrorCodes::NotYetInitialized>&) {
+                        return 0LL;
+                    }
+                }();
                 result.appendNumber("rangeDeleterTasks", nRangeDeletions);
             }
 
