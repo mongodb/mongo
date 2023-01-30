@@ -72,8 +72,8 @@ selector:
   # list_catalog test will be broken as it checks for non-tenant-prefixed entries.
   - jstests/core/**/list_catalog.js
   # These tests create a new thread, so $tenant won't be properly injected.
-  - jstests/core/txns/txns/transactions_block_ddl.js
-  - jstests/core/txns/txns/write_conflicts_with_non_txns.js
+  - jstests/core/txns/transactions_block_ddl.js
+  - jstests/core/txns/write_conflicts_with_non_txns.js
   # TODO SERVER-72357: cannot get the expected error due to an authorization contract issue.
   - jstests/core/txns/multi_statement_transaction_command_args.js
   # TODO SERVER-73023 The tenantId is not attached to the namespace provided to failcommand
