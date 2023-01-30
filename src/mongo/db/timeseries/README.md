@@ -174,7 +174,7 @@ the index does not exist, then query-based reopening will not be used.
 ### Bucket Closure and Archival
 
 A bucket is permanently closed by setting the optional `control.closed` flag, which makes it
-ineligible for reopening. This can only be done manually for [Atlas Online Archive](https://www.mongodb.com/docs/atlas/online-archive/manage-online-archive/)).
+ineligible for reopening. This can only be done manually for [Atlas Online Archive](https://www.mongodb.com/docs/atlas/online-archive/manage-online-archive/).
 
 If the `BucketCatalog` is using more memory than it's given threshold (controlled by the server
 parameter `timeseriesIdleBucketExpiryMemoryUsageThreshold`), it will start to archive or close idle
