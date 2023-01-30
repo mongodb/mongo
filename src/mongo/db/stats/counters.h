@@ -429,6 +429,26 @@ public:
 };
 extern SortCounters sortCounters;
 
+class GroupCounters {
+public:
+    GroupCounters() = default;
+
+    void incrementGroupCounters(const GroupStats& stats) {
+        spills.increment(stats.spills);
+        spillFileSizeBytes.increment(stats.spillFileSizeBytes);
+        numBytesSpilledEstimate.increment(stats.numBytesSpilledEstimate);
+    }
+
+    CounterMetric spills{
+        "query.group.spills"};  // The total number of spills to disk from group stages.
+    CounterMetric spillFileSizeBytes{
+        "query.group.spillFileSizeBytes"};  // The size of the file spilled to disk.
+    CounterMetric numBytesSpilledEstimate{
+        "query.group.numBytesSpilledEstimate"};  // The number of bytes evicted from memory and
+                                                 // spilled to disk.
+};
+extern GroupCounters groupCounters;
+
 /**
  * Generic class for counters of expressions inside various MQL statements.
  */

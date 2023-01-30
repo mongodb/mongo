@@ -160,6 +160,8 @@ protected:
                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             boost::optional<size_t> maxMemoryUsageBytes = boost::none);
 
+    virtual ~DocumentSourceGroupBase();
+
     void initializeFromBson(BSONElement elem);
     virtual bool isSpecFieldReserved(StringData fieldName) = 0;
 
