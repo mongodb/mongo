@@ -82,6 +82,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(WTCompactIndexEBUSY);
 MONGO_FAIL_POINT_DEFINE(WTEmulateOutOfOrderNextIndexKey);
 MONGO_FAIL_POINT_DEFINE(WTIndexPauseAfterSearchNear);
+MONGO_FAIL_POINT_DEFINE(WTValidateIndexStructuralDamage);
 
 using std::string;
 using std::vector;
@@ -288,6 +289,15 @@ void WiredTigerIndex::fullValidate(OperationContext* opCtx,
                                    ValidateResults* fullResults) const {
     dassert(opCtx->lockState()->isReadLocked());
     if (fullResults && !WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->isEphemeral()) {
+        if (WTValidateIndexStructuralDamage.shouldFail()) {
+            std::string msg = str::stream() << "verify() returned an error. "
+                                            << "This indicates structural damage. "
+                                            << "Not examining individual index entries.";
+            fullResults->errors.push_back(msg);
+            fullResults->valid = false;
+            return;
+        }
+
         int err = WiredTigerUtil::verifyTable(opCtx, _uri, &(fullResults->errors));
         if (err == EBUSY) {
             std::string msg = str::stream()

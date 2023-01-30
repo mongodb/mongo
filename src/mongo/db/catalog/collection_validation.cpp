@@ -264,16 +264,18 @@ void _reportValidationResults(OperationContext* opCtx,
 
     // Report detailed index validation results gathered when using {full: true} for validated
     // indexes.
-    for (const auto& index : validateState->getIndexes()) {
-        const std::string indexName = index->descriptor()->indexName();
-        if (indexNsResultsMap->find(indexName) == indexNsResultsMap->end()) {
-            continue;
-        }
-
-        const ValidateResults& vr = indexNsResultsMap->at(indexName);
-
+    int nIndexes = indexNsResultsMap->size();
+    for (const auto& [indexName, vr] : *indexNsResultsMap) {
         if (!vr.valid) {
             results->valid = false;
+        }
+
+        if (validateState->getSkippedIndexes().contains(indexName)) {
+            // Index internal state was checked and cleared, so it was reported in indexResultsMap,
+            // but we did not verify the index contents against the collection, so we should exclude
+            // it from this report.
+            --nIndexes;
+            continue;
         }
 
         BSONObjBuilder bob(indexDetails.subobjStart(indexName));
@@ -291,7 +293,7 @@ void _reportValidationResults(OperationContext* opCtx,
         results->errors.insert(results->errors.end(), vr.errors.begin(), vr.errors.end());
     }
 
-    output->append("nIndexes", static_cast<int>(validateState->getIndexes().size()));
+    output->append("nIndexes", nIndexes);
     output->append("keysPerIndex", keysPerIndex->done());
     output->append("indexDetails", indexDetails.done());
 }

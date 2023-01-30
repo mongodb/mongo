@@ -91,13 +91,16 @@ public:
  * Calls validate on collection kNss with both kValidateFull and kValidateNormal validation levels
  * and verifies the results.
  */
-void foregroundValidate(
-    OperationContext* opCtx, bool valid, int numRecords, int numInvalidDocuments, int numErrors) {
-    std::vector<CollectionValidation::ValidateOptions> optionsList = {
-        CollectionValidation::ValidateOptions::kNoFullValidation,
-        CollectionValidation::ValidateOptions::kFullRecordStoreValidation,
-        CollectionValidation::ValidateOptions::kFullIndexValidation,
-        CollectionValidation::ValidateOptions::kFullValidation};
+void foregroundValidate(OperationContext* opCtx,
+                        bool valid,
+                        int numRecords,
+                        int numInvalidDocuments,
+                        int numErrors,
+                        std::initializer_list<CollectionValidation::ValidateOptions> optionsList = {
+                            CollectionValidation::ValidateOptions::kNoFullValidation,
+                            CollectionValidation::ValidateOptions::kFullRecordStoreValidation,
+                            CollectionValidation::ValidateOptions::kFullIndexValidation,
+                            CollectionValidation::ValidateOptions::kFullValidation}) {
     CollectionValidation::RepairMode repairMode = CollectionValidation::RepairMode::kNone;
     for (auto options : optionsList) {
         ValidateResults validateResults;
@@ -255,6 +258,19 @@ TEST_F(BackgroundCollectionValidationTest, BackgroundValidateError) {
                        /*numInvalidDocuments*/ 1,
                        /*numErrors*/ 1,
                        /*runForegroundAsWell*/ true);
+}
+
+TEST_F(BackgroundCollectionValidationTest, ValidateIndexDetailResultsSurfaceVerifyErrors) {
+    FailPointEnableBlock fp{"WTValidateIndexStructuralDamage"};
+    auto opCtx = operationContext();
+    insertDataRange(opCtx, 0, 5);  // initialize collection
+    foregroundValidate(
+        opCtx,
+        /*valid*/ false,
+        /*numRecords*/ std::numeric_limits<int32_t>::min(),           // uninitialized
+        /*numInvalidDocuments*/ std::numeric_limits<int32_t>::min(),  // uninitialized
+        /*numErrors*/ 1,
+        {CollectionValidation::ValidateOptions::kFullIndexValidation});
 }
 
 /**
