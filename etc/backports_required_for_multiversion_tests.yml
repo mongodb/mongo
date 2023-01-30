@@ -90,6 +90,8 @@ last-continuous:
     ticket: SERVER-68728
   - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
     ticket: SERVER-68648
+  - test_file: jstests/sharding/timeseries_cluster_indexstats.js
+    ticket: SERVER-72620
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -277,6 +279,8 @@ last-lts:
     ticket: SERVER-68728
   - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
     ticket: SERVER-68648
+  - test_file: jstests/sharding/timeseries_cluster_indexstats.js
+    ticket: SERVER-72620
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
