@@ -145,6 +145,10 @@ public:
         return _indexes;
     }
 
+    const StringSet& getSkippedIndexes() const {
+        return _skippedIndexes;
+    }
+
     /**
      * Map of index names to index cursors.
      */
@@ -256,6 +260,10 @@ private:
     std::map<std::string, std::unique_ptr<SortedDataInterfaceThrottleCursor>> _indexCursors;
     std::unique_ptr<SeekableRecordThrottleCursor> _traverseRecordStoreCursor;
     std::unique_ptr<SeekableRecordThrottleCursor> _seekRecordStoreCursor;
+
+    // Stores the set of indexes that will not be validated for some reason, e.g. they are not
+    // ready.
+    StringSet _skippedIndexes;
 
     RecordId _firstRecordId;
 

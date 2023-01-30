@@ -272,6 +272,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
                   "checkpoint.",
                   "desc_indexName"_attr = desc->indexName(),
                   "nss"_attr = _nss);
+            _skippedIndexes.emplace(desc->indexName());
             continue;
         }
 
@@ -289,12 +290,15 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
                   "yet in a checkpoint.",
                   "desc_indexName"_attr = desc->indexName(),
                   "nss"_attr = _nss);
+            _skippedIndexes.emplace(desc->indexName());
             continue;
         }
 
         auto iam = entry->accessMethod()->asSortedData();
-        if (!iam)
+        if (!iam) {
+            _skippedIndexes.emplace(desc->indexName());
             continue;
+        }
 
         _indexCursors.emplace(
             desc->indexName(),
