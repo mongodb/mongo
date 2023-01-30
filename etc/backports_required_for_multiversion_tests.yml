@@ -244,6 +244,8 @@ last-continuous:
     ticket: SERVER-72422
   - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
     ticket: SERVER-68648
+  - test_file: jstests/sharding/timeseries_cluster_indexstats.js
+    ticket: SERVER-72620
   suites: null
 last-lts:
   all:
@@ -565,4 +567,6 @@ last-lts:
     ticket: SERVER-72422
   - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
     ticket: SERVER-68648
+  - test_file: jstests/sharding/timeseries_cluster_indexstats.js
+    ticket: SERVER-72620
   suites: null
