@@ -152,7 +152,7 @@ Status refreshDbMetadata(OperationContext* opCtx,
         }
     }
 
-    Lock::DBLock dbLock(opCtx, dbName, MODE_X);
+    Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
         opCtx, dbName, DSSAcquisitionMode::kExclusive);
     if (!cancellationToken.isCanceled()) {
