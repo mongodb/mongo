@@ -31,7 +31,7 @@
 
 
 namespace mongo::optimizer {
-bool EvalPathLowering::optimize(ABT& n) {
+bool EvalPathLowering::optimize(ABT& n, bool rebuild) {
     _changed = false;
 
     algebra::transport<true>(n, *this);
@@ -39,7 +39,7 @@ bool EvalPathLowering::optimize(ABT& n) {
     // This is needed for cases in which EvalPathLowering is called from a context other than during
     // PathLowering. If the ABT is modified in a way that adds variable references and definitions
     // the environment must be updated.
-    if (_changed) {
+    if (_changed && rebuild) {
         _env.rebuild(n);
     }
 
@@ -223,7 +223,7 @@ void EvalPathLowering::transport(ABT& n, const EvalPath&, ABT& path, ABT& input)
     _changed = true;
 }
 
-bool EvalFilterLowering::optimize(ABT& n) {
+bool EvalFilterLowering::optimize(ABT& n, bool rebuild) {
     _changed = false;
 
     algebra::transport<true>(n, *this);
@@ -231,7 +231,7 @@ bool EvalFilterLowering::optimize(ABT& n) {
     // This is needed for cases in which EvalFilterLowering is called from a context other than
     // during PathLowering. If the ABT is modified in a way that adds variable references or
     // definitions the environment must be updated.
-    if (_changed) {
+    if (_changed && rebuild) {
         _env.rebuild(n);
     }
 
@@ -414,11 +414,11 @@ void EvalFilterLowering::transport(ABT& n, const EvalFilter&, ABT& path, ABT& in
 }
 
 void PathLowering::transport(ABT& n, const EvalPath&, ABT&, ABT&) {
-    _changed = _changed || _project.optimize(n);
+    _changed = _changed || _project.optimize(n, false /*rebuild*/);
 }
 
 void PathLowering::transport(ABT& n, const EvalFilter&, ABT&, ABT&) {
-    _changed = _changed || _filter.optimize(n);
+    _changed = _changed || _filter.optimize(n, false /*rebuild*/);
 }
 
 bool PathLowering::optimize(ABT& n) {
