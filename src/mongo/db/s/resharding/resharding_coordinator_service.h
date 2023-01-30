@@ -60,7 +60,8 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                  ReshardingMetrics* metrics,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
-                                 Timestamp newCollectionTimestamp);
+                                 Timestamp newCollectionTimestamp,
+                                 boost::optional<CollectionIndexes> indexVersion);
 
 void updateTagsDocsForTempNss(OperationContext* opCtx,
                               const ReshardingCoordinatorDocument& coordinatorDoc);
@@ -105,6 +106,9 @@ public:
     boost::optional<CollectionIndexes> getCatalogIndexVersion(OperationContext* opCtx,
                                                               const NamespaceString& nss,
                                                               const UUID& uuid);
+
+    boost::optional<CollectionIndexes> getCatalogIndexVersionForCommit(OperationContext* opCtx,
+                                                                       const NamespaceString& nss);
 
     virtual void sendCommandToShards(OperationContext* opCtx,
                                      StringData dbName,

@@ -554,24 +554,40 @@ assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments
 assert.commandWorked(
     st.s.adminCommand({shardCollection: nss6, key: {_id: 1}, primaryShard: shard0}));
 
-const collection6UUID = st.s.getCollection('config.collections').findOne({_id: nss6}).uuid;
+assert.commandWorked(st.s.adminCommand({split: nss6, middle: {_id: 0}}));
+assert.commandWorked(st.s.adminCommand({moveChunk: nss6, find: {_id: 0}, to: shard1}));
+
+const collection6UUID = st.s.getCollection(configsvrCollectionCatalog).findOne({_id: nss6}).uuid;
 registerIndex(st.rs0, nss6, index1Pattern, index1Name, collection6UUID);
 registerIndex(st.rs0, nss6, index2Pattern, index2Name, collection6UUID);
+
+const beforeReshardingIndexVersion =
+    st.s.getCollection(configsvrCollectionCatalog).findOne({_id: nss6}).indexVersion;
 
 assert.commandWorked(st.s.getDB(dbName).runCommand(
     {createIndexes: collection6Name, indexes: [{key: {x: 1}, name: 'x_1'}]}));
 
-assert.commandWorked(st.s.adminCommand({reshardCollection: nss6, key: {x: 1}}));
-const collection6UUIDAfterResharding =
-    st.s.getCollection('config.collections').findOne({_id: nss6}).uuid;
+// Give enough cardinality for two chunks to resharding.
+assert.commandWorked(st.s.getCollection(nss6).insert({x: 0}));
+assert.commandWorked(st.s.getCollection(nss6).insert({x: 1}));
 
-assert.neq(collection6UUID, collection6UUIDAfterResharding);
+assert.commandWorked(st.s.adminCommand({reshardCollection: nss6, key: {x: 1}}));
+const collection6AfterResharding =
+    st.s.getCollection(configsvrCollectionCatalog).findOne({_id: nss6});
+
+assert.gte(collection6AfterResharding.indexVersion, beforeReshardingIndexVersion);
+assert.eq(
+    st.rs0.getPrimary().getCollection(shardCollectionCatalog).findOne({_id: nss6}).indexVersion,
+    collection6AfterResharding.indexVersion);
+assert.eq(
+    st.rs1.getPrimary().getCollection(shardCollectionCatalog).findOne({_id: nss6}).indexVersion,
+    collection6AfterResharding.indexVersion);
 
 assert.eq(0, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
     collectionUUID: collection6UUID
 }));
 assert.eq(2, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
-    collectionUUID: collection6UUIDAfterResharding
+    collectionUUID: collection6AfterResharding.uuid
 }));
 
 assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
@@ -579,7 +595,15 @@ assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments
 }));
 
 assert.eq(2, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
-    collectionUUID: collection6UUIDAfterResharding
+    collectionUUID: collection6AfterResharding.uuid
+}));
+
+assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection6UUID
+}));
+
+assert.eq(2, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection6AfterResharding.uuid
 }));
 
 st.stop();

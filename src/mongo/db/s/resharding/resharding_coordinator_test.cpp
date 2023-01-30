@@ -633,7 +633,8 @@ protected:
                                     _metrics.get(),
                                     expectedCoordinatorDoc,
                                     _finalEpoch,
-                                    _finalTimestamp);
+                                    _finalTimestamp,
+                                    boost::none);
 
         updateTagsDocsForTempNss(operationContext(), expectedCoordinatorDoc);
 
