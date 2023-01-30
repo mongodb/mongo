@@ -1526,7 +1526,7 @@ buildvariants:
       <<: *compile-expansions
       compile-variant: -arm64
     run_on:
-      - "amazon2-arm64"
+      - "amazon2-arm64-large"
     tasks:
       - name: compile
 
@@ -1553,7 +1553,7 @@ buildvariants:
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
     run_on:
-      - "amazon2-arm64"
+      - "amazon2-arm64-large"
     tasks:
       - name: compile_mongocrypt_shlib
 
