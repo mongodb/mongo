@@ -50,6 +50,7 @@
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/historical_ident_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
@@ -589,7 +590,7 @@ bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
  * rebuild the index.
  */
 StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAndIdents(
-    OperationContext* opCtx, LastShutdownState lastShutdownState) {
+    OperationContext* opCtx, Timestamp stableTs, LastShutdownState lastShutdownState) {
     // Gather all tables known to the storage engine and drop those that aren't cross-referenced
     // in the _mdb_catalog. This can happen for two reasons.
     //
@@ -656,16 +657,23 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         }
 
         const auto& toRemove = it;
-        LOGV2(22251, "Dropping unknown ident", "ident"_attr = toRemove);
-        WriteUnitOfWork wuow(opCtx);
-        Status status = _engine->dropIdent(opCtx->recoveryUnit(), toRemove);
-        if (!status.isOK()) {
-            // A concurrent operation, such as a checkpoint could be holding an open data handle on
-            // the ident. Handoff the ident drop to the ident reaper to retry later.
-            addDropPendingIdent(
-                Timestamp::min(), std::make_shared<Ident>(toRemove), /*onDrop=*/nullptr);
+        Timestamp identDropTs = feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()
+            ? stableTs
+            : Timestamp::min();
+        LOGV2(22251, "Dropping unknown ident", "ident"_attr = toRemove, "ts"_attr = identDropTs);
+        if (!identDropTs.isNull()) {
+            addDropPendingIdent(identDropTs, std::make_shared<Ident>(toRemove), /*onDrop=*/nullptr);
+        } else {
+            WriteUnitOfWork wuow(opCtx);
+            Status status = _engine->dropIdent(opCtx->recoveryUnit(), toRemove);
+            if (!status.isOK()) {
+                // A concurrent operation, such as a checkpoint could be holding an open data handle
+                // on the ident. Handoff the ident drop to the ident reaper to retry later.
+                addDropPendingIdent(
+                    identDropTs, std::make_shared<Ident>(toRemove), /*onDrop=*/nullptr);
+            }
+            wuow.commit();
         }
-        wuow.commit();
     }
 
     // Scan all collections in the catalog and make sure their ident is known to the storage

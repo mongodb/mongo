@@ -628,8 +628,9 @@ public:
     };
 
     /**
-     * Drop abandoned idents. If successful, returns a ReconcileResult with indexes that need to be
-     * rebuilt or builds that need to be restarted.
+     * Drop abandoned idents using two-phase drop at the stable timestamp. Idents may be needed for
+     * reads between the oldest and stable timestamps. If successful, returns a ReconcileResult with
+     * indexes that need to be rebuilt or builds that need to be restarted.
      *
      * Abandoned internal idents require special handling based on the context known only to the
      * caller. For example, on starting from a previous unclean shutdown, we would always drop all
@@ -637,7 +638,7 @@ public:
      * information for resuming index builds.
      */
     virtual StatusWith<ReconcileResult> reconcileCatalogAndIdents(
-        OperationContext* opCtx, LastShutdownState lastShutdownState) = 0;
+        OperationContext* opCtx, Timestamp stableTs, LastShutdownState lastShutdownState) = 0;
 
     /**
      * Returns the all_durable timestamp. All transactions with timestamps earlier than the

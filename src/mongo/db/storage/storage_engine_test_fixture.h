@@ -116,14 +116,14 @@ public:
 
     StatusWith<StorageEngine::ReconcileResult> reconcile(OperationContext* opCtx) {
         Lock::GlobalLock globalLock{opCtx, MODE_IX};
-        return _storageEngine->reconcileCatalogAndIdents(opCtx,
-                                                         StorageEngine::LastShutdownState::kClean);
+        return _storageEngine->reconcileCatalogAndIdents(
+            opCtx, Timestamp::min(), StorageEngine::LastShutdownState::kClean);
     }
 
     StatusWith<StorageEngine::ReconcileResult> reconcileAfterUncleanShutdown(
         OperationContext* opCtx) {
         return _storageEngine->reconcileCatalogAndIdents(
-            opCtx, StorageEngine::LastShutdownState::kUnclean);
+            opCtx, Timestamp::min(), StorageEngine::LastShutdownState::kUnclean);
     }
 
     std::vector<std::string> getAllKVEngineIdents(OperationContext* opCtx) {

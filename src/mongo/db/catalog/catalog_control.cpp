@@ -254,9 +254,10 @@ void openCatalog(OperationContext* opCtx,
     storageEngine->loadCatalog(opCtx, stableTimestamp, StorageEngine::LastShutdownState::kClean);
 
     LOGV2(20274, "openCatalog: reconciling catalog and idents");
-    auto reconcileResult = fassert(
-        40688,
-        storageEngine->reconcileCatalogAndIdents(opCtx, StorageEngine::LastShutdownState::kClean));
+    auto reconcileResult =
+        fassert(40688,
+                storageEngine->reconcileCatalogAndIdents(
+                    opCtx, stableTimestamp, StorageEngine::LastShutdownState::kClean));
 
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.

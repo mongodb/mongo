@@ -195,8 +195,8 @@ findWithIndex(restartInsertTS, ErrorCodes.BadValue);
 
 assert.eq(3, findWithIndex(undefined)["cursor"]["firstBatch"].length);
 
-const finalInsertTS = insert({a: 3});
-assert.eq(4, findWithIndex(finalInsertTS)["cursor"]["firstBatch"].length);
+const insertAfterIndexBuildTS = insert({a: 3});
+assert.eq(4, findWithIndex(insertAfterIndexBuildTS)["cursor"]["firstBatch"].length);
 assert.eq(4, findWithIndex(undefined)["cursor"]["firstBatch"].length);
 
 // Demonstrate that durable history can be used across a restart with a finished index.
@@ -204,7 +204,8 @@ assert.commandWorked(testDB().adminCommand({fsync: 1}));
 replTest.restart(primary());
 
 assert.eq(4, findWithIndex(undefined)["cursor"]["firstBatch"].length);
-assert.eq(5, findWithIndex(insert({a: 4}))["cursor"]["firstBatch"].length);
+const insertAfterRestartAfterIndexBuild = insert({a: 4});
+assert.eq(5, findWithIndex(insertAfterRestartAfterIndexBuild)["cursor"]["firstBatch"].length);
 assert.eq(5, findWithIndex(undefined)["cursor"]["firstBatch"].length);
 
 findWithIndex(
@@ -219,7 +220,32 @@ findWithIndex(
     restartInsertTS,
     pointInTimeCatalogLookupsAreEnabled ? ErrorCodes.BadValue : ErrorCodes.SnapshotUnavailable);
 
-assert.eq(4, findWithIndex(finalInsertTS)["cursor"]["firstBatch"].length);
+assert.eq(4, findWithIndex(insertAfterIndexBuildTS)["cursor"]["firstBatch"].length);
+
+if (pointInTimeCatalogLookupsAreEnabled) {
+    // Drop the index and demonstrate the durable history can be used across a restart for reads
+    // with times prior to the drop.
+    const dropIndexTS = assert.commandWorked(coll().dropIndex(indexSpec)).operationTime;
+    jsTestLog("Index drop timestamp: " + tojson(dropIndexTS));
+
+    // Take a checkpoint to persist the new catalog entry of the index being rebuilt.
+    assert.commandWorked(testDB().adminCommand({fsync: 1}));
+
+    replTest.stop(0, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
+    replTest.start(
+        0,
+        {
+            setParameter: {
+                // To control durable history more predictably, disable the checkpoint thread.
+                syncdelay: 0
+            }
+        },
+        true /* restart */);
+
+    // Test that we can read using the dropped index on timestamps before the drop
+    assert.eq(4, findWithIndex(insertAfterIndexBuildTS)["cursor"]["firstBatch"].length);
+    assert.eq(5, findWithIndex(insertAfterRestartAfterIndexBuild)["cursor"]["firstBatch"].length);
+}
 
 replTest.stopSet();
 })();

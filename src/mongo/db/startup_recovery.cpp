@@ -340,8 +340,11 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(
     OperationContext* opCtx,
     StorageEngine* storageEngine,
     StorageEngine::LastShutdownState lastShutdownState) {
+
     auto reconcileResult =
-        fassert(40593, storageEngine->reconcileCatalogAndIdents(opCtx, lastShutdownState));
+        fassert(40593,
+                storageEngine->reconcileCatalogAndIdents(
+                    opCtx, storageEngine->getStableTimestamp(), lastShutdownState));
 
     auto tempDir = boost::filesystem::path(storageGlobalParams.dbpath).append("_tmp");
     if (reconcileResult.indexBuildsToResume.empty() ||

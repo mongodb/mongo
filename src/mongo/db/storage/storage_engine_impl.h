@@ -331,7 +331,7 @@ public:
                                                       CheckpointLock::Mode mode) override;
 
     StatusWith<ReconcileResult> reconcileCatalogAndIdents(
-        OperationContext* opCtx, LastShutdownState lastShutdownState) override;
+        OperationContext* opCtx, Timestamp stableTs, LastShutdownState lastShutdownState) override;
 
     std::string getFilesystemPathForDb(const DatabaseName& dbName) const override;
 
