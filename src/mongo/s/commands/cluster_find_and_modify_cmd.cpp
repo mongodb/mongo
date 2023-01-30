@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_set.h"
@@ -61,6 +58,7 @@
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/session_catalog_router.h"
+#include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
@@ -139,8 +137,8 @@ BSONObj getShardKey(OperationContext* opCtx,
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(
         opCtx, nss, collation, verbosity, let, runtimeConstants);
 
-    BSONObj shardKey =
-        uassertStatusOK(chunkMgr.getShardKeyPattern().extractShardKeyFromQuery(expCtx, query));
+    BSONObj shardKey = uassertStatusOK(
+        extractShardKeyFromBasicQueryWithContext(expCtx, chunkMgr.getShardKeyPattern(), query));
     uassert(ErrorCodes::ShardKeyNotFound,
             "Query for sharded findAndModify must contain the shard key",
             !shardKey.isEmpty());

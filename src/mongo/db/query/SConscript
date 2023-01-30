@@ -105,16 +105,19 @@ env.Library(
 )
 
 env.Library(
-    target="query_plan_cache",
+    target='query_plan_cache',
     source=[
-        "classic_plan_cache.cpp",
-        "plan_cache_callbacks.cpp",
-        "plan_cache_invalidator.cpp",
-        "sbe_plan_cache.cpp",
+        'classic_plan_cache.cpp',
+        'plan_cache_callbacks.cpp',
+        'plan_cache_invalidator.cpp',
+        'sbe_plan_cache.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base", "$BUILD_DIR/mongo/db/exec/sbe/query_sbe", "canonical_query",
-        "memory_util"
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe',
+        '$BUILD_DIR/mongo/db/query_expressions',
+        'canonical_query',
+        'memory_util',
     ],
 )
 

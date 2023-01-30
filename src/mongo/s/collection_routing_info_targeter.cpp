@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-
 #include "mongo/s/collection_routing_info_targeter.h"
-
-#include <csignal>
 
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
@@ -53,11 +50,9 @@
 #include "mongo/s/cluster_ddl.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
-
-#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -149,8 +144,8 @@ BSONObj getUpdateExprForTargeting(const boost::intrusive_ptr<ExpressionContext> 
     // We are missing _id, so attempt to extract it from an exact match in the update's query spec.
     // This will guarantee that we can target a single shard, but it is not necessarily fatal if no
     // exact _id can be found.
-    const auto idFromQuery =
-        uassertStatusOK(kVirtualIdShardKey.extractShardKeyFromQuery(expCtx, updateQuery));
+    const auto idFromQuery = uassertStatusOK(
+        extractShardKeyFromBasicQueryWithContext(expCtx, kVirtualIdShardKey, updateQuery));
     if (auto idElt = idFromQuery[kIdFieldName]) {
         updateExpr = updateExpr.addField(idElt);
     }
@@ -472,8 +467,9 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     // to target based on the replacement doc, it could result in an insertion even if a document
     // matching the query exists on another shard.
     if (isUpsert) {
-        return targetByShardKey(shardKeyPattern.extractShardKeyFromQuery(expCtx, query),
-                                "Failed to target upsert by query");
+        return targetByShardKey(
+            extractShardKeyFromBasicQueryWithContext(expCtx, shardKeyPattern, query),
+            "Failed to target upsert by query");
     }
 
     // We first try to target based on the update's query. It is always valid to forward any update
@@ -562,8 +558,8 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
         // Sharded collections have the following further requirements for targeting:
         //
         // Limit-1 deletes must be targeted exactly by shard key *or* exact _id
-        shardKey = uassertStatusOK(
-            _cri.cm.getShardKeyPattern().extractShardKeyFromQuery(expCtx, deleteQuery));
+        shardKey = uassertStatusOK(extractShardKeyFromBasicQueryWithContext(
+            expCtx, _cri.cm.getShardKeyPattern(), deleteQuery));
     }
 
     // Target the shard key or delete query

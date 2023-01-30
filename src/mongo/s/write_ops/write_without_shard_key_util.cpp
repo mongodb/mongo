@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 
 #include "mongo/bson/bsonobj.h"
@@ -37,6 +38,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
+#include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -138,7 +140,7 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
     }
 
     auto shardKey =
-        uassertStatusOK(cm.getShardKeyPattern().extractShardKeyFromQuery(opCtx, nss, query));
+        uassertStatusOK(extractShardKeyFromBasicQuery(opCtx, nss, cm.getShardKeyPattern(), query));
 
     // 'shardKey' will only be populated only if a full equality shard key is extracted.
     if (shardKey.isEmpty()) {

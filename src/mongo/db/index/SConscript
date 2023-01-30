@@ -15,7 +15,10 @@ env.Benchmark(
 
 env.Library(
     target='expression_params',
-    source=['expression_params.cpp', 's2_common.cpp'],
+    source=[
+        'expression_params.cpp',
+        's2_common.cpp',
+    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
@@ -96,10 +99,10 @@ iamEnv.Library(
 )
 
 iamEnv.Library(
-    target="column_store_index",
+    target='column_store_index',
     source=[
         'column_cell.cpp',
-        "column_store_sorter.cpp",
+        'column_store_sorter.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',

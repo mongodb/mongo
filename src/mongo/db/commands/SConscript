@@ -651,8 +651,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/s/grid',
-        '$BUILD_DIR/mongo/s/write_ops/cluster_write_ops',
+        '$BUILD_DIR/mongo/s/sharding_api',
         'cluster_server_parameter_cmds_idl',
     ],
 )

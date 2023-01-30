@@ -30,10 +30,10 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <memory>
 
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
@@ -180,6 +180,27 @@ public:
 
     long long getSessionOplogEntriesToBeMigratedSoFar();
     long long getSessionOplogEntriesSkippedSoFarLowerBound();
+
+    /**
+     * Given an Oplog entry, extracts the shard key corresponding to the key pattern for insert,
+     * update, and delete op types. If the op type is not a CRUD operation, an empty BSONObj()
+     * will be returned.
+     *
+     * For update and delete operations, the Oplog entry will contain an object with the document
+     * key.
+     *
+     * For insert operations, the Oplog entry will contain the original document from which the
+     * document key must be extracted
+     *
+     * Examples:
+     *  For KeyPattern {'a.b': 1}
+     *   If the oplog entries contains field op='i'
+     *     oplog contains: { a : { b : "1" } }
+     *   If the oplog entries contains field op='u' or op='d'
+     *     oplog contains: { 'a.b': "1" }
+     */
+    static BSONObj extractShardKeyFromOplogEntry(const ShardKeyPattern& shardKeyPattern,
+                                                 const repl::OplogEntry& entry);
 
 private:
     /**

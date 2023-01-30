@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -46,10 +43,10 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
+#include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 namespace {
@@ -145,8 +142,8 @@ public:
 
             if (find) {
                 // find
-                BSONObj shardKey = uassertStatusOK(
-                    chunkManager.getShardKeyPattern().extractShardKeyFromQuery(opCtx, ns(), *find));
+                BSONObj shardKey = uassertStatusOK(extractShardKeyFromBasicQuery(
+                    opCtx, ns(), chunkManager.getShardKeyPattern(), *find));
 
                 uassert(656450,
                         str::stream() << "no shard key found in chunk query " << *find,

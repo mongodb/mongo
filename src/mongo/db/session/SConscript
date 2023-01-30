@@ -54,7 +54,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
-        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
         'logical_session_id',
         'logical_session_id_helpers',
     ],

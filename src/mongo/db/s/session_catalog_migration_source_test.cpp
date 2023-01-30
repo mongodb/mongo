@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
 #include <utility>
 #include <vector>
@@ -139,6 +137,31 @@ repl::OplogEntry makeOplogEntry(
                           preImageOpTime,
                           postImageOpTime,
                           needsRetryImage);
+}
+
+repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
+                                repl::OpTypeEnum opType,
+                                BSONObj oField,
+                                boost::optional<BSONObj> o2Field = boost::none) {
+    return {
+        repl::DurableOplogEntry(opTime,                           // optime
+                                opType,                           // opType
+                                kNs,                              // namespace
+                                boost::none,                      // uuid
+                                boost::none,                      // fromMigrate
+                                repl::OplogEntry::kOplogVersion,  // version
+                                oField,                           // o
+                                o2Field,                          // o2
+                                {},                               // sessionInfo
+                                boost::none,                      // upsert
+                                Date_t(),                         // wall clock time
+                                {},                               // statement ids
+                                boost::none,    // optime of previous write within same transaction
+                                boost::none,    // pre-image optime
+                                boost::none,    // post-image optime
+                                boost::none,    // ShardId of resharding recipient
+                                boost::none,    // _id
+                                boost::none)};  // needsRetryImage
 }
 
 repl::OplogEntry makeSentinelOplogEntry(const LogicalSessionId& sessionId,
@@ -3032,6 +3055,84 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldSkipOplogEntryWorksWithRewritten
 
     ASSERT_FALSE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
         rewrittenEntryOne, shardKeyPattern, kNestedChunkRange));
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, ExtractShardKeyFromOplogUnnested) {
+    //
+    // Unnested ShardKeyPatterns from oplog entries with CRUD operation
+    //
+
+    ShardKeyPattern pattern(BSON("a" << 1));
+    auto deleteOplog = makeOplogEntry(repl::OpTime(Timestamp(50, 10), 1),  // optime
+                                      repl::OpTypeEnum::kDelete,           // op type
+                                      BSON("_id" << 1 << "a" << 5));       // o
+    auto insertOplog = makeOplogEntry(repl::OpTime(Timestamp(60, 10), 1),  // optime
+                                      repl::OpTypeEnum::kInsert,           // op type
+                                      BSON("_id" << 2 << "a" << 6));       // o
+    auto updateOplog = makeOplogEntry(repl::OpTime(Timestamp(70, 10), 1),  // optime
+                                      repl::OpTypeEnum::kUpdate,           // op type
+                                      BSON("_id" << 3),                    // o
+                                      BSON("_id" << 3 << "a" << 7));       // o2
+
+    ASSERT_BSONOBJ_EQ(
+        SessionCatalogMigrationSource::extractShardKeyFromOplogEntry(pattern, deleteOplog),
+        fromjson("{a: 5}"));
+    ASSERT_BSONOBJ_EQ(
+        SessionCatalogMigrationSource::extractShardKeyFromOplogEntry(pattern, insertOplog),
+        fromjson("{a: 6}"));
+    ASSERT_BSONOBJ_EQ(
+        SessionCatalogMigrationSource::extractShardKeyFromOplogEntry(pattern, updateOplog),
+        fromjson("{a: 7}"));
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, ExtractShardKeyFromOplogNested) {
+    //
+    // Nested ShardKeyPatterns from oplog entries with CRUD operation
+    //
+
+    ShardKeyPattern pattern(BSON("a.b" << 1));
+    auto deleteOplog = makeOplogEntry(repl::OpTime(Timestamp(50, 10), 1),          // optime
+                                      repl::OpTypeEnum::kDelete,                   // op type
+                                      BSON("_id" << 1 << "a.b" << 5));             // o
+    auto insertOplog = makeOplogEntry(repl::OpTime(Timestamp(60, 10), 1),          // optime
+                                      repl::OpTypeEnum::kInsert,                   // op type
+                                      BSON("_id" << 2 << "a" << BSON("b" << 6)));  // o
+    auto updateOplog = makeOplogEntry(repl::OpTime(Timestamp(70, 10), 1),          // optime
+                                      repl::OpTypeEnum::kUpdate,                   // op type
+                                      BSON("_id" << 3),                            // o
+                                      BSON("_id" << 3 << "a.b" << 7));             // o2
+
+    ASSERT_BSONOBJ_EQ(
+        SessionCatalogMigrationSource::extractShardKeyFromOplogEntry(pattern, deleteOplog),
+        fromjson("{'a.b': 5}"));
+    ASSERT_BSONOBJ_EQ(
+        SessionCatalogMigrationSource::extractShardKeyFromOplogEntry(pattern, insertOplog),
+        fromjson("{'a.b': 6}"));
+    ASSERT_BSONOBJ_EQ(
+        SessionCatalogMigrationSource::extractShardKeyFromOplogEntry(pattern, updateOplog),
+        fromjson("{'a.b': 7}"));
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, ExtractShardKeyFromOplogNonCRUD) {
+    //
+    // Oplogs with non-CRUD op types
+    //
+
+    ShardKeyPattern pattern(BSON("a.b" << 1));
+    auto noopOplog = makeOplogEntry(repl::OpTime(Timestamp(50, 10), 1),     // optime
+                                    repl::OpTypeEnum::kNoop,                // op type
+                                    BSON("_id" << 1 << "a.b" << 5));        // o
+    auto commandOplog = makeOplogEntry(repl::OpTime(Timestamp(60, 10), 1),  // optime
+                                       repl::OpTypeEnum::kCommand,          // op type
+                                       BSON("create"
+                                            << "c"));  // o
+
+    ASSERT_BSONOBJ_EQ(
+        SessionCatalogMigrationSource::extractShardKeyFromOplogEntry(pattern, noopOplog),
+        BSONObj());
+    ASSERT_BSONOBJ_EQ(
+        SessionCatalogMigrationSource::extractShardKeyFromOplogEntry(pattern, commandOplog),
+        BSONObj());
 }
 
 }  // namespace

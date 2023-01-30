@@ -7,18 +7,22 @@ env = env.Clone()
 env.Library(
     target='cluster_query',
     source=[
+        'cluster_client_cursor_impl.cpp',
         'cluster_find.cpp',
         'cluster_query_knobs.idl',
+        'store_possible_cursor.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
+        '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/db/query/query_common',
         '$BUILD_DIR/mongo/s/sharding_router_api',
-        'cluster_client_cursor',
+        'async_results_merger',
         'cluster_cursor_cleanup_job',
-        'store_possible_cursor',
+        'cluster_cursor_manager',
+        'router_exec_stage',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
@@ -37,26 +41,17 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface',
         '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
+        '$BUILD_DIR/mongo/db/shared_request_handling',
         '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
         '$BUILD_DIR/mongo/db/views/views',
-        '$BUILD_DIR/mongo/s/query/cluster_client_cursor',
         'cluster_query',
+        'router_exec_stage',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
+        'async_results_merger',
         'cqf_utils',
-    ],
-)
-
-env.Library(
-    target='cluster_client_cursor',
-    source=[
-        'cluster_client_cursor_impl.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/shared_request_handling',
-        'router_exec_stage',
     ],
 )
 
@@ -104,20 +99,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
-    ],
-)
-
-env.Library(
-    target="store_possible_cursor",
-    source=[
-        "store_possible_cursor.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "$BUILD_DIR/mongo/db/query/op_metrics",
-        "cluster_client_cursor",
-        "cluster_cursor_manager",
     ],
 )
 
@@ -180,9 +161,8 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "async_results_merger",
         "cluster_aggregate",
-        "cluster_client_cursor",
         "cluster_cursor_manager",
+        "cluster_query",
         "router_exec_stage",
-        "store_possible_cursor",
     ],
 )

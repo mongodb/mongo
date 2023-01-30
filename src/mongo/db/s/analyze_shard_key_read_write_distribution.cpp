@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/analyze_shard_key_read_write_distribution.h"
 
 #include "mongo/db/db_raii.h"
@@ -41,6 +39,7 @@
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_key_pattern_query_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -114,8 +113,8 @@ DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_increme
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
     const boost::optional<BSONObj>& letParameters) {
     auto filter = primaryFilter;
-    auto shardKey = uassertStatusOK(
-        _getShardKeyPattern().extractShardKeyFromQuery(opCtx, _targeter.getNS(), primaryFilter));
+    auto shardKey = uassertStatusOK(extractShardKeyFromBasicQuery(
+        opCtx, _targeter.getNS(), _getShardKeyPattern(), primaryFilter));
     if (shardKey.isEmpty() && !secondaryFilter.isEmpty()) {
         shardKey = _getShardKeyPattern().extractShardKeyFromDoc(secondaryFilter);
         filter = shardKey;

@@ -29,22 +29,17 @@
 
 #pragma once
 
-#include <memory>
 #include <vector>
 
-#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/exec/filter.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_bounds.h"
-#include "mongo/db/repl/oplog_entry.h"
 
 namespace mongo {
-
-class CanonicalQuery;
-class FieldRef;
-class OperationContext;
 
 /**
  * Helper struct when generating flattened bounds below
@@ -214,62 +209,9 @@ public:
     BSONObj extractShardKeyFromDocThrows(const BSONObj& doc) const;
 
     /**
-     * Given an Oplog entry, extracts the shard key corresponding to the key pattern for insert,
-     * update, and delete op types. If the op type is not a CRUD operation, an empty BSONObj()
-     * will be returned.
-     *
-     * For update and delete operations, the Oplog entry will contain an object with the document
-     * key.
-     *
-     * For insert operations, the Oplog entry will contain the original document from which the
-     * document key must be extracted
-     *
-     * Examples:
-     *  For KeyPattern {'a.b': 1}
-     *   If the oplog entries contains field op='i'
-     *     oplog contains: { a : { b : "1" } }
-     *   If the oplog entries contains field op='u' or op='d'
-     *     oplog contains: { 'a.b': "1" }
-     */
-    BSONObj extractShardKeyFromOplogEntry(const repl::OplogEntry& entry) const;
-
-    /**
      * Returns the document with missing shard key values set to null.
      */
     BSONObj emplaceMissingShardKeyValuesForDocument(BSONObj doc) const;
-
-    /**
-     * Given a simple BSON query, extracts the shard key corresponding to the key pattern
-     * from equality matches in the query.  The query expression *must not* be a complex query
-     * with sorts or other attributes.
-     *
-     * Logically, the equalities in the BSON query can be serialized into a BSON document and
-     * then a shard key is extracted from this equality document.
-     *
-     * NOTE: BSON queries and BSON documents look similar but are different languages.  Use the
-     * correct shard key extraction function.
-     *
-     * Returns !OK status if the query cannot be parsed.  Returns an empty BSONObj() if there is
-     * no shard key found in the query equalities.
-     *
-     * Examples:
-     *  If the key pattern is { a : 1 }
-     *   { a : "hi", b : 4 } --> returns { a : "hi" }
-     *   { a : { $eq : "hi" }, b : 4 } --> returns { a : "hi" }
-     *   { $and : [{a : { $eq : "hi" }}, { b : 4 }] } --> returns { a : "hi" }
-     *  If the key pattern is { 'a.b' : 1 }
-     *   { a : { b : "hi" } } --> returns { 'a.b' : "hi" }
-     *   { 'a.b' : "hi" } --> returns { 'a.b' : "hi" }
-     *   { a : { b : { $eq : "hi" } } } --> returns {} because the query language treats this as
-     *                                                 a : { $eq : { b : ... } }
-     */
-    StatusWith<BSONObj> extractShardKeyFromQuery(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 const BSONObj& basicQuery) const;
-
-    // Used to parse queries that contain let parameters and runtime constants.
-    StatusWith<BSONObj> extractShardKeyFromQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                                 const BSONObj& basicQuery) const;
 
     BSONObj extractShardKeyFromQuery(const CanonicalQuery& query) const;
 

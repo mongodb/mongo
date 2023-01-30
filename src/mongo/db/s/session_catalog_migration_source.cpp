@@ -396,7 +396,7 @@ bool SessionCatalogMigrationSource::shouldSkipOplogEntry(const mongo::repl::Oplo
                                                          const ShardKeyPattern& shardKeyPattern,
                                                          const ChunkRange& chunkRange) {
     if (oplogEntry.isCrudOpType()) {
-        auto shardKey = shardKeyPattern.extractShardKeyFromOplogEntry(oplogEntry);
+        auto shardKey = extractShardKeyFromOplogEntry(shardKeyPattern, oplogEntry);
         return !chunkRange.containsKey(shardKey);
     }
 
@@ -417,7 +417,7 @@ bool SessionCatalogMigrationSource::shouldSkipOplogEntry(const mongo::repl::Oplo
             // prevent a multi-statement transaction from being retried as a retryable write.
             return false;
         }
-        auto shardKey = shardKeyPattern.extractShardKeyFromOplogEntry(object2.value());
+        auto shardKey = extractShardKeyFromOplogEntry(shardKeyPattern, object2.value());
         return !chunkRange.containsKey(shardKey);
     }
 
@@ -430,6 +430,21 @@ long long SessionCatalogMigrationSource::getSessionOplogEntriesToBeMigratedSoFar
 
 long long SessionCatalogMigrationSource::getSessionOplogEntriesSkippedSoFarLowerBound() {
     return _sessionOplogEntriesSkippedSoFarLowerBound.load();
+}
+
+BSONObj SessionCatalogMigrationSource::extractShardKeyFromOplogEntry(
+    const ShardKeyPattern& shardKeyPattern, const repl::OplogEntry& entry) {
+    if (!entry.isCrudOpType()) {
+        return BSONObj();
+    }
+
+    auto objWithDocumentKey = entry.getObjectContainingDocumentKey();
+
+    if (!entry.isUpdateOrDelete()) {
+        return shardKeyPattern.extractShardKeyFromDoc(objWithDocumentKey);
+    }
+
+    return shardKeyPattern.extractShardKeyFromDocumentKey(objWithDocumentKey);
 }
 
 void SessionCatalogMigrationSource::_extractOplogEntriesForInternalTransactionForRetryableWrite(

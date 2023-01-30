@@ -27,20 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/shard_key_pattern.h"
 
-#include <vector>
-
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/path_internal.h"
-#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
@@ -430,20 +424,6 @@ BSONObj ShardKeyPattern::extractShardKeyFromDocThrows(const BSONObj& doc) const 
     return shardKey;
 }
 
-BSONObj ShardKeyPattern::extractShardKeyFromOplogEntry(const repl::OplogEntry& entry) const {
-    if (!entry.isCrudOpType()) {
-        return BSONObj();
-    }
-
-    auto objWithDocumentKey = entry.getObjectContainingDocumentKey();
-
-    if (!entry.isUpdateOrDelete()) {
-        return extractShardKeyFromDoc(objWithDocumentKey);
-    }
-
-    return extractShardKeyFromDocumentKey(objWithDocumentKey);
-}
-
 BSONObj ShardKeyPattern::emplaceMissingShardKeyValuesForDocument(const BSONObj doc) const {
     BSONObjBuilder fullDocBuilder(doc);
     for (const auto& skField : _keyPattern.toBSON()) {
@@ -458,49 +438,6 @@ BSONObj ShardKeyPattern::emplaceMissingShardKeyValuesForDocument(const BSONObj d
     }
 
     return fullDocBuilder.obj();
-}
-
-StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* opCtx,
-                                                              const NamespaceString& nss,
-                                                              const BSONObj& basicQuery) const {
-    auto findCommand = std::make_unique<FindCommandRequest>(nss);
-    findCommand->setFilter(basicQuery.getOwned());
-
-    const boost::intrusive_ptr<ExpressionContext> expCtx;
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx,
-                                     std::move(findCommand),
-                                     false, /* isExplain */
-                                     expCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
-    if (!statusWithCQ.isOK()) {
-        return statusWithCQ.getStatus();
-    }
-
-    return extractShardKeyFromQuery(*statusWithCQ.getValue());
-}
-
-StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(
-    boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& basicQuery) const {
-    auto findCommand = std::make_unique<FindCommandRequest>(expCtx->ns);
-    findCommand->setFilter(basicQuery.getOwned());
-    if (!expCtx->getCollatorBSON().isEmpty()) {
-        findCommand->setCollation(expCtx->getCollatorBSON().getOwned());
-    }
-
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(expCtx->opCtx,
-                                     std::move(findCommand),
-                                     false, /* isExplain */
-                                     expCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
-    if (!statusWithCQ.isOK()) {
-        return statusWithCQ.getStatus();
-    }
-
-    return extractShardKeyFromQuery(*statusWithCQ.getValue());
 }
 
 BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) const {
