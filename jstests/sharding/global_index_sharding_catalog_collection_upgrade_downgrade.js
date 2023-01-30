@@ -2,7 +2,8 @@
  * Tests that the global indexes collections are dropped on FCV downgrade and recreated after
  * upgrading.
  *
- * @tags: [multiversion_incompatible, featureFlagGlobalIndexesShardingCatalog]
+ * @tags: [multiversion_incompatible, featureFlagGlobalIndexesShardingCatalog,
+ * featureFlagDowngradingToUpgrading]
  */
 
 (function() {
@@ -57,7 +58,20 @@ assert.eq(1, st.rs0.getPrimary().getCollection(shardCollectionsCollectionNss).co
     indexVersion: {$exists: true}
 }));
 
-st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV});
+assert.commandFailedWithCode(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
+                             ErrorCodes.CannotDowngrade);
+assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+
+// Drop global index before downgrade
+st.rs0.getPrimary().adminCommand({
+    _shardsvrUnregisterIndex: nss,
+    name: 'x_1',
+    collectionUUID: collectionUUID,
+    lastmod: Timestamp(0, 0),
+    writeConcern: {w: 'majority'}
+});
+
+assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 
 assert.commandFailedWithCode(
     st.configRS.getPrimary().getDB('config').runCommand({listIndexes: csrsIndexesCollection}),

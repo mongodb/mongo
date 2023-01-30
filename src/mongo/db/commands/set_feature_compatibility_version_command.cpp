@@ -50,6 +50,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/global_settings.h"
@@ -767,6 +768,37 @@ private:
     void _userCollectionsUassertsForDowngrade(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(
+                    requestedVersion)) {
+                bool hasGlobalIndexes;
+                BSONObj indexDoc, collDoc;
+                {
+                    AutoGetCollection indexesColl(
+                        opCtx, NamespaceString::kConfigsvrIndexCatalogNamespace, MODE_IS);
+                    hasGlobalIndexes =
+                        Helpers::findOne(opCtx, indexesColl.getCollection(), BSONObj(), indexDoc);
+                }
+                if (hasGlobalIndexes) {
+                    auto uuid = uassertStatusOK(
+                        UUID::parse(indexDoc[IndexCatalogType::kCollectionUUIDFieldName]));
+                    AutoGetCollection collsColl(
+                        opCtx, NamespaceString::kConfigsvrCollectionsNamespace, MODE_IS);
+                    Helpers::findOne(opCtx,
+                                     collsColl.getCollection(),
+                                     BSON(CollectionType::kUuidFieldName << uuid),
+                                     collDoc);
+                }
+                uassert(ErrorCodes::CannotDowngrade,
+                        str::stream()
+                            << "Cannot downgrade the cluster when there are global indexes "
+                               "present. Drop all global indexes before downgrading. First "
+                               "detected global index name: '"
+                            << indexDoc[IndexCatalogType::kNameFieldName].String()
+                            << "' on collection '"
+                            << NamespaceString(collDoc[CollectionType::kNssFieldName].String())
+                            << "'",
+                        !hasGlobalIndexes);
+            }
             return;
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
                    serverGlobalParams.clusterRole == ClusterRole::None) {
