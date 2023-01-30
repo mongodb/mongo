@@ -767,6 +767,25 @@ public:
     ECCDerivedFromDataTokenAndContentionFactorToken ecc;
 };
 
+/*
+ * Values of ECOC documents in Queryable Encryption protocol version 2
+ *
+ * Encrypt(ECOCToken, ESCDerivedFromDataTokenAndContentionFactorToken)
+ *
+ * struct {
+ *    uint8_t[32] esc;
+ * }
+ */
+struct EncryptedStateCollectionTokensV2 {
+public:
+    EncryptedStateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken s) : esc(s) {}
+    static StatusWith<EncryptedStateCollectionTokensV2> decryptAndParse(ECOCToken token,
+                                                                        ConstDataRange cdr);
+    StatusWith<std::vector<uint8_t>> serialize(ECOCToken token);
+
+    ESCDerivedFromDataTokenAndContentionFactorToken esc;
+};
+
 
 struct ECOCCompactionDocument {
 
@@ -862,6 +881,114 @@ struct FLE2IndexedEqualityEncryptedValue {
     BSONType bsonType;
     UUID indexKeyId;
     std::vector<uint8_t> clientEncryptedValue;
+};
+
+/**
+ * Class to read/write the metadata block consisting of the encrypted counter
+ * and contention factor, the tag, and the encrypted 128-bit string of zeros.
+ *
+ * In QE protocol version 2, this block appears exactly once in the on-disk
+ * format of equality-indexed encrypted values, and at least once in the on-disk
+ * format of range-indexed encrypted values.
+ *
+ * The metadata block serialization consists of the following:
+ * struct {
+ *   uint8_t[32] encryptedCountersBlob;
+ *   uint8_t[32] tag;
+ *   uint8_t[32] encryptedZerosBlob;
+ * }
+ *
+ * Decryption of encryptedCountersBlob results in:
+ * struct {
+ *   uint64_t counter;
+ *   uint64_t contentionFactor;
+ * }
+ *
+ * Decryption of encryptedZerosBlob results in:
+ * struct {
+ *   uint8_t[16] zerosBlob;
+ * }
+ */
+struct FLE2TagAndEncryptedMetadataBlock {
+    using ZerosBlob = std::array<std::uint8_t, 16>;
+    using EncryptedCountersBlob =
+        std::array<std::uint8_t, sizeof(uint64_t) * 2 + crypto::aesCTRIVSize>;
+    using EncryptedZerosBlob = std::array<std::uint8_t, sizeof(ZerosBlob) + crypto::aesCTRIVSize>;
+    using SerializedBlob =
+        std::array<std::uint8_t,
+                   sizeof(EncryptedCountersBlob) + sizeof(PrfBlock) + sizeof(EncryptedZerosBlob)>;
+
+    FLE2TagAndEncryptedMetadataBlock(uint64_t countParam,
+                                     uint64_t contentionFactorParam,
+                                     PrfBlock tagParam);
+    FLE2TagAndEncryptedMetadataBlock(uint64_t countParam,
+                                     uint64_t contentionFactorParam,
+                                     PrfBlock tagParam,
+                                     ZerosBlob zerosParam);
+
+    StatusWith<std::vector<uint8_t>> serialize(ServerDerivedFromDataToken token);
+
+    static StatusWith<FLE2TagAndEncryptedMetadataBlock> decryptAndParse(
+        ServerDerivedFromDataToken token, ConstDataRange serializedBlock);
+
+    /*
+     * Decrypts and returns only the zeros blob from the serialized
+     * FLE2TagAndEncryptedMetadataBlock in serializedBlock.
+     */
+    static StatusWith<ZerosBlob> decryptZerosBlob(ServerDerivedFromDataToken token,
+                                                  ConstDataRange serializedBlock);
+
+    static bool isValidZerosBlob(const ZerosBlob& blob);
+
+    uint64_t count;
+    uint64_t contentionFactor;
+    PrfBlock tag;
+    ZerosBlob zeros;
+};
+
+/**
+ * Class to read/write QE protocol version 2 of Equality Indexed
+ * Encrypted Values.
+ *
+ * Fields are encrypted with the following:
+ *
+ * struct {
+ *   uint8_t fle_blob_subtype = 14;
+ *   uint8_t key_uuid[16];
+ *   uint8  original_bson_type;
+ *   ciphertext[ciphertext_length];
+ *   metadataBlock;
+ * }
+ * where ciphertext computed as:
+ *   Encrypt(ServerDataEncryptionLevel1Token, clientCiphertext)
+ * and metadataBlock is a serialized FLE2TagAndEncryptedMetadataBlock.
+ *
+ * The specification needs to be in sync with the validation in 'bson_validate.cpp'.
+ */
+struct FLE2IndexedEqualityEncryptedValueV2 {
+    FLE2IndexedEqualityEncryptedValueV2(FLE2InsertUpdatePayloadV2 payload,
+                                        PrfBlock tag,
+                                        uint64_t counter);
+    FLE2IndexedEqualityEncryptedValueV2(BSONType typeParam,
+                                        UUID indexKeyIdParam,
+                                        std::vector<uint8_t> clientEncryptedValueParam,
+                                        FLE2TagAndEncryptedMetadataBlock metadataBlockParam);
+
+    static StatusWith<FLE2IndexedEqualityEncryptedValueV2> decryptAndParse(
+        ServerDataEncryptionLevel1Token serverEncryptionToken,
+        ServerDerivedFromDataToken serverDataDerivedToken,
+        ConstDataRange serializedServerValue);
+
+    static StatusWith<UUID> readKeyId(ConstDataRange serializedServerValue);
+
+    StatusWith<std::vector<uint8_t>> serialize(
+        ServerDataEncryptionLevel1Token serverEncryptionToken,
+        ServerDerivedFromDataToken serverDataDerivedToken);
+
+    BSONType bsonType;
+    UUID indexKeyId;
+    std::vector<uint8_t> clientEncryptedValue;
+    FLE2TagAndEncryptedMetadataBlock metadataBlock;
 };
 
 /**
