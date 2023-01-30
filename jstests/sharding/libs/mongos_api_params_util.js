@@ -775,7 +775,11 @@ let MongosAPIParametersUtil = (function() {
                     jsTestLog(`Waiting for "find" on "${st.rs0.name}" ` +
                               `with comment ${uuidStr} in currentOp`);
                     assert.soon(() => {
-                        const filter = {"command.comment": uuidStr, shard: st.rs0.name};
+                        const filter = {
+                            "command.find": "collection",
+                            "command.comment": uuidStr,
+                            shard: st.rs0.name
+                        };
                         const inprog = adminDb.currentOp(filter).inprog;
                         if (inprog.length === 1) {
                             jsTestLog(`Found it! findOpId ${inprog[0].opid}`);
