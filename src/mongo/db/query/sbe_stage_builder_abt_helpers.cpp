@@ -59,24 +59,12 @@ std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
     return makeBalancedBooleanOpTreeImpl(logicOp, leaves, 0, leaves.size());
 }
 
-optimizer::ABT makeBalancedBooleanOpTreeImpl(optimizer::Operations logicOp,
-                                             std::vector<optimizer::ABT>& leaves,
-                                             size_t from,
-                                             size_t until) {
-    invariant(from < until);
-    if (from + 1 == until) {
-        return std::move(leaves[from]);
-    } else {
-        size_t mid = (from + until) / 2;
-        auto lhs = makeBalancedBooleanOpTreeImpl(logicOp, leaves, from, mid);
-        auto rhs = makeBalancedBooleanOpTreeImpl(logicOp, leaves, mid, until);
-        return optimizer::make<optimizer::BinaryOp>(logicOp, std::move(lhs), std::move(rhs));
-    }
-}
-
 optimizer::ABT makeBalancedBooleanOpTree(optimizer::Operations logicOp,
                                          std::vector<optimizer::ABT> leaves) {
-    return makeBalancedBooleanOpTreeImpl(logicOp, leaves, 0, leaves.size());
+    auto builder = [=](optimizer::ABT lhs, optimizer::ABT rhs) {
+        return optimizer::make<optimizer::BinaryOp>(logicOp, std::move(lhs), std::move(rhs));
+    };
+    return makeBalancedTreeImpl(builder, leaves, 0, leaves.size());
 }
 
 EvalExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,

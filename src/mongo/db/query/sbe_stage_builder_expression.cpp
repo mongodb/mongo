@@ -48,6 +48,9 @@
 
 namespace mongo::stage_builder {
 namespace {
+
+size_t kArgumentCountForBinaryTree = 100;
+
 struct ExpressionVisitorContext {
     struct VarsFrame {
         VarsFrame(const std::vector<Variables::Id>& variableIds,
@@ -684,6 +687,69 @@ public:
     }
 
     void visit(const ExpressionAdd* expr) final {
+        size_t arity = expr->getChildren().size();
+        _context->ensureArity(arity);
+
+        // Build a linear tree for a small number of children so that we can pre-validate all
+        // arguments.
+        if (arity < kArgumentCountForBinaryTree) {
+            visitFast(expr);
+            return;
+        }
+
+        auto checkLeaf = [&](optimizer::ABT arg) {
+            auto name = makeLocalVariableName(_context->state.frameId(), 0);
+            auto var = makeVariable(name);
+            auto checkedLeaf = buildABTMultiBranchConditional(
+                ABTCaseValuePair{
+                    optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
+                                                         makeABTFunction("isNumber", var),
+                                                         makeABTFunction("isDate", var)),
+                    var},
+                makeABTFail(ErrorCodes::Error{7315401},
+                            "only numbers and dates are allowed in an $add expression"));
+            return optimizer::make<optimizer::Let>(
+                std::move(name), std::move(arg), std::move(checkedLeaf));
+        };
+
+        auto combineTwoTree = [&](optimizer::ABT left, optimizer::ABT right) {
+            auto nameLeft = makeLocalVariableName(_context->state.frameId(), 0);
+            auto nameRight = makeLocalVariableName(_context->state.frameId(), 0);
+            auto varLeft = makeVariable(nameLeft);
+            auto varRight = makeVariable(nameRight);
+
+            auto addExpr = buildABTMultiBranchConditional(
+                ABTCaseValuePair{
+                    optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
+                                                         generateABTNullOrMissing(nameLeft),
+                                                         generateABTNullOrMissing(nameRight)),
+                    optimizer::Constant::null()},
+                ABTCaseValuePair{
+                    optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
+                                                         makeABTFunction("isDate", varLeft),
+                                                         makeABTFunction("isDate", varRight)),
+                    makeABTFail(ErrorCodes::Error{7315402},
+                                "only one date allowed in an $add expression")},
+                optimizer::make<optimizer::BinaryOp>(
+                    optimizer::Operations::Add, varLeft, varRight));
+            return optimizer::make<optimizer::Let>(
+                std::move(nameLeft),
+                std::move(left),
+                optimizer::make<optimizer::Let>(
+                    std::move(nameRight), std::move(right), std::move(addExpr)));
+        };
+
+        optimizer::ABTVector leaves;
+        leaves.reserve(arity);
+        for (size_t idx = 0; idx < arity; ++idx) {
+            leaves.emplace_back(checkLeaf(_context->popABTExpr()));
+        }
+        std::reverse(std::begin(leaves), std::end(leaves));
+
+        pushABT(makeBalancedTree(combineTwoTree, std::move(leaves)));
+    }
+
+    void visitFast(const ExpressionAdd* expr) {
         size_t arity = expr->getChildren().size();
         _context->ensureArity(arity);
 
@@ -2114,6 +2180,56 @@ public:
                 std::move(rhsName), std::move(rhs), std::move(modExpr))));
     }
     void visit(const ExpressionMultiply* expr) final {
+        auto arity = expr->getChildren().size();
+        _context->ensureArity(arity);
+
+        if (arity < kArgumentCountForBinaryTree) {
+            visitFast(expr);
+            return;
+        }
+
+        auto checkLeaf = [&](optimizer::ABT arg) {
+            auto name = makeLocalVariableName(_context->state.frameId(), 0);
+            auto var = makeVariable(name);
+            auto checkedLeaf = buildABTMultiBranchConditional(
+                ABTCaseValuePair{makeABTFunction("isNumber", var), var},
+                makeABTFail(ErrorCodes::Error{7315403},
+                            "only numbers are allowed in an $multiply expression"));
+            return optimizer::make<optimizer::Let>(
+                std::move(name), std::move(arg), std::move(checkedLeaf));
+        };
+
+        auto combineTwoTree = [&](optimizer::ABT left, optimizer::ABT right) {
+            auto nameLeft = makeLocalVariableName(_context->state.frameId(), 0);
+            auto nameRight = makeLocalVariableName(_context->state.frameId(), 0);
+            auto varLeft = makeVariable(nameLeft);
+            auto varRight = makeVariable(nameRight);
+
+            auto mulExpr = buildABTMultiBranchConditional(
+                ABTCaseValuePair{
+                    optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
+                                                         generateABTNullOrMissing(nameLeft),
+                                                         generateABTNullOrMissing(nameRight)),
+                    optimizer::Constant::null()},
+                optimizer::make<optimizer::BinaryOp>(
+                    optimizer::Operations::Mult, varLeft, varRight));
+            return optimizer::make<optimizer::Let>(
+                std::move(nameLeft),
+                std::move(left),
+                optimizer::make<optimizer::Let>(
+                    std::move(nameRight), std::move(right), std::move(mulExpr)));
+        };
+
+        optimizer::ABTVector leaves;
+        leaves.reserve(arity);
+        for (size_t idx = 0; idx < arity; ++idx) {
+            leaves.emplace_back(checkLeaf(_context->popABTExpr()));
+        }
+        std::reverse(std::begin(leaves), std::end(leaves));
+
+        pushABT(makeBalancedTree(combineTwoTree, std::move(leaves)));
+    }
+    void visitFast(const ExpressionMultiply* expr) {
         auto arity = expr->getChildren().size();
         _context->ensureArity(arity);
 
