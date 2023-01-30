@@ -836,7 +836,7 @@ public:
  * struct {
  *   uint8_t fle_blob_subtype = 7;
  *   uint8_t key_uuid[16];
- *   uint8  original_bson_type;
+ *   uint8_t original_bson_type;
  *   ciphertext[ciphertext_length];
  * }
  *
@@ -955,7 +955,7 @@ struct FLE2TagAndEncryptedMetadataBlock {
  * struct {
  *   uint8_t fle_blob_subtype = 14;
  *   uint8_t key_uuid[16];
- *   uint8  original_bson_type;
+ *   uint8_t original_bson_type;
  *   ciphertext[ciphertext_length];
  *   metadataBlock;
  * }
@@ -966,7 +966,7 @@ struct FLE2TagAndEncryptedMetadataBlock {
  * The specification needs to be in sync with the validation in 'bson_validate.cpp'.
  */
 struct FLE2IndexedEqualityEncryptedValueV2 {
-    FLE2IndexedEqualityEncryptedValueV2(FLE2InsertUpdatePayloadV2 payload,
+    FLE2IndexedEqualityEncryptedValueV2(const FLE2InsertUpdatePayloadV2& payload,
                                         PrfBlock tag,
                                         uint64_t counter);
     FLE2IndexedEqualityEncryptedValueV2(BSONType typeParam,
@@ -999,7 +999,7 @@ struct FLE2IndexedEqualityEncryptedValueV2 {
  * struct {
  *   uint8_t fle_blob_subtype = 6;
  *   uint8_t key_uuid[16];
- *   uint8  original_bson_type;
+ *   uint8_t original_bson_type;
  *   ciphertext[ciphertext_length];
  * } blob;
  *
@@ -1028,7 +1028,7 @@ struct FLEEdgeToken {
  * struct {
  *   uint8_t fle_blob_subtype = 9;
  *   uint8_t key_uuid[16];
- *   uint8  original_bson_type;
+ *   uint8_t original_bson_type;
  *   ciphertext[ciphertext_length];
  * }
  *
@@ -1074,6 +1074,53 @@ struct FLE2IndexedRangeEncryptedValue {
     BSONType bsonType;
     UUID indexKeyId;
     std::vector<uint8_t> clientEncryptedValue;
+};
+
+/**
+ * Class to read/write QE protocol version 2 of Range Indexed
+ * Encrypted Values.
+ *
+ * Fields are encrypted with the following:
+ *
+ * struct {
+ *   uint8_t fle_blob_subtype = 15;
+ *   uint8_t key_uuid[16];
+ *   uint8_t original_bson_type;
+ *   uint8_t edge_count;
+ *   ciphertext[ciphertext_length];
+ *   vector of metadataBlocks;
+ * }
+ * where ciphertext computed as:
+ *   Encrypt(ServerDataEncryptionLevel1Token, clientCiphertext)
+ * and metadataBlock is a vector of serialized FLE2TagAndEncryptedMetadataBlock.
+ *
+ * The specification needs to be in sync with the validation in 'bson_validate.cpp'.
+ */
+struct FLE2IndexedRangeEncryptedValueV2 {
+    FLE2IndexedRangeEncryptedValueV2(const FLE2InsertUpdatePayloadV2& payload,
+                                     std::vector<PrfBlock> tags,
+                                     const std::vector<uint64_t>& counters);
+    FLE2IndexedRangeEncryptedValueV2(
+        BSONType typeParam,
+        UUID indexKeyIdParam,
+        std::vector<uint8_t> clientEncryptedValueParam,
+        std::vector<FLE2TagAndEncryptedMetadataBlock> metadataBlockParam);
+
+    static StatusWith<FLE2IndexedRangeEncryptedValueV2> decryptAndParse(
+        ServerDataEncryptionLevel1Token serverEncryptionToken,
+        const std::vector<ServerDerivedFromDataToken>& serverDataDerivedTokens,
+        ConstDataRange serializedServerValue);
+
+    static StatusWith<UUID> readKeyId(ConstDataRange serializedServerValue);
+
+    StatusWith<std::vector<uint8_t>> serialize(
+        ServerDataEncryptionLevel1Token serverEncryptionToken,
+        const std::vector<ServerDerivedFromDataToken>& serverDataDerivedTokens);
+
+    BSONType bsonType;
+    UUID indexKeyId;
+    std::vector<uint8_t> clientEncryptedValue;
+    std::vector<FLE2TagAndEncryptedMetadataBlock> metadataBlocks;
 };
 
 struct EDCServerPayloadInfo {

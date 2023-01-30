@@ -3015,13 +3015,14 @@ bool FLE2TagAndEncryptedMetadataBlock::isValidZerosBlob(const ZerosBlob& blob) {
 }
 
 FLE2IndexedEqualityEncryptedValueV2::FLE2IndexedEqualityEncryptedValueV2(
-    FLE2InsertUpdatePayloadV2 payload, PrfBlock tag, uint64_t counter)
+    const FLE2InsertUpdatePayloadV2& payload, PrfBlock tag, uint64_t counter)
     : FLE2IndexedEqualityEncryptedValueV2(
           static_cast<BSONType>(payload.getType()),
           payload.getIndexKeyId(),
           vectorFromCDR(payload.getValue()),
           FLE2TagAndEncryptedMetadataBlock(
               counter, payload.getContentionFactor(), std::move(tag))) {}
+
 
 FLE2IndexedEqualityEncryptedValueV2::FLE2IndexedEqualityEncryptedValueV2(
     BSONType typeParam,
@@ -3397,6 +3398,210 @@ StatusWith<std::vector<uint8_t>> FLE2IndexedRangeEncryptedValue::serialize(
     std::copy(serverEncryptedValue.begin(),
               serverEncryptedValue.end(),
               serializedServerValue.begin() + cdrKeyId.length() + 1);
+
+    return serializedServerValue;
+}
+
+
+FLE2IndexedRangeEncryptedValueV2::FLE2IndexedRangeEncryptedValueV2(
+    const FLE2InsertUpdatePayloadV2& payload,
+    std::vector<PrfBlock> tags,
+    const std::vector<uint64_t>& counters)
+    : bsonType(static_cast<BSONType>(payload.getType())),
+      indexKeyId(payload.getIndexKeyId()),
+      clientEncryptedValue(vectorFromCDR(payload.getValue())) {
+
+    uassert(7290900,
+            "Tags and counters parameters must be non-zero and of the same length",
+            tags.size() == counters.size() && tags.size() > 0);
+    uassert(7290901,
+            "Invalid BSON Type in Queryable Encryption InsertUpdatePayloadV2",
+            isValidBSONType(bsonType));
+    uassert(7290902,
+            "Invalid client encrypted value length in Queryable Encryption InsertUpdatePayloadV2",
+            !clientEncryptedValue.empty());
+
+    metadataBlocks.reserve(tags.size());
+
+    for (size_t i = 0; i < tags.size(); i++) {
+        metadataBlocks.push_back(
+            FLE2TagAndEncryptedMetadataBlock(counters[i], payload.getContentionFactor(), tags[i]));
+    }
+}
+
+FLE2IndexedRangeEncryptedValueV2::FLE2IndexedRangeEncryptedValueV2(
+    BSONType typeParam,
+    UUID indexKeyIdParam,
+    std::vector<uint8_t> clientEncryptedValueParam,
+    std::vector<FLE2TagAndEncryptedMetadataBlock> metadataBlockParam)
+    : bsonType(typeParam),
+      indexKeyId(std::move(indexKeyIdParam)),
+      clientEncryptedValue(std::move(clientEncryptedValueParam)),
+      metadataBlocks(std::move(metadataBlockParam)) {
+
+    uassert(7290903,
+            "FLE2IndexedRangeEncryptedValueV2 must have a non-zero number of edges",
+            metadataBlocks.size() > 0);
+    uassert(7290904,
+            "Invalid BSON Type in Queryable Encryption InsertUpdatePayloadV2",
+            isValidBSONType(bsonType));
+    uassert(7290905,
+            "Invalid client encrypted value length in Queryable Encryption InsertUpdatePayloadV2",
+            !clientEncryptedValue.empty());
+}
+
+StatusWith<UUID> FLE2IndexedRangeEncryptedValueV2::readKeyId(ConstDataRange serializedServerValue) {
+    ConstDataRangeCursor baseCdrc(serializedServerValue);
+
+    auto swKeyId = baseCdrc.readAndAdvanceNoThrow<UUIDBuf>();
+    if (!swKeyId.isOK()) {
+        return {swKeyId.getStatus()};
+    }
+
+    return UUID::fromCDR(swKeyId.getValue());
+}
+
+StatusWith<FLE2IndexedRangeEncryptedValueV2> FLE2IndexedRangeEncryptedValueV2::decryptAndParse(
+    ServerDataEncryptionLevel1Token serverEncryptionToken,
+    const std::vector<ServerDerivedFromDataToken>& serverDataDerivedTokens,
+    ConstDataRange serializedServerValue) {
+    ConstDataRangeCursor serializedServerCdrc(serializedServerValue);
+
+    auto swIndexKeyId = serializedServerCdrc.readAndAdvanceNoThrow<UUIDBuf>();
+    if (!swIndexKeyId.isOK()) {
+        return swIndexKeyId.getStatus();
+    }
+
+    auto swBsonType = serializedServerCdrc.readAndAdvanceNoThrow<uint8_t>();
+    if (!swBsonType.isOK()) {
+        return swBsonType.getStatus();
+    }
+
+    uassert(7290906,
+            "Invalid BSON Type in Queryable Encryption IndexedRangeEncryptedValueV2",
+            isValidBSONType(swBsonType.getValue()));
+
+    auto type = static_cast<BSONType>(swBsonType.getValue());
+
+    auto swEdgeCount = serializedServerCdrc.readAndAdvanceNoThrow<uint8_t>();
+    if (!swEdgeCount.isOK()) {
+        return swEdgeCount.getStatus();
+    }
+
+    auto edgeCount = swEdgeCount.getValue();
+
+    uassert(7290907,
+            "Invalid length of serverDataDerivedTokens parameter",
+            serverDataDerivedTokens.size() == edgeCount);
+
+    uassert(7290908,
+            "Invalid length of Queryable Encryption IndexedRangeEncryptedValueV2",
+            serializedServerCdrc.length() >=
+                edgeCount * sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
+
+    auto encryptedDataSize = serializedServerCdrc.length() -
+        edgeCount * sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob);
+
+    auto swClientEncryptedData =
+        decryptData(serverEncryptionToken.toCDR(),
+                    ConstDataRange(serializedServerCdrc.data(), encryptedDataSize));
+
+    if (!swClientEncryptedData.isOK()) {
+        return swClientEncryptedData.getStatus();
+    }
+
+    serializedServerCdrc.advance(encryptedDataSize);
+
+    std::vector<FLE2TagAndEncryptedMetadataBlock> metadataBlocks;
+    metadataBlocks.reserve(edgeCount);
+
+    for (uint8_t i = 0; i < edgeCount; i++) {
+        auto encryptedMetadataBlockCDR = serializedServerCdrc.sliceAndAdvance(
+            sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
+
+        auto swMetadataBlock = FLE2TagAndEncryptedMetadataBlock::decryptAndParse(
+            serverDataDerivedTokens[i], encryptedMetadataBlockCDR);
+
+        if (!swMetadataBlock.isOK()) {
+            return swMetadataBlock.getStatus();
+        }
+
+        metadataBlocks.push_back(swMetadataBlock.getValue());
+    }
+
+    return FLE2IndexedRangeEncryptedValueV2(type,
+                                            UUID::fromCDR(swIndexKeyId.getValue()),
+                                            std::move(swClientEncryptedData.getValue()),
+                                            std::move(metadataBlocks));
+}
+
+StatusWith<std::vector<uint8_t>> FLE2IndexedRangeEncryptedValueV2::serialize(
+    ServerDataEncryptionLevel1Token serverEncryptionToken,
+    const std::vector<ServerDerivedFromDataToken>& serverDataDerivedTokens) {
+
+    uassert(7290909,
+            "ServerDataDerivedTokens parameter should be as long as metadata blocks",
+            serverDataDerivedTokens.size() == metadataBlocks.size());
+
+    uassert(7290910,
+            "Size of serverDataDerivedTokens is too large",
+            serverDataDerivedTokens.size() < UINT8_MAX);
+
+    uint8_t edgeCount = static_cast<uint8_t>(metadataBlocks.size());
+
+    auto swEncryptedData =
+        encryptData(serverEncryptionToken.toCDR(), ConstDataRange(clientEncryptedValue));
+    if (!swEncryptedData.isOK()) {
+        return swEncryptedData;
+    }
+
+    auto cdrKeyId = indexKeyId.toCDR();
+    auto& serverEncryptedValue = swEncryptedData.getValue();
+
+
+    std::vector<uint8_t> serializedServerValue(
+        cdrKeyId.length() + 1 + 1 + serverEncryptedValue.size() +
+        edgeCount * sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
+
+    size_t offset = 0;
+
+    std::copy(cdrKeyId.data(), cdrKeyId.data() + cdrKeyId.length(), serializedServerValue.begin());
+    offset += cdrKeyId.length();
+
+    uint8_t bsonTypeByte = bsonType;
+    std::copy(&bsonTypeByte, (&bsonTypeByte) + 1, serializedServerValue.begin() + offset);
+    offset++;
+
+    std::copy(&edgeCount, (&edgeCount) + 1, serializedServerValue.begin() + offset);
+    offset++;
+
+    std::copy(serverEncryptedValue.begin(),
+              serverEncryptedValue.end(),
+              serializedServerValue.begin() + offset);
+    offset += serverEncryptedValue.size();
+
+    for (size_t i = 0; i < metadataBlocks.size(); i++) {
+        auto& metadataBlock = metadataBlocks[i];
+        auto& serverDataDerivedToken = serverDataDerivedTokens[i];
+
+        auto swSerializedMetadata = metadataBlock.serialize(serverDataDerivedToken);
+        if (!swSerializedMetadata.isOK()) {
+            return swSerializedMetadata.getStatus();
+        }
+
+        auto& serializedMetadata = swSerializedMetadata.getValue();
+
+        uassert(7290911,
+                "Serialized metadata is incorrect length",
+                serializedMetadata.size() ==
+                    sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
+
+        std::copy(serializedMetadata.begin(),
+                  serializedMetadata.end(),
+                  serializedServerValue.begin() + offset);
+
+        offset += serializedMetadata.size();
+    }
 
     return serializedServerValue;
 }
