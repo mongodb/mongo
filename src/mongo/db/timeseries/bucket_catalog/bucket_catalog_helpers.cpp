@@ -140,7 +140,7 @@ void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj) {
  *       {$and: [{"control.min.time":{$lte:<measurementTs>}},
  *               {"control.min.time":{$gt:<measurementTs - maxSpanSeconds>}}]
  *       },
-         {"data.<timeField>.999":{$exists:false}}]
+         {"data.<timeField>.<timeseriesBucketMaxCount - 1>":{$exists:false}}]
  * }
  */
 BSONObj generateReopeningMatchFilter(const Date_t& time,
@@ -173,8 +173,8 @@ BSONObj generateReopeningMatchFilter(const Date_t& time,
     auto upperBound = BSON(controlMinTimePath << BSON("$gt" << measurementMaxDifference));
     auto timeRangeFilter = BSON("$and" << BSON_ARRAY(lowerBound << upperBound));
 
-    // If the "data.<timeField>.999" field exists, it means the bucket is full and we do not want to
-    // insert future measurements into it.
+    // If the "data.<timeField>.<timeseriesBucketMaxCount - 1>" field exists, it means the bucket is
+    // full and we do not want to insert future measurements into it.
     auto measurementSizeFilter = BSON(maxDataTimeFieldPath << BSON("$exists" << false));
 
     return BSON("$and" << BSON_ARRAY(versionFilter << closedFlagFilter << timeRangeFilter

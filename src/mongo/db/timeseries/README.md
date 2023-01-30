@@ -160,7 +160,8 @@ the caller that can be used to retrieve a bucket from disk to reopen. In some ca
 the `_id` of an archived bucket (more details below). In other cases, this will be a set of filters
 to use for a query.
 
-The filters will include an exact match on the `metaField`, a range match on the `timeField`, and a
+The filters will include an exact match on the `metaField`, a range match on the `timeField`, size
+filters on the `timeseriesBucketMaxCount` and `timeseriesBucketMaxSize` server parameters, and a 
 missing or `false` value for `control.closed`. At least for v6.3, the filters will also specify
 `control.version: 1` to disallow selecting compressed buckets. The last restriction is for
 performance, and may be removed in the future if we improve decompression speed or deem the benefits
@@ -173,10 +174,7 @@ the index does not exist, then query-based reopening will not be used.
 ### Bucket Closure and Archival
 
 A bucket is permanently closed by setting the optional `control.closed` flag, which makes it
-ineligible for reopening. This can be done manually (e.g. for Online Archive), or automatically
-by the `BucketCatalog` in a number of situations, for instance if it contains more than the maximum
-number of measurements (`timeseriesBucketMaxCount`), if it contains more than the maximum amount of
-data (`timeseriesBucketMaxSize`), or if it detects a schema change.
+ineligible for reopening. This can only be done manually for [Atlas Online Archive](https://www.mongodb.com/docs/atlas/online-archive/manage-online-archive/)).
 
 If the `BucketCatalog` is using more memory than it's given threshold (controlled by the server
 parameter `timeseriesIdleBucketExpiryMemoryUsageThreshold`), it will start to archive or close idle
