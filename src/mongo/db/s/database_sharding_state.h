@@ -123,9 +123,13 @@ public:
     /**
      * Resets this node's cached database info.
      *
+     * NOTE: Only the thread that refreshes the database metadata (which calls the function
+     * `onDbVersionMismatch`) actually needs to change the default initialization of
+     * `cancelOngoingRefresh`. This parameter must be ignored in any other case.
+     *
      * The caller must hold the database lock in MODE_IX.
      */
-    void clearDbInfo(OperationContext* opCtx);
+    void clearDbInfo(OperationContext* opCtx, bool cancelOngoingRefresh = true);
 
     /**
      * Returns this node's cached  database version if the database info is cached, otherwise
@@ -191,11 +195,6 @@ public:
      */
     void resetDbMetadataRefreshFuture();
 
-    /**
-     * Cancel any ongoing database metadata refresh.
-     */
-    void cancelDbMetadataRefresh();
-
 private:
     struct DbMetadataRefresh {
         DbMetadataRefresh(SharedSemiFuture<void> future, CancellationSource cancellationSource)
@@ -207,6 +206,11 @@ private:
         // Cancellation source to cancel the ongoing database metadata refresh.
         CancellationSource cancellationSource;
     };
+
+    /**
+     * Cancel any ongoing database metadata refresh.
+     */
+    void cancelDbMetadataRefresh();
 
     const DatabaseName _dbName;
 

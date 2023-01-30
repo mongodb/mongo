@@ -161,7 +161,7 @@ Status refreshDbMetadata(OperationContext* opCtx,
             scopedDss->setDbInfo(opCtx, *swDbMetadata.getValue());
         } else if (swDbMetadata == ErrorCodes::NamespaceNotFound) {
             // The database has been dropped, so clear its metadata in the local catalog.
-            scopedDss->clearDbInfo(opCtx);
+            scopedDss->clearDbInfo(opCtx, false /* cancelOngoingRefresh */);
         }
     }
 

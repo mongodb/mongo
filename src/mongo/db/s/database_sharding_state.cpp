@@ -211,8 +211,12 @@ void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseTyp
     _dbInfo.emplace(dbInfo);
 }
 
-void DatabaseShardingState::clearDbInfo(OperationContext* opCtx) {
+void DatabaseShardingState::clearDbInfo(OperationContext* opCtx, bool cancelOngoingRefresh) {
     invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
+
+    if (cancelOngoingRefresh) {
+        cancelDbMetadataRefresh();
+    }
 
     LOGV2(7286901, "Clearing this node's cached database info", "db"_attr = _dbName);
     _dbInfo = boost::none;
@@ -226,6 +230,7 @@ boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(
 void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,
                                                              const BSONObj& reason) {
     _critSec.enterCriticalSectionCatchUpPhase(reason);
+
     cancelDbMetadataRefresh();
 }
 

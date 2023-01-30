@@ -435,7 +435,6 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             AutoGetDb autoDb(opCtx, dbName, MODE_X);
             auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
                 opCtx, dbName, DSSAcquisitionMode::kExclusive);
-            scopedDss->cancelDbMetadataRefresh();
             scopedDss->clearDbInfo(opCtx);
         }
     }
@@ -684,7 +683,6 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         AutoGetDb autoDb(opCtx, dbName, MODE_X);
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
             opCtx, dbName, DSSAcquisitionMode::kExclusive);
-        scopedDss->cancelDbMetadataRefresh();
         scopedDss->clearDbInfo(opCtx);
     }
 
