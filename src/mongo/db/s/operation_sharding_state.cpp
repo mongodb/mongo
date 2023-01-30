@@ -193,6 +193,17 @@ ScopedSetShardRole::ScopedSetShardRole(OperationContext* opCtx,
       _nss(std::move(nss)),
       _shardVersion(std::move(shardVersion)),
       _databaseVersion(std::move(databaseVersion)) {
+    // "Fixed" dbVersions are only used for dbs that don't have the sharding infrastructure set up
+    // to handle real database or shard versions (like config and admin), so we ignore them.
+    if (_databaseVersion && _databaseVersion->isFixed()) {
+        uassert(7331300,
+                "A 'fixed' dbVersion should only be used with an unsharded shard version or none "
+                "at all",
+                !_shardVersion || _shardVersion == ShardVersion::UNSHARDED());
+        _databaseVersion.reset();
+        _shardVersion.reset();
+    }
+
     OperationShardingState::setShardRole(_opCtx, _nss, _shardVersion, _databaseVersion);
 }
 

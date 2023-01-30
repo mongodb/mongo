@@ -112,7 +112,7 @@ protected:
                                   ShardId("this"));
     }
 
-    const DatabaseVersion dbVersion0 = DatabaseVersion::makeFixed();
+    const DatabaseVersion dbVersion0 = DatabaseVersion{UUID::gen(), Timestamp(1, 0)};
     const DatabaseVersion dbVersion1 = dbVersion0.makeUpdated();
 };
 

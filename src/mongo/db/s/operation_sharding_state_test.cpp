@@ -39,7 +39,7 @@ const NamespaceString kAnotherNss("TestDB", "AnotherColl");
 using OperationShardingStateTest = ShardServerTestFixture;
 
 TEST_F(OperationShardingStateTest, ScopedSetShardRoleDbVersion) {
-    DatabaseVersion dbv{DatabaseVersion::makeFixed()};
+    DatabaseVersion dbv{UUID::gen(), Timestamp(1, 0)};
     ScopedSetShardRole scopedSetShardRole(operationContext(), kNss, boost::none, dbv);
 
     auto& oss = OperationShardingState::get(operationContext());
@@ -87,6 +87,40 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleRecursiveShardVersionDiffer
     auto& oss = OperationShardingState::get(operationContext());
     ASSERT_EQ(shardVersion1, *oss.getShardVersion(kNss));
     ASSERT_EQ(shardVersion2, *oss.getShardVersion(kAnotherNss));
+}
+
+TEST_F(OperationShardingStateTest, ScopedSetShardRoleIgnoresFixedDbVersion) {
+    DatabaseVersion dbv{DatabaseVersion::makeFixed()};
+    ScopedSetShardRole scopedSetShardRole(operationContext(), kNss, boost::none, dbv);
+
+    auto& oss = OperationShardingState::get(operationContext());
+    ASSERT_FALSE(oss.getDbVersion(kNss.db()));
+}
+
+TEST_F(OperationShardingStateTest, ScopedSetShardRoleAllowedShardVersionsWithFixedDbVersion) {
+    {
+        // The UNSHARDED version can be passed with a fixed dbVersion.
+        DatabaseVersion dbv{DatabaseVersion::makeFixed()};
+        ShardVersion sv{ShardVersion::UNSHARDED()};
+        ScopedSetShardRole scopedSetShardRole0(operationContext(), kNss, sv, dbv);
+    }
+
+    {
+        // No shard version can be passed with a fixed dbVersion.
+        DatabaseVersion dbv{DatabaseVersion::makeFixed()};
+        ScopedSetShardRole scopedSetShardRole1(operationContext(), kNss, boost::none, dbv);
+    }
+
+    {
+        // Any other shard version cannot be passed with a fixed dbVersion.
+        DatabaseVersion dbv{DatabaseVersion::makeFixed()};
+        CollectionGeneration gen(OID::gen(), Timestamp(1, 0));
+        ShardVersion sv({gen, {1, 0}}, boost::optional<CollectionIndexes>(boost::none));
+        ASSERT_THROWS_CODE(
+            [&] { ScopedSetShardRole scopedSetShardRole(operationContext(), kNss, sv, dbv); }(),
+            DBException,
+            7331300);
+    }
 }
 
 }  // namespace
