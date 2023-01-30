@@ -701,6 +701,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::collSetDifference, false}},
     {"collSetEquals",
      BuiltinFn{[](size_t n) { return n >= 3; }, vm::Builtin::collSetEquals, false}},
+    {"aggSetUnion", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggSetUnion, true}},
     {"aggSetUnionCapped",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggSetUnionCapped, true}},
     {"aggCollSetUnionCapped",

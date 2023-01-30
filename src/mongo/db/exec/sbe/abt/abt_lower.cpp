@@ -683,14 +683,15 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const GroupByNode& n,
     tassert(6624227, "refs expected", refsAgg);
     auto& exprs = refsAgg->nodes();
 
-    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> aggs;
+    sbe::SlotExprPairVector aggs;
+    aggs.reserve(exprs.size());
 
     for (size_t idx = 0; idx < exprs.size(); ++idx) {
         auto expr = lowerExpression(exprs[idx]);
         auto slot = _slotIdGenerator.generate();
 
         mapProjToSlot(names[idx], slot);
-        aggs.emplace(slot, std::move(expr));
+        aggs.push_back({slot, std::move(expr)});
     }
 
     boost::optional<sbe::value::SlotId> collatorSlot = _namedSlots.getSlotIfExists("collator"_sd);
@@ -705,6 +706,11 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const GroupByNode& n,
                                          true /*optimizedClose*/,
                                          collatorSlot,
                                          false /*allowDiskUse*/,
+                                         // Since we are always disallowing disk use for this stage,
+                                         // we need not provide merging expressions. Once spilling
+                                         // is permitted here, we will need to generate merging
+                                         // expressions during lowering.
+                                         sbe::makeSlotExprPairVec() /*mergingExprs*/,
                                          planNodeId);
 }
 

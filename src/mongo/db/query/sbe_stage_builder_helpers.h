@@ -37,6 +37,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
+#include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/makeobj.h"
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/pipeline/expression.h"
@@ -424,9 +425,10 @@ EvalStage makeUnion(std::vector<EvalStage> inputStages,
 
 EvalStage makeHashAgg(EvalStage stage,
                       sbe::value::SlotVector gbs,
-                      sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> aggs,
+                      sbe::SlotExprPairVector aggs,
                       boost::optional<sbe::value::SlotId> collatorSlot,
                       bool allowDiskUse,
+                      sbe::SlotExprPairVector mergingExprs,
                       PlanNodeId planNodeId);
 
 EvalStage makeMkBsonObj(EvalStage stage,

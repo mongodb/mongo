@@ -129,11 +129,12 @@ TEST_F(PlanSizeTest, Filter) {
 TEST_F(PlanSizeTest, HashAgg) {
     auto stage = makeS<HashAggStage>(mockS(),
                                      mockSV(),
-                                     makeEM(generateSlotId(), mockE()),
+                                     makeSlotExprPairVec(generateSlotId(), mockE()),
                                      makeSV(),
                                      true,
                                      generateSlotId(),
                                      false,
+                                     makeSlotExprPairVec(),
                                      kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }

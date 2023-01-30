@@ -4219,6 +4219,41 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSetUnionCappedImpl(
     return {ownAcc, tagAcc, valAcc};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggSetUnion(ArityType arity) {
+    auto [ownAcc, tagAcc, valAcc] = getFromStack(0);
+
+    if (tagAcc == value::TypeTags::Nothing) {
+        // Initialize the accumulator.
+        ownAcc = true;
+        std::tie(tagAcc, valAcc) = value::makeNewArraySet();
+    } else {
+        // Take ownership of the accumulator.
+        topStack(false, value::TypeTags::Nothing, 0);
+    }
+
+    tassert(7039552, "accumulator must be owned", ownAcc);
+    value::ValueGuard guardAcc{tagAcc, valAcc};
+    tassert(7039553, "accumulator must be of type ArraySet", tagAcc == value::TypeTags::ArraySet);
+    auto acc = value::getArraySetView(valAcc);
+
+    auto [tagNewSet, valNewSet] = moveOwnedFromStack(1);
+    value::ValueGuard guardNewSet{tagNewSet, valNewSet};
+    if (!value::isArray(tagNewSet)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto i = value::ArrayEnumerator{tagNewSet, valNewSet};
+    while (!i.atEnd()) {
+        auto [elTag, elVal] = i.getViewOfValue();
+        auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
+        acc->push_back(copyTag, copyVal);
+        i.advance();
+    }
+
+    guardAcc.reset();
+    return {ownAcc, tagAcc, valAcc};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggSetUnionCapped(ArityType arity) {
     auto [tagNewElem, valNewElem] = moveOwnedFromStack(1);
     value::ValueGuard guardNewElem{tagNewElem, valNewElem};
@@ -5354,6 +5389,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinConcatArrays(arity);
         case Builtin::aggConcatArraysCapped:
             return builtinAggConcatArraysCapped(arity);
+        case Builtin::aggSetUnion:
+            return builtinAggSetUnion(arity);
         case Builtin::aggSetUnionCapped:
             return builtinAggSetUnionCapped(arity);
         case Builtin::aggCollSetUnionCapped:
@@ -5551,6 +5588,8 @@ std::string builtinToString(Builtin b) {
             return "concatArrays";
         case Builtin::aggConcatArraysCapped:
             return "aggConcatArraysCapped";
+        case Builtin::aggSetUnion:
+            return "aggSetUnion";
         case Builtin::aggSetUnionCapped:
             return "aggSetUnionCapped";
         case Builtin::aggCollSetUnionCapped:

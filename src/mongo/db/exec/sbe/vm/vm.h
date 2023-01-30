@@ -669,6 +669,8 @@ enum class Builtin : uint8_t {
     // specified size.
     aggSetUnionCapped,
     aggCollSetUnionCapped,
+    // Agg function for a simple set union (with no size cap or collation).
+    aggSetUnion,
 
     acos,
     acosh,
@@ -1289,6 +1291,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinConcat(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinConcatArrays(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggConcatArraysCapped(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnion(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnionCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggCollSetUnionCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> aggSetUnionCappedImpl(

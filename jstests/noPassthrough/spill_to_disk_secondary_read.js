@@ -91,8 +91,10 @@ const readColl = secondary.getDB("test").foo;
         assert(hashAggGroup.hasOwnProperty("usedDisk"), hashAggGroup);
         assert(hashAggGroup.usedDisk, hashAggGroup);
         assert.eq(hashAggGroup.spilledRecords, expectedSpilledRecords, hashAggGroup);
-        assert.gte(hashAggGroup.spilledBytesApprox, expectedSpilledBytesAtLeast, hashAggGroup);
-        assert.gt(hashAggGroup.spilledRecordEstimatedStorageSize, 0, hashAggGroup);
+        // We expect each record to be individually spilled, so the number of spill events and the
+        // number of spilled records should be equal.
+        assert.eq(hashAggGroup.numSpills, hashAggGroup.spilledRecords, hashAggGroup);
+        assert.gt(hashAggGroup.spilledDataStorageSize, expectedSpilledBytesAtLeast, hashAggGroup);
     } finally {
         assert.commandWorked(secondary.adminCommand({
             setParameter: 1,
