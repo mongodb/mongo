@@ -29,13 +29,17 @@
 
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/grid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -48,8 +52,8 @@ public:
     using Request = ShardsvrParticipantBlock;
 
     std::string help() const override {
-        return "Internal command, which is exported by the shards. Do not call "
-               "directly. Blocks CRUD operations.";
+        return "Internal command, which is exported by the shards. Do not call directly. Blocks "
+               "CRUD operations.";
     }
 
     bool skipApiVersionCheck() const override {
@@ -76,27 +80,62 @@ public:
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-            auto service = ShardingRecoveryService::get(opCtx);
-            const auto reason =
-                request().getReason().get_value_or(BSON("command"
-                                                        << "ShardSvrParticipantBlockCommand"
-                                                        << "ns" << ns().toString()));
-            auto blockType = request().getBlockType().get_value_or(
-                CriticalSectionBlockTypeEnum::kReadsAndWrites);
-            switch (blockType) {
-                case CriticalSectionBlockTypeEnum::kUnblock:
-                    service->releaseRecoverableCriticalSection(
-                        opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
-                    break;
-                case CriticalSectionBlockTypeEnum::kWrites:
-                    service->acquireRecoverableCriticalSectionBlockWrites(
-                        opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
-                    break;
-                default:
-                    service->acquireRecoverableCriticalSectionBlockWrites(
-                        opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
-                    service->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                        opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
+            auto handleRecoverableCriticalSection = [this](auto opCtx) {
+                const auto reason =
+                    request().getReason().get_value_or(BSON("command"
+                                                            << "ShardSvrParticipantBlockCommand"
+                                                            << "ns" << ns().toString()));
+                auto blockType = request().getBlockType().get_value_or(
+                    CriticalSectionBlockTypeEnum::kReadsAndWrites);
+                auto service = ShardingRecoveryService::get(opCtx);
+                switch (blockType) {
+                    case CriticalSectionBlockTypeEnum::kUnblock:
+                        service->releaseRecoverableCriticalSection(
+                            opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
+                        break;
+                    case CriticalSectionBlockTypeEnum::kWrites:
+                        service->acquireRecoverableCriticalSectionBlockWrites(
+                            opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
+                        break;
+                    default:
+                        service->acquireRecoverableCriticalSectionBlockWrites(
+                            opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
+                        service->promoteRecoverableCriticalSectionToBlockAlsoReads(
+                            opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
+                };
+            };
+
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+            if (txnParticipant) {
+                auto newClient =
+                    getGlobalServiceContext()->makeClient("ShardSvrParticipantBlockCmdClient");
+                {
+                    stdx::lock_guard<Client> lk(*newClient);
+                    newClient->setSystemOperationKillableByStepdown(lk);
+                }
+                AlternativeClientRegion acr(newClient);
+                auto cancelableOperationContext = CancelableOperationContext(
+                    cc().makeOperationContext(),
+                    opCtx->getCancellationToken(),
+                    Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
+
+                cancelableOperationContext->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+                handleRecoverableCriticalSection(cancelableOperationContext.get());
+            } else {
+                handleRecoverableCriticalSection(opCtx);
+            }
+
+            if (txnParticipant) {
+                // Since no write that generated a retryable write oplog entry with this sessionId
+                // and txnNumber happened, we need to make a dummy write so that the session gets
+                // durably persisted on the oplog. This must be the last operation done on this
+                // command.
+                DBDirectClient client(opCtx);
+                client.update(NamespaceString::kServerConfigurationNamespace.ns(),
+                              BSON("_id" << Request::kCommandName),
+                              BSON("$inc" << BSON("count" << 1)),
+                              true /* upsert */,
+                              false /* multi */);
             }
         }
 
