@@ -267,6 +267,8 @@ executor:
         jsTest.authenticate(db.getMongo());
       global_vars:
         TestData: &TestData
+          # Informs behavior in the inject_tenant_prefix override.
+          splitPassthrough: true
           tenantIds: ["636d957b2646ddfaf9b5e13f", "123d957b2646ddfaf9b5e91d"]
           # Temp collections are removed when the recipient steps up. We expect a mismatch, this
           # ensures we don't compare them.

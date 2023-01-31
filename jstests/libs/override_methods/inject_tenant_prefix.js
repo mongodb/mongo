@@ -82,9 +82,9 @@ function closeRoutingConnection(conn) {
 }
 
 /**
- * @returns Whether we are currently running a shard split passthrough.
+ * @returns Whether we are currently running an operation with multiple tenants.
  */
-function isShardSplitPassthrough() {
+function usingMultipleTenants() {
     return !!TestData.tenantIds;
 }
 
@@ -108,7 +108,7 @@ function prependTenantIdToDbNameIfApplicable(dbName) {
 
     let prefix;
     // If running shard split passthroughs, then assign a database to a randomly selected tenant
-    if (isShardSplitPassthrough()) {
+    if (usingMultipleTenants()) {
         if (!kTenantPrefixMap[dbName]) {
             const tenantId =
                 TestData.tenantIds[Math.floor(Math.random() * TestData.tenantIds.length)];
@@ -142,7 +142,7 @@ function prependTenantIdToNsIfApplicable(ns) {
  * Remove a tenant prefix from the provided database name, if applicable.
  */
 function extractOriginalDbName(dbName) {
-    if (isShardSplitPassthrough()) {
+    if (usingMultipleTenants()) {
         const anyTenantPrefixOnceRegex = new RegExp(Object.values(kTenantPrefixMap).join('|'), '');
         return dbName.replace(anyTenantPrefixOnceRegex, "");
     }
@@ -163,7 +163,7 @@ function extractOriginalNs(ns) {
  * Removes all occurrences of a tenant prefix in the provided string.
  */
 function removeTenantIdFromString(string) {
-    if (isShardSplitPassthrough()) {
+    if (usingMultipleTenants()) {
         const anyTenantPrefixGlobalRegex =
             new RegExp(Object.values(kTenantPrefixMap).join('|'), 'g');
         return string.replace(anyTenantPrefixGlobalRegex, "");
@@ -173,17 +173,10 @@ function removeTenantIdFromString(string) {
 }
 
 /**
- * @returns Whether we are currently running a shard merge passthrough.
+ * @returns Whether we are running a shard split passthrough.
  */
-function isShardMergePassthrough(conn) {
-    const flagDoc = assert.commandWorked(
-        originalRunCommand.apply(conn, ["admin", {getParameter: 1, featureFlagShardMerge: 1}, 0]));
-    const fcvDoc = assert.commandWorked(assert.commandWorked(originalRunCommand.apply(
-        conn, ["admin", {getParameter: 1, featureCompatibilityVersion: 1}, 0])));
-    return flagDoc.hasOwnProperty("featureFlagShardMerge") && flagDoc.featureFlagShardMerge.value &&
-        MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
-                                       flagDoc.featureFlagShardMerge.version) >= 0 &&
-        TestData.useLocalDBForDBCheck;
+function isShardSplitPassthrough() {
+    return !!TestData.splitPassthrough;
 }
 
 /**
@@ -455,14 +448,10 @@ function convertServerConnectionStringToURI(input) {
 function getOperationStateDocument(conn) {
     const collection = isShardSplitPassthrough() ? "shardSplitDonors" : "tenantMigrationDonors";
     let filter = {tenantId: TestData.tenantId};
-    if (isShardSplitPassthrough()) {
+    if (usingMultipleTenants()) {
         let tenantIds = [];
         TestData.tenantIds.forEach(tenantId => tenantIds.push(ObjectId(tenantId)));
         filter = {tenantIds: tenantIds};
-    } else if (isShardMergePassthrough(conn)) {
-        // TODO (SERVER-68643) No longer require to check for shard merge since shard merge will be
-        // the only protocol left.
-        filter = {};
     }
 
     const findRes = assert.commandWorked(
