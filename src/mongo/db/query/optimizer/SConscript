@@ -161,3 +161,15 @@ env.CppUnitTest(
         "unit_test_utils",
     ],
 )
+
+env.Benchmark(
+    target='path_lower_bm',
+    source=[
+        'rewrites/path_lower_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'optimizer_rewrites',
+        'unit_test_utils',
+    ],
+)

@@ -1,4 +1,4 @@
-# This benchmark measures the performance of ABT lowering.
+# This benchmark measures the performance of the ABT path lowering phase.
 test_kind: benchmark_test
 
 selector:
@@ -6,7 +6,7 @@ selector:
   include_files:
   # The trailing asterisk is for handling the .exe extension on Windows.
   - build/**/system_resource_canary_bm*
-  - build/install/bin/abt_lowering_bm*
+  - build/install/bin/path_lower_bm*
 
 executor:
   config: {}
