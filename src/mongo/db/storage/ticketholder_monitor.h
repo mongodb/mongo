@@ -30,19 +30,27 @@
 #pragma once
 
 #include "mongo/db/service_context.h"
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
 
 class TicketHolderMonitor {
 public:
-    explicit TicketHolderMonitor(ServiceContext*, Milliseconds interval);
+    TicketHolderMonitor(ServiceContext* svcCtx,
+                        TicketHolder* readTicketHolder,
+                        TicketHolder* writeTicketHolder,
+                        Milliseconds interval);
 
     virtual ~TicketHolderMonitor(){};
 
     void start();
 
 protected:
+    TicketHolder* _readTicketHolder;
+    TicketHolder* _writeTicketHolder;
+
+private:
     virtual void _run(Client*) = 0;
 
     PeriodicJobAnchor _job;

@@ -31,8 +31,13 @@
 
 namespace mongo {
 
-TicketHolderMonitor::TicketHolderMonitor(ServiceContext* svcCtx, Milliseconds interval)
-    : _job(svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
+TicketHolderMonitor::TicketHolderMonitor(ServiceContext* svcCtx,
+                                         TicketHolder* readTicketHolder,
+                                         TicketHolder* writeTicketHolder,
+                                         Milliseconds interval)
+    : _readTicketHolder(readTicketHolder),
+      _writeTicketHolder(writeTicketHolder),
+      _job(svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
           "TicketHolderMonitor", [this](Client* client) { _run(client); }, interval})) {}
 
 void TicketHolderMonitor::start() {
