@@ -5,9 +5,8 @@
  */
 (function() {
 
-load("jstests/libs/log.js");                                     // For findMatchingLogLine.
-load("jstests/libs/fixture_helpers.js");                         // For FixtureHelpers.
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameter.
+load("jstests/libs/log.js");              // For findMatchingLogLine.
+load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 
 // Updates the global profiling filter to 'newFilter' and validates that 'oldFilter' is returned in
 // the response and the change is logged correctly. If `newFilter' is null, unsets the filter.
