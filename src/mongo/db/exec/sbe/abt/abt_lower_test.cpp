@@ -120,8 +120,8 @@ protected:
 
         Metadata md(scanDefs);
         auto planStage =
-            SBENodeLowering{env, map, namedSlots, ridSlot, ids, md, _nodeMap, ScanOrder::Forward}
-                .optimize(n);
+            SBENodeLowering{env, namedSlots, ids, md, _nodeMap, ScanOrder::Forward}.optimize(
+                n, map, ridSlot);
         sbe::DebugPrinter printer;
         stream << stripUUIDs(printer.print(*planStage)) << std::endl;
 

@@ -435,14 +435,12 @@ TEST_F(NodeSBE, Lower1) {
     sbe::value::SlotIdGenerator ids;
 
     SBENodeLowering g{env,
-                      map,
                       *runtimeEnv,
-                      ridSlot,
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
                       ScanOrder::Forward};
-    auto sbePlan = g.optimize(tree);
+    auto sbePlan = g.optimize(tree, map, ridSlot);
     ASSERT_EQ(1, map.size());
     ASSERT_FALSE(ridSlot);
 
@@ -585,13 +583,11 @@ TEST_F(NodeSBE, Lower2) {
     // boost::optional<sbe::value::SlotId> ridSlot;
     // sbe::value::SlotIdGenerator ids;
     // SBENodeLowering g{env,
-    //                   map,
-    //                   ridSlot,
     //                   ids,
     //                   phaseManager.getMetadata(),
     //                   phaseManager.getNodeToGroupPropsMap(),
     //                   false /*randomScan*/};
-    // auto sbePlan = g.optimize(root);
+    // auto sbePlan = g.optimize(root, map, ridSlot, ids);
 
     // ASSERT_EQ(
     //     "[4] smerge [s4] [asc] [\n"
@@ -660,14 +656,12 @@ TEST_F(NodeSBE, RequireRID) {
     sbe::value::SlotIdGenerator ids;
 
     SBENodeLowering g{env,
-                      map,
                       *runtimeEnv,
-                      ridSlot,
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
                       ScanOrder::Forward};
-    auto sbePlan = g.optimize(tree);
+    auto sbePlan = g.optimize(tree, map, ridSlot);
     ASSERT_EQ(1, map.size());
     ASSERT_TRUE(ridSlot);
 
@@ -808,8 +802,8 @@ TEST_F(NodeSBE, SpoolFibonacci) {
     auto runtimeEnv = std::make_unique<sbe::RuntimeEnvironment>();
     boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
-    SBENodeLowering g{env, map, *runtimeEnv, ridSlot, ids, metadata, props, ScanOrder::Forward};
-    auto sbePlan = g.optimize(tree);
+    SBENodeLowering g{env, *runtimeEnv, ids, metadata, props, ScanOrder::Forward};
+    auto sbePlan = g.optimize(tree, map, ridSlot);
     ASSERT_EQ(1, map.size());
 
     auto opCtx = makeOperationContext();

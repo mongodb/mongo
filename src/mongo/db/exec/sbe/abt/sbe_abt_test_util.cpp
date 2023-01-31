@@ -133,14 +133,12 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
 
     auto env = VariableEnvironment::build(tree);
     SBENodeLowering g{env,
-                      map,
                       *runtimeEnv,
-                      ridSlot,
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
                       ScanOrder::Forward};
-    auto sbePlan = g.optimize(tree);
+    auto sbePlan = g.optimize(tree, map, ridSlot);
     ASSERT_EQ(1, map.size());
     tassert(6624260, "Unexpected rid slot", !ridSlot);
     uassert(6624249, "Cannot optimize SBE plan", sbePlan != nullptr);

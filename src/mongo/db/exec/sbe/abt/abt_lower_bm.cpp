@@ -87,8 +87,8 @@ protected:
             sbe::value::SlotIdGenerator ids;
 
             benchmark::DoNotOptimize(
-                SBENodeLowering{env, map, namedSlots, ridSlot, ids, m, _nodeMap, ScanOrder::Forward}
-                    .optimize(n));
+                SBENodeLowering{env, namedSlots, ids, m, _nodeMap, ScanOrder::Forward}.optimize(
+                    n, map, ridSlot));
             benchmark::ClobberMemory();
         }
     }

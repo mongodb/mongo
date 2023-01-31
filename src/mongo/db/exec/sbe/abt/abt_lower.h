@@ -101,19 +101,14 @@ enum class ScanOrder {
 
 class SBENodeLowering {
 public:
-    // TODO: SERVER-69540. Consider avoiding a mutable slotMap argument here.
     SBENodeLowering(const VariableEnvironment& env,
-                    SlotVarMap& slotMap,
                     const NamedSlotsProvider& namedSlots,
-                    boost::optional<sbe::value::SlotId>& ridSlot,
                     sbe::value::SlotIdGenerator& ids,
                     const Metadata& metadata,
                     const NodeToGroupPropsMap& nodeToGroupPropsMap,
                     const ScanOrder scanOrder)
         : _env(env),
-          _slotMap(slotMap),
           _namedSlots(namedSlots),
-          _ridSlot(ridSlot),
           _slotIdGenerator(ids),
           _metadata(metadata),
           _nodeToGroupPropsMap(nodeToGroupPropsMap),
@@ -121,7 +116,10 @@ public:
 
     // The default noop transport.
     template <typename T, typename... Ts>
-    std::unique_ptr<sbe::PlanStage> walk(const T&, Ts&&...) {
+    std::unique_ptr<sbe::PlanStage> walk(const T&,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
+                                         Ts&&...) {
         // We should not be seeing a physical delegator node here.
         static_assert(!canBePhysicalNode<T>() || std::is_same_v<MemoPhysicalDelegatorNode, T>,
                       "Physical nodes need to implement lowering");
@@ -130,27 +128,59 @@ public:
         return nullptr;
     }
 
-    std::unique_ptr<sbe::PlanStage> walk(const RootNode& n, const ABT& child, const ABT& refs);
+    std::unique_ptr<sbe::PlanStage> walk(const RootNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
+                                         const ABT& child,
+                                         const ABT& refs);
     std::unique_ptr<sbe::PlanStage> walk(const EvaluationNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
                                          const ABT& child,
                                          const ABT& binds);
 
-    std::unique_ptr<sbe::PlanStage> walk(const FilterNode& n, const ABT& child, const ABT& filter);
+    std::unique_ptr<sbe::PlanStage> walk(const FilterNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
+                                         const ABT& child,
+                                         const ABT& filter);
 
-    std::unique_ptr<sbe::PlanStage> walk(const LimitSkipNode& n, const ABT& child);
-    std::unique_ptr<sbe::PlanStage> walk(const ExchangeNode& n, const ABT& child, const ABT& refs);
-    std::unique_ptr<sbe::PlanStage> walk(const CollationNode& n, const ABT& child, const ABT& refs);
+    std::unique_ptr<sbe::PlanStage> walk(const LimitSkipNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
+                                         const ABT& child);
+    std::unique_ptr<sbe::PlanStage> walk(const ExchangeNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
+                                         const ABT& child,
+                                         const ABT& refs);
+    std::unique_ptr<sbe::PlanStage> walk(const CollationNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
+                                         const ABT& child,
+                                         const ABT& refs);
 
-    std::unique_ptr<sbe::PlanStage> walk(const UniqueNode& n, const ABT& child, const ABT& refs);
+    std::unique_ptr<sbe::PlanStage> walk(const UniqueNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
+                                         const ABT& child,
+                                         const ABT& refs);
 
     std::unique_ptr<sbe::PlanStage> walk(const SpoolProducerNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
                                          const ABT& child,
                                          const ABT& filter,
                                          const ABT& binder,
                                          const ABT& refs);
-    std::unique_ptr<sbe::PlanStage> walk(const SpoolConsumerNode& n, const ABT& binder);
+    std::unique_ptr<sbe::PlanStage> walk(const SpoolConsumerNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
+                                         const ABT& binder);
 
     std::unique_ptr<sbe::PlanStage> walk(const GroupByNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
                                          const ABT& child,
                                          const ABT& aggBinds,
                                          const ABT& aggRefs,
@@ -158,45 +188,70 @@ public:
                                          const ABT& gbRefs);
 
     std::unique_ptr<sbe::PlanStage> walk(const NestedLoopJoinNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
                                          const ABT& leftChild,
                                          const ABT& rightChild,
                                          const ABT& filter);
     std::unique_ptr<sbe::PlanStage> walk(const HashJoinNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
                                          const ABT& leftChild,
                                          const ABT& rightChild,
                                          const ABT& refs);
     std::unique_ptr<sbe::PlanStage> walk(const MergeJoinNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
                                          const ABT& leftChild,
                                          const ABT& rightChild,
                                          const ABT& refs);
 
     std::unique_ptr<sbe::PlanStage> walk(const SortedMergeNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
                                          const ABTVector& children,
                                          const ABT& binder,
                                          const ABT& refs);
 
     std::unique_ptr<sbe::PlanStage> walk(const UnionNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
                                          const ABTVector& children,
                                          const ABT& binder,
                                          const ABT& refs);
 
     std::unique_ptr<sbe::PlanStage> walk(const UnwindNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
                                          const ABT& child,
                                          const ABT& pidBind,
                                          const ABT& refs);
 
-    std::unique_ptr<sbe::PlanStage> walk(const PhysicalScanNode& n, const ABT& /*binds*/);
-    std::unique_ptr<sbe::PlanStage> walk(const CoScanNode& n);
+    std::unique_ptr<sbe::PlanStage> walk(const PhysicalScanNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
+                                         const ABT& /*binds*/);
+    std::unique_ptr<sbe::PlanStage> walk(const CoScanNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot);
 
-    std::unique_ptr<sbe::PlanStage> walk(const IndexScanNode& n, const ABT& /*binds*/);
+    std::unique_ptr<sbe::PlanStage> walk(const IndexScanNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
+                                         const ABT& /*binds*/);
     std::unique_ptr<sbe::PlanStage> walk(const SeekNode& n,
+                                         SlotVarMap& slotMap,
+                                         boost::optional<sbe::value::SlotId>& ridSlot,
                                          const ABT& /*binds*/,
                                          const ABT& /*refs*/);
 
-    std::unique_ptr<sbe::PlanStage> optimize(const ABT& n);
+    std::unique_ptr<sbe::PlanStage> optimize(const ABT& n,
+                                             SlotVarMap& slotMap,
+                                             boost::optional<sbe::value::SlotId>& ridSlot);
 
 private:
-    void generateSlots(const FieldProjectionMap& fieldProjectionMap,
+    void generateSlots(SlotVarMap& slotMap,
+                       const FieldProjectionMap& fieldProjectionMap,
                        boost::optional<sbe::value::SlotId>& ridSlot,
                        boost::optional<sbe::value::SlotId>& rootSlot,
                        std::vector<std::string>& fields,
@@ -206,7 +261,8 @@ private:
      * Convert a vector of ProjectionNames to slot IDs from the projections that have already been
      * bound to slots.
      */
-    sbe::value::SlotVector convertProjectionsToSlots(const ProjectionNameVector& projectionNames);
+    sbe::value::SlotVector convertProjectionsToSlots(const SlotVarMap& slotMap,
+                                                     const ProjectionNameVector& projectionNames);
 
     /**
      * During Cascades, projections that a node is required to propagate up the tree are added to
@@ -215,15 +271,22 @@ private:
      * some slots from being added to the output vector.
      */
     sbe::value::SlotVector convertRequiredProjectionsToSlots(
-        const NodeProps& props, const sbe::value::SlotVector& toExclude = {});
+        const SlotVarMap& slotMap,
+        const NodeProps& props,
+        const sbe::value::SlotVector& toExclude = {});
 
     std::unique_ptr<sbe::EExpression> convertBoundsToExpr(
-        bool isLower, const IndexDefinition& indexDef, const CompoundIntervalRequirement& interval);
+        SlotVarMap& slotMap,
+        bool isLower,
+        const IndexDefinition& indexDef,
+        const CompoundIntervalRequirement& interval);
 
-    std::unique_ptr<sbe::PlanStage> generateInternal(const ABT& n);
+    std::unique_ptr<sbe::PlanStage> generateInternal(const ABT& n,
+                                                     SlotVarMap& slotMap,
+                                                     boost::optional<sbe::value::SlotId>& ridSlot);
 
     /**
-     * Maps a projection name to a slot by updating _slotMap field.
+     * Maps a projection name to a slot by updating slotMap field.
      * By default it will tassert rather than overwrite an existing entry--it's the caller's
      * responsibility not to call this twice with the same projName. With 'canOverwrite = true' it
      * is allowed to overwrite an existing entry. This is useful for nodes that intentionally use
@@ -231,24 +294,24 @@ private:
      * both use the same projName for RID. Or, Unwind uses the same projName both for the original
      * array, and the unwound elements.
      */
-    void mapProjToSlot(const ProjectionName& projName,
+    void mapProjToSlot(SlotVarMap& slotMap,
+                       const ProjectionName& projName,
                        sbe::value::SlotId slot,
                        bool canOverwrite = false);
 
     /**
      * Instantiate an expression lowering transporter for use in node lowering.
      */
-    SBEExpressionLowering getExpressionLowering() {
-        return SBEExpressionLowering{_env, _slotMap, _namedSlots};
+    SBEExpressionLowering getExpressionLowering(SlotVarMap& slotMap) {
+        return SBEExpressionLowering{_env, slotMap, _namedSlots};
     }
 
-    std::unique_ptr<sbe::EExpression> lowerExpression(const ABT& e) {
-        return getExpressionLowering().optimize(e);
+    std::unique_ptr<sbe::EExpression> lowerExpression(const ABT& e, SlotVarMap& slotMap) {
+        return getExpressionLowering(slotMap).optimize(e);
     }
     const VariableEnvironment& _env;
-    SlotVarMap& _slotMap;
     const NamedSlotsProvider& _namedSlots;
-    boost::optional<sbe::value::SlotId>& _ridSlot;
+
     sbe::value::SlotIdGenerator& _slotIdGenerator;
 
     const Metadata& _metadata;

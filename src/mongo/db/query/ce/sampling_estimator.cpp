@@ -262,14 +262,12 @@ private:
         boost::optional<sbe::value::SlotId> ridSlot;
         sbe::value::SlotIdGenerator ids;
         SBENodeLowering g{env,
-                          slotMap,
                           *runtimeEnvironment,
-                          ridSlot,
                           ids,
                           _phaseManager.getMetadata(),
                           _phaseManager.getNodeToGroupPropsMap(),
                           ScanOrder::Random};
-        auto sbePlan = g.optimize(abtTree);
+        auto sbePlan = g.optimize(abtTree, slotMap, ridSlot);
         tassert(6624261, "Unexpected rid slot", !ridSlot);
 
         // TODO: return errors instead of exceptions?

@@ -308,14 +308,12 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
     sbe::value::SlotIdGenerator ids;
     boost::optional<sbe::value::SlotId> ridSlot;
     SBENodeLowering g{env,
-                      slotMap,
                       *runtimeEnvironment,
-                      ridSlot,
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
                       scanOrder};
-    auto sbePlan = g.optimize(abt);
+    auto sbePlan = g.optimize(abt, slotMap, ridSlot);
     tassert(6624262, "Unexpected rid slot", !requireRID || ridSlot);
 
     uassert(6624253, "Lowering failed: did not produce a plan.", sbePlan != nullptr);
