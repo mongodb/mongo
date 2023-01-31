@@ -483,14 +483,11 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
             throw;
         }
 
-        if (_memoryTracker.currentMemoryBytes() >=
-                static_cast<long long>(_memoryTracker._maxAllowedMemoryUsageBytes) &&
-            _memoryTracker._allowDiskUse) {
+        if (!_memoryTracker.withinMemoryLimit() && _memoryTracker._allowDiskUse) {
             // Attempt to spill where possible.
             _iterator.spillToDisk();
         }
-        if (_memoryTracker.currentMemoryBytes() >
-            static_cast<long long>(_memoryTracker._maxAllowedMemoryUsageBytes)) {
+        if (!_memoryTracker.withinMemoryLimit()) {
             _iterator.finalize();
             uasserted(5414201,
                       str::stream()
