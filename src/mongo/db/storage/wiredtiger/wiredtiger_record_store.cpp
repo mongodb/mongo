@@ -42,6 +42,8 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/catalog/health_log.h"
+#include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/locker.h"
@@ -70,6 +72,7 @@
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
@@ -2155,7 +2158,8 @@ WiredTigerRecordStoreCursorBase::WiredTigerRecordStoreCursorBase(OperationContex
       _keyFormat(rs._keyFormat),
       _forward(forward),
       _isOplog(rs._isOplog),
-      _isCapped(rs._isCapped) {
+      _isCapped(rs._isCapped),
+      _ns(rs.ns()) {
     if (_isCapped) {
         initCappedVisibility(_opCtx);
     }
@@ -2222,18 +2226,36 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
 
     if ((_forward && _lastReturnedId >= id) ||
         (!_forward && !_lastReturnedId.isNull() && id >= _lastReturnedId)) {
-        LOGV2_ERROR(22406,
-                    "WTCursor::next -- returned out-of-order keys",
-                    "forward"_attr = _forward,
-                    "next"_attr = id,
-                    "last"_attr = _lastReturnedId);
+        HealthLogEntry entry;
+        entry.setNss(_ns);
+        entry.setTimestamp(Date_t::now());
+        entry.setSeverity(SeverityEnum::Error);
+        entry.setScope(ScopeEnum::Collection);
+        entry.setOperation("WT_Cursor::next");
+        entry.setMsg("Cursor returned out-of-order keys");
+
+        BSONObjBuilder bob;
+        bob.append("forward", _forward);
+        bob.append("next", id.toString());
+        bob.append("last", _lastReturnedId.toString());
+        bob.append("ident", _ident);
+        bob.appendElements(getStackTrace().getBSONRepresentation());
+        entry.setData(bob.obj());
+
+        HealthLog::get(_opCtx).log(entry);
 
         // Crash when testing diagnostics are enabled.
         invariant(!TestingProctor::instance().isEnabled(), "cursor returned out-of-order keys");
 
-        // Force a retry of the operation from our last known position by acting as-if
-        // we received a WT_ROLLBACK error.
-        throwWriteConflictException("WTCursor::next -- returned out-of-order keys");
+        // uassert with 'DataCorruptionDetected' after logging.
+        LOGV2_ERROR_OPTIONS(22406,
+                            {logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)},
+                            "WT_Cursor::next -- returned out-of-order keys",
+                            "forward"_attr = _forward,
+                            "next"_attr = id,
+                            "last"_attr = _lastReturnedId,
+                            "ident"_attr = _ident,
+                            logAttrs(_ns));
     }
 
     WT_ITEM value;

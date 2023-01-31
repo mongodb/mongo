@@ -423,6 +423,7 @@ protected:
     const bool _forward;
     const bool _isOplog;
     const bool _isCapped;
+    const NamespaceString _ns;
     bool _skipNextAdvance = false;
     bool _eof = false;
     bool _hasRestored = true;
