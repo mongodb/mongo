@@ -24,7 +24,11 @@ const st = new ShardingTest({
         binVersion: "latest",
         setParameter: {logComponentVerbosity: '{command: {verbosity: 2}}'}
     },
-    other: {mongosOptions: {binVersion: "latest"}}
+    other: {
+        configOptions:
+            {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}},
+        mongosOptions: {binVersion: "latest"}
+    }
 });
 
 let shardedColl = st.s.getDB(dbName)[collName];
