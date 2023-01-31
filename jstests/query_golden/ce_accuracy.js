@@ -23,15 +23,15 @@ runHistogramsTest(function() {
     const collMeta = {
         "collectionName": "ce_data_20",
         "fields": [
-            {"fieldName": "a", "data_type": "integer", "indexed": true},
-            {"fieldName": "b", "data_type": "string", "indexed": true},
-            {"fieldName": "c", "data_type": "array", "indexed": true},
-            {"fieldName": "mixed", "data_type": "mixed", "indexed": true},
+            {"fieldName": "a", "dataType": "integer", "indexed": true},
+            {"fieldName": "b", "dataType": "string", "indexed": true},
+            {"fieldName": "c", "dataType": "array", "indexed": true},
+            {"fieldName": "mixed", "dataType": "mixed", "indexed": true},
         ],
         "compound_indexes": [],
         "cardinality": 20
     };
 
-    runCETestForCollection(db, collMeta);
+    runCETestForCollection(db, collMeta, 4);
 });
 })();

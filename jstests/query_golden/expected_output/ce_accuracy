@@ -22,7 +22,67 @@ Running CE accuracy test for collection ce_data_20 of 20 documents.
 
 
 [jsTest] ----
-[jsTest] Selected query values: {  "a" : [ 10, 12, 17, 25, 27, 32, 33, 34 ],  "b" : [ "a", "c", "opqr", "stu", "wxyz", "yz", "yzab" ],  "c" : [ 1, 2, 3, 4, 5, 9, 15, 16, 17, 18, 19, 20 ],  "mixed" : [ 0, 22, 77, "cde", "gh", "mno", "u", "yzab" ] }
+[jsTest] Selected query values: {
+[jsTest] 	"a" : {
+[jsTest] 		"values" : [
+[jsTest] 			10,
+[jsTest] 			12,
+[jsTest] 			17,
+[jsTest] 			25,
+[jsTest] 			27,
+[jsTest] 			32,
+[jsTest] 			33,
+[jsTest] 			34
+[jsTest] 		],
+[jsTest] 		"min" : 10,
+[jsTest] 		"max" : 34
+[jsTest] 	},
+[jsTest] 	"b" : {
+[jsTest] 		"values" : [
+[jsTest] 			"a",
+[jsTest] 			"c",
+[jsTest] 			"opqr",
+[jsTest] 			"stu",
+[jsTest] 			"wxyz",
+[jsTest] 			"yz",
+[jsTest] 			"yzab"
+[jsTest] 		],
+[jsTest] 		"min" : "a",
+[jsTest] 		"max" : "yzab"
+[jsTest] 	},
+[jsTest] 	"c" : {
+[jsTest] 		"values" : [
+[jsTest] 			1,
+[jsTest] 			2,
+[jsTest] 			3,
+[jsTest] 			4,
+[jsTest] 			5,
+[jsTest] 			9,
+[jsTest] 			15,
+[jsTest] 			16,
+[jsTest] 			17,
+[jsTest] 			18,
+[jsTest] 			19,
+[jsTest] 			20
+[jsTest] 		],
+[jsTest] 		"min" : 1,
+[jsTest] 		"max" : 20
+[jsTest] 	},
+[jsTest] 	"mixed" : {
+[jsTest] 		"values" : [
+[jsTest] 			0,
+[jsTest] 			22,
+[jsTest] 			77,
+[jsTest] 			"cde",
+[jsTest] 			"gh",
+[jsTest] 			"mno",
+[jsTest] 			"u",
+[jsTest] 			"yzab"
+[jsTest] 		],
+[jsTest] 		"min" : 0,
+[jsTest] 		"max" : "yzab"
+[jsTest] 	}
+[jsTest] }
 [jsTest] ----
 
 
@@ -34,7 +94,9 @@ Running CE accuracy test for collection ce_data_20 of 20 documents.
 Actual cardinality: 1
 Cardinality estimates:
 heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
 histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -44,7 +106,9 @@ histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 1
 Cardinality estimates:
 heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
 histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -54,7 +118,9 @@ histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 2
 Cardinality estimates:
 heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
+heuristicIdx: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
 histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -64,7 +130,9 @@ histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 3
 Cardinality estimates:
 heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
+heuristicIdx: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
 histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 3 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -74,7 +142,9 @@ histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 17
 Cardinality estimates:
 heuristic: 9 AbsError: -8, RelError: -0.47, SelError: -40%
+heuristicIdx: 9 AbsError: -8, RelError: -0.47, SelError: -40%
 histogram: 17 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 17 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -84,7 +154,9 @@ histogram: 17 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 18
 Cardinality estimates:
 heuristic: 9 AbsError: -9, RelError: -0.5, SelError: -45%
+heuristicIdx: 9 AbsError: -9, RelError: -0.5, SelError: -45%
 histogram: 18 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 18 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -94,7 +166,9 @@ histogram: 18 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 7
 Cardinality estimates:
 heuristic: 6.6 AbsError: -0.4, RelError: -0.06, SelError: -2%
+heuristicIdx: 6.6 AbsError: -0.4, RelError: -0.06, SelError: -2%
 histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 7 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -104,7 +178,9 @@ histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 11
 Cardinality estimates:
 heuristic: 6.6 AbsError: -4.4, RelError: -0.4, SelError: -22%
+heuristicIdx: 6.6 AbsError: -4.4, RelError: -0.4, SelError: -22%
 histogram: 11 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 11 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -114,7 +190,9 @@ histogram: 11 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 7
 Cardinality estimates:
 heuristic: 9 AbsError: 2, RelError: 0.29, SelError: 10%
+heuristicIdx: 9 AbsError: 2, RelError: 0.29, SelError: 10%
 histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 7 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -124,7 +202,9 @@ histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 1
 Cardinality estimates:
 heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
 histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -134,7 +214,9 @@ histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 17
 Cardinality estimates:
 heuristic: 6.6 AbsError: -10.4, RelError: -0.61, SelError: -52%
+heuristicIdx: 6.6 AbsError: -10.4, RelError: -0.61, SelError: -52%
 histogram: 17 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 17 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -144,7 +226,9 @@ histogram: 17 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 18
 Cardinality estimates:
 heuristic: 6.6 AbsError: -11.4, RelError: -0.63, SelError: -57%
+heuristicIdx: 6.6 AbsError: -11.4, RelError: -0.63, SelError: -57%
 histogram: 18 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 18 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -154,7 +238,9 @@ histogram: 18 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 2
 Cardinality estimates:
 heuristic: 9 AbsError: 7, RelError: 3.5, SelError: 35%
+heuristicIdx: 9 AbsError: 7, RelError: 3.5, SelError: 35%
 histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -164,7 +250,9 @@ histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 3
 Cardinality estimates:
 heuristic: 9 AbsError: 6, RelError: 2, SelError: 30%
+heuristicIdx: 9 AbsError: 6, RelError: 2, SelError: 30%
 histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 3 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -174,7 +262,9 @@ histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 2
 Cardinality estimates:
 heuristic: 9 AbsError: 7, RelError: 3.5, SelError: 35%
+heuristicIdx: 9 AbsError: 7, RelError: 3.5, SelError: 35%
 histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -184,7 +274,9 @@ histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
 Actual cardinality: 1
 Cardinality estimates:
 heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
 histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -193,2651 +285,2140 @@ histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
-histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 1.95 AbsError: 0.95, RelError: 0.95, SelError: 4.75%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 17: [ { "$match" : { "a" : { "$gt" : 10, "$lte" : 12 } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 18: [ { "$match" : { "a" : { "$gte" : 10, "$lt" : 12 } } } ]
+[jsTest] Query 17: [ { "$match" : { "a" : { "$gt" : 12, "$lte" : 14 } } } ]
 [jsTest] ----
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
+histogram: 4.61 AbsError: 2.61, RelError: 1.31, SelError: 13.05%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 19: [ { "$match" : { "a" : { "$gte" : 10, "$lte" : 12 } } } ]
+[jsTest] Query 18: [ { "$match" : { "a" : { "$gte" : 17, "$lt" : 19 } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
+histogram: 7.26 AbsError: 5.26, RelError: 2.63, SelError: 26.3%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 19: [ { "$match" : { "a" : { "$gte" : 25, "$lte" : 27 } } } ]
 [jsTest] ----
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
-histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
+heuristicIdx: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
+histogram: 8.06 AbsError: 5.06, RelError: 1.69, SelError: 25.3%
+histogramIdx: 3 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 20: [ { "$match" : { "a" : { "$gt" : 17, "$lt" : 25 } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 21: [ { "$match" : { "a" : { "$gt" : 17, "$lte" : 25 } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
-histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 22: [ { "$match" : { "a" : { "$gte" : 17, "$lt" : 25 } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
-histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 23: [ { "$match" : { "a" : { "$gte" : 17, "$lte" : 25 } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 6.6 AbsError: 2.6, RelError: 0.65, SelError: 13%
-histogram: 4 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 24: [ { "$match" : { "a" : { "$gt" : 27, "$lt" : 32 } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 6.6 AbsError: 2.6, RelError: 0.65, SelError: 13%
-histogram: 4 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 25: [ { "$match" : { "a" : { "$gt" : 27, "$lte" : 32 } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 6.6 AbsError: 1.6, RelError: 0.32, SelError: 8%
-histogram: 5 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 26: [ { "$match" : { "a" : { "$gte" : 27, "$lt" : 32 } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 6.6 AbsError: 1.6, RelError: 0.32, SelError: 8%
-histogram: 5 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 27: [ { "$match" : { "a" : { "$gte" : 27, "$lte" : 32 } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 6.6 AbsError: 0.6, RelError: 0.1, SelError: 3%
-histogram: 6 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 28: [ { "$match" : { "a" : { "$gt" : 33, "$lt" : 34 } } } ]
-[jsTest] ----
-
-Actual cardinality: 0
-Cardinality estimates:
-heuristic: 6.6 AbsError: 6.6, RelError: 0.66, SelError: 33%
-histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 29: [ { "$match" : { "a" : { "$gt" : 33, "$lte" : 34 } } } ]
-[jsTest] ----
-
-Actual cardinality: 1
-Cardinality estimates:
-heuristic: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
-histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 30: [ { "$match" : { "a" : { "$gte" : 33, "$lt" : 34 } } } ]
-[jsTest] ----
-
-Actual cardinality: 1
-Cardinality estimates:
-heuristic: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
-histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 31: [ { "$match" : { "a" : { "$gte" : 33, "$lte" : 34 } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 32: [ { "$match" : { "a" : { "$gt" : 10, "$lt" : 25 } } } ]
-[jsTest] ----
-
-Actual cardinality: 9
-Cardinality estimates:
-heuristic: 6.6 AbsError: -2.4, RelError: -0.27, SelError: -12%
-histogram: 9 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 33: [ { "$match" : { "a" : { "$gt" : 10, "$lte" : 25 } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 6.6 AbsError: -3.4, RelError: -0.34, SelError: -17%
-histogram: 10 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 34: [ { "$match" : { "a" : { "$gte" : 10, "$lt" : 25 } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 6.6 AbsError: -3.4, RelError: -0.34, SelError: -17%
-histogram: 10 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 35: [ { "$match" : { "a" : { "$gte" : 10, "$lte" : 25 } } } ]
-[jsTest] ----
-
-Actual cardinality: 11
-Cardinality estimates:
-heuristic: 6.6 AbsError: -4.4, RelError: -0.4, SelError: -22%
-histogram: 11 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 36: [ { "$match" : { "a" : { "$gt" : 12, "$lt" : 27 } } } ]
-[jsTest] ----
-
-Actual cardinality: 9
-Cardinality estimates:
-heuristic: 6.6 AbsError: -2.4, RelError: -0.27, SelError: -12%
-histogram: 9 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 37: [ { "$match" : { "a" : { "$gt" : 12, "$lte" : 27 } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 6.6 AbsError: -3.4, RelError: -0.34, SelError: -17%
-histogram: 10 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 38: [ { "$match" : { "a" : { "$gte" : 12, "$lt" : 27 } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 6.6 AbsError: -3.4, RelError: -0.34, SelError: -17%
-histogram: 10 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 39: [ { "$match" : { "a" : { "$gte" : 12, "$lte" : 27 } } } ]
-[jsTest] ----
-
-Actual cardinality: 11
-Cardinality estimates:
-heuristic: 6.6 AbsError: -4.4, RelError: -0.4, SelError: -22%
-histogram: 11 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 40: [ { "$match" : { "a" : { "$gt" : 17, "$lt" : 32 } } } ]
-[jsTest] ----
-
-Actual cardinality: 9
-Cardinality estimates:
-heuristic: 6.6 AbsError: -2.4, RelError: -0.27, SelError: -12%
-histogram: 9 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 41: [ { "$match" : { "a" : { "$gt" : 17, "$lte" : 32 } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 6.6 AbsError: -3.4, RelError: -0.34, SelError: -17%
-histogram: 10 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 42: [ { "$match" : { "a" : { "$gte" : 17, "$lt" : 32 } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 6.6 AbsError: -3.4, RelError: -0.34, SelError: -17%
-histogram: 10 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 43: [ { "$match" : { "a" : { "$gte" : 17, "$lte" : 32 } } } ]
-[jsTest] ----
-
-Actual cardinality: 11
-Cardinality estimates:
-heuristic: 6.6 AbsError: -4.4, RelError: -0.4, SelError: -22%
-histogram: 11 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 44: [ { "$match" : { "a" : { "$gt" : 25, "$lt" : 33 } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 6.6 AbsError: -0.4, RelError: -0.06, SelError: -2%
-histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 45: [ { "$match" : { "a" : { "$gt" : 25, "$lte" : 33 } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 6.6 AbsError: -1.4, RelError: -0.18, SelError: -7%
-histogram: 8 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 46: [ { "$match" : { "a" : { "$gte" : 25, "$lt" : 33 } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 6.6 AbsError: -1.4, RelError: -0.18, SelError: -7%
-histogram: 8 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 47: [ { "$match" : { "a" : { "$gte" : 25, "$lte" : 33 } } } ]
-[jsTest] ----
-
-Actual cardinality: 9
-Cardinality estimates:
-heuristic: 6.6 AbsError: -2.4, RelError: -0.27, SelError: -12%
-histogram: 9 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 48: [ { "$match" : { "a" : { "$gt" : 27, "$lt" : 34 } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 6.6 AbsError: 0.6, RelError: 0.1, SelError: 3%
-histogram: 6 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 49: [ { "$match" : { "a" : { "$gt" : 27, "$lte" : 34 } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 6.6 AbsError: -0.4, RelError: -0.06, SelError: -2%
-histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 50: [ { "$match" : { "a" : { "$gte" : 27, "$lt" : 34 } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 6.6 AbsError: -0.4, RelError: -0.06, SelError: -2%
-histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 51: [ { "$match" : { "a" : { "$gte" : 27, "$lte" : 34 } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 6.6 AbsError: -1.4, RelError: -0.18, SelError: -7%
-histogram: 8 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 52: [ { "$match" : { "b" : { "$eq" : "a" } } } ]
-[jsTest] ----
-
-Actual cardinality: 1
-Cardinality estimates:
-heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
-histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 53: [ { "$match" : { "b" : { "$eq" : "c" } } } ]
-[jsTest] ----
-
-Actual cardinality: 1
-Cardinality estimates:
-heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
-histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 54: [ { "$match" : { "b" : { "$lt" : "c" } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 55: [ { "$match" : { "b" : { "$lte" : "c" } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
-histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 56: [ { "$match" : { "b" : { "$gt" : "c" } } } ]
-[jsTest] ----
-
-Actual cardinality: 17
-Cardinality estimates:
-heuristic: 9 AbsError: -8, RelError: -0.47, SelError: -40%
-histogram: 17 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 57: [ { "$match" : { "b" : { "$gte" : "c" } } } ]
-[jsTest] ----
-
-Actual cardinality: 18
-Cardinality estimates:
-heuristic: 9 AbsError: -9, RelError: -0.5, SelError: -45%
-histogram: 18 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 58: [ { "$match" : { "b" : { "$lt" : "opqr" } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 6.6 AbsError: -3.4, RelError: -0.34, SelError: -17%
-histogram: 10 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 59: [ { "$match" : { "b" : { "$lte" : "stu" } } } ]
-[jsTest] ----
-
-Actual cardinality: 14
-Cardinality estimates:
-heuristic: 6.6 AbsError: -7.4, RelError: -0.53, SelError: -37%
-histogram: 14 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 60: [ { "$match" : { "b" : { "$gt" : "wxyz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 9 AbsError: 7, RelError: 3.5, SelError: 35%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 61: [ { "$match" : { "b" : { "$eq" : "yz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 1
-Cardinality estimates:
-heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
-histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 62: [ { "$match" : { "b" : { "$lt" : "yz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 18
-Cardinality estimates:
-heuristic: 6.6 AbsError: -11.4, RelError: -0.63, SelError: -57%
-histogram: 18 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 63: [ { "$match" : { "b" : { "$lte" : "yz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 19
-Cardinality estimates:
-heuristic: 6.6 AbsError: -12.4, RelError: -0.65, SelError: -62%
-histogram: 19 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 64: [ { "$match" : { "b" : { "$gt" : "yz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 1
-Cardinality estimates:
-heuristic: 9 AbsError: 8, RelError: 8, SelError: 40%
-histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 65: [ { "$match" : { "b" : { "$gte" : "yz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 9 AbsError: 7, RelError: 3.5, SelError: 35%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 66: [ { "$match" : { "b" : { "$gte" : "yzab" } } } ]
-[jsTest] ----
-
-Actual cardinality: 1
-Cardinality estimates:
-heuristic: 9 AbsError: 8, RelError: 8, SelError: 40%
-histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 67: [ { "$match" : { "b" : { "$gt" : "a", "$lt" : "c" } } } ]
-[jsTest] ----
-
-Actual cardinality: 1
-Cardinality estimates:
-heuristic: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
-histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 68: [ { "$match" : { "b" : { "$gt" : "a", "$lte" : "c" } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 69: [ { "$match" : { "b" : { "$gte" : "a", "$lt" : "c" } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 70: [ { "$match" : { "b" : { "$gte" : "a", "$lte" : "c" } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
-histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 71: [ { "$match" : { "b" : { "$gt" : "opqr", "$lt" : "stu" } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 72: [ { "$match" : { "b" : { "$gt" : "opqr", "$lte" : "stu" } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
-histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 73: [ { "$match" : { "b" : { "$gte" : "opqr", "$lt" : "stu" } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
-histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 74: [ { "$match" : { "b" : { "$gte" : "opqr", "$lte" : "stu" } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 6.6 AbsError: 2.6, RelError: 0.65, SelError: 13%
-histogram: 4 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 75: [ { "$match" : { "b" : { "$gt" : "wxyz", "$lt" : "yz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 0
-Cardinality estimates:
-heuristic: 6.6 AbsError: 6.6, RelError: 0.66, SelError: 33%
-histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 76: [ { "$match" : { "b" : { "$gt" : "wxyz", "$lte" : "yz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 1
-Cardinality estimates:
-heuristic: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
-histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 77: [ { "$match" : { "b" : { "$gte" : "wxyz", "$lt" : "yz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 1
-Cardinality estimates:
-heuristic: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
-histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 78: [ { "$match" : { "b" : { "$gte" : "wxyz", "$lte" : "yz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 79: [ { "$match" : { "b" : { "$gt" : "a", "$lt" : "stu" } } } ]
-[jsTest] ----
-
-Actual cardinality: 12
-Cardinality estimates:
-heuristic: 6.6 AbsError: -5.4, RelError: -0.45, SelError: -27%
-histogram: 12 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 80: [ { "$match" : { "b" : { "$gt" : "a", "$lte" : "stu" } } } ]
-[jsTest] ----
-
-Actual cardinality: 13
-Cardinality estimates:
-heuristic: 6.6 AbsError: -6.4, RelError: -0.49, SelError: -32%
-histogram: 13 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 81: [ { "$match" : { "b" : { "$gte" : "a", "$lt" : "stu" } } } ]
-[jsTest] ----
-
-Actual cardinality: 13
-Cardinality estimates:
-heuristic: 6.6 AbsError: -6.4, RelError: -0.49, SelError: -32%
-histogram: 13 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 82: [ { "$match" : { "b" : { "$gte" : "a", "$lte" : "stu" } } } ]
-[jsTest] ----
-
-Actual cardinality: 14
-Cardinality estimates:
-heuristic: 6.6 AbsError: -7.4, RelError: -0.53, SelError: -37%
-histogram: 14 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 83: [ { "$match" : { "b" : { "$gt" : "c", "$lt" : "wxyz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 14
-Cardinality estimates:
-heuristic: 6.6 AbsError: -7.4, RelError: -0.53, SelError: -37%
-histogram: 14 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 84: [ { "$match" : { "b" : { "$gt" : "c", "$lte" : "wxyz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 15
-Cardinality estimates:
-heuristic: 6.6 AbsError: -8.4, RelError: -0.56, SelError: -42%
-histogram: 15 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 85: [ { "$match" : { "b" : { "$gte" : "c", "$lt" : "wxyz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 15
-Cardinality estimates:
-heuristic: 6.6 AbsError: -8.4, RelError: -0.56, SelError: -42%
-histogram: 15 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 86: [ { "$match" : { "b" : { "$gte" : "c", "$lte" : "wxyz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 16
-Cardinality estimates:
-heuristic: 6.6 AbsError: -9.4, RelError: -0.59, SelError: -47%
-histogram: 16 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 87: [ { "$match" : { "b" : { "$gt" : "opqr", "$lt" : "yz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 6.6 AbsError: -0.4, RelError: -0.06, SelError: -2%
-histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 88: [ { "$match" : { "b" : { "$gt" : "opqr", "$lte" : "yz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 6.6 AbsError: -1.4, RelError: -0.18, SelError: -7%
-histogram: 8 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 89: [ { "$match" : { "b" : { "$gte" : "opqr", "$lt" : "yz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 6.6 AbsError: -1.4, RelError: -0.18, SelError: -7%
-histogram: 8 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 90: [ { "$match" : { "b" : { "$gte" : "opqr", "$lte" : "yz" } } } ]
-[jsTest] ----
-
-Actual cardinality: 9
-Cardinality estimates:
-heuristic: 6.6 AbsError: -2.4, RelError: -0.27, SelError: -12%
-histogram: 9 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 91: [ { "$match" : { "b" : { "$gt" : "stu", "$lt" : "yzab" } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 6.6 AbsError: 1.6, RelError: 0.32, SelError: 8%
-histogram: 5 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 92: [ { "$match" : { "b" : { "$gt" : "stu", "$lte" : "yzab" } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 6.6 AbsError: 0.6, RelError: 0.1, SelError: 3%
-histogram: 6 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 93: [ { "$match" : { "b" : { "$gte" : "stu", "$lt" : "yzab" } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 6.6 AbsError: 0.6, RelError: 0.1, SelError: 3%
-histogram: 6 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 94: [ { "$match" : { "b" : { "$gte" : "stu", "$lte" : "yzab" } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 6.6 AbsError: -0.4, RelError: -0.06, SelError: -2%
-histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 95: [ { "$match" : { "c" : { "$eq" : 1 } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 4.47 AbsError: 2.47, RelError: 1.23, SelError: 12.35%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 96: [ { "$match" : { "c" : { "$eq" : 2 } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 4.47 AbsError: 2.47, RelError: 1.23, SelError: 12.35%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 97: [ { "$match" : { "c" : { "$lt" : 2 } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 98: [ { "$match" : { "c" : { "$lte" : 2 } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
-histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 99: [ { "$match" : { "c" : { "$gt" : 2 } } } ]
-[jsTest] ----
-
-Actual cardinality: 18
-Cardinality estimates:
-heuristic: 9 AbsError: -9, RelError: -0.5, SelError: -45%
-histogram: 18 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 100: [ { "$match" : { "c" : { "$gte" : 2 } } } ]
-[jsTest] ----
-
-Actual cardinality: 19
-Cardinality estimates:
-heuristic: 9 AbsError: -10, RelError: -0.53, SelError: -50%
-histogram: 19 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 101: [ { "$match" : { "c" : { "$lt" : 3 } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
-histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 102: [ { "$match" : { "c" : { "$lte" : 4 } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 6.6 AbsError: 1.6, RelError: 0.32, SelError: 8%
-histogram: 5 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 103: [ { "$match" : { "c" : { "$gt" : 5 } } } ]
-[jsTest] ----
-
-Actual cardinality: 16
-Cardinality estimates:
-heuristic: 9 AbsError: -7, RelError: -0.44, SelError: -35%
-histogram: 16 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 104: [ { "$match" : { "c" : { "$eq" : 9 } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 4.47 AbsError: 1.47, RelError: 0.49, SelError: 7.35%
-histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 105: [ { "$match" : { "c" : { "$lt" : 9 } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 6.6 AbsError: -3.4, RelError: -0.34, SelError: -17%
-histogram: 10 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 106: [ { "$match" : { "c" : { "$lte" : 9 } } } ]
-[jsTest] ----
-
-Actual cardinality: 11
-Cardinality estimates:
-heuristic: 6.6 AbsError: -4.4, RelError: -0.4, SelError: -22%
-histogram: 11 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 107: [ { "$match" : { "c" : { "$gt" : 9 } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 9 AbsError: -1, RelError: -0.1, SelError: -5%
-histogram: 10 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 108: [ { "$match" : { "c" : { "$gte" : 9 } } } ]
-[jsTest] ----
-
-Actual cardinality: 12
-Cardinality estimates:
-heuristic: 9 AbsError: -3, RelError: -0.25, SelError: -15%
-histogram: 12 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 109: [ { "$match" : { "c" : { "$gte" : 15 } } } ]
-[jsTest] ----
-
-Actual cardinality: 9
-Cardinality estimates:
-heuristic: 9 AbsError: 0, RelError: 0, SelError: 0%
-histogram: 9 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 110: [ { "$match" : { "c" : { "$eq" : 16 } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.47 AbsError: 0.47, RelError: 0.12, SelError: 2.35%
-histogram: 4 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 111: [ { "$match" : { "c" : { "$lt" : 17 } } } ]
-[jsTest] ----
-
-Actual cardinality: 15
-Cardinality estimates:
-heuristic: 6.6 AbsError: -8.4, RelError: -0.56, SelError: -42%
-histogram: 15 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 112: [ { "$match" : { "c" : { "$eq" : 18 } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 4.47 AbsError: -1.53, RelError: -0.26, SelError: -7.65%
-histogram: 6 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 113: [ { "$match" : { "c" : { "$lt" : 18 } } } ]
-[jsTest] ----
-
-Actual cardinality: 16
-Cardinality estimates:
-heuristic: 6.6 AbsError: -9.4, RelError: -0.59, SelError: -47%
-histogram: 16 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 114: [ { "$match" : { "c" : { "$lte" : 18 } } } ]
-[jsTest] ----
-
-Actual cardinality: 18
-Cardinality estimates:
-heuristic: 6.6 AbsError: -11.4, RelError: -0.63, SelError: -57%
-histogram: 18 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 115: [ { "$match" : { "c" : { "$gt" : 18 } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 9 AbsError: 3, RelError: 0.5, SelError: 15%
-histogram: 6 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 116: [ { "$match" : { "c" : { "$gte" : 18 } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 9 AbsError: 1, RelError: 0.13, SelError: 5%
-histogram: 8 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 117: [ { "$match" : { "c" : { "$lte" : 19 } } } ]
-[jsTest] ----
-
-Actual cardinality: 19
-Cardinality estimates:
-heuristic: 6.6 AbsError: -12.4, RelError: -0.65, SelError: -62%
-histogram: 19 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 118: [ { "$match" : { "c" : { "$gt" : 20 } } } ]
-[jsTest] ----
-
-Actual cardinality: 0
-Cardinality estimates:
-heuristic: 9 AbsError: 9, RelError: 0.9, SelError: 45%
-histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 119: [ { "$match" : { "c" : { "$gt" : 1, "$lt" : 2 } } } ]
+[jsTest] Query 20: [ { "$match" : { "a" : { "$gt" : 27, "$lt" : 29 } } } ]
 [jsTest] ----
 
 Actual cardinality: 1
 Cardinality estimates:
 heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
-histogram: 1.95 AbsError: 0.95, RelError: 0.95, SelError: 4.75%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 5.86 AbsError: 4.86, RelError: 4.86, SelError: 24.3%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 120: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 1, "$lt" : 2 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 0
-Cardinality estimates:
-heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
-histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 121: [ { "$match" : { "c" : { "$gt" : 1, "$lte" : 2 } } } ]
+[jsTest] Query 21: [ { "$match" : { "a" : { "$gt" : 32, "$lte" : 34 } } } ]
 [jsTest] ----
 
 Actual cardinality: 2
 Cardinality estimates:
 heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
-histogram: 2.92 AbsError: 0.92, RelError: 0.46, SelError: 4.6%
-
-
-[jsTest] ----
-[jsTest] Query 122: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 1, "$lte" : 2 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
-histogram: 1.63 AbsError: -0.37, RelError: -0.19, SelError: -1.85%
-
-
-[jsTest] ----
-[jsTest] Query 123: [ { "$match" : { "c" : { "$gte" : 1, "$lt" : 2 } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
 histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 124: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 1, "$lt" : 2 } } } } ]
+[jsTest] Query 22: [ { "$match" : { "a" : { "$gte" : 33, "$lt" : 35 } } } ]
 [jsTest] ----
 
 Actual cardinality: 2
 Cardinality estimates:
 heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
 histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 125: [ { "$match" : { "c" : { "$gte" : 1, "$lte" : 2 } } } ]
+[jsTest] Query 23: [ { "$match" : { "a" : { "$gte" : 34, "$lte" : 36 } } } ]
 [jsTest] ----
 
-Actual cardinality: 3
+Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
-histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 126: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 1, "$lte" : 2 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
-histogram: 3.27 AbsError: 0.27, RelError: 0.09, SelError: 1.35%
-
-
-[jsTest] ----
-[jsTest] Query 127: [ { "$match" : { "c" : { "$gt" : 3, "$lt" : 4 } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
-histogram: 3.79 AbsError: 1.79, RelError: 0.9, SelError: 8.95%
-
-
-[jsTest] ----
-[jsTest] Query 128: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 3, "$lt" : 4 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 0
-Cardinality estimates:
-heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
-histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 129: [ { "$match" : { "c" : { "$gt" : 3, "$lte" : 4 } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
-histogram: 4.74 AbsError: 1.74, RelError: 0.58, SelError: 8.7%
-
-
-[jsTest] ----
-[jsTest] Query 130: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 3, "$lte" : 4 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
-histogram: 2.45 AbsError: -0.55, RelError: -0.18, SelError: -2.75%
-
-
-[jsTest] ----
-[jsTest] Query 131: [ { "$match" : { "c" : { "$gte" : 3, "$lt" : 4 } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
-histogram: 3.79 AbsError: 1.79, RelError: 0.9, SelError: 8.95%
-
-
-[jsTest] ----
-[jsTest] Query 132: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 3, "$lt" : 4 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
-histogram: 1.63 AbsError: -0.37, RelError: -0.19, SelError: -1.85%
-
-
-[jsTest] ----
-[jsTest] Query 133: [ { "$match" : { "c" : { "$gte" : 3, "$lte" : 4 } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
-histogram: 4.74 AbsError: 1.74, RelError: 0.58, SelError: 8.7%
-
-
-[jsTest] ----
-[jsTest] Query 134: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 3, "$lte" : 4 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
-histogram: 4.08 AbsError: 1.08, RelError: 0.36, SelError: 5.4%
-
-
-[jsTest] ----
-[jsTest] Query 135: [ { "$match" : { "c" : { "$gt" : 5, "$lt" : 9 } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 4.43 AbsError: -1.57, RelError: -0.26, SelError: -7.85%
-histogram: 8.94 AbsError: 2.94, RelError: 0.49, SelError: 14.7%
-
-
-[jsTest] ----
-[jsTest] Query 136: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 5, "$lt" : 9 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 4.43 AbsError: -1.57, RelError: -0.26, SelError: -7.85%
-histogram: 8.17 AbsError: 2.17, RelError: 0.36, SelError: 10.85%
-
-
-[jsTest] ----
-[jsTest] Query 137: [ { "$match" : { "c" : { "$gt" : 5, "$lte" : 9 } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 9.84 AbsError: 2.84, RelError: 0.41, SelError: 14.2%
-
-
-[jsTest] ----
-[jsTest] Query 138: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 5, "$lte" : 9 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 10.62 AbsError: 3.62, RelError: 0.52, SelError: 18.1%
-
-
-[jsTest] ----
-[jsTest] Query 139: [ { "$match" : { "c" : { "$gte" : 5, "$lt" : 9 } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 9.49 AbsError: 1.49, RelError: 0.19, SelError: 7.45%
-
-
-[jsTest] ----
-[jsTest] Query 140: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 5, "$lt" : 9 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 11.44 AbsError: 3.44, RelError: 0.43, SelError: 17.2%
-
-
-[jsTest] ----
-[jsTest] Query 141: [ { "$match" : { "c" : { "$gte" : 5, "$lte" : 9 } } } ]
-[jsTest] ----
-
-Actual cardinality: 9
-Cardinality estimates:
-heuristic: 4.43 AbsError: -4.57, RelError: -0.51, SelError: -22.85%
-histogram: 10.44 AbsError: 1.44, RelError: 0.16, SelError: 7.2%
-
-
-[jsTest] ----
-[jsTest] Query 142: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 5, "$lte" : 9 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 9
-Cardinality estimates:
-heuristic: 4.43 AbsError: -4.57, RelError: -0.51, SelError: -22.85%
-histogram: 13.89 AbsError: 4.89, RelError: 0.54, SelError: 24.45%
-
-
-[jsTest] ----
-[jsTest] Query 143: [ { "$match" : { "c" : { "$gt" : 15, "$lt" : 16 } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
-histogram: 7.53 AbsError: 4.53, RelError: 1.51, SelError: 22.65%
-
-
-[jsTest] ----
-[jsTest] Query 144: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 15, "$lt" : 16 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 0
-Cardinality estimates:
-heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
-histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 145: [ { "$match" : { "c" : { "$gt" : 15, "$lte" : 16 } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 7.79 AbsError: 3.79, RelError: 0.95, SelError: 18.95%
-
-
-[jsTest] ----
-[jsTest] Query 146: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 15, "$lte" : 16 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 3.27 AbsError: -0.73, RelError: -0.18, SelError: -3.65%
-
-
-[jsTest] ----
-[jsTest] Query 147: [ { "$match" : { "c" : { "$gte" : 15, "$lt" : 16 } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
-histogram: 7.53 AbsError: 4.53, RelError: 1.51, SelError: 22.65%
-
-
-[jsTest] ----
-[jsTest] Query 148: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 15, "$lt" : 16 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
-histogram: 2.45 AbsError: -0.55, RelError: -0.18, SelError: -2.75%
-
-
-[jsTest] ----
-[jsTest] Query 149: [ { "$match" : { "c" : { "$gte" : 15, "$lte" : 16 } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 7.79 AbsError: 3.79, RelError: 0.95, SelError: 18.95%
-
-
-[jsTest] ----
-[jsTest] Query 150: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 15, "$lte" : 16 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 5.72 AbsError: 1.72, RelError: 0.43, SelError: 8.6%
-
-
-[jsTest] ----
-[jsTest] Query 151: [ { "$match" : { "c" : { "$gt" : 17, "$lt" : 18 } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 7.16 AbsError: 3.16, RelError: 0.79, SelError: 15.8%
-
-
-[jsTest] ----
-[jsTest] Query 152: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 17, "$lt" : 18 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 0
-Cardinality estimates:
-heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
-histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 153: [ { "$match" : { "c" : { "$gt" : 17, "$lte" : 18 } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 4.43 AbsError: -1.57, RelError: -0.26, SelError: -7.85%
-histogram: 7.59 AbsError: 1.59, RelError: 0.26, SelError: 7.95%
-
-
-[jsTest] ----
-[jsTest] Query 154: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 17, "$lte" : 18 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 4.43 AbsError: -1.57, RelError: -0.26, SelError: -7.85%
-histogram: 4.9 AbsError: -1.1, RelError: -0.18, SelError: -5.5%
-
-
-[jsTest] ----
-[jsTest] Query 155: [ { "$match" : { "c" : { "$gte" : 17, "$lt" : 18 } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
-histogram: 8.05 AbsError: 3.05, RelError: 0.61, SelError: 15.25%
-
-
-[jsTest] ----
-[jsTest] Query 156: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 17, "$lt" : 18 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
-histogram: 4.08 AbsError: -0.92, RelError: -0.18, SelError: -4.6%
-
-
-[jsTest] ----
-[jsTest] Query 157: [ { "$match" : { "c" : { "$gte" : 17, "$lte" : 18 } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 8.54 AbsError: 1.54, RelError: 0.22, SelError: 7.7%
-
-
-[jsTest] ----
-[jsTest] Query 158: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 17, "$lte" : 18 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 8.99 AbsError: 1.99, RelError: 0.28, SelError: 9.95%
-
-
-[jsTest] ----
-[jsTest] Query 159: [ { "$match" : { "c" : { "$gt" : 19, "$lt" : 20 } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
-histogram: 3.9 AbsError: 0.9, RelError: 0.3, SelError: 4.5%
-
-
-[jsTest] ----
-[jsTest] Query 160: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 19, "$lt" : 20 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 0
-Cardinality estimates:
-heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
-histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 161: [ { "$match" : { "c" : { "$gt" : 19, "$lte" : 20 } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 4 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 162: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 19, "$lte" : 20 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 4 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 163: [ { "$match" : { "c" : { "$gte" : 19, "$lt" : 20 } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
-histogram: 5.85 AbsError: 0.85, RelError: 0.17, SelError: 4.25%
-
-
-[jsTest] ----
-[jsTest] Query 164: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 19, "$lt" : 20 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
-histogram: 4.08 AbsError: -0.92, RelError: -0.18, SelError: -4.6%
-
-
-[jsTest] ----
-[jsTest] Query 165: [ { "$match" : { "c" : { "$gte" : 19, "$lte" : 20 } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 4.43 AbsError: -1.57, RelError: -0.26, SelError: -7.85%
-histogram: 6 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 166: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 19, "$lte" : 20 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 4.43 AbsError: -1.57, RelError: -0.26, SelError: -7.85%
-histogram: 7.35 AbsError: 1.35, RelError: 0.22, SelError: 6.75%
-
-
-[jsTest] ----
-[jsTest] Query 167: [ { "$match" : { "c" : { "$gt" : 1, "$lt" : 4 } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
-histogram: 3.9 AbsError: 0.9, RelError: 0.3, SelError: 4.5%
-
-
-[jsTest] ----
-[jsTest] Query 168: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 1, "$lt" : 4 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
-histogram: 3.27 AbsError: 0.27, RelError: 0.09, SelError: 1.35%
-
-
-[jsTest] ----
-[jsTest] Query 169: [ { "$match" : { "c" : { "$gt" : 1, "$lte" : 4 } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 4.87 AbsError: 0.87, RelError: 0.22, SelError: 4.35%
-
-
-[jsTest] ----
-[jsTest] Query 170: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 1, "$lte" : 4 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 5.72 AbsError: 1.72, RelError: 0.43, SelError: 8.6%
-
-
-[jsTest] ----
-[jsTest] Query 171: [ { "$match" : { "c" : { "$gte" : 1, "$lt" : 4 } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 4 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 172: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 1, "$lt" : 4 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 4.9 AbsError: 0.9, RelError: 0.23, SelError: 4.5%
-
-
-[jsTest] ----
-[jsTest] Query 173: [ { "$match" : { "c" : { "$gte" : 1, "$lte" : 4 } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
-histogram: 5 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 174: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 1, "$lte" : 4 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
-histogram: 7.35 AbsError: 2.35, RelError: 0.47, SelError: 11.75%
-
-
-[jsTest] ----
-[jsTest] Query 175: [ { "$match" : { "c" : { "$gt" : 2, "$lt" : 5 } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
-histogram: 4.74 AbsError: 1.74, RelError: 0.58, SelError: 8.7%
-
-
-[jsTest] ----
-[jsTest] Query 176: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 2, "$lt" : 5 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
-histogram: 4.08 AbsError: 1.08, RelError: 0.36, SelError: 5.4%
-
-
-[jsTest] ----
-[jsTest] Query 177: [ { "$match" : { "c" : { "$gt" : 2, "$lte" : 5 } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 5.69 AbsError: 1.69, RelError: 0.42, SelError: 8.45%
-
-
-[jsTest] ----
-[jsTest] Query 178: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 2, "$lte" : 5 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 7.35 AbsError: 3.35, RelError: 0.84, SelError: 16.75%
-
-
-[jsTest] ----
-[jsTest] Query 179: [ { "$match" : { "c" : { "$gte" : 2, "$lt" : 5 } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 4.87 AbsError: 0.87, RelError: 0.22, SelError: 4.35%
-
-
-[jsTest] ----
-[jsTest] Query 180: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 2, "$lt" : 5 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
-histogram: 5.72 AbsError: 1.72, RelError: 0.43, SelError: 8.6%
-
-
-[jsTest] ----
-[jsTest] Query 181: [ { "$match" : { "c" : { "$gte" : 2, "$lte" : 5 } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
-histogram: 5.85 AbsError: 0.85, RelError: 0.17, SelError: 4.25%
-
-
-[jsTest] ----
-[jsTest] Query 182: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 2, "$lte" : 5 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
-histogram: 8.99 AbsError: 3.99, RelError: 0.8, SelError: 19.95%
-
-
-[jsTest] ----
-[jsTest] Query 183: [ { "$match" : { "c" : { "$gt" : 3, "$lt" : 9 } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 9.49 AbsError: 1.49, RelError: 0.19, SelError: 7.45%
-
-
-[jsTest] ----
-[jsTest] Query 184: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 3, "$lt" : 9 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 13.89 AbsError: 5.89, RelError: 0.74, SelError: 29.45%
-
-
-[jsTest] ----
-[jsTest] Query 185: [ { "$match" : { "c" : { "$gt" : 3, "$lte" : 9 } } } ]
-[jsTest] ----
-
-Actual cardinality: 9
-Cardinality estimates:
-heuristic: 4.43 AbsError: -4.57, RelError: -0.51, SelError: -22.85%
-histogram: 10.44 AbsError: 1.44, RelError: 0.16, SelError: 7.2%
-
-
-[jsTest] ----
-[jsTest] Query 186: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 3, "$lte" : 9 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 9
-Cardinality estimates:
-heuristic: 4.43 AbsError: -4.57, RelError: -0.51, SelError: -22.85%
-histogram: 16.34 AbsError: 7.34, RelError: 0.82, SelError: 36.7%
-
-
-[jsTest] ----
-[jsTest] Query 187: [ { "$match" : { "c" : { "$gte" : 3, "$lt" : 9 } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 9.49 AbsError: 1.49, RelError: 0.19, SelError: 7.45%
-
-
-[jsTest] ----
-[jsTest] Query 188: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 3, "$lt" : 9 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 15.52 AbsError: 7.52, RelError: 0.94, SelError: 37.6%
-
-
-[jsTest] ----
-[jsTest] Query 189: [ { "$match" : { "c" : { "$gte" : 3, "$lte" : 9 } } } ]
-[jsTest] ----
-
-Actual cardinality: 9
-Cardinality estimates:
-heuristic: 4.43 AbsError: -4.57, RelError: -0.51, SelError: -22.85%
-histogram: 10.44 AbsError: 1.44, RelError: 0.16, SelError: 7.2%
-
-
-[jsTest] ----
-[jsTest] Query 190: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 3, "$lte" : 9 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 9
-Cardinality estimates:
-heuristic: 4.43 AbsError: -4.57, RelError: -0.51, SelError: -22.85%
-histogram: 17.97 AbsError: 8.97, RelError: 1, SelError: 44.85%
-
-
-[jsTest] ----
-[jsTest] Query 191: [ { "$match" : { "c" : { "$gt" : 4, "$lt" : 15 } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 4.43 AbsError: -5.57, RelError: -0.56, SelError: -27.85%
-histogram: 11.38 AbsError: 1.38, RelError: 0.14, SelError: 6.9%
-
-
-[jsTest] ----
-[jsTest] Query 192: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 4, "$lt" : 15 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 4.43 AbsError: -5.57, RelError: -0.56, SelError: -27.85%
-histogram: 15.52 AbsError: 5.52, RelError: 0.55, SelError: 27.6%
-
-
-[jsTest] ----
-[jsTest] Query 193: [ { "$match" : { "c" : { "$gt" : 4, "$lte" : 15 } } } ]
-[jsTest] ----
-
-Actual cardinality: 12
-Cardinality estimates:
-heuristic: 4.43 AbsError: -7.57, RelError: -0.63, SelError: -37.85%
-histogram: 13.28 AbsError: 1.28, RelError: 0.11, SelError: 6.4%
-
-
-[jsTest] ----
-[jsTest] Query 194: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 4, "$lte" : 15 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 12
-Cardinality estimates:
-heuristic: 4.43 AbsError: -7.57, RelError: -0.63, SelError: -37.85%
-histogram: 17.97 AbsError: 5.97, RelError: 0.5, SelError: 29.85%
-
-
-[jsTest] ----
-[jsTest] Query 195: [ { "$match" : { "c" : { "$gte" : 4, "$lt" : 15 } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 4.43 AbsError: -5.57, RelError: -0.56, SelError: -27.85%
-histogram: 11.38 AbsError: 1.38, RelError: 0.14, SelError: 6.9%
-
-
-[jsTest] ----
-[jsTest] Query 196: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 4, "$lt" : 15 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 4.43 AbsError: -5.57, RelError: -0.56, SelError: -27.85%
-histogram: 17.97 AbsError: 7.97, RelError: 0.8, SelError: 39.85%
-
-
-[jsTest] ----
-[jsTest] Query 197: [ { "$match" : { "c" : { "$gte" : 4, "$lte" : 15 } } } ]
-[jsTest] ----
-
-Actual cardinality: 12
-Cardinality estimates:
-heuristic: 4.43 AbsError: -7.57, RelError: -0.63, SelError: -37.85%
-histogram: 13.28 AbsError: 1.28, RelError: 0.11, SelError: 6.4%
-
-
-[jsTest] ----
-[jsTest] Query 198: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 4, "$lte" : 15 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 12
-Cardinality estimates:
-heuristic: 4.43 AbsError: -7.57, RelError: -0.63, SelError: -37.85%
-histogram: 20 AbsError: 8, RelError: 0.67, SelError: 40%
-
-
-[jsTest] ----
-[jsTest] Query 199: [ { "$match" : { "c" : { "$gt" : 5, "$lt" : 16 } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 4.43 AbsError: -5.57, RelError: -0.56, SelError: -27.85%
-histogram: 12.52 AbsError: 2.52, RelError: 0.25, SelError: 12.6%
-
-
-[jsTest] ----
-[jsTest] Query 200: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 5, "$lt" : 16 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 10
-Cardinality estimates:
-heuristic: 4.43 AbsError: -5.57, RelError: -0.56, SelError: -27.85%
-histogram: 14.7 AbsError: 4.7, RelError: 0.47, SelError: 23.5%
-
-
-[jsTest] ----
-[jsTest] Query 201: [ { "$match" : { "c" : { "$gt" : 5, "$lte" : 16 } } } ]
-[jsTest] ----
-
-Actual cardinality: 11
-Cardinality estimates:
-heuristic: 4.43 AbsError: -6.57, RelError: -0.6, SelError: -32.85%
-histogram: 13.42 AbsError: 2.42, RelError: 0.22, SelError: 12.1%
-
-
-[jsTest] ----
-[jsTest] Query 202: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 5, "$lte" : 16 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 11
-Cardinality estimates:
-heuristic: 4.43 AbsError: -6.57, RelError: -0.6, SelError: -32.85%
-histogram: 17.97 AbsError: 6.97, RelError: 0.63, SelError: 34.85%
-
-
-[jsTest] ----
-[jsTest] Query 203: [ { "$match" : { "c" : { "$gte" : 5, "$lt" : 16 } } } ]
-[jsTest] ----
-
-Actual cardinality: 12
-Cardinality estimates:
-heuristic: 4.43 AbsError: -7.57, RelError: -0.63, SelError: -37.85%
-histogram: 13.28 AbsError: 1.28, RelError: 0.11, SelError: 6.4%
-
-
-[jsTest] ----
-[jsTest] Query 204: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 5, "$lt" : 16 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 12
-Cardinality estimates:
-heuristic: 4.43 AbsError: -7.57, RelError: -0.63, SelError: -37.85%
-histogram: 17.97 AbsError: 5.97, RelError: 0.5, SelError: 29.85%
-
-
-[jsTest] ----
-[jsTest] Query 205: [ { "$match" : { "c" : { "$gte" : 5, "$lte" : 16 } } } ]
-[jsTest] ----
-
-Actual cardinality: 13
-Cardinality estimates:
-heuristic: 4.43 AbsError: -8.57, RelError: -0.66, SelError: -42.85%
-histogram: 14.23 AbsError: 1.23, RelError: 0.09, SelError: 6.15%
-
-
-[jsTest] ----
-[jsTest] Query 206: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 5, "$lte" : 16 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 13
-Cardinality estimates:
-heuristic: 4.43 AbsError: -8.57, RelError: -0.66, SelError: -42.85%
-histogram: 20 AbsError: 7, RelError: 0.54, SelError: 35%
-
-
-[jsTest] ----
-[jsTest] Query 207: [ { "$match" : { "c" : { "$gt" : 9, "$lt" : 17 } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
-histogram: 8.66 AbsError: 3.66, RelError: 0.73, SelError: 18.3%
-
-
-[jsTest] ----
-[jsTest] Query 208: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 9, "$lt" : 17 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
-histogram: 7.35 AbsError: 2.35, RelError: 0.47, SelError: 11.75%
-
-
-[jsTest] ----
-[jsTest] Query 209: [ { "$match" : { "c" : { "$gt" : 9, "$lte" : 17 } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 4.43 AbsError: -1.57, RelError: -0.26, SelError: -7.85%
-histogram: 8.94 AbsError: 2.94, RelError: 0.49, SelError: 14.7%
-
-
-[jsTest] ----
-[jsTest] Query 210: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 9, "$lte" : 17 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 4.43 AbsError: -1.57, RelError: -0.26, SelError: -7.85%
-histogram: 11.44 AbsError: 5.44, RelError: 0.91, SelError: 27.2%
-
-
-[jsTest] ----
-[jsTest] Query 211: [ { "$match" : { "c" : { "$gte" : 9, "$lt" : 17 } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 10.39 AbsError: 3.39, RelError: 0.48, SelError: 16.95%
-
-
-[jsTest] ----
-[jsTest] Query 212: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 9, "$lt" : 17 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 9.8 AbsError: 2.8, RelError: 0.4, SelError: 14%
-
-
-[jsTest] ----
-[jsTest] Query 213: [ { "$match" : { "c" : { "$gte" : 9, "$lte" : 17 } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 10.73 AbsError: 2.73, RelError: 0.34, SelError: 13.65%
-
-
-[jsTest] ----
-[jsTest] Query 214: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 9, "$lte" : 17 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 13.89 AbsError: 5.89, RelError: 0.74, SelError: 29.45%
-
-
-[jsTest] ----
-[jsTest] Query 215: [ { "$match" : { "c" : { "$gt" : 15, "$lt" : 18 } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
-histogram: 8.05 AbsError: 3.05, RelError: 0.61, SelError: 15.25%
-
-
-[jsTest] ----
-[jsTest] Query 216: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 15, "$lt" : 18 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
-histogram: 7.35 AbsError: 2.35, RelError: 0.47, SelError: 11.75%
-
-
-[jsTest] ----
-[jsTest] Query 217: [ { "$match" : { "c" : { "$gt" : 15, "$lte" : 18 } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 8.54 AbsError: 1.54, RelError: 0.22, SelError: 7.7%
-
-
-[jsTest] ----
-[jsTest] Query 218: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 15, "$lte" : 18 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 12.25 AbsError: 5.25, RelError: 0.75, SelError: 26.25%
-
-
-[jsTest] ----
-[jsTest] Query 219: [ { "$match" : { "c" : { "$gte" : 15, "$lt" : 18 } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
-histogram: 8.05 AbsError: 3.05, RelError: 0.61, SelError: 15.25%
-
-
-[jsTest] ----
-[jsTest] Query 220: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 15, "$lt" : 18 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
-histogram: 9.8 AbsError: 4.8, RelError: 0.96, SelError: 24%
-
-
-[jsTest] ----
-[jsTest] Query 221: [ { "$match" : { "c" : { "$gte" : 15, "$lte" : 18 } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 8.54 AbsError: 1.54, RelError: 0.22, SelError: 7.7%
-
-
-[jsTest] ----
-[jsTest] Query 222: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 15, "$lte" : 18 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 14.7 AbsError: 7.7, RelError: 1.1, SelError: 38.5%
-
-
-[jsTest] ----
-[jsTest] Query 223: [ { "$match" : { "c" : { "$gt" : 16, "$lt" : 19 } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 8.54 AbsError: 1.54, RelError: 0.22, SelError: 7.7%
-
-
-[jsTest] ----
-[jsTest] Query 224: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 16, "$lt" : 19 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 8.99 AbsError: 1.99, RelError: 0.28, SelError: 9.95%
-
-
-[jsTest] ----
-[jsTest] Query 225: [ { "$match" : { "c" : { "$gt" : 16, "$lte" : 19 } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 8.77 AbsError: 0.77, RelError: 0.1, SelError: 3.85%
-
-
-[jsTest] ----
-[jsTest] Query 226: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 16, "$lte" : 19 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 13.07 AbsError: 5.07, RelError: 0.63, SelError: 25.35%
-
-
-[jsTest] ----
-[jsTest] Query 227: [ { "$match" : { "c" : { "$gte" : 16, "$lt" : 19 } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 8.54 AbsError: 1.54, RelError: 0.22, SelError: 7.7%
-
-
-[jsTest] ----
-[jsTest] Query 228: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 16, "$lt" : 19 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 12.25 AbsError: 5.25, RelError: 0.75, SelError: 26.25%
-
-
-[jsTest] ----
-[jsTest] Query 229: [ { "$match" : { "c" : { "$gte" : 16, "$lte" : 19 } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 8.77 AbsError: 0.77, RelError: 0.1, SelError: 3.85%
-
-
-[jsTest] ----
-[jsTest] Query 230: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 16, "$lte" : 19 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 16.34 AbsError: 8.34, RelError: 1.04, SelError: 41.7%
-
-
-[jsTest] ----
-[jsTest] Query 231: [ { "$match" : { "c" : { "$gt" : 17, "$lt" : 20 } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 7.8 AbsError: 0.8, RelError: 0.11, SelError: 4%
-
-
-[jsTest] ----
-[jsTest] Query 232: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 17, "$lt" : 20 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
-histogram: 8.99 AbsError: 1.99, RelError: 0.28, SelError: 9.95%
-
-
-[jsTest] ----
-[jsTest] Query 233: [ { "$match" : { "c" : { "$gt" : 17, "$lte" : 20 } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 8 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 234: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 17, "$lte" : 20 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 12.25 AbsError: 4.25, RelError: 0.53, SelError: 21.25%
-
-
-[jsTest] ----
-[jsTest] Query 235: [ { "$match" : { "c" : { "$gte" : 17, "$lt" : 20 } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 8.77 AbsError: 0.77, RelError: 0.1, SelError: 3.85%
-
-
-[jsTest] ----
-[jsTest] Query 236: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 17, "$lt" : 20 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 8
-Cardinality estimates:
-heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
-histogram: 13.07 AbsError: 5.07, RelError: 0.63, SelError: 25.35%
-
-
-[jsTest] ----
-[jsTest] Query 237: [ { "$match" : { "c" : { "$gte" : 17, "$lte" : 20 } } } ]
-[jsTest] ----
-
-Actual cardinality: 9
-Cardinality estimates:
-heuristic: 4.43 AbsError: -4.57, RelError: -0.51, SelError: -22.85%
-histogram: 9 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 238: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 17, "$lte" : 20 } } } } ]
-[jsTest] ----
-
-Actual cardinality: 9
-Cardinality estimates:
-heuristic: 4.43 AbsError: -4.57, RelError: -0.51, SelError: -22.85%
-histogram: 16.34 AbsError: 7.34, RelError: 0.82, SelError: 36.7%
-
-
-[jsTest] ----
-[jsTest] Query 239: [ { "$match" : { "mixed" : { "$eq" : 0 } } } ]
+[jsTest] Query 24: [ { "$match" : { "b" : { "$eq" : "a" } } } ]
 [jsTest] ----
 
 Actual cardinality: 1
 Cardinality estimates:
 heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
 histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 240: [ { "$match" : { "mixed" : { "$eq" : 22 } } } ]
+[jsTest] Query 25: [ { "$match" : { "b" : { "$eq" : "c" } } } ]
 [jsTest] ----
 
 Actual cardinality: 1
 Cardinality estimates:
 heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
 histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 241: [ { "$match" : { "mixed" : { "$lt" : 22 } } } ]
+[jsTest] Query 26: [ { "$match" : { "b" : { "$lt" : "c" } } } ]
 [jsTest] ----
 
 Actual cardinality: 2
 Cardinality estimates:
 heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
+heuristicIdx: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
 histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 242: [ { "$match" : { "mixed" : { "$lte" : 22 } } } ]
+[jsTest] Query 27: [ { "$match" : { "b" : { "$lte" : "c" } } } ]
 [jsTest] ----
 
 Actual cardinality: 3
 Cardinality estimates:
 heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
+heuristicIdx: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
 histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 3 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 243: [ { "$match" : { "mixed" : { "$gt" : 22 } } } ]
+[jsTest] Query 28: [ { "$match" : { "b" : { "$gt" : "c" } } } ]
 [jsTest] ----
 
-Actual cardinality: 7
+Actual cardinality: 17
 Cardinality estimates:
-heuristic: 9 AbsError: 2, RelError: 0.29, SelError: 10%
-histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 9 AbsError: -8, RelError: -0.47, SelError: -40%
+heuristicIdx: 9 AbsError: -8, RelError: -0.47, SelError: -40%
+histogram: 17 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 17 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 244: [ { "$match" : { "mixed" : { "$gte" : 22 } } } ]
+[jsTest] Query 29: [ { "$match" : { "b" : { "$gte" : "c" } } } ]
 [jsTest] ----
 
-Actual cardinality: 8
+Actual cardinality: 18
 Cardinality estimates:
-heuristic: 9 AbsError: 1, RelError: 0.13, SelError: 5%
-histogram: 8 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 9 AbsError: -9, RelError: -0.5, SelError: -45%
+heuristicIdx: 9 AbsError: -9, RelError: -0.5, SelError: -45%
+histogram: 18 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 18 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 245: [ { "$match" : { "mixed" : { "$lt" : 77 } } } ]
+[jsTest] Query 30: [ { "$match" : { "b" : { "$lt" : "opqr" } } } ]
 [jsTest] ----
 
-Actual cardinality: 7
+Actual cardinality: 10
 Cardinality estimates:
-heuristic: 6.6 AbsError: -0.4, RelError: -0.06, SelError: -2%
-histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 6.6 AbsError: -3.4, RelError: -0.34, SelError: -17%
+heuristicIdx: 6.6 AbsError: -3.4, RelError: -0.34, SelError: -17%
+histogram: 10 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 10 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 246: [ { "$match" : { "mixed" : { "$lte" : "cde" } } } ]
+[jsTest] Query 31: [ { "$match" : { "b" : { "$lte" : "stu" } } } ]
 [jsTest] ----
 
-Actual cardinality: 1
+Actual cardinality: 14
 Cardinality estimates:
-heuristic: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
-histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 6.6 AbsError: -7.4, RelError: -0.53, SelError: -37%
+heuristicIdx: 6.6 AbsError: -7.4, RelError: -0.53, SelError: -37%
+histogram: 14 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 14 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 247: [ { "$match" : { "mixed" : { "$gt" : "gh" } } } ]
-[jsTest] ----
-
-Actual cardinality: 7
-Cardinality estimates:
-heuristic: 9 AbsError: 2, RelError: 0.29, SelError: 10%
-histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 248: [ { "$match" : { "mixed" : { "$eq" : "mno" } } } ]
-[jsTest] ----
-
-Actual cardinality: 1
-Cardinality estimates:
-heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
-histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 249: [ { "$match" : { "mixed" : { "$lt" : "mno" } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 6.6 AbsError: 1.6, RelError: 0.32, SelError: 8%
-histogram: 5 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 250: [ { "$match" : { "mixed" : { "$lte" : "mno" } } } ]
-[jsTest] ----
-
-Actual cardinality: 6
-Cardinality estimates:
-heuristic: 6.6 AbsError: 0.6, RelError: 0.1, SelError: 3%
-histogram: 6 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 251: [ { "$match" : { "mixed" : { "$gt" : "mno" } } } ]
-[jsTest] ----
-
-Actual cardinality: 4
-Cardinality estimates:
-heuristic: 9 AbsError: 5, RelError: 1.25, SelError: 25%
-histogram: 4 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 252: [ { "$match" : { "mixed" : { "$gte" : "mno" } } } ]
-[jsTest] ----
-
-Actual cardinality: 5
-Cardinality estimates:
-heuristic: 9 AbsError: 4, RelError: 0.8, SelError: 20%
-histogram: 5 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 253: [ { "$match" : { "mixed" : { "$gte" : "u" } } } ]
+[jsTest] Query 32: [ { "$match" : { "b" : { "$gt" : "wxyz" } } } ]
 [jsTest] ----
 
 Actual cardinality: 2
 Cardinality estimates:
 heuristic: 9 AbsError: 7, RelError: 3.5, SelError: 35%
+heuristicIdx: 9 AbsError: 7, RelError: 3.5, SelError: 35%
 histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 254: [ { "$match" : { "mixed" : { "$eq" : "yzab" } } } ]
+[jsTest] Query 33: [ { "$match" : { "b" : { "$eq" : "yz" } } } ]
 [jsTest] ----
 
 Actual cardinality: 1
 Cardinality estimates:
 heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
 histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 255: [ { "$match" : { "mixed" : { "$gt" : 0, "$lt" : 22 } } } ]
+[jsTest] Query 34: [ { "$match" : { "b" : { "$lt" : "yz" } } } ]
+[jsTest] ----
+
+Actual cardinality: 18
+Cardinality estimates:
+heuristic: 6.6 AbsError: -11.4, RelError: -0.63, SelError: -57%
+heuristicIdx: 6.6 AbsError: -11.4, RelError: -0.63, SelError: -57%
+histogram: 18 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 18 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 35: [ { "$match" : { "b" : { "$lte" : "yz" } } } ]
+[jsTest] ----
+
+Actual cardinality: 19
+Cardinality estimates:
+heuristic: 6.6 AbsError: -12.4, RelError: -0.65, SelError: -62%
+heuristicIdx: 6.6 AbsError: -12.4, RelError: -0.65, SelError: -62%
+histogram: 19 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 19 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 36: [ { "$match" : { "b" : { "$gt" : "yz" } } } ]
 [jsTest] ----
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+heuristic: 9 AbsError: 8, RelError: 8, SelError: 40%
+heuristicIdx: 9 AbsError: 8, RelError: 8, SelError: 40%
 histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 256: [ { "$match" : { "mixed" : { "$gt" : 0, "$lte" : 22 } } } ]
-[jsTest] ----
-
-Actual cardinality: 2
-Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 257: [ { "$match" : { "mixed" : { "$gte" : 0, "$lt" : 22 } } } ]
+[jsTest] Query 37: [ { "$match" : { "b" : { "$gte" : "yz" } } } ]
 [jsTest] ----
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
+heuristic: 9 AbsError: 7, RelError: 3.5, SelError: 35%
+heuristicIdx: 9 AbsError: 7, RelError: 3.5, SelError: 35%
 histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 258: [ { "$match" : { "mixed" : { "$gte" : 0, "$lte" : 22 } } } ]
-[jsTest] ----
-
-Actual cardinality: 3
-Cardinality estimates:
-heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
-histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
-
-
-[jsTest] ----
-[jsTest] Query 259: [ { "$match" : { "mixed" : { "$gt" : "cde", "$lt" : "gh" } } } ]
+[jsTest] Query 38: [ { "$match" : { "b" : { "$gte" : "yzab" } } } ]
 [jsTest] ----
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+heuristic: 9 AbsError: 8, RelError: 8, SelError: 40%
+heuristicIdx: 9 AbsError: 8, RelError: 8, SelError: 40%
 histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 260: [ { "$match" : { "mixed" : { "$gt" : "cde", "$lte" : "gh" } } } ]
+[jsTest] Query 39: [ { "$match" : { "b" : { "$gt" : "a", "$lt" : "b" } } } ]
 [jsTest] ----
 
-Actual cardinality: 2
+Actual cardinality: 1
 Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 1.95 AbsError: 0.95, RelError: 0.95, SelError: 4.75%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 261: [ { "$match" : { "mixed" : { "$gte" : "cde", "$lt" : "gh" } } } ]
+[jsTest] Query 40: [ { "$match" : { "b" : { "$gt" : "c", "$lte" : "d" } } } ]
 [jsTest] ----
 
-Actual cardinality: 2
+Actual cardinality: 1
 Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 3.69 AbsError: 2.69, RelError: 2.69, SelError: 13.45%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 262: [ { "$match" : { "mixed" : { "$gte" : "cde", "$lte" : "gh" } } } ]
+[jsTest] Query 41: [ { "$match" : { "b" : { "$gte" : "opqr", "$lt" : "oprr" } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 7.42 AbsError: 6.42, RelError: 6.42, SelError: 32.1%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 42: [ { "$match" : { "b" : { "$gte" : "stu", "$lte" : "stv" } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 5.86 AbsError: 4.86, RelError: 4.86, SelError: 24.3%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 43: [ { "$match" : { "b" : { "$gt" : "wxyz", "$lt" : "wxzz" } } } ]
+[jsTest] ----
+
+Actual cardinality: 0
+Cardinality estimates:
+heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 AbsError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 1.9 AbsError: 1.9, RelError: 0.19, SelError: 9.5%
+histogramIdx: 0 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 44: [ { "$match" : { "b" : { "$gt" : "yz", "$lte" : "y{" } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 45: [ { "$match" : { "b" : { "$gte" : "yzab", "$lt" : "yzbb" } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 46: [ { "$match" : { "b" : { "$gte" : "a", "$lte" : "c" } } } ]
 [jsTest] ----
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
+heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
+heuristicIdx: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
 histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 3 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 263: [ { "$match" : { "mixed" : { "$gt" : "mno", "$lt" : "u" } } } ]
+[jsTest] Query 47: [ { "$match" : { "b" : { "$gt" : "c", "$lt" : "e" } } } ]
 [jsTest] ----
 
-Actual cardinality: 2
+Actual cardinality: 1
 Cardinality estimates:
-heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
-histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 3.69 AbsError: 2.69, RelError: 2.69, SelError: 13.45%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 264: [ { "$match" : { "mixed" : { "$gt" : "mno", "$lte" : "u" } } } ]
+[jsTest] Query 48: [ { "$match" : { "b" : { "$gt" : "opqr", "$lte" : "orqr" } } } ]
 [jsTest] ----
 
-Actual cardinality: 3
+Actual cardinality: 0
 Cardinality estimates:
-heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
-histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 AbsError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 6.67 AbsError: 6.67, RelError: 0.67, SelError: 33.35%
+histogramIdx: 0 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 265: [ { "$match" : { "mixed" : { "$gte" : "mno", "$lt" : "u" } } } ]
+[jsTest] Query 49: [ { "$match" : { "b" : { "$gte" : "stu", "$lt" : "svu" } } } ]
 [jsTest] ----
 
-Actual cardinality: 3
+Actual cardinality: 1
 Cardinality estimates:
-heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
-histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 5.86 AbsError: 4.86, RelError: 4.86, SelError: 24.3%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 266: [ { "$match" : { "mixed" : { "$gte" : "mno", "$lte" : "u" } } } ]
+[jsTest] Query 50: [ { "$match" : { "b" : { "$gte" : "wxyz", "$lte" : "wzyz" } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 2.85 AbsError: 1.85, RelError: 1.85, SelError: 9.25%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 51: [ { "$match" : { "b" : { "$gt" : "yz", "$lt" : "y|" } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 52: [ { "$match" : { "b" : { "$gt" : "yzab", "$lte" : "y|ab" } } } ]
+[jsTest] ----
+
+Actual cardinality: 0
+Cardinality estimates:
+heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 AbsError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 0 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 53: [ { "$match" : { "b" : { "$gte" : "a", "$lt" : "d" } } } ]
 [jsTest] ----
 
 Actual cardinality: 4
 Cardinality estimates:
-heuristic: 6.6 AbsError: 2.6, RelError: 0.65, SelError: 13%
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 6.6 AbsError: 2.6, RelError: 0.65, SelError: 13%
 histogram: 4 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 4 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 267: [ { "$match" : { "mixed" : { "$gt" : "cde", "$lt" : "u" } } } ]
+[jsTest] Query 54: [ { "$match" : { "b" : { "$gte" : "c", "$lte" : "f" } } } ]
+[jsTest] ----
+
+Actual cardinality: 3
+Cardinality estimates:
+heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
+heuristicIdx: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
+histogram: 4.74 AbsError: 1.74, RelError: 0.58, SelError: 8.7%
+histogramIdx: 3 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 55: [ { "$match" : { "b" : { "$gt" : "opqr", "$lt" : "rpqr" } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 6.97 AbsError: 5.97, RelError: 5.97, SelError: 29.85%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 56: [ { "$match" : { "b" : { "$gt" : "stu", "$lte" : "vtu" } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
+histogram: 5.37 AbsError: 3.37, RelError: 1.69, SelError: 16.85%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 57: [ { "$match" : { "b" : { "$gte" : "wxyz", "$lt" : "zxyz" } } } ]
+[jsTest] ----
+
+Actual cardinality: 3
+Cardinality estimates:
+heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
+heuristicIdx: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
+histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 3 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 58: [ { "$match" : { "b" : { "$gte" : "yz", "$lte" : "|z" } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
+histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 59: [ { "$match" : { "b" : { "$gt" : "yzab", "$lt" : "|zab" } } } ]
+[jsTest] ----
+
+Actual cardinality: 0
+Cardinality estimates:
+heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 AbsError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 0 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 60: [ { "$match" : { "c" : { "$eq" : 1 } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 4.47 AbsError: 2.47, RelError: 1.23, SelError: 12.35%
+heuristicIdx: 4.47 AbsError: 2.47, RelError: 1.23, SelError: 12.35%
+histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 61: [ { "$match" : { "c" : { "$eq" : 2 } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 4.47 AbsError: 2.47, RelError: 1.23, SelError: 12.35%
+heuristicIdx: 4.47 AbsError: 2.47, RelError: 1.23, SelError: 12.35%
+histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 62: [ { "$match" : { "c" : { "$lt" : 2 } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
+heuristicIdx: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
+histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 63: [ { "$match" : { "c" : { "$lte" : 2 } } } ]
+[jsTest] ----
+
+Actual cardinality: 3
+Cardinality estimates:
+heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
+heuristicIdx: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
+histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 3 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 64: [ { "$match" : { "c" : { "$gt" : 2 } } } ]
+[jsTest] ----
+
+Actual cardinality: 18
+Cardinality estimates:
+heuristic: 9 AbsError: -9, RelError: -0.5, SelError: -45%
+heuristicIdx: 9 AbsError: -9, RelError: -0.5, SelError: -45%
+histogram: 18 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 18 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 65: [ { "$match" : { "c" : { "$gte" : 2 } } } ]
+[jsTest] ----
+
+Actual cardinality: 19
+Cardinality estimates:
+heuristic: 9 AbsError: -10, RelError: -0.53, SelError: -50%
+heuristicIdx: 9 AbsError: -10, RelError: -0.53, SelError: -50%
+histogram: 19 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 19 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 66: [ { "$match" : { "c" : { "$lt" : 3 } } } ]
+[jsTest] ----
+
+Actual cardinality: 3
+Cardinality estimates:
+heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
+heuristicIdx: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
+histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 3 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 67: [ { "$match" : { "c" : { "$lte" : 4 } } } ]
+[jsTest] ----
+
+Actual cardinality: 5
+Cardinality estimates:
+heuristic: 6.6 AbsError: 1.6, RelError: 0.32, SelError: 8%
+heuristicIdx: 6.6 AbsError: 1.6, RelError: 0.32, SelError: 8%
+histogram: 5 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 5 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 68: [ { "$match" : { "c" : { "$gt" : 5 } } } ]
+[jsTest] ----
+
+Actual cardinality: 16
+Cardinality estimates:
+heuristic: 9 AbsError: -7, RelError: -0.44, SelError: -35%
+heuristicIdx: 9 AbsError: -7, RelError: -0.44, SelError: -35%
+histogram: 16 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 16 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 69: [ { "$match" : { "c" : { "$eq" : 9 } } } ]
+[jsTest] ----
+
+Actual cardinality: 3
+Cardinality estimates:
+heuristic: 4.47 AbsError: 1.47, RelError: 0.49, SelError: 7.35%
+heuristicIdx: 4.47 AbsError: 1.47, RelError: 0.49, SelError: 7.35%
+histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 3 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 70: [ { "$match" : { "c" : { "$lt" : 9 } } } ]
+[jsTest] ----
+
+Actual cardinality: 10
+Cardinality estimates:
+heuristic: 6.6 AbsError: -3.4, RelError: -0.34, SelError: -17%
+heuristicIdx: 6.6 AbsError: -3.4, RelError: -0.34, SelError: -17%
+histogram: 10 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 10 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 71: [ { "$match" : { "c" : { "$lte" : 9 } } } ]
+[jsTest] ----
+
+Actual cardinality: 11
+Cardinality estimates:
+heuristic: 6.6 AbsError: -4.4, RelError: -0.4, SelError: -22%
+heuristicIdx: 6.6 AbsError: -4.4, RelError: -0.4, SelError: -22%
+histogram: 11 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 11 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 72: [ { "$match" : { "c" : { "$gt" : 9 } } } ]
+[jsTest] ----
+
+Actual cardinality: 10
+Cardinality estimates:
+heuristic: 9 AbsError: -1, RelError: -0.1, SelError: -5%
+heuristicIdx: 9 AbsError: -1, RelError: -0.1, SelError: -5%
+histogram: 10 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 10 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 73: [ { "$match" : { "c" : { "$gte" : 9 } } } ]
+[jsTest] ----
+
+Actual cardinality: 12
+Cardinality estimates:
+heuristic: 9 AbsError: -3, RelError: -0.25, SelError: -15%
+heuristicIdx: 9 AbsError: -3, RelError: -0.25, SelError: -15%
+histogram: 12 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 12 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 74: [ { "$match" : { "c" : { "$gte" : 15 } } } ]
+[jsTest] ----
+
+Actual cardinality: 9
+Cardinality estimates:
+heuristic: 9 AbsError: 0, RelError: 0, SelError: 0%
+heuristicIdx: 9 AbsError: 0, RelError: 0, SelError: 0%
+histogram: 9 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 9 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 75: [ { "$match" : { "c" : { "$eq" : 16 } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.47 AbsError: 0.47, RelError: 0.12, SelError: 2.35%
+heuristicIdx: 4.47 AbsError: 0.47, RelError: 0.12, SelError: 2.35%
+histogram: 4 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 4 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 76: [ { "$match" : { "c" : { "$lt" : 17 } } } ]
+[jsTest] ----
+
+Actual cardinality: 15
+Cardinality estimates:
+heuristic: 6.6 AbsError: -8.4, RelError: -0.56, SelError: -42%
+heuristicIdx: 6.6 AbsError: -8.4, RelError: -0.56, SelError: -42%
+histogram: 15 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 15 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 77: [ { "$match" : { "c" : { "$eq" : 18 } } } ]
+[jsTest] ----
+
+Actual cardinality: 6
+Cardinality estimates:
+heuristic: 4.47 AbsError: -1.53, RelError: -0.26, SelError: -7.65%
+heuristicIdx: 4.47 AbsError: -1.53, RelError: -0.26, SelError: -7.65%
+histogram: 6 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 6 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 78: [ { "$match" : { "c" : { "$lt" : 18 } } } ]
+[jsTest] ----
+
+Actual cardinality: 16
+Cardinality estimates:
+heuristic: 6.6 AbsError: -9.4, RelError: -0.59, SelError: -47%
+heuristicIdx: 6.6 AbsError: -9.4, RelError: -0.59, SelError: -47%
+histogram: 16 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 16 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 79: [ { "$match" : { "c" : { "$lte" : 18 } } } ]
+[jsTest] ----
+
+Actual cardinality: 18
+Cardinality estimates:
+heuristic: 6.6 AbsError: -11.4, RelError: -0.63, SelError: -57%
+heuristicIdx: 6.6 AbsError: -11.4, RelError: -0.63, SelError: -57%
+histogram: 18 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 18 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 80: [ { "$match" : { "c" : { "$gt" : 18 } } } ]
+[jsTest] ----
+
+Actual cardinality: 6
+Cardinality estimates:
+heuristic: 9 AbsError: 3, RelError: 0.5, SelError: 15%
+heuristicIdx: 9 AbsError: 3, RelError: 0.5, SelError: 15%
+histogram: 6 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 6 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 81: [ { "$match" : { "c" : { "$gte" : 18 } } } ]
+[jsTest] ----
+
+Actual cardinality: 8
+Cardinality estimates:
+heuristic: 9 AbsError: 1, RelError: 0.13, SelError: 5%
+heuristicIdx: 9 AbsError: 1, RelError: 0.13, SelError: 5%
+histogram: 8 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 8 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 82: [ { "$match" : { "c" : { "$lte" : 19 } } } ]
+[jsTest] ----
+
+Actual cardinality: 19
+Cardinality estimates:
+heuristic: 6.6 AbsError: -12.4, RelError: -0.65, SelError: -62%
+heuristicIdx: 6.6 AbsError: -12.4, RelError: -0.65, SelError: -62%
+histogram: 19 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 19 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 83: [ { "$match" : { "c" : { "$gt" : 20 } } } ]
+[jsTest] ----
+
+Actual cardinality: 0
+Cardinality estimates:
+heuristic: 9 AbsError: 9, RelError: 0.9, SelError: 45%
+heuristicIdx: 9 AbsError: 9, RelError: 0.9, SelError: 45%
+histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 0 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 84: [ { "$match" : { "c" : { "$gt" : 1, "$lt" : 2 } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+histogram: 1.95 AbsError: 0.95, RelError: 0.95, SelError: 4.75%
+histogramIdx: 1.95 AbsError: 0.95, RelError: 0.95, SelError: 4.75%
+
+
+[jsTest] ----
+[jsTest] Query 85: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 1, "$lt" : 2 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 0
+Cardinality estimates:
+heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 0 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 86: [ { "$match" : { "c" : { "$gt" : 2, "$lte" : 3 } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+histogram: 3.79 AbsError: 1.79, RelError: 0.9, SelError: 8.95%
+histogramIdx: 3.79 AbsError: 1.79, RelError: 0.9, SelError: 8.95%
+
+
+[jsTest] ----
+[jsTest] Query 87: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 2, "$lte" : 3 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+histogram: 1.63 AbsError: -0.37, RelError: -0.19, SelError: -1.85%
+histogramIdx: 1.63 AbsError: -0.37, RelError: -0.19, SelError: -1.85%
+
+
+[jsTest] ----
+[jsTest] Query 88: [ { "$match" : { "c" : { "$gte" : 3, "$lt" : 4 } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+histogram: 3.79 AbsError: 1.79, RelError: 0.9, SelError: 8.95%
+histogramIdx: 3.79 AbsError: 1.79, RelError: 0.9, SelError: 8.95%
+
+
+[jsTest] ----
+[jsTest] Query 89: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 3, "$lt" : 4 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+histogram: 1.63 AbsError: -0.37, RelError: -0.19, SelError: -1.85%
+histogramIdx: 1.63 AbsError: -0.37, RelError: -0.19, SelError: -1.85%
+
+
+[jsTest] ----
+[jsTest] Query 90: [ { "$match" : { "c" : { "$gte" : 4, "$lte" : 5 } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 5.69 AbsError: 1.69, RelError: 0.42, SelError: 8.45%
+histogramIdx: 5.69 AbsError: 1.69, RelError: 0.42, SelError: 8.45%
+
+
+[jsTest] ----
+[jsTest] Query 91: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 4, "$lte" : 5 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 5.72 AbsError: 1.72, RelError: 0.43, SelError: 8.6%
+histogramIdx: 5.72 AbsError: 1.72, RelError: 0.43, SelError: 8.6%
+
+
+[jsTest] ----
+[jsTest] Query 92: [ { "$match" : { "c" : { "$gt" : 5, "$lt" : 9 } } } ]
+[jsTest] ----
+
+Actual cardinality: 6
+Cardinality estimates:
+heuristic: 4.43 AbsError: -1.57, RelError: -0.26, SelError: -7.85%
+heuristicIdx: 4.43 AbsError: -1.57, RelError: -0.26, SelError: -7.85%
+histogram: 8.94 AbsError: 2.94, RelError: 0.49, SelError: 14.7%
+histogramIdx: 8.94 AbsError: 2.94, RelError: 0.49, SelError: 14.7%
+
+
+[jsTest] ----
+[jsTest] Query 93: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 5, "$lt" : 9 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 6
+Cardinality estimates:
+heuristic: 4.43 AbsError: -1.57, RelError: -0.26, SelError: -7.85%
+heuristicIdx: 4.43 AbsError: -1.57, RelError: -0.26, SelError: -7.85%
+histogram: 8.17 AbsError: 2.17, RelError: 0.36, SelError: 10.85%
+histogramIdx: 8.17 AbsError: 2.17, RelError: 0.36, SelError: 10.85%
+
+
+[jsTest] ----
+[jsTest] Query 94: [ { "$match" : { "c" : { "$gt" : 9, "$lte" : 15 } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 8.37 AbsError: 4.37, RelError: 1.09, SelError: 21.85%
+histogramIdx: 8.37 AbsError: 4.37, RelError: 1.09, SelError: 21.85%
+
+
+[jsTest] ----
+[jsTest] Query 95: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 9, "$lte" : 15 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 4.08 AbsError: 0.08, RelError: 0.02, SelError: 0.4%
+histogramIdx: 4.08 AbsError: 0.08, RelError: 0.02, SelError: 0.4%
+
+
+[jsTest] ----
+[jsTest] Query 96: [ { "$match" : { "c" : { "$gte" : 15, "$lt" : 16 } } } ]
+[jsTest] ----
+
+Actual cardinality: 3
+Cardinality estimates:
+heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
+heuristicIdx: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
+histogram: 7.53 AbsError: 4.53, RelError: 1.51, SelError: 22.65%
+histogramIdx: 7.53 AbsError: 4.53, RelError: 1.51, SelError: 22.65%
+
+
+[jsTest] ----
+[jsTest] Query 97: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 15, "$lt" : 16 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 3
+Cardinality estimates:
+heuristic: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
+heuristicIdx: 4.43 AbsError: 1.43, RelError: 0.48, SelError: 7.15%
+histogram: 2.45 AbsError: -0.55, RelError: -0.18, SelError: -2.75%
+histogramIdx: 2.45 AbsError: -0.55, RelError: -0.18, SelError: -2.75%
+
+
+[jsTest] ----
+[jsTest] Query 98: [ { "$match" : { "c" : { "$gte" : 16, "$lte" : 17 } } } ]
+[jsTest] ----
+
+Actual cardinality: 5
+Cardinality estimates:
+heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+histogram: 8.05 AbsError: 3.05, RelError: 0.61, SelError: 15.25%
+histogramIdx: 8.05 AbsError: 3.05, RelError: 0.61, SelError: 15.25%
+
+
+[jsTest] ----
+[jsTest] Query 99: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 16, "$lte" : 17 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 5
+Cardinality estimates:
+heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+histogram: 7.35 AbsError: 2.35, RelError: 0.47, SelError: 11.75%
+histogramIdx: 7.35 AbsError: 2.35, RelError: 0.47, SelError: 11.75%
+
+
+[jsTest] ----
+[jsTest] Query 100: [ { "$match" : { "c" : { "$gt" : 17, "$lt" : 18 } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 7.16 AbsError: 3.16, RelError: 0.79, SelError: 15.8%
+histogramIdx: 7.16 AbsError: 3.16, RelError: 0.79, SelError: 15.8%
+
+
+[jsTest] ----
+[jsTest] Query 101: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 17, "$lt" : 18 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 0
+Cardinality estimates:
+heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 0 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 102: [ { "$match" : { "c" : { "$gt" : 18, "$lte" : 19 } } } ]
+[jsTest] ----
+
+Actual cardinality: 5
+Cardinality estimates:
+heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+histogram: 5.85 AbsError: 0.85, RelError: 0.17, SelError: 4.25%
+histogramIdx: 5.85 AbsError: 0.85, RelError: 0.17, SelError: 4.25%
+
+
+[jsTest] ----
+[jsTest] Query 103: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 18, "$lte" : 19 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 5
+Cardinality estimates:
+heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+histogram: 4.08 AbsError: -0.92, RelError: -0.18, SelError: -4.6%
+histogramIdx: 4.08 AbsError: -0.92, RelError: -0.18, SelError: -4.6%
+
+
+[jsTest] ----
+[jsTest] Query 104: [ { "$match" : { "c" : { "$gte" : 19, "$lt" : 20 } } } ]
+[jsTest] ----
+
+Actual cardinality: 5
+Cardinality estimates:
+heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+histogram: 5.85 AbsError: 0.85, RelError: 0.17, SelError: 4.25%
+histogramIdx: 5.85 AbsError: 0.85, RelError: 0.17, SelError: 4.25%
+
+
+[jsTest] ----
+[jsTest] Query 105: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 19, "$lt" : 20 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 5
+Cardinality estimates:
+heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+histogram: 4.08 AbsError: -0.92, RelError: -0.18, SelError: -4.6%
+histogramIdx: 4.08 AbsError: -0.92, RelError: -0.18, SelError: -4.6%
+
+
+[jsTest] ----
+[jsTest] Query 106: [ { "$match" : { "c" : { "$gte" : 1, "$lte" : 3 } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 4 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 4 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 107: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 1, "$lte" : 3 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 4.9 AbsError: 0.9, RelError: 0.23, SelError: 4.5%
+histogramIdx: 4.9 AbsError: 0.9, RelError: 0.23, SelError: 4.5%
+
+
+[jsTest] ----
+[jsTest] Query 108: [ { "$match" : { "c" : { "$gt" : 2, "$lt" : 4 } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+histogram: 3.79 AbsError: 1.79, RelError: 0.9, SelError: 8.95%
+histogramIdx: 3.79 AbsError: 1.79, RelError: 0.9, SelError: 8.95%
+
+
+[jsTest] ----
+[jsTest] Query 109: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 2, "$lt" : 4 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+histogram: 1.63 AbsError: -0.37, RelError: -0.19, SelError: -1.85%
+histogramIdx: 1.63 AbsError: -0.37, RelError: -0.19, SelError: -1.85%
+
+
+[jsTest] ----
+[jsTest] Query 110: [ { "$match" : { "c" : { "$gt" : 3, "$lte" : 5 } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 5.69 AbsError: 1.69, RelError: 0.42, SelError: 8.45%
+histogramIdx: 5.69 AbsError: 1.69, RelError: 0.42, SelError: 8.45%
+
+
+[jsTest] ----
+[jsTest] Query 111: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 3, "$lte" : 5 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 5.72 AbsError: 1.72, RelError: 0.43, SelError: 8.6%
+histogramIdx: 5.72 AbsError: 1.72, RelError: 0.43, SelError: 8.6%
+
+
+[jsTest] ----
+[jsTest] Query 112: [ { "$match" : { "c" : { "$gte" : 4, "$lt" : 9 } } } ]
+[jsTest] ----
+
+Actual cardinality: 8
+Cardinality estimates:
+heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
+heuristicIdx: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
+histogram: 9.49 AbsError: 1.49, RelError: 0.19, SelError: 7.45%
+histogramIdx: 9.49 AbsError: 1.49, RelError: 0.19, SelError: 7.45%
+
+
+[jsTest] ----
+[jsTest] Query 113: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 4, "$lt" : 9 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 8
+Cardinality estimates:
+heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
+heuristicIdx: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
+histogram: 13.89 AbsError: 5.89, RelError: 0.74, SelError: 29.45%
+histogramIdx: 13.89 AbsError: 5.89, RelError: 0.74, SelError: 29.45%
+
+
+[jsTest] ----
+[jsTest] Query 114: [ { "$match" : { "c" : { "$gte" : 5, "$lte" : 15 } } } ]
+[jsTest] ----
+
+Actual cardinality: 12
+Cardinality estimates:
+heuristic: 4.43 AbsError: -7.57, RelError: -0.63, SelError: -37.85%
+heuristicIdx: 4.43 AbsError: -7.57, RelError: -0.63, SelError: -37.85%
+histogram: 13.28 AbsError: 1.28, RelError: 0.11, SelError: 6.4%
+histogramIdx: 13.28 AbsError: 1.28, RelError: 0.11, SelError: 6.4%
+
+
+[jsTest] ----
+[jsTest] Query 115: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 5, "$lte" : 15 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 12
+Cardinality estimates:
+heuristic: 4.43 AbsError: -7.57, RelError: -0.63, SelError: -37.85%
+heuristicIdx: 4.43 AbsError: -7.57, RelError: -0.63, SelError: -37.85%
+histogram: 17.97 AbsError: 5.97, RelError: 0.5, SelError: 29.85%
+histogramIdx: 17.97 AbsError: 5.97, RelError: 0.5, SelError: 29.85%
+
+
+[jsTest] ----
+[jsTest] Query 116: [ { "$match" : { "c" : { "$gt" : 9, "$lt" : 16 } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 8.37 AbsError: 4.37, RelError: 1.09, SelError: 21.85%
+histogramIdx: 8.37 AbsError: 4.37, RelError: 1.09, SelError: 21.85%
+
+
+[jsTest] ----
+[jsTest] Query 117: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 9, "$lt" : 16 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 4.08 AbsError: 0.08, RelError: 0.02, SelError: 0.4%
+histogramIdx: 4.08 AbsError: 0.08, RelError: 0.02, SelError: 0.4%
+
+
+[jsTest] ----
+[jsTest] Query 118: [ { "$match" : { "c" : { "$gt" : 15, "$lte" : 17 } } } ]
+[jsTest] ----
+
+Actual cardinality: 5
+Cardinality estimates:
+heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+histogram: 8.05 AbsError: 3.05, RelError: 0.61, SelError: 15.25%
+histogramIdx: 8.05 AbsError: 3.05, RelError: 0.61, SelError: 15.25%
+
+
+[jsTest] ----
+[jsTest] Query 119: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 15, "$lte" : 17 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 5
+Cardinality estimates:
+heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+histogram: 7.35 AbsError: 2.35, RelError: 0.47, SelError: 11.75%
+histogramIdx: 7.35 AbsError: 2.35, RelError: 0.47, SelError: 11.75%
+
+
+[jsTest] ----
+[jsTest] Query 120: [ { "$match" : { "c" : { "$gte" : 16, "$lt" : 18 } } } ]
+[jsTest] ----
+
+Actual cardinality: 5
+Cardinality estimates:
+heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+histogram: 8.05 AbsError: 3.05, RelError: 0.61, SelError: 15.25%
+histogramIdx: 8.05 AbsError: 3.05, RelError: 0.61, SelError: 15.25%
+
+
+[jsTest] ----
+[jsTest] Query 121: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 16, "$lt" : 18 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 5
+Cardinality estimates:
+heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+histogram: 7.35 AbsError: 2.35, RelError: 0.47, SelError: 11.75%
+histogramIdx: 7.35 AbsError: 2.35, RelError: 0.47, SelError: 11.75%
+
+
+[jsTest] ----
+[jsTest] Query 122: [ { "$match" : { "c" : { "$gte" : 17, "$lte" : 19 } } } ]
+[jsTest] ----
+
+Actual cardinality: 8
+Cardinality estimates:
+heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
+heuristicIdx: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
+histogram: 8.77 AbsError: 0.77, RelError: 0.1, SelError: 3.85%
+histogramIdx: 8.77 AbsError: 0.77, RelError: 0.1, SelError: 3.85%
+
+
+[jsTest] ----
+[jsTest] Query 123: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 17, "$lte" : 19 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 8
+Cardinality estimates:
+heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
+heuristicIdx: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
+histogram: 13.07 AbsError: 5.07, RelError: 0.63, SelError: 25.35%
+histogramIdx: 13.07 AbsError: 5.07, RelError: 0.63, SelError: 25.35%
+
+
+[jsTest] ----
+[jsTest] Query 124: [ { "$match" : { "c" : { "$gt" : 18, "$lt" : 20 } } } ]
+[jsTest] ----
+
+Actual cardinality: 5
+Cardinality estimates:
+heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+histogram: 5.85 AbsError: 0.85, RelError: 0.17, SelError: 4.25%
+histogramIdx: 5.85 AbsError: 0.85, RelError: 0.17, SelError: 4.25%
+
+
+[jsTest] ----
+[jsTest] Query 125: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 18, "$lt" : 20 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 5
+Cardinality estimates:
+heuristic: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 AbsError: -0.57, RelError: -0.11, SelError: -2.85%
+histogram: 4.08 AbsError: -0.92, RelError: -0.18, SelError: -4.6%
+histogramIdx: 4.08 AbsError: -0.92, RelError: -0.18, SelError: -4.6%
+
+
+[jsTest] ----
+[jsTest] Query 126: [ { "$match" : { "c" : { "$gt" : 1, "$lte" : 4 } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 4.87 AbsError: 0.87, RelError: 0.22, SelError: 4.35%
+histogramIdx: 4.87 AbsError: 0.87, RelError: 0.22, SelError: 4.35%
+
+
+[jsTest] ----
+[jsTest] Query 127: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 1, "$lte" : 4 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 5.72 AbsError: 1.72, RelError: 0.43, SelError: 8.6%
+histogramIdx: 5.72 AbsError: 1.72, RelError: 0.43, SelError: 8.6%
+
+
+[jsTest] ----
+[jsTest] Query 128: [ { "$match" : { "c" : { "$gte" : 2, "$lt" : 5 } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 4.87 AbsError: 0.87, RelError: 0.22, SelError: 4.35%
+histogramIdx: 4.87 AbsError: 0.87, RelError: 0.22, SelError: 4.35%
+
+
+[jsTest] ----
+[jsTest] Query 129: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 2, "$lt" : 5 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 4
+Cardinality estimates:
+heuristic: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 AbsError: 0.43, RelError: 0.11, SelError: 2.15%
+histogram: 5.72 AbsError: 1.72, RelError: 0.43, SelError: 8.6%
+histogramIdx: 5.72 AbsError: 1.72, RelError: 0.43, SelError: 8.6%
+
+
+[jsTest] ----
+[jsTest] Query 130: [ { "$match" : { "c" : { "$gte" : 3, "$lte" : 9 } } } ]
+[jsTest] ----
+
+Actual cardinality: 9
+Cardinality estimates:
+heuristic: 4.43 AbsError: -4.57, RelError: -0.51, SelError: -22.85%
+heuristicIdx: 4.43 AbsError: -4.57, RelError: -0.51, SelError: -22.85%
+histogram: 10.44 AbsError: 1.44, RelError: 0.16, SelError: 7.2%
+histogramIdx: 10.44 AbsError: 1.44, RelError: 0.16, SelError: 7.2%
+
+
+[jsTest] ----
+[jsTest] Query 131: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 3, "$lte" : 9 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 9
+Cardinality estimates:
+heuristic: 4.43 AbsError: -4.57, RelError: -0.51, SelError: -22.85%
+heuristicIdx: 4.43 AbsError: -4.57, RelError: -0.51, SelError: -22.85%
+histogram: 17.97 AbsError: 8.97, RelError: 1, SelError: 44.85%
+histogramIdx: 17.97 AbsError: 8.97, RelError: 1, SelError: 44.85%
+
+
+[jsTest] ----
+[jsTest] Query 132: [ { "$match" : { "c" : { "$gt" : 4, "$lt" : 15 } } } ]
+[jsTest] ----
+
+Actual cardinality: 10
+Cardinality estimates:
+heuristic: 4.43 AbsError: -5.57, RelError: -0.56, SelError: -27.85%
+heuristicIdx: 4.43 AbsError: -5.57, RelError: -0.56, SelError: -27.85%
+histogram: 11.38 AbsError: 1.38, RelError: 0.14, SelError: 6.9%
+histogramIdx: 11.38 AbsError: 1.38, RelError: 0.14, SelError: 6.9%
+
+
+[jsTest] ----
+[jsTest] Query 133: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 4, "$lt" : 15 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 10
+Cardinality estimates:
+heuristic: 4.43 AbsError: -5.57, RelError: -0.56, SelError: -27.85%
+heuristicIdx: 4.43 AbsError: -5.57, RelError: -0.56, SelError: -27.85%
+histogram: 15.52 AbsError: 5.52, RelError: 0.55, SelError: 27.6%
+histogramIdx: 15.52 AbsError: 5.52, RelError: 0.55, SelError: 27.6%
+
+
+[jsTest] ----
+[jsTest] Query 134: [ { "$match" : { "c" : { "$gt" : 5, "$lte" : 16 } } } ]
+[jsTest] ----
+
+Actual cardinality: 11
+Cardinality estimates:
+heuristic: 4.43 AbsError: -6.57, RelError: -0.6, SelError: -32.85%
+heuristicIdx: 4.43 AbsError: -6.57, RelError: -0.6, SelError: -32.85%
+histogram: 13.42 AbsError: 2.42, RelError: 0.22, SelError: 12.1%
+histogramIdx: 13.42 AbsError: 2.42, RelError: 0.22, SelError: 12.1%
+
+
+[jsTest] ----
+[jsTest] Query 135: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 5, "$lte" : 16 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 11
+Cardinality estimates:
+heuristic: 4.43 AbsError: -6.57, RelError: -0.6, SelError: -32.85%
+heuristicIdx: 4.43 AbsError: -6.57, RelError: -0.6, SelError: -32.85%
+histogram: 17.97 AbsError: 6.97, RelError: 0.63, SelError: 34.85%
+histogramIdx: 17.97 AbsError: 6.97, RelError: 0.63, SelError: 34.85%
+
+
+[jsTest] ----
+[jsTest] Query 136: [ { "$match" : { "c" : { "$gte" : 9, "$lt" : 17 } } } ]
+[jsTest] ----
+
+Actual cardinality: 7
+Cardinality estimates:
+heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
+heuristicIdx: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
+histogram: 10.39 AbsError: 3.39, RelError: 0.48, SelError: 16.95%
+histogramIdx: 10.39 AbsError: 3.39, RelError: 0.48, SelError: 16.95%
+
+
+[jsTest] ----
+[jsTest] Query 137: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 9, "$lt" : 17 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 7
+Cardinality estimates:
+heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
+heuristicIdx: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
+histogram: 9.8 AbsError: 2.8, RelError: 0.4, SelError: 14%
+histogramIdx: 9.8 AbsError: 2.8, RelError: 0.4, SelError: 14%
+
+
+[jsTest] ----
+[jsTest] Query 138: [ { "$match" : { "c" : { "$gte" : 15, "$lte" : 18 } } } ]
+[jsTest] ----
+
+Actual cardinality: 7
+Cardinality estimates:
+heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
+heuristicIdx: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
+histogram: 8.54 AbsError: 1.54, RelError: 0.22, SelError: 7.7%
+histogramIdx: 8.54 AbsError: 1.54, RelError: 0.22, SelError: 7.7%
+
+
+[jsTest] ----
+[jsTest] Query 139: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 15, "$lte" : 18 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 7
+Cardinality estimates:
+heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
+heuristicIdx: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
+histogram: 14.7 AbsError: 7.7, RelError: 1.1, SelError: 38.5%
+histogramIdx: 14.7 AbsError: 7.7, RelError: 1.1, SelError: 38.5%
+
+
+[jsTest] ----
+[jsTest] Query 140: [ { "$match" : { "c" : { "$gt" : 16, "$lt" : 19 } } } ]
+[jsTest] ----
+
+Actual cardinality: 7
+Cardinality estimates:
+heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
+heuristicIdx: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
+histogram: 8.54 AbsError: 1.54, RelError: 0.22, SelError: 7.7%
+histogramIdx: 8.54 AbsError: 1.54, RelError: 0.22, SelError: 7.7%
+
+
+[jsTest] ----
+[jsTest] Query 141: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 16, "$lt" : 19 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 7
+Cardinality estimates:
+heuristic: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
+heuristicIdx: 4.43 AbsError: -2.57, RelError: -0.37, SelError: -12.85%
+histogram: 8.99 AbsError: 1.99, RelError: 0.28, SelError: 9.95%
+histogramIdx: 8.99 AbsError: 1.99, RelError: 0.28, SelError: 9.95%
+
+
+[jsTest] ----
+[jsTest] Query 142: [ { "$match" : { "c" : { "$gt" : 17, "$lte" : 20 } } } ]
+[jsTest] ----
+
+Actual cardinality: 8
+Cardinality estimates:
+heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
+heuristicIdx: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
+histogram: 8 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 8 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 143: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 17, "$lte" : 20 } } } } ]
+[jsTest] ----
+
+Actual cardinality: 8
+Cardinality estimates:
+heuristic: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
+heuristicIdx: 4.43 AbsError: -3.57, RelError: -0.45, SelError: -17.85%
+histogram: 12.25 AbsError: 4.25, RelError: 0.53, SelError: 21.25%
+histogramIdx: 12.25 AbsError: 4.25, RelError: 0.53, SelError: 21.25%
+
+
+[jsTest] ----
+[jsTest] Query 144: [ { "$match" : { "mixed" : { "$eq" : 0 } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 145: [ { "$match" : { "mixed" : { "$eq" : 22 } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 146: [ { "$match" : { "mixed" : { "$lt" : 22 } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
+heuristicIdx: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
+histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 147: [ { "$match" : { "mixed" : { "$lte" : 22 } } } ]
+[jsTest] ----
+
+Actual cardinality: 3
+Cardinality estimates:
+heuristic: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
+heuristicIdx: 6.6 AbsError: 3.6, RelError: 1.2, SelError: 18%
+histogram: 3 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 3 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 148: [ { "$match" : { "mixed" : { "$gt" : 22 } } } ]
+[jsTest] ----
+
+Actual cardinality: 7
+Cardinality estimates:
+heuristic: 9 AbsError: 2, RelError: 0.29, SelError: 10%
+heuristicIdx: 9 AbsError: 2, RelError: 0.29, SelError: 10%
+histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 7 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 149: [ { "$match" : { "mixed" : { "$gte" : 22 } } } ]
+[jsTest] ----
+
+Actual cardinality: 8
+Cardinality estimates:
+heuristic: 9 AbsError: 1, RelError: 0.13, SelError: 5%
+heuristicIdx: 9 AbsError: 1, RelError: 0.13, SelError: 5%
+histogram: 8 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 8 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 150: [ { "$match" : { "mixed" : { "$lt" : 77 } } } ]
 [jsTest] ----
 
 Actual cardinality: 7
 Cardinality estimates:
 heuristic: 6.6 AbsError: -0.4, RelError: -0.06, SelError: -2%
+heuristicIdx: 6.6 AbsError: -0.4, RelError: -0.06, SelError: -2%
 histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 7 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 268: [ { "$match" : { "mixed" : { "$gt" : "cde", "$lte" : "u" } } } ]
+[jsTest] Query 151: [ { "$match" : { "mixed" : { "$lte" : "cde" } } } ]
 [jsTest] ----
 
-Actual cardinality: 8
+Actual cardinality: 1
 Cardinality estimates:
-heuristic: 6.6 AbsError: -1.4, RelError: -0.18, SelError: -7%
-histogram: 8 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 269: [ { "$match" : { "mixed" : { "$gte" : "cde", "$lt" : "u" } } } ]
+[jsTest] Query 152: [ { "$match" : { "mixed" : { "$gt" : "gh" } } } ]
 [jsTest] ----
 
-Actual cardinality: 8
+Actual cardinality: 7
 Cardinality estimates:
-heuristic: 6.6 AbsError: -1.4, RelError: -0.18, SelError: -7%
-histogram: 8 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 9 AbsError: 2, RelError: 0.29, SelError: 10%
+heuristicIdx: 9 AbsError: 2, RelError: 0.29, SelError: 10%
+histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 7 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 270: [ { "$match" : { "mixed" : { "$gte" : "cde", "$lte" : "u" } } } ]
+[jsTest] Query 153: [ { "$match" : { "mixed" : { "$eq" : "mno" } } } ]
 [jsTest] ----
 
-Actual cardinality: 9
+Actual cardinality: 1
 Cardinality estimates:
-heuristic: 6.6 AbsError: -2.4, RelError: -0.27, SelError: -12%
-histogram: 9 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 271: [ { "$match" : { "mixed" : { "$gt" : "gh", "$lt" : "yzab" } } } ]
+[jsTest] Query 154: [ { "$match" : { "mixed" : { "$lt" : "mno" } } } ]
+[jsTest] ----
+
+Actual cardinality: 5
+Cardinality estimates:
+heuristic: 6.6 AbsError: 1.6, RelError: 0.32, SelError: 8%
+heuristicIdx: 6.6 AbsError: 1.6, RelError: 0.32, SelError: 8%
+histogram: 5 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 5 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 155: [ { "$match" : { "mixed" : { "$lte" : "mno" } } } ]
 [jsTest] ----
 
 Actual cardinality: 6
 Cardinality estimates:
 heuristic: 6.6 AbsError: 0.6, RelError: 0.1, SelError: 3%
+heuristicIdx: 6.6 AbsError: 0.6, RelError: 0.1, SelError: 3%
 histogram: 6 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 6 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 272: [ { "$match" : { "mixed" : { "$gt" : "gh", "$lte" : "yzab" } } } ]
+[jsTest] Query 156: [ { "$match" : { "mixed" : { "$gt" : "mno" } } } ]
 [jsTest] ----
 
-Actual cardinality: 7
+Actual cardinality: 4
 Cardinality estimates:
-heuristic: 6.6 AbsError: -0.4, RelError: -0.06, SelError: -2%
-histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 9 AbsError: 5, RelError: 1.25, SelError: 25%
+heuristicIdx: 9 AbsError: 5, RelError: 1.25, SelError: 25%
+histogram: 4 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 4 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 273: [ { "$match" : { "mixed" : { "$gte" : "gh", "$lt" : "yzab" } } } ]
+[jsTest] Query 157: [ { "$match" : { "mixed" : { "$gte" : "mno" } } } ]
 [jsTest] ----
 
-Actual cardinality: 7
+Actual cardinality: 5
 Cardinality estimates:
-heuristic: 6.6 AbsError: -0.4, RelError: -0.06, SelError: -2%
-histogram: 7 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 9 AbsError: 4, RelError: 0.8, SelError: 20%
+heuristicIdx: 9 AbsError: 4, RelError: 0.8, SelError: 20%
+histogram: 5 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 5 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] Query 274: [ { "$match" : { "mixed" : { "$gte" : "gh", "$lte" : "yzab" } } } ]
+[jsTest] Query 158: [ { "$match" : { "mixed" : { "$gte" : "u" } } } ]
 [jsTest] ----
 
-Actual cardinality: 8
+Actual cardinality: 2
 Cardinality estimates:
-heuristic: 6.6 AbsError: -1.4, RelError: -0.18, SelError: -7%
-histogram: 8 AbsError: 0, RelError: 0, SelError: 0%
+heuristic: 9 AbsError: 7, RelError: 3.5, SelError: 35%
+heuristicIdx: 9 AbsError: 7, RelError: 3.5, SelError: 35%
+histogram: 2 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] CE aggregate errors per query category: qtype
+[jsTest] Query 159: [ { "$match" : { "mixed" : { "$eq" : "yzab" } } } ]
 [jsTest] ----
 
-heuristic mean errors for $eq: absRMSE: 3.055, relRMSE: 2.913, meanAbsSelErr: 14.556%
-histogram mean errors for $eq: absRMSE: 0, relRMSE: 0, meanAbsSelErr: 0%
-heuristic mean errors for $gt: absRMSE: 6.256, relRMSE: 2.567, meanAbsSelErr: 27.857%
-histogram mean errors for $gt: absRMSE: 0, relRMSE: 0, meanAbsSelErr: 0%
-heuristic mean errors for $gte: absRMSE: 6.421, relRMSE: 2.859, meanAbsSelErr: 27.692%
-histogram mean errors for $gte: absRMSE: 0, relRMSE: 0, meanAbsSelErr: 0%
-heuristic mean errors for $lt: absRMSE: 6.098, relRMSE: 1.319, meanAbsSelErr: 25.286%
-histogram mean errors for $lt: absRMSE: 0, relRMSE: 0, meanAbsSelErr: 0%
-heuristic mean errors for $lte: absRMSE: 7.305, relRMSE: 1.679, meanAbsSelErr: 30.714%
-histogram mean errors for $lte: absRMSE: 0, relRMSE: 0, meanAbsSelErr: 0%
-heuristic mean errors for large range: absRMSE: 3.936, relRMSE: 0.388, meanAbsSelErr: 15.559%
-histogram mean errors for large range: absRMSE: 3.146, relRMSE: 0.409, meanAbsSelErr: 9.772%
-heuristic mean errors for small range: absRMSE: 3.467, relRMSE: 2.034, meanAbsSelErr: 15.123%
-histogram mean errors for small range: absRMSE: 1.502, relRMSE: 0.385, meanAbsSelErr: 4.057%
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 AbsError: 3.47, RelError: 3.47, SelError: 17.35%
+histogram: 1 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] CE aggregate errors per query category: dtype
+[jsTest] Query 160: [ { "$match" : { "mixed" : { "$gt" : "cde", "$lt" : "cdf" } } } ]
 [jsTest] ----
 
-heuristic mean errors for array: absRMSE: 4.012, relRMSE: 0.622, meanAbsSelErr: 15.546%
-histogram mean errors for array: absRMSE: 3.058, relRMSE: 0.475, meanAbsSelErr: 10.352%
-heuristic mean errors for integer: absRMSE: 4.516, relRMSE: 1.998, meanAbsSelErr: 19.085%
-histogram mean errors for integer: absRMSE: 0, relRMSE: 0, meanAbsSelErr: 0%
-heuristic mean errors for mixed: absRMSE: 3.556, relRMSE: 2.337, meanAbsSelErr: 15.4%
-histogram mean errors for mixed: absRMSE: 0, relRMSE: 0, meanAbsSelErr: 0%
-heuristic mean errors for string: absRMSE: 5.95, relRMSE: 2.728, meanAbsSelErr: 25.978%
-histogram mean errors for string: absRMSE: 0, relRMSE: 0, meanAbsSelErr: 0%
+Actual cardinality: 0
+Cardinality estimates:
+heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 AbsError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 0.67 AbsError: 0.67, RelError: 0.07, SelError: 3.35%
+histogramIdx: 0 AbsError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
-[jsTest] CE aggregate errors for all queries
+[jsTest] Query 161: [ { "$match" : { "mixed" : { "$gt" : "gh", "$lte" : "gi" } } } ]
 [jsTest] ----
 
-heuristic mean errors: absRMSE: 4.413, relRMSE: 1.684, meanAbsSelErr: 17.827%
-histogram mean errors: absRMSE: 2.213, relRMSE: 0.344, meanAbsSelErr: 5.421%
-Top 20 inaccurate cardinality estimates
-Id: 190: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 3, "$lte" : 9 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 190,  "nReturned" : 9,  "heuristic" : 4.43,  "histogram" : 17.97 } - Histogram errors {  "absError" : 8.97,  "relError" : 1,  "selError" : 44.85 }
-Id: 230: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 16, "$lte" : 19 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 230,  "nReturned" : 8,  "heuristic" : 4.43,  "histogram" : 16.34 } - Histogram errors {  "absError" : 8.34,  "relError" : 1.04,  "selError" : 41.7 }
-Id: 198: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 4, "$lte" : 15 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 198,  "nReturned" : 12,  "heuristic" : 4.43,  "histogram" : 20 } - Histogram errors {  "absError" : 8,  "relError" : 0.67,  "selError" : 40 }
-Id: 196: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 4, "$lt" : 15 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 196,  "nReturned" : 10,  "heuristic" : 4.43,  "histogram" : 17.97 } - Histogram errors {  "absError" : 7.97,  "relError" : 0.8,  "selError" : 39.85 }
-Id: 222: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 15, "$lte" : 18 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 222,  "nReturned" : 7,  "heuristic" : 4.43,  "histogram" : 14.7 } - Histogram errors {  "absError" : 7.7,  "relError" : 1.1,  "selError" : 38.5 }
-Id: 188: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 3, "$lt" : 9 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 188,  "nReturned" : 8,  "heuristic" : 4.43,  "histogram" : 15.52 } - Histogram errors {  "absError" : 7.52,  "relError" : 0.94,  "selError" : 37.6 }
-Id: 186: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 3, "$lte" : 9 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 186,  "nReturned" : 9,  "heuristic" : 4.43,  "histogram" : 16.34 } - Histogram errors {  "absError" : 7.34,  "relError" : 0.82,  "selError" : 36.7 }
-Id: 238: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 17, "$lte" : 20 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 238,  "nReturned" : 9,  "heuristic" : 4.43,  "histogram" : 16.34 } - Histogram errors {  "absError" : 7.34,  "relError" : 0.82,  "selError" : 36.7 }
-Id: 206: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 5, "$lte" : 16 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 206,  "nReturned" : 13,  "heuristic" : 4.43,  "histogram" : 20 } - Histogram errors {  "absError" : 7,  "relError" : 0.54,  "selError" : 35 }
-Id: 202: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 5, "$lte" : 16 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 202,  "nReturned" : 11,  "heuristic" : 4.43,  "histogram" : 17.97 } - Histogram errors {  "absError" : 6.97,  "relError" : 0.63,  "selError" : 34.85 }
-Id: 194: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 4, "$lte" : 15 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 194,  "nReturned" : 12,  "heuristic" : 4.43,  "histogram" : 17.97 } - Histogram errors {  "absError" : 5.97,  "relError" : 0.5,  "selError" : 29.85 }
-Id: 204: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 5, "$lt" : 16 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 204,  "nReturned" : 12,  "heuristic" : 4.43,  "histogram" : 17.97 } - Histogram errors {  "absError" : 5.97,  "relError" : 0.5,  "selError" : 29.85 }
-Id: 184: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 3, "$lt" : 9 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 184,  "nReturned" : 8,  "heuristic" : 4.43,  "histogram" : 13.89 } - Histogram errors {  "absError" : 5.89,  "relError" : 0.74,  "selError" : 29.45 }
-Id: 214: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 9, "$lte" : 17 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 214,  "nReturned" : 8,  "heuristic" : 4.43,  "histogram" : 13.89 } - Histogram errors {  "absError" : 5.89,  "relError" : 0.74,  "selError" : 29.45 }
-Id: 192: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 4, "$lt" : 15 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 192,  "nReturned" : 10,  "heuristic" : 4.43,  "histogram" : 15.52 } - Histogram errors {  "absError" : 5.52,  "relError" : 0.55,  "selError" : 27.6 }
-Id: 210: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 9, "$lte" : 17 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 210,  "nReturned" : 6,  "heuristic" : 4.43,  "histogram" : 11.44 } - Histogram errors {  "absError" : 5.44,  "relError" : 0.91,  "selError" : 27.2 }
-Id: 228: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 16, "$lt" : 19 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 228,  "nReturned" : 7,  "heuristic" : 4.43,  "histogram" : 12.25 } - Histogram errors {  "absError" : 5.25,  "relError" : 0.75,  "selError" : 26.25 }
-Id: 218: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 15, "$lte" : 18 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 218,  "nReturned" : 7,  "heuristic" : 4.43,  "histogram" : 12.25 } - Histogram errors {  "absError" : 5.25,  "relError" : 0.75,  "selError" : 26.25 }
-Id: 236: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 17, "$lt" : 20 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 236,  "nReturned" : 8,  "heuristic" : 4.43,  "histogram" : 13.07 } - Histogram errors {  "absError" : 5.07,  "relError" : 0.63,  "selError" : 25.35 }
-Id: 226: {  "pipeline" : [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 16, "$lte" : 19 } } } } ],  "qtype" : "large range",  "dtype" : "array",  "elemMatch" : true,  "_id" : 226,  "nReturned" : 8,  "heuristic" : 4.43,  "histogram" : 13.07 } - Histogram errors {  "absError" : 5.07,  "relError" : 0.63,  "selError" : 25.35 }
+Actual cardinality: 0
+Cardinality estimates:
+heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 AbsError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 1.77 AbsError: 1.77, RelError: 0.18, SelError: 8.85%
+histogramIdx: 0 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 162: [ { "$match" : { "mixed" : { "$gte" : "mno", "$lt" : "mnp" } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 2.74 AbsError: 1.74, RelError: 1.74, SelError: 8.7%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 163: [ { "$match" : { "mixed" : { "$gte" : "u", "$lte" : "v" } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 1.34 AbsError: 0.34, RelError: 0.34, SelError: 1.7%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 164: [ { "$match" : { "mixed" : { "$gt" : "yzab", "$lt" : "yzbb" } } } ]
+[jsTest] ----
+
+Actual cardinality: 0
+Cardinality estimates:
+heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 AbsError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 0 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 165: [ { "$match" : { "mixed" : { "$gt" : "cde", "$lte" : "cfe" } } } ]
+[jsTest] ----
+
+Actual cardinality: 0
+Cardinality estimates:
+heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 AbsError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 0.67 AbsError: 0.67, RelError: 0.07, SelError: 3.35%
+histogramIdx: 0 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 166: [ { "$match" : { "mixed" : { "$gte" : "gh", "$lt" : "gj" } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 1.9 AbsError: 0.9, RelError: 0.9, SelError: 4.5%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 167: [ { "$match" : { "mixed" : { "$gte" : "mno", "$lte" : "mpo" } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 2.74 AbsError: 1.74, RelError: 1.74, SelError: 8.7%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 168: [ { "$match" : { "mixed" : { "$gt" : "u", "$lt" : "w" } } } ]
+[jsTest] ----
+
+Actual cardinality: 0
+Cardinality estimates:
+heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 AbsError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 0.67 AbsError: 0.67, RelError: 0.07, SelError: 3.35%
+histogramIdx: 0 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 169: [ { "$match" : { "mixed" : { "$gt" : "yzab", "$lte" : "y|ab" } } } ]
+[jsTest] ----
+
+Actual cardinality: 0
+Cardinality estimates:
+heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 AbsError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 0 AbsError: 0, RelError: 0, SelError: 0%
+histogramIdx: 0 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 170: [ { "$match" : { "mixed" : { "$gte" : "cde", "$lt" : "fde" } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
+histogram: 1.41 AbsError: -0.59, RelError: -0.3, SelError: -2.95%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 171: [ { "$match" : { "mixed" : { "$gte" : "gh", "$lte" : "jh" } } } ]
+[jsTest] ----
+
+Actual cardinality: 2
+Cardinality estimates:
+heuristic: 4.43 AbsError: 2.43, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 AbsError: 4.6, RelError: 2.3, SelError: 23%
+histogram: 2.53 AbsError: 0.53, RelError: 0.26, SelError: 2.65%
+histogramIdx: 2 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 172: [ { "$match" : { "mixed" : { "$gt" : "mno", "$lt" : "pno" } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 2.37 AbsError: 1.37, RelError: 1.37, SelError: 6.85%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 173: [ { "$match" : { "mixed" : { "$gt" : "u", "$lte" : "x" } } } ]
+[jsTest] ----
+
+Actual cardinality: 0
+Cardinality estimates:
+heuristic: 4.43 AbsError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 AbsError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 0.67 AbsError: 0.67, RelError: 0.07, SelError: 3.35%
+histogramIdx: 0 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Query 174: [ { "$match" : { "mixed" : { "$gte" : "yzab", "$lt" : "|zab" } } } ]
+[jsTest] ----
+
+Actual cardinality: 1
+Cardinality estimates:
+heuristic: 4.43 AbsError: 3.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 AbsError: 5.6, RelError: 5.6, SelError: 28%
+histogram: 0.71 AbsError: -0.29, RelError: -0.29, SelError: -1.45%
+histogramIdx: 1 AbsError: 0, RelError: 0, SelError: 0%
+
+
+[jsTest] ----
+[jsTest] Mean errors per qtype:
+[jsTest] ----
+
+heuristic:
+{  "category" : "$eq",  "queryCount" : 16,  "RMSAbsError" : 3.055,  "RMSRelError" : 2.913,  "meanSelError" : 14.556 }
+{  "category" : "$gt",  "queryCount" : 14,  "RMSAbsError" : 6.256,  "RMSRelError" : 2.567,  "meanSelError" : 27.857 }
+{  "category" : "$gte",  "queryCount" : 13,  "RMSAbsError" : 6.421,  "RMSRelError" : 2.859,  "meanSelError" : 27.692 }
+{  "category" : "$lt",  "queryCount" : 14,  "RMSAbsError" : 6.098,  "RMSRelError" : 1.319,  "meanSelError" : 25.286 }
+{  "category" : "$lte",  "queryCount" : 14,  "RMSAbsError" : 7.305,  "RMSRelError" : 1.679,  "meanSelError" : 30.714 }
+{  "category" : "large range",  "queryCount" : 38,  "RMSAbsError" : 3.322,  "RMSRelError" : 1.509,  "meanSelError" : 14.645 }
+{  "category" : "medium range",  "queryCount" : 32,  "RMSAbsError" : 3.313,  "RMSRelError" : 1.546,  "meanSelError" : 13.194 }
+{  "category" : "small range",  "queryCount" : 34,  "RMSAbsError" : 2.761,  "RMSRelError" : 1.828,  "meanSelError" : 11.579 }
+heuristicIdx:
+{  "category" : "$eq",  "queryCount" : 16,  "RMSAbsError" : 3.055,  "RMSRelError" : 2.913,  "meanSelError" : 14.556 }
+{  "category" : "$gt",  "queryCount" : 14,  "RMSAbsError" : 6.256,  "RMSRelError" : 2.567,  "meanSelError" : 27.857 }
+{  "category" : "$gte",  "queryCount" : 13,  "RMSAbsError" : 6.421,  "RMSRelError" : 2.859,  "meanSelError" : 27.692 }
+{  "category" : "$lt",  "queryCount" : 14,  "RMSAbsError" : 6.098,  "RMSRelError" : 1.319,  "meanSelError" : 25.286 }
+{  "category" : "$lte",  "queryCount" : 14,  "RMSAbsError" : 7.305,  "RMSRelError" : 1.679,  "meanSelError" : 30.714 }
+{  "category" : "large range",  "queryCount" : 38,  "RMSAbsError" : 4.431,  "RMSRelError" : 2.509,  "meanSelError" : 20.355 }
+{  "category" : "medium range",  "queryCount" : 32,  "RMSAbsError" : 4.328,  "RMSRelError" : 2.478,  "meanSelError" : 17.262 }
+{  "category" : "small range",  "queryCount" : 34,  "RMSAbsError" : 3.879,  "RMSRelError" : 2.825,  "meanSelError" : 15.409 }
+histogram:
+{  "category" : "$eq",  "queryCount" : 16,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+{  "category" : "$gt",  "queryCount" : 14,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+{  "category" : "$gte",  "queryCount" : 13,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+{  "category" : "$lt",  "queryCount" : 14,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+{  "category" : "$lte",  "queryCount" : 14,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+{  "category" : "large range",  "queryCount" : 38,  "RMSAbsError" : 3.324,  "RMSRelError" : 1.463,  "meanSelError" : 11.626 }
+{  "category" : "medium range",  "queryCount" : 32,  "RMSAbsError" : 2.763,  "RMSRelError" : 1.166,  "meanSelError" : 10.002 }
+{  "category" : "small range",  "queryCount" : 34,  "RMSAbsError" : 2.288,  "RMSRelError" : 1.575,  "meanSelError" : 8.347 }
+histogramIdx:
+{  "category" : "$eq",  "queryCount" : 16,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+{  "category" : "$gt",  "queryCount" : 14,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+{  "category" : "$gte",  "queryCount" : 13,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+{  "category" : "$lt",  "queryCount" : 14,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+{  "category" : "$lte",  "queryCount" : 14,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+{  "category" : "large range",  "queryCount" : 38,  "RMSAbsError" : 2.725,  "RMSRelError" : 0.337,  "meanSelError" : 7.249 }
+{  "category" : "medium range",  "queryCount" : 32,  "RMSAbsError" : 2.241,  "RMSRelError" : 0.393,  "meanSelError" : 6.869 }
+{  "category" : "small range",  "queryCount" : 34,  "RMSAbsError" : 1.668,  "RMSRelError" : 0.49,  "meanSelError" : 5.209 }
+
+
+[jsTest] ----
+[jsTest] Mean errors per fieldName:
+[jsTest] ----
+
+heuristic:
+{  "category" : "a",  "queryCount" : 24,  "RMSAbsError" : 5.338,  "RMSRelError" : 2.294,  "meanSelError" : 22.733 }
+{  "category" : "b",  "queryCount" : 36,  "RMSAbsError" : 5.316,  "RMSRelError" : 3.032,  "meanSelError" : 22.95 }
+{  "category" : "c",  "queryCount" : 84,  "RMSAbsError" : 4.074,  "RMSRelError" : 0.705,  "meanSelError" : 14.629 }
+{  "category" : "mixed",  "queryCount" : 31,  "RMSAbsError" : 3.748,  "RMSRelError" : 2.382,  "meanSelError" : 17.376 }
+heuristicIdx:
+{  "category" : "a",  "queryCount" : 24,  "RMSAbsError" : 5.826,  "RMSRelError" : 2.898,  "meanSelError" : 26.35 }
+{  "category" : "b",  "queryCount" : 36,  "RMSAbsError" : 6.233,  "RMSRelError" : 3.941,  "meanSelError" : 29.279 }
+{  "category" : "c",  "queryCount" : 84,  "RMSAbsError" : 4.074,  "RMSRelError" : 0.705,  "meanSelError" : 14.629 }
+{  "category" : "mixed",  "queryCount" : 31,  "RMSAbsError" : 4.922,  "RMSRelError" : 3.125,  "meanSelError" : 22.626 }
+histogram:
+{  "category" : "a",  "queryCount" : 24,  "RMSAbsError" : 1.878,  "RMSRelError" : 1.225,  "meanSelError" : 3.904 }
+{  "category" : "b",  "queryCount" : 36,  "RMSAbsError" : 2.388,  "RMSRelError" : 2.018,  "meanSelError" : 6.107 }
+{  "category" : "c",  "queryCount" : 84,  "RMSAbsError" : 2.53,  "RMSRelError" : 0.456,  "meanSelError" : 8.004 }
+{  "category" : "mixed",  "queryCount" : 31,  "RMSAbsError" : 0.684,  "RMSRelError" : 0.543,  "meanSelError" : 1.927 }
+histogramIdx:
+{  "category" : "a",  "queryCount" : 24,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+{  "category" : "b",  "queryCount" : 36,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+{  "category" : "c",  "queryCount" : 84,  "RMSAbsError" : 2.53,  "RMSRelError" : 0.456,  "meanSelError" : 8.004 }
+{  "category" : "mixed",  "queryCount" : 31,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+
+
+[jsTest] ----
+[jsTest] Mean errors per data distribution:
+[jsTest] ----
+
+heuristic:
+{  "_id" : "a",  "RMSAbsErr" : 5.338,  "RMSRelErr" : 2.294,  "meanSelErr" : 22.733 }
+{  "_id" : "b",  "RMSAbsErr" : 5.316,  "RMSRelErr" : 3.032,  "meanSelErr" : 22.95 }
+{  "_id" : "c",  "RMSAbsErr" : 4.074,  "RMSRelErr" : 0.705,  "meanSelErr" : 14.629 }
+{  "_id" : "mixed",  "RMSAbsErr" : 3.748,  "RMSRelErr" : 2.382,  "meanSelErr" : 17.376 }
+heuristicIdx:
+{  "_id" : "a",  "RMSAbsErr" : 5.826,  "RMSRelErr" : 2.898,  "meanSelErr" : 26.35 }
+{  "_id" : "b",  "RMSAbsErr" : 6.233,  "RMSRelErr" : 3.941,  "meanSelErr" : 29.279 }
+{  "_id" : "c",  "RMSAbsErr" : 4.074,  "RMSRelErr" : 0.705,  "meanSelErr" : 14.629 }
+{  "_id" : "mixed",  "RMSAbsErr" : 4.922,  "RMSRelErr" : 3.125,  "meanSelErr" : 22.626 }
+histogram:
+{  "_id" : "a",  "RMSAbsErr" : 1.878,  "RMSRelErr" : 1.225,  "meanSelErr" : 3.904 }
+{  "_id" : "b",  "RMSAbsErr" : 2.388,  "RMSRelErr" : 2.018,  "meanSelErr" : 6.107 }
+{  "_id" : "c",  "RMSAbsErr" : 2.53,  "RMSRelErr" : 0.456,  "meanSelErr" : 8.004 }
+{  "_id" : "mixed",  "RMSAbsErr" : 0.684,  "RMSRelErr" : 0.543,  "meanSelErr" : 1.927 }
+histogramIdx:
+{  "_id" : "a",  "RMSAbsErr" : 0,  "RMSRelErr" : 0,  "meanSelErr" : 0 }
+{  "_id" : "b",  "RMSAbsErr" : 0,  "RMSRelErr" : 0,  "meanSelErr" : 0 }
+{  "_id" : "c",  "RMSAbsErr" : 2.53,  "RMSRelErr" : 0.456,  "meanSelErr" : 8.004 }
+{  "_id" : "mixed",  "RMSAbsErr" : 0,  "RMSRelErr" : 0,  "meanSelErr" : 0 }
+
+
+[jsTest] ----
+[jsTest] Mean errors per dtype:
+[jsTest] ----
+
+heuristic:
+{  "category" : "array",  "queryCount" : 84,  "RMSAbsError" : 4.074,  "RMSRelError" : 0.705,  "meanSelError" : 14.629 }
+{  "category" : "integer",  "queryCount" : 24,  "RMSAbsError" : 5.338,  "RMSRelError" : 2.294,  "meanSelError" : 22.733 }
+{  "category" : "mixed",  "queryCount" : 31,  "RMSAbsError" : 3.748,  "RMSRelError" : 2.382,  "meanSelError" : 17.376 }
+{  "category" : "string",  "queryCount" : 36,  "RMSAbsError" : 5.316,  "RMSRelError" : 3.032,  "meanSelError" : 22.95 }
+heuristicIdx:
+{  "category" : "array",  "queryCount" : 84,  "RMSAbsError" : 4.074,  "RMSRelError" : 0.705,  "meanSelError" : 14.629 }
+{  "category" : "integer",  "queryCount" : 24,  "RMSAbsError" : 5.826,  "RMSRelError" : 2.898,  "meanSelError" : 26.35 }
+{  "category" : "mixed",  "queryCount" : 31,  "RMSAbsError" : 4.922,  "RMSRelError" : 3.125,  "meanSelError" : 22.626 }
+{  "category" : "string",  "queryCount" : 36,  "RMSAbsError" : 6.233,  "RMSRelError" : 3.941,  "meanSelError" : 29.279 }
+histogram:
+{  "category" : "array",  "queryCount" : 84,  "RMSAbsError" : 2.53,  "RMSRelError" : 0.456,  "meanSelError" : 8.004 }
+{  "category" : "integer",  "queryCount" : 24,  "RMSAbsError" : 1.878,  "RMSRelError" : 1.225,  "meanSelError" : 3.904 }
+{  "category" : "mixed",  "queryCount" : 31,  "RMSAbsError" : 0.684,  "RMSRelError" : 0.543,  "meanSelError" : 1.927 }
+{  "category" : "string",  "queryCount" : 36,  "RMSAbsError" : 2.388,  "RMSRelError" : 2.018,  "meanSelError" : 6.107 }
+histogramIdx:
+{  "category" : "array",  "queryCount" : 84,  "RMSAbsError" : 2.53,  "RMSRelError" : 0.456,  "meanSelError" : 8.004 }
+{  "category" : "integer",  "queryCount" : 24,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+{  "category" : "mixed",  "queryCount" : 31,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+{  "category" : "string",  "queryCount" : 36,  "RMSAbsError" : 0,  "RMSRelError" : 0,  "meanSelError" : 0 }
+
+
+[jsTest] ----
+[jsTest] Mean errors per strategy:
+[jsTest] ----
+
+heuristic: {  "RMSAbsError" : 4.492,  "RMSRelError" : 1.964,  "meanSelError" : 17.939 }
+heuristicIdx: {  "RMSAbsError" : 4.99,  "RMSRelError" : 2.513,  "meanSelError" : 20.667 }
+histogram: {  "RMSAbsError" : 2.194,  "RMSRelError" : 1.093,  "meanSelError" : 5.975 }
+histogramIdx: {  "RMSAbsError" : 1.753,  "RMSRelError" : 0.316,  "meanSelError" : 3.842 }
+
+
+[jsTest] ----
+[jsTest] Top 10 inaccurate cardinality estimates by histogram according to the relError field:
+[jsTest] ----
+
+Id: 41: [ { "$match" : { "b" : { "$gte" : "opqr", "$lt" : "oprr" } } } ], qtype: small range, data type: string, 
+cardinality: 1, Histogram estimation: 7.42, errors: {  "absError" : 6.42,  "relError" : 6.42,  "selError" : 32.1 }
+Id: 55: [ { "$match" : { "b" : { "$gt" : "opqr", "$lt" : "rpqr" } } } ], qtype: large range, data type: string, 
+cardinality: 1, Histogram estimation: 6.97, errors: {  "absError" : 5.97,  "relError" : 5.97,  "selError" : 29.85 }
+Id: 42: [ { "$match" : { "b" : { "$gte" : "stu", "$lte" : "stv" } } } ], qtype: small range, data type: string, 
+cardinality: 1, Histogram estimation: 5.86, errors: {  "absError" : 4.86,  "relError" : 4.86,  "selError" : 24.3 }
+Id: 20: [ { "$match" : { "a" : { "$gt" : 27, "$lt" : 29 } } } ], qtype: large range, data type: integer, 
+cardinality: 1, Histogram estimation: 5.86, errors: {  "absError" : 4.86,  "relError" : 4.86,  "selError" : 24.3 }
+Id: 49: [ { "$match" : { "b" : { "$gte" : "stu", "$lt" : "svu" } } } ], qtype: medium range, data type: string, 
+cardinality: 1, Histogram estimation: 5.86, errors: {  "absError" : 4.86,  "relError" : 4.86,  "selError" : 24.3 }
+Id: 47: [ { "$match" : { "b" : { "$gt" : "c", "$lt" : "e" } } } ], qtype: medium range, data type: string, 
+cardinality: 1, Histogram estimation: 3.69, errors: {  "absError" : 2.69,  "relError" : 2.69,  "selError" : 13.45 }
+Id: 40: [ { "$match" : { "b" : { "$gt" : "c", "$lte" : "d" } } } ], qtype: small range, data type: string, 
+cardinality: 1, Histogram estimation: 3.69, errors: {  "absError" : 2.69,  "relError" : 2.69,  "selError" : 13.45 }
+Id: 18: [ { "$match" : { "a" : { "$gte" : 17, "$lt" : 19 } } } ], qtype: large range, data type: integer, 
+cardinality: 2, Histogram estimation: 7.26, errors: {  "absError" : 5.26,  "relError" : 2.63,  "selError" : 26.3 }
+Id: 50: [ { "$match" : { "b" : { "$gte" : "wxyz", "$lte" : "wzyz" } } } ], qtype: medium range, data type: string, 
+cardinality: 1, Histogram estimation: 2.85, errors: {  "absError" : 1.85,  "relError" : 1.85,  "selError" : 9.25 }
+Id: 162: [ { "$match" : { "mixed" : { "$gte" : "mno", "$lt" : "mnp" } } } ], qtype: small range, data type: mixed, 
+cardinality: 1, Histogram estimation: 2.74, errors: {  "absError" : 1.74,  "relError" : 1.74,  "selError" : 8.7 }
+
+
+[jsTest] ----
+[jsTest] Top 10 inaccurate cardinality estimates by histogramIdx according to the relError field:
+[jsTest] ----
+
+Id: 96: [ { "$match" : { "c" : { "$gte" : 15, "$lt" : 16 } } } ], qtype: small range, data type: array, 
+cardinality: 3, Histogram estimation: 7.53, errors: {  "absError" : 4.53,  "relError" : 1.51,  "selError" : 22.65 }
+Id: 139: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 15, "$lte" : 18 } } } } ], qtype: large range, data type: array, 
+cardinality: 7, Histogram estimation: 14.7, errors: {  "absError" : 7.7,  "relError" : 1.1,  "selError" : 38.5 }
+Id: 94: [ { "$match" : { "c" : { "$gt" : 9, "$lte" : 15 } } } ], qtype: small range, data type: array, 
+cardinality: 4, Histogram estimation: 8.37, errors: {  "absError" : 4.37,  "relError" : 1.09,  "selError" : 21.85 }
+Id: 116: [ { "$match" : { "c" : { "$gt" : 9, "$lt" : 16 } } } ], qtype: medium range, data type: array, 
+cardinality: 4, Histogram estimation: 8.37, errors: {  "absError" : 4.37,  "relError" : 1.09,  "selError" : 21.85 }
+Id: 131: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 3, "$lte" : 9 } } } } ], qtype: large range, data type: array, 
+cardinality: 9, Histogram estimation: 17.97, errors: {  "absError" : 8.97,  "relError" : 1,  "selError" : 44.85 }
+Id: 84: [ { "$match" : { "c" : { "$gt" : 1, "$lt" : 2 } } } ], qtype: small range, data type: array, 
+cardinality: 1, Histogram estimation: 1.95, errors: {  "absError" : 0.95,  "relError" : 0.95,  "selError" : 4.75 }
+Id: 86: [ { "$match" : { "c" : { "$gt" : 2, "$lte" : 3 } } } ], qtype: small range, data type: array, 
+cardinality: 2, Histogram estimation: 3.79, errors: {  "absError" : 1.79,  "relError" : 0.9,  "selError" : 8.95 }
+Id: 108: [ { "$match" : { "c" : { "$gt" : 2, "$lt" : 4 } } } ], qtype: medium range, data type: array, 
+cardinality: 2, Histogram estimation: 3.79, errors: {  "absError" : 1.79,  "relError" : 0.9,  "selError" : 8.95 }
+Id: 88: [ { "$match" : { "c" : { "$gte" : 3, "$lt" : 4 } } } ], qtype: small range, data type: array, 
+cardinality: 2, Histogram estimation: 3.79, errors: {  "absError" : 1.79,  "relError" : 0.9,  "selError" : 8.95 }
+Id: 100: [ { "$match" : { "c" : { "$gt" : 17, "$lt" : 18 } } } ], qtype: small range, data type: array, 
+cardinality: 4, Histogram estimation: 7.16, errors: {  "absError" : 3.16,  "relError" : 0.79,  "selError" : 15.8 }
+
+
+[jsTest] ----
+[jsTest] Top 10 inaccurate cardinality estimates by histogram according to the absError field:
+[jsTest] ----
+
+Id: 131: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 3, "$lte" : 9 } } } } ], qtype: large range, data type: array, 
+cardinality: 9, Histogram estimation: 17.97, errors: {  "absError" : 8.97,  "relError" : 1,  "selError" : 44.85 }
+Id: 139: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 15, "$lte" : 18 } } } } ], qtype: large range, data type: array, 
+cardinality: 7, Histogram estimation: 14.7, errors: {  "absError" : 7.7,  "relError" : 1.1,  "selError" : 38.5 }
+Id: 135: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 5, "$lte" : 16 } } } } ], qtype: large range, data type: array, 
+cardinality: 11, Histogram estimation: 17.97, errors: {  "absError" : 6.97,  "relError" : 0.63,  "selError" : 34.85 }
+Id: 48: [ { "$match" : { "b" : { "$gt" : "opqr", "$lte" : "orqr" } } } ], qtype: medium range, data type: string, 
+cardinality: 0, Histogram estimation: 6.67, errors: {  "absError" : 6.67,  "relError" : 0.67,  "selError" : 33.35 }
+Id: 41: [ { "$match" : { "b" : { "$gte" : "opqr", "$lt" : "oprr" } } } ], qtype: small range, data type: string, 
+cardinality: 1, Histogram estimation: 7.42, errors: {  "absError" : 6.42,  "relError" : 6.42,  "selError" : 32.1 }
+Id: 115: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 5, "$lte" : 15 } } } } ], qtype: medium range, data type: array, 
+cardinality: 12, Histogram estimation: 17.97, errors: {  "absError" : 5.97,  "relError" : 0.5,  "selError" : 29.85 }
+Id: 55: [ { "$match" : { "b" : { "$gt" : "opqr", "$lt" : "rpqr" } } } ], qtype: large range, data type: string, 
+cardinality: 1, Histogram estimation: 6.97, errors: {  "absError" : 5.97,  "relError" : 5.97,  "selError" : 29.85 }
+Id: 113: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 4, "$lt" : 9 } } } } ], qtype: medium range, data type: array, 
+cardinality: 8, Histogram estimation: 13.89, errors: {  "absError" : 5.89,  "relError" : 0.74,  "selError" : 29.45 }
+Id: 133: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 4, "$lt" : 15 } } } } ], qtype: large range, data type: array, 
+cardinality: 10, Histogram estimation: 15.52, errors: {  "absError" : 5.52,  "relError" : 0.55,  "selError" : 27.6 }
+Id: 18: [ { "$match" : { "a" : { "$gte" : 17, "$lt" : 19 } } } ], qtype: large range, data type: integer, 
+cardinality: 2, Histogram estimation: 7.26, errors: {  "absError" : 5.26,  "relError" : 2.63,  "selError" : 26.3 }
+
+
+[jsTest] ----
+[jsTest] Top 10 inaccurate cardinality estimates by histogramIdx according to the absError field:
+[jsTest] ----
+
+Id: 131: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 3, "$lte" : 9 } } } } ], qtype: large range, data type: array, 
+cardinality: 9, Histogram estimation: 17.97, errors: {  "absError" : 8.97,  "relError" : 1,  "selError" : 44.85 }
+Id: 139: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 15, "$lte" : 18 } } } } ], qtype: large range, data type: array, 
+cardinality: 7, Histogram estimation: 14.7, errors: {  "absError" : 7.7,  "relError" : 1.1,  "selError" : 38.5 }
+Id: 135: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 5, "$lte" : 16 } } } } ], qtype: large range, data type: array, 
+cardinality: 11, Histogram estimation: 17.97, errors: {  "absError" : 6.97,  "relError" : 0.63,  "selError" : 34.85 }
+Id: 115: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 5, "$lte" : 15 } } } } ], qtype: medium range, data type: array, 
+cardinality: 12, Histogram estimation: 17.97, errors: {  "absError" : 5.97,  "relError" : 0.5,  "selError" : 29.85 }
+Id: 113: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 4, "$lt" : 9 } } } } ], qtype: medium range, data type: array, 
+cardinality: 8, Histogram estimation: 13.89, errors: {  "absError" : 5.89,  "relError" : 0.74,  "selError" : 29.45 }
+Id: 133: [ { "$match" : { "c" : { "$elemMatch" : { "$gt" : 4, "$lt" : 15 } } } } ], qtype: large range, data type: array, 
+cardinality: 10, Histogram estimation: 15.52, errors: {  "absError" : 5.52,  "relError" : 0.55,  "selError" : 27.6 }
+Id: 123: [ { "$match" : { "c" : { "$elemMatch" : { "$gte" : 17, "$lte" : 19 } } } } ], qtype: medium range, data type: array, 
+cardinality: 8, Histogram estimation: 13.07, errors: {  "absError" : 5.07,  "relError" : 0.63,  "selError" : 25.35 }
+Id: 96: [ { "$match" : { "c" : { "$gte" : 15, "$lt" : 16 } } } ], qtype: small range, data type: array, 
+cardinality: 3, Histogram estimation: 7.53, errors: {  "absError" : 4.53,  "relError" : 1.51,  "selError" : 22.65 }
+Id: 94: [ { "$match" : { "c" : { "$gt" : 9, "$lte" : 15 } } } ], qtype: small range, data type: array, 
+cardinality: 4, Histogram estimation: 8.37, errors: {  "absError" : 4.37,  "relError" : 1.09,  "selError" : 21.85 }
+Id: 116: [ { "$match" : { "c" : { "$gt" : 9, "$lt" : 16 } } } ], qtype: medium range, data type: array, 
+cardinality: 4, Histogram estimation: 8.37, errors: {  "absError" : 4.37,  "relError" : 1.09,  "selError" : 21.85 }
 
 
 [jsTest] ----

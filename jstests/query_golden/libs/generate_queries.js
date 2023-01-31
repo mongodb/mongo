@@ -30,12 +30,14 @@ function generateComparisons(field, boundaries, fieldType) {
         if (i % 4 == 1) {
             for (const op of compOps) {
                 const pred = makeMatchPredicate(field, boundary, op);
-                const doc = {"pipeline": [pred], "qtype": op, "dtype": fieldType};
+                const doc =
+                    {"pipeline": [pred], "qtype": op, "dtype": fieldType, "fieldName": field};
                 docs.push(doc);
             }
         } else {
             const pred = makeMatchPredicate(field, boundary, compOps[j]);
-            const doc = {"pipeline": [pred], "qtype": compOps[j], "dtype": fieldType};
+            const doc =
+                {"pipeline": [pred], "qtype": compOps[j], "dtype": fieldType, "fieldName": field};
             docs.push(doc);
             j = (j + 1) % 5;
         }
@@ -44,17 +46,63 @@ function generateComparisons(field, boundaries, fieldType) {
     return docs;
 }
 
+function nextChar(thisChar, distance) {
+    const min_char_code = '0'.codePointAt(0);
+    const max_char_code = '~'.codePointAt(0);
+    const number_of_chars = max_char_code - min_char_code + 1;
+    const char_code = thisChar.codePointAt(0);
+    assert(min_char_code <= char_code <= max_char_code, "char is out of range");
+    const new_char_code =
+        ((char_code - min_char_code + distance) % number_of_chars) + min_char_code;
+    assert(min_char_code <= new_char_code <= max_char_code, "new char is out of range");
+    return String.fromCodePoint(new_char_code);
+}
+
+/**
+ * Produces a string value at some distance from the argument string.
+ * distance: "small", "middle", "large".
+ */
+function nextStr(str, distance) {
+    const spec = {"small": 3, "medium": 2, "large": 1};
+    let pos = spec[distance] - 1;
+    if (pos >= str.length) {
+        pos = str.length - 1;
+    }
+
+    let newStr = str.slice(0, pos);
+    newStr = newStr + nextChar(str[pos], 4 - spec[distance] /*char distance*/);
+    newStr = newStr + str.slice(pos + 1, str.length);
+    return newStr;
+}
+
 /**
  * Helper function to generate an array of query ranges given an array of boundary values. The
- * 'step' parameter determines the size of the ranges.
+ * 'rangeSize' parameter determines the size of the ranges and varies depending on the 'fieldType'.
+ * For fieldType integer 'rangeSize' is the amount to add to the low bound to compute the upper
+ * bound. For fieldType string 'rangeSize' is one of "small", "medium", "large". For other data
+ * types both low and upper bounds are taken from the 'values' array and rangeSize is the distance
+ * they are apart from each other.
  */
-function generateRanges(values, step) {
+function generateRanges(values, fieldType, rangeSize) {
     let ranges = [];
-    let i = 0;
-    while (i + step < values.length) {
-        ranges.push([values[i], values[i + step]]);
-        i = (step > 1) ? i + 1 : i + 2;
+    if (fieldType == 'integer') {
+        for (const val of values) {
+            ranges.push([val, val + rangeSize]);
+        }
+    } else if (fieldType == 'string') {
+        for (const val of values) {
+            ranges.push([val, nextStr(val, rangeSize)]);
+        }
+    } else {
+        // For other data types use the values array to form the ranges.
+        let i = 0;
+        const step = rangeSize;
+        while (i + step < values.length) {
+            ranges.push([values[i], values[i + step]]);
+            i++;
+        }
     }
+
     return ranges;
 }
 
@@ -84,44 +132,76 @@ function splitValuesPerType(values) {
 }
 
 /**
- * Generate range predicates with $match and $elemMatch over the 'field' using the values in the
- * array 'values'. isSmall is a boolean flag to generate small ranges.
+ * Generate range predicates with $match and $elemMatch over the 'field' using the values specified
+ * in the 'queryValues' document: {values: [1, 15, 37, 72, 100], min: 1, max: 100}. The 'values'
+ * array is sorted.
  */
-function generateRangePredicates(field, values, isSmall, fieldType) {
-    const qtype = isSmall ? "small range" : "large range";
-    const step = isSmall ? 1 : 3;
-    const op1Option = ["$gt", "$gte"];
-    const op2Option = ["$lt", "$lte"];
+function generateRangePredicates(field, queryValues, fieldType) {
+    const querySpecs = {"small": 0.001, "medium": 0.01, "large": 0.1};
 
-    let ranges = [];
-    if (fieldType == 'mixed') {
-        const typedValues = splitValuesPerType(values);
-        for (const tv of typedValues) {
-            const subRanges = generateRanges(tv, step);
-            ranges = ranges.concat(subRanges);
-        }
-    } else {
-        ranges = generateRanges(values, step);
+    const opOptions = [["$gt", "$lt"], ["$gt", "$lte"], ["$gte", "$lt"], ["$gte", "$lte"]];
+    // Index over comparison operators to choose them in a round robin fashion.
+    let j = 0;
+
+    let elemType = fieldType;
+    if (fieldType == 'array') {
+        elemType = typeof queryValues.values[0];
     }
-
     let docs = [];
-
-    ranges.forEach(function(range) {
-        assert(range.length == 2);
-        for (let op1 of op1Option) {
-            for (let op2 of op2Option) {
-                pred = makeRangePredicate(field, op1, range[0], op2, range[1]);
-                const doc = {"pipeline": [pred], "qtype": qtype, "dtype": fieldType};
-                docs.push(doc);
-                if (fieldType == 'array' && range[0] <= range[1]) {
-                    pred = makeRangePredicate(field, op1, range[0], op2, range[1], true);
-                    const doc =
-                        {"pipeline": [pred], "qtype": qtype, "dtype": fieldType, "elemMatch": true};
-                    docs.push(doc);
+    for (const qSize in querySpecs) {
+        let ranges = [];
+        if (elemType == 'integer') {
+            const rangeSize =
+                Math.round((queryValues["max"] - queryValues["min"]) * querySpecs[qSize]);
+            if (rangeSize < 2) {
+                continue;
+            }
+            ranges = generateRanges(queryValues["values"], elemType, rangeSize);
+        } else if (elemType == 'string') {
+            ranges = generateRanges(queryValues["values"], elemType, qSize);
+        } else if (elemType == 'mixed') {
+            const typedValues = splitValuesPerType(queryValues.values);
+            for (const tv of typedValues) {
+                const subType = (typeof tv[0]);
+                if (subType == 'integer') {
+                    const rangeSize = Math.round((tv.at(-1) - tv[0]) * querySpecs[qSize]);
+                    const subRanges = generateRanges(tv, subType, rangeSize);
+                    ranges = ranges.concat(subRanges);
+                } else if (subType == 'string') {
+                    const subRanges = generateRanges(tv, subType, qSize);
+                    ranges = ranges.concat(subRanges);
                 }
             }
+        } else {
+            const step = (qSize == "small") ? 1 : (qSize == "medium") ? 2 : 3;
+            ranges = generateRanges(queryValues["values"], elemType, step);
         }
-    });
+
+        ranges.forEach(function(range) {
+            assert(range.length == 2);
+            let [op1, op2] = opOptions[j];
+            pred = makeRangePredicate(field, op1, range[0], op2, range[1]);
+            const doc = {
+                "pipeline": [pred],
+                "qtype": qSize + " range",
+                "dtype": fieldType,
+                "fieldName": field
+            };
+            docs.push(doc);
+            if (fieldType == 'array' && range[0] <= range[1]) {
+                pred = makeRangePredicate(field, op1, range[0], op2, range[1], true);
+                const doc = {
+                    "pipeline": [pred],
+                    "qtype": qSize + " range",
+                    "dtype": fieldType,
+                    "fieldName": field,
+                    "elemMatch": true
+                };
+                docs.push(doc);
+            }
+            j = (j + 1) % opOptions.length;
+        });
+    }
 
     return docs;
 }
@@ -233,8 +313,9 @@ function deduplicate(boundaries) {
  * 'samplePos' argument.
  * 3. Values from histogram bucket boundaries;
  * 4. TODO: Out-of-range values.
- * The function returns a document with keys- field names and values - arrays of selected query
- * values for the respective field.
+ * The function returns a document with keys- field names and values - documents of selected query
+ * values, min, and max for the respective field. Example:
+ * {"a": {values: [1, 15, 37, 72, 100], min: 1, max: 100}, "b": {...} }
  */
 function selectQueryValues(coll, fields, fieldTypes, samplePos, statsColl) {
     const sample = selectSample(coll, samplePos);
@@ -260,10 +341,14 @@ function selectQueryValues(coll, fields, fieldTypes, samplePos, statsColl) {
 
         let values = sortValues(v);
 
-        queryValues[[field]] = deduplicate(values);
+        queryValues[[field]] = {
+            values: deduplicate(values),
+            min: minMaxDoc["min"],
+            max: minMaxDoc["max"]
+        };
         i++;
     }
-    jsTestLog(`Selected query values: ${tojsononeline(queryValues)}`);
+    jsTestLog(`Selected query values: ${tojson(queryValues)}`);
 
     return queryValues;
 }
@@ -283,12 +368,10 @@ function generateQueries(coll, fields, fieldTypes, collSize, sampleSize, statsCo
     while (i < fields.length) {
         const field = fields[i];
         const fieldType = fieldTypes[i];
-        testCases = testCases.concat(generateComparisons(field, queryValues[field], fieldType));
-
-        testCases = testCases.concat(
-            generateRangePredicates(field, queryValues[field], true /* small range */, fieldType));
         testCases =
-            testCases.concat(generateRangePredicates(field, queryValues[field], false, fieldType));
+            testCases.concat(generateComparisons(field, queryValues[field].values, fieldType));
+
+        testCases = testCases.concat(generateRangePredicates(field, queryValues[field], fieldType));
         i++;
     }
 
