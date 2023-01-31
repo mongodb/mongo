@@ -126,4 +126,4 @@ server_parameters:
         cpp_vartype: TestIntClusterParameterStorage
         test_only: true
         condition:
-            feature_flag: featureFlagClusterWideToaster
+            feature_flag: gFeatureFlagClusterWideToaster

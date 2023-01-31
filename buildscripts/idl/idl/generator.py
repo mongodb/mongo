@@ -2493,13 +2493,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                     if param.condition:
                         if param.condition.feature_flag:
-                            ffs = [sp for sp in params if sp.name == param.condition.feature_flag]
-                            if len(ffs) == 0:
-                                raise ValueError("Unable to find feature flag named %s" %
-                                                 (param.condition.feature_flag))
-                            assert len(ffs) == 1
-                            self._writer.write_line(
-                                'scp_%d->setFeatureFlag(&%s);' % (param_no, ffs[0].cpp_varname))
+                            self._writer.write_line('scp_%d->setFeatureFlag(&%s);' %
+                                                    (param_no, param.condition.feature_flag))
                         if param.condition.min_fcv:
                             self._writer.write_line(
                                 'scp_%d->setMinFCV(FeatureCompatibilityVersionParser::parseVersion("%s"));'

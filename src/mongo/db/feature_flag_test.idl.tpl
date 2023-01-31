@@ -73,7 +73,7 @@ server_parameters:
       test_only: true
       default: false
       condition:
-        feature_flag: featureFlagToaster
+        feature_flag: gFeatureFlagToaster
 
     spTestNeedsLatestFCV:
       description: "Server parameter gated on FCV >= latestFCV"
@@ -102,7 +102,7 @@ server_parameters:
       test_only: true
       default: 0
       condition:
-        feature_flag: featureFlagBlender
+        feature_flag: gFeatureFlagBlender
 
     cwspTestNeedsFeatureFlagBlender:
       description: "Cluster server Parameter gated on featureFlagBlender"
@@ -111,4 +111,4 @@ server_parameters:
       cpp_vartype: CWSPIntStorage
       test_only: true
       condition:
-        feature_flag: featureFlagBlender
+        feature_flag: gFeatureFlagBlender
