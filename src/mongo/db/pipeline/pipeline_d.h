@@ -295,7 +295,7 @@ Unpacking with Sort Optimization.
     }
 
     static bool sortAndKeyPatternPartAgreeAndOnMeta(const BucketUnpacker& bucketUnpacker,
-                                                    const char* keyPatternFieldName,
+                                                    StringData keyPatternFieldName,
                                                     const FieldPath& sortFieldPath) {
         FieldPath keyPatternFieldPath = FieldPath(keyPatternFieldName);
 

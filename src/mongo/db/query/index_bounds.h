@@ -89,6 +89,14 @@ struct OrderedIntervalList {
      * Returns true if this OIL represents a single [MinKey, MaxKey] bound.
      */
     bool isMinToMax() const;
+
+    /**
+     * Returns true if this OIL represents a point predicate: [N, N].
+     *
+     * These predicates are interesting because if you have an index on {a:1, b:1},
+     * and a point predicate on 'a', then the index provides a sort on {b: 1}.
+     */
+    bool isPoint() const;
 };
 
 /**

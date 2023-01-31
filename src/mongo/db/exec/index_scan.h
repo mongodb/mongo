@@ -125,7 +125,9 @@ public:
 
     std::unique_ptr<PlanStageStats> getStats() final;
 
-    const SpecificStats* getSpecificStats() const final;
+    const IndexScanStats* getSpecificStats() const final {
+        return &_specificStats;
+    }
 
     static const char* kStageType;
 
@@ -135,6 +137,10 @@ public:
 
     bool isForward() const {
         return _forward;
+    }
+
+    const IndexBounds& getBounds() const {
+        return _bounds;
     }
 
 protected:

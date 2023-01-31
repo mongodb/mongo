@@ -222,14 +222,6 @@ void optimizePrefix(Pipeline::SourceContainer::iterator itr, Pipeline::SourceCon
     container->splice(itr, prefix);
 }
 
-// Returns whether 'field' depends on a pushed down $addFields or computed $project.
-bool fieldIsComputed(const BucketSpec& spec, const std::string& field) {
-    return std::any_of(
-        spec.computedMetaProjFields.begin(), spec.computedMetaProjFields.end(), [&](auto& s) {
-            return s == field || expression::isPathPrefixOf(field, s) ||
-                expression::isPathPrefixOf(s, field);
-        });
-}
 }  // namespace
 
 DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
@@ -662,7 +654,7 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
         return nullptr;
 
     // We must avoid mapping predicates on fields computed via $addFields or a computed $project.
-    if (fieldIsComputed(bucketSpec, matchExprPath.toString())) {
+    if (bucketSpec.fieldIsComputed(matchExprPath)) {
         return nullptr;
     }
 
@@ -964,7 +956,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     // Some optimizations may not be safe to do if we have computed the metaField via an $addFields
     // or a computed $project. We won't do those optimizations if 'haveComputedMetaField' is true.
     bool haveComputedMetaField = _bucketUnpacker.bucketSpec().metaField &&
-        fieldIsComputed(_bucketUnpacker.bucketSpec(), _bucketUnpacker.bucketSpec().metaField.get());
+        _bucketUnpacker.bucketSpec().fieldIsComputed(_bucketUnpacker.bucketSpec().metaField.get());
 
     // Before any other rewrites for the current stage, consider reordering with $sort.
     if (auto sortPtr = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get())) {

@@ -58,6 +58,9 @@ struct BucketSpec {
     // after unpacking.
     boost::optional<std::string> metaField;
 
+    // Returns whether 'field' depends on a pushed down $addFields or computed $project.
+    bool fieldIsComputed(StringData field) const;
+
     // The set of field names in the data region that should be included or excluded.
     std::set<std::string> fieldSet;
 

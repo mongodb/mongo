@@ -40,6 +40,13 @@ const metaCollName = "bucket_unpacking_with_sort_with_meta";
 const metaColl = db[metaCollName];
 const metaCollSubFieldsName = "bucket_unpacking_with_sort_with_meta_sub";
 const metaCollSubFields = db[metaCollSubFieldsName];
+const geoCollName = 'bucket_unpacking_with_sort_geo';
+const geoColl = db[geoCollName];
+// Case-insensitive, and case-sensitive string collections.
+const ciStringCollName = 'bucket_unpacking_with_sort_ci';
+const ciStringColl = db[ciStringCollName];
+const csStringCollName = 'bucket_unpacking_with_sort_cs';
+const csStringColl = db[csStringCollName];
 const subFields = ["a", "b"];
 
 const setupColl = (coll, collName, usesMeta, subFields = null) => {
@@ -58,9 +65,8 @@ const setupColl = (coll, collName, usesMeta, subFields = null) => {
     for (let j = 0; j < meta; ++j) {
         let metaVal = j;
         if (subFields) {
-            metaVal = subFields.reduce((memo, field) => {
-                return Object.assign(Object.assign({}, memo), {[field]: j});
-            }, {});
+            metaVal = Object.assign({}, ...subFields.map(field => ({[field]: j})));
+            metaVal.array = [1, 2];
         }
         for (let i = 0; i < numberOfItemsPerBucket; ++i) {
             docs.push({m: metaVal, t: new Date(i * 6000)});
@@ -79,29 +85,55 @@ const setupColl = (coll, collName, usesMeta, subFields = null) => {
 setupColl(coll, collName, false);
 setupColl(metaColl, metaCollName, true);
 setupColl(metaCollSubFields, metaCollSubFieldsName, true, subFields);
+{
+    geoColl.drop();
+    // We'll only use the geo collection to test that the rewrite doesn't happen, so it doesn't
+    // need to be big.
+    assert.commandWorked(
+        db.createCollection(geoCollName, {timeseries: {timeField: "t", metaField: "m"}}));
+    // This polygon is big enough that a 2dsphere index on it is multikey.
+    const area = {type: "Polygon", coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]};
+    assert.commandWorked(geoColl.insert([
+        // These two locations are far enough apart that a 2dsphere index on 'loc' is multikey.
+        {t: ISODate('1970-01-01'), m: {area}, loc: [0, 0]},
+        {t: ISODate('1970-01-01'), m: {area}, loc: [90, 0]},
+    ]));
+    assert.eq(db['system.buckets.' + geoCollName].count(), 1);
+}
+{
+    // Create two collections, with the same data but different collation.
 
-// For use in reductions.
-// Takes a memo (accumulator value) and a stage and returns if the stage was an internal bounded
-// sort or the memo was true.
-const stageIsInternalBoundedSort = (stage) => {
-    return stage.hasOwnProperty("$_internalBoundedSort");
-};
+    const times = [
+        ISODate('1970-01-01T00:00:00'),
+        ISODate('1970-01-01T00:00:07'),
+    ];
+    let docs = [];
+    for (const m of ['a', 'A', 'b', 'B'])
+        for (const t of times)
+            docs.push({t, m});
 
-const hasInternalBoundedSort = (pipeline) => pipeline.some(stageIsInternalBoundedSort);
+    csStringColl.drop();
+    ciStringColl.drop();
+    assert.commandWorked(db.createCollection(csStringCollName, {
+        timeseries: {timeField: "t", metaField: "m"},
+    }));
+    assert.commandWorked(db.createCollection(ciStringCollName, {
+        timeseries: {timeField: "t", metaField: "m"},
+        collation: {locale: 'en_US', strength: 2},
+    }));
 
-const getIfMatch = (memo, stage) => {
-    if (memo)
-        return memo;
-    else if (stage.hasOwnProperty("$match"))
-        return stage;
-    else
-        return null;
-};
+    for (const coll of [csStringColl, ciStringColl]) {
+        assert.commandWorked(coll.insert(docs));
+        assert.eq(db['system.buckets.' + coll.getName()].count(), 4);
+    }
+}
 
-const findFirstMatch = (pipeline) => pipeline.reduce(getIfMatch, null);
+const hasInternalBoundedSort = (pipeline) =>
+    pipeline.some((stage) => stage.hasOwnProperty("$_internalBoundedSort"));
+
+const findFirstMatch = (pipeline) => pipeline.find(stage => stage.hasOwnProperty("$match"));
 
 const setup = (coll, createIndex = null) => {
-    // Create index.
     if (createIndex) {
         assert.commandWorked(coll.createIndex(createIndex));
     }
@@ -140,18 +172,27 @@ const runRewritesTest = (sortSpec,
                          precise,
                          intermediaryStages = [],
                          posteriorStages = []) => {
+    jsTestLog(`runRewritesTest ${tojson({
+        sortSpec,
+        createIndex,
+        hint,
+        testColl,
+        precise,
+        intermediaryStages,
+        posteriorStages
+    })}`);
     setup(testColl, createIndex);
+    assert.neq(typeof precise, "object", `'precise' arg must be a boolean: ${tojson(precise)}`);
 
     const options = (hint) ? {hint: fixHint(hint)} : {};
 
-    const match = {$match: {t: {$lt: new Date("2022-01-01")}}};
     // Get results
-    const optPipeline = [match, ...intermediaryStages, {$sort: sortSpec}, ...posteriorStages];
+    const optPipeline = [...intermediaryStages, {$sort: sortSpec}, ...posteriorStages];
     const optResults = testColl.aggregate(optPipeline, options).toArray();
     const optExplainFull = testColl.explain().aggregate(optPipeline, options);
+    printjson({optExplainFull});
 
     const ogPipeline = [
-        match,
         ...intermediaryStages,
         {$_internalInhibitOptimization: {}},
         {$sort: sortSpec},
@@ -161,7 +202,9 @@ const runRewritesTest = (sortSpec,
     const ogExplainFull = testColl.explain().aggregate(ogPipeline, options);
 
     // Assert correct
-    assert.docEq(optResults, ogResults, {optResults: optResults, ogResults: ogResults});
+    assert.docEq(optResults, ogResults);
+    // Make sure we're not testing trivial / empty queries.
+    assert.gt(ogResults.length, 0, 'Expected the queries in this test to have nonempty results');
 
     // Check contains stage
     const optExplain = getExplainedPipelineFromAggregation(
@@ -173,24 +216,31 @@ const runRewritesTest = (sortSpec,
         db, testColl, ogPipeline, {inhibitOptimization: false, hint: fixHint(hint)});
     assert(!hasInternalBoundedSort(ogExplain), ogExplainFull);
 
+    // For some queries we expect to see an extra predicate, to defend against bucketMaxSpanSeconds
+    // changing out from under us.
+    const bucketSpanMatch = {
+        $match: {
+            $expr: {$lte: [{$subtract: ["$control.max.t", "$control.min.t"]}, {$const: 3600000}]},
+        }
+    };
     let foundMatch = findFirstMatch(optExplain);
     if (!precise) {
-        assert.docEq(foundMatch, {
-            $match: {
-                $expr:
-                    {$lte: [{$subtract: ["$control.max.t", "$control.min.t"]}, {$const: 3600000}]}
-            }
-        });
+        assert.docEq(
+            foundMatch, bucketSpanMatch, 'Expected an extra $match to check the bucket span');
     } else {
-        assert.docEq(foundMatch, match);
+        // (We don't have a 'assert.notDocEq' helper, but docEq is 'eq' + 'sortDoc'.)
+        assert.neq(sortDoc(foundMatch),
+                   sortDoc(bucketSpanMatch),
+                   'Did not expect an extra $match to check the bucket span');
     }
 };
 
 const runDoesntRewriteTest = (sortSpec, createIndex, hint, testColl, intermediaryStages = []) => {
+    jsTestLog(`runDoesntRewriteTest ${
+        tojson({sortSpec, createIndex, hint, testColl, intermediaryStages})}`);
     setup(testColl, createIndex);
 
     const optPipeline = [
-        {$match: {t: {$lt: new Date("2022-01-01")}}},
         ...intermediaryStages,
         {$sort: sortSpec},
     ];
@@ -199,7 +249,7 @@ const runDoesntRewriteTest = (sortSpec, createIndex, hint, testColl, intermediar
     const optExplain = getExplainedPipelineFromAggregation(
         db, testColl, optPipeline, {inhibitOptimization: false, hint: fixHint(hint)});
     const optExplainFull = testColl.explain().aggregate(optPipeline, {hint: fixHint(hint)});
-    const containsOptimization = optExplain.reduce(stageIsInternalBoundedSort, false);
+    const containsOptimization = hasInternalBoundedSort(optExplain);
     assert(!containsOptimization, optExplainFull);
 };
 
@@ -220,11 +270,13 @@ runRewritesTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, true);
 runRewritesTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, true, [{$project: {a: 0}}]);
 runRewritesTest(
     {m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, true, [{$project: {m: 1, t: 1}}]);
+runRewritesTest({t: 1}, {t: 1}, {t: 1}, metaColl, true, [{$project: {m: 0, _id: 0}}]);
+runRewritesTest({'m.b': 1, t: 1}, {'m.b': 1, t: 1}, {'m.b': 1, t: 1}, metaCollSubFields, true, [
+    {$project: {'m.a': 0}}
+]);
 
 // Test multiple meta fields
-let metaIndexObj = subFields.reduce((memo, field) => {
-    return Object.assign(Object.assign({}, memo), {[`m.${field}`]: 1});
-}, {});
+let metaIndexObj = Object.assign({}, ...subFields.map(field => ({[`m.${field}`]: 1})));
 Object.assign(metaIndexObj, {t: 1});
 runRewritesTest(metaIndexObj, metaIndexObj, metaIndexObj, metaCollSubFields, true);
 runRewritesTest(
@@ -370,6 +422,15 @@ for (let m = -1; m < 2; m++) {
     }
 }
 
+// Test that non-time, non-meta fields are not optimized.
+assert.throwsWithCode(() => runDoesntRewriteTest({foo: 1}, {foo: 1}, {foo: 1}, coll),
+                      // At the time of backporting this test to 5.0, 5.0 does not support indexes
+                      // on time-series measurement fields.
+                      ErrorCodes.CannotCreateIndex);
+// Test that a meta-only sort does not use $_internalBoundedSort.
+// (It doesn't need to: we can push down the entire sort.)
+runDoesntRewriteTest({m: 1}, {m: 1}, {m: 1}, metaColl);
+
 // Test mismatched meta paths don't produce the optimization.
 runDoesntRewriteTest({m: 1, t: 1}, {"m.a": 1, t: 1}, {"m.a": 1, t: 1}, metaCollSubFields);
 runDoesntRewriteTest(
@@ -378,12 +439,197 @@ runDoesntRewriteTest({"m.a": 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaCollSubFi
 runDoesntRewriteTest({"m.a": 1, "m.b": 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaCollSubFields);
 // Test matched meta-subpaths with mismatched directions don't produce the optimization.
 runDoesntRewriteTest({"m.a": 1, t: -1}, {"m.a": 1, t: 1}, {"m.a": 1, t: 1}, metaCollSubFields);
+
 // Test intermediary projections that exclude the sorted fields don't produce the optimizaiton.
+runDoesntRewriteTest({t: 1}, null, {$natural: 1}, metaColl, [{$project: {t: 0}}]);
+runDoesntRewriteTest({t: 1}, null, {$natural: 1}, metaColl, [{$unset: 't'}]);
+runDoesntRewriteTest({t: 1}, null, {$natural: 1}, metaColl, [{$set: {t: {$const: 5}}}]);
+runDoesntRewriteTest({t: 1}, null, {$natural: 1}, metaColl, [{$set: {t: "$m.junk"}}]);
+
 runDoesntRewriteTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, [{$project: {m: 0}}]);
+runDoesntRewriteTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, [{$unset: 'm'}]);
+runDoesntRewriteTest(
+    {m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, [{$set: {m: {$const: 5}}}]);
+runDoesntRewriteTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, [{$set: {m: "$m.junk"}}]);
+
 runDoesntRewriteTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, [{$project: {t: 0}}]);
+
 runDoesntRewriteTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, [{$project: {a: 1}}]);
+
 runDoesntRewriteTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, [{$project: {'m.a': 0}}]);
+
 runDoesntRewriteTest({'m.a': 1, t: 1}, {'m.a': 1, t: 1}, {'m.a': 1, t: 1}, metaCollSubFields, [
     {$project: {'m': 0}}
 ]);
+
+// Test point queries on metadata.
+
+// Test point predicate on a single meta field.
+for (const sort of [-1, +1]) {
+    for (const m of [-1, +1]) {
+        for (const t of [-1, +1]) {
+            const index = {m, t};
+            // TODO SERVER-64994 will allow reverse scan.
+            if (t === sort)
+                runRewritesTest({t: sort}, index, index, metaColl, true, [{$match: {m: 7}}]);
+            else
+                runDoesntRewriteTest({t: sort}, index, index, metaColl, [{$match: {m: 7}}]);
+        }
+    }
+}
+
+// Test point predicate on multiple meta fields.
+for (const sort of [-1, +1]) {
+    for (const a of [-1, +1]) {
+        for (const b of [-1, +1]) {
+            for (const t of [-1, +1]) {
+                for (const trailing of [{}, {'m.x': 1, 'm.y': -1}]) {
+                    const index = Object.merge({'m.a': a, 'm.b': b, t: t}, trailing);
+                    // TODO SERVER-64994 will allow reverse scan.
+                    if (t === sort)
+                        runRewritesTest({t: sort}, index, index, metaCollSubFields, true, [
+                            {$match: {'m.a': 5, 'm.b': 5}}
+                        ]);
+                    else
+                        runDoesntRewriteTest({t: sort}, index, index, metaCollSubFields, [
+                            {$match: {'m.a': 5, 'm.b': 5}}
+                        ]);
+                }
+            }
+        }
+    }
+}
+
+// Test mixed cases involving both a point predicate and compound sort.
+// In all of these cases we have an index on {m.a, m.b, t}, and possibly some more trailing fields.
+for (const ixA of [-1, +1]) {
+    for (const ixB of [-1, +1]) {
+        for (const ixT of [-1, +1]) {
+            for (const ixTrailing of [{}, {'m.x': 1, 'm.y': -1}]) {
+                const ix = Object.merge({'m.a': ixA, 'm.b': ixB, t: ixT}, ixTrailing);
+
+                // Test a point predicate on 'm.a' with a sort on {m.b, t}.
+                // The point predicate lets us zoom in on a contiguous range of the index,
+                // as if we were using an index on {constant, m.b, t}.
+                for (const sortB of [-1, +1]) {
+                    for (const sortT of [-1, +1]) {
+                        const predicate = [{$match: {'m.a': 7}}];
+                        const sort = {'m.b': sortB, t: sortT};
+
+                        // 'sortB * sortT' is +1 if the sort has those fields in the same
+                        // direction, -1 for opposite direction. 'b * t' says the same thing about
+                        // the index key. The index and sort are compatible iff they agree on
+                        // whether or not these two fields are in the same direction.
+                        if (ixB * ixT === sortB * sortT) {
+                            // TODO SERVER-64994 will allow reverse scan.
+                            if (ixT === sortT)
+                                runRewritesTest(sort, ix, ix, metaCollSubFields, true, predicate);
+                            else
+                                runDoesntRewriteTest(sort, ix, ix, metaCollSubFields, predicate);
+                        } else {
+                            runDoesntRewriteTest(sort, ix, ix, metaCollSubFields, predicate);
+                        }
+                    }
+                }
+
+                // Test a point predicate on 'm.b' with a sort on {m.a, t}.
+                // This predicate does not select a contiguous range of the index, but it does
+                // limit the scan to index entries that look like {m.a, constant, t}, which can
+                // satisfy a sort on {m.a, t}.
+                for (const sortA of [-1, +1]) {
+                    for (const sortT of [-1, +1]) {
+                        const sort = {'m.a': sortA, t: sortT};
+
+                        // However, when there is no point predicate on 'm.a', the planner gives us
+                        // a full index scan with no bounds on 'm.b'. Since our implementation
+                        // looks at index bounds to decide whether to rewrite, we don't get the
+                        // optimization in this case.
+                        {
+                            const predicate = [{$match: {'m.b': 7}}];
+                            runDoesntRewriteTest(sort, ix, ix, metaCollSubFields, predicate);
+                        }
+
+                        // We do get the optimization if we add any range predicate to 'm.a',
+                        // because that makes the planner generate index bounds: a range on 'm.a'
+                        // and a single point on 'm.b'.
+                        //
+                        // As usual the index and sort must agree on whether m.a, t are
+                        // in the same direction.
+                        const predicate = [{$match: {'m.a': {$gte: -999, $lte: 999}, 'm.b': 7}}];
+                        if (ixA * ixT === sortA * sortT) {
+                            // TODO SERVER-64994 will allow reverse scan.
+                            if (ixT === sortT)
+                                runRewritesTest(sort, ix, ix, metaCollSubFields, true, predicate);
+                            else
+                                runDoesntRewriteTest(sort, ix, ix, metaCollSubFields, predicate);
+                        } else {
+                            runDoesntRewriteTest(sort, ix, ix, metaCollSubFields, predicate);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Test some negative cases:
+// The predicate must be an equality.
+runDoesntRewriteTest(
+    {t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, [{$match: {m: {$gte: 5, $lte: 6}}}]);
+runDoesntRewriteTest(
+    {t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, [{$match: {m: {$in: [4, 5, 6]}}}]);
+// The index must not be multikey.
+runDoesntRewriteTest({t: 1}, {'m.array': 1, t: 1}, {'m.array': 1, t: 1}, metaCollSubFields, [
+    {$match: {'m.array': 123}}
+]);
+// Even if the multikey component is a trailing field, for simplicity we are not handling it.
+runDoesntRewriteTest({t: 1},
+                     {'m.a': 1, t: 1, 'm.array': 1},
+                     {'m.a': 1, t: 1, 'm.array': 1},
+                     metaCollSubFields,
+                     [{$match: {'m.a': 7}}]);
+
+// Geo indexes are typically multikey, which prevents us from doing the rewrite.
+{
+    const indexes = [
+        {t: 1, 'm.area': '2dsphere'},
+        {'m.a': 1, t: 1, 'm.area': '2dsphere'},
+    ];
+    for (const ix of indexes) {
+        runDoesntRewriteTest({t: 1}, ix, ix, geoColl, [{$match: {'m.a': 7}}]);
+    }
+}
+{
+    // At the time of backporting this test to 5.0, 5.0 does
+    // not support indexes on time-series measurement fields.
+    const indexes = [
+        {t: 1, loc: '2dsphere'},
+        {'m.a': 1, t: 1, loc: '2dsphere'},
+    ];
+    for (const ix of indexes) {
+        assert.throwsWithCode(
+            () => runDoesntRewriteTest({t: 1}, ix, ix, geoColl, [{$match: {'m.a': 7}}]),
+            ErrorCodes.CannotCreateIndex);
+    }
+}
+
+// String collation affects whether an equality query is really a point query.
+{
+    // When the collation of the query matches the index, an equality predicate in the query
+    // becomes a 1-point interval in the index bounds.
+    runRewritesTest({t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, csStringColl, true, [{$match: {m: 'a'}}]);
+    runRewritesTest({t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, ciStringColl, true, [{$match: {m: 'a'}}]);
+    // When the collation doesn't match, then the equality predicate is not a 1-point interval
+    // in the index.
+    csStringColl.dropIndexes();
+    ciStringColl.dropIndexes();
+    assert.commandWorked(csStringColl.createIndex({m: 1, t: 1}, {
+        collation: {locale: 'en_US', strength: 2},
+    }));
+    assert.commandWorked(ciStringColl.createIndex({m: 1, t: 1}, {
+        collation: {locale: 'simple'},
+    }));
+    runDoesntRewriteTest({t: 1}, null, {m: 1, t: 1}, csStringColl, [{$match: {m: 'a'}}]);
+    runDoesntRewriteTest({t: 1}, null, {m: 1, t: 1}, ciStringColl, [{$match: {m: 'a'}}]);
+}
 })();

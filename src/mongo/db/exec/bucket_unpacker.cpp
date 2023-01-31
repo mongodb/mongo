@@ -31,8 +31,17 @@
 
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/db/exec/bucket_unpacker.h"
+#include "mongo/db/matcher/expression_algo.h"
 
 namespace mongo {
+
+bool BucketSpec::fieldIsComputed(StringData field) const {
+    return std::any_of(computedMetaProjFields.begin(), computedMetaProjFields.end(), [&](auto& s) {
+        return s == field || expression::isPathPrefixOf(field, s) ||
+            expression::isPathPrefixOf(s, field);
+    });
+}
+
 class BucketUnpacker::UnpackingImpl {
 public:
     UnpackingImpl() = default;

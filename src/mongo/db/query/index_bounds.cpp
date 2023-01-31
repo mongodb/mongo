@@ -244,6 +244,10 @@ bool OrderedIntervalList::isMinToMax() const {
     return intervals.size() == 1 && intervals[0].isMinToMax();
 }
 
+bool OrderedIntervalList::isPoint() const {
+    return intervals.size() == 1 && intervals[0].isPoint();
+}
+
 // static
 void OrderedIntervalList::complement() {
     BSONObjBuilder minBob;
