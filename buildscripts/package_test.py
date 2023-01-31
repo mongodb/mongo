@@ -12,7 +12,7 @@ import uuid
 
 from concurrent import futures
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional, Tuple, Set
+from typing import Any, Dict, Generator, List, Optional, Set, Tuple
 
 import docker
 import docker.errors
@@ -21,8 +21,7 @@ import requests
 from docker.client import DockerClient
 from docker.models.containers import Container
 from docker.models.images import Image
-
-from simple_report import Result, Report
+from simple_report import Report, Result
 
 root = logging.getLogger()
 root.setLevel(logging.DEBUG)
@@ -114,9 +113,10 @@ OS_DOCKER_LOOKUP = {
     'ubuntu1204': None,
     'ubuntu1404': None,
     'ubuntu1604': ('ubuntu:16.04', "apt",
-                   frozenset(
-                       ["python", "python3", "wget", "pkg-config", "systemd", "procps", "file"]),
-                   "python3"),
+                   frozenset([
+                       "apt-utils", "python", "python3", "wget", "pkg-config", "systemd", "procps",
+                       "file"
+                   ]), "python3"),
     'ubuntu1804': ('ubuntu:18.04', "apt",
                    frozenset(
                        ["python", "python3", "wget", "pkg-config", "systemd", "procps", "file"]),
@@ -215,7 +215,7 @@ def run_test(test: Test, client: DockerClient) -> Result:
     logging.debug(test_external_root)
     log_external_path = Path.joinpath(test_external_root, log_name)
 
-    commands: List[str] = []
+    commands: List[str] = ["export PYTHONIOENCODING=UTF-8"]
 
     if test.os_name.startswith('rhel'):
         if test.os_name.startswith('rhel7'):
@@ -224,7 +224,7 @@ def run_test(test: Test, client: DockerClient) -> Result:
                 "yum -y install centos-release-scl",
                 "yum-config-manager --enable centos-sclo-rh",
             ]
-            # RHEL distros need EPEL for Compass dependencies
+        # RHEL distros need EPEL for Compass dependencies
         commands += [
             "yum -y install yum-utils epel-release",
             "yum-config-manager --enable epel",
