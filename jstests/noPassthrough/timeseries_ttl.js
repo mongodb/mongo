@@ -11,6 +11,7 @@
 (function() {
 "use strict";
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
+load("jstests/libs/ttl_util.js");
 
 // Run TTL monitor constantly to speed up this test.
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
@@ -50,7 +51,7 @@ testCase((coll, bucketsColl) => {
     assert.eq(2, coll.find().itcount());
     assert.eq(1, bucketsColl.find().itcount());
 
-    ClusteredCollectionUtil.waitForTTL(coll.getDB("test"));
+    TTLUtil.waitForPass(coll.getDB("test"));
     assert.eq(2, coll.find().itcount());
     assert.eq(1, bucketsColl.find().itcount());
 });
@@ -67,7 +68,7 @@ testCase((coll, bucketsColl) => {
     assert.eq(2, coll.find().itcount());
     assert.eq(1, bucketsColl.find().itcount());
 
-    ClusteredCollectionUtil.waitForTTL(coll.getDB("test"));
+    TTLUtil.waitForPass(coll.getDB("test"));
     assert.eq(2, coll.find().itcount());
     assert.eq(1, bucketsColl.find().itcount());
 });
@@ -81,7 +82,7 @@ testCase((coll, bucketsColl) => {
     assert.commandWorked(coll.insert({[timeFieldName]: minTime, [metaFieldName]: "localhost"}));
     assert.commandWorked(coll.insert({[timeFieldName]: maxTime, [metaFieldName]: "localhost"}));
 
-    ClusteredCollectionUtil.waitForTTL(coll.getDB("test"));
+    TTLUtil.waitForPass(coll.getDB("test"));
     assert.eq(0, coll.find().itcount());
     assert.eq(0, bucketsColl.find().itcount());
 });
@@ -100,7 +101,7 @@ testCase((coll, bucketsColl) => {
     assert.eq(2, coll.find().itcount());
     assert.eq(1, bucketsColl.find().itcount());
 
-    ClusteredCollectionUtil.waitForTTL(coll.getDB("test"));
+    TTLUtil.waitForPass(coll.getDB("test"));
     assert.eq(2, coll.find().itcount());
     assert.eq(1, bucketsColl.find().itcount());
 });
@@ -116,7 +117,7 @@ testCase((coll, bucketsColl) => {
         {[timeFieldName]: maxTime, [metaFieldName]: "localhost"}
     ]));
 
-    ClusteredCollectionUtil.waitForTTL(coll.getDB("test"));
+    TTLUtil.waitForPass(coll.getDB("test"));
     assert.eq(0, coll.find().itcount());
     assert.eq(0, bucketsColl.find().itcount());
 });
@@ -149,7 +150,7 @@ testCase((coll, bucketsColl) => {
         expireAfterSeconds: expireAfterSeconds,
     }));
 
-    ClusteredCollectionUtil.waitForTTL(coll.getDB("test"));
+    TTLUtil.waitForPass(coll.getDB("test"));
     assert.eq(0, coll.find().itcount());
     assert.eq(0, bucketsColl.find().itcount());
 })();

@@ -2,6 +2,8 @@
 // SERVER-17984.
 (function() {
 "use strict";
+load("jstests/libs/ttl_util.js");
+
 // Launch mongod with shorter TTL monitor sleep interval.
 var runner = MongoRunner.runMongod({setParameter: "ttlMonitorSleepSecs=1"});
 var coll = runner.getDB("test").ttl_partial_index;
@@ -17,10 +19,7 @@ assert.commandWorked(coll.insert({x: now}));
 
 // Wait for the TTL monitor to run at least twice (in case we weren't finished setting up our
 // collection when it ran the first time).
-var ttlPass = coll.getDB().serverStatus().metrics.ttl.passes;
-assert.soon(function() {
-    return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 2;
-}, "TTL monitor didn't run before timing out.");
+TTLUtil.waitForPass(coll.getDB());
 
 assert.eq(0,
           coll.find({z: {$exists: true}}).hint({x: 1}).itcount(),

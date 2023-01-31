@@ -11,6 +11,7 @@
 
 load('jstests/noPassthrough/libs/index_build.js');  // For IndexBuildTest
 load("jstests/libs/fail_point_util.js");
+load("jstests/libs/ttl_util.js");
 
 var rst = new ReplSetTest({
     nodes: 2,
@@ -58,15 +59,6 @@ const assertMetrics = (conn, assertFn) => {
     }
 };
 
-const waitForTtlPass = (db) => {
-    // Wait for the TTL monitor to run at least twice (in case we weren't finished setting up our
-    // collection when it ran the first time).
-    let ttlPass = db.serverStatus().metrics.ttl.passes;
-    assert.soon(function() {
-        return db.serverStatus().metrics.ttl.passes >= ttlPass + 2;
-    }, "TTL monitor didn't run before timing out.");
-};
-
 // Create a TTL index and pause the thread.
 assert.commandWorked(primaryDB[collName].createIndex({x: 1}, {expireAfterSeconds: 0}));
 
@@ -93,7 +85,7 @@ assertMetrics(primary, (metrics) => {
 // Clear metrics and wait for a TTL pass to delete the documents.
 clearMetrics(primary);
 pauseTtl.off();
-waitForTtlPass(primaryDB);
+TTLUtil.waitForPass(primaryDB);
 
 // Ensure that the TTL monitor deleted 2 documents on the primary and recorded read and write
 // metrics.

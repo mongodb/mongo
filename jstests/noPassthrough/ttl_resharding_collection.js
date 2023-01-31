@@ -1,6 +1,8 @@
 // Tests that the TTL Monitor is disabled for <database>.system.resharding.* namespaces.
 (function() {
 "use strict";
+load("jstests/libs/ttl_util.js");
+
 // Launch mongod with shorter TTL monitor sleep interval.
 const runner = MongoRunner.runMongod({setParameter: "ttlMonitorSleepSecs=1"});
 const collName = "system.resharding.mycoll";
@@ -14,10 +16,7 @@ assert.commandWorked(coll.insert({x: now}));
 
 // Wait for the TTL monitor to run at least twice (in case we weren't finished setting up our
 // collection when it ran the first time).
-const ttlPass = coll.getDB().serverStatus().metrics.ttl.passes;
-assert.soon(function() {
-    return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 2;
-}, "TTL monitor didn't run before timing out.");
+TTLUtil.waitForPass(coll.getDB());
 
 // Confirm the document was not removed because it was in a <database>.system.resharding.*
 // namespace.
