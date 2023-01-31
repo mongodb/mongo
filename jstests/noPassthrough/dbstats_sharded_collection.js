@@ -29,7 +29,8 @@ for (let i = 0; i < numDocs; i++) {
 assert.commandWorked(bulk.execute());
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: numDocs / 2}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: secondaryShard.name}));
+assert.commandWorked(st.s.adminCommand(
+    {moveChunk: ns, find: {_id: 0}, to: secondaryShard.name, _waitForDelete: true}));
 
 const scale = 1024 * 1024;
 let dbStats = db.runCommand({dbStats: 1, scale: scale});
