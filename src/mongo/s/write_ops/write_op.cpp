@@ -282,4 +282,9 @@ void WriteOp::setOpError(const write_ops::WriteError& error) {
     // No need to updateOpState, set directly
 }
 
+void TargetedWriteBatch::addWrite(std::unique_ptr<TargetedWrite> targetedWrite, int estWriteSize) {
+    _writes.push_back(std::move(targetedWrite));
+    _estimatedSizeBytes += estWriteSize;
+}
+
 }  // namespace mongo

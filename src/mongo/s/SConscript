@@ -35,6 +35,7 @@ env.Library(
         'shard_key_pattern_query_util.cpp',
         'write_ops/batch_write_exec.cpp',
         'write_ops/batch_write_op.cpp',
+        'write_ops/bulk_write_exec.cpp',
         'write_ops/write_op.cpp',
         'write_ops/write_without_shard_key_util.cpp',
     ],

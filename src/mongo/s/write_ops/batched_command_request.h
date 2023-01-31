@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 #include <memory>
 
+#include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/database_version.h"
@@ -235,13 +236,22 @@ private:
 /**
  * Similar to above, this class wraps the write items of a command request into a generically usable
  * type. Very thin wrapper, does not own the write item itself.
+ *
+ * This can wrap write items of a batched insert/update/delete command and a bulkWrite command.
  */
 class BatchItemRef {
 public:
     BatchItemRef(const BatchedCommandRequest* request, int index);
+    BatchItemRef(const BulkWriteCommandRequest* request, int index);
 
     BatchedCommandRequest::BatchType getOpType() const {
-        return _request.getBatchType();
+        if (_batchedRequest) {
+            return _batchedRequest->getBatchType();
+        } else {
+            // TODO(SERVER-73281): Support bulkWrite update and delete.
+            tassert(7263702, "invalid bulkWrite request reference", _bulkWriteRequest);
+            return BatchedCommandRequest::BatchType_Insert;
+        }
     }
 
     int getItemIndex() const {
@@ -249,26 +259,56 @@ public:
     }
 
     const auto& getDocument() const {
-        return _request.getInsertRequest().getDocuments()[_index];
+        if (_batchedRequest) {
+            return _batchedRequest->getInsertRequest().getDocuments()[_index];
+        } else {
+            tassert(7263703, "invalid bulkWrite request reference", _bulkWriteRequest);
+            return _bulkWriteRequest->getOps()[_index].getDocument();
+        }
     }
     const auto& getUpdate() const {
-        return _request.getUpdateRequest().getUpdates()[_index];
+        if (_batchedRequest) {
+            return _batchedRequest->getUpdateRequest().getUpdates()[_index];
+        } else {
+            // TODO(SERVER-73281): Support bulkWrite update.
+            tassert(7263704, "invalid bulkWrite request reference", _bulkWriteRequest);
+            MONGO_UNIMPLEMENTED;
+        }
     }
 
     const auto& getDelete() const {
-        return _request.getDeleteRequest().getDeletes()[_index];
+        if (_batchedRequest) {
+            return _batchedRequest->getDeleteRequest().getDeletes()[_index];
+        } else {
+            // TODO(SERVER-73281): Support bulkWrite delete.
+            tassert(7263705, "invalid bulkWrite request reference", _bulkWriteRequest);
+            MONGO_UNIMPLEMENTED;
+        }
     }
 
     auto& getLet() const {
-        return _request.getLet();
+        if (_batchedRequest) {
+            return _batchedRequest->getLet();
+        } else {
+            // TODO(SERVER-73231): Support top-level 'let' variable.
+            tassert(7263706, "invalid bulkWrite request reference", _bulkWriteRequest);
+            MONGO_UNIMPLEMENTED;
+        }
     }
 
     auto& getLegacyRuntimeConstants() const {
-        return _request.getLegacyRuntimeConstants();
+        if (_batchedRequest) {
+            return _batchedRequest->getLegacyRuntimeConstants();
+        } else {
+            // bulkWrite command doesn't support legacy 'runtimeConstants'.
+            tassert(7263707, "invalid bulkWrite request reference", _bulkWriteRequest);
+            return BatchedCommandRequest::kEmptyRuntimeConstants;
+        }
     }
 
 private:
-    const BatchedCommandRequest& _request;
+    boost::optional<const BatchedCommandRequest&> _batchedRequest;
+    boost::optional<const BulkWriteCommandRequest&> _bulkWriteRequest;
     const int _index;
 };
 

@@ -1,0 +1,116 @@
+/**
+ *    Copyright (C) 2023-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#pragma once
+
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/s/ns_targeter.h"
+#include "mongo/s/write_ops/write_op.h"
+
+namespace mongo {
+
+namespace bulkWriteExec {
+/**
+ * Executes a client bulkWrite request by sending child batches to several shard endpoints, and
+ * returns a client bulkWrite response.
+ *
+ * This function does not throw, any errors are reported via the reply object.
+ */
+void execute(OperationContext* opCtx,
+             const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+             const BulkWriteCommandRequest& clientRequest,
+             BulkWriteCommandReply* reply);
+
+/**
+ * The BulkWriteOp class manages the lifecycle of a bulkWrite request received by mongos. Each op in
+ * the ops array is tracked via a WriteOp, and the function of the BulkWriteOp is to aggregate the
+ * dispatched requests and responses for the underlying WriteOps.
+ *
+ * Overall, the BulkWriteOp lifecycle is similar to the WriteOp lifecycle, with the following
+ * stages:
+ *
+ * 0) Client request comes in, a BulkWriteOp is initialized.
+ *
+ * 1a) One or more ops in the bulkWrite are targeted, resulting in TargetedWriteBatches for these
+ *     ops.
+ * 1b) There are targeting errors, and the batch must be retargeted after refreshing the NSTargeter.
+ *
+ * 2) Child bulkWrite requests are built for each TargetedWriteBatch before sending.
+ *
+ * 3) Responses for sent TargetedWriteBatches are noted, errors are stored and aggregated
+ *    per-write-op. Errors the caller is interested in are returned.
+ *
+ * 4) If the whole bulkWrite is not finished, goto 0.
+ *
+ * 5) When all responses come back for all write ops, errors are aggregated and returned in
+ *    a client response.
+ *
+ */
+class BulkWriteOp {
+    BulkWriteOp(const BulkWriteOp&) = delete;
+    BulkWriteOp& operator=(const BulkWriteOp&) = delete;
+
+public:
+    BulkWriteOp() = delete;
+    BulkWriteOp(OperationContext* opCtx, const BulkWriteCommandRequest& clientRequest);
+    ~BulkWriteOp() = default;
+
+    // TODO(SERVER-72787): Finish this.
+    StatusWith<bool> target(
+        const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+        stdx::unordered_map<ShardId, std::unique_ptr<TargetedWriteBatch>>* targetedBatches);
+
+    /**
+     * Returns false if the bulk write op needs more processing.
+     */
+    bool isFinished();
+
+private:
+    // The OperationContext the client bulkWrite request is run on.
+    OperationContext* const _opCtx;
+
+    // The incoming client bulkWrite request.
+    const BulkWriteCommandRequest& _clientRequest;
+
+    // Array of ops being processed from the client bulkWrite request.
+    std::vector<WriteOp> _writeOps;
+
+    // Cached transaction number (if one is present on the operation contex).
+    boost::optional<TxnNumber> _txnNum;
+
+    // Set to true if this write is part of a transaction.
+    const bool _inTransaction{false};
+    const bool _isRetryableWrite{false};
+};
+
+}  // namespace bulkWriteExec
+}  // namespace mongo

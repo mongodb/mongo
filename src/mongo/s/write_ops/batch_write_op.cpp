@@ -1019,9 +1019,4 @@ const std::vector<ShardError>& TrackedErrors::getErrors(int errCode) const {
     return _errorMap.find(errCode)->second;
 }
 
-void TargetedWriteBatch::addWrite(std::unique_ptr<TargetedWrite> targetedWrite, int estWriteSize) {
-    _writes.push_back(std::move(targetedWrite));
-    _estimatedSizeBytes += estWriteSize;
-}
-
 }  // namespace mongo

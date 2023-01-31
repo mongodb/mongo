@@ -324,8 +324,13 @@ BatchedCommandRequest BatchedCommandRequest::buildPipelineUpdateOp(
 }
 
 BatchItemRef::BatchItemRef(const BatchedCommandRequest* request, int index)
-    : _request(*request), _index(index) {
+    : _batchedRequest(*request), _index(index) {
     invariant(index < int(request->sizeWriteOps()));
+}
+
+BatchItemRef::BatchItemRef(const BulkWriteCommandRequest* request, int index)
+    : _bulkWriteRequest(*request), _index(index) {
+    invariant(index < int(request->getOps().size()));
 }
 
 }  // namespace mongo

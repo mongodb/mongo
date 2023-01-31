@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/s/write_ops/batch_write_exec.h"
+#include "mongo/s/write_ops/bulk_write_exec.h"
 
 namespace mongo {
 namespace cluster {
@@ -43,6 +44,10 @@ void write(OperationContext* opCtx,
            BatchWriteExecStats* stats,
            BatchedCommandResponse* response,
            boost::optional<OID> targetEpoch = boost::none);
+
+void bulkWrite(OperationContext* opCtx,
+               const BulkWriteCommandRequest& request,
+               BulkWriteCommandReply* reply);
 
 }  // namespace cluster
 }  // namespace mongo

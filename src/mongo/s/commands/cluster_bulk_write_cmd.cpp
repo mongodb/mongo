@@ -42,6 +42,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/s/cluster_write.h"
 
 namespace mongo {
 namespace {
@@ -99,9 +100,7 @@ public:
                 gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
 
             auto reply = Reply();
-            auto replies = std::vector<BulkWriteReplyItem>();
-            replies.emplace_back(1, 0);
-            reply.setCursor(BulkWriteCommandResponseCursor(0, replies));
+            cluster::bulkWrite(opCtx, request(), &reply);
             return reply;
         }
 

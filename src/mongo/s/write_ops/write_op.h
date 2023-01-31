@@ -236,4 +236,52 @@ struct TargetedWrite {
     boost::optional<UUID> sampleId;
 };
 
+/**
+ * Data structure representing the information needed to make a batch request, along with
+ * pointers to where the resulting responses should be placed.
+ *
+ * Internal support for storage as a doubly-linked list, to allow the TargetedWriteBatch to
+ * efficiently be registered for reporting.
+ */
+class TargetedWriteBatch {
+    TargetedWriteBatch(const TargetedWriteBatch&) = delete;
+    TargetedWriteBatch& operator=(const TargetedWriteBatch&) = delete;
+
+public:
+    TargetedWriteBatch(const ShardEndpoint& endpoint) : _endpoint(endpoint) {}
+
+    const ShardEndpoint& getEndpoint() const {
+        return _endpoint;
+    }
+
+    const std::vector<std::unique_ptr<TargetedWrite>>& getWrites() const {
+        return _writes;
+    };
+
+    size_t getNumOps() const {
+        return _writes.size();
+    }
+
+    int getEstimatedSizeBytes() const {
+        return _estimatedSizeBytes;
+    }
+
+    /**
+     * TargetedWrite is owned here once given to the TargetedWriteBatch.
+     */
+    void addWrite(std::unique_ptr<TargetedWrite> targetedWrite, int estWriteSize);
+
+private:
+    // Where to send the batch
+    const ShardEndpoint _endpoint;
+
+    // Where the responses go
+    // TargetedWrite*s are owned by the TargetedWriteBatch
+    std::vector<std::unique_ptr<TargetedWrite>> _writes;
+
+    // Conservatively estimated size of the batch, for ensuring it doesn't grow past the maximum
+    // BSON size
+    int _estimatedSizeBytes{0};
+};
+
 }  // namespace mongo
