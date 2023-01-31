@@ -2195,19 +2195,18 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     }
 
     if (_forward && _lastReturnedId >= id) {
-        LOGV2(22406,
-              "WTCursor::next -- c->next_key ( {next}) was not greater than _lastReturnedId "
-              "({last}) which is a bug.",
-              "WTCursor::next -- next was not greater than last which is a bug",
-              "next"_attr = id,
-              "last"_attr = _lastReturnedId);
-
         // Crash when testing diagnostics are enabled.
         invariant(!TestingProctor::instance().isEnabled());
 
-        // Force a retry of the operation from our last known position by acting as-if
-        // we received a WT_ROLLBACK error.
-        throw WriteConflictException();
+        // uassert with 'DataCorruptionDetected' after logging.
+        LOGV2_ERROR_OPTIONS(22406,
+                            {logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)},
+                            "WT_Cursor::next -- returned out-of-order keys",
+                            "forward"_attr = _forward,
+                            "next"_attr = id,
+                            "last"_attr = _lastReturnedId,
+                            "ident"_attr = _rs._ident,
+                            "ns"_attr = _rs.ns());
     }
 
     WT_ITEM value;
