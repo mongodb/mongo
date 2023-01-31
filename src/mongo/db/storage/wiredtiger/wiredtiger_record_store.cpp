@@ -1980,16 +1980,16 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     }
 
     if (_forward && _lastReturnedId >= id) {
-        log() << "WTCursor::next -- c->next_key ( " << id
-              << ") was not greater than _lastReturnedId (" << _lastReturnedId
-              << ") which is a bug.";
-
         // Crash when test commands are enabled.
         invariant(!getTestCommandsEnabled());
 
-        // Force a retry of the operation from our last known position by acting as-if
-        // we received a WT_ROLLBACK error.
-        throw WriteConflictException();
+        // uassert with 'DataCorruptionDetected' after logging.
+        std::stringstream ss;
+        ss << "WT_Cursor::next -- returned out-of-order keys. Forward: " << _forward
+           << ", next: " << id << ", last: " << _lastReturnedId << ", ident: " << _rs._ident
+           << ", ns: " << _rs._ns;
+        log() << ss.str();
+        uasserted(ErrorCodes::DataCorruptionDetected, ss.str());
     }
 
     WT_ITEM value;
