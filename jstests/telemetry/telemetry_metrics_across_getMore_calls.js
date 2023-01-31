@@ -1,9 +1,5 @@
 /**
  * Test that the telemetry metrics are updated correctly across getMores.
- * @tags: [
- *   #TODO SERVER-72406 Unblock this from the telemetry passthrough
- *   exclude_from_telemetry_passthrough,
- * ]
  */
 load("jstests/libs/feature_flag_util.js");  // For FeatureFlagUtil.
 
