@@ -166,6 +166,12 @@ void resumeMigrations(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const boost::optional<UUID>& expectedCollectionUUID);
 
+/**
+ * Calls to the config server primary to get the collection document for the given nss.
+ * Returns the value of the allowMigrations flag on the collection document.
+ */
+bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss);
+
 /*
  * Returns the UUID of the collection (if exists) using the catalog. It does not provide any locking
  * guarantees after the call.

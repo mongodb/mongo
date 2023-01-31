@@ -203,6 +203,11 @@ protected:
         return false;
     };
 
+    /*
+     * Specify if the given error will be retried by the ddl coordinator infrastructure.
+     */
+    bool _isRetriableErrorForDDLCoordinator(const Status& status);
+
     ShardingDDLCoordinatorService* _service;
     const ShardingDDLCoordinatorId _coordId;
 
