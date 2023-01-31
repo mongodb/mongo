@@ -79,7 +79,7 @@ configs:
         description: 'Serverless mode implies replication is enabled, cannot be used with replSet or replSetName.'
         arg_vartype: Bool
         short_name: serverless
-        source: [ cli, ini ]
+        source: [ yaml, cli ]
     'replication.enableMajorityReadConcern':
         section: 'Replica set options'
         description: 'Enables majority readConcern. enableMajorityReadConcern=false is no longer supported'
