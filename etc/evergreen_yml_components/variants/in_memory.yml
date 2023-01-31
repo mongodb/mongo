@@ -53,7 +53,8 @@ buildvariants:
   - name: .read_write_concern !.durable_history
   - name: replica_sets_gen
   - name: .replica_sets .common
-  - name: .replica_sets .multi_oplog
+  - name: .replica_sets .multi_oplog !.encrypt
+  - name: replica_sets_max_mirroring_large_txns_format_gen
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
     distros:

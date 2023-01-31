@@ -2443,7 +2443,7 @@ buildvariants:
   - name: .read_write_concern !.linearize
   - name: replica_sets_gen
   - name: replica_sets_kill_secondaries_jscore_passthrough
-  - name: replica_sets_large_txns_format_gen
+  - name: replica_sets_max_mirroring_large_txns_format_gen
   - name: .replica_sets .common !.auth
   - name: retryable_writes_jscore_passthrough_gen
   - name: .rollbackfuzzer
@@ -2497,7 +2497,7 @@ buildvariants:
   - name: .read_write_concern !.linearize
   - name: replica_sets_gen
   - name: replica_sets_kill_secondaries_jscore_passthrough
-  - name: replica_sets_large_txns_format_gen
+  - name: replica_sets_max_mirroring_large_txns_format_gen
   - name: .replica_sets .common !.auth
   - name: retryable_writes_jscore_passthrough_gen
   - name: .rollbackfuzzer

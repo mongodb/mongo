@@ -337,6 +337,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+  - name: replica_sets_max_mirroring_large_txns_format_gen
   - name: .retry
   - name: .read_only
   - name: session_jscore_passthrough
@@ -835,6 +836,7 @@ buildvariants:
   - name: .replica_sets .large !.fcbis
     distros:
     - windows-vsCurrent-large
+  - name: replica_sets_max_mirroring_large_txns_format_gen
   - name: .resharding_fuzzer
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough_gen
@@ -897,11 +899,10 @@ buildvariants:
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
   - name: .replica_sets .common !.ignore_non_generated_replica_sets_jscore_passthrough
-  - name: .replica_sets .multi_oplog !.ignore_non_generated_replica_sets_jscore_passthrough
+  - name: .replica_sets .multi_oplog !.ignore_non_generated_replica_sets_jscore_passthrough !.gcm
   - name: replica_sets_jscore_passthrough_gen
     distros:
     - windows-vsCurrent-large
-  - name: replica_sets_ese_gen
   - name: sasl
   - name: .sharding .txns
   - name: sharding_auth_gen
@@ -967,9 +968,8 @@ buildvariants:
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
   - name: .replica_sets .common !.ignore_non_generated_replica_sets_jscore_passthrough
-  - name: .replica_sets .multi_oplog !.ignore_non_generated_replica_sets_jscore_passthrough
+  - name: .replica_sets .multi_oplog !.ignore_non_generated_replica_sets_jscore_passthrough !.gcm
   - name: replica_sets_jscore_passthrough_gen
-  - name: replica_sets_ese_gen
   - name: sasl
   - name: .sharding .txns
   - name: sharding_auth_gen
@@ -1125,7 +1125,7 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: mongosTest
   - name: replica_sets_gen
-  - name: replica_sets_large_txns_format_gen
+  - name: replica_sets_max_mirroring_large_txns_format_gen
   - name: .ssl
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
@@ -1794,6 +1794,7 @@ buildvariants:
   - name: .replica_sets !.multi_oplog .large
     distros:
     - rhel80-medium
+  - name: .replica_sets .encrypt
   - name: .resharding_fuzzer
   - name: .rollbackfuzzer
   - name: .sharding .txns
@@ -1918,7 +1919,8 @@ buildvariants:
   - name: libunwind_tests
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: .replica_sets .multi_oplog
+  - name: .replica_sets .multi_oplog !.encrypt
+  - name: replica_sets_max_mirroring_large_txns_format_gen
   - name: sasl
   - name: search
   - name: search_auth
@@ -2081,7 +2083,8 @@ buildvariants:
   - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: .replica_sets .multi_oplog
+  - name: .replica_sets .multi_oplog !.encrypt
+  - name: replica_sets_max_mirroring_large_txns_format_gen
   - name: sasl
   - name: search
   - name: search_auth
@@ -2374,9 +2377,9 @@ buildvariants:
   - name: .multi_shard .common
   - name: .query_fuzzer
   - name: .read_write_concern
-  - name: replica_sets_large_txns_format_gen
   - name: replica_sets_large_txns_format_jscore_passthrough
   - name: .replica_sets !.multi_oplog
+  - name: .replica_sets .encrypt
   - name: .resharding_fuzzer
   - name: .retry
   - name: .read_only
@@ -2457,9 +2460,9 @@ buildvariants:
   - name: .multi_shard .common
   - name: .query_fuzzer
   - name: .read_write_concern
-  - name: replica_sets_large_txns_format_gen
   - name: replica_sets_large_txns_format_jscore_passthrough
   - name: .replica_sets !.multi_oplog
+  - name: .replica_sets .encrypt
   - name: .resharding_fuzzer
   - name: .retry
   - name: .read_only
@@ -2546,9 +2549,9 @@ buildvariants:
   - name: .logical_session_cache .one_sec
   - name: .multi_shard .common
   - name: .read_write_concern
-  - name: replica_sets_large_txns_format_gen
   - name: replica_sets_large_txns_format_jscore_passthrough
   - name: .replica_sets !.multi_oplog
+  - name: .replica_sets .encrypt
   - name: .resharding_fuzzer
   - name: .retry
   - name: .rollbackfuzzer
@@ -2625,9 +2628,9 @@ buildvariants:
   - name: .logical_session_cache .one_sec
   - name: .multi_shard .common
   - name: .read_write_concern
-  - name: replica_sets_large_txns_format_gen
   - name: replica_sets_large_txns_format_jscore_passthrough
   - name: .replica_sets !.multi_oplog
+  - name: .replica_sets .encrypt
   - name: .resharding_fuzzer
   - name: .retry
   - name: .rollbackfuzzer

@@ -6250,16 +6250,22 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
-  name: replica_sets_ese_gen
-  tags: ["replica_sets", "encrypt", "san", "no_debug_mode"]
+  name: replica_sets_max_mirroring_large_txns_format_gen
+  tags: []
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: replica_sets_max_mirroring_large_txns_format_ese_gen
+  tags: ["replica_sets", "encrypt", "san", "no_debug_mode", "multi_oplog"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
 
 - <<: *gen_task_template
-  name: replica_sets_ese_gcm_gen
-  tags: ["replica_sets", "encrypt", "san", "gcm", "no_debug_mode"]
+  name: replica_sets_max_mirroring_large_txns_format_ese_gcm_gen
+  tags: ["replica_sets", "encrypt", "san", "gcm", "no_debug_mode", "multi_oplog"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6272,18 +6278,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: replica_sets_large_txns_format_gen
-  tags: ["replica_sets", "multi_oplog", "san"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: replica_sets_max_mirroring_gen
-  tags: ["replica_sets", "san"]
-  commands:
-  - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
   name: replica_sets_multiversion_gen

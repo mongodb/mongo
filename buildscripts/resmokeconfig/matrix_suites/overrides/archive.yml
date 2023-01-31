@@ -1,0 +1,5 @@
+- name: tests
+  value:
+    executor:
+      archive:
+        tests: true
