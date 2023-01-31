@@ -2681,8 +2681,6 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     // Need to return the collection lock back to exclusive mode to complete the index build.
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_X);
-    AutoGetCollection indexBuildEntryColl(
-        opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
 
     // If we can't acquire the RSTL within a given time period, there is an active state transition
     // and we should release our locks and try again. We would otherwise introduce a deadlock with
@@ -2703,6 +2701,9 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
         return CommitResult::kLockTimeout;
     }
+
+    AutoGetCollection indexBuildEntryColl(
+        opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
 
     // If we are no longer primary after receiving a commit quorum, we must restart and wait for a
     // new signal from a new primary because we cannot commit. Note that two-phase index builds can
