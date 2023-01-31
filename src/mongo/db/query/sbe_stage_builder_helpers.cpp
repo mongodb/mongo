@@ -36,6 +36,8 @@
 #include <iterator>
 #include <numeric>
 
+#include "mongo/db/catalog/health_log_gen.h"
+#include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
@@ -53,6 +55,7 @@
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo::stage_builder {
 
@@ -856,6 +859,22 @@ void indexKeyCorruptionCheckCallback(OperationContext* opCtx,
             BSONObj bsonKeyPattern(sbe::value::bitcastTo<const char*>(kpVal));
             auto bsonKeyString = KeyString::toBson(*keyString, Ordering::make(bsonKeyPattern));
             auto hydratedKey = IndexKeyEntry::rehydrateKey(bsonKeyPattern, bsonKeyString);
+
+            HealthLogEntry entry;
+            entry.setNss(nss);
+            entry.setTimestamp(Date_t::now());
+            entry.setSeverity(SeverityEnum::Error);
+            entry.setScope(ScopeEnum::Index);
+            entry.setOperation("Index scan");
+            entry.setMsg("Erroneous index key found with reference to non-existent record id");
+
+            BSONObjBuilder bob;
+            bob.append("recordId", rid.toString());
+            bob.append("indexKeyData", hydratedKey);
+            bob.appendElements(getStackTrace().getBSONRepresentation());
+            entry.setData(bob.obj());
+
+            HealthLogInterface::get(opCtx)->log(entry);
 
             LOGV2_ERROR_OPTIONS(
                 5113709,

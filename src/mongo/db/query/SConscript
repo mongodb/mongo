@@ -118,6 +118,9 @@ env.Library(
         "$BUILD_DIR/mongo/db/matcher/expressions",
         "$BUILD_DIR/mongo/db/storage/execution_context",
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/health_log_interface',
+    ],
 )
 
 env.Library(
