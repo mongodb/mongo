@@ -69,6 +69,21 @@ if (columnstoreEnabled) {
                  assert.commandWorked(collection.update({a: 4}, {a: 2}));
              }),
              "_columnstore");
+    runTests({a: {b: 1}, c: 1},
+             [{"a.$**": "columnstore"}, {h: 1}],
+             (function(collection) {
+                 assert.commandWorked(collection.insert({a: 1}));
+                 assert.commandWorked(collection.insert({a: {b: 2}}));
+
+                 // Updates that leave the indexed columns unmodified.
+                 assert.commandWorked(collection.update({"a.b": 1}, {a: {b: 1}, c: 10}));
+                 assert.commandWorked(collection.update({"a.b": 2}, {a: {b: 2}, c: 10}));
+
+                 // Insert and delete that do not involve any indexed columns.
+                 assert.commandWorked(collection.insert({c: 20}));
+                 assert.commandWorked(collection.deleteOne({c: 20}));
+             }),
+             "_subdocument_columnstore");
 }
 rst.stopSet();
 })();

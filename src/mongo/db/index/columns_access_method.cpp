@@ -398,10 +398,16 @@ Status ColumnStoreAccessMethod::update(OperationContext* opCtx,
                                             diffAction);
             });
 
+        // Create a "side write" that records the changes made to this document during the bulk
+        // build, so that they can be applied when the bulk builder finishes. It is possible that an
+        // update does not result in any changes when there is a "columnstoreProjection" on the
+        // index that excludes all the changed fields.
         int64_t inserted = 0;
         int64_t deleted = 0;
-        Status status = _indexCatalogEntry->indexBuildInterceptor()->sideWrite(
-            opCtx, *columnChanges, &inserted, &deleted);
+        if (columnChanges->size() > 0) {
+            uassertStatusOK(_indexCatalogEntry->indexBuildInterceptor()->sideWrite(
+                opCtx, *columnChanges, &inserted, &deleted));
+        }
         if (keysInsertedOut) {
             *keysInsertedOut += inserted;
         }
