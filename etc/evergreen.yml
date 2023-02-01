@@ -1305,8 +1305,7 @@ buildvariants:
     exec_timeout_factor: 1.5
     large_distro_name: rhel80-medium
     burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-dynamic-required
-    burn_in_tag_compile_distro: rhel80-xlarge
-    burn_in_tag_compile_task_group_name: compile_and_archive_dist_test_TG
+    burn_in_tag_compile_task_dependency: archive_dist_test_debug
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
@@ -1587,8 +1586,7 @@ buildvariants:
     max_sub_suites: 5
     large_distro_name: rhel80-medium
     burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-dynamic-required
-    burn_in_tag_compile_distro: rhel80-xlarge
-    burn_in_tag_compile_task_group_name: compile_and_archive_dist_test_TG
+    burn_in_tag_compile_task_dependency: archive_dist_test_debug
     num_scons_link_jobs_available: 0.99
     test_flags: >-
       --mongodSetParameters="{internalQueryForceClassicEngine: true}"
