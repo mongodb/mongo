@@ -179,9 +179,11 @@ public:
     /**
      * Returns a unique sample id for a query if it should be sampled, and none otherwise. Can only
      * be invoked once for each query since generating a sample id causes the number of remaining
-     * queries to sample to get decremented.
+     * queries to sample to get decremented. Does not generate a sample id if the client is
+     * internal (defined as not having a network session) unless this operation has explicitly
+     * opted into query sampling.
      */
-    boost::optional<UUID> tryGenerateSampleId(const NamespaceString& nss);
+    boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx, const NamespaceString& nss);
 
     void appendInfoForServerStatus(BSONObjBuilder* bob) const;
 

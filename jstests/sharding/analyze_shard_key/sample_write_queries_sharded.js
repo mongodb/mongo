@@ -55,6 +55,8 @@ const expectedSampledQueryDocs = [];
 {
     // Perform some updates.
     assert.commandWorked(mongosColl.insert([
+        // The doc below is on shard0.
+        {x: -1, y: -1, z: [-1]},
         // The docs below are on shard1.
         {x: 1, y: 1, z: [1, 0, 1]},
         {x: 2, y: 2, z: [2]},
@@ -84,7 +86,7 @@ const expectedSampledQueryDocs = [];
     const diff1 = {y: 'u', w: 'i'};
     const shardNames1 = [st.rs1.name, st.rs2.name];
 
-    const originalCmdObj = {
+    const originalCmdObj0 = {
         update: collName,
         updates: [updateOp0, updateOp1],
         let : {var1: 1},
@@ -94,7 +96,7 @@ const expectedSampledQueryDocs = [];
     const lsid = {id: UUID()};
     const txnNumber = NumberLong(1);
     assert.commandWorked(mongosDB.runCommand(Object.assign(
-        {}, originalCmdObj, {lsid, txnNumber, startTransaction: true, autocommit: false})));
+        {}, originalCmdObj0, {lsid, txnNumber, startTransaction: true, autocommit: false})));
     assert.commandWorked(
         mongosDB.adminCommand({commitTransaction: 1, lsid, txnNumber, autocommit: false}));
     assert.neq(mongosColl.findOne({x: 1, y: 10, z: [10, 0, 10]}), null);
@@ -104,14 +106,14 @@ const expectedSampledQueryDocs = [];
     expectedSampledQueryDocs.push({
         filter: {"cmd.updates.0.q": updateOp0.q},
         cmdName: cmdName,
-        cmdObj: Object.assign({}, originalCmdObj, {updates: [updateOp0]}),
+        cmdObj: Object.assign({}, originalCmdObj0, {updates: [updateOp0]}),
         diff: diff0,
         shardNames: shardNames0
     });
     expectedSampledQueryDocs.push({
         filter: {"cmd.updates.0.q": updateOp1.q},
         cmdName: cmdName,
-        cmdObj: Object.assign({}, originalCmdObj, {updates: [updateOp1]}),
+        cmdObj: Object.assign({}, originalCmdObj0, {updates: [updateOp1]}),
         diff: diff1,
         shardNames: shardNames1
     });
@@ -123,6 +125,34 @@ const expectedSampledQueryDocs = [];
         explain:
             {update: collName, updates: [{q: {x: {$gte: 102}}, u: {$set: {y: 102}}, multi: true}]}
     }));
+
+    // This is a WouldChangeOwningShard update. It causes the document to move from shard0 to
+    // shard1.
+    const updateOp2 = {
+        q: {x: -1},
+        u: {$inc: {x: 1000}, $set: {v: -1}},
+        multi: false,
+        collation: QuerySamplingUtil.generateRandomCollation(),
+    };
+    const diff2 = {x: 'u', v: 'i'};
+    const shardNames2 = [st.rs0.name];
+
+    const originalCmdObj1 = {
+        update: collName,
+        updates: [updateOp2],
+        let : {var1: 1},
+    };
+
+    assert.commandWorked(mongosDB.runCommand(originalCmdObj1));
+    assert.neq(mongosColl.findOne({x: 999, y: -1, z: [-1], v: -1}), null);
+
+    expectedSampledQueryDocs.push({
+        filter: {"cmd.updates.0.q": updateOp2.q},
+        cmdName: cmdName,
+        cmdObj: Object.assign({}, originalCmdObj1, {updates: [updateOp2]}),
+        diff: diff2,
+        shardNames: shardNames2
+    });
 }
 
 {
@@ -183,11 +213,13 @@ const expectedSampledQueryDocs = [];
     // Perform some findAndModify.
     assert.commandWorked(mongosColl.insert([
         // The doc below is on shard0.
-        {x: -5, y: -5, z: [-5, 0, -5]}
+        {x: -5, y: -5, z: [-5, 0, -5]},
+        // The doc below is on shard1.
+        {x: 6, y: 6, z: [6, 0, 6]}
     ]));
 
     const cmdName = "findAndModify";
-    const originalCmdObj = {
+    const originalCmdObj0 = {
         findAndModify: collName,
         query: {x: -5},
         update: {$mul: {y: 10}, $set: {"z.$[element]": -50}},
@@ -198,23 +230,47 @@ const expectedSampledQueryDocs = [];
         upsert: false,
         let : {var0: 1}
     };
-    const diff = {y: 'u', z: 'u'};
-    const shardNames = [st.rs0.name];
+    const diff0 = {y: 'u', z: 'u'};
+    const shardNames0 = [st.rs0.name];
 
-    assert.commandWorked(mongosDB.runCommand(originalCmdObj));
+    assert.commandWorked(mongosDB.runCommand(originalCmdObj0));
     assert.neq(mongosColl.findOne({x: -5, y: -50, z: [-50, 0, -50]}), null);
 
     expectedSampledQueryDocs.push({
-        filter: {"cmd.query": originalCmdObj.query},
+        filter: {"cmd.query": originalCmdObj0.query},
         cmdName: cmdName,
-        cmdObj: Object.assign({}, originalCmdObj),
-        diff,
-        shardNames
+        cmdObj: Object.assign({}, originalCmdObj0),
+        diff: diff0,
+        shardNames: shardNames0
     });
 
     // 'explain' queries should not get sampled.
     assert.commandWorked(mongosDB.runCommand(
         {explain: {findAndModify: collName, query: {x: 501}, update: {$set: {y: 501}}}}));
+
+    // This is a WouldChangeOwningShard update. It causes the document to move from shard1 to
+    // shard2.
+    const originalCmdObj1 = {
+        findAndModify: collName,
+        query: {x: 6},
+        update: {$inc: {x: 1000}, $mul: {y: -1}},
+        collation: QuerySamplingUtil.generateRandomCollation(),
+        upsert: false,
+        let : {var0: 1}
+    };
+    const diff1 = {x: 'u', y: 'u'};
+    const shardNames1 = [st.rs1.name];
+
+    assert.commandWorked(mongosDB.runCommand(originalCmdObj1));
+    assert.neq(mongosColl.findOne({x: 1006, y: -6, z: [6, 0, 6]}), null);
+
+    expectedSampledQueryDocs.push({
+        filter: {"cmd.query": originalCmdObj1.query},
+        cmdName: cmdName,
+        cmdObj: Object.assign({}, originalCmdObj1),
+        diff: diff1,
+        shardNames: shardNames1
+    });
 }
 
 const cmdNames = ["update", "delete", "findAndModify"];

@@ -52,8 +52,9 @@ auto sampleIter(C&& c) {
 }  // namespace
 
 boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx, const NamespaceString& nss) {
-    return supportsSamplingQueries() ? QueryAnalysisSampler::get(opCtx).tryGenerateSampleId(nss)
-                                     : boost::none;
+    return supportsSamplingQueries()
+        ? QueryAnalysisSampler::get(opCtx).tryGenerateSampleId(opCtx, nss)
+        : boost::none;
 }
 
 boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* opCtx,

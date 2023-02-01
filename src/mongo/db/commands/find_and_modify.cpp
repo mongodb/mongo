@@ -70,6 +70,7 @@
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/log_and_backoff.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -679,10 +680,9 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
         }
     }
 
-    if (analyze_shard_key::supportsPersistingSampledQueries() && request().getSampleId()) {
-        analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-            ->addFindAndModifyQuery(request())
-            .getAsync([](auto) {});
+    if (analyze_shard_key::supportsPersistingSampledQueries() && req.getSampleId()) {
+        analyze_shard_key::QueryAnalysisWriter::get(opCtx)->addFindAndModifyQuery(req).getAsync(
+            [](auto) {});
     }
 
     if (MONGO_unlikely(failAllFindAndModify.shouldFail())) {
@@ -745,6 +745,26 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                                   retryAttempts,
                                   "Caught DuplicateKey exception during findAndModify upsert",
                                   "namespace"_attr = nsString.ns());
+                } catch (const ExceptionFor<ErrorCodes::WouldChangeOwningShard>& ex) {
+                    if (analyze_shard_key::supportsPersistingSampledQueries() &&
+                        req.getSampleId()) {
+                        // Sample the diff before rethrowing the error since mongos will handle this
+                        // update by performing a delete on the shard owning the pre-image doc and
+                        // an insert on the shard owning the post-image doc. As a result, this
+                        // update will not show up in the OpObserver as an update.
+                        auto wouldChangeOwningShardInfo =
+                            ex.extraInfo<WouldChangeOwningShardInfo>();
+                        invariant(wouldChangeOwningShardInfo);
+
+                        analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+                            ->addDiff(*req.getSampleId(),
+                                      ns(),
+                                      *wouldChangeOwningShardInfo->getUuid(),
+                                      wouldChangeOwningShardInfo->getPreImage(),
+                                      wouldChangeOwningShardInfo->getPostImage())
+                            .getAsync([](auto) {});
+                    }
+                    throw;
                 }
             }
         }

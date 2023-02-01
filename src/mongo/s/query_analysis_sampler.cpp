@@ -252,7 +252,14 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
     _sampleRateLimiters = std::move(sampleRateLimiters);
 }
 
-boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(const NamespaceString& nss) {
+boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext* opCtx,
+                                                                const NamespaceString& nss) {
+    if (!opCtx->getClient()->session() && !opCtx->explicitlyOptedIntoQuerySampling()) {
+        // Do not generate a sample id for an internal query unless it has explicitly opted into
+        // query sampling.
+        return boost::none;
+    }
+
     stdx::lock_guard<Latch> lk(_mutex);
     auto it = _sampleRateLimiters.find(nss);
 

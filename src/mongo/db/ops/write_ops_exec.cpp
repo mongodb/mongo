@@ -82,6 +82,7 @@
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/scopeguard.h"
@@ -203,6 +204,7 @@ bool handleError(OperationContext* opCtx,
                  const NamespaceString& nss,
                  const bool ordered,
                  bool isMultiUpdate,
+                 const boost::optional<UUID> sampleId,
                  WriteResult* out) {
     NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(ex.code());
     auto& curOp = *CurOp::get(opCtx);
@@ -213,6 +215,22 @@ bool handleError(OperationContext* opCtx,
     }
 
     if (ErrorCodes::WouldChangeOwningShard == ex.code()) {
+        if (analyze_shard_key::supportsPersistingSampledQueries() && sampleId) {
+            // Sample the diff before rethrowing the error since mongos will handle this update by
+            // by performing a delete on the shard owning the pre-image doc and an insert on the
+            // shard owning the post-image doc. As a result, this update will not show up in the
+            // OpObserver as an update.
+            auto wouldChangeOwningShardInfo = ex.extraInfo<WouldChangeOwningShardInfo>();
+            invariant(wouldChangeOwningShardInfo);
+
+            analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+                ->addDiff(*sampleId,
+                          nss,
+                          *wouldChangeOwningShardInfo->getUuid(),
+                          wouldChangeOwningShardInfo->getPreImage(),
+                          wouldChangeOwningShardInfo->getPostImage())
+                .getAsync([](auto) {});
+        }
         throw;  // Fail this write so mongos can retry
     }
 
@@ -462,7 +480,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         if (inTxn) {
             // It is not safe to ignore errors from collection creation while inside a
             // multi-document transaction.
-            auto canContinue = handleError(opCtx, ex, nss, ordered, false /* multiUpdate */, out);
+            auto canContinue = handleError(
+                opCtx, ex, nss, ordered, false /* multiUpdate */, boost::none /* sampleId */, out);
             invariant(!canContinue);
             return false;
         }
@@ -540,7 +559,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 }
             });
         } catch (const DBException& ex) {
-            bool canContinue = handleError(opCtx, ex, nss, ordered, false /* multiUpdate */, out);
+            bool canContinue = handleError(
+                opCtx, ex, nss, ordered, false /* multiUpdate */, boost::none /* sampleId */, out);
 
             if (!canContinue) {
                 // Failed in ordered batch, or in a transaction, or from some unrecoverable error.
@@ -729,6 +749,7 @@ WriteResult performInserts(OperationContext* opCtx,
                                               wholeOp.getNamespace(),
                                               wholeOp.getOrdered(),
                                               false /* multiUpdate */,
+                                              boost::none /* sampleId */,
                                               &out);
             }
 
@@ -1096,8 +1117,13 @@ WriteResult performUpdates(OperationContext* opCtx,
             forgoOpCounterIncrements = true;
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
-            out.canContinue =
-                handleError(opCtx, ex, ns, wholeOp.getOrdered(), singleOp.getMulti(), &out);
+            out.canContinue = handleError(opCtx,
+                                          ex,
+                                          ns,
+                                          wholeOp.getOrdered(),
+                                          singleOp.getMulti(),
+                                          singleOp.getSampleId(),
+                                          &out);
             if (!out.canContinue) {
                 break;
             }
@@ -1329,8 +1355,13 @@ WriteResult performDeletes(OperationContext* opCtx,
                                                         source));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
-            out.canContinue =
-                handleError(opCtx, ex, ns, wholeOp.getOrdered(), false /* multiUpdate */, &out);
+            out.canContinue = handleError(opCtx,
+                                          ex,
+                                          ns,
+                                          wholeOp.getOrdered(),
+                                          false /* multiUpdate */,
+                                          singleOp.getSampleId(),
+                                          &out);
             if (!out.canContinue)
                 break;
         }

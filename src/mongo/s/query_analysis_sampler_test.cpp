@@ -36,6 +36,7 @@
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -847,11 +848,18 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
     ASSERT(rateLimiters3.empty());
 }
 
-TEST_F(QueryAnalysisSamplerTest, ShouldSampleBasic) {
+TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdExternalClient) {
     const RAIIServerParameterControllerForTest burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 1};
 
-    auto& sampler = QueryAnalysisSampler::get(operationContext());
+    transport::TransportLayerMock transportLayer;
+    transport::SessionHandle session = transportLayer.createSession();
+    auto client =
+        getGlobalServiceContext()->makeClient("TryGenerateSampleIdExternalClient", session);
+    auto opCtxHolder = client->makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+
+    auto& sampler = QueryAnalysisSampler::get(opCtx);
 
     std::vector<CollectionQueryAnalyzerConfiguration> configurations;
     configurations.push_back(CollectionQueryAnalyzerConfiguration{nss0, collUuid0, 1});
@@ -859,38 +867,72 @@ TEST_F(QueryAnalysisSamplerTest, ShouldSampleBasic) {
     setUpConfigurations(&sampler, configurations);
 
     // Cannot sample if time has not elapsed.
-    ASSERT_FALSE(sampler.tryGenerateSampleId(nss0));
-    ASSERT_FALSE(sampler.tryGenerateSampleId(nss1));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss1));
 
     advanceTime(Milliseconds(1000));
     // The number of tokens available in the bucket for rateLimiter0 right after the refill is 0
     // + 1.0.
-    ASSERT(sampler.tryGenerateSampleId(nss0));
-    ASSERT_FALSE(sampler.tryGenerateSampleId(nss0));
+    ASSERT(sampler.tryGenerateSampleId(opCtx, nss0));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0));
     // The number of tokens available in the bucket for rateLimiter1 right after the refill is 0 +
     // 0.5.
-    ASSERT_FALSE(sampler.tryGenerateSampleId(nss1));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss1));
     // This collection doesn't have sampling enabled.
-    ASSERT_FALSE(sampler.tryGenerateSampleId(nss2));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss2));
 
     advanceTime(Milliseconds(1000));
     // The number of tokens available in the bucket for rateLimiter0 right after the refill is 0
     // + 1.0.
-    ASSERT(sampler.tryGenerateSampleId(nss0));
-    ASSERT_FALSE(sampler.tryGenerateSampleId(nss0));
+    ASSERT(sampler.tryGenerateSampleId(opCtx, nss0));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0));
     // The number of tokens available in the bucket for rateLimiter1 right after the refill is 0.5 +
     // 0.5.
-    ASSERT(sampler.tryGenerateSampleId(nss1));
-    ASSERT_FALSE(sampler.tryGenerateSampleId(nss1));
+    ASSERT(sampler.tryGenerateSampleId(opCtx, nss1));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss1));
     // This collection doesn't have sampling enabled.
-    ASSERT_FALSE(sampler.tryGenerateSampleId(nss2));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss2));
+}
+
+TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdInternalClient) {
+    const RAIIServerParameterControllerForTest burstMultiplierController{
+        "queryAnalysisSamplerBurstMultiplier", 1};
+
+    // Note how this client does not have a network session.
+    auto client = getGlobalServiceContext()->makeClient("TryGenerateSampleIdInternalClient");
+    auto opCtxHolder = client->makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+
+    auto& sampler = QueryAnalysisSampler::get(opCtx);
+
+    std::vector<CollectionQueryAnalyzerConfiguration> configurations;
+    configurations.push_back(CollectionQueryAnalyzerConfiguration{nss0, collUuid0, 1});
+    setUpConfigurations(&sampler, configurations);
+
+    advanceTime(Milliseconds(1000));
+    // The number of tokens available in the bucket for rateLimiter0 right after the refill is 0
+    // + 1.0. Cannot sample since the client is internal.
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0));
+
+    opCtx->setExplicitlyOptIntoQuerySampling();
+    // Can sample now since the client has explicitly opted into query sampling.
+    ASSERT(sampler.tryGenerateSampleId(opCtx, nss0));
+    // Cannot sample since there are no tokens left.
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0));
 }
 
 TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
     const RAIIServerParameterControllerForTest burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 1};
 
-    auto& sampler = QueryAnalysisSampler::get(operationContext());
+    transport::TransportLayerMock transportLayer;
+    transport::SessionHandle session = transportLayer.createSession();
+    auto client =
+        getGlobalServiceContext()->makeClient("RefreshConfigurationsNewCollectionUuid", session);
+    auto opCtxHolder = client->makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+
+    auto& sampler = QueryAnalysisSampler::get(opCtx);
 
     std::vector<CollectionQueryAnalyzerConfiguration> oldConfigurations;
     oldConfigurations.push_back(CollectionQueryAnalyzerConfiguration{nss0, collUuid0, 2});
@@ -906,7 +948,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
 
     advanceTime(Milliseconds(1000));
     // The number of tokens available in the bucket right after the refill is 0 + 2.
-    ASSERT(sampler.tryGenerateSampleId(nss0));
+    ASSERT(sampler.tryGenerateSampleId(opCtx, nss0));
 
     // Force the sampler to refresh and return a different collection uuid and sample rate this
     // time.
@@ -916,7 +958,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
     auto future = stdx::async(stdx::launch::async, [&] {
         expectConfigurationRefreshReturnSuccess(*queryStats.getLastAvgCount(), newConfigurations);
     });
-    sampler.refreshConfigurationsForTest(operationContext());
+    sampler.refreshConfigurationsForTest(opCtx);
     future.get();
 
     auto newRateLimiters = sampler.getRateLimitersForTest();
@@ -930,7 +972,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
     // Cannot sample if time has not elapsed. There should be no tokens available in the bucket
     // right after the refill unless the one token from the previous configurations was
     // carried over, which is not the correct behavior.
-    ASSERT_FALSE(sampler.tryGenerateSampleId(nss0));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0));
 }
 
 }  // namespace
