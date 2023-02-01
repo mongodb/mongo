@@ -121,9 +121,9 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     OperationContext* opCtx,
     OrphanCleanupPolicy orphanCleanupPolicy,
     bool supportNonVersionedOperations) const {
-    boost::optional<ShardVersion> optReceivedShardVersion = boost::none;
+    const boost::optional<ShardVersion> optReceivedShardVersion =
+        getOperationReceivedVersion(opCtx, _nss);
     if (!supportNonVersionedOperations) {
-        optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
         // No operations should be calling getOwnershipFilter without a shard version
         tassert(7032300,
                 "getOwnershipFilter called by operation that doesn't specify shard version",
