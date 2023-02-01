@@ -37,13 +37,10 @@
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
-#include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/tree_walker.h"
-#include "mongo/db/record_id_helpers.h"
 
 namespace mongo {
 namespace {

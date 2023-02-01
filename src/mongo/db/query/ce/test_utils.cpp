@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/ce/test_utils.h"
 
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
@@ -36,7 +37,6 @@
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::optimizer::ce {
@@ -173,7 +173,7 @@ stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data) {
     std::vector<stats::SBEValue> values;
     for (size_t i = 0; i < data.size(); i++) {
         const auto& item = data[i];
-        const auto [tag, val] = stage_builder::makeValue(item._v);
+        const auto [tag, val] = sbe::value::makeValue(item._v);
         values.emplace_back(tag, val);
     }
     sortValueVector(values);

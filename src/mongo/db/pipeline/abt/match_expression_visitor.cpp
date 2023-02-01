@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
@@ -201,7 +202,7 @@ public:
         arraysOnlyPtr->reserve(equalities.size());
 
         for (const auto& pred : equalities) {
-            const auto [tag, val] = convertFrom(Value(pred));
+            const auto [tag, val] = sbe::value::makeValue(Value(pred));
             arrTraversePtr->push_back(tag, val);
 
             if (tag == sbe::value::TypeTags::Null) {
@@ -520,7 +521,7 @@ private:
     void generateSimpleComparison(const ComparisonMatchExpressionBase* expr, const Operations op) {
         assertSupportedPathExpression(expr);
 
-        auto [tag, val] = convertFrom(Value(expr->getData()));
+        auto [tag, val] = sbe::value::makeValue(Value(expr->getData()));
         ABT result = make<PathCompare>(op, make<Constant>(tag, val));
 
         bool tagNullMatchMissingField =

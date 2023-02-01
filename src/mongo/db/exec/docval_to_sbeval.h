@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -30,40 +30,22 @@
 #pragma once
 
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/value.h"
 
-
-namespace mongo::optimizer {
-
-using ABTFieldNameFn =
-    std::function<ABT(FieldNameType fieldName, const bool isLastElement, ABT input)>;
+namespace mongo::sbe::value {
 
 /**
- * Translates an aggregation FieldPath by invoking the `fieldNameFn` for each path component.
+ * Helper function for converting mongo::Value to SBE Value. Caller owns the SBE Value returned.
  */
-ABT translateFieldPath(const FieldPath& fieldPath,
-                       ABT initial,
-                       const ABTFieldNameFn& fieldNameFn,
-                       size_t skipFromStart = 0);
+inline std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const ::mongo::Value& val) {
+    // TODO SERVER-73443: Rationalize Document Value to SBE Value Conversion.
+    BSONObjBuilder bob;
+    val.addToBsonObj(&bob, ""_sd);
+    auto obj = bob.done();
+    auto be = obj.objdata();
+    auto end = be + obj.objsize();
+    return sbe::bson::convertFrom<false>(be + 4, end, 0);
+}
 
-/**
- * Translates a given FieldRef (typically used in a MatchExpression) with 'initial' as the input
- * ABT.
- */
-ABT translateFieldRef(const FieldRef& fieldRef, ABT initial);
-
-/**
- * Return the minimum or maximum value for the "class" of values represented by the input
- * constant. Used to support type bracketing.
- * Return format is <min/max value, bool inclusive>
- */
-std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(bool isMin,
-                                                            const sbe::value::TypeTags& tag);
-
-/**
- * Used by the optimizer to optionally convert path elements (e.g. PathArr) directly into intervals.
- */
-boost::optional<IntervalReqExpr::Node> defaultConvertPathToInterval(const ABT& node);
-
-}  // namespace mongo::optimizer
+}  // namespace mongo::sbe::value

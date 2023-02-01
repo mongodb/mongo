@@ -30,6 +30,7 @@
 #include <stack>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/pipeline/abt/agg_expression_visitor.h"
 #include "mongo/db/pipeline/abt/expr_algebrizer_context.h"
 #include "mongo/db/pipeline/abt/utils.h"
@@ -45,7 +46,7 @@ public:
     ABTAggExpressionVisitor(ExpressionAlgebrizerContext& ctx) : _ctx(ctx){};
 
     void visit(const ExpressionConstant* expr) override final {
-        auto [tag, val] = convertFrom(expr->getValue());
+        auto [tag, val] = sbe::value::makeValue(expr->getValue());
         _ctx.push<Constant>(tag, val);
     }
 

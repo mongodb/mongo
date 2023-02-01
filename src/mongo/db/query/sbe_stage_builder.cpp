@@ -32,6 +32,7 @@
 #include <fmt/format.h>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/column_scan.h"
@@ -59,7 +60,6 @@
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_accumulator.h"
 #include "mongo/db/query/sbe_stage_builder_coll_scan.h"
@@ -127,7 +127,7 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
     for (auto&& [id, name] : Variables::kIdToBuiltinVarName) {
         if (id != Variables::kRootId && id != Variables::kRemoveId &&
             cq.getExpCtx()->variables.hasValue(id)) {
-            auto [tag, val] = makeValue(cq.getExpCtx()->variables.getValue(id));
+            auto [tag, val] = sbe::value::makeValue(cq.getExpCtx()->variables.getValue(id));
             env->registerSlot(name, tag, val, true, slotIdGenerator);
         } else if (id == Variables::kSearchMetaId) {
             // Normally, $search is responsible for setting a value for SEARCH_META, in which case
@@ -210,7 +210,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
         // Variables defined in "ExpressionContext" may not always be translated into SBE slots.
         if (auto it = data->variableIdToSlotMap.find(id); it != data->variableIdToSlotMap.end()) {
             auto slotId = it->second;
-            auto [tag, val] = makeValue(expCtx->variables.getValue(id));
+            auto [tag, val] = sbe::value::makeValue(expCtx->variables.getValue(id));
             env->resetSlot(slotId, tag, val, true);
         }
     }
@@ -221,7 +221,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
         // actually make use of it in the query plan.
         if (auto slot = env->getSlotIfExists(name); id != Variables::kRootId &&
             id != Variables::kRemoveId && expCtx->variables.hasValue(id) && slot) {
-            auto [tag, val] = makeValue(expCtx->variables.getValue(id));
+            auto [tag, val] = sbe::value::makeValue(expCtx->variables.getValue(id));
             env->resetSlot(*slot, tag, val, true);
         }
     }

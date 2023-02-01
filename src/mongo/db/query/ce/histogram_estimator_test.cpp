@@ -28,11 +28,11 @@
  */
 
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
 #include "mongo/db/query/ce/test_utils.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/stats/collection_statistics_mock.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/unittest/unittest.h"
@@ -86,7 +86,7 @@ ScalarHistogram getHistogramFromData(TestBuckets testBuckets) {
     double cumulativeNDV = 0.0;
     for (const auto& b : testBuckets) {
         // Add bucket boundary value to bounds.
-        auto [tag, val] = stage_builder::makeValue(b.val);
+        auto [tag, val] = sbe::value::makeValue(b.val);
         bounds.push_back(tag, val);
 
         cumulativeFreq += b.equalFreq + b.rangeFreq;
@@ -109,7 +109,7 @@ std::pair<TypeCounts, double> getTypeCountsFromData(TestBuckets testBuckets,
     double total = 0.0;
     for (const auto& b : testBuckets) {
         // Add bucket boundary value to bounds.
-        auto sbeVal = stage_builder::makeValue(b.val);
+        auto sbeVal = sbe::value::makeValue(b.val);
         auto [tag, val] = sbeVal;
 
         const auto num = b.equalFreq + b.rangeFreq;
@@ -1284,8 +1284,8 @@ TEST_F(CEHistogramTest, TestHistogramNeq) {
     {
         std::vector<stats::SBEValue> values;
         for (double v = 0; v < kTypeCard; v++) {
-            values.push_back(stage_builder::makeValue(Value(v)));
-            values.push_back(stage_builder::makeValue(Value(BSON_ARRAY(v))));
+            values.push_back(sbe::value::makeValue(Value(v)));
+            values.push_back(sbe::value::makeValue(Value(BSON_ARRAY(v))));
         }
         addHistogramFromValues(t, "a", values, kCollCard);
     }
@@ -1295,8 +1295,8 @@ TEST_F(CEHistogramTest, TestHistogramNeq) {
         std::string s = "charA";
         for (double v = 0; v < kTypeCard; v++) {
             s[4] += (char)v;
-            values.push_back(stage_builder::makeValue(Value(s)));
-            values.push_back(stage_builder::makeValue(Value(BSON_ARRAY(s))));
+            values.push_back(sbe::value::makeValue(Value(s)));
+            values.push_back(sbe::value::makeValue(Value(BSON_ARRAY(s))));
         }
         addHistogramFromValues(t, "b", values, kCollCard);
     }
@@ -1347,9 +1347,9 @@ TEST_F(CEHistogramTest, TestHistogramConjTypeCount) {
     {
         std::vector<stats::SBEValue> values;
         for (double v = 0; v < 10.0; v++) {
-            values.push_back(stage_builder::makeValue(Value(true)));
-            values.push_back(stage_builder::makeValue(Value(false)));
-            values.push_back(stage_builder::makeValue(Value(false)));
+            values.push_back(sbe::value::makeValue(Value(true)));
+            values.push_back(sbe::value::makeValue(Value(false)));
+            values.push_back(sbe::value::makeValue(Value(false)));
             // Remaining values in coll for 'tc' are missing.
             values.push_back({value::TypeTags::Nothing, 0});
         }
@@ -1359,7 +1359,7 @@ TEST_F(CEHistogramTest, TestHistogramConjTypeCount) {
     {
         std::vector<stats::SBEValue> values;
         for (double v = 0; v < 10.0; v++) {
-            values.push_back(stage_builder::makeValue(Value(v)));
+            values.push_back(sbe::value::makeValue(Value(v)));
             // Remaining values in coll for 'i' are missing.
             values.push_back({value::TypeTags::Nothing, 0});
             values.push_back({value::TypeTags::Nothing, 0});

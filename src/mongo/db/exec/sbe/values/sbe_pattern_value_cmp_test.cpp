@@ -30,6 +30,7 @@
 #include "mongo/db/exec/sbe/values/sbe_pattern_value_cmp.h"
 
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -54,7 +55,7 @@ public:
     }
 
     void addValue(const mongo::Value& val) {
-        objs.push_back(stage_builder::makeValue(val));
+        objs.push_back(sbe::value::makeValue(val));
     }
 
     void sortArray(const BSONObj& sortPattern, const CollatorInterface* collator) {

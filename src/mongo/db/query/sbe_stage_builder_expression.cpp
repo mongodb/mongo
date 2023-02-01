@@ -33,8 +33,8 @@
 #include "mongo/db/query/util/make_data_structure.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
-#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression_visitor.h"
@@ -665,7 +665,7 @@ public:
     };
 
     void visit(const ExpressionConstant* expr) final {
-        auto [tag, val] = makeValue(expr->getValue());
+        auto [tag, val] = sbe::value::makeValue(expr->getValue());
         pushABT(makeABTConstant(tag, val));
     }
 

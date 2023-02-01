@@ -29,21 +29,11 @@
 
 #include "mongo/db/pipeline/abt/utils.h"
 
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 namespace mongo::optimizer {
-std::pair<sbe::value::TypeTags, sbe::value::Value> convertFrom(const Value val) {
-    // TODO: Either make this conversion unnecessary by changing the value representation in
-    // ExpressionConstant, or provide a nicer way to convert directly from Document/Value to
-    // sbe::Value.
-    BSONObjBuilder bob;
-    val.addToBsonObj(&bob, ""_sd);
-    auto obj = bob.done();
-    auto be = obj.objdata();
-    auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
-    return sbe::bson::convertFrom<false>(be + 4, end, 0);
-}
 
 ABT translateFieldPath(const FieldPath& fieldPath,
                        ABT initial,
@@ -136,7 +126,7 @@ std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(const bool isMin,
             return {Constant::null(), true};
 
         case sbe::value::TypeTags::bsonUndefined: {
-            const auto [tag1, val1] = convertFrom(Value(BSONUndefined));
+            const auto [tag1, val1] = sbe::value::makeValue(Value(BSONUndefined));
             return {make<Constant>(sbe::value::TypeTags::bsonUndefined, val1), true};
         }
 
@@ -154,16 +144,16 @@ std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(const bool isMin,
             if (isMin) {
                 return {Constant::emptyArray(), true};
             } else {
-                const auto [tag1, val1] = convertFrom(Value(BSONBinData()));
+                const auto [tag1, val1] = sbe::value::makeValue(Value(BSONBinData()));
                 return {make<Constant>(sbe::value::TypeTags::bsonBinData, val1), false};
             }
 
         case sbe::value::TypeTags::bsonBinData:
             if (isMin) {
-                const auto [tag1, val1] = convertFrom(Value(BSONBinData()));
+                const auto [tag1, val1] = sbe::value::makeValue(Value(BSONBinData()));
                 return {make<Constant>(sbe::value::TypeTags::bsonBinData, val1), true};
             } else {
-                auto [tag1, val1] = convertFrom(Value(OID()));
+                auto [tag1, val1] = sbe::value::makeValue(Value(OID()));
                 return {make<Constant>(sbe::value::TypeTags::ObjectId, val1), false};
             }
 
@@ -177,25 +167,25 @@ std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(const bool isMin,
         case sbe::value::TypeTags::ObjectId:
         case sbe::value::TypeTags::bsonObjectId:
             if (isMin) {
-                const auto [tag1, val1] = convertFrom(Value(OID()));
+                const auto [tag1, val1] = sbe::value::makeValue(Value(OID()));
                 return {make<Constant>(sbe::value::TypeTags::ObjectId, val1), true};
             } else {
-                const auto [tag1, val1] = convertFrom(Value(OID::max()));
+                const auto [tag1, val1] = sbe::value::makeValue(Value(OID::max()));
                 return {make<Constant>(sbe::value::TypeTags::ObjectId, val1), true};
             }
 
         case sbe::value::TypeTags::bsonRegex:
             if (isMin) {
-                const auto [tag1, val1] = convertFrom(Value(BSONRegEx("", "")));
+                const auto [tag1, val1] = sbe::value::makeValue(Value(BSONRegEx("", "")));
                 return {make<Constant>(sbe::value::TypeTags::bsonRegex, val1), true};
             } else {
-                const auto [tag1, val1] = convertFrom(Value(BSONDBRef()));
+                const auto [tag1, val1] = sbe::value::makeValue(Value(BSONDBRef()));
                 return {make<Constant>(sbe::value::TypeTags::bsonDBPointer, val1), false};
             }
 
         case sbe::value::TypeTags::bsonDBPointer:
             if (isMin) {
-                const auto [tag1, val1] = convertFrom(Value(BSONDBRef()));
+                const auto [tag1, val1] = sbe::value::makeValue(Value(BSONDBRef()));
                 return {make<Constant>(sbe::value::TypeTags::bsonDBPointer, val1), true};
             } else {
                 const auto [tag1, val1] = sbe::value::makeCopyBsonJavascript(StringData(""));
@@ -207,13 +197,13 @@ std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(const bool isMin,
                 const auto [tag1, val1] = sbe::value::makeCopyBsonJavascript(StringData(""));
                 return {make<Constant>(sbe::value::TypeTags::bsonJavascript, val1), true};
             } else {
-                const auto [tag1, val1] = convertFrom(Value(BSONCodeWScope()));
+                const auto [tag1, val1] = sbe::value::makeValue(Value(BSONCodeWScope()));
                 return {make<Constant>(sbe::value::TypeTags::bsonCodeWScope, val1), false};
             }
 
         case sbe::value::TypeTags::bsonCodeWScope:
             if (isMin) {
-                const auto [tag1, val1] = convertFrom(Value(BSONCodeWScope()));
+                const auto [tag1, val1] = sbe::value::makeValue(Value(BSONCodeWScope()));
                 return {make<Constant>(sbe::value::TypeTags::bsonCodeWScope, val1), true};
             } else {
                 return {Constant::maxKey(), false};

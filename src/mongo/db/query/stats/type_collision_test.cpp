@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/value_utils.h"
@@ -44,18 +45,18 @@ TEST(TypeCollisionTest, ZeroedCollidingTypesHistogram) {
 
     std::vector<SBEValue> data{
         // Numeric types.
-        stage_builder::makeValue(Value((double)0.0)),
-        stage_builder::makeValue(Value((int)0)),
-        stage_builder::makeValue(Value((long long)0)),
-        stage_builder::makeValue(Value(Decimal128())),
+        sbe::value::makeValue(Value((double)0.0)),
+        sbe::value::makeValue(Value((int)0)),
+        sbe::value::makeValue(Value((long long)0)),
+        sbe::value::makeValue(Value(Decimal128())),
         // Object ID.
-        stage_builder::makeValue(Value(OID({0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}))),
+        sbe::value::makeValue(Value(OID({0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}))),
         // Date types: note that we can ensure their double equivalent is 0 by default-constructing
         // them.
-        stage_builder::makeValue(Value(Date_t())),
-        stage_builder::makeValue(Value(Timestamp())),
+        sbe::value::makeValue(Value(Date_t())),
+        sbe::value::makeValue(Value(Timestamp())),
         // String types.
-        stage_builder::makeValue(Value(std::string(""))),
+        sbe::value::makeValue(Value(std::string(""))),
     };
 
     // We should always fail to build a histogram on 0 buckets.
