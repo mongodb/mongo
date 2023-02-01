@@ -64,7 +64,7 @@ void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
  * currently compatible with transactions.
  */
 void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
-                                                 const NamespaceString& userCollectionNss,
+                                                 const NamespaceString& nss,
                                                  const UUID& collectionUUID,
                                                  const std::string& indexName,
                                                  const Timestamp& lastmod);
@@ -82,14 +82,13 @@ void replaceGlobalIndexes(OperationContext* opCtx,
 /**
  * Drops all indexes and the collection entry.
  */
-void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx,
-                                         const NamespaceString& userCollectionNss);
+void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
  * Removes all the indexes and unset the current index version.
  */
 void clearGlobalIndexes(OperationContext* opCtx,
-                        const NamespaceString& userCollectionNss,
+                        const NamespaceString& nss,
                         const UUID& collectionUUID);
 
 }  // namespace mongo

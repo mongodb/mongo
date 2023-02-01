@@ -550,7 +550,6 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
                 UUID::parse(indexDoc["entry"][IndexCatalogType::kCollectionUUIDFieldName]));
             opCtx->recoveryUnit()->onCommit(
                 [opCtx, nss, collUuid, indexVersion, indexEntry](auto _) {
-                    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                     auto scsr =
                         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
                                                                                              nss);
@@ -565,7 +564,6 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
                 UUID::parse(indexDoc["entry"][IndexCatalogType::kCollectionUUIDFieldName]));
             opCtx->recoveryUnit()->onCommit(
                 [opCtx, nss, indexName, indexVersion, collUuid](auto _) {
-                    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                     auto scsr =
                         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
                                                                                              nss);
@@ -585,7 +583,6 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             auto collUuid = uassertStatusOK(
                 UUID::parse(indexDoc["entry"][IndexCatalogType::kCollectionUUIDFieldName]));
             opCtx->recoveryUnit()->onCommit([opCtx, nss, collUuid, indexVersion, indexes](auto _) {
-                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                     opCtx, nss);
                 scsr->replaceIndexes(opCtx, indexes, {collUuid, indexVersion});
@@ -594,7 +591,6 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
         }
         case 'c':
             opCtx->recoveryUnit()->onCommit([opCtx, nss](auto _) {
-                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                     opCtx, nss);
                 scsr->clearIndexes(opCtx);
@@ -603,11 +599,11 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             break;
         case 'o': {
             opCtx->recoveryUnit()->onCommit([opCtx, nss](auto _) {
-                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                     opCtx, nss);
                 scsr->clearIndexes(opCtx);
             });
+
             break;
         }
         case 'm': {
@@ -615,11 +611,6 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             auto fromNss = NamespaceString(indexDoc["entry"]["fromNss"].String());
             auto toNss = NamespaceString(indexDoc["entry"]["toNss"].String());
             opCtx->recoveryUnit()->onCommit([opCtx, fromNss, toNss, indexVersion](auto _) {
-                AutoGetCollection autoCollFrom(
-                    opCtx,
-                    fromNss,
-                    MODE_IX,
-                    AutoGetCollection::Options{}.secondaryNssOrUUIDs({toNss}));
                 std::vector<IndexCatalogType> fromIndexes;
                 boost::optional<UUID> uuid;
                 {
