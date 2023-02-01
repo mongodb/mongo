@@ -5,6 +5,7 @@
  * @tags: [
  *   # State management statistics added as part of scalability improvements project.
  *   featureFlagTimeseriesScalabilityImprovements,
+ *   requires_fcv_63,
  * ]
  */
 (function() {

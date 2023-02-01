@@ -187,7 +187,8 @@ feature_flags:
     featureFlagTimeseriesScalabilityImprovements:
         description: "Enable scalability and usability improvements for time-series collections"
         cpp_varname: feature_flags::gTimeseriesScalabilityImprovements
-        default: false
+        default: true
+        version: 6.3
     featureFlagExtendValidateCommand:
         description: "Enable checks on more types of inconsistencies for the validate command"
         cpp_varname: feature_flags::gExtendValidateCommand
