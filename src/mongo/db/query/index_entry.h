@@ -163,14 +163,16 @@ struct IndexEntry : CoreIndexInfo {
                const MatchExpression* fe,
                const BSONObj& io,
                const CollatorInterface* ci,
-               const WildcardProjection* wildcardProjection)
+               const WildcardProjection* wildcardProjection,
+               size_t wildcardPos = 0)
         : CoreIndexInfo(kp, type, sp, std::move(ident), fe, ci, wildcardProjection),
           version(version),
           multikey(mk),
+          unique(unq),
           multikeyPaths(mkp),
           multikeyPathSet(std::move(multikeyPathSet)),
-          unique(unq),
-          infoObj(io) {
+          infoObj(io),
+          wildcardFieldPos(wildcardPos) {
         // The caller must not supply multikey metadata in two different formats.
         invariant(this->multikeyPaths.empty() || this->multikeyPathSet.empty());
     }
@@ -232,6 +234,7 @@ struct IndexEntry : CoreIndexInfo {
 
     IndexDescriptor::IndexVersion version;
     bool multikey;
+    bool unique;
 
     // If non-empty, 'multikeyPaths' is a vector with size equal to the number of elements in the
     // index key pattern. Each element in the vector is an ordered set of positions (starting at 0)
@@ -251,10 +254,12 @@ struct IndexEntry : CoreIndexInfo {
     // 'multikeyPathSet' must be empty.
     std::set<FieldRef> multikeyPathSet;
 
-    bool unique;
-
     // Geo indices have extra parameters.  We need those available to plan correctly.
     BSONObj infoObj;
+
+    // Position of the replaced wildcard index field in the keyPattern, applied to Wildcard Indexes
+    // only.
+    size_t wildcardFieldPos;
 };
 
 /**

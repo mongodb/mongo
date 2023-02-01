@@ -47,6 +47,13 @@ namespace mongo {
 namespace wildcard_planning {
 namespace {
 /**
+ * Returns true if the given 'fieldName' is a wildcard field of the form "[path.]$**".
+ */
+bool isWildcardField(const StringData& fieldName) {
+    return (fieldName == "$**"_sd) || fieldName.endsWith(".$**"_sd);
+}
+
+/**
  * Compares the path 'fieldNameOrArrayIndexPath' to 'staticComparisonPath', ignoring any array
  * indices present in the former if they are not present in the latter. The 'multikeyPathComponents'
  * set contains the path positions that are known to be arrays; only numerical path components that
@@ -144,16 +151,27 @@ FieldRef pathWithoutSpecifiedComponents(const FieldRef& path,
  * looking up multikeyness in 'multikeyPathSet'.
  */
 MultikeyPaths buildMultiKeyPathsForExpandedWildcardIndexEntry(
-    const FieldRef& indexedPath, const std::set<FieldRef>& multikeyPathSet) {
-    FieldRef pathToLookup;
-    MultikeyComponents multikeyPaths;
-    for (size_t i = 0; i < indexedPath.numParts(); ++i) {
-        pathToLookup.appendPart(indexedPath.getPart(i));
-        if (fieldNameOrArrayIndexPathSetContains(multikeyPathSet, multikeyPaths, pathToLookup)) {
-            multikeyPaths.insert(i);
+    const BSONObj& keyPattern,
+    const FieldRef& indexedPath,
+    const std::set<FieldRef>& multikeyPathSet) {
+    MultikeyPaths multikeyPaths{};
+    for (const auto& field : keyPattern) {
+        if (isWildcardField(field.fieldNameStringData())) {
+            FieldRef pathToLookup;
+            MultikeyComponents mkComponents;
+            for (size_t i = 0; i < indexedPath.numParts(); ++i) {
+                pathToLookup.appendPart(indexedPath.getPart(i));
+                if (fieldNameOrArrayIndexPathSetContains(
+                        multikeyPathSet, mkComponents, pathToLookup)) {
+                    mkComponents.insert(i);
+                }
+            }
+            multikeyPaths.emplace_back(mkComponents);
+        } else {
+            multikeyPaths.emplace_back();
         }
     }
-    return {multikeyPaths};
+    return multikeyPaths;
 }
 
 std::set<FieldRef> generateFieldNameOrArrayIndexPathSet(const MultikeyComponents& multikeyPaths,
@@ -233,9 +251,6 @@ std::set<FieldRef> generateFieldNameOrArrayIndexPathSet(const MultikeyComponents
 bool validateNumericPathComponents(const MultikeyPaths& multikeyPaths,
                                    const std::set<FieldRef>& includedPaths,
                                    const FieldRef& queryPath) {
-    // $** multikeyPaths always have a singleton set, since they are single-element indexes.
-    invariant(multikeyPaths.size() == 1);
-
     // Find the positions of all multikey path components in 'queryPath' that have a numerical path
     // component immediately after. For a queryPath of 'a.2.b' this will return position 0; that is,
     // 'a'. If no such multikey path was found, we are clear to proceed with planning.
@@ -344,25 +359,72 @@ bool boundsOverlapObjectTypeBracket(const OrderedIntervalList& oil) {
     // If we're here, then all the OIL's bounds precede the object type bracket.
     return false;
 }
+
+/**
+ * Returns expanded wildcard key pattern with a wildcard field replaced by the given expandField and
+ * the position of the replaced wildcard field.
+ */
+std::pair<BSONObj, size_t> expandWildcardIndexKeyPattern(const BSONObj& wildcardKeyPattern,
+                                                         StringData expandFieldName) {
+    int wildcardFieldPos = -1;
+    int fieldPos = 0;
+    BSONObjBuilder builder{};
+    for (const auto& field : wildcardKeyPattern) {
+        const auto& fieldName = field.fieldNameStringData();
+        if (isWildcardField(fieldName)) {
+            tassert(7246500,
+                    str::stream()
+                        << "Wildcard Index's key pattern must contain exactly one wildcard field: '"
+                        << wildcardKeyPattern << "'.",
+                    wildcardFieldPos < 0);
+            builder.appendAs(field, expandFieldName);
+            wildcardFieldPos = fieldPos;
+        } else {
+            builder.append(field);
+        }
+        ++fieldPos;
+    }
+
+    tassert(7246501,
+            str::stream() << "Wildcard Index's key pattern must contain one wildcard field: '"
+                          << wildcardKeyPattern << "'.",
+            wildcardFieldPos >= 0);
+
+    return std::make_pair(builder.obj(), static_cast<size_t>(wildcardFieldPos));
+}
 }  // namespace
 
 void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
                               const stdx::unordered_set<std::string>& fields,
                               std::vector<IndexEntry>* out) {
-    invariant(out);
-    invariant(wildcardIndex.type == INDEX_WILDCARD);
-    // Should only have one field of the form {"path.$**" : 1}.
-    invariant(wildcardIndex.keyPattern.nFields() == 1);
-    invariant(wildcardIndex.keyPattern.firstElement().fieldNameStringData().endsWith("$**"));
+    tassert(7246502, "out parameter cannot be null", out);
+    tassert(7246503,
+            "expandWildcardIndexEntry expected only WildcardIndexes",
+            wildcardIndex.type == INDEX_WILDCARD);
+
+    if (!feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // Should only have one field of the form {"path.$**" : 1}.
+        tassert(7246511,
+                "Wildcard Index's key pattern must always have length 1 for non-compound Wildcard "
+                "Indexes",
+                wildcardIndex.keyPattern.nFields() == 1);
+        tassert(7246512,
+                "Wildcard Index's field name must end with the wildcard suffix '$**'",
+                wildcardIndex.keyPattern.firstElement().fieldNameStringData().endsWith("$**"));
+    }
 
     // $** indexes do not keep the multikey metadata inside the index catalog entry, as the amount
     // of metadata is not bounded. We do not expect IndexEntry objects for $** indexes to have a
     // fixed-size vector of multikey metadata until after they are expanded.
-    invariant(wildcardIndex.multikeyPaths.empty());
+    tassert(7246504,
+            "multikeyPaths must be empty for Wildcard Indexes",
+            wildcardIndex.multikeyPaths.empty());
 
     // Obtain the projection executor from the parent wildcard IndexEntry.
     auto* wildcardProjection = wildcardIndex.indexPathProjection;
-    invariant(wildcardProjection);
+    tassert(
+        7246505, "wildcardProjection must be non-null for Wildcard Indexes", wildcardProjection);
 
     const auto projectedFields =
         projection_executor_utils::applyProjectionToFields(wildcardProjection->exec(), fields);
@@ -371,6 +433,7 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
     const auto& includedPaths =
         wildcardProjection->exhaustivePaths() ? *wildcardProjection->exhaustivePaths() : kEmptySet;
     out->reserve(out->size() + projectedFields.size());
+
     for (auto&& fieldName : projectedFields) {
         // Convert string 'fieldName' into a FieldRef, to better facilitate the subsequent checks.
         auto queryPath = FieldRef{fieldName};
@@ -380,7 +443,7 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
         // which will indicate to the downstream planning code which components of 'fieldName' are
         // multikey.
         auto multikeyPaths = buildMultiKeyPathsForExpandedWildcardIndexEntry(
-            queryPath, wildcardIndex.multikeyPathSet);
+            wildcardIndex.keyPattern, queryPath, wildcardIndex.multikeyPathSet);
 
         // Check whether a query on the current fieldpath is answerable by the $** index, given any
         // numerical path components that may be present in the path string.
@@ -394,10 +457,14 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
         // we will generate two expanded index entries: one for "a.b" and "c.d". The "a.b" entry
         // will be marked as multikey because "a" is multikey, whereas the "c.d" entry will not be
         // marked as multikey.
-        invariant(multikeyPaths.size() == 1u);
-        const bool isMultikey = !multikeyPaths[0].empty();
+        tassert(7246506,
+                "multikeyPaths size must be equal to the number of the key pattern fields.",
+                multikeyPaths.size() == static_cast<size_t>(wildcardIndex.keyPattern.nFields()));
 
-        IndexEntry entry(BSON(fieldName << wildcardIndex.keyPattern.firstElement()),
+        auto [expandedKeyPattern, wildcardFieldPos] =
+            expandWildcardIndexKeyPattern(wildcardIndex.keyPattern, fieldName);
+        const bool isMultikey = !multikeyPaths[wildcardFieldPos].empty();
+        IndexEntry entry(std::move(expandedKeyPattern),
                          IndexType::INDEX_WILDCARD,
                          IndexDescriptor::kLatestIndexVersion,
                          isMultikey,
@@ -411,9 +478,12 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
                          wildcardIndex.filterExpr,
                          wildcardIndex.infoObj,
                          wildcardIndex.collator,
-                         wildcardIndex.indexPathProjection);
+                         wildcardIndex.indexPathProjection,
+                         wildcardFieldPos);
 
-        invariant("$_path"_sd != fieldName);
+        tassert(7246507,
+                "'$_path' is reserved fieldname for Wildcard Indexes",
+                "$_path"_sd != fieldName);
         out->push_back(std::move(entry));
     }
 }

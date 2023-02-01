@@ -419,6 +419,7 @@ env.CppUnitTest(
         "planner_access_test.cpp",
         "planner_analysis_test.cpp",
         "planner_ixselect_test.cpp",
+        "planner_wildcard_helpers_test.cpp",
         "projection_ast_test.cpp",
         "projection_test.cpp",
         "query_planner_array_test.cpp",
