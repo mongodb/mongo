@@ -306,15 +306,14 @@ public:
      *   - shardVersion - The new shard version of the source shard
      *   - collectionVersion - The new collection version after the commit
      */
-    StatusWith<ShardAndCollectionVersion> commitChunkMigration(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const ChunkType& migratedChunk,
-        const OID& collectionEpoch,
-        const Timestamp& collectionTimestamp,
-        const ShardId& fromShard,
-        const ShardId& toShard,
-        const boost::optional<Timestamp>& validAfter);
+    StatusWith<ShardAndCollectionVersion> commitChunkMigration(OperationContext* opCtx,
+                                                               const NamespaceString& nss,
+                                                               const ChunkType& migratedChunk,
+                                                               const OID& collectionEpoch,
+                                                               const Timestamp& collectionTimestamp,
+                                                               const ShardId& fromShard,
+                                                               const ShardId& toShard,
+                                                               const Timestamp& validAfter);
 
     /**
      * Removes the jumbo flag from the specified chunk.

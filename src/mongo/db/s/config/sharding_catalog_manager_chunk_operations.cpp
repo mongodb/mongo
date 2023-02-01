@@ -1148,11 +1148,11 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
                                              const Timestamp& collectionTimestamp,
                                              const ShardId& fromShard,
                                              const ShardId& toShard,
-                                             const boost::optional<Timestamp>& validAfter) {
-
-    if (!validAfter) {
-        return {ErrorCodes::IllegalOperation, "chunk operation requires validAfter timestamp"};
-    }
+                                             const Timestamp& validAfter) {
+    uassertStatusOK(
+        ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(migratedChunk.getMin()));
+    uassertStatusOK(
+        ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(migratedChunk.getMax()));
 
     // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
     // under the exclusive _kChunkOpLock happen on the same term.
@@ -1301,7 +1301,6 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
 
     // Copy the complete history.
     auto newHistory = currentChunk.getHistory();
-    invariant(validAfter);
 
     // Drop old history. Keep at least 1 entry so ChunkInfo::getShardIdAt finds valid history for
     // any query younger than the history window.
@@ -1309,7 +1308,7 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
         int entriesDeleted = 0;
         while (newHistory.size() > 1 &&
                newHistory.back().getValidAfter().getSecs() + getHistoryWindowInSeconds() <
-                   validAfter.value().getSecs()) {
+                   validAfter.getSecs()) {
             newHistory.pop_back();
             ++entriesDeleted;
         }
@@ -1323,16 +1322,16 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
         LOGV2_DEBUG(4778500, 1, "Deleted old chunk history entries", attrs);
     }
 
-    if (!newHistory.empty() && newHistory.front().getValidAfter() >= validAfter.value()) {
+    if (!newHistory.empty() && newHistory.front().getValidAfter() >= validAfter) {
         return {ErrorCodes::IncompatibleShardingMetadata,
                 str::stream() << "The chunk history for chunk with namespace " << nss.ns()
                               << " and min key " << migratedChunk.getMin()
                               << " is corrupted. The last validAfter "
                               << newHistory.back().getValidAfter().toString()
                               << " is greater or equal to the new validAfter "
-                              << validAfter.value().toString()};
+                              << validAfter.toString()};
     }
-    newMigratedChunk->setOnCurrentShardSince(validAfter.value());
+    newMigratedChunk->setOnCurrentShardSince(validAfter);
     newHistory.emplace(newHistory.begin(),
                        ChunkHistory(*newMigratedChunk->getOnCurrentShardSince(), toShard));
     newMigratedChunk->setHistory(std::move(newHistory));
