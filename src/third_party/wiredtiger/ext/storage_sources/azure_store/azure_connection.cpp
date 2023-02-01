@@ -97,9 +97,38 @@ azure_connection::delete_object(const std::string &object_key) const
     return 0;
 }
 
+// Reads an object and outputs the content into a buffer.
 int
-azure_connection::get_object(const std::string &path) const
+azure_connection::read_object(
+  const std::string &object_key, int64_t offset, size_t len, void *buf) const
 {
+    auto blob_client = _azure_client.GetBlockBlobClient(_object_prefix + object_key);
+    auto blob_properties = blob_client.GetProperties().Value;
+
+    // Checks whether the offset is before the start of the blob.
+    if (offset < 0 || offset > blob_properties.BlobSize) {
+        std::cerr << "Invalid argument: Offset!" << std::endl;
+        return -1;
+    }
+
+    // Checks whether the offset and length is greater than the blob size.
+    if (offset + len > blob_properties.BlobSize) {
+        std::cerr << "Reading past end of file!" << std::endl;
+        return -1;
+    }
+
+    // Utilise the inbuilt DownloadTo options to avoid having to store the blob's content
+    // in memory to save space.
+    Azure::Core::Http::HttpRange range;
+    range.Length = len;
+    range.Offset = offset;
+
+    Azure::Storage::Blobs::DownloadBlobToOptions options;
+    options.Range = range;
+
+    // Downloads the content of the blob with the specified length to the provided buffer.
+    blob_client.DownloadTo(static_cast<uint8_t *>(buf), len, options);
+
     return 0;
 }
 
