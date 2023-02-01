@@ -275,7 +275,6 @@ Status UpdateDriver::update(OperationContext* opCtx,
     auto applyResult = _updateExecutor->applyUpdate(applyParams);
     if (applyResult.indexesAffected) {
         _affectIndices = true;
-        doc->disableInPlaceUpdates();
     }
     if (docWasModified) {
         *docWasModified = !applyResult.noop;
