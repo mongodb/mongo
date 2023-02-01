@@ -28,10 +28,12 @@ var QuerySamplingUtil = (function() {
 
     /**
      * Waits for the given node to have one active collection for query sampling.
+     * Throws if the featureFlagAnalyzeShardKey is not set.
      */
     function waitForActiveSampling(node) {
         assert.soon(() => {
             const res = assert.commandWorked(node.adminCommand({serverStatus: 1}));
+            assert(res.hasOwnProperty("queryAnalyzers"));
             return res.queryAnalyzers.activeCollections == 1;
         });
     }

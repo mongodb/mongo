@@ -202,8 +202,7 @@ QueryAnalysisWriter* QueryAnalysisWriter::get(ServiceContext* serviceContext) {
 bool QueryAnalysisWriter::shouldRegisterReplicaSetAwareService() const {
     // This is invoked when the Register above is constructed which is before FCV is set so we need
     // to ignore FCV when checking if the feature flag is enabled.
-    return analyze_shard_key::isFeatureFlagEnabledIgnoreFCV() &&
-        serverGlobalParams.clusterRole == ClusterRole::ShardServer;
+    return analyze_shard_key::supportsPersistingSampledQueriesIgnoreFCV();
 }
 
 void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
@@ -272,6 +271,7 @@ void QueryAnalysisWriter::onStepUpComplete(OperationContext* opCtx, long long te
 
 ExecutorFuture<void> QueryAnalysisWriter::createTTLIndexes(OperationContext* opCtx) {
     static unsigned int tryCount = 0;
+    invariant(_executor);
     auto future =
         AsyncTry([this, opCtx] {
             ++tryCount;
