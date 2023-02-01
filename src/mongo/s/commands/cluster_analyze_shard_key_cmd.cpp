@@ -76,12 +76,13 @@ public:
             const auto& nss = ns();
             const auto& catalogCache = Grid::get(opCtx)->catalogCache();
             const auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+            const auto primaryShardId = cri.cm.dbPrimary();
 
             std::set<ShardId> candidateShardIds;
             if (cri.cm.isSharded()) {
                 cri.cm.getAllShardIds(&candidateShardIds);
             } else {
-                candidateShardIds.insert(cri.cm.dbPrimary());
+                candidateShardIds.insert(primaryShardId);
             }
 
             PseudoRandom random{SecureRandom{}.nextInt64()};
@@ -90,9 +91,26 @@ public:
             while (true) {
                 // Select a random shard.
                 invariant(!candidateShardIds.empty());
-                auto it = candidateShardIds.begin();
-                std::advance(it, random.nextInt64(candidateShardIds.size()));
-                auto shardId = *it;
+                auto shardId = [&] {
+                    // The monotonicity check can return an incorrect result if the collection has
+                    // gone through chunk migrations since chunk migration deletes documents from
+                    // the donor shard and re-inserts them on the recipient shard so there is no
+                    // guarantee that the insertion order from the client is preserved. Therefore,
+                    // the likelihood of an incorrect result is correlated to the ratio between
+                    // the number of documents inserted by the client and the number of documents
+                    // inserted by chunk migrations. Prioritizing the primary shard helps lower the
+                    // risk of incorrect results since if the collection did not start out as being
+                    // sharded (which applies to most cases), the primary shard is likely to be the
+                    // shard with the least number of documents inserted by chunk migrations since
+                    // all the data starts out there.
+                    if (candidateShardIds.find(primaryShardId) != candidateShardIds.end()) {
+                        return primaryShardId;
+                    }
+
+                    auto it = candidateShardIds.begin();
+                    std::advance(it, random.nextInt64(candidateShardIds.size()));
+                    return *it;
+                }();
                 candidateShardIds.erase(shardId);
 
                 uassert(ErrorCodes::IllegalOperation,
