@@ -443,6 +443,14 @@ TEST(IDLOneTypeTests, TestBase64StringNegative) {
     }
 }
 
+
+// BSONElement::exactNumberLong() provides different errors on windows
+#ifdef _WIN32
+constexpr auto kNANRepr = "-nan(ind)"_sd;
+#else
+constexpr auto kNANRepr = "nan"_sd;
+#endif
+
 TEST(IDLStructTests, DurationParse) {
     IDLParserContext ctxt("duration");
 
@@ -469,10 +477,11 @@ TEST(IDLStructTests, DurationParse) {
                                 "Duration value must be numeric, got: string");
 
     auto notADurationDoc = BSON("secs" << NAN);
-    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_durations::parse(ctxt, notADurationDoc),
-                                AssertionException,
-                                ErrorCodes::FailedToParse,
-                                "Expected an integer, but found NaN in: secs: nan.0");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        Struct_with_durations::parse(ctxt, notADurationDoc),
+        AssertionException,
+        ErrorCodes::FailedToParse,
+        fmt::format("Expected an integer, but found NaN in: secs: {}.0", kNANRepr));
 
     auto endOfTimeDoc = BSON("secs" << std::numeric_limits<double>::infinity());
     ASSERT_THROWS_CODE_AND_WHAT(Struct_with_durations::parse(ctxt, endOfTimeDoc),
@@ -522,10 +531,11 @@ TEST(IDLStructTests, EpochsParse) {
                                 "Epoch value must be numeric, got: string");
 
     auto notATimeDoc = BSON("unix" << 0 << "ecma" << NAN);
-    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(ctxt, notATimeDoc),
-                                AssertionException,
-                                ErrorCodes::FailedToParse,
-                                "Expected an integer, but found NaN in: ecma: nan.0");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        Struct_with_epochs::parse(ctxt, notATimeDoc),
+        AssertionException,
+        ErrorCodes::FailedToParse,
+        fmt::format("Expected an integer, but found NaN in: ecma: {}.0", kNANRepr));
 
     auto endOfTimeDoc = BSON("unix" << std::numeric_limits<double>::infinity() << "ecma" << 0);
     ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(ctxt, endOfTimeDoc),
