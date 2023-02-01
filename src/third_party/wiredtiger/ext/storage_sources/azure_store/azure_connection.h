@@ -33,7 +33,15 @@
 
 #include <string>
 #include <vector>
-#include <iostream>
+
+// Mapping between HTTP response codes and corresponding errno values to be used by the Azure
+// connection methods to return errno values expected by the filesystem interface.
+static const std::map<Azure::Core::Http::HttpStatusCode, int32_t> to_errno = {
+  {Azure::Core::Http::HttpStatusCode::NotFound, ENOENT},
+  {Azure::Core::Http::HttpStatusCode::Forbidden, EACCES},
+  {Azure::Core::Http::HttpStatusCode::Conflict, EBUSY},
+  {Azure::Core::Http::HttpStatusCode::BadRequest, EINVAL},
+  {Azure::Core::Http::HttpStatusCode::InternalServerError, EAGAIN}};
 
 /*
  * This class represents an active connection to the Azure endpoint and allows for interaction with
@@ -59,5 +67,6 @@ class azure_connection {
     const std::string _object_prefix;
     const Azure::Storage::Blobs::BlobContainerClient _azure_client;
 
+    const int http_to_errno(const Azure::Core::RequestFailedException &e) const;
     int bucket_exists(bool &exists) const;
 };
