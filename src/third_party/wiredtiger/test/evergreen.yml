@@ -682,6 +682,22 @@ variables:
         vars:
           format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 360
 
+  - &format-stress-sanitizer-ppc-test
+    exec_timeout_secs: 25200
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_clang.cmake -DCMAKE_BUILD_TYPE=ASan -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1
+      - func: "format test script"
+        vars:
+          # Always disable mmap for PPC due to issues on variant setup.
+          # See https://bugzilla.redhat.com/show_bug.cgi?id=1686261#c10 for the potential cause.
+          format_test_script_args: -t 360 -- -C "mmap=false,mmap_all=false"
+          test_env_vars:
+            ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0:unmap_shadow_on_exit=1"
+            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
+
   - &format-stress-sanitizer-test
     exec_timeout_secs: 25200
     commands:
@@ -2644,9 +2660,8 @@ tasks:
             set -o verbose
             for i in {1..10}; do ${test_env_vars|} ${python_binary|python3} split_stress.py; done
 
-  # The task name is ppc-zseries because this task will be used in both buildVariants
-  - name: format-stress-ppc-zseries-test
-    tags: ["stress-test-ppc-1", "stress-test-zseries-1"]
+  - name: format-stress-zseries-test
+    tags: ["stress-test-zseries-1"]
     # Set 2.5 hours timeout (60 * 60 * 2.5)
     exec_timeout_secs: 9000
     commands:
@@ -2656,6 +2671,22 @@ tasks:
         vars:
           #run for 2 hours ( 2 * 60 = 120 minutes), use default config
           format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 120
+
+  - name: format-stress-ppc-test
+    tags: ["stress-test-ppc-1"]
+    # Set 2.5 hours timeout (60 * 60 * 2.5)
+    exec_timeout_secs: 9000
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars: 
+          posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1
+      - func: "format test script"
+        vars:
+          #run for 2 hours ( 2 * 60 = 120 minutes), use default config
+          # Always disable mmap for PPC due to issues on variant setup.
+          # See https://bugzilla.redhat.com/show_bug.cgi?id=1686261#c10 for the potential cause.
+          format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 120 -- -C "mmap=false,mmap_all=false"
 
   - <<: *format-stress-test
     name: format-stress-test-1
@@ -2669,12 +2700,18 @@ tasks:
   - <<: *format-stress-test
     name: format-stress-test-4
     tags: ["stress-test-4"]
+  - <<: *format-stress-sanitizer-ppc-test
+    name: format-stress-sanitizer-ppc-test-1
+    tags: ["stress-test-ppc-1"]
+  - <<: *format-stress-sanitizer-ppc-test
+    name: format-stress-sanitizer-ppc-test-2
+    tags: ["stress-test-ppc-2"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-1
-    tags: ["stress-test-1", "stress-test-ppc-1"]
+    tags: ["stress-test-sanitizer-1"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-2
-    tags: ["stress-test-2", "stress-test-ppc-2"]
+    tags: ["stress-test-sanitizer-2"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-3
     tags: ["stress-test-3"]
@@ -4162,8 +4199,6 @@ buildvariants:
 
 - name: rhel8-ppc
   display_name: "~ RHEL8 PPC"
-  # FIXME-WT-8981
-  activate: false
   run_on:
   - rhel81-power8-small
   batchtime: 120 # 2 hours
@@ -4182,8 +4217,8 @@ buildvariants:
       -DENABLE_STRICT=1
       -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
     python_binary: '/opt/mongodbtoolchain/v4/bin/python3'
-    # Use half number of vCPU to avoid OOM kill failure
-    smp_command: -j $(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)
+    # Use quarter of the vCPUs to avoid OOM kill failure and disk issues on this variant.
+    smp_command: -j $(echo $(grep -c ^processor /proc/cpuinfo) / 4 | bc)
     cmake_generator: Ninja
     make_command: ninja
   tasks:
