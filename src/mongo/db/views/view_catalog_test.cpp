@@ -107,7 +107,7 @@ public:
         Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
         Lock::CollectionLock sysCollLock(
             operationContext(),
-            NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+            NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()),
             MODE_X);
 
         WriteUnitOfWork wuow(opCtx);
@@ -126,7 +126,7 @@ public:
         Lock::CollectionLock collLock(operationContext(), viewName, MODE_X);
         Lock::CollectionLock sysCollLock(
             operationContext(),
-            NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+            NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()),
             MODE_X);
 
         WriteUnitOfWork wuow(opCtx);
@@ -142,7 +142,7 @@ public:
         Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
         Lock::CollectionLock sysCollLock(
             operationContext(),
-            NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+            NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()),
             MODE_X);
 
         WriteUnitOfWork wuow(opCtx);
@@ -169,7 +169,7 @@ private:
     Database* _createDatabase(const DatabaseName& dbName) {
         WriteUnitOfWork wuow{operationContext()};
 
-        NamespaceString ns{dbName, NamespaceString::kSystemDotViewsCollectionName};
+        NamespaceString ns = NamespaceString::makeSystemDotViewsNamespace(dbName);
         AutoGetCollection systemViews{operationContext(), ns, MODE_X};
         auto db = systemViews.ensureDbExists(operationContext());
         ASSERT(db->createCollection(operationContext(), ns));
@@ -530,7 +530,7 @@ TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
         Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
         Lock::CollectionLock sysCollLock(
             operationContext(),
-            NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName),
+            NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()),
             MODE_X);
 
         WriteUnitOfWork wunit(operationContext());
@@ -574,7 +574,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
         Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
         Lock::CollectionLock sysCollLock(
             operationContext(),
-            NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName),
+            NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()),
             MODE_X);
 
         WriteUnitOfWork wunit(operationContext());
@@ -612,7 +612,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
         Lock::CollectionLock collLock(operationContext(), viewName, MODE_X);
         Lock::CollectionLock sysCollLock(
             operationContext(),
-            NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName),
+            NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()),
             MODE_X);
 
         WriteUnitOfWork wunit(operationContext());

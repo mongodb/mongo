@@ -148,8 +148,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedApplyOpsOpWithOtherO
 
 TEST_F(OplogApplierTest, GetNextApplierBatchReturnsSystemDotViewsOpInOwnBatch) {
     std::vector<OplogEntry> srcOps;
-    srcOps.push_back(makeInsertOplogEntry(
-        1, NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName)));
+    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString::makeSystemDotViewsNamespace(dbName)));
     srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")));
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
 

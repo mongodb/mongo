@@ -83,8 +83,7 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
     uassert(ErrorCodes::InvalidViewDefinition,
             str::stream() << "found invalid view definition " << viewDefinition["_id"]
                           << " while reading '"
-                          << NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName)
-                          << "'",
+                          << NamespaceString::makeSystemDotViewsNamespace(dbName) << "'",
             valid);
 }
 }  // namespace mongo::view_util

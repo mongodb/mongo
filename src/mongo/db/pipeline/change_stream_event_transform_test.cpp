@@ -100,7 +100,8 @@ TEST(ChangeStreamEventTransformTest, TestDefaultUpdateTransform) {
 }
 
 TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {
-    const NamespaceString systemViewNss(boost::none, "viewDB.system.views");
+    const NamespaceString systemViewNss =
+        NamespaceString::makeSystemDotViewsNamespace({boost::none, "viewDB"});
     const NamespaceString viewNss(boost::none, "viewDB.view.name");
     const auto viewPipeline =
         Value(fromjson("[{$match: {field: 'value'}}, {$project: {field: 1}}]"));
@@ -133,7 +134,8 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {
 }
 
 TEST(ChangeStreamEventTransformTest, TestCreateViewOnSingleCollection) {
-    const NamespaceString systemViewNss(boost::none, "viewDB.system.views");
+    const NamespaceString systemViewNss =
+        NamespaceString::makeSystemDotViewsNamespace({boost::none, "viewDB"});
     const NamespaceString viewNss(boost::none, "viewDB.view.name");
     const auto viewPipeline =
         Value(fromjson("[{$match: {field: 'value'}}, {$project: {field: 1}}]"));
@@ -354,7 +356,8 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransformWithTenantId) {
 
     const auto tenantId = TenantId(OID::gen());
 
-    const NamespaceString systemViewNss(tenantId, "viewDB.system.views");
+    const NamespaceString systemViewNss =
+        NamespaceString::makeSystemDotViewsNamespace({tenantId, "viewDB"});
     const NamespaceString viewNss(tenantId, "viewDB.view.name");
     const auto viewPipeline =
         Value(fromjson("[{$match: {field: 'value'}}, {$project: {field: 1}}]"));

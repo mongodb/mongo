@@ -2926,7 +2926,8 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
     create(backingCollNss);
 
     const NamespaceString viewNss("unittests.view");
-    const NamespaceString systemViewsNss("unittests.system.views");
+    const NamespaceString systemViewsNss =
+        NamespaceString::makeSystemDotViewsNamespace({boost::none, "unittests"});
 
     ASSERT_OK(createCollection(_opCtx,
                                viewNss.dbName(),

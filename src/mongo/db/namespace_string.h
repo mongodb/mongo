@@ -397,6 +397,11 @@ public:
     static NamespaceString makeClusterParametersNSS(const boost::optional<TenantId>& tenantId);
 
     /**
+     * Constructs the system.views NamespaceString for the specified DatabaseName.
+     */
+    static NamespaceString makeSystemDotViewsNamespace(const DatabaseName& dbName);
+
+    /**
      * Constructs a NamespaceString representing a BulkWrite namespace. The format for this
      * namespace is admin.$cmd.bulkWrite".
      */

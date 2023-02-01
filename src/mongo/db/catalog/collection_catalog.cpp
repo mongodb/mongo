@@ -615,8 +615,7 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
     invariant(durability == ViewsForDatabase::Durability::kAlreadyDurable ||
               opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
-        MODE_X));
+        NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()), MODE_X));
 
     invariant(_viewsForDatabase.contains(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
@@ -665,8 +664,7 @@ Status CollectionCatalog::modifyView(
     const ViewsForDatabase::PipelineValidatorFn& validatePipeline) const {
     invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_X));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
-        MODE_X));
+        NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()), MODE_X));
     invariant(_viewsForDatabase.contains(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
 
@@ -711,8 +709,7 @@ Status CollectionCatalog::modifyView(
 Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceString& viewName) const {
     invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
-        MODE_X));
+        NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()), MODE_X));
     invariant(_viewsForDatabase.contains(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
     assertViewCatalogValid(viewsForDb);
@@ -753,7 +750,7 @@ void CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseName&
     // rollback()function runs, for thread saftey. And, MODE_X locks always opt for two-phase
     // locking.
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+        NamespaceString::makeSystemDotViewsNamespace(dbName), MODE_X));
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     if (uncommittedCatalogUpdates.shouldIgnoreExternalViewChanges(dbName)) {
@@ -1972,7 +1969,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
 void CollectionCatalog::registerUncommittedView(OperationContext* opCtx,
                                                 const NamespaceString& nss) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(nss.dbName(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+        NamespaceString::makeSystemDotViewsNamespace(nss.dbName()), MODE_X));
 
     // Since writing to system.views requires an X lock, we only need to cross-check collection
     // namespaces here.
@@ -2246,7 +2243,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews(ServiceContext* svcCtx)
 
 void CollectionCatalog::clearViews(OperationContext* opCtx, const DatabaseName& dbName) const {
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+        NamespaceString::makeSystemDotViewsNamespace(dbName), MODE_X));
 
     auto it = _viewsForDatabase.find(dbName);
     invariant(it != _viewsForDatabase.end());
@@ -2430,8 +2427,7 @@ bool CollectionCatalog::hasExclusiveAccessToCollection(OperationContext* opCtx,
 
 CollectionPtr CollectionCatalog::_lookupSystemViews(OperationContext* opCtx,
                                                     const DatabaseName& dbName) const {
-    return lookupCollectionByNamespace(opCtx,
-                                       {dbName, NamespaceString::kSystemDotViewsCollectionName});
+    return lookupCollectionByNamespace(opCtx, NamespaceString::makeSystemDotViewsNamespace(dbName));
 }
 
 boost::optional<const ViewsForDatabase&> CollectionCatalog::_getViewsForDatabase(

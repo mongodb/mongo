@@ -3225,7 +3225,7 @@ TEST_F(IdempotencyTest, CreateCollectionWithView) {
     // Create data collection
     ASSERT_OK(runOpInitialSync(createCollection()));
     // Create "system.views" collection
-    auto viewNss = NamespaceString(_nss.db(), "system.views");
+    auto viewNss = NamespaceString::makeSystemDotViewsNamespace(_nss.dbName());
     ASSERT_OK(
         runOpInitialSync(makeCreateCollectionOplogEntry(nextOpTime(), viewNss, options.toBSON())));
 

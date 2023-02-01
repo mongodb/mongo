@@ -756,7 +756,7 @@ Status _collModInternal(OperationContext* opCtx,
     auto nss = coll.getNss();
     auto dbName = nss.dbName();
     Lock::CollectionLock systemViewsLock(
-        opCtx, NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X);
+        opCtx, NamespaceString::makeSystemDotViewsNamespace(dbName), MODE_X);
 
     Database* const db = coll.getDb();
 

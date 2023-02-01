@@ -167,9 +167,7 @@ Status _createView(OperationContext* opCtx,
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         // Operations all lock system.views in the end to prevent deadlock.
         Lock::CollectionLock systemViewsLock(
-            opCtx,
-            NamespaceString(nss.dbName(), NamespaceString::kSystemDotViewsCollectionName),
-            MODE_X);
+            opCtx, NamespaceString::makeSystemDotViewsNamespace(nss.dbName()), MODE_X);
 
         auto db = autoDb.ensureDbExists(opCtx);
 
@@ -408,9 +406,7 @@ Status _createTimeseries(OperationContext* opCtx,
             MODE_IX,
             AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
         Lock::CollectionLock systemDotViewsLock(
-            opCtx,
-            NamespaceString(ns.dbName(), NamespaceString::kSystemDotViewsCollectionName),
-            MODE_X);
+            opCtx, NamespaceString::makeSystemDotViewsNamespace(ns.dbName()), MODE_X);
         auto db = autoColl.ensureDbExists(opCtx);
 
         // This is a top-level handler for time-series creation name conflicts. New commands coming

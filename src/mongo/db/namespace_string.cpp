@@ -332,6 +332,10 @@ NamespaceString NamespaceString::makeClusterParametersNSS(
                     : kClusterParametersNamespace;
 }
 
+NamespaceString NamespaceString::makeSystemDotViewsNamespace(const DatabaseName& dbName) {
+    return NamespaceString(dbName, kSystemDotViewsCollectionName);
+}
+
 NamespaceString NamespaceString::makeListCollectionsNSS(const DatabaseName& dbName) {
     NamespaceString nss(dbName, listCollectionsCursorCol);
     dassert(nss.isValid());

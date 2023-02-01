@@ -3284,7 +3284,7 @@ TEST_F(ChangeStreamStageDBTest, MatchFiltersOperationsOnSystemCollections) {
 
     // Rename from a 'system' collection to another 'system' collection should not include a
     // notification.
-    NamespaceString renamedSystemColl(nss.db() + ".system.views");
+    NamespaceString renamedSystemColl(NamespaceString::makeSystemDotViewsNamespace(nss.dbName()));
     OplogEntry rename = createCommand(
         BSON("renameCollection" << systemColl.ns() << "to" << renamedSystemColl.ns()), testUuid());
     checkTransformation(rename, boost::none);

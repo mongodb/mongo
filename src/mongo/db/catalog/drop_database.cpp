@@ -235,7 +235,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
         // a time-series view may be missing while the buckets collection exists, but a time-series
         // view is never present without its corresponding buckets collection.
         auto viewCollPtr = catalog->lookupCollectionByNamespace(
-            opCtx, NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName));
+            opCtx, NamespaceString::makeSystemDotViewsNamespace(dbName));
         if (viewCollPtr) {
             ++numCollections;
             const auto& nss = viewCollPtr->ns();
