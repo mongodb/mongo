@@ -108,6 +108,12 @@ const int kMaxBytesBeforeGC = 0xffffffff;
 const int kStackChunkSize = 8192;
 
 /**
+ * Maximum size in bytes of an error string. It should be smaller than 'BufferMaxSize' as it may
+ * share the buffer with error code, call stack, etc.
+ */
+constexpr size_t kMaxErrorStringSize = logv2::constants::kDefaultMaxAttributeOutputSizeKB * 1024;
+
+/**
  * Runtime's can race on first creation (on some function statics), so we just
  * serialize the initial Runtime creation.
  */
@@ -1110,7 +1116,9 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
                 if (!JS::GetPrivate(excn.toObjectOrNull())) {
                     ss << "uncaught exception: ";
                 }
-                ss << ValueWriter(_context, excn).toString();
+                JSStringWrapper jsstr;
+                ss << str::UTF8SafeTruncation(ValueWriter(_context, excn).toStringData(&jsstr),
+                                              kMaxErrorStringSize);
                 auto stackStr = ObjectWrapper(_context, excn).getString(InternedString::stack);
                 auto status =
                     jsExceptionToStatus(_context, excn, ErrorCodes::JSInterpreterFailure, ss);
@@ -1134,7 +1142,10 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
 
             } else {
                 str::stream ss;
-                ss << "uncaught exception: " << ValueWriter(_context, excn).toString();
+                JSStringWrapper jsstr;
+                ss << "uncaught exception: "
+                   << str::UTF8SafeTruncation(ValueWriter(_context, excn).toStringData(&jsstr),
+                                              kMaxErrorStringSize);
                 _status = Status(ErrorCodes::UnknownError, ss);
             }
         } else {
