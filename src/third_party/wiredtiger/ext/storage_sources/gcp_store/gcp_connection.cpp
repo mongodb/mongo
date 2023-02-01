@@ -102,8 +102,46 @@ gcp_connection::delete_object(const std::string &object_key)
 
 // Retrieves an object from the google cloud bucket.
 int
-gcp_connection::get_object(const std::string &object_key, const std::string &path) const
+gcp_connection::read_object(const std::string &object_key, int64_t offset, size_t len, void *buf)
 {
+    bool exists = false;
+    size_t object_size;
+
+    // The object_exists function will check if the given object exists and print out any error
+    // messages.
+    if (object_exists(object_key, exists, object_size) != 0) {
+        return -1;
+    }
+
+    if (!exists) {
+        std::cerr << "Object '" << object_key << "' does not exist." << std::endl;
+        return -1;
+    }
+
+    if (offset < 0) {
+        std::cerr << "Offset " << offset << " is invalid. The offset cannot be less than zero."
+                  << std::endl;
+        return -1;
+    }
+
+    if (offset + len > object_size) {
+        std::cerr << "Length " << len << " plus offset " << offset
+                  << " must not exceed the object size " << object_size << "." << std::endl;
+        return -1;
+    }
+
+    gcs::ObjectReadStream stream = _gcp_client.ReadObject(
+      _bucket_name, _object_prefix + object_key, gcs::ReadFromOffset(offset));
+
+    if (stream.bad()) {
+        std::cerr << stream.status().message() << std::endl;
+        return -1;
+    }
+
+    std::istreambuf_iterator<char> begin{stream}, end;
+    std::string buffer{begin, end};
+
+    memcpy(static_cast<char *>(buf), buffer.c_str(), len);
     return 0;
 }
 
