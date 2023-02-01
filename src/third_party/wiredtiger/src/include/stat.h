@@ -187,11 +187,16 @@ __wt_stats_clear(void *stats_arg, int slot)
         WT_STAT_INCRV_ATOMIC_BASE(session, (stats)[(session)->stat_bucket], fld, value); \
     } while (0)
 #define WT_STAT_INCR(session, stats, fld) WT_STAT_INCRV(session, stats, fld, 1)
+#define WT_STAT_SET_BASE(session, stat, fld, value) \
+    do {                                            \
+        if (WT_STAT_ENABLED(session))               \
+            (stat)->fld = (int64_t)(value);         \
+    } while (0)
 #define WT_STAT_SET(session, stats, fld, value)                            \
     do {                                                                   \
         if (WT_STAT_ENABLED(session)) {                                    \
             __wt_stats_clear(stats, WT_STATS_FIELD_TO_OFFSET(stats, fld)); \
-            (stats)[0]->fld = (int64_t)(value);                            \
+            WT_STAT_SET_BASE(session, (stats)[0], fld, value);             \
         }                                                                  \
     } while (0)
 
@@ -260,6 +265,8 @@ __wt_stats_clear(void *stats_arg, int slot)
  */
 #define WT_STAT_SESSION_INCRV(session, fld, value) \
     WT_STAT_INCRV_BASE(session, &(session)->stats, fld, value)
+#define WT_STAT_SESSION_SET(session, fld, value) \
+    WT_STAT_SET_BASE(session, &(session)->stats, fld, value)
 
 /*
  * Construct histogram increment functions to put the passed value into the right bucket. Bucket
@@ -1107,6 +1114,7 @@ struct __wt_session_stats {
     int64_t bytes_read;
     int64_t bytes_write;
     int64_t lock_dhandle_wait;
+    int64_t txn_bytes_dirty;
     int64_t read_time;
     int64_t write_time;
     int64_t lock_schema_wait;
