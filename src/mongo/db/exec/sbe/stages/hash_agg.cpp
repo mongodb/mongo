@@ -27,17 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/str.h"
-
-#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
-#include "mongo/db/exec/sbe/size_estimator.h"
 
 namespace mongo {
 namespace sbe {
@@ -304,6 +302,15 @@ void HashAggStage::spill(MemoryCheckData& mcd) {
     for (auto&& it : *_ht) {
         spillRowToDisk(it.first, it.second);
     }
+
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
+    // We're not actually doing any sorting here or using the 'Sorter' class, but for the purposes
+    // of $operationMetrics we incorporate the number of spilled records into the "keysSorted"
+    // metric. Similarly, "sorterSpills" despite the name counts the number of individual spill
+    // events.
+    metricsCollector.incrementKeysSorted(_ht->size());
+    metricsCollector.incrementSorterSpills(1);
+
     _ht->clear();
 
     ++_specificStats.numSpills;
