@@ -39,7 +39,6 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(AsyncRPCErrorInfo);
 
 }  // namespace
 
-// NOTE: parse() and serialize() will be removed altogether as part of SERVER-69634.
 std::shared_ptr<const ErrorExtraInfo> AsyncRPCErrorInfo::parse(const BSONObj& obj) {
     return std::make_shared<AsyncRPCErrorInfo>(
         Status(ErrorCodes::BadValue, "RemoteCommandExectionError illegally parsed from bson"));

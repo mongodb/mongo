@@ -598,7 +598,6 @@ TEST_F(AsyncRPCTestFixture, NoRetry) {
     ASSERT_EQUALS(p.getNextRetryDelay(), Milliseconds::zero());
 }
 
-// TODO SERVER-69634: Remove this test.
 TEST_F(AsyncRPCTestFixture, ParseAndSeralizeNoop) {
     std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     HelloCommand helloCmd;
