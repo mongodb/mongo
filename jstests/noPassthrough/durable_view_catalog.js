@@ -79,7 +79,7 @@ assert.commandFailedWithCode(viewsDB.runCommand({collMod: "view2", viewOn: "view
 
 // Checks that dropping a nonexistent view or collection is not affected by an invalid view existing
 // in the view catalog.
-assert.commandFailedWithCode(viewsDB.runCommand({drop: "view4"}), ErrorCodes.NamespaceNotFound);
+assert.commandWorked(viewsDB.runCommand({drop: "view4"}));
 assert.commandFailedWithCode(viewsDB.runCommand({listCollections: 1}),
                              ErrorCodes.InvalidViewDefinition);
 

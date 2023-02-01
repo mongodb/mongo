@@ -222,7 +222,7 @@ commands.push({
         assert.commandWorkedIgnoringWriteConcernErrors(db.runCommand({drop: collName}));
     },
     confirmFunc: function(res) {
-        assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotFound);
+        assert.commandWorkedIgnoringWriteConcernErrors(res);
     }
 });
 
@@ -255,6 +255,18 @@ function testCommandWithWriteConcern(cmd) {
     // Provide a small wtimeout that we expect to time out.
     cmd.req.writeConcern = {w: 3, wtimeout: 1000};
     jsTest.log("Testing " + tojson(cmd.req));
+
+    // Don't run drop cmd on older versions. Starting in v7.0 drop returns OK on non-existent
+    // collections, instead of a NamespaceNotFound error.
+    if (cmd.req["drop"] !== undefined) {
+        const primaryShell = new Mongo(primary.host);
+        const primaryBinVersion = primaryShell.getDB("admin").serverStatus()["version"];
+        if (primaryBinVersion != MongoRunner.getBinVersionFor("latest")) {
+            jsTest.log(
+                "Skipping test: drop on non-existent collections in older versions returns an error.");
+            return;
+        }
+    }
 
     dropTestCollection();
 

@@ -59,24 +59,24 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(hangDropCollectionBeforeLockAcquisition);
 MONGO_FAIL_POINT_DEFINE(hangDuringDropCollection);
 
-Status _checkNssAndReplState(OperationContext* opCtx,
-                             const CollectionPtr& coll,
-                             const NamespaceString& nss,
-                             const boost::optional<UUID>& expectedUUID = boost::none) {
+/**
+ * Checks that the collection has the 'expectedUUID' if given.
+ * Checks that writes are allowed to 'coll' -- e.g. whether this server is PRIMARY.
+ */
+Status _checkUUIDAndReplState(OperationContext* opCtx,
+                              const CollectionPtr& coll,
+                              const NamespaceString& nss,
+                              const boost::optional<UUID>& expectedUUID = boost::none) {
     try {
         checkCollectionUUIDMismatch(opCtx, nss, coll, expectedUUID);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
 
-    if (!coll) {
-        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
-    }
-
     if (opCtx->writesAreReplicated() &&
-        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, coll->ns())) {
+        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
         return Status(ErrorCodes::NotWritablePrimary,
-                      str::stream() << "Not primary while dropping collection " << coll->ns());
+                      str::stream() << "Not primary while dropping collection " << nss);
     }
 
     return Status::OK();
@@ -125,11 +125,7 @@ Status _dropView(OperationContext* opCtx,
                  const NamespaceString& collectionName,
                  const boost::optional<UUID>& expectedUUID,
                  DropReply* reply) {
-    if (!db) {
-        Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
-        audit::logDropView(opCtx->getClient(), collectionName, "", {}, status.code());
-        return status;
-    }
+    invariant(db);
 
     // Views don't have UUIDs so if the expectedUUID is specified, we will always throw.
     try {
@@ -141,9 +137,9 @@ Status _dropView(OperationContext* opCtx,
     auto view =
         CollectionCatalog::get(opCtx)->lookupViewWithoutValidatingDurable(opCtx, collectionName);
     if (!view) {
-        Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
-        audit::logDropView(opCtx->getClient(), collectionName, "", {}, status.code());
-        return status;
+        audit::logDropView(
+            opCtx->getClient(), collectionName, "", {}, ErrorCodes::NamespaceNotFound);
+        return Status::OK();
     }
 
     // Validates the view or throws an "invalid view" error.
@@ -207,9 +203,13 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
 
     CollectionPtr coll =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, startingNss);
-    Status status = _checkNssAndReplState(opCtx, coll, startingNss, expectedUUID);
+
+    // Even if the collection doesn't exist, UUID mismatches must return an error.
+    Status status = _checkUUIDAndReplState(opCtx, coll, startingNss, expectedUUID);
     if (!status.isOK()) {
         return status;
+    } else if (!coll) {
+        return Status::OK();
     }
 
     warnEncryptedCollectionsIfNeeded(opCtx, coll);
@@ -262,9 +262,13 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
 
         coll = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collectionUUID);
-        status = _checkNssAndReplState(opCtx, coll, startingNss, expectedUUID);
+
+        // Even if the collection doesn't exist, UUID mismatches must return an error.
+        status = _checkUUIDAndReplState(opCtx, coll, startingNss, expectedUUID);
         if (!status.isOK()) {
             return status;
+        } else if (!coll) {
+            return Status::OK();
         }
 
         // Check if any new index builds were started while releasing the collection lock
@@ -311,9 +315,13 @@ Status _dropCollectionForApplyOps(OperationContext* opCtx,
     Lock::CollectionLock collLock(opCtx, collectionName, MODE_X);
     const CollectionPtr& coll =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName);
-    Status status = _checkNssAndReplState(opCtx, coll, collectionName);
+
+    // Even if the collection doesn't exist, UUID mismatches must return an error.
+    Status status = _checkUUIDAndReplState(opCtx, coll, collectionName);
     if (!status.isOK()) {
         return status;
+    } else if (!coll) {
+        return Status::OK();
     }
 
     if (MONGO_unlikely(hangDuringDropCollection.shouldFail())) {
@@ -369,7 +377,7 @@ Status _dropCollection(OperationContext* opCtx,
                                                         collectionName.coll().toString(),
                                                         boost::none),
                              "Database does not exist"}
-                    : Status(ErrorCodes::NamespaceNotFound, "ns not found");
+                    : Status::OK();
             }
 
             if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName)) {
@@ -457,15 +465,18 @@ Status _dropCollection(OperationContext* opCtx,
                     return dropTimeseries(bucketsNs, false);
                 }
 
+                // There is no collection or view at the namespace. Check whether a UUID was given
+                // and error if so because the caller expects the collection to exist. If no UUID
+                // was given, then it is OK to return success.
                 try {
                     checkCollectionUUIDMismatch(opCtx, collectionName, nullptr, expectedUUID);
                 } catch (const DBException& ex) {
                     return ex.toStatus();
                 }
 
-                Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
-                audit::logDropView(opCtx->getClient(), collectionName, "", {}, status.code());
-                return status;
+                audit::logDropView(
+                    opCtx->getClient(), collectionName, "", {}, ErrorCodes::NamespaceNotFound);
+                return Status::OK();
             }
             if (view->timeseries() &&
                 CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, view->viewOn())) {
@@ -478,9 +489,15 @@ Status _dropCollection(OperationContext* opCtx,
             return _dropView(opCtx, db, collectionName, expectedUUID, reply);
         });
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // The shell requires that NamespaceNotFound error codes return the "ns not found"
-        // string.
-        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+        // Any unhandled namespace not found errors should be converted into success. Unless the
+        // caller specified a UUID and expects the collection to exist.
+        try {
+            checkCollectionUUIDMismatch(opCtx, collectionName, nullptr, expectedUUID);
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+
+        return Status::OK();
     }
 }
 }  // namespace
@@ -559,7 +576,7 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
         AutoGetDb autoDb(opCtx, collectionName.dbName(), MODE_IX);
         Database* db = autoDb.getDb();
         if (!db) {
-            return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+            return Status::OK();
         }
 
         const CollectionPtr& coll =

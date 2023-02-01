@@ -17,7 +17,7 @@ assert.commandWorked(explain);
 
 // Collection should still not exist.
 assert.eq(0, t.count());
-assert(!t.drop());
+assert(!db.getCollectionInfos({name: t.getName()}).length);
 
 // Add a document to the collection.
 t.insert({a: 3});
@@ -27,3 +27,4 @@ explain = db.runCommand(
     {explain: {update: t.getName(), updates: [{q: {a: 1}, u: {a: 1}, upsert: true}]}});
 assert.commandWorked(explain);
 assert.eq(1, t.count());
+assert(db.getCollectionInfos({name: t.getName()}).length);

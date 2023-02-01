@@ -25,18 +25,12 @@ function assertCollectionDropped(ns) {
 
 const coll = db[jsTestName() + "_coll"];
 
-const isMongos = db.adminCommand({isdbgrid: 1}).isdbgrid;
-
 jsTest.log("Drop Unexistent collection.");
 {
     // Drop the collection
-    let dropRes = db.runCommand({drop: coll.getName()});
-    if (isMongos) {
-        assert.commandWorked(dropRes);
-    } else {
-        // TODO SERVER-43894 Make dropping a nonexistent collection a noop
-        assert.commandWorkedOrFailedWithCode(dropRes, ErrorCodes.NamespaceNotFound);
-    }
+    // NamespaceNotFound will be returned by mongod versions earlier than 7.0.
+    assert.commandWorkedOrFailedWithCode(db.runCommand({drop: coll.getName()}),
+                                         ErrorCodes.NamespaceNotFound);
     assertCollectionDropped(coll.getFullName());
 }
 
@@ -51,13 +45,8 @@ jsTest.log("Drop existing collection.");
     assertCollectionDropped(coll.getFullName());
 
     // Test idempotency
-    let dropRes = db.runCommand({drop: coll.getName()});
-    if (isMongos) {
-        assert.commandWorked(dropRes);
-    } else {
-        // TODO SERVER-43894 Make dropping a nonexistent collection a noop
-        assert.commandWorkedOrFailedWithCode(dropRes, ErrorCodes.NamespaceNotFound);
-    }
+    // NamespaceNotFound will be returned by mongod versions earlier than 7.0.
+    assert.commandWorkedOrFailedWithCode(db.runCommand({drop: coll.getName()}));
     assertCollectionDropped(coll.getFullName());
 }
 

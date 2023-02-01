@@ -804,8 +804,7 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsSourceAndTargetDoNotExis
     auto uuid = UUID::gen();
     auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNss.ns() << "dropTarget"
                                        << "true");
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  renameCollectionForApplyOps(_opCtx.get(), uuid, boost::none, cmd, {}));
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), uuid, boost::none, cmd, {}));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _targetNss));
 }

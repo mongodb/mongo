@@ -469,7 +469,7 @@ TEST_F(ViewCatalogFixture, CannotCreateViewIfItsFullyResolvedPipelineWouldExceed
 
 TEST_F(ViewCatalogFixture, DropMissingView) {
     NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
-    ASSERT_NOT_OK(dropView(operationContext(), viewName));
+    ASSERT_OK(dropView(operationContext(), viewName));
 }
 
 TEST_F(ViewCatalogFixture, ModifyMissingView) {

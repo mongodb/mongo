@@ -734,11 +734,8 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
     invariant(_viewsForDatabase.contains(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
     assertViewCatalogValid(viewsForDb);
-
-    // Make sure the view exists before proceeding.
-    if (auto viewPtr = viewsForDb.lookup(viewName); !viewPtr) {
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "cannot drop missing view: " << viewName.ns()};
+    if (!viewsForDb.lookup(viewName)) {
+        return Status::OK();
     }
 
     Status result = Status::OK();
