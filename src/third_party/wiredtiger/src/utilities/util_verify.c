@@ -15,7 +15,7 @@
 static int
 usage(void)
 {
-    static const char *options[] = {"-c",
+    static const char *options[] = {"-a", "abort on error during verification of all tables", "-c",
       "continue to the next page after encountering error during verification", "-d config",
       "display underlying information during verification", "-s",
       "verify against the specified timestamp", "-t", "do not clear txn ids during verification",
@@ -24,7 +24,7 @@ usage(void)
       "-?", "show this message", NULL, NULL};
 
     util_usage(
-      "verify [-cstu] [-d dump_address | dump_blocks | dump_layout | dump_offsets=#,# "
+      "verify [-acstu] [-d dump_address | dump_blocks | dump_layout | dump_offsets=#,# "
       "| dump_pages] [uri]",
       "options:", options);
 
@@ -61,14 +61,17 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
     size_t size;
     int ch;
     char *config, *dump_offsets, *key, *uri;
-    bool do_not_clear_txn_id, dump_address, dump_app_data, dump_blocks, dump_layout, dump_pages,
-      read_corrupt, stable_timestamp;
+    bool abort_on_error, do_not_clear_txn_id, dump_address, dump_app_data, dump_blocks, dump_layout,
+      dump_pages, read_corrupt, stable_timestamp;
 
-    do_not_clear_txn_id = dump_address = dump_app_data = dump_blocks = dump_layout = dump_pages =
-      read_corrupt = stable_timestamp = false;
+    abort_on_error = do_not_clear_txn_id = dump_address = dump_app_data = dump_blocks =
+      dump_layout = dump_pages = read_corrupt = stable_timestamp = false;
     config = dump_offsets = uri = NULL;
-    while ((ch = __wt_getopt(progname, argc, argv, "cd:stu?")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "acd:stu?")) != EOF)
         switch (ch) {
+        case 'a':
+            abort_on_error = true;
+            break;
         case 'c':
             read_corrupt = true;
             break;
@@ -161,8 +164,12 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
              */
             if ((WT_PREFIX_MATCH(key, "table:") || WT_PREFIX_MATCH(key, "lsm:")) &&
               strcmp(key, WT_HS_URI) != 0 && strcmp(key, WT_METADATA_URI) != 0 &&
-              !WT_PREFIX_MATCH(key, WT_SYSTEM_PREFIX))
-                WT_TRET(verify_one(session, config, key));
+              !WT_PREFIX_MATCH(key, WT_SYSTEM_PREFIX)) {
+                if (abort_on_error)
+                    WT_ERR_ERROR_OK(verify_one(session, config, key), ENOTSUP, false);
+                else
+                    WT_TRET(verify_one(session, config, key));
+            }
         }
         if (ret == WT_NOTFOUND)
             ret = 0;

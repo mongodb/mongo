@@ -166,6 +166,7 @@ aarch
 abc
 abstime
 ack'ed
+acstu
 addr
 ajn
 alloc
@@ -246,7 +247,6 @@ crashless
 crc
 cryptographic
 cryptographically
-cstu
 csuite
 ctest
 curfile
