@@ -179,12 +179,12 @@ wtEnv.Library(
 )
 
 wtEnv.Library(
-    target='additional_wiredtiger_index_tests',
+    target='wiredtiger_index_test_harness',
     source=[
-        'wiredtiger_index_test.cpp',
+        'wiredtiger_index_test_harness.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
         'storage_wiredtiger_core',
     ],
@@ -222,6 +222,7 @@ wtEnv.CppUnitTest(
     source=[
         'wiredtiger_record_store_test.cpp',
         'wiredtiger_column_store_test.cpp',
+        'wiredtiger_index_test.cpp',
         'wiredtiger_standard_index_test.cpp',
         'wiredtiger_standard_record_store_test.cpp',
     ],
@@ -229,8 +230,26 @@ wtEnv.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        'additional_wiredtiger_index_tests',
+        '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
+        '$BUILD_DIR/mongo/db/storage/sorted_data_interface_tests',
+        'storage_wiredtiger_core',
+        'wiredtiger_index_test_harness',
         'wiredtiger_record_store_test_harness',
+    ],
+)
+
+wtEnv.Benchmark(
+    target='storage_wiredtiger_index_bm',
+    source=[
+        'wiredtiger_index_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/multitenancy',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
+        '$BUILD_DIR/mongo/db/storage/sorted_data_interface_bm',
+        'wiredtiger_index_test_harness',
     ],
 )
 

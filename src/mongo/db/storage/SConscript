@@ -243,6 +243,21 @@ env.Library(
 env.Library(
     target='sorted_data_interface_test_harness',
     source=[
+        'sorted_data_interface_test_harness.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/record_id_helpers',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'index_entry_comparison',
+        'key_string',
+    ],
+)
+
+env.Library(
+    target='sorted_data_interface_tests',
+    source=[
         'sorted_data_interface_test_bulkbuilder.cpp',
         'sorted_data_interface_test_cursor.cpp',
         'sorted_data_interface_test_cursor_advanceto.cpp',
@@ -252,7 +267,6 @@ env.Library(
         'sorted_data_interface_test_cursor_seek_exact.cpp',
         'sorted_data_interface_test_dupkeycheck.cpp',
         'sorted_data_interface_test_fullvalidate.cpp',
-        'sorted_data_interface_test_harness.cpp',
         'sorted_data_interface_test_insert.cpp',
         'sorted_data_interface_test_isempty.cpp',
         'sorted_data_interface_test_keyformat_string.cpp',
@@ -261,14 +275,21 @@ env.Library(
         'sorted_data_interface_test_unindex.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/record_id_helpers',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        'key_string',
+        'sorted_data_interface_test_harness',
+        'storage_options',
     ],
-    LIBDEPS_PRIVATE=[
-        'index_entry_comparison',
+)
+
+bmEnv = env.Clone()
+bmEnv.InjectThirdParty(libraries=["benchmark"])
+bmEnv.Library(
+    target='sorted_data_interface_bm',
+    source=[
+        'sorted_data_interface_bm_cursor.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/third_party/shim_benchmark',
+        'sorted_data_interface_test_harness',
     ],
 )
 

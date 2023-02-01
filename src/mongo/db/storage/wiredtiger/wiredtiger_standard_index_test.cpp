@@ -54,122 +54,8 @@ namespace {
 
 using std::string;
 
-class WiredTigerIndexHarnessHelper final : public SortedDataInterfaceHarnessHelper {
-public:
-    WiredTigerIndexHarnessHelper() : _dbpath("wt_test"), _conn(nullptr) {
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-
-        const char* config = "create,cache_size=1G,";
-        int ret = wiredtiger_open(_dbpath.path().c_str(), nullptr, config, &_conn);
-        invariantWTOK(ret, nullptr);
-
-        _fastClockSource = std::make_unique<SystemClockSource>();
-        _sessionCache = new WiredTigerSessionCache(_conn, _fastClockSource.get());
-    }
-
-    ~WiredTigerIndexHarnessHelper() final {
-        delete _sessionCache;
-        _conn->close(_conn, nullptr);
-    }
-
-    std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface() final {
-        std::string ns = "test.wt";
-        NamespaceString nss(ns);
-        OperationContextNoop opCtx(newRecoveryUnit().release());
-
-        BSONObj spec = BSON("key" << BSON("_id" << 1) << "name"
-                                  << "_id_"
-                                  << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
-                                  << "unique" << true);
-
-        auto collection = std::make_unique<CollectionMock>(nss);
-        IndexDescriptor desc("", spec);
-        invariant(desc.isIdIndex());
-
-        const bool isLogged = false;
-        StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-            kWiredTigerEngineName, "", "", nss, desc, isLogged);
-        ASSERT_OK(result.getStatus());
-
-        string uri = "table:" + ns;
-        invariant(Status::OK() == WiredTigerIndex::create(&opCtx, uri, result.getValue()));
-
-        return std::make_unique<WiredTigerIdIndex>(
-            &opCtx, uri, UUID::gen(), "" /* ident */, &desc, isLogged);
-    }
-
-    std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique,
-                                                                       bool partial,
-                                                                       KeyFormat keyFormat) final {
-        std::string ns = "test.wt";
-        NamespaceString nss(ns);
-        OperationContextNoop opCtx(newRecoveryUnit().release());
-
-        BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
-                                  << "testIndex"
-                                  << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
-                                  << "unique" << unique);
-
-        if (partial) {
-            auto partialBSON =
-                BSON(IndexDescriptor::kPartialFilterExprFieldName.toString() << BSON(""
-                                                                                     << ""));
-            spec = spec.addField(partialBSON.firstElement());
-        }
-
-        auto collection = std::make_unique<CollectionMock>(nss);
-
-        IndexDescriptor& desc = _descriptors.emplace_back("", spec);
-
-        StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-            kWiredTigerEngineName, "", "", nss, desc, WiredTigerUtil::useTableLogging(nss));
-        ASSERT_OK(result.getStatus());
-
-        string uri = "table:" + ns;
-        invariant(Status::OK() == WiredTigerIndex::create(&opCtx, uri, result.getValue()));
-
-        if (unique) {
-            return std::make_unique<WiredTigerIndexUnique>(&opCtx,
-                                                           uri,
-                                                           UUID::gen(),
-                                                           "" /* ident */,
-                                                           keyFormat,
-                                                           &desc,
-                                                           WiredTigerUtil::useTableLogging(nss));
-        }
-        return std::make_unique<WiredTigerIndexStandard>(&opCtx,
-                                                         uri,
-                                                         UUID::gen(),
-                                                         "" /* ident */,
-                                                         keyFormat,
-                                                         &desc,
-                                                         WiredTigerUtil::useTableLogging(nss));
-    }
-
-    std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-        return std::make_unique<WiredTigerRecoveryUnit>(_sessionCache, &_oplogManager);
-    }
-
-private:
-    unittest::TempDir _dbpath;
-    std::unique_ptr<ClockSource> _fastClockSource;
-    std::vector<IndexDescriptor> _descriptors;
-    WT_CONNECTION* _conn;
-    WiredTigerSessionCache* _sessionCache;
-    WiredTigerOplogManager _oplogManager;
-};
-
-std::unique_ptr<SortedDataInterfaceHarnessHelper> makeWTIndexHarnessHelper() {
-    return std::make_unique<WiredTigerIndexHarnessHelper>();
-}
-
-MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {
-    mongo::registerSortedDataInterfaceHarnessHelperFactory(makeWTIndexHarnessHelper);
-}
-
 TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
-    auto harnessHelper = makeWTIndexHarnessHelper();
+    auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     bool unique = false;
     bool partial = false;
     auto sdi = harnessHelper->newSortedDataInterface(unique, partial);
@@ -214,7 +100,7 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
 }
 
 TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
-    auto harnessHelper = makeWTIndexHarnessHelper();
+    auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     bool unique = false;
     bool partial = false;
     auto sdi = harnessHelper->newSortedDataInterface(unique, partial);

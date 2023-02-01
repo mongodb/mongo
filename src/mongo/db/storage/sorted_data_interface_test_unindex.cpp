@@ -513,5 +513,112 @@ TEST(SortedDataInterface, PartialIndex) {
     }
 }
 
+TEST(SortedDataInterface, Unindex1) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 18)), true));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            sorted->unindex(
+                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 20)), true);
+            ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            sorted->unindex(
+                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 2), RecordId(5, 18)), true);
+            ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+    }
+
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            sorted->unindex(
+                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 18)), true);
+            ASSERT(sorted->isEmpty(opCtx.get()));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+}
+
+TEST(SortedDataInterface, Unindex2Rollback) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 18)), true));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            sorted->unindex(
+                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 18)), true);
+            ASSERT(sorted->isEmpty(opCtx.get()));
+            // no commit
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+    }
+}
+
 }  // namespace
 }  // namespace mongo

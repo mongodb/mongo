@@ -92,7 +92,7 @@ TempDir::TempDir(const std::string& namePrefix) {
         fassertFailed(17147);
     }
 
-    LOGV2(23051, "Created temporary directory: {path}", "path"_attr = _path);
+    LOGV2_DEBUG(23051, 1, "Created temporary directory: {path}", "path"_attr = _path);
 }
 
 TempDir::~TempDir() {

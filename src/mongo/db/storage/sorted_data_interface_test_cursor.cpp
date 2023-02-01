@@ -270,6 +270,102 @@ TEST(SortedDataInterface, ExhaustKeyStringCursorReversed) {
     }
 }
 
+
+TEST(SortedDataInterface, CursorIterate1) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+
+    int N = 5;
+    for (int i = 0; i < N; i++) {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), BSON("" << i), RecordId(5, i * 2)), true));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        int n = 0;
+        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
+             entry;
+             entry = cursor->next()) {
+            ASSERT_EQ(entry, IndexKeyEntry(BSON("" << n), RecordId(5, n * 2)));
+            n++;
+        }
+        ASSERT_EQUALS(N, n);
+    }
+}
+
+TEST(SortedDataInterface, CursorIterate1WithSaveRestore) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+
+    int N = 5;
+    for (int i = 0; i < N; i++) {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), BSON("" << i), RecordId(5, i * 2)), true));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        int n = 0;
+        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
+             entry;
+             entry = cursor->next()) {
+            ASSERT_EQ(entry, IndexKeyEntry(BSON("" << n), RecordId(5, n * 2)));
+            n++;
+            cursor->save();
+            cursor->restore();
+        }
+        ASSERT_EQUALS(N, n);
+    }
+}
+
+
+TEST(SortedDataInterface, CursorIterateAllDupKeysWithSaveRestore) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+
+    int N = 5;
+    for (int i = 0; i < N; i++) {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 5), RecordId(5, i * 2)), true));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        int n = 0;
+        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
+             entry;
+             entry = cursor->next()) {
+            ASSERT_EQ(entry, IndexKeyEntry(BSON("" << 5), RecordId(5, n * 2)));
+            n++;
+            cursor->save();
+            cursor->restore();
+        }
+        ASSERT_EQUALS(N, n);
+    }
+}
+
 void testBoundaries(bool unique, bool forward, bool inclusive) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
