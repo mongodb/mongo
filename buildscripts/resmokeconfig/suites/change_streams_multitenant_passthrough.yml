@@ -90,6 +90,7 @@ executor:
     mongod_options:
       bind_ip_all: ''
       serverless: true
+      noscripting: ''
       set_parameters:
         enableTestCommands: 1
         featureFlagServerlessChangeStreams: true

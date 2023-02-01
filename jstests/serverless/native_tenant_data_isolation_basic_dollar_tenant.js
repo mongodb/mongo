@@ -403,7 +403,7 @@ const testColl = testDb.getCollection(kCollName);
         "index": {"keyPattern": {c: 1}, expireAfterSeconds: 100},
     });
     assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotFound);
-    // TODO SERVER-70876 Uncomment out this conditional below, and remove the assertion above in
+    // TODO SERVER-73025 Uncomment out this conditional below, and remove the assertion above in
     // favor of the assertion in the conditional.
     /* if (featureFlagRequireTenantId) {
         assert.commandFailedWithCode(res, 7005300);
@@ -456,6 +456,93 @@ const testColl = testDb.getCollection(kCollName);
 
 // Test dbCheck command.
 { assert.commandWorked(testDb.runCommand({dbCheck: kCollName, '$tenant': kTenant})); }
+
+// fail server-side javascript commands/stages, all unsupported in serverless
+{
+    // Create a number of collections and entries used to test agg stages
+    const kCollA = "collA";
+    assert.commandWorked(testDb.createCollection(kCollA, {'$tenant': kTenant}));
+
+    const collADocs = [
+        {_id: 0, start: "a", end: "b"},
+        {_id: 1, start: "b", end: "c"},
+        {_id: 2, start: "c", end: "d"}
+    ];
+
+    assert.commandWorked(
+        testDb.runCommand({insert: kCollA, documents: collADocs, '$tenant': kTenant}));
+
+    // $where expression
+    assert.commandFailedWithCode(testDb.runCommand({
+        find: kCollA,
+        filter: {
+            $where: function() {
+                return true;
+            }
+        },
+        '$tenant': kTenant
+    }),
+                                 6108304);
+
+    // $function aggregate stage
+    assert.commandFailedWithCode(testDb.runCommand({
+        aggregate: kCollA,
+        pipeline: [{
+            $match: {
+                $expr: {
+                    $function: {
+                        body: function() {
+                            return true;
+                        },
+                        args: [],
+                        lang: "js"
+                    }
+                }
+            }
+        }],
+        cursor: {},
+        '$tenant': kTenant
+    }),
+                                 31264);
+
+    // $accumulator operator
+    assert.commandFailedWithCode(testDb.runCommand({
+        aggregate: kCollA,
+        pipeline: [{
+            $group: {
+                _id: 1,
+                value: {
+                    $accumulator: {
+                        init: function() {},
+                        accumulateArgs: {$const: []},
+                        accumulate: function(state, value) {},
+                        merge: function(s1, s2) {},
+                        lang: 'js',
+                    }
+                }
+            }
+        }],
+        cursor: {},
+        '$tenant': kTenant
+    }),
+                                 31264);
+
+    // mapReduce command
+    function mapFunc() {
+        emit(this.key, this.value);
+    }
+    function reduceFunc(key, values) {
+        return values.join('');
+    }
+    assert.commandFailedWithCode(testDb.runCommand({
+        mapReduce: kCollA,
+        map: mapFunc,
+        reduce: reduceFunc,
+        out: {inline: 1},
+        '$tenant': kTenant
+    }),
+                                 31264);
+}
 
 rst.stopSet();
 })();

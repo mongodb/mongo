@@ -142,4 +142,5 @@ executor:
           command: 2
       auth: ''
       keyFile: *keyFile
+      noscripting: ''
     auth_options: *authOptions

@@ -75,7 +75,7 @@ const featureFlagRequireTenantId = FeatureFlagUtil.isEnabled(adminDb, "RequireTe
         assert.eq({_id: 0, a: 21, b: 1}, findAndModPrefixed.value);
     } else {
         // assert.commandFailed(findAndModPrefixed);
-        // TODO SERVER-70876 Uncomment out the check above, and remove the check below.
+        // TODO SERVER-73025 Uncomment out the check above, and remove the check below.
         assert.eq(null, findAndModPrefixed.value);
     }
 }

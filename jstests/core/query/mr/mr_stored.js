@@ -9,6 +9,7 @@
 //   does_not_support_stepdowns,
 //   requires_non_retryable_writes,
 //   uses_map_reduce_with_temp_collections,
+//   requires_scripting,
 // ]
 /**
  * Tests that map reduce works with stored javascript.

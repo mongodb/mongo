@@ -6,6 +6,7 @@
  *   incompatible_with_embedded,
  *   # mapReduce does not support afterClusterTime.
  *   does_not_support_causal_consistency,
+ *   requires_scripting,
  * ]
  */
 (function() {

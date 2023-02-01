@@ -67,7 +67,7 @@ TEST(DatabaseNameUtilTest, SerializeMultitenancySupportOff) {
 }
 
 // Assert that if multitenancySupport and featureFlagRequireTenantID are on, then tenantId is set.
-// TODO SERVER-70876 Uncomment out the test case below.
+// TODO SERVER-73025 Uncomment out the test case below.
 /* TEST(DatabaseNameUtilTest,
      DeserializeAssertTenantIdSetMultitenancySupportOnFeatureFlagRequireTenantIDOn) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);

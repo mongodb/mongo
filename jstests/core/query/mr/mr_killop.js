@@ -9,6 +9,7 @@
 //   uses_multiple_connections,
 //   uses_parallel_shell,
 //   no_selinux,
+//   requires_scripting,
 // ]
 (function() {
 "use strict";

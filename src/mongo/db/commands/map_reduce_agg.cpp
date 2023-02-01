@@ -138,8 +138,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
     Timer cmdTimer;
 
-    // TODO SERVER-68721: create IDLParserContext with tenant id of dbName.
-    auto parsedMr = MapReduceCommandRequest::parse(IDLParserContext("mapReduce"), cmd);
+    auto parsedMr = MapReduceCommandRequest::parse(
+        IDLParserContext("mapReduce", false /* apiStrict */, dbName.tenantId()), cmd);
     auto curop = CurOp::get(opCtx);
     curop->beginQueryPlanningTimer();
     auto expCtx = makeExpressionContext(opCtx, parsedMr, verbosity);

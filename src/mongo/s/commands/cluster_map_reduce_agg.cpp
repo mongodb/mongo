@@ -149,8 +149,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                              const BSONObj& cmd,
                              BSONObjBuilder& result,
                              boost::optional<ExplainOptions::Verbosity> verbosity) {
-    // TODO SERVER-68721: create IDLParserContext with tenant id of dbName.
-    auto parsedMr = MapReduceCommandRequest::parse(IDLParserContext("mapReduce"), cmd);
+    auto parsedMr = MapReduceCommandRequest::parse(
+        IDLParserContext("mapReduce", false /* apiStrict */, dbName.tenantId()), cmd);
     stdx::unordered_set<NamespaceString> involvedNamespaces{parsedMr.getNamespace()};
     auto hasOutDB = parsedMr.getOutOptions().getDatabaseName();
     auto resolvedOutNss = NamespaceString{hasOutDB ? *hasOutDB : parsedMr.getNamespace().db(),
@@ -253,7 +253,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                 "mapReduce on a view is not supported",
                 e.code() != ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
 
-        e.addContext("MapReduce internal error");
+        e.addContext("MapReduce internal error xxx");
         throw;
     }
     auto aggResults = tempResults.done();

@@ -104,3 +104,4 @@ executor:
         featureFlagRequireTenantID: true
         logComponentVerbosity:
           command: 2
+      noscripting: ''

@@ -794,6 +794,14 @@ MongoRunner.mongodOptions = function(opts = {}) {
         opts.auditPath = MongoRunner.toRealPath(opts.auditPath, opts);
     }
 
+    if (opts.hasOwnProperty("setParameter")) {
+        if (((typeof opts.setParameter === "string") &&
+             opts.setParameter.includes("multitenancySupport") &&
+             opts.setParameter.includes("true")) ||
+            (opts.setParameter.multitenancySupport))
+            opts.noscripting = "";
+    }
+
     if (opts.noReplSet)
         opts.replSet = null;
     if (opts.arbiter)

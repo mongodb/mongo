@@ -8,6 +8,7 @@
 //   requires_fastcount,
 //   requires_getmore,
 //   uses_map_reduce_with_temp_collections,
+//   requires_scripting,
 // ]
 (function() {
 "use strict";

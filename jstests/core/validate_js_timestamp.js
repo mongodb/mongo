@@ -7,6 +7,7 @@
  *
  * @tags: [
  *   requires_fcv_63,
+ *   requires_scripting
  * ]
  */
 (function() {

@@ -3,7 +3,10 @@
  * Test that a $function behaves as expected when its return value is a BSON scalar, i.e. a value
  * that is not an object or array.
  *
- * @tags: [requires_fcv_60]
+ * @tags: [
+ *   requires_fcv_60,
+ *   requires_scripting
+ * ]
  */
 
 (function() {

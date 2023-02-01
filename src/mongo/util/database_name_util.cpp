@@ -85,7 +85,7 @@ DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId, S
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
         // TODO SERVER-62491 Remove this conditional, the tenantId should be kSystemTenantId.
-        // TODO SERVER-70876 Uncomment out this conditional to check that we always have a tenantId.
+        // TODO SERVER-73025 Uncomment out this conditional to check that we always have a tenantId.
         /* if (db != "admin" && db != "config" && db != "local")
             massert(7005300, "TenantId must be set", tenantId != boost::none);
         */
