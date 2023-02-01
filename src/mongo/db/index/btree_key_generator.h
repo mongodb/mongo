@@ -88,6 +88,13 @@ public:
 
     size_t getApproximateSize() const;
 
+    /**
+     * This function does _not_ generate any keys but extract non-array elements for building a key
+     * string. It throws an exception if any extracted element is an array. This can be useful when
+     * the caller wants to utilize these elements to build a set of index keys.
+     */
+    void extractElements(const BSONObj& obj, std::vector<BSONElement>* elems) const;
+
 private:
     /**
      * Stores info regarding traversal of a positional path. A path through a document is

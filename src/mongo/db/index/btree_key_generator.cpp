@@ -59,8 +59,8 @@ const BSONElement undefinedElt = undefinedObj.firstElement();
  * The 'path' can be specified using a dotted notation in order to traverse through embedded
  * objects.
  *
- * This function must only be used when there is no an array element along the 'path'. The caller is
- * responsible to ensure this invariant holds.
+ * This function must only be used when there is no an array element along the 'path'. Otherwise,
+ * an exception will be thrown if encounters any array.
  */
 BSONElement extractNonArrayElementAtPath(const BSONObj& obj, StringData path) {
     static const auto kEmptyElt = BSONElement{};
@@ -71,7 +71,9 @@ BSONElement extractNonArrayElementAtPath(const BSONObj& obj, StringData path) {
         }
         return {obj.getField(path), ""_sd};
     }();
-    invariant(elt.type() != BSONType::Array);
+    uassert(7246301,
+            str::stream() << "field " << path << " cannot be indexed as an array (multikey)",
+            elt.type() != BSONType::Array);
 
     if (elt.eoo()) {
         return kEmptyElt;
@@ -340,6 +342,12 @@ void BtreeKeyGenerator::_getKeysWithoutArray(SharedBufferFragmentBuilder& pooled
         keyString.appendRecordId(*id);
     }
     keys->insert(keyString.release());
+}
+
+void BtreeKeyGenerator::extractElements(const BSONObj& obj, std::vector<BSONElement>* elems) const {
+    for (auto&& fieldName : _fieldNames) {
+        elems->push_back(extractNonArrayElementAtPath(obj, fieldName));
+    }
 }
 
 void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
