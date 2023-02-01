@@ -339,6 +339,18 @@ class ShardedClusterFixture(interface.Fixture):
             del mongod_options["shardsvr"]
             mongod_options["configsvr"] = ""
             replset_config_options["configsvr"] = True
+            mongod_options["set_parameters"]["featureFlagCatalogShard"] = "true"
+
+            configsvr_options = self.configsvr_options.copy()
+            for option, value in configsvr_options.items():
+                if option == "num_nodes":
+                    continue
+                if option in shard_options:
+                    if shard_options[option] != value:
+                        raise Exception(
+                            "Conflicting values when combining shard and configsvr options")
+                else:
+                    shard_options[option] = value
 
         shard_logging_prefix = self._get_rs_shard_logging_prefix(index)
 
