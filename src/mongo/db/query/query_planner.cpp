@@ -469,12 +469,46 @@ static BSONObj finishMaxObj(const IndexEntry& indexEntry,
     }
 }
 
+bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
+    return query.getFindCommandRequest().getSort().isPrefixOf(
+        kp, SimpleBSONElementComparator::kInstance);
+}
+
+/**
+ * Determine whether this query has a sort that can be provided by the clustered index, if so, which
+ * direction the scan should be. If the collection is not clustered, or the sort cannot be provided,
+ * returns 'boost::none'.
+ */
+boost::optional<int> determineClusteredScanDirection(const CanonicalQuery& query,
+                                                     const QueryPlannerParams& params) {
+    if (params.clusteredInfo && query.getSortPattern() &&
+        CollatorInterface::collatorsMatch(params.clusteredCollectionCollator,
+                                          query.getCollator())) {
+        auto kp = clustered_util::getSortPattern(params.clusteredInfo->getIndexSpec());
+        if (providesSort(query, kp)) {
+            return 1;
+        } else if (providesSort(query, QueryPlannerCommon::reverseSortObj(kp))) {
+            return -1;
+        }
+    }
+
+    return boost::none;
+}
+
+/**
+ * Determine the direction of the scan needed for the query. Defaults to 1 unless this is a
+ * clustered collection and we have a sort that can be provided by the clustered index.
+ */
+int determineCollscanDirection(const CanonicalQuery& query, const QueryPlannerParams& params) {
+    return determineClusteredScanDirection(query, params).value_or(1);
+}
+
 std::unique_ptr<QuerySolution> buildCollscanSoln(const CanonicalQuery& query,
                                                  bool tailable,
                                                  const QueryPlannerParams& params,
-                                                 int direction = 1) {
-    std::unique_ptr<QuerySolutionNode> solnRoot(
-        QueryPlannerAccess::makeCollectionScan(query, tailable, params, direction));
+                                                 boost::optional<int> direction = boost::none) {
+    std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::makeCollectionScan(
+        query, tailable, params, direction.value_or(determineCollscanDirection(query, params))));
     return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
 }
 
@@ -489,11 +523,6 @@ std::unique_ptr<QuerySolution> buildWholeIXSoln(
     std::unique_ptr<QuerySolutionNode> solnRoot(
         QueryPlannerAccess::scanWholeIndex(index, query, params, direction.value_or(1)));
     return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
-}
-
-bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
-    return query.getFindCommandRequest().getSort().isPrefixOf(
-        kp, SimpleBSONElementComparator::kInstance);
 }
 
 StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTaggedTree(
@@ -661,7 +690,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     } else if (SolutionCacheData::COLLSCAN_SOLN == winnerCacheData.solnType) {
         // The cached solution is a collection scan. We don't cache collscans
         // with tailable==true, hence the false below.
-        auto soln = buildCollscanSoln(query, false, params);
+        auto soln = buildCollscanSoln(query, false, params, winnerCacheData.wholeIXSolnDir);
         if (!soln) {
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "plan cache error: collection scan soln");
@@ -1260,32 +1289,19 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
         // The base index is sorted on some key, so it's possible we might want to use
         // a collection scan to provide the sort requested
-        if (params.clusteredInfo) {
-            if (CollatorInterface::collatorsMatch(params.clusteredCollectionCollator,
-                                                  query.getCollator())) {
-                auto kp = clustered_util::getSortPattern(params.clusteredInfo->getIndexSpec());
-                int direction = 0;
-                if (providesSort(query, kp)) {
-                    direction = 1;
-                } else if (providesSort(query, QueryPlannerCommon::reverseSortObj(kp))) {
-                    direction = -1;
-                }
+        if (auto direction = determineClusteredScanDirection(query, params)) {
+            auto soln = buildCollscanSoln(query, isTailable, params, direction);
+            if (soln) {
+                LOGV2_DEBUG(6082401,
+                            5,
+                            "Planner: outputting soln that uses clustered index to "
+                            "provide sort");
+                SolutionCacheData* scd = new SolutionCacheData();
+                scd->solnType = SolutionCacheData::COLLSCAN_SOLN;
+                scd->wholeIXSolnDir = *direction;
 
-                if (direction != 0) {
-                    auto soln = buildCollscanSoln(query, isTailable, params, direction);
-                    if (soln) {
-                        LOGV2_DEBUG(6082401,
-                                    5,
-                                    "Planner: outputting soln that uses clustered index to "
-                                    "provide sort");
-                        SolutionCacheData* scd = new SolutionCacheData();
-                        scd->solnType = SolutionCacheData::COLLSCAN_SOLN;
-                        scd->wholeIXSolnDir = direction;
-
-                        soln->cacheData.reset(scd);
-                        out.push_back(std::move(soln));
-                    }
-                }
+                soln->cacheData.reset(scd);
+                out.push_back(std::move(soln));
             }
         }
     }
@@ -1349,7 +1365,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     }
 
     if (possibleToCollscan && (collscanRequested || collScanRequired)) {
-        auto collscan = buildCollscanSoln(query, isTailable, params);
+        auto direction = determineCollscanDirection(query, params);
+        auto collscan = buildCollscanSoln(query, isTailable, params, direction);
         if (!collscan && collScanRequired) {
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "Failed to build collection scan soln");
@@ -1361,6 +1378,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                         "collectionScan"_attr = redact(collscan->toString()));
             SolutionCacheData* scd = new SolutionCacheData();
             scd->solnType = SolutionCacheData::COLLSCAN_SOLN;
+            scd->wholeIXSolnDir = direction;
             collscan->cacheData.reset(scd);
             out.push_back(std::move(collscan));
         }
