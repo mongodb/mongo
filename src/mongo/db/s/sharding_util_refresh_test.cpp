@@ -74,7 +74,7 @@ protected:
 
 TEST_F(ShardingRefresherTest, refresherTwoShardsSucceed) {
     auto opCtx = operationContext();
-    auto nss = NamespaceString("mydb", "mycoll");
+    auto nss = NamespaceString::createNamespaceString_forTest("mydb", "mycoll");
     auto future = launchAsync([&] {
         sharding_util::tellShardsToRefreshCollection(opCtx, kShardIdList, nss, executor());
     });
@@ -87,7 +87,7 @@ TEST_F(ShardingRefresherTest, refresherTwoShardsSucceed) {
 
 TEST_F(ShardingRefresherTest, refresherTwoShardsFirstErrors) {
     auto opCtx = operationContext();
-    auto nss = NamespaceString("mydb", "mycoll");
+    auto nss = NamespaceString::createNamespaceString_forTest("mydb", "mycoll");
     auto future = launchAsync([&] {
         sharding_util::tellShardsToRefreshCollection(opCtx, kShardIdList, nss, executor());
     });
@@ -99,7 +99,7 @@ TEST_F(ShardingRefresherTest, refresherTwoShardsFirstErrors) {
 
 TEST_F(ShardingRefresherTest, refresherTwoShardsSecondErrors) {
     auto opCtx = operationContext();
-    auto nss = NamespaceString("mydb", "mycoll");
+    auto nss = NamespaceString::createNamespaceString_forTest("mydb", "mycoll");
     auto future = launchAsync([&] {
         sharding_util::tellShardsToRefreshCollection(opCtx, kShardIdList, nss, executor());
     });
@@ -112,7 +112,7 @@ TEST_F(ShardingRefresherTest, refresherTwoShardsSecondErrors) {
 
 TEST_F(ShardingRefresherTest, refresherTwoShardsWriteConcernFailed) {
     auto opCtx = operationContext();
-    auto nss = NamespaceString("mydb", "mycoll");
+    auto nss = NamespaceString::createNamespaceString_forTest("mydb", "mycoll");
     auto future = launchAsync([&] {
         sharding_util::tellShardsToRefreshCollection(opCtx, kShardIdList, nss, executor());
     });

@@ -59,8 +59,8 @@ namespace {
 
 using executor::RemoteCommandRequest;
 
-const NamespaceString kNs("a.b");
-const NamespaceString kOtherNs("a.b.c");
+const NamespaceString kNs = NamespaceString::createNamespaceString_forTest("a.b");
+const NamespaceString kOtherNs = NamespaceString::createNamespaceString_forTest("a.b.c");
 const KeyPattern kShardKey(BSON("x" << 1));
 const ChunkRange kChunkRange(BSON("x" << 0), BSON("x" << 100));
 const KeyPattern kNestedShardKey(BSON("x.y" << 1));
@@ -815,12 +815,12 @@ TEST_F(SessionCatalogMigrationSourceTest, OplogWithOtherNsShouldBeIgnored) {
 
 
     auto entry2 = makeOplogEntry(
-        repl::OpTime(Timestamp(53, 12), 2),  // optime
-        repl::OpTypeEnum::kDelete,           // op type
-        NamespaceString("x.y"),              // namespace
-        BSON("x" << 30),                     // o
-        boost::none,                         // o2
-        Date_t::now(),                       // wall clock time
+        repl::OpTime(Timestamp(53, 12), 2),                     // optime
+        repl::OpTypeEnum::kDelete,                              // op type
+        NamespaceString::createNamespaceString_forTest("x.y"),  // namespace
+        BSON("x" << 30),                                        // o
+        boost::none,                                            // o2
+        Date_t::now(),                                          // wall clock time
         sessionId2,
         txnNumber2,
         {1},                               // statement ids

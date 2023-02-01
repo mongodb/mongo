@@ -730,7 +730,7 @@ TEST_F(SemanticAnalysisFindLongestViablePrefix, FindsLastPossibleStageWithCallba
 
 TEST_F(SemanticAnalysisFindLongestViablePrefix, CorrectlyAnswersReshardingUseCase) {
     auto expCtx = getExpCtx();
-    auto lookupNss = NamespaceString{"config.cache.chunks.test"};
+    auto lookupNss = NamespaceString::createNamespaceString_forTest("config.cache.chunks.test");
     expCtx->setResolvedNamespace(lookupNss, ExpressionContext::ResolvedNamespace{lookupNss, {}});
     auto pipeline =
         Pipeline::parse({fromjson("{$replaceWith: {original: '$$ROOT'}}"),

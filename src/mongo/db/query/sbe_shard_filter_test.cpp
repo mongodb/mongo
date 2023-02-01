@@ -39,7 +39,8 @@
 
 namespace mongo {
 
-const NamespaceString kTestNss("TestDB", "TestColl");
+const NamespaceString kTestNss =
+    NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
 class SbeShardFilterTest : public SbeStageBuilderTestFixture {
 protected:
@@ -240,7 +241,7 @@ TEST_F(SbeShardFilterTest, CoveredShardFilterPlan) {
                                BSON_ARRAY(BSON("a" << 3 << "b" << 3 << "c" << 3 << "d" << 3))};
     auto expected = BSON_ARRAY(BSON("a" << 2 << "c" << 2) << BSON("a" << 3 << "c" << 3));
 
-    auto nss = NamespaceString{"db", "coll"};
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     auto expCtx = make_intrusive<ExpressionContextForTest>(nss);
     auto emptyMatchExpression =
         unittest::assertGet(MatchExpressionParser::parse(BSONObj{}, expCtx));

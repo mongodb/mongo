@@ -349,7 +349,8 @@ private:
     QuerySettings _querySettings;
 };
 
-const NamespaceString IndexFilterCommandsTest::_nss{"test.collection"};
+const NamespaceString IndexFilterCommandsTest::_nss(
+    NamespaceString::createNamespaceString_forTest("test.collection"));
 
 /**
  * Tests for ListFilters

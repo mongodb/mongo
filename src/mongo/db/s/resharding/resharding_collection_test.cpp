@@ -84,11 +84,12 @@ TEST_F(ReshardingCollectionTest, TestWritesToTempReshardingCollection) {
     SimpleClient client(operationContext());
     auto uuid = UUID::gen();
 
-    auto tempNss = NamespaceString{"{}.system.resharding.{}"_format("test", uuid.toString())};
+    auto tempNss = NamespaceString::createNamespaceString_forTest(
+        "{}.system.resharding.{}"_format("test", uuid.toString()));
     ASSERT_OK(client.insert(tempNss, BSON("x" << 5)));
 
-    auto chunksNss = NamespaceString{
-        "config.cache.chunks.{}.system.resharding.{}"_format("test", uuid.toString())};
+    auto chunksNss = NamespaceString::createNamespaceString_forTest(
+        "config.cache.chunks.{}.system.resharding.{}"_format("test", uuid.toString()));
     ASSERT_OK(client.insert(chunksNss, BSON("X" << 5)));
 }
 
@@ -108,12 +109,12 @@ TEST_F(ReshardingCollectionTest, TestWritesToTempReshardingCollectionStressTest)
                 SimpleClient client(opCtx.get());
                 auto uuid = UUID::gen();
 
-                auto tempNss =
-                    NamespaceString{"{}.system.resharding.{}"_format("test", uuid.toString())};
+                auto tempNss = NamespaceString::createNamespaceString_forTest(
+                    "{}.system.resharding.{}"_format("test", uuid.toString()));
                 ASSERT_OK(client.insert(tempNss, BSON("x" << 5)));
 
-                auto chunksNss = NamespaceString{
-                    "config.cache.chunks.{}.system.resharding.{}"_format("test", uuid.toString())};
+                auto chunksNss = NamespaceString::createNamespaceString_forTest(
+                    "config.cache.chunks.{}.system.resharding.{}"_format("test", uuid.toString()));
                 ASSERT_OK(client.insert(chunksNss, BSON("X" << 5)));
                 iterations.increment();
             }

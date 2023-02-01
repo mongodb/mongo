@@ -1686,14 +1686,15 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherResumesFromTopOfOplogBuf
     const auto oplogBuffer = getDonorOplogBuffer(instance.get());
     OplogBuffer::Batch batch1;
     const OpTime resumeOpTime(Timestamp(2, 1), initialOpTime.getTerm());
-    auto resumeOplogBson = makeOplogEntry(resumeOpTime,
-                                          OpTypeEnum::kInsert,
-                                          NamespaceString(tenantId + "_foo.bar"),
-                                          UUID::gen(),
-                                          BSON("doc" << 2),
-                                          boost::none /* o2 */)
-                               .getEntry()
-                               .toBSON();
+    auto resumeOplogBson =
+        makeOplogEntry(resumeOpTime,
+                       OpTypeEnum::kInsert,
+                       NamespaceString::createNamespaceString_forTest(tenantId + "_foo.bar"),
+                       UUID::gen(),
+                       BSON("doc" << 2),
+                       boost::none /* o2 */)
+            .getEntry()
+            .toBSON();
     batch1.push_back(resumeOplogBson);
     oplogBuffer->push(opCtx.get(), batch1.cbegin(), batch1.cend());
     ASSERT_EQUALS(oplogBuffer->getCount(), 1);
@@ -1719,12 +1720,13 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherResumesFromTopOfOplogBuf
     hangAfterStartingOplogApplier->setMode(FailPoint::off);
 
     // Feed the oplog fetcher the last doc required for us to be considered consistent.
-    auto dataConsistentOplogEntry = makeOplogEntry(dataConsistentOpTime,
-                                                   OpTypeEnum::kInsert,
-                                                   NamespaceString(tenantId + "_foo.bar"),
-                                                   UUID::gen(),
-                                                   BSON("doc" << 3),
-                                                   boost::none /* o2 */);
+    auto dataConsistentOplogEntry =
+        makeOplogEntry(dataConsistentOpTime,
+                       OpTypeEnum::kInsert,
+                       NamespaceString::createNamespaceString_forTest(tenantId + "_foo.bar"),
+                       UUID::gen(),
+                       BSON("doc" << 3),
+                       boost::none /* o2 */);
     oplogFetcher->receiveBatch(
         1, {dataConsistentOplogEntry.getEntry().toBSON()}, dataConsistentOpTime.getTimestamp());
 
@@ -1817,7 +1819,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherNoDocInBufferToResumeFro
            OplogFetcher::StartingPoint::kEnqueueFirstDoc);
 
     // Feed the oplog fetcher the last doc required for the recipient to be considered consistent.
-    const auto tenantNss = NamespaceString(tenantId + "_foo.bar");
+    const auto tenantNss = NamespaceString::createNamespaceString_forTest(tenantId + "_foo.bar");
     auto resumeFetchingOplogEntry = makeOplogEntry(resumeFetchingOpTime,
                                                    OpTypeEnum::kInsert,
                                                    tenantNss,
@@ -1911,7 +1913,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
     }
     // Create and insert two tenant migration no-op entries into the oplog. The oplog applier should
     // resume from the no-op entry with the most recent donor opTime.
-    const auto insertNss = NamespaceString(tenantId + "_foo.bar");
+    const auto insertNss = NamespaceString::createNamespaceString_forTest(tenantId + "_foo.bar");
     const auto earlierOplogBson = makeOplogEntry(earlierThanResumeOpTime,
                                                  OpTypeEnum::kInsert,
                                                  insertNss,
@@ -2057,7 +2059,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     //       'fromTenantMigrate' field. This oplog entry does not satisfy the conditions
     //       for the oplog applier to resume applying from so we default to apply from
     //       'startDonorApplyingOpTime'.
-    const auto insertNss = NamespaceString(tenantId + "_foo.bar");
+    const auto insertNss = NamespaceString::createNamespaceString_forTest(tenantId + "_foo.bar");
     const auto beforeStartApplyingOpTime = OpTime(Timestamp(1, 1), 1);
     const auto entryBeforeStartApplyingOpTime = makeOplogEntry(
                                                     beforeStartApplyingOpTime,
@@ -2129,12 +2131,13 @@ TEST_F(TenantMigrationRecipientServiceTest,
     hangBeforeCreatingOplogApplier->setMode(FailPoint::off);
     hangAfterStartingOplogApplier->waitForTimesEntered(initialTimesEntered + 1);
 
-    auto dataConsistentOplogEntry = makeOplogEntry(dataConsistentOpTime,
-                                                   OpTypeEnum::kInsert,
-                                                   NamespaceString(tenantId + "_foo.bar"),
-                                                   UUID::gen(),
-                                                   BSON("doc" << 3),
-                                                   boost::none /* o2 */);
+    auto dataConsistentOplogEntry =
+        makeOplogEntry(dataConsistentOpTime,
+                       OpTypeEnum::kInsert,
+                       NamespaceString::createNamespaceString_forTest(tenantId + "_foo.bar"),
+                       UUID::gen(),
+                       BSON("doc" << 3),
+                       boost::none /* o2 */);
 
     auto oplogFetcher = getDonorOplogFetcher(instance.get());
     // Feed the oplog fetcher the last doc required for the recipient to be considered consistent.
@@ -2221,7 +2224,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
     //       'fromTenantMigrate' field. This oplog entry does not satisfy the conditions
     //       for the oplog applier to resume applying from so we default to applying and
     //       batching from the start of the buffer collection.
-    const auto insertNss = NamespaceString(tenantId + "_foo.bar");
+    const auto insertNss = NamespaceString::createNamespaceString_forTest(tenantId + "_foo.bar");
     const auto afterStartApplyingOpTime = OpTime(Timestamp(3, 1), 1);
     const auto entryAfterStartApplyingOpTime = makeOplogEntry(
                                                    afterStartApplyingOpTime,
@@ -2276,12 +2279,13 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
 
     hangAfterStartingOplogApplier->waitForTimesEntered(initialTimesEntered + 1);
 
-    auto dataConsistentOplogEntry = makeOplogEntry(dataConsistentOpTime,
-                                                   OpTypeEnum::kInsert,
-                                                   NamespaceString(tenantId + "_foo.bar"),
-                                                   UUID::gen(),
-                                                   BSON("doc" << 3),
-                                                   boost::none /* o2 */);
+    auto dataConsistentOplogEntry =
+        makeOplogEntry(dataConsistentOpTime,
+                       OpTypeEnum::kInsert,
+                       NamespaceString::createNamespaceString_forTest(tenantId + "_foo.bar"),
+                       UUID::gen(),
+                       BSON("doc" << 3),
+                       boost::none /* o2 */);
 
     auto oplogFetcher = getDonorOplogFetcher(instance.get());
     // Feed the oplog fetcher the last doc required for the recipient to be considered consistent.
@@ -2364,23 +2368,25 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // should know to skip this document on service restart.
     const auto oplogBuffer = getDonorOplogBuffer(instance.get());
     OplogBuffer::Batch batch1;
-    batch1.push_back(makeOplogEntry(startFetchingOpTime,
-                                    OpTypeEnum::kInsert,
-                                    NamespaceString(tenantId + "_foo.bar"),
-                                    UUID::gen(),
-                                    BSON("doc" << 2),
-                                    boost::none /* o2 */)
-                         .getEntry()
-                         .toBSON());
+    batch1.push_back(
+        makeOplogEntry(startFetchingOpTime,
+                       OpTypeEnum::kInsert,
+                       NamespaceString::createNamespaceString_forTest(tenantId + "_foo.bar"),
+                       UUID::gen(),
+                       BSON("doc" << 2),
+                       boost::none /* o2 */)
+            .getEntry()
+            .toBSON());
     oplogBuffer->push(opCtx.get(), batch1.cbegin(), batch1.cend());
     ASSERT_EQUALS(oplogBuffer->getCount(), 1);
 
-    auto dataConsistentOplogEntry = makeOplogEntry(dataConsistentOpTime,
-                                                   OpTypeEnum::kInsert,
-                                                   NamespaceString(tenantId + "_foo.bar"),
-                                                   UUID::gen(),
-                                                   BSON("doc" << 3),
-                                                   boost::none /* o2 */);
+    auto dataConsistentOplogEntry =
+        makeOplogEntry(dataConsistentOpTime,
+                       OpTypeEnum::kInsert,
+                       NamespaceString::createNamespaceString_forTest(tenantId + "_foo.bar"),
+                       UUID::gen(),
+                       BSON("doc" << 3),
+                       boost::none /* o2 */);
     // Continue the recipient service to hang before starting the oplog applier.
     const auto hangAfterStartingOplogApplier =
         globalFailPointRegistry().find("fpAfterStartingOplogApplierMigrationRecipientInstance");
@@ -2475,13 +2481,14 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierFails) {
         ASSERT_TRUE(oplogFetcher->isActive());
 
         // Send an oplog entry not from our tenant, which should cause the oplog applier to assert.
-        auto oplogEntry = makeOplogEntry(injectedEntryOpTime,
-                                         OpTypeEnum::kInsert,
-                                         NamespaceString("admin.bogus"),
-                                         UUID::gen(),
-                                         BSON("_id"
-                                              << "bad insert"),
-                                         boost::none /* o2 */);
+        auto oplogEntry =
+            makeOplogEntry(injectedEntryOpTime,
+                           OpTypeEnum::kInsert,
+                           NamespaceString::createNamespaceString_forTest("admin.bogus"),
+                           UUID::gen(),
+                           BSON("_id"
+                                << "bad insert"),
+                           boost::none /* o2 */);
         oplogFetcher->receiveBatch(
             1LL, {oplogEntry.getEntry().toBSON()}, injectedEntryOpTime.getTimestamp());
     }
@@ -2598,22 +2605,24 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTok
     // Feed the oplog fetcher a resume token.
     auto oplogFetcher = getDonorOplogFetcher(instance.get());
     const auto resumeToken1 = topOfOplogOpTime.getTimestamp();
-    auto oplogEntry1 = makeOplogEntry(topOfOplogOpTime,
-                                      OpTypeEnum::kInsert,
-                                      NamespaceString("foo.bar") /* namespace */,
-                                      UUID::gen() /* uuid */,
-                                      BSON("doc" << 2) /* o */,
-                                      boost::none /* o2 */);
+    auto oplogEntry1 =
+        makeOplogEntry(topOfOplogOpTime,
+                       OpTypeEnum::kInsert,
+                       NamespaceString::createNamespaceString_forTest("foo.bar") /* namespace */,
+                       UUID::gen() /* uuid */,
+                       BSON("doc" << 2) /* o */,
+                       boost::none /* o2 */);
     oplogFetcher->receiveBatch(17, {oplogEntry1.getEntry().toBSON()}, resumeToken1);
 
     const Timestamp oplogEntryTS2 = Timestamp(6, 2);
     const Timestamp resumeToken2 = Timestamp(7, 3);
-    auto oplogEntry2 = makeOplogEntry(OpTime(oplogEntryTS2, topOfOplogOpTime.getTerm()),
-                                      OpTypeEnum::kInsert,
-                                      NamespaceString("foo.bar") /* namespace */,
-                                      UUID::gen() /* uuid */,
-                                      BSON("doc" << 3) /* o */,
-                                      boost::none /* o2 */);
+    auto oplogEntry2 =
+        makeOplogEntry(OpTime(oplogEntryTS2, topOfOplogOpTime.getTerm()),
+                       OpTypeEnum::kInsert,
+                       NamespaceString::createNamespaceString_forTest("foo.bar") /* namespace */,
+                       UUID::gen() /* uuid */,
+                       BSON("doc" << 3) /* o */,
+                       boost::none /* o2 */);
     oplogFetcher->receiveBatch(17, {oplogEntry2.getEntry().toBSON()}, resumeToken2);
 
     // Receive an empty batch.
@@ -2644,7 +2653,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTok
         ASSERT_TRUE(noopEntry.getOpType() == OpTypeEnum::kNoop);
         ASSERT_EQUALS(noopEntry.getTimestamp(), resumeToken2);
         ASSERT_EQUALS(noopEntry.getTerm().value(), -1);
-        ASSERT_EQUALS(noopEntry.getNss(), NamespaceString(""));
+        ASSERT_EQUALS(noopEntry.getNss(), NamespaceString::createNamespaceString_forTest(""));
     }
 
     ASSERT_TRUE(oplogBuffer->isEmpty());

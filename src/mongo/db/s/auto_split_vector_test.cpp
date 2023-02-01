@@ -45,7 +45,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss = NamespaceString("autosplitDB", "coll");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("autosplitDB", "coll");
 const std::string kPattern = "_id";
 
 /*
@@ -135,14 +135,15 @@ class AutoSplitVectorTest10MB : public AutoSplitVectorTest {
 
 // Throw exception upon calling autoSplitVector on dropped/unexisting collection
 TEST_F(AutoSplitVectorTest, NoCollection) {
-    ASSERT_THROWS_CODE(autoSplitVector(operationContext(),
-                                       NamespaceString("dummy", "collection"),
-                                       BSON(kPattern << 1) /* shard key pattern */,
-                                       BSON(kPattern << kMinBSONKey) /* min */,
-                                       BSON(kPattern << kMaxBSONKey) /* max */,
-                                       1 * 1024 * 1024 /* max chunk size in bytes*/),
-                       DBException,
-                       ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS_CODE(
+        autoSplitVector(operationContext(),
+                        NamespaceString::createNamespaceString_forTest("dummy", "collection"),
+                        BSON(kPattern << 1) /* shard key pattern */,
+                        BSON(kPattern << kMinBSONKey) /* min */,
+                        BSON(kPattern << kMaxBSONKey) /* max */,
+                        1 * 1024 * 1024 /* max chunk size in bytes*/),
+        DBException,
+        ErrorCodes::NamespaceNotFound);
 }
 
 TEST_F(AutoSplitVectorTest, EmptyCollection) {

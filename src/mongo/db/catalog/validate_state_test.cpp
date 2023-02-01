@@ -48,7 +48,7 @@ namespace mongo {
 
 namespace {
 
-const NamespaceString kNss = NamespaceString("fooDB.fooColl");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("fooDB.fooColl");
 
 class ValidateStateTest : public CatalogTestFixture {
 protected:

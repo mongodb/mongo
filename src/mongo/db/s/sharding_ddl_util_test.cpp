@@ -86,7 +86,7 @@ private:
     }
 };
 
-const NamespaceString kToNss("test.to");
+const NamespaceString kToNss = NamespaceString::createNamespaceString_forTest("test.to");
 
 // Query 'limit' objects from the database into an array.
 void findN(DBClientBase& client,
@@ -109,7 +109,7 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     auto opCtx = operationContext();
     DBDirectClient client(opCtx);
 
-    const NamespaceString fromNss("test.from");
+    const NamespaceString fromNss = NamespaceString::createNamespaceString_forTest("test.from");
     const auto fromCollQuery = BSON(CollectionType::kNssFieldName << fromNss.ns());
 
     const auto toCollQuery = BSON(CollectionType::kNssFieldName << kToNss.ns());
@@ -250,14 +250,15 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
     const std::string dbName{"test"};
 
     // Check that no exception is thrown if the namespace of the target collection is long enough
-    const NamespaceString longEnoughNss{
+    const NamespaceString longEnoughNss = NamespaceString::createNamespaceString_forTest(
         dbName + "." +
-        std::string(NamespaceString::MaxNsShardedCollectionLen - dbName.length() - 1, 'x')};
+        std::string(NamespaceString::MaxNsShardedCollectionLen - dbName.length() - 1, 'x'));
     sharding_ddl_util::checkRenamePreconditions(
         opCtx, true /* sourceIsSharded */, longEnoughNss, false /* dropTarget */);
 
     // Check that an exception is thrown if the namespace of the target collection is too long
-    const NamespaceString tooLongNss{longEnoughNss.ns() + 'x'};
+    const NamespaceString tooLongNss =
+        NamespaceString::createNamespaceString_forTest(longEnoughNss.ns() + 'x');
     ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
                            opCtx, true /* sourceIsSharded */, tooLongNss, false /* dropTarget */),
                        AssertionException,

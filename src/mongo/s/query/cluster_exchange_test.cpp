@@ -49,7 +49,8 @@ using MergeStrategyDescriptor = DocumentSourceMerge::MergeStrategyDescriptor;
 using WhenMatched = MergeStrategyDescriptor::WhenMatched;
 using WhenNotMatched = MergeStrategyDescriptor::WhenNotMatched;
 
-const NamespaceString kTestTargetNss = NamespaceString{"unittests", "out_ns"};
+const NamespaceString kTestTargetNss =
+    NamespaceString::createNamespaceString_forTest("unittests", "out_ns");
 
 class ClusterExchangeTest : public ShardedAggTestFixture {
 protected:

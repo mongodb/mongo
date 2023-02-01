@@ -103,7 +103,7 @@ struct ThrowingObserver : public TestObserver {
 };
 
 struct OpObserverRegistryTest : public unittest::Test {
-    NamespaceString testNss = {"test", "coll"};
+    NamespaceString testNss = NamespaceString::createNamespaceString_forTest("test", "coll");
     std::unique_ptr<TestObserver> unique1 = std::make_unique<TestObserver>();
     std::unique_ptr<TestObserver> unique2 = std::make_unique<TestObserver>();
     TestObserver* observer1 = unique1.get();

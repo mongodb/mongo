@@ -69,7 +69,7 @@ void MultiIndexBlockTest::setUp() {
     repl::ReplicationCoordinator::set(service,
                                       std::make_unique<repl::ReplicationCoordinatorMock>(service));
 
-    _nss = NamespaceString("db.coll");
+    _nss = NamespaceString::createNamespaceString_forTest("db.coll");
 
     CollectionOptions options;
     options.uuid = UUID::gen();

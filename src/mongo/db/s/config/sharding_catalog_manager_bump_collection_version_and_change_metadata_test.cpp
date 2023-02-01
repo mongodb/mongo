@@ -44,7 +44,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss("TestDB", "TestColl");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const KeyPattern kKeyPattern(BSON("a" << 1));
 const ShardType kShard0("shard0000", "shard0000:1234");
 const ShardType kShard1("shard0001", "shard0001:1234");

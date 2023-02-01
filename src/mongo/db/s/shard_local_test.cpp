@@ -173,7 +173,7 @@ StatusWith<Shard::QueryResponse> ShardLocalTest::runFindQuery(NamespaceString ns
 }
 
 TEST_F(ShardLocalTest, RunCommand) {
-    NamespaceString nss("admin.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("admin.bar");
     StatusWith<Shard::CommandResponse> findAndModifyResponse = runFindAndModifyRunCommand(
         nss, BSON("fooItem" << 1), BSON("$set" << BSON("fooRandom" << 254)));
 
@@ -185,7 +185,7 @@ TEST_F(ShardLocalTest, RunCommand) {
 }
 
 TEST_F(ShardLocalTest, FindOneWithoutLimit) {
-    NamespaceString nss("admin.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("admin.bar");
 
     // Set up documents to be queried.
     StatusWith<Shard::CommandResponse> findAndModifyResponse = runFindAndModifyRunCommand(
@@ -209,7 +209,7 @@ TEST_F(ShardLocalTest, FindOneWithoutLimit) {
 }
 
 TEST_F(ShardLocalTest, FindManyWithLimit) {
-    NamespaceString nss("admin.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("admin.bar");
 
     // Set up documents to be queried.
     StatusWith<Shard::CommandResponse> findAndModifyResponse = runFindAndModifyRunCommand(
@@ -239,7 +239,7 @@ TEST_F(ShardLocalTest, FindManyWithLimit) {
 }
 
 TEST_F(ShardLocalTest, FindNoMatchingDocumentsEmpty) {
-    NamespaceString nss("admin.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("admin.bar");
 
     // Set up a document.
     StatusWith<Shard::CommandResponse> findAndModifyResponse = runFindAndModifyRunCommand(

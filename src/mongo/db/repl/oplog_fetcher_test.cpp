@@ -54,7 +54,7 @@ using namespace mongo::repl;
 using namespace unittest;
 
 HostAndPort source("localhost:12345");
-NamespaceString nss("local.oplog.rs");
+NamespaceString nss = NamespaceString::createNamespaceString_forTest("local.oplog.rs");
 
 ReplSetConfig _createConfig() {
     BSONObjBuilder bob;
@@ -83,25 +83,25 @@ BSONObj concatenate(BSONObj a, const BSONObj& b) {
 }
 
 BSONObj makeNoopOplogEntry(OpTime opTime) {
-    auto oplogEntry =
-        repl::DurableOplogEntry(opTime,                           // optime
-                                OpTypeEnum ::kNoop,               // opType
-                                NamespaceString("test.t"),        // namespace
-                                boost::none,                      // uuid
-                                boost::none,                      // fromMigrate
-                                repl::OplogEntry::kOplogVersion,  // version
-                                BSONObj(),                        // o
-                                boost::none,                      // o2
-                                {},                               // sessionInfo
-                                boost::none,                      // upsert
-                                Date_t(),                         // wall clock time
-                                {},                               // statement ids
-                                boost::none,   // optime of previous write within same transaction
-                                boost::none,   // pre-image optime
-                                boost::none,   // post-image optime
-                                boost::none,   // ShardId of resharding recipient
-                                boost::none,   // _id
-                                boost::none);  // needsRetryImage
+    auto oplogEntry = repl::DurableOplogEntry(
+        opTime,                                                    // optime
+        OpTypeEnum ::kNoop,                                        // opType
+        NamespaceString::createNamespaceString_forTest("test.t"),  // namespace
+        boost::none,                                               // uuid
+        boost::none,                                               // fromMigrate
+        repl::OplogEntry::kOplogVersion,                           // version
+        BSONObj(),                                                 // o
+        boost::none,                                               // o2
+        {},                                                        // sessionInfo
+        boost::none,                                               // upsert
+        Date_t(),                                                  // wall clock time
+        {},                                                        // statement ids
+        boost::none,   // optime of previous write within same transaction
+        boost::none,   // pre-image optime
+        boost::none,   // post-image optime
+        boost::none,   // ShardId of resharding recipient
+        boost::none,   // _id
+        boost::none);  // needsRetryImage
     return oplogEntry.toBSON();
 }
 

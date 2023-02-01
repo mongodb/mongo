@@ -42,7 +42,7 @@
 namespace mongo::timeseries::bucket_catalog {
 namespace {
 
-const NamespaceString kNss = NamespaceString("test.ts");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.ts");
 
 class BucketCatalogHelpersTest : public CatalogTestFixture {
 protected:

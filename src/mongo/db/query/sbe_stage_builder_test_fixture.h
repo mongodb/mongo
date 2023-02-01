@@ -99,7 +99,8 @@ public:
     }
 
 protected:
-    const NamespaceString _nss = NamespaceString{"testdb.sbe_stage_builder"};
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder");
 };
 
 }  // namespace mongo

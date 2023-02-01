@@ -351,7 +351,9 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         chunks1.push_back(c2);
     }
 
-    setupCollection(NamespaceString("db1.coll1"), BSON("x" << 1 << "y" << 1), chunks1);
+    setupCollection(NamespaceString::createNamespaceString_forTest("db1.coll1"),
+                    BSON("x" << 1 << "y" << 1),
+                    chunks1);
 
     // generate coll2 and its chunk:
     // 10 chunks: from shard6 to shard10
@@ -379,7 +381,9 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         chunks2.push_back(c1);
     }
 
-    setupCollection(NamespaceString("db1.coll2"), BSON("x" << 1 << "y" << 1), chunks2);
+    setupCollection(NamespaceString::createNamespaceString_forTest("db1.coll2"),
+                    BSON("x" << 1 << "y" << 1),
+                    chunks2);
 
     // Ensure that the vector clock is able to return an up-to-date config time to both the
     // ShardingCatalogManager and this test.
@@ -400,7 +404,10 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         NamespaceString::kConfigsvrPlacementHistoryNamespace,
         BSON("nss"
              << "db1"));
-    assertPlacementType(db1Entry, NamespaceString("db1"), configTimeAtInitialization, {"shard1"});
+    assertPlacementType(db1Entry,
+                        NamespaceString::createNamespaceString_forTest("db1"),
+                        configTimeAtInitialization,
+                        {"shard1"});
 
     // check db2
     auto db2Entry = findOneOnConfigCollection<NamespacePlacementType>(
@@ -408,7 +415,10 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         NamespaceString::kConfigsvrPlacementHistoryNamespace,
         BSON("nss"
              << "db2"));
-    assertPlacementType(db2Entry, NamespaceString("db2"), configTimeAtInitialization, {"shard2"});
+    assertPlacementType(db2Entry,
+                        NamespaceString::createNamespaceString_forTest("db2"),
+                        configTimeAtInitialization,
+                        {"shard2"});
 
     // check db3
     auto db3Entry = findOneOnConfigCollection<NamespacePlacementType>(
@@ -416,7 +426,10 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         NamespaceString::kConfigsvrPlacementHistoryNamespace,
         BSON("nss"
              << "db3"));
-    assertPlacementType(db3Entry, NamespaceString("db3"), configTimeAtInitialization, {"shard3"});
+    assertPlacementType(db3Entry,
+                        NamespaceString::createNamespaceString_forTest("db3"),
+                        configTimeAtInitialization,
+                        {"shard3"});
 
     // check coll1
     auto coll1Entry = findOneOnConfigCollection<NamespacePlacementType>(
@@ -425,7 +438,7 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         BSON("nss"
              << "db1.coll1"));
     assertPlacementType(coll1Entry,
-                        NamespaceString("db1.coll1"),
+                        NamespaceString::createNamespaceString_forTest("db1.coll1"),
                         configTimeAtInitialization,
                         {"shard1", "shard2", "shard3", "shard4", "shard5"});
 
@@ -436,7 +449,7 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         BSON("nss"
              << "db1.coll2"));
     assertPlacementType(coll2Entry,
-                        NamespaceString("db1.coll2"),
+                        NamespaceString::createNamespaceString_forTest("db1.coll2"),
                         configTimeAtInitialization,
                         {"shard6", "shard7", "shard8", "shard9", "shard10"});
 

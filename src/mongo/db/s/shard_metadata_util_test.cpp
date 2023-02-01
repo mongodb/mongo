@@ -46,8 +46,9 @@ using std::unique_ptr;
 using std::vector;
 using unittest::assertGet;
 
-const NamespaceString kNss = NamespaceString("test.foo");
-const NamespaceString kChunkMetadataNss = NamespaceString("config.cache.chunks.test.foo");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.foo");
+const NamespaceString kChunkMetadataNss =
+    NamespaceString::createNamespaceString_forTest("config.cache.chunks.test.foo");
 const ShardId kShardId = ShardId("shard0");
 const bool kUnique = false;
 

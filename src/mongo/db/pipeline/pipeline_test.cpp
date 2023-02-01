@@ -74,8 +74,9 @@ using boost::intrusive_ptr;
 using std::string;
 using std::vector;
 
-const NamespaceString kTestNss = NamespaceString("a.collection");
-const NamespaceString kAdminCollectionlessNss = NamespaceString("admin.$cmd.aggregate");
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("a.collection");
+const NamespaceString kAdminCollectionlessNss =
+    NamespaceString::createNamespaceString_forTest("admin.$cmd.aggregate");
 
 constexpr size_t getChangeStreamStageSize() {
     return 6;
@@ -139,8 +140,9 @@ void assertPipelineOptimizesAndSerializesTo(std::string inputPipeJson,
 
     // For $graphLookup and $lookup, we have to populate the resolvedNamespaces so that the
     // operations will be able to have a resolved view definition.
-    NamespaceString lookupCollNs("a", "lookupColl");
-    NamespaceString unionCollNs("b", "unionColl");
+    NamespaceString lookupCollNs =
+        NamespaceString::createNamespaceString_forTest("a", "lookupColl");
+    NamespaceString unionCollNs = NamespaceString::createNamespaceString_forTest("b", "unionColl");
     ctx->setResolvedNamespace(lookupCollNs, {lookupCollNs, std::vector<BSONObj>{}});
     ctx->setResolvedNamespace(unionCollNs, {unionCollNs, std::vector<BSONObj>{}});
 
@@ -3383,7 +3385,7 @@ public:
 
     // Allows tests to override the default resolvedNamespaces.
     virtual NamespaceString getLookupCollNs() {
-        return NamespaceString("a", "lookupColl");
+        return NamespaceString::createNamespaceString_forTest("a", "lookupColl");
     }
 
     BSONObj pipelineFromJsonArray(const string& array) {
@@ -4359,7 +4361,9 @@ TEST(PipelineInitialSource, GeoNearInitialQuery) {
     const std::vector<BSONObj> rawPipeline = {
         fromjson("{$geoNear: {distanceField: 'd', near: [0, 0], query: {a: 1}}}")};
     intrusive_ptr<ExpressionContextForTest> ctx = new ExpressionContextForTest(
-        &_opCtx, AggregateCommandRequest(NamespaceString("a.collection"), rawPipeline));
+        &_opCtx,
+        AggregateCommandRequest(NamespaceString::createNamespaceString_forTest("a.collection"),
+                                rawPipeline));
     auto pipe = Pipeline::parse(rawPipeline, ctx);
     ASSERT_BSONOBJ_EQ(pipe->getInitialQuery(), BSON("a" << 1));
 }
@@ -4368,7 +4372,9 @@ TEST(PipelineInitialSource, MatchInitialQuery) {
     OperationContextNoop _opCtx;
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {'a': 4}}")};
     intrusive_ptr<ExpressionContextForTest> ctx = new ExpressionContextForTest(
-        &_opCtx, AggregateCommandRequest(NamespaceString("a.collection"), rawPipeline));
+        &_opCtx,
+        AggregateCommandRequest(NamespaceString::createNamespaceString_forTest("a.collection"),
+                                rawPipeline));
 
     auto pipe = Pipeline::parse(rawPipeline, ctx);
     ASSERT_BSONOBJ_EQ(pipe->getInitialQuery(), BSON("a" << 4));
@@ -4460,7 +4466,7 @@ TEST_F(PipelineValidateTest, ChangeStreamIsValidAsFirstStage) {
     const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}")};
     auto ctx = getExpCtx();
     setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
-    ctx->ns = NamespaceString("a.collection");
+    ctx->ns = NamespaceString::createNamespaceString_forTest("a.collection");
     Pipeline::parse(rawPipeline, ctx);
 }
 
@@ -4469,7 +4475,7 @@ TEST_F(PipelineValidateTest, ChangeStreamIsNotValidIfNotFirstStage) {
                                               fromjson("{$changeStream: {}}")};
     auto ctx = getExpCtx();
     setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
-    ctx->ns = NamespaceString("a.collection");
+    ctx->ns = NamespaceString::createNamespaceString_forTest("a.collection");
     ASSERT_THROWS_CODE(Pipeline::parse(rawPipeline, ctx), AssertionException, 40602);
 }
 
@@ -4479,7 +4485,7 @@ TEST_F(PipelineValidateTest, ChangeStreamIsNotValidIfNotFirstStageInFacet) {
 
     auto ctx = getExpCtx();
     setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
-    ctx->ns = NamespaceString("a.collection");
+    ctx->ns = NamespaceString::createNamespaceString_forTest("a.collection");
     ASSERT_THROWS_CODE(Pipeline::parse(rawPipeline, ctx), AssertionException, 40600);
 }
 
@@ -5132,8 +5138,9 @@ TEST_F(InvolvedNamespacesTest, NoInvolvedNamespacesForMatchSortProject) {
 
 TEST_F(InvolvedNamespacesTest, IncludesLookupNamespace) {
     auto expCtx = getExpCtx();
-    const NamespaceString lookupNss{"test", "foo"};
-    const NamespaceString resolvedNss{"test", "bar"};
+    const NamespaceString lookupNss = NamespaceString::createNamespaceString_forTest("test", "foo");
+    const NamespaceString resolvedNss =
+        NamespaceString::createNamespaceString_forTest("test", "bar");
     expCtx->setResolvedNamespace(lookupNss, {resolvedNss, vector<BSONObj>{}});
     auto lookupSpec =
         fromjson("{$lookup: {from: 'foo', as: 'x', localField: 'foo_id', foreignField: '_id'}}");
@@ -5149,8 +5156,9 @@ TEST_F(InvolvedNamespacesTest, IncludesLookupNamespace) {
 
 TEST_F(InvolvedNamespacesTest, IncludesGraphLookupNamespace) {
     auto expCtx = getExpCtx();
-    const NamespaceString lookupNss{"test", "foo"};
-    const NamespaceString resolvedNss{"test", "bar"};
+    const NamespaceString lookupNss = NamespaceString::createNamespaceString_forTest("test", "foo");
+    const NamespaceString resolvedNss =
+        NamespaceString::createNamespaceString_forTest("test", "bar");
     expCtx->setResolvedNamespace(lookupNss, {resolvedNss, vector<BSONObj>{}});
     auto graphLookupSpec = fromjson(
         "{$graphLookup: {"
@@ -5172,10 +5180,14 @@ TEST_F(InvolvedNamespacesTest, IncludesGraphLookupNamespace) {
 
 TEST_F(InvolvedNamespacesTest, IncludesLookupSubpipelineNamespaces) {
     auto expCtx = getExpCtx();
-    const NamespaceString outerLookupNss{"test", "foo_outer"};
-    const NamespaceString outerResolvedNss{"test", "bar_outer"};
-    const NamespaceString innerLookupNss{"test", "foo_inner"};
-    const NamespaceString innerResolvedNss{"test", "bar_inner"};
+    const NamespaceString outerLookupNss =
+        NamespaceString::createNamespaceString_forTest("test", "foo_outer");
+    const NamespaceString outerResolvedNss =
+        NamespaceString::createNamespaceString_forTest("test", "bar_outer");
+    const NamespaceString innerLookupNss =
+        NamespaceString::createNamespaceString_forTest("test", "foo_inner");
+    const NamespaceString innerResolvedNss =
+        NamespaceString::createNamespaceString_forTest("test", "bar_inner");
     expCtx->setResolvedNamespace(outerLookupNss, {outerResolvedNss, vector<BSONObj>{}});
     expCtx->setResolvedNamespace(innerLookupNss, {innerResolvedNss, vector<BSONObj>{}});
     auto lookupSpec = fromjson(
@@ -5197,10 +5209,14 @@ TEST_F(InvolvedNamespacesTest, IncludesLookupSubpipelineNamespaces) {
 
 TEST_F(InvolvedNamespacesTest, IncludesGraphLookupSubPipeline) {
     auto expCtx = getExpCtx();
-    const NamespaceString outerLookupNss{"test", "foo_outer"};
-    const NamespaceString outerResolvedNss{"test", "bar_outer"};
-    const NamespaceString innerLookupNss{"test", "foo_inner"};
-    const NamespaceString innerResolvedNss{"test", "bar_inner"};
+    const NamespaceString outerLookupNss =
+        NamespaceString::createNamespaceString_forTest("test", "foo_outer");
+    const NamespaceString outerResolvedNss =
+        NamespaceString::createNamespaceString_forTest("test", "bar_outer");
+    const NamespaceString innerLookupNss =
+        NamespaceString::createNamespaceString_forTest("test", "foo_inner");
+    const NamespaceString innerResolvedNss =
+        NamespaceString::createNamespaceString_forTest("test", "bar_inner");
     expCtx->setResolvedNamespace(outerLookupNss, {outerResolvedNss, vector<BSONObj>{}});
     expCtx->setResolvedNamespace(
         outerLookupNss,
@@ -5228,10 +5244,13 @@ TEST_F(InvolvedNamespacesTest, IncludesGraphLookupSubPipeline) {
 
 TEST_F(InvolvedNamespacesTest, IncludesAllCollectionsWhenResolvingViews) {
     auto expCtx = getExpCtx();
-    const NamespaceString normalCollectionNss{"test", "collection"};
-    const NamespaceString lookupNss{"test", "foo"};
-    const NamespaceString resolvedNss{"test", "bar"};
-    const NamespaceString nssIncludedInResolvedView{"test", "extra_backer_of_bar"};
+    const NamespaceString normalCollectionNss =
+        NamespaceString::createNamespaceString_forTest("test", "collection");
+    const NamespaceString lookupNss = NamespaceString::createNamespaceString_forTest("test", "foo");
+    const NamespaceString resolvedNss =
+        NamespaceString::createNamespaceString_forTest("test", "bar");
+    const NamespaceString nssIncludedInResolvedView =
+        NamespaceString::createNamespaceString_forTest("test", "extra_backer_of_bar");
     expCtx->setResolvedNamespace(
         lookupNss,
         {resolvedNss,

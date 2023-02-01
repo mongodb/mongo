@@ -104,7 +104,7 @@ Status createIndexFromSpec(OperationContext* opCtx,
                            VectorClockMutable* clock,
                            StringData ns,
                            const BSONObj& spec) {
-    NamespaceString nss(ns);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
 
     // Make sure we haven't already locked this namespace. An AutoGetCollection already instantiated
     // on this namespace would have a dangling Collection pointer after this function has run.
@@ -118,7 +118,7 @@ Status createIndexFromSpec(OperationContext* opCtx,
         if (!coll) {
             auto db = autoDb.ensureDbExists(opCtx);
             invariant(db);
-            coll = db->createCollection(opCtx, NamespaceString(ns));
+            coll = db->createCollection(opCtx, NamespaceString::createNamespaceString_forTest(ns));
         }
         invariant(coll);
         wunit.commit();
@@ -813,7 +813,8 @@ TEST_F(StorageTimestampTest, SecondaryInsertTimes) {
     repl::UnreplicatedWritesBlock uwb(_opCtx);
 
     // Create a new collection.
-    NamespaceString nss("unittests.timestampedUpdates");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.timestampedUpdates");
     create(nss);
 
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
@@ -859,7 +860,8 @@ TEST_F(StorageTimestampTest, SecondaryArrayInsertTimes) {
     DisableDocumentValidation validationDisabler(_opCtx);
 
     // Create a new collection.
-    NamespaceString nss("unittests.timestampedUpdates");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.timestampedUpdates");
     create(nss);
 
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
@@ -916,7 +918,8 @@ TEST_F(StorageTimestampTest, SecondaryDeleteTimes) {
     repl::UnreplicatedWritesBlock uwb(_opCtx);
 
     // Create a new collection.
-    NamespaceString nss("unittests.timestampedDeletes");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.timestampedDeletes");
     create(nss);
 
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
@@ -961,7 +964,8 @@ TEST_F(StorageTimestampTest, SecondaryUpdateTimes) {
     repl::UnreplicatedWritesBlock uwb(_opCtx);
 
     // Create a new collection.
-    NamespaceString nss("unittests.timestampedUpdates");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.timestampedUpdates");
     create(nss);
 
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
@@ -1036,7 +1040,8 @@ TEST_F(StorageTimestampTest, SecondaryInsertToUpsert) {
     repl::UnreplicatedWritesBlock uwb(_opCtx);
 
     // Create a new collection.
-    NamespaceString nss("unittests.insertToUpsert");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.insertToUpsert");
     create(nss);
 
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
@@ -1085,7 +1090,8 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollection) {
     // In order for applyOps to assign timestamps, we must be in non-replicated mode.
     repl::UnreplicatedWritesBlock uwb(_opCtx);
 
-    NamespaceString nss("unittests.secondaryCreateCollection");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.secondaryCreateCollection");
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss));
 
     { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
@@ -1114,8 +1120,10 @@ TEST_F(StorageTimestampTest, SecondaryCreateTwoCollections) {
     repl::UnreplicatedWritesBlock uwb(_opCtx);
 
     std::string dbName = "unittest";
-    NamespaceString nss1(dbName, "secondaryCreateTwoCollections1");
-    NamespaceString nss2(dbName, "secondaryCreateTwoCollections2");
+    NamespaceString nss1 =
+        NamespaceString::createNamespaceString_forTest(dbName, "secondaryCreateTwoCollections1");
+    NamespaceString nss2 =
+        NamespaceString::createNamespaceString_forTest(dbName, "secondaryCreateTwoCollections2");
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss1));
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss2));
 
@@ -1161,8 +1169,10 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollectionBetweenInserts) {
     repl::UnreplicatedWritesBlock uwb(_opCtx);
 
     std::string dbName = "unittest";
-    NamespaceString nss1(dbName, "secondaryCreateCollectionBetweenInserts1");
-    NamespaceString nss2(dbName, "secondaryCreateCollectionBetweenInserts2");
+    NamespaceString nss1 = NamespaceString::createNamespaceString_forTest(
+        dbName, "secondaryCreateCollectionBetweenInserts1");
+    NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(
+        dbName, "secondaryCreateCollectionBetweenInserts2");
     BSONObj doc1 = BSON("_id" << 1 << "field" << 1);
     BSONObj doc2 = BSON("_id" << 2 << "field" << 2);
 
@@ -1234,7 +1244,8 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollectionBetweenInserts) {
 }
 
 TEST_F(StorageTimestampTest, PrimaryCreateCollectionInApplyOps) {
-    NamespaceString nss("unittests.primaryCreateCollectionInApplyOps");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.primaryCreateCollectionInApplyOps");
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss));
 
     { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
@@ -1272,7 +1283,8 @@ TEST_F(StorageTimestampTest, SecondarySetIndexMultikeyOnInsert) {
     // Pretend to be a secondary.
     repl::UnreplicatedWritesBlock uwb(_opCtx);
 
-    NamespaceString nss("unittests.SecondarySetIndexMultikeyOnInsert");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.SecondarySetIndexMultikeyOnInsert");
     create(nss);
     UUID uuid = UUID::gen();
     {
@@ -1337,7 +1349,8 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
     // Pretend to be a secondary.
     repl::UnreplicatedWritesBlock uwb(_opCtx);
 
-    NamespaceString nss("unittests.SecondarySetWildcardIndexMultikeyOnInsert");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.SecondarySetWildcardIndexMultikeyOnInsert");
     // Use a capped collection to prevent the batch applier from grouping insert operations
     // together in the same WUOW. This test attempts to apply operations out of order, but the
     // storage engine does not allow an operation to set out-of-order timestamps in the same
@@ -1440,7 +1453,8 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
     // Pretend to be a secondary.
     repl::UnreplicatedWritesBlock uwb(_opCtx);
 
-    NamespaceString nss("unittests.SecondarySetWildcardIndexMultikeyOnUpdate");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.SecondarySetWildcardIndexMultikeyOnUpdate");
     create(nss);
     UUID uuid = UUID::gen();
     {
@@ -1535,7 +1549,8 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
 }
 
 TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsert) {
-    NamespaceString nss("unittests.PrimarySetIndexMultikeyOnInsert");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.PrimarySetIndexMultikeyOnInsert");
     create(nss);
 
     auto indexName = "a_1";
@@ -1561,7 +1576,8 @@ TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsert) {
 TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsertUnreplicated) {
     // Use an unreplicated collection.
     repl::UnreplicatedWritesBlock noRep(_opCtx);
-    NamespaceString nss("unittests.system.profile");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.system.profile");
     create(nss);
 
     auto indexName = "a_1";
@@ -1591,7 +1607,8 @@ TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) 
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx);
     mongoDSessionCatalog->onStepUp(_opCtx);
 
-    NamespaceString nss("unittests.PrimarySetsMultikeyInsideMultiDocumentTransaction");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.PrimarySetsMultikeyInsideMultiDocumentTransaction");
     create(nss);
 
     auto indexName = "a_1";
@@ -1669,7 +1686,8 @@ TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) 
 }
 
 TEST_F(StorageTimestampTest, InitializeMinValid) {
-    NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
     create(nss);
 
     repl::ReplicationConsistencyMarkersImpl consistencyMarkers(repl::StorageInterface::get(_opCtx));
@@ -1686,7 +1704,8 @@ TEST_F(StorageTimestampTest, InitializeMinValid) {
 }
 
 TEST_F(StorageTimestampTest, SetMinValidInitialSyncFlag) {
-    NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
     create(nss);
 
     repl::ReplicationConsistencyMarkersImpl consistencyMarkers(repl::StorageInterface::get(_opCtx));
@@ -1711,7 +1730,8 @@ TEST_F(StorageTimestampTest, SetMinValidInitialSyncFlag) {
 }
 
 TEST_F(StorageTimestampTest, SetMinValidAppliedThrough) {
-    NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
     create(nss);
 
     repl::ReplicationConsistencyMarkersImpl consistencyMarkers(repl::StorageInterface::get(_opCtx));
@@ -1765,7 +1785,8 @@ public:
         // This test drops collections piece-wise instead of having the "drop database" algorithm
         // perform this walk. Defensively operate on a separate DB from the other tests to ensure
         // no leftover collections carry-over.
-        const NamespaceString nss("unittestsDropDB.kvDropDatabase");
+        const NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest("unittestsDropDB.kvDropDatabase");
         const NamespaceString sysProfile("unittestsDropDB.system.profile");
 
         std::string collIdent;
@@ -1889,7 +1910,8 @@ public:
         auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         auto durableCatalog = storageEngine->getCatalog();
 
-        NamespaceString nss("unittests.timestampIndexBuilds");
+        NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest("unittests.timestampIndexBuilds");
         create(nss);
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
@@ -2034,7 +2056,8 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuilds) {
                          NamespaceString::kIndexBuildEntryNamespace.dbName(),
                          BSON("create" << NamespaceString::kIndexBuildEntryNamespace.coll())));
 
-    NamespaceString nss("unittests.timestampMultiIndexBuilds");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.timestampMultiIndexBuilds");
     create(nss);
 
     std::vector<std::string> origIdents;
@@ -2138,7 +2161,8 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
     auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto durableCatalog = storageEngine->getCatalog();
 
-    NamespaceString nss("unittests.timestampMultiIndexBuildsDuringRename");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.timestampMultiIndexBuildsDuringRename");
     create(nss);
 
     {
@@ -2202,7 +2226,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
                              << "b_1"));
     const auto tmpCollName =
         createIndexesDocument.getObjectField("o").getStringField("createIndexes");
-    tmpName = NamespaceString(renamedNss.db(), tmpCollName);
+    tmpName = NamespaceString::createNamespaceString_forTest(renamedNss.db(), tmpCollName);
     indexCommitTs = createIndexesDocument["ts"].timestamp();
     const Timestamp indexCreateInitTs = queryOplog(BSON("op"
                                                         << "c"
@@ -2252,7 +2276,8 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
                          NamespaceString::kIndexBuildEntryNamespace.dbName(),
                          BSON("create" << NamespaceString::kIndexBuildEntryNamespace.coll())));
 
-    NamespaceString nss("unittests.timestampAbortIndexBuild");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.timestampAbortIndexBuild");
     create(nss);
 
     std::vector<std::string> origIdents;
@@ -2355,7 +2380,8 @@ TEST_F(StorageTimestampTest, TimestampIndexDropsWildcard) {
     auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto durableCatalog = storageEngine->getCatalog();
 
-    NamespaceString nss("unittests.timestampIndexDrops");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.timestampIndexDrops");
     create(nss);
 
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
@@ -2426,7 +2452,8 @@ TEST_F(StorageTimestampTest, TimestampIndexDropsListed) {
     auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto durableCatalog = storageEngine->getCatalog();
 
-    NamespaceString nss("unittests.timestampIndexDrops");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.timestampIndexDrops");
     create(nss);
 
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
@@ -2568,7 +2595,8 @@ Status SecondaryReadsDuringBatchApplicationAreAllowedApplier::applyOplogBatchPer
 }
 
 TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary) {
-    NamespaceString nss("unittests.timestampIndexBuilds");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.timestampIndexBuilds");
     create(nss);
 
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
@@ -2721,7 +2749,8 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
 TEST_F(StorageTimestampTest, SecondaryReadsDuringBatchApplicationAreAllowed) {
     ASSERT(_opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot());
 
-    NamespaceString ns("unittest.secondaryReadsDuringBatchApplicationAreAllowed");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "unittest.secondaryReadsDuringBatchApplicationAreAllowed");
     create(ns);
     UUID uuid = UUID::gen();
     {
@@ -2812,7 +2841,8 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
     DisableDocumentValidation validationDisabler(_opCtx);
 
     std::string dbName = "unittest";
-    NamespaceString nss(dbName, "oplogApplicationOnPrimary");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(dbName, "oplogApplicationOnPrimary");
     BSONObj doc = BSON("_id" << 1 << "field" << 1);
 
     const LogicalTime setupStart = _clock->tickClusterTime(1);
@@ -2925,7 +2955,8 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
     const NamespaceString backingCollNss("unittests.backingColl");
     create(backingCollNss);
 
-    const NamespaceString viewNss("unittests.view");
+    const NamespaceString viewNss =
+        NamespaceString::createNamespaceString_forTest("unittests.view");
     const NamespaceString systemViewsNss =
         NamespaceString::makeSystemDotViewsNamespace({boost::none, "unittests"});
 
@@ -2970,7 +3001,7 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
 }
 
 TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
-    NamespaceString nss("admin.system.users");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("admin.system.users");
 
     { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
 
@@ -3050,7 +3081,8 @@ TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
                          NamespaceString::kIndexBuildEntryNamespace.dbName(),
                          BSON("create" << NamespaceString::kIndexBuildEntryNamespace.coll())));
 
-    NamespaceString nss("unittests.timestampVectoredInsertMultikey");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.timestampVectoredInsertMultikey");
     create(nss);
 
     {

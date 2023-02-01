@@ -48,7 +48,7 @@ protected:
     }
 
     BSONObj queryKey(const ShardKeyPattern& pattern, const BSONObj& query) {
-        const NamespaceString nss("foo");
+        const NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo");
 
         StatusWith<BSONObj> status = extractShardKeyFromBasicQuery(_opCtx, nss, pattern, query);
         if (!status.isOK())

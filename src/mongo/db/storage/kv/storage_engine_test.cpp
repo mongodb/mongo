@@ -66,12 +66,14 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
 
     // Add a collection, `db.coll1` to both the DurableCatalog and KVEngine. The returned value is
     // the `ident` name given to the collection.
-    auto swCollInfo = createCollection(opCtx.get(), NamespaceString("db.coll1"));
+    auto swCollInfo =
+        createCollection(opCtx.get(), NamespaceString::createNamespaceString_forTest("db.coll1"));
     ASSERT_OK(swCollInfo.getStatus());
 
     // Create a table in the KVEngine not reflected in the DurableCatalog. This should be dropped
     // when reconciling.
-    ASSERT_OK(createCollTable(opCtx.get(), NamespaceString("db.coll2")));
+    ASSERT_OK(
+        createCollTable(opCtx.get(), NamespaceString::createNamespaceString_forTest("db.coll2")));
 
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
     ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
@@ -98,7 +100,7 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
 TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     auto opCtx = cc().makeOperationContext();
 
-    const NamespaceString collNs("db.coll1");
+    const NamespaceString collNs = NamespaceString::createNamespaceString_forTest("db.coll1");
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
 
@@ -248,7 +250,7 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
 
     Lock::GlobalLock lk(&*opCtx, MODE_X);
 
-    const NamespaceString ns("db.coll1");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
     const std::string indexName("a_1");
 
     auto swCollInfo = createCollection(opCtx.get(), ns);
@@ -285,7 +287,7 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
 TEST_F(StorageEngineTest, ReconcileUnfinishedBackgroundSecondaryIndex) {
     auto opCtx = cc().makeOperationContext();
 
-    const NamespaceString ns("db.coll1");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
     const std::string indexName("a_1");
 
     auto swCollInfo = createCollection(opCtx.get(), ns);
@@ -330,7 +332,7 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedBackgroundSecondaryIndex) {
 TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
     auto opCtx = cc().makeOperationContext();
 
-    const NamespaceString ns("db.coll1");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
     const std::string indexA("a_1");
     const std::string indexB("b_1");
 
@@ -398,7 +400,7 @@ TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
 TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     auto opCtx = cc().makeOperationContext();
 
-    const NamespaceString collNs("db.coll1");
+    const NamespaceString collNs = NamespaceString::createNamespaceString_forTest("db.coll1");
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
 
@@ -425,7 +427,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
 TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
     auto opCtx = cc().makeOperationContext();
 
-    const NamespaceString collNs("db.coll1");
+    const NamespaceString collNs = NamespaceString::createNamespaceString_forTest("db.coll1");
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
 
@@ -448,7 +450,7 @@ TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
 TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     auto opCtx = cc().makeOperationContext();
 
-    const NamespaceString collNs("db.coll1");
+    const NamespaceString collNs = NamespaceString::createNamespaceString_forTest("db.coll1");
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
     ASSERT(collectionExists(opCtx.get(), collNs));
@@ -470,7 +472,8 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     _storageEngine->loadCatalog(opCtx.get(), boost::none, StorageEngine::LastShutdownState::kClean);
     auto identNs = swCollInfo.getValue().ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
-    NamespaceString orphanNs = NamespaceString("local.orphan." + identNs);
+    NamespaceString orphanNs =
+        NamespaceString::createNamespaceString_forTest("local.orphan." + identNs);
 
     ASSERT(identExists(opCtx.get(), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), orphanNs));
@@ -482,7 +485,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
 TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     auto opCtx = cc().makeOperationContext();
 
-    const NamespaceString collNs("db.coll1");
+    const NamespaceString collNs = NamespaceString::createNamespaceString_forTest("db.coll1");
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
     ASSERT(collectionExists(opCtx.get(), collNs));
@@ -513,7 +516,8 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     ASSERT(!identExists(opCtx.get(), swCollInfo.getValue().ident));
     auto identNs = swCollInfo.getValue().ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
-    NamespaceString orphanNs = NamespaceString("local.orphan." + identNs);
+    NamespaceString orphanNs =
+        NamespaceString::createNamespaceString_forTest("local.orphan." + identNs);
     ASSERT(!collectionExists(opCtx.get(), orphanNs));
 }
 
@@ -691,8 +695,8 @@ TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
 TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     auto opCtx = cc().makeOperationContext();
 
-    const NamespaceString coll1Ns("db.coll1");
-    const NamespaceString coll2Ns("db.coll2");
+    const NamespaceString coll1Ns = NamespaceString::createNamespaceString_forTest("db.coll1");
+    const NamespaceString coll2Ns = NamespaceString::createNamespaceString_forTest("db.coll2");
     auto swCollInfo = createCollection(opCtx.get(), coll1Ns);
     ASSERT_OK(swCollInfo.getStatus());
     ASSERT(collectionExists(opCtx.get(), coll1Ns));

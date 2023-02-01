@@ -112,7 +112,8 @@ private:
 
     const StringData _currentShardKey = "sk";
 
-    const NamespaceString _sourceNss{"test_crud", "collection_being_resharded"};
+    const NamespaceString _sourceNss =
+        NamespaceString::createNamespaceString_forTest("test_crud", "collection_being_resharded");
     const UUID _sourceUUID = UUID::gen();
 
     const ShardId _myDonorId{"myDonorId"};

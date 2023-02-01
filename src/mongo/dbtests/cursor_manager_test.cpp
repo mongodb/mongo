@@ -53,7 +53,7 @@
 
 namespace mongo {
 namespace {
-const NamespaceString kTestNss{"test.collection"};
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("test.collection");
 
 class CursorManagerTest : public unittest::Test {
 public:
@@ -214,16 +214,17 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
     CursorManager* cursorManager = useCursorManager();
     auto clock = useClock();
 
-    cursorManager->registerCursor(_opCtx.get(),
-                                  {makeFakePlanExecutor(),
-                                   NamespaceString{"test.collection"},
-                                   {},
-                                   APIParameters(),
-                                   {},
-                                   repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-                                   ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                   BSONObj(),
-                                   PrivilegeVector()});
+    cursorManager->registerCursor(
+        _opCtx.get(),
+        {makeFakePlanExecutor(),
+         NamespaceString::createNamespaceString_forTest("test.collection"),
+         {},
+         APIParameters(),
+         {},
+         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
+         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+         BSONObj(),
+         PrivilegeVector()});
 
     ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), Date_t()));
 
@@ -231,16 +232,17 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
     ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
     ASSERT_EQ(0UL, cursorManager->numCursors());
 
-    cursorManager->registerCursor(_opCtx.get(),
-                                  {makeFakePlanExecutor(),
-                                   NamespaceString{"test.collection"},
-                                   {},
-                                   APIParameters(),
-                                   {},
-                                   repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-                                   ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                   BSONObj(),
-                                   PrivilegeVector()});
+    cursorManager->registerCursor(
+        _opCtx.get(),
+        {makeFakePlanExecutor(),
+         NamespaceString::createNamespaceString_forTest("test.collection"),
+         {},
+         APIParameters(),
+         {},
+         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
+         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+         BSONObj(),
+         PrivilegeVector()});
     ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), Date_t::max()));
     ASSERT_EQ(0UL, cursorManager->numCursors());
 }
@@ -255,7 +257,7 @@ TEST_F(CursorManagerTest, InactivePinnedCursorShouldNotTimeout) {
     auto cursorPin = cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
-         NamespaceString{"test.collection"},
+         NamespaceString::createNamespaceString_forTest("test.collection"),
          {},
          APIParameters(),
          {},
@@ -281,7 +283,7 @@ TEST_F(CursorManagerTest, MarkedAsKilledCursorsShouldBeDeletedOnCursorPin) {
     auto cursorPin = cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
-         NamespaceString{"test.collection"},
+         NamespaceString::createNamespaceString_forTest("test.collection"),
          {},
          APIParameters(),
          {},
@@ -316,7 +318,7 @@ TEST_F(CursorManagerTest, InactiveKilledCursorsShouldTimeout) {
     auto cursorPin = cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
-         NamespaceString{"test.collection"},
+         NamespaceString::createNamespaceString_forTest("test.collection"),
          {},
          APIParameters(),
          {},

@@ -37,7 +37,7 @@
 
 namespace mongo {
 namespace {
-const auto kInsertTestNss = NamespaceString{"dbtests.InsertTest"};
+const auto kInsertTestNss = NamespaceString::createNamespaceString_forTest("dbtests.InsertTest");
 
 class InsertTest : public unittest::Test {
 public:

@@ -251,7 +251,7 @@ public:
     }
 
 private:
-    const NamespaceString _nss{"test.foo"};
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test.foo");
     const UUID _uuid{UUID::gen()};
     const ShardKeyPattern _shardKeyPattern = ShardKeyPattern(BSON("x"
                                                                   << "hashed"));
@@ -1785,7 +1785,7 @@ public:
 };
 
 TEST_F(SamplingBasedInitSplitTest, NoZones) {
-    const NamespaceString ns("foo", "bar");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -1826,7 +1826,7 @@ TEST_F(SamplingBasedInitSplitTest, NoZones) {
 }
 
 TEST_F(SamplingBasedInitSplitTest, HashedShardKey) {
-    const NamespaceString ns("foo", "bar");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y"
                                         << "hashed"));
 
@@ -1868,7 +1868,7 @@ TEST_F(SamplingBasedInitSplitTest, HashedShardKey) {
 }
 
 TEST_F(SamplingBasedInitSplitTest, SingleInitialChunk) {
-    const NamespaceString ns("foo", "bar");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -1900,7 +1900,7 @@ TEST_F(SamplingBasedInitSplitTest, SingleInitialChunk) {
 }
 
 TEST_F(SamplingBasedInitSplitTest, ZonesCoversEntireDomainButInsufficient) {
-    const NamespaceString ns("foo", "bar");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -1945,7 +1945,7 @@ TEST_F(SamplingBasedInitSplitTest, ZonesCoversEntireDomainButInsufficient) {
 }
 
 TEST_F(SamplingBasedInitSplitTest, SamplesCoincidingWithZones) {
-    const NamespaceString ns("foo", "bar");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -1993,7 +1993,7 @@ TEST_F(SamplingBasedInitSplitTest, SamplesCoincidingWithZones) {
 }
 
 TEST_F(SamplingBasedInitSplitTest, ZoneWithHoles) {
-    const NamespaceString ns("foo", "bar");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -2039,7 +2039,7 @@ TEST_F(SamplingBasedInitSplitTest, ZoneWithHoles) {
 }
 
 TEST_F(SamplingBasedInitSplitTest, UnsortedZoneWithHoles) {
-    const NamespaceString ns("foo", "bar");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -2085,7 +2085,7 @@ TEST_F(SamplingBasedInitSplitTest, UnsortedZoneWithHoles) {
 }
 
 TEST_F(SamplingBasedInitSplitTest, ZonesIsPrefixOfShardKey) {
-    const NamespaceString ns("foo", "bar");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1 << "z" << 1));
 
     std::vector<ShardType> shardList;
@@ -2128,7 +2128,7 @@ TEST_F(SamplingBasedInitSplitTest, ZonesIsPrefixOfShardKey) {
 }
 
 TEST_F(SamplingBasedInitSplitTest, ZonesHasIncompatibleShardKey) {
-    const NamespaceString ns("foo", "bar");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1 << "z" << 1));
 
     std::vector<ShardType> shardList;
@@ -2161,7 +2161,7 @@ TEST_F(SamplingBasedInitSplitTest, ZonesHasIncompatibleShardKey) {
 }
 
 TEST_F(SamplingBasedInitSplitTest, InsufficientSamples) {
-    const NamespaceString ns("foo", "bar");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -2193,7 +2193,7 @@ TEST_F(SamplingBasedInitSplitTest, InsufficientSamples) {
 }
 
 TEST_F(SamplingBasedInitSplitTest, ZeroInitialChunks) {
-    const NamespaceString ns("foo", "bar");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;

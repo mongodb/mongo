@@ -49,7 +49,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss = NamespaceString("foo", "bar");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("foo", "bar");
 const std::string kShardKey = "_id";
 const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
 
@@ -141,7 +141,8 @@ private:
  */
 class RenameRangeDeletionsTest : public RangeDeleterTest {
 public:
-    const NamespaceString kToNss = NamespaceString(kNss.db(), "toColl");
+    const NamespaceString kToNss =
+        NamespaceString::createNamespaceString_forTest(kNss.db(), "toColl");
 
     void setUp() override {
         RangeDeleterTest::setUp();
@@ -357,7 +358,8 @@ TEST_F(RangeDeleterTest,
 
 TEST_F(RangeDeleterTest, RemoveDocumentsInRangeThrowsErrorWhenCollectionDoesNotExist) {
     auto queriesComplete = SemiFuture<void>::makeReady();
-    const auto notExistingNss = NamespaceString("someFake.namespace");
+    const auto notExistingNss =
+        NamespaceString::createNamespaceString_forTest("someFake.namespace");
     const auto notExistingCollectionUUID = UUID::gen();
     const auto range = ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10));
     auto task =

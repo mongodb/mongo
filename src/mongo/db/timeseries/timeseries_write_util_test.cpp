@@ -182,7 +182,8 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurementsWithMeta) {
 }
 
 TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
-    NamespaceString ns{"db_timeseries_write_util_test", "PerformAtomicDelete"};
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_util_test", "PerformAtomicDelete");
     auto opCtx = operationContext();
     ASSERT_OK(createCollection(opCtx,
                                ns.dbName(),
@@ -234,7 +235,8 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
 }
 
 TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
-    NamespaceString ns{"db_timeseries_write_util_test", "PerformAtomicUpdate"};
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_util_test", "PerformAtomicUpdate");
     auto opCtx = operationContext();
     ASSERT_OK(createCollection(opCtx,
                                ns.dbName(),

@@ -49,7 +49,7 @@ using namespace mongo;
 
 namespace {
 
-static const NamespaceString kNss("db.dummy");
+static const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("db.dummy");
 
 class SortStageDefaultTest : public ServiceContextMongoDTest {
 public:

@@ -172,7 +172,7 @@ using MigrationDestinationManagerNetworkTest = CatalogCacheTestFixture;
 // manager and won't include a read concern without afterClusterTime.
 TEST_F(MigrationDestinationManagerNetworkTest,
        MigrationDestinationManagerGetIndexesAndCollectionsNoVersionsOrReadConcern) {
-    const NamespaceString nss("db.foo");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("db.foo");
 
     // Shard nss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1" respectively.
     // ShardId("1") is the primary shard for the database.

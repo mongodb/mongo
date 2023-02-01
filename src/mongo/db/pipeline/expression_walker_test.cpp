@@ -54,7 +54,8 @@ protected:
 
         ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
         auto rawPipeline = parsePipelineFromBSON(inputBson["pipeline"]);
-        NamespaceString testNss("test", "collection");
+        NamespaceString testNss =
+            NamespaceString::createNamespaceString_forTest("test", "collection");
         auto command = AggregateCommandRequest{testNss, rawPipeline};
 
         return Pipeline::parse(command.getPipeline(), getExpCtx());

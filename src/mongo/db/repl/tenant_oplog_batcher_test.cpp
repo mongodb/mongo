@@ -125,8 +125,14 @@ TEST_F(TenantOplogBatcherTest, OplogBatcherGroupsCrudOps) {
     // We just started, no batch should be available.
     ASSERT(!batchFuture.isReady());
     std::vector<BSONObj> srcOps;
-    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "foo")).getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")).getEntry().toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(1, NamespaceString::createNamespaceString_forTest(dbName, "foo"))
+            .getEntry()
+            .toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
     _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
 
     auto batch = batchFuture.get();
@@ -185,10 +191,15 @@ static DurableReplOperation stripB(const DurableReplOperation& withB) {
 TEST_F(TenantOplogBatcherTest, GetNextApplierBatchGroupsUnpreparedApplyOpsOpWithOtherOps) {
     std::vector<OplogEntry> innerOps;
     std::vector<BSONObj> srcOps;
-    innerOps.push_back(makeInsertOplogEntry(10, NamespaceString(dbName, "foo")));
-    innerOps.push_back(makeInsertOplogEntry(11, NamespaceString(dbName, "foo")));
+    innerOps.push_back(
+        makeInsertOplogEntry(10, NamespaceString::createNamespaceString_forTest(dbName, "foo")));
+    innerOps.push_back(
+        makeInsertOplogEntry(11, NamespaceString::createNamespaceString_forTest(dbName, "foo")));
     srcOps.push_back(makeApplyOpsOplogEntry(1, false, innerOps).getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")).getEntry().toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
 
     auto batcher = std::make_shared<TenantOplogBatcher>(
         _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
@@ -217,10 +228,14 @@ TEST_F(TenantOplogBatcherTest, GetNextApplierBatchGroupsMultipleTransactions) {
     std::vector<OplogEntry> innerOps1;
     std::vector<OplogEntry> innerOps2;
     std::vector<BSONObj> srcOps;
-    innerOps1.push_back(makeInsertOplogEntry(10, NamespaceString(dbName, "foo")));
-    innerOps1.push_back(makeInsertOplogEntry(11, NamespaceString(dbName, "foo")));
-    innerOps2.push_back(makeInsertOplogEntry(20, NamespaceString(dbName, "foo")));
-    innerOps2.push_back(makeInsertOplogEntry(21, NamespaceString(dbName, "foo")));
+    innerOps1.push_back(
+        makeInsertOplogEntry(10, NamespaceString::createNamespaceString_forTest(dbName, "foo")));
+    innerOps1.push_back(
+        makeInsertOplogEntry(11, NamespaceString::createNamespaceString_forTest(dbName, "foo")));
+    innerOps2.push_back(
+        makeInsertOplogEntry(20, NamespaceString::createNamespaceString_forTest(dbName, "foo")));
+    innerOps2.push_back(
+        makeInsertOplogEntry(21, NamespaceString::createNamespaceString_forTest(dbName, "foo")));
     srcOps.push_back(makeApplyOpsOplogEntry(1, false, innerOps1).getEntry().toBSON());
     srcOps.push_back(makeApplyOpsOplogEntry(2, false, innerOps2).getEntry().toBSON());
 
@@ -258,11 +273,26 @@ TEST_F(TenantOplogBatcherTest, GetNextApplierBatchGroupsMultipleTransactions) {
 
 TEST_F(TenantOplogBatcherTest, GetNextApplierBatchChecksBatchLimitsForNumberOfOperations) {
     std::vector<BSONObj> srcOps;
-    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")).getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")).getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(3, NamespaceString(dbName, "bar")).getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(4, NamespaceString(dbName, "bar")).getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(5, NamespaceString(dbName, "bar")).getEntry().toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(1, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(3, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(4, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(5, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
     _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
 
     // Set batch limits so that each batch contains a maximum of 'BatchLimit::ops'.
@@ -292,9 +322,18 @@ TEST_F(TenantOplogBatcherTest, GetNextApplierBatchChecksBatchLimitsForNumberOfOp
 
 TEST_F(TenantOplogBatcherTest, GetNextApplierBatchChecksBatchLimitsForSizeOfOperations) {
     std::vector<BSONObj> srcOps;
-    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")).getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")).getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(3, NamespaceString(dbName, "bar")).getEntry().toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(1, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(3, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
     _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
 
     // Set batch limits so that only the first two operations can fit into the first batch.
@@ -322,16 +361,25 @@ TEST_F(TenantOplogBatcherTest, GetNextApplierBatchChecksBatchLimitsForSizeOfOper
 
 TEST_F(TenantOplogBatcherTest, LargeTransactionProcessedIndividuallyAndExpanded) {
     std::vector<BSONObj> srcOps;
-    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")).getEntry().toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(1, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
     std::vector<OplogEntry> innerOps1;
-    innerOps1.push_back(makeInsertOplogEntry(11, NamespaceString(dbName, "bar")));
-    innerOps1.push_back(makeInsertOplogEntry(12, NamespaceString(dbName, "bar")));
+    innerOps1.push_back(
+        makeInsertOplogEntry(11, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
+    innerOps1.push_back(
+        makeInsertOplogEntry(12, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
     std::vector<OplogEntry> innerOps2;
-    innerOps2.push_back(makeInsertOplogEntry(21, NamespaceString(dbName, "bar")));
-    innerOps2.push_back(makeInsertOplogEntry(22, NamespaceString(dbName, "bar")));
+    innerOps2.push_back(
+        makeInsertOplogEntry(21, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
+    innerOps2.push_back(
+        makeInsertOplogEntry(22, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
     std::vector<OplogEntry> innerOps3;
-    innerOps3.push_back(makeInsertOplogEntry(31, NamespaceString(dbName, "bar")));
-    innerOps3.push_back(makeInsertOplogEntry(32, NamespaceString(dbName, "bar")));
+    innerOps3.push_back(
+        makeInsertOplogEntry(31, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
+    innerOps3.push_back(
+        makeInsertOplogEntry(32, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
 
     // Makes entries with ts from range [2, 5).
     std::vector<OplogEntry> multiEntryTransaction = makeMultiEntryTransactionOplogEntries(
@@ -342,7 +390,10 @@ TEST_F(TenantOplogBatcherTest, LargeTransactionProcessedIndividuallyAndExpanded)
 
     // Push one extra operation to ensure that the last oplog entry of a large transaction
     // is processed by itself.
-    srcOps.push_back(makeInsertOplogEntry(5, NamespaceString(dbName, "bar")).getEntry().toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(5, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
 
     _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
 
@@ -407,9 +458,15 @@ TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPreImageOutOfOrder) {
     ASSERT(!batchFuture.isReady());
     std::vector<BSONObj> srcOps;
     srcOps.push_back(makeNoopOplogEntry(1, "preImage").getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "foo")).getEntry().toBSON());
     srcOps.push_back(
-        makeUpdateOplogEntry(3, NamespaceString(dbName, "bar"), UUID::gen(), OpTime({1, 1}, 1))
+        makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "foo"))
+            .getEntry()
+            .toBSON());
+    srcOps.push_back(
+        makeUpdateOplogEntry(3,
+                             NamespaceString::createNamespaceString_forTest(dbName, "bar"),
+                             UUID::gen(),
+                             OpTime({1, 1}, 1))
             .getEntry()
             .toBSON());
 
@@ -442,14 +499,18 @@ TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPostImageOutOfOrder) {
     ASSERT(!batchFuture.isReady());
     std::vector<BSONObj> srcOps;
     srcOps.push_back(makeNoopOplogEntry(1, "postImage").getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "foo")).getEntry().toBSON());
-    srcOps.push_back(makeUpdateOplogEntry(3,
-                                          NamespaceString(dbName, "bar"),
-                                          UUID::gen(),
-                                          boost::none /* preImageOpTime */,
-                                          OpTime({1, 1}, 1))
-                         .getEntry()
-                         .toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "foo"))
+            .getEntry()
+            .toBSON());
+    srcOps.push_back(
+        makeUpdateOplogEntry(3,
+                             NamespaceString::createNamespaceString_forTest(dbName, "bar"),
+                             UUID::gen(),
+                             boost::none /* preImageOpTime */,
+                             OpTime({1, 1}, 1))
+            .getEntry()
+            .toBSON());
 
     _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
 
@@ -491,7 +552,10 @@ TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPreImageBeforeBatchStart) {
     std::vector<BSONObj> srcOps;
     srcOps.push_back(makeNoopOplogEntry(1, "preImage").getEntry().toBSON());
     srcOps.push_back(
-        makeUpdateOplogEntry(2, NamespaceString(dbName, "bar"), UUID::gen(), OpTime({1, 1}, 1))
+        makeUpdateOplogEntry(2,
+                             NamespaceString::createNamespaceString_forTest(dbName, "bar"),
+                             UUID::gen(),
+                             OpTime({1, 1}, 1))
             .getEntry()
             .toBSON());
 
@@ -521,13 +585,14 @@ TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPostImageBeforeBatchStart) {
     ASSERT_OK(batcher->startup());
     std::vector<BSONObj> srcOps;
     srcOps.push_back(makeNoopOplogEntry(1, "postImage").getEntry().toBSON());
-    srcOps.push_back(makeUpdateOplogEntry(2,
-                                          NamespaceString(dbName, "bar"),
-                                          UUID::gen(),
-                                          boost::none /* preImageOpTime */,
-                                          OpTime({1, 1}, 1))
-                         .getEntry()
-                         .toBSON());
+    srcOps.push_back(
+        makeUpdateOplogEntry(2,
+                             NamespaceString::createNamespaceString_forTest(dbName, "bar"),
+                             UUID::gen(),
+                             boost::none /* preImageOpTime */,
+                             OpTime({1, 1}, 1))
+            .getEntry()
+            .toBSON());
 
     _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
     // Pull the postImage off the buffer.
@@ -564,11 +629,26 @@ TEST_F(TenantOplogBatcherTest, GetNextApplierBatchRejectsZeroBatchSizeLimits) {
 
 TEST_F(TenantOplogBatcherTest, ResumeOplogBatcherFromTimestamp) {
     std::vector<BSONObj> srcOps;
-    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")).getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")).getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(3, NamespaceString(dbName, "bar")).getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(4, NamespaceString(dbName, "bar")).getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(5, NamespaceString(dbName, "bar")).getEntry().toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(1, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(3, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(4, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(5, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
     _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
 
     auto batcher = std::make_shared<TenantOplogBatcher>(
@@ -587,8 +667,14 @@ TEST_F(TenantOplogBatcherTest, ResumeOplogBatcherFromTimestamp) {
 
 TEST_F(TenantOplogBatcherTest, ResumeOplogBatcherFromNonExistentTimestamp) {
     std::vector<BSONObj> srcOps;
-    srcOps.push_back(makeInsertOplogEntry(4, NamespaceString(dbName, "bar")).getEntry().toBSON());
-    srcOps.push_back(makeInsertOplogEntry(5, NamespaceString(dbName, "bar")).getEntry().toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(4, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
+    srcOps.push_back(
+        makeInsertOplogEntry(5, NamespaceString::createNamespaceString_forTest(dbName, "bar"))
+            .getEntry()
+            .toBSON());
     _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
 
     auto batcher = std::make_shared<TenantOplogBatcher>(

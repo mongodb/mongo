@@ -81,7 +81,7 @@ TEST_F(ConfigIndexTest, IncompatibleIndexAlreadyExists) {
 }
 
 TEST_F(ConfigIndexTest, CreateIndex) {
-    NamespaceString nss("config.foo");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("config.foo");
 
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, getIndexes(operationContext(), nss).getStatus());
 
@@ -111,7 +111,7 @@ TEST_F(ConfigIndexTest, CreateIndex) {
 }
 
 TEST_F(ConfigIndexTest, CreateIndexNonEmptyCollection) {
-    NamespaceString nss("config.foo");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("config.foo");
 
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, getIndexes(operationContext(), nss).getStatus());
 

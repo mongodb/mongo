@@ -88,7 +88,7 @@ OplogEntry _getSingleOplogEntry(OperationContext* opCtx) {
 TEST_F(OplogTest, LogOpReturnsOpTimeOnSuccessfulInsertIntoOplogCollection) {
     auto opCtx = cc().makeOperationContext();
 
-    const NamespaceString nss("test.coll");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
     auto msgObj = BSON("msg"
                        << "hello, world!");
 
@@ -163,8 +163,8 @@ void _testConcurrentLogOp(const F& makeTaskFunction,
     // test thread can proceed with shutting the thread pool down.
     auto mtx = MONGO_MAKE_LATCH();
     unittest::Barrier barrier(3U);
-    const NamespaceString nss1("test1.coll");
-    const NamespaceString nss2("test2.coll");
+    const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test1.coll");
+    const NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("test2.coll");
     pool.schedule([&](auto status) mutable {
         ASSERT_OK(status) << "Failed to schedule logOp() task for namespace " << nss1;
         makeTaskFunction(nss1, &mtx, opTimeNssMap, &barrier)();
@@ -354,7 +354,7 @@ TEST_F(OplogTest, MigrationIdAddedToOplog) {
     auto migrationUuid = UUID::gen();
     tenantMigrationInfo(opCtx.get()) = boost::make_optional<TenantMigrationInfo>(migrationUuid);
 
-    const NamespaceString nss("test.coll");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
     auto msgObj = BSON("msg"
                        << "hello, world!");
 

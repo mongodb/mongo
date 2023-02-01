@@ -40,7 +40,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss = NamespaceString("foo", "bar");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("foo", "bar");
 const std::string kPattern = "_id";
 
 void setUnshardedFilteringMetadata(OperationContext* opCtx, const NamespaceString& nss) {
@@ -250,17 +250,18 @@ TEST_F(SplitVectorTest, NoSplit) {
 }
 
 TEST_F(SplitVectorTest, NoCollection) {
-    ASSERT_THROWS_CODE(splitVector(operationContext(),
-                                   NamespaceString("dummy", "collection"),
-                                   BSON(kPattern << 1),
-                                   BSON(kPattern << 0),
-                                   BSON(kPattern << 100),
-                                   false,
-                                   boost::none,
-                                   boost::none,
-                                   boost::none),
-                       DBException,
-                       ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS_CODE(
+        splitVector(operationContext(),
+                    NamespaceString::createNamespaceString_forTest("dummy", "collection"),
+                    BSON(kPattern << 1),
+                    BSON(kPattern << 0),
+                    BSON(kPattern << 100),
+                    false,
+                    boost::none,
+                    boost::none,
+                    boost::none),
+        DBException,
+        ErrorCodes::NamespaceNotFound);
 }
 
 TEST_F(SplitVectorTest, NoIndex) {
@@ -291,7 +292,7 @@ TEST_F(SplitVectorTest, NoMaxChunkSize) {
                        ErrorCodes::InvalidOptions);
 }
 
-const NamespaceString kJumboNss = NamespaceString("foo", "bar2");
+const NamespaceString kJumboNss = NamespaceString::createNamespaceString_forTest("foo", "bar2");
 const std::string kJumboPattern = "a";
 
 class SplitVectorJumboTest : public ShardServerTestFixture {
@@ -344,7 +345,8 @@ TEST_F(SplitVectorJumboTest, JumboChunk) {
     ASSERT_EQUALS(splitKeys.size(), 0UL);
 }
 
-const NamespaceString kMaxResponseNss = NamespaceString("foo", "bar3");
+const NamespaceString kMaxResponseNss =
+    NamespaceString::createNamespaceString_forTest("foo", "bar3");
 
 // This is not the actual max bytes size -- we are rounding down from 512000.
 int maxShardingUnitTestOplogDocSize = 510000;

@@ -55,7 +55,9 @@ class LockerImplTest : public ServiceContextTest {};
 TEST_F(LockerImplTest, LockNoConflict) {
     auto opCtx = makeOperationContext();
 
-    const ResourceId resId(RESOURCE_COLLECTION, NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resId(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IX);
@@ -75,7 +77,9 @@ TEST_F(LockerImplTest, LockNoConflict) {
 TEST_F(LockerImplTest, ReLockNoConflict) {
     auto opCtx = makeOperationContext();
 
-    const ResourceId resId(RESOURCE_COLLECTION, NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resId(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IX);
@@ -95,7 +99,9 @@ TEST_F(LockerImplTest, ReLockNoConflict) {
 TEST_F(LockerImplTest, ConflictWithTimeout) {
     auto opCtx = makeOperationContext();
 
-    const ResourceId resId(RESOURCE_COLLECTION, NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resId(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     LockerImpl locker1(opCtx->getServiceContext());
     locker1.lockGlobal(opCtx.get(), MODE_IX);
@@ -119,7 +125,9 @@ TEST_F(LockerImplTest, ConflictWithTimeout) {
 TEST_F(LockerImplTest, ConflictUpgradeWithTimeout) {
     auto opCtx = makeOperationContext();
 
-    const ResourceId resId(RESOURCE_COLLECTION, NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resId(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     LockerImpl locker1(opCtx->getServiceContext());
     locker1.lockGlobal(opCtx.get(), MODE_IS);
@@ -175,7 +183,9 @@ TEST_F(LockerImplTest, FailPointInLockFailsNonIntentLocksIfTheyCannotBeImmediate
     auto newOpCtx = cc().makeOperationContext();
 
     // Granted MODE_X lock, fail incoming MODE_S and MODE_X.
-    const ResourceId resId(RESOURCE_COLLECTION, NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resId(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     LockerImpl locker1(newOpCtx->getServiceContext());
     locker1.lockGlobal(newOpCtx.get(), MODE_IX);
@@ -336,8 +346,9 @@ TEST_F(LockerImplTest, saveAndRestoreDBAndCollection) {
     LockerImpl locker(opCtx->getServiceContext());
 
     const ResourceId resIdDatabase(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
-    const ResourceId resIdCollection(RESOURCE_COLLECTION,
-                                     NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resIdCollection(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     // Lock some stuff.
     locker.lockGlobal(opCtx.get(), MODE_IX);
@@ -367,8 +378,9 @@ TEST_F(LockerImplTest, releaseWriteUnitOfWork) {
     LockerImpl locker(opCtx->getServiceContext());
 
     const ResourceId resIdDatabase(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
-    const ResourceId resIdCollection(RESOURCE_COLLECTION,
-                                     NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resIdCollection(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     locker.beginWriteUnitOfWork();
     // Lock some stuff.
@@ -398,8 +410,9 @@ TEST_F(LockerImplTest, restoreWriteUnitOfWork) {
     LockerImpl locker(opCtx->getServiceContext());
 
     const ResourceId resIdDatabase(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
-    const ResourceId resIdCollection(RESOURCE_COLLECTION,
-                                     NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resIdCollection(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     locker.beginWriteUnitOfWork();
     // Lock some stuff.
@@ -441,10 +454,12 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithoutUnlock) {
     LockerImpl locker(opCtx->getServiceContext());
 
     const ResourceId resIdDatabase(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
-    const ResourceId resIdCollection(RESOURCE_COLLECTION,
-                                     NamespaceString(boost::none, "TestDB.collection"));
-    const ResourceId resIdCollection2(RESOURCE_COLLECTION,
-                                      NamespaceString(boost::none, "TestDB.collection2"));
+    const ResourceId resIdCollection(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
+    const ResourceId resIdCollection2(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection2"));
 
     locker.beginWriteUnitOfWork();
     // Lock some stuff.
@@ -559,8 +574,9 @@ TEST_F(LockerImplTest, releaseAndRestoreReadOnlyWriteUnitOfWork) {
     LockerImpl locker(opCtx->getServiceContext());
 
     const ResourceId resIdDatabase(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
-    const ResourceId resIdCollection(RESOURCE_COLLECTION,
-                                     NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resIdCollection(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     // Snapshot transactions delay shared locks as well.
     locker.setSharedLocksShouldTwoPhaseLock(true);
@@ -627,8 +643,9 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithRecursiveLocks) {
     LockerImpl locker(opCtx->getServiceContext());
 
     const ResourceId resIdDatabase(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
-    const ResourceId resIdCollection(RESOURCE_COLLECTION,
-                                     NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resIdCollection(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     locker.beginWriteUnitOfWork();
     // Lock some stuff.
@@ -734,10 +751,12 @@ TEST_F(LockerImplTest, SharedLocksShouldTwoPhaseLockIsTrue) {
 
     const ResourceId resId1(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB1"));
     const ResourceId resId2(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB2"));
-    const ResourceId resId3(RESOURCE_COLLECTION,
-                            NamespaceString(boost::none, "TestDB.collection3"));
-    const ResourceId resId4(RESOURCE_COLLECTION,
-                            NamespaceString(boost::none, "TestDB.collection4"));
+    const ResourceId resId3(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection3"));
+    const ResourceId resId4(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection4"));
 
     LockerImpl locker(opCtx->getServiceContext());
     locker.setSharedLocksShouldTwoPhaseLock(true);
@@ -792,10 +811,12 @@ TEST_F(LockerImplTest, ModeIXAndXLockParticipatesInTwoPhaseLocking) {
 
     const ResourceId resId1(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB1"));
     const ResourceId resId2(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB2"));
-    const ResourceId resId3(RESOURCE_COLLECTION,
-                            NamespaceString(boost::none, "TestDB.collection3"));
-    const ResourceId resId4(RESOURCE_COLLECTION,
-                            NamespaceString(boost::none, "TestDB.collection4"));
+    const ResourceId resId3(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection3"));
+    const ResourceId resId4(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection4"));
 
     LockerImpl locker(opCtx->getServiceContext());
 
@@ -1030,8 +1051,9 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportHeldLocks) {
     auto opCtx = makeOperationContext();
 
     const ResourceId dbId(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
-    const ResourceId collectionId(RESOURCE_COLLECTION,
-                                  NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId collectionId(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     // Take an exclusive lock on the collection.
     LockerImpl locker(opCtx->getServiceContext());
@@ -1057,8 +1079,9 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportPendingLocks) {
     auto opCtx = makeOperationContext();
 
     const ResourceId dbId(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
-    const ResourceId collectionId(RESOURCE_COLLECTION,
-                                  NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId collectionId(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     // Take an exclusive lock on the collection.
     LockerImpl successfulLocker(opCtx->getServiceContext());
@@ -1103,7 +1126,9 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportPendingLocks) {
 TEST_F(LockerImplTest, ReaquireLockPendingUnlock) {
     auto opCtx = makeOperationContext();
 
-    const ResourceId resId(RESOURCE_COLLECTION, NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resId(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IS);
@@ -1133,7 +1158,9 @@ TEST_F(LockerImplTest, ReaquireLockPendingUnlock) {
 TEST_F(LockerImplTest, AcquireLockPendingUnlockWithCoveredMode) {
     auto opCtx = makeOperationContext();
 
-    const ResourceId resId(RESOURCE_COLLECTION, NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resId(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IS);
@@ -1163,7 +1190,9 @@ TEST_F(LockerImplTest, AcquireLockPendingUnlockWithCoveredMode) {
 TEST_F(LockerImplTest, ConvertLockPendingUnlock) {
     auto opCtx = makeOperationContext();
 
-    const ResourceId resId(RESOURCE_COLLECTION, NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resId(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IS);
@@ -1197,7 +1226,9 @@ TEST_F(LockerImplTest, ConvertLockPendingUnlock) {
 TEST_F(LockerImplTest, ConvertLockPendingUnlockAndUnlock) {
     auto opCtx = makeOperationContext();
 
-    const ResourceId resId(RESOURCE_COLLECTION, NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resId(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IS);
@@ -1269,7 +1300,9 @@ DEATH_TEST_F(LockerImplTest,
              "Operation ending while holding locks.") {
     auto opCtx = makeOperationContext();
 
-    const ResourceId resId(RESOURCE_COLLECTION, NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resId(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IX);

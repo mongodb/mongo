@@ -46,7 +46,7 @@ protected:
     void runTest(const BSONObj& obj, const std::function<void(const BSONObj&)>& test) {
         test(obj);
 
-        NamespaceString nss{"test"};
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest("test");
         auto compressionResult = timeseries::compressBucket(obj, "time", nss, true);
         ASSERT_TRUE(compressionResult.compressedBucket.has_value());
         ASSERT_FALSE(compressionResult.decompressionFailed);

@@ -330,7 +330,7 @@ public:
         });
     }
 
-    const NamespaceString nss{"foo.bar"};
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
 
     const CollectionGeneration gen{OID::gen(), Timestamp(1, 1)};
     MockNSTargeter singleShardNSTargeter{
@@ -1950,7 +1950,7 @@ public:
                      }()});
     }
 
-    const NamespaceString nss{"foo.bar"};
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
 };
 
 TEST_F(BatchWriteExecTargeterErrorTest, TargetedFailedAndErrorResponse) {
@@ -2095,7 +2095,7 @@ public:
         BatchWriteExecTest::tearDown();
     }
 
-    const NamespaceString nss{"foo.bar"};
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
 
 private:
     boost::optional<RouterOperationContextSession> _scopedSession;

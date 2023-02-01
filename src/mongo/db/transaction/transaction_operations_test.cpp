@@ -246,14 +246,16 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoReturnsOneEntryContainingTwoOpera
 
     TransactionOperations::TransactionOperation op1;
     op1.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
-    op1.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
-    op1.setObject(BSON("_id" << 1));           // required for DurableReplOperation::serialize()
+    op1.setNss(NamespaceString::createNamespaceString_forTest(
+        "test.t"));                   // required for DurableReplOperation::serialize()
+    op1.setObject(BSON("_id" << 1));  // required for DurableReplOperation::serialize()
     ASSERT_OK(ops.addOperation(op1));
 
     TransactionOperations::TransactionOperation op2;
     op2.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
-    op2.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
-    op2.setObject(BSON("_id" << 2));           // required for DurableReplOperation::serialize()
+    op2.setNss(NamespaceString::createNamespaceString_forTest(
+        "test.t"));                   // required for DurableReplOperation::serialize()
+    op2.setObject(BSON("_id" << 2));  // required for DurableReplOperation::serialize()
     ASSERT_OK(ops.addOperation(op2));
 
     // We have to allocate as many oplog slots as operations even though only
@@ -283,14 +285,16 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoRespectsOperationCountLimit) {
 
     TransactionOperations::TransactionOperation op1;
     op1.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
-    op1.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
-    op1.setObject(BSON("_id" << 1));           // required for DurableReplOperation::serialize()
+    op1.setNss(NamespaceString::createNamespaceString_forTest(
+        "test.t"));                   // required for DurableReplOperation::serialize()
+    op1.setObject(BSON("_id" << 1));  // required for DurableReplOperation::serialize()
     ASSERT_OK(ops.addOperation(op1));
 
     TransactionOperations::TransactionOperation op2;
     op2.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
-    op2.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
-    op2.setObject(BSON("_id" << 2));           // required for DurableReplOperation::serialize()
+    op2.setNss(NamespaceString::createNamespaceString_forTest(
+        "test.t"));                   // required for DurableReplOperation::serialize()
+    op2.setObject(BSON("_id" << 2));  // required for DurableReplOperation::serialize()
     ASSERT_OK(ops.addOperation(op2));
 
     // We have to allocate as many oplog slots as operations even though only
@@ -327,14 +331,16 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoRespectsOperationSizeLimit) {
 
     TransactionOperations::TransactionOperation op1;
     op1.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
-    op1.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
-    op1.setObject(BSON("_id" << 1));           // required for DurableReplOperation::serialize()
+    op1.setNss(NamespaceString::createNamespaceString_forTest(
+        "test.t"));                   // required for DurableReplOperation::serialize()
+    op1.setObject(BSON("_id" << 1));  // required for DurableReplOperation::serialize()
     ASSERT_OK(ops.addOperation(op1));
 
     TransactionOperations::TransactionOperation op2;
     op2.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
-    op2.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
-    op2.setObject(BSON("_id" << 2));           // required for DurableReplOperation::serialize()
+    op2.setNss(NamespaceString::createNamespaceString_forTest(
+        "test.t"));                   // required for DurableReplOperation::serialize()
+    op2.setObject(BSON("_id" << 2));  // required for DurableReplOperation::serialize()
     ASSERT_OK(ops.addOperation(op2));
 
     // We have to allocate as many oplog slots as operations even though only
@@ -378,8 +384,9 @@ DEATH_TEST(TransactionOperationsTest,
     TransactionOperations::TransactionOperation op;
     op.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
     op.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
-    op.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
-    op.setObject(BSON("_id" << 1));           // required for DurableReplOperation::serialize()
+    op.setNss(NamespaceString::createNamespaceString_forTest(
+        "test.t"));                  // required for DurableReplOperation::serialize()
+    op.setObject(BSON("_id" << 1));  // required for DurableReplOperation::serialize()
     ASSERT_OK(ops.addOperation(op));
 
     // We allocated a slot for the operation but not for the pre-image.
@@ -401,8 +408,9 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoAssignsPreImageSlotBeforeOperatio
     TransactionOperations::TransactionOperation op;
     op.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
     op.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
-    op.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
-    op.setObject(BSON("_id" << 1));           // required for DurableReplOperation::serialize()
+    op.setNss(NamespaceString::createNamespaceString_forTest(
+        "test.t"));                  // required for DurableReplOperation::serialize()
+    op.setObject(BSON("_id" << 1));  // required for DurableReplOperation::serialize()
     ASSERT_OK(ops.addOperation(op));
 
     // We allocated a slot for the operation but not for the pre-image.
@@ -430,8 +438,9 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoAssignsLastOplogSlotForPrepare) {
 
     TransactionOperations::TransactionOperation op;
     op.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
-    op.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
-    op.setObject(BSON("_id" << 1));           // required for DurableReplOperation::serialize()
+    op.setNss(NamespaceString::createNamespaceString_forTest(
+        "test.t"));                  // required for DurableReplOperation::serialize()
+    op.setObject(BSON("_id" << 1));  // required for DurableReplOperation::serialize()
     ASSERT_OK(ops.addOperation(op));
 
     // We allocate two oplog slots and confirm that the second oplog slot is assigned
@@ -488,7 +497,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesSingleOperation) {
     // Add a small operation. This should be packed into a single applyOps entry.
     TransactionOperations::TransactionOperation op;
     op.setOpType(repl::OpTypeEnum::kInsert);
-    op.setNss(NamespaceString{"test.t"});
+    op.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
     op.setObject(BSON("_id" << 1 << "x" << 1));
     op.setTid(tenant);
     std::vector<StmtId> stmtIds = {1};
@@ -514,7 +523,9 @@ TEST(TransactionOperationsTest, LogOplogEntriesSingleOperation) {
                                           std::vector<StmtId> stmtIdsWritten) {
         ASSERT(entry) << "tried to log null applyOps oplog entry";
         ASSERT_EQ(entry->getOpType(), repl::OpTypeEnum::kCommand);
-        ASSERT_EQ(entry->getNss(), NamespaceString{NamespaceString::kAdminDb}.getCommandNS());
+        ASSERT_EQ(entry->getNss(),
+                  NamespaceString::createNamespaceString_forTest(NamespaceString::kAdminDb)
+                      .getCommandNS());
         ASSERT_EQ(entry->getOpTime(), oplogSlots[0]);
         const auto& prevWriteOpTime = entry->getPrevWriteOpTimeInTransaction();
         ASSERT(prevWriteOpTime);
@@ -550,7 +561,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsCommitUnprepare
     // in the applyOps chain.
     TransactionOperations::TransactionOperation op1;
     op1.setOpType(repl::OpTypeEnum::kInsert);
-    op1.setNss(NamespaceString{"test.t"});
+    op1.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
     op1.setObject(BSON("_id" << 1 << "x" << 1));
     op1.setTid(tenant);
     std::vector<StmtId> stmtIds1 = {1};
@@ -559,7 +570,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsCommitUnprepare
 
     TransactionOperations::TransactionOperation op2;
     op2.setOpType(repl::OpTypeEnum::kInsert);
-    op2.setNss(NamespaceString{"test.t"});
+    op2.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
     op2.setObject(BSON("_id" << 2 << "x" << 2));
     op2.setTid(tenant);
     std::vector<StmtId> stmtIds2 = {2};
@@ -568,7 +579,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsCommitUnprepare
 
     TransactionOperations::TransactionOperation op3;
     op3.setOpType(repl::OpTypeEnum::kInsert);
-    op3.setNss(NamespaceString{"test.t"});
+    op3.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
     op3.setObject(BSON("_id" << 3 << "x" << 3));
     op3.setTid(tenant);
     std::vector<StmtId> stmtIds3 = {3};
@@ -598,7 +609,9 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsCommitUnprepare
         ASSERT(entry) << "tried to log null applyOps oplog entry";
 
         ASSERT_EQ(entry->getOpType(), repl::OpTypeEnum::kCommand);
-        ASSERT_EQ(entry->getNss(), NamespaceString{NamespaceString::kAdminDb}.getCommandNS());
+        ASSERT_EQ(entry->getNss(),
+                  NamespaceString::createNamespaceString_forTest(NamespaceString::kAdminDb)
+                      .getCommandNS());
 
         auto expectedOpTime = oplogSlots[numEntriesLogged];
         ASSERT_EQ(entry->getOpTime(), expectedOpTime);
@@ -670,7 +683,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsPreparedTransac
     // in the applyOps chain.
     TransactionOperations::TransactionOperation op1;
     op1.setOpType(repl::OpTypeEnum::kInsert);
-    op1.setNss(NamespaceString{"test.t"});
+    op1.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
     op1.setObject(BSON("_id" << 1 << "x" << 1));
     op1.setTid(tenant);
     std::vector<StmtId> stmtIds1 = {1};
@@ -679,7 +692,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsPreparedTransac
 
     TransactionOperations::TransactionOperation op2;
     op2.setOpType(repl::OpTypeEnum::kInsert);
-    op2.setNss(NamespaceString{"test.t"});
+    op2.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
     op2.setObject(BSON("_id" << 2 << "x" << 2));
     op2.setTid(tenant);
     std::vector<StmtId> stmtIds2 = {2};
@@ -688,7 +701,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsPreparedTransac
 
     TransactionOperations::TransactionOperation op3;
     op3.setOpType(repl::OpTypeEnum::kInsert);
-    op3.setNss(NamespaceString{"test.t"});
+    op3.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
     op3.setObject(BSON("_id" << 3 << "x" << 3));
     op3.setTid(tenant);
     std::vector<StmtId> stmtIds3 = {3};
@@ -717,7 +730,9 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsPreparedTransac
                                                               std::vector<StmtId> stmtIdsWritten) {
         ASSERT(entry) << "tried to log null applyOps oplog entry";
         ASSERT_EQ(entry->getOpType(), repl::OpTypeEnum::kCommand);
-        ASSERT_EQ(entry->getNss(), NamespaceString{NamespaceString::kAdminDb}.getCommandNS());
+        ASSERT_EQ(entry->getNss(),
+                  NamespaceString::createNamespaceString_forTest(NamespaceString::kAdminDb)
+                      .getCommandNS());
 
         auto expectedOpTime = oplogSlots[numEntriesLogged];
         ASSERT_EQ(entry->getOpTime(), expectedOpTime);
@@ -816,7 +831,7 @@ TEST(TransactionOperationsTest,
     for (int i = 0; i < 2; i++) {
         TransactionOperations::TransactionOperation op;
         op.setOpType(repl::OpTypeEnum::kInsert);
-        op.setNss(NamespaceString{"test.t"});
+        op.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
         op.setObject(BSON("_id" << i << "x" << std::string(15 * 1024 * 1024, 'x')));
         ASSERT_OK(ops.addOperation(op));
 
@@ -847,7 +862,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesExtractsPreImage) {
     // Add a small operation with a pre images.
     TransactionOperations::TransactionOperation op;
     op.setOpType(repl::OpTypeEnum::kInsert);
-    op.setNss(NamespaceString{"test.t"});
+    op.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
     op.setObject(BSON("_id" << 1 << "x" << 1));
     op.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
     op.setPreImage(BSON("_id" << 1));
@@ -890,7 +905,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesExtractsPostImage) {
     // Add a small operation with a pre images.
     TransactionOperations::TransactionOperation op;
     op.setOpType(repl::OpTypeEnum::kInsert);
-    op.setNss(NamespaceString{"test.t"});
+    op.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
     op.setObject(BSON("_id" << 1 << "x" << 1));
     op.setNeedsRetryImage(repl::RetryImageEnum::kPostImage);
     op.setPostImage(BSON("_id" << 1));
@@ -934,7 +949,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultiplePrePostImagesInSameEntry)
     // Add two small operations with pre/post images.
     TransactionOperations::TransactionOperation op1;
     op1.setOpType(repl::OpTypeEnum::kInsert);
-    op1.setNss(NamespaceString{"test.t"});
+    op1.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
     op1.setObject(BSON("_id" << 1 << "x" << 1));
     op1.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
     op1.setPreImage(BSON("_id" << 1));
@@ -942,7 +957,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultiplePrePostImagesInSameEntry)
 
     TransactionOperations::TransactionOperation op2;
     op2.setOpType(repl::OpTypeEnum::kInsert);
-    op2.setNss(NamespaceString{"test.t"});
+    op2.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
     op2.setObject(BSON("_id" << 2 << "x" << 2));
     op2.setNeedsRetryImage(repl::RetryImageEnum::kPostImage);
     op2.setPostImage(BSON("_id" << 2));
@@ -976,7 +991,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultiplePrePostImagesInDifferentE
     // Add two large 15MB operations with pre/post images.
     TransactionOperations::TransactionOperation op1;
     op1.setOpType(repl::OpTypeEnum::kInsert);
-    op1.setNss(NamespaceString{"test.t"});
+    op1.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
     op1.setObject(BSON("_id" << 1 << "x" << std::string(15 * 1024 * 1024, 'x')));
     op1.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
     op1.setPreImage(BSON("_id" << 1));
@@ -984,7 +999,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultiplePrePostImagesInDifferentE
 
     TransactionOperations::TransactionOperation op2;
     op2.setOpType(repl::OpTypeEnum::kInsert);
-    op2.setNss(NamespaceString{"test.t"});
+    op2.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
     op2.setObject(BSON("_id" << 2 << "x" << std::string(15 * 1024 * 1024, 'x')));
     op2.setNeedsRetryImage(repl::RetryImageEnum::kPostImage);
     op2.setPostImage(BSON("_id" << 2));

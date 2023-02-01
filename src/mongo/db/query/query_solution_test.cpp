@@ -809,8 +809,10 @@ TEST(QuerySolutionTest, IndexScanNodeHasFieldExcludesSimpleBoundsStringFieldWhen
 auto createMatchExprAndProjection(const BSONObj& query, const BSONObj& projObj) {
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
-    const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(
-        opCtx.get(), std::unique_ptr<CollatorInterface>(nullptr), NamespaceString("test.dummy")));
+    const boost::intrusive_ptr<ExpressionContext> expCtx(
+        new ExpressionContext(opCtx.get(),
+                              std::unique_ptr<CollatorInterface>(nullptr),
+                              NamespaceString::createNamespaceString_forTest("test.dummy")));
     StatusWithMatchExpression queryMatchExpr = MatchExpressionParser::parse(query, expCtx);
     ASSERT(queryMatchExpr.isOK());
     projection_ast::Projection res = projection_ast::parseAndAnalyze(
@@ -1103,8 +1105,10 @@ TEST(QuerySolutionTest, NodeIdsAssignedInPostOrderFashionStartingFromOne) {
 TEST(QuerySolutionTest, GroupNodeWithIndexScan) {
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
-    const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(
-        opCtx.get(), std::unique_ptr<CollatorInterface>(nullptr), NamespaceString("test.dummy")));
+    const boost::intrusive_ptr<ExpressionContext> expCtx(
+        new ExpressionContext(opCtx.get(),
+                              std::unique_ptr<CollatorInterface>(nullptr),
+                              NamespaceString::createNamespaceString_forTest("test.dummy")));
     auto scanNode =
         std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
     scanNode->bounds.isSimpleRange = true;
@@ -1134,7 +1138,7 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScan) {
     scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1);
 
     EqLookupNode node(std::move(scanNode),
-                      NamespaceString("db.col"),
+                      NamespaceString::createNamespaceString_forTest("db.col"),
                       "local",
                       "foreign",
                       "as",
@@ -1169,7 +1173,7 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScanFieldOverwrite) {
                                        << "1");
 
     EqLookupNode node(std::move(scanNode),
-                      NamespaceString("db.col"),
+                      NamespaceString::createNamespaceString_forTest("db.col"),
                       "local",
                       "foreign",
                       "b",
@@ -1241,8 +1245,8 @@ TEST(QuerySolutionTest, FieldAvailabilityOutputStreamOperator) {
 
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverSingleEqLookupNode) {
     auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
-    const NamespaceString mainNss("db.main");
-    const NamespaceString foreignColl("db.col");
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    const NamespaceString foreignColl = NamespaceString::createNamespaceString_forTest("db.col");
     auto root = std::make_unique<EqLookupNode>(std::move(scanNode),
                                                foreignColl,
                                                "local",
@@ -1263,7 +1267,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverSingleEqLookupNode) {
 
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {
     auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
-    const NamespaceString mainNss("db.main");
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     auto root = std::make_unique<EqLookupNode>(std::move(scanNode),
                                                mainNss,
                                                "local",
@@ -1285,9 +1289,9 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {
 
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverNestedEqLookupNodes) {
     auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
-    const NamespaceString mainNss("db.main");
-    const NamespaceString foreignCollOne("db.col");
-    const NamespaceString foreignCollTwo("db.foo");
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    const NamespaceString foreignCollOne = NamespaceString::createNamespaceString_forTest("db.col");
+    const NamespaceString foreignCollTwo = NamespaceString::createNamespaceString_forTest("db.foo");
     auto childEqLookupNode =
         std::make_unique<EqLookupNode>(std::move(scanNode),
                                        foreignCollOne,
@@ -1320,8 +1324,8 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverNestedEqLookupNodes) {
 
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesNestedEqLookupNodes) {
     auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
-    const NamespaceString mainNss("db.main");
-    const NamespaceString foreignColl("db.col");
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    const NamespaceString foreignColl = NamespaceString::createNamespaceString_forTest("db.col");
     auto childEqLookupNode =
         std::make_unique<EqLookupNode>(std::move(scanNode),
                                        foreignColl,

@@ -39,7 +39,7 @@ namespace repl {
 namespace {
 
 const OpTime entryOpTime{Timestamp(3, 4), 5};
-const NamespaceString nss{"foo", "bar"};
+const NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo", "bar");
 const int docId = 17;
 
 TEST(OplogEntryTest, Update) {
@@ -145,7 +145,7 @@ TEST(OplogEntryTest, InsertIncludesTidField) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     const BSONObj doc = BSON("_id" << docId << "a" << 5);
     TenantId tid(OID::gen());
-    NamespaceString nss(tid, "foo", "bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "foo", "bar");
     const auto entry =
         makeOplogEntry(entryOpTime, OpTypeEnum::kInsert, nss, doc, boost::none, {}, Date_t::now());
 
@@ -162,7 +162,8 @@ TEST(OplogEntryTest, ParseMutableOplogEntryIncludesTidField) {
 
     const TenantId tid(OID::gen());
 
-    const NamespaceString nssWithTid{tid, nss.ns()};
+    const NamespaceString nssWithTid =
+        NamespaceString::createNamespaceString_forTest(tid, nss.ns());
 
     const BSONObj oplogBson = [&] {
         BSONObjBuilder bob;
@@ -187,7 +188,8 @@ TEST(OplogEntryTest, ParseDurableOplogEntryIncludesTidField) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
 
     const TenantId tid(OID::gen());
-    const NamespaceString nssWithTid{tid, nss.ns()};
+    const NamespaceString nssWithTid =
+        NamespaceString::createNamespaceString_forTest(tid, nss.ns());
 
     const BSONObj oplogBson = [&] {
         BSONObjBuilder bob;
@@ -214,7 +216,7 @@ TEST(OplogEntryTest, ParseReplOperationIncludesTidField) {
 
     UUID uuid(UUID::gen());
     TenantId tid(OID::gen());
-    NamespaceString nssWithTid(tid, nss.ns());
+    NamespaceString nssWithTid = NamespaceString::createNamespaceString_forTest(tid, nss.ns());
 
     auto op = repl::DurableOplogEntry::makeInsertOperation(
         nssWithTid,

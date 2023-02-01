@@ -188,14 +188,15 @@ TEST_F(ABTTranslationTest, UnionTranslation) {
     std::string scanDefA = "collA";
     std::string scanDefB = "collB";
     Metadata metadataUnion{{{scanDefA, {}}, {scanDefB, {}}}};
-    testABTTranslationAndOptimization("union",
-                                      "[{$unionWith: 'collB'}, {$match: {_id: 1}}]",
-                                      scanDefA,
-                                      {},
-                                      metadataUnion,
-                                      {},
-                                      false,
-                                      {{NamespaceString("a." + scanDefB), {}}});
+    testABTTranslationAndOptimization(
+        "union",
+        "[{$unionWith: 'collB'}, {$match: {_id: 1}}]",
+        scanDefA,
+        {},
+        metadataUnion,
+        {},
+        false,
+        {{NamespaceString::createNamespaceString_forTest("a." + scanDefB), {}}});
 }
 
 TEST_F(ABTTranslationTest, SortTranslation) {

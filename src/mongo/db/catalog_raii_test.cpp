@@ -55,12 +55,17 @@ public:
         return std::make_pair(std::move(client), std::move(opCtx));
     }
 
-    const NamespaceString nss = NamespaceString("test", "coll");
-    const NamespaceString kSecondaryNss1 = NamespaceString("test", "secondaryColl1");
-    const NamespaceString kSecondaryNss2 = NamespaceString("test", "secondaryColl2");
-    const NamespaceString kSecondaryNss3 = NamespaceString("test", "secondaryColl3");
-    const NamespaceString kSecondaryNssOtherDb1 = NamespaceString("test2", "secondaryColl1");
-    const NamespaceString kSecondaryNssOtherDb2 = NamespaceString("test2", "secondaryColl2");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    const NamespaceString kSecondaryNss1 =
+        NamespaceString::createNamespaceString_forTest("test", "secondaryColl1");
+    const NamespaceString kSecondaryNss2 =
+        NamespaceString::createNamespaceString_forTest("test", "secondaryColl2");
+    const NamespaceString kSecondaryNss3 =
+        NamespaceString::createNamespaceString_forTest("test", "secondaryColl3");
+    const NamespaceString kSecondaryNssOtherDb1 =
+        NamespaceString::createNamespaceString_forTest("test2", "secondaryColl1");
+    const NamespaceString kSecondaryNssOtherDb2 =
+        NamespaceString::createNamespaceString_forTest("test2", "secondaryColl2");
     const Milliseconds timeoutMs = Seconds(1);
     const ClientAndCtx client1 = makeClientWithLocker("client1");
     const ClientAndCtx client2 = makeClientWithLocker("client2");

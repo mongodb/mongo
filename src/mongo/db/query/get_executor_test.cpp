@@ -63,7 +63,8 @@ auto createProjectionExecutor(const BSONObj& spec, const ProjectionPolicies& pol
 
 using std::unique_ptr;
 
-static const NamespaceString nss("test.collection");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("test.collection");
 
 /**
  * Utility functions to create a CanonicalQuery

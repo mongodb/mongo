@@ -122,7 +122,7 @@ public:
         : _impl{UUID::gen(),
                 BSON("command"
                      << "test"),
-                NamespaceString("test.source"),
+                NamespaceString::createNamespaceString_forTest("test.source"),
                 ShardingDataTransformInstanceMetrics::Role::kDonor,
                 startTime,
                 clockSource,

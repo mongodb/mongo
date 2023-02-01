@@ -113,7 +113,9 @@ TEST_F(ShardingInitializationOpObserverTest, GlobalInitDoesntGetCalledIfWriteAbo
 
     {
         AutoGetCollection autoColl(
-            operationContext(), NamespaceString("admin.system.version"), MODE_IX);
+            operationContext(),
+            NamespaceString::createNamespaceString_forTest("admin.system.version"),
+            MODE_IX);
 
         WriteUnitOfWork wuow(operationContext());
         InsertStatement stmt(shardIdentity.toShardIdentityDocument());

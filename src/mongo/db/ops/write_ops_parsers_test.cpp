@@ -206,7 +206,7 @@ TEST(CommandWriteOpsParsers, BadArrayFiltersElementInUpdateDoc) {
 }
 
 TEST(CommandWriteOpsParsers, SingleInsert) {
-    const auto ns = NamespaceString("test", "foo");
+    const auto ns = NamespaceString::createNamespaceString_forTest("test", "foo");
     const BSONObj obj = BSON("x" << 1);
     auto cmd = BSON("insert" << ns.coll() << "documents" << BSON_ARRAY(obj));
     for (bool seq : {false, true}) {
@@ -221,7 +221,7 @@ TEST(CommandWriteOpsParsers, SingleInsert) {
 }
 
 TEST(CommandWriteOpsParsers, EmptyMultiInsertFails) {
-    const auto ns = NamespaceString("test", "foo");
+    const auto ns = NamespaceString::createNamespaceString_forTest("test", "foo");
     auto cmd = BSON("insert" << ns.coll() << "documents" << BSONArray());
     for (bool seq : {false, true}) {
         auto request = toOpMsg(ns.db(), cmd, seq);
@@ -230,7 +230,7 @@ TEST(CommandWriteOpsParsers, EmptyMultiInsertFails) {
 }
 
 TEST(CommandWriteOpsParsers, RealMultiInsert) {
-    const auto ns = NamespaceString("test", "foo");
+    const auto ns = NamespaceString::createNamespaceString_forTest("test", "foo");
     const BSONObj obj0 = BSON("x" << 0);
     const BSONObj obj1 = BSON("x" << 1);
     auto cmd = BSON("insert" << ns.coll() << "documents" << BSON_ARRAY(obj0 << obj1));
@@ -249,7 +249,7 @@ TEST(CommandWriteOpsParsers, RealMultiInsert) {
 }
 
 TEST(CommandWriteOpsParsers, MultiInsertWithStmtId) {
-    const auto ns = NamespaceString("test", "foo");
+    const auto ns = NamespaceString::createNamespaceString_forTest("test", "foo");
     const BSONObj obj0 = BSON("x" << 0);
     const BSONObj obj1 = BSON("x" << 1);
     auto cmd =
@@ -269,7 +269,7 @@ TEST(CommandWriteOpsParsers, MultiInsertWithStmtId) {
 }
 
 TEST(CommandWriteOpsParsers, MultiInsertWithStmtIdsArray) {
-    const auto ns = NamespaceString("test", "foo");
+    const auto ns = NamespaceString::createNamespaceString_forTest("test", "foo");
     const BSONObj obj0 = BSON("x" << 0);
     const BSONObj obj1 = BSON("x" << 1);
     auto cmd = BSON("insert" << ns.coll() << "documents" << BSON_ARRAY(obj0 << obj1) << "stmtIds"
@@ -289,7 +289,7 @@ TEST(CommandWriteOpsParsers, MultiInsertWithStmtIdsArray) {
 }
 
 TEST(CommandWriteOpsParsers, UpdateCommandRequest) {
-    const auto ns = NamespaceString("test", "foo");
+    const auto ns = NamespaceString::createNamespaceString_forTest("test", "foo");
     const BSONObj query = BSON("x" << 1);
     const BSONObj update = BSON("$inc" << BSON("x" << 1));
     const BSONObj collation = BSON("locale"
@@ -327,7 +327,7 @@ TEST(CommandWriteOpsParsers, UpdateCommandRequest) {
 }
 
 TEST(CommandWriteOpsParsers, UpdateWithPipeline) {
-    const auto ns = NamespaceString("test", "foo");
+    const auto ns = NamespaceString::createNamespaceString_forTest("test", "foo");
     const BSONObj query = BSON("q" << BSON("x" << 1));
     std::vector<BSONObj> pipeline{BSON("$addFields" << BSON("x" << 1))};
     const BSONObj update = BSON("u" << pipeline);
@@ -363,7 +363,7 @@ TEST(CommandWriteOpsParsers, UpdateWithPipeline) {
 }
 
 TEST(CommandWriteOpsParsers, Remove) {
-    const auto ns = NamespaceString("test", "foo");
+    const auto ns = NamespaceString::createNamespaceString_forTest("test", "foo");
     const BSONObj query = BSON("x" << 1);
     const BSONObj collation = BSON("locale"
                                    << "en_US");

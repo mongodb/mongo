@@ -166,7 +166,7 @@ TEST(NamespaceStringTest, MakeDropPendingNamespace) {
                       repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL)));
 
     std::string collName(NamespaceString::MaxNsCollectionLen, 't');
-    NamespaceString nss("test", collName);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", collName);
     ASSERT_EQUALS(NamespaceString{"test.system.drop.1234567i8t9." + collName},
                   nss.makeDropPendingNamespace(repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL)));
 }
@@ -253,31 +253,31 @@ TEST(NamespaceStringTest, nsToDatabase1) {
 }
 
 TEST(NamespaceStringTest, NamespaceStringParse1) {
-    NamespaceString ns("a.b");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("a.b");
     ASSERT_EQUALS(std::string("a"), ns.db());
     ASSERT_EQUALS(std::string("b"), ns.coll());
 }
 
 TEST(NamespaceStringTest, NamespaceStringParse2) {
-    NamespaceString ns("a.b.c");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("a.b.c");
     ASSERT_EQUALS(std::string("a"), ns.db());
     ASSERT_EQUALS(std::string("b.c"), ns.coll());
 }
 
 TEST(NamespaceStringTest, NamespaceStringParse3) {
-    NamespaceString ns("abc");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("abc");
     ASSERT_EQUALS(std::string("abc"), ns.db());
     ASSERT_EQUALS(std::string(""), ns.coll());
 }
 
 TEST(NamespaceStringTest, NamespaceStringParse4) {
-    NamespaceString ns("abc.");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("abc.");
     ASSERT_EQUALS(std::string("abc"), ns.db());
     ASSERT(ns.coll().empty());
 }
 
 TEST(NamespaceStringTest, NamespaceStringParse5) {
-    NamespaceString ns("abc", "");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("abc", "");
     ASSERT_EQUALS(std::string("abc"), ns.db());
     ASSERT(ns.coll().empty());
 }
@@ -306,7 +306,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
     TenantId tenantId(OID::gen());
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
 
-    NamespaceString nss(tenantId, "foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
     ASSERT_EQ(nss.ns(), "foo.bar");
     ASSERT_EQ(nss.toString(), "foo.bar");
     ASSERT_EQ(nss.toStringWithTenantId(), tenantNsStr);
@@ -314,7 +314,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
     ASSERT_EQ(*nss.tenantId(), tenantId);
 
     DatabaseName dbName(tenantId, "foo");
-    NamespaceString nss2(dbName, "bar");
+    NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(dbName, "bar");
     ASSERT_EQ(nss2.ns(), "foo.bar");
     ASSERT_EQ(nss2.toString(), "foo.bar");
     ASSERT_EQ(nss2.toStringWithTenantId(), tenantNsStr);
@@ -340,7 +340,7 @@ TEST(NamespaceStringTest, NSSNoCollectionWithTenantId) {
     TenantId tenantId(OID::gen());
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo";
 
-    NamespaceString nss(tenantId, "foo");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo");
     ASSERT_EQ(nss.ns(), "foo");
     ASSERT_EQ(nss.toString(), "foo");
     ASSERT_EQ(nss.toStringWithTenantId(), tenantNsStr);
@@ -348,7 +348,7 @@ TEST(NamespaceStringTest, NSSNoCollectionWithTenantId) {
     ASSERT_EQ(*nss.tenantId(), tenantId);
 
     DatabaseName dbName(tenantId, "foo");
-    NamespaceString nss2(dbName, "");
+    NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(dbName, "");
     ASSERT(nss2.tenantId());
     ASSERT_EQ(*nss2.tenantId(), tenantId);
 

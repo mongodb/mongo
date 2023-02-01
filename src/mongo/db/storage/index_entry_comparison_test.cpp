@@ -39,7 +39,7 @@ namespace mongo {
 
 void buildDupKeyErrorStatusProducesExpectedErrorObject(
     DuplicateKeyErrorInfo::FoundValue&& foundValue) {
-    NamespaceString collNss("test.foo");
+    NamespaceString collNss = NamespaceString::createNamespaceString_forTest("test.foo");
     std::string indexName("a_1_b_1");
     auto keyPattern = BSON("a" << 1 << "b" << 1);
     auto keyValue = BSON("" << 10 << ""
@@ -95,7 +95,7 @@ void duplicateKeyErrorSerializationAndParseReturnTheSameObject(
     BSONObj collation,
     BSONObj keyValueWithFieldName,
     BSONObj expectedEncodedKeyValueField) {
-    NamespaceString collNss("test.foo");
+    NamespaceString collNss = NamespaceString::createNamespaceString_forTest("test.foo");
     std::string indexName("a_1_b_1");
 
     auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern, collation);
@@ -148,7 +148,7 @@ TEST(IndexEntryComparison, BuildDupKeyErrorSerializeAndParseReturnTheSameObjectF
 TEST(IndexEntryComparison, BuildDupKeyErrorMessageIncludesCollationAndHexEncodedCollationKey) {
     StringData mockCollationKey("bar");
 
-    NamespaceString collNss("test.foo");
+    NamespaceString collNss = NamespaceString::createNamespaceString_forTest("test.foo");
     std::string indexName("a_1");
     auto keyPattern = BSON("a" << 1);
     auto keyValue = BSON("" << mockCollationKey);
@@ -173,7 +173,7 @@ TEST(IndexEntryComparison, BuildDupKeyErrorMessageIncludesCollationAndHexEncoded
 }
 
 TEST(IndexEntryComparison, BuildDupKeyErrorMessageHexEncodesInvalidUTF8ForIndexWithoutCollation) {
-    NamespaceString collNss("test.foo");
+    NamespaceString collNss = NamespaceString::createNamespaceString_forTest("test.foo");
     std::string indexName("a_1");
     auto keyPattern = BSON("a" << 1);
 

@@ -222,11 +222,11 @@ void FleCompactTest::setUp() {
 
     _queryImpl = std::make_unique<FLEQueryInterfaceMock>(_opCtx.get(), _storage);
 
-    _namespaces.edcNss = NamespaceString("test.edc");
-    _namespaces.escNss = NamespaceString("test.esc");
-    _namespaces.eccNss = NamespaceString("test.ecc");
-    _namespaces.ecocNss = NamespaceString("test.ecoc");
-    _namespaces.ecocRenameNss = NamespaceString("test.ecoc.compact");
+    _namespaces.edcNss = NamespaceString::createNamespaceString_forTest("test.edc");
+    _namespaces.escNss = NamespaceString::createNamespaceString_forTest("test.esc");
+    _namespaces.eccNss = NamespaceString::createNamespaceString_forTest("test.ecc");
+    _namespaces.ecocNss = NamespaceString::createNamespaceString_forTest("test.ecoc");
+    _namespaces.ecocRenameNss = NamespaceString::createNamespaceString_forTest("test.ecoc.compact");
 
     createCollection(_namespaces.edcNss);
     createCollection(_namespaces.escNss);
@@ -244,7 +244,9 @@ void FleCompactTest::createCollection(const NamespaceString& ns) {
     CollectionOptions collectionOptions;
     collectionOptions.uuid = UUID::gen();
     auto statusCC = _storage->createCollection(
-        _opCtx.get(), NamespaceString(ns.db(), ns.coll()), collectionOptions);
+        _opCtx.get(),
+        NamespaceString::createNamespaceString_forTest(ns.dbName(), ns.coll()),
+        collectionOptions);
     ASSERT_OK(statusCC);
 }
 

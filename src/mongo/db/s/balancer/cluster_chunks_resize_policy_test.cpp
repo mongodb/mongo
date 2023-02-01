@@ -36,7 +36,7 @@ namespace {
 
 class ClusterChunksResizePolicyTest : public ConfigServerTestFixture {
 protected:
-    const NamespaceString kNss{"testDb.testColl"};
+    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
     const UUID kUuid = UUID::gen();
     const ChunkVersion kCollectionVersion = ChunkVersion({OID::gen(), Timestamp(10)}, {1, 1});
 

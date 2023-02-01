@@ -160,7 +160,7 @@ private:
             operationContext(), spec.getStringField(IndexDescriptor::kIndexNameFieldName)));
     }
 
-    NamespaceString _nss{"testDB.columns"};
+    NamespaceString _nss = NamespaceString::createNamespaceString_forTest("testDB.columns");
     boost::optional<AutoGetCollection> _coll;
     ColumnStoreAccessMethod* _accessMethod;
 

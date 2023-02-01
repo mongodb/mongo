@@ -70,8 +70,9 @@ public:
     CheckResultsBase()
         : _queryServiceContext(std::make_unique<QueryTestServiceContext>()),
           _opCtx(_queryServiceContext->makeOperationContext()),
-          _ctx(new ExpressionContextForTest(_opCtx.get(),
-                                            AggregateCommandRequest(NamespaceString(ns), {}))) {}
+          _ctx(new ExpressionContextForTest(
+              _opCtx.get(),
+              AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(ns), {}))) {}
 
     virtual ~CheckResultsBase() {}
 

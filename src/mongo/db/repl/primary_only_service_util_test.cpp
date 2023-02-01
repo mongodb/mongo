@@ -67,7 +67,7 @@ private:
 
 // Create a global instance of the 'PrimaryOnlyServiceStateStore' to store the state document.
 PrimaryOnlyServiceStateStore<TestStateDocument> gStateDocStore{
-    NamespaceString{kTestPrimaryOnlyServiceStateDocumentNss}};
+    NamespaceString::createNamespaceString_forTest(kTestPrimaryOnlyServiceStateDocumentNss)};
 
 /**
  * Test class for the 'DefaultPrimaryOnlyServiceInstance'.
@@ -124,7 +124,8 @@ public:
     }
 
     NamespaceString getStateDocumentsNS() const final {
-        return NamespaceString(kTestPrimaryOnlyServiceStateDocumentNss);
+        return NamespaceString::createNamespaceString_forTest(
+            kTestPrimaryOnlyServiceStateDocumentNss);
     }
 
     ThreadPool::Limits getThreadPoolLimits() const final {

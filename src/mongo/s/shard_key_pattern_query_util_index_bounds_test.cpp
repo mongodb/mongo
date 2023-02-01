@@ -51,7 +51,7 @@ protected:
     // Utility function to create a CanonicalQuery
     std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
         BSONObj queryObj = fromjson(queryStr);
-        const NamespaceString nss("test.foo");
+        const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(queryObj);
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(
@@ -635,7 +635,7 @@ TEST_F(CMCollapseTreeTest, GeoNearLimitationsInPlace) {
             "{a: 2, b: {$near: {$geometry: {type: \"Point\", coordinates: [0, 0]}, $minDistance: "
             "0, $maxDistance: 2}}, c: {$near: {$geometry: {type: \"Point\", coordinates: [0, 0]}, "
             "$minDistance: 0, $maxDistance: 2}}}");
-        const NamespaceString nss("test.foo");
+        const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(queryObj);
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(
@@ -657,7 +657,7 @@ TEST_F(CMCollapseTreeTest, GeoNearLimitationsInPlace) {
         BSONObj queryObj = fromjson(
             "{$or: {a: 2, b: {$near: {$geometry: {type: \"Point\", coordinates: [0, 0]}, "
             "$minDistance: 0, $maxDistance: 2}}}}");
-        const NamespaceString nss("test.foo");
+        const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(queryObj);
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(

@@ -90,7 +90,7 @@ protected:
     }
 
 private:
-    NamespaceString _nss{"testDB.interceptor"};
+    NamespaceString _nss = NamespaceString::createNamespaceString_forTest("testDB.interceptor");
     boost::optional<AutoGetCollection> _coll;
 };
 

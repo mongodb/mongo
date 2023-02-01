@@ -76,7 +76,7 @@ const ConnectionString kConfigConnStr =
 const ConnectionString kDonorConnStr =
     ConnectionString::forReplicaSet("donor", {HostAndPort("donor:1")});
 const ShardId kFromShard("donor");
-const NamespaceString kNs("a.b");
+const NamespaceString kNs = NamespaceString::createNamespaceString_forTest("a.b");
 
 /**
  * Creates an OplogEntry with given parameters and preset defaults for this test suite.

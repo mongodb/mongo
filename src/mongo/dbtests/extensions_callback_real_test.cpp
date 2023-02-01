@@ -244,7 +244,7 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveAndCaseSensitiveTrue) {
 //
 // $where parsing tests.
 //
-const NamespaceString kTestNss = NamespaceString("db.dummy");
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("db.dummy");
 
 TEST_F(ExtensionsCallbackRealTest, WhereExpressionDesugarsToExprAndInternalJs) {
     if (_isDesugarWhereToFunctionOn) {

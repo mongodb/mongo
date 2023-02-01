@@ -40,7 +40,7 @@ using ShardStatistics = ClusterStatistics::ShardStatistics;
 
 class BalancerDefragmentationPolicyTest : public ConfigServerTestFixture {
 protected:
-    const NamespaceString kNss{"testDb.testColl"};
+    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
     const UUID kUuid = UUID::gen();
     const ShardId kShardId0 = ShardId("shard0");
     const ShardId kShardId1 = ShardId("shard1");

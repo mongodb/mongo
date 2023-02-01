@@ -46,7 +46,8 @@ const std::vector<HostAndPort> ResultsMergerTestFixture::kTestShardHosts = {
     HostAndPort("FakeShard2Host", 12345),
     HostAndPort("FakeShard3Host", 12345)};
 
-const NamespaceString ResultsMergerTestFixture::kTestNss = NamespaceString{"testdb.testcoll"};
+const NamespaceString ResultsMergerTestFixture::kTestNss =
+    NamespaceString::createNamespaceString_forTest("testdb.testcoll");
 
 void ResultsMergerTestFixture::setUp() {
     ShardingTestFixture::setUp();

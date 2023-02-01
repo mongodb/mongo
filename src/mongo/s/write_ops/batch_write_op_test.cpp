@@ -120,7 +120,7 @@ protected:
 using BatchWriteOpTest = WriteOpTestFixture;
 
 TEST_F(BatchWriteOpTest, SingleOp) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     auto targeter = initTargeterFullRange(nss, endpoint);
@@ -152,7 +152,7 @@ TEST_F(BatchWriteOpTest, SingleOp) {
 }
 
 TEST_F(BatchWriteOpTest, SingleError) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     auto targeter = initTargeterFullRange(nss, endpoint);
@@ -190,7 +190,7 @@ TEST_F(BatchWriteOpTest, SingleError) {
 }
 
 TEST_F(BatchWriteOpTest, SingleTargetError) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     auto targeter = initTargeterHalfRange(nss, endpoint);
@@ -224,7 +224,7 @@ TEST_F(BatchWriteOpTest, SingleTargetError) {
 // Write concern error test - we should pass write concern to sub-batches, and pass up the write
 // concern error if one occurs.
 TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     auto targeter = initTargeterFullRange(nss, endpoint);
@@ -266,7 +266,7 @@ TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
 
 // Single-op stale version test. We should retry the same batch until we're not stale.
 TEST_F(BatchWriteOpTest, SingleStaleError) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     auto targeter = initTargeterFullRange(nss, endpoint);
@@ -329,7 +329,7 @@ TEST_F(BatchWriteOpTest, SingleStaleError) {
 
 // Multi-op targeting test (ordered)
 TEST_F(BatchWriteOpTest, MultiOpSameShardOrdered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     auto targeter = initTargeterFullRange(nss, endpoint);
@@ -365,7 +365,7 @@ TEST_F(BatchWriteOpTest, MultiOpSameShardOrdered) {
 
 // Multi-op targeting test (unordered)
 TEST_F(BatchWriteOpTest, MultiOpSameShardUnordered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     auto targeter = initTargeterFullRange(nss, endpoint);
@@ -407,7 +407,7 @@ TEST_F(BatchWriteOpTest, MultiOpSameShardUnordered) {
 // Multi-op, multi-endpoing targeting test (ordered). There should be two sets of single batches
 // (one to each shard, one-by-one)
 TEST_F(BatchWriteOpTest, MultiOpTwoShardsOrdered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -473,7 +473,7 @@ void verifyTargetedBatches(std::map<ShardId, size_t> expected,
 // Multi-op, multi-endpoint targeting test (unordered). There should be one set of two batches (one
 // to each shard).
 TEST_F(BatchWriteOpTest, MultiOpTwoShardsUnordered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -518,7 +518,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsUnordered) {
 // Multi-op (ordered) targeting test where each op goes to both shards. There should be two sets of
 // two batches to each shard (two for each delete op).
 TEST_F(BatchWriteOpTest, MultiOpTwoShardsEachOrdered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -573,7 +573,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsEachOrdered) {
 // Multi-op (unaordered) targeting test where each op goes to both shards. There should be one set
 // of two batches to each shard (containing writes for both ops).
 TEST_F(BatchWriteOpTest, MultiOpTwoShardsEachUnordered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -620,7 +620,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsEachUnordered) {
 // shards. Should batch the first two ops, then second ops should be batched separately, then last
 // ops should be batched together.
 TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsOrdered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -714,7 +714,7 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsOrdered) {
 // Multi-op (unordered) targeting test where first two ops go to one shard, second two ops go to two
 // shards. Should batch all the ops together into two batches of four ops for each shard.
 TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsUnordered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -767,7 +767,7 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsUnordered) {
 // Multi-op targeting test where two ops go to two separate shards and there's an error on one op on
 // one shard. There should be one set of two batches to each shard and an error reported.
 TEST_F(BatchWriteOpTest, MultiOpSingleShardErrorUnordered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -827,7 +827,7 @@ TEST_F(BatchWriteOpTest, MultiOpSingleShardErrorUnordered) {
 // Multi-op targeting test where two ops go to two separate shards and there's an error on each op
 // on each shard. There should be one set of two batches to each shard and and two errors reported.
 TEST_F(BatchWriteOpTest, MultiOpTwoShardErrorsUnordered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -884,7 +884,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardErrorsUnordered) {
 // Multi-op targeting test where each op goes to both shards and there's an error on one op on one
 // shard. There should be one set of two batches to each shard and an error reported.
 TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorUnordered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -946,7 +946,7 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorUnordered) {
 // shard. There should be one set of two batches to each shard and an error reported, the second op
 // should not get run.
 TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorOrdered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -1007,7 +1007,7 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorOrdered) {
 // for single-doc batches, since the error means there's no write concern applied. Don't suppress
 // the error if ordered : false.
 TEST_F(BatchWriteOpTest, MultiOpErrorAndWriteConcernErrorUnordered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     auto targeter = initTargeterFullRange(nss, endpoint);
@@ -1050,7 +1050,7 @@ TEST_F(BatchWriteOpTest, MultiOpErrorAndWriteConcernErrorUnordered) {
 // Single-op (ordered) error and write concern error test. Suppress the write concern error if
 // ordered and we also have an error
 TEST_F(BatchWriteOpTest, SingleOpErrorAndWriteConcernErrorOrdered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -1105,7 +1105,7 @@ TEST_F(BatchWriteOpTest, SingleOpErrorAndWriteConcernErrorOrdered) {
 
 // Targeting failure on second op in batch op (ordered)
 TEST_F(BatchWriteOpTest, MultiOpFailedTargetOrdered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     auto targeter = initTargeterHalfRange(nss, endpoint);
@@ -1159,7 +1159,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedTargetOrdered) {
 
 // Targeting failure on second op in batch op (unordered)
 TEST_F(BatchWriteOpTest, MultiOpFailedTargetUnordered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     auto targeter = initTargeterHalfRange(nss, endpoint);
@@ -1212,7 +1212,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedTargetUnordered) {
 // Batch failure (ok : 0) reported in a multi-op batch (ordered). Expect this gets translated down
 // into write errors for first affected write.
 TEST_F(BatchWriteOpTest, MultiOpFailedBatchOrdered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -1259,7 +1259,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedBatchOrdered) {
 // Batch failure (ok : 0) reported in a multi-op batch (unordered). Expect this gets translated down
 // into write errors for all affected writes.
 TEST_F(BatchWriteOpTest, MultiOpFailedBatchUnordered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -1315,7 +1315,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedBatchUnordered) {
 // Batch aborted (ordered). Expect this gets translated down into write error for first affected
 // write.
 TEST_F(BatchWriteOpTest, MultiOpAbortOrdered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -1358,7 +1358,7 @@ TEST_F(BatchWriteOpTest, MultiOpAbortOrdered) {
 // Batch aborted (unordered). Expect this gets translated down into write errors for all affected
 // writes.
 TEST_F(BatchWriteOpTest, MultiOpAbortUnordered) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -1398,7 +1398,7 @@ TEST_F(BatchWriteOpTest, MultiOpAbortUnordered) {
 
 // Multi-op targeting test where each op goes to both shards and both return a write concern error
 TEST_F(BatchWriteOpTest, MultiOpTwoWCErrors) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ShardVersion::IGNORED(), boost::none);
     ShardEndpoint endpointB(ShardId("shardB"), ShardVersion::IGNORED(), boost::none);
 
@@ -1440,7 +1440,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoWCErrors) {
 }
 
 TEST_F(BatchWriteOpTest, AttachingStmtIds) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
     auto targeter = initTargeterFullRange(nss, endpoint);
 
@@ -1530,7 +1530,7 @@ using BatchWriteOpLimitTests = WriteOpTestFixture;
 
 // Big single operation test - should go through
 TEST_F(BatchWriteOpLimitTests, OneBigDoc) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     auto targeter = initTargeterFullRange(nss, endpoint);
@@ -1565,7 +1565,7 @@ TEST_F(BatchWriteOpLimitTests, OneBigDoc) {
 
 // Big doc with smaller additional doc - should go through as two batches
 TEST_F(BatchWriteOpLimitTests, OneBigOneSmall) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     auto targeter = initTargeterFullRange(nss, endpoint);
@@ -1633,7 +1633,7 @@ private:
 };
 
 TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Delete) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     auto targeter = initTargeterHalfRange(nss, endpoint);
@@ -1662,7 +1662,7 @@ TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Delete) {
 }
 
 TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Update) {
-    NamespaceString nss("foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     auto targeter = initTargeterHalfRange(nss, endpoint);
@@ -1690,7 +1690,7 @@ TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Update) {
     ASSERT_EQ(ErrorCodes::UnknownError, response.getErrDetailsAt(0).getStatus().code());
 }
 
-const NamespaceString kNss("TestDB", "TestColl");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const int splitPoint = 50;
 
 class WriteWithoutShardKeyFixture : public CatalogCacheTestFixture {

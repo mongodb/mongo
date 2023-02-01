@@ -180,7 +180,8 @@ TEST_F(DocumentSourceUnionWithTest, UnionsWithNonEmptySubPipelines) {
 
 TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithPipeline) {
     auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith(expCtx->ns.dbName(), "coll");
+    NamespaceString nsToUnionWith =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {nsToUnionWith.coll().toString(), {nsToUnionWith, std::vector<BSONObj>()}}});
     auto bson =
@@ -200,7 +201,8 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithPipeline) {
 
 TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithoutPipeline) {
     auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith(expCtx->ns.dbName(), "coll");
+    NamespaceString nsToUnionWith =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {nsToUnionWith.coll().toString(), {nsToUnionWith, std::vector<BSONObj>()}}});
     auto bson = BSON("$unionWith" << nsToUnionWith.coll());
@@ -219,7 +221,8 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithoutPipeline) {
 
 TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithoutPipelineExtraSubobject) {
     auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith(expCtx->ns.dbName(), "coll");
+    NamespaceString nsToUnionWith =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {nsToUnionWith.coll().toString(), {nsToUnionWith, std::vector<BSONObj>()}}});
     auto bson = BSON("$unionWith" << BSON("coll" << nsToUnionWith.coll()));
@@ -238,7 +241,8 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithoutPipelineExtraSubobje
 
 TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
     auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith(expCtx->ns.dbName(), "coll");
+    NamespaceString nsToUnionWith =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {nsToUnionWith.coll().toString(), {nsToUnionWith, std::vector<BSONObj>()}}});
     ASSERT_THROWS_CODE(
@@ -397,7 +401,8 @@ TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsReferencedFieldsBef
 
 TEST_F(DocumentSourceUnionWithTest, RespectsViewDefinition) {
     auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith(expCtx->ns.dbName(), "coll");
+    NamespaceString nsToUnionWith =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {nsToUnionWith.coll().toString(),
          {nsToUnionWith, std::vector<BSONObj>{fromjson("{$match: {_id: {$mod: [2, 0]}}}")}}}});
@@ -427,8 +432,10 @@ TEST_F(DocumentSourceUnionWithTest, RespectsViewDefinition) {
 
 TEST_F(DocumentSourceUnionWithTest, ConcatenatesViewDefinitionToPipeline) {
     auto expCtx = getExpCtx();
-    NamespaceString viewNsToUnionWith(expCtx->ns.dbName(), "view");
-    NamespaceString nsToUnionWith(expCtx->ns.dbName(), "coll");
+    NamespaceString viewNsToUnionWith =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "view");
+    NamespaceString nsToUnionWith =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {viewNsToUnionWith.coll().toString(),
          {nsToUnionWith, std::vector<BSONObj>{fromjson("{$match: {_id: {$mod: [2, 0]}}}")}}}});
@@ -463,7 +470,8 @@ TEST_F(DocumentSourceUnionWithTest, ConcatenatesViewDefinitionToPipeline) {
 
 TEST_F(DocumentSourceUnionWithTest, RejectUnionWhenDepthLimitIsExceeded) {
     auto expCtx = getExpCtx();
-    NamespaceString fromNs(boost::none, "test", "coll");
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
 
@@ -615,11 +623,11 @@ TEST_F(DocumentSourceUnionWithTest, IncrementNestedAggregateOpCounterOnCreateBut
         ASSERT_EQ(countAfterCopy - countAfterCreate, 0);
     };
 
-    testOpCounter(NamespaceString{"testDb", "testColl"}, 1);
+    testOpCounter(NamespaceString::createNamespaceString_forTest("testDb", "testColl"), 1);
     // $unionWith against internal databases should not cause the counter to get incremented.
-    testOpCounter(NamespaceString{"config", "testColl"}, 0);
-    testOpCounter(NamespaceString{"admin", "testColl"}, 0);
-    testOpCounter(NamespaceString{"local", "testColl"}, 0);
+    testOpCounter(NamespaceString::createNamespaceString_forTest("config", "testColl"), 0);
+    testOpCounter(NamespaceString::createNamespaceString_forTest("admin", "testColl"), 0);
+    testOpCounter(NamespaceString::createNamespaceString_forTest("local", "testColl"), 0);
 }
 
 using DocumentSourceUnionWithServerlessTest = ServerlessAggregationContextFixture;
@@ -627,7 +635,8 @@ using DocumentSourceUnionWithServerlessTest = ServerlessAggregationContextFixtur
 TEST_F(DocumentSourceUnionWithServerlessTest,
        LiteParsedDocumentSourceLookupContainsExpectedNamespacesInServerless) {
     auto tenantId = TenantId(OID::gen());
-    NamespaceString nss(tenantId, "test", "testColl");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(tenantId, "test", "testColl");
     std::vector<BSONObj> pipeline;
 
     auto stageSpec = BSON("$unionWith"
@@ -636,7 +645,9 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
         DocumentSourceUnionWith::LiteParsed::parse(nss, stageSpec.firstElement());
     auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
     ASSERT_EQ(1, namespaceSet.size());
-    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, "test", "some_coll")));
+    ASSERT_EQ(1ul,
+              namespaceSet.count(
+                  NamespaceString::createNamespaceString_forTest(tenantId, "test", "some_coll")));
 
     stageSpec = BSON("$unionWith" << BSON("coll"
                                           << "some_coll"
@@ -644,7 +655,9 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
     liteParsedLookup = DocumentSourceUnionWith::LiteParsed::parse(nss, stageSpec.firstElement());
     namespaceSet = liteParsedLookup->getInvolvedNamespaces();
     ASSERT_EQ(1, namespaceSet.size());
-    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, "test", "some_coll")));
+    ASSERT_EQ(1ul,
+              namespaceSet.count(
+                  NamespaceString::createNamespaceString_forTest(tenantId, "test", "some_coll")));
 }
 
 TEST_F(DocumentSourceUnionWithServerlessTest,
@@ -652,7 +665,8 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
     auto expCtx = getExpCtx();
     ASSERT(expCtx->ns.tenantId());
 
-    NamespaceString unionWithNs(expCtx->ns.tenantId(), "test", "some_coll");
+    NamespaceString unionWithNs =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.tenantId(), "test", "some_coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {unionWithNs.coll().toString(), {unionWithNs, std::vector<BSONObj>()}}});
 

@@ -390,8 +390,9 @@ TEST_F(NodeSBE, Lower1) {
     Metadata metadata{{}};
 
     auto opCtx = makeOperationContext();
-    auto pipeline = parsePipeline(
-        "[{$project:{'a.b.c.d':{$literal:'abc'}}}]", NamespaceString("test"), opCtx.get());
+    auto pipeline = parsePipeline("[{$project:{'a.b.c.d':{$literal:'abc'}}}]",
+                                  NamespaceString::createNamespaceString_forTest("test"),
+                                  opCtx.get());
 
     const auto [tag, val] = sbe::value::makeNewArray();
     {
@@ -605,7 +606,8 @@ TEST_F(NodeSBE, RequireRID) {
     Metadata metadata{{}};
 
     auto opCtx = makeOperationContext();
-    auto pipeline = parsePipeline("[{$match: {a: 2}}]", NamespaceString("test"), opCtx.get());
+    auto pipeline = parsePipeline(
+        "[{$match: {a: 2}}]", NamespaceString::createNamespaceString_forTest("test"), opCtx.get());
 
     const ProjectionName scanProjName = prefixId.getNextId("scan");
 

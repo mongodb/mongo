@@ -73,7 +73,7 @@ void CollectionTest::makeTimeseries(NamespaceString nss) {
 }
 
 TEST_F(CollectionTest, CappedNotifierKillAndIsDead) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
@@ -85,7 +85,7 @@ TEST_F(CollectionTest, CappedNotifierKillAndIsDead) {
 }
 
 TEST_F(CollectionTest, CappedNotifierTimeouts) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
@@ -101,7 +101,7 @@ TEST_F(CollectionTest, CappedNotifierTimeouts) {
 }
 
 TEST_F(CollectionTest, CappedNotifierWaitAfterNotifyIsImmediate) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
@@ -120,7 +120,7 @@ TEST_F(CollectionTest, CappedNotifierWaitAfterNotifyIsImmediate) {
 }
 
 TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousNotifyAll) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
@@ -145,7 +145,7 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousNotifyAll) {
 }
 
 TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousKill) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
@@ -169,7 +169,7 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousKill) {
 }
 
 TEST_F(CollectionTest, HaveCappedWaiters) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
@@ -183,7 +183,7 @@ TEST_F(CollectionTest, HaveCappedWaiters) {
 }
 
 TEST_F(CollectionTest, NotifyCappedWaitersIfNeeded) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
@@ -198,7 +198,7 @@ TEST_F(CollectionTest, NotifyCappedWaitersIfNeeded) {
 }
 
 TEST_F(CollectionTest, AsynchronouslyNotifyCappedWaitersIfNeeded) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
@@ -243,7 +243,7 @@ void CollectionTest::makeCollectionForMultikey(NamespaceString nss, StringData i
 }
 
 TEST_F(CollectionTest, VerifyIndexIsUpdated) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     auto indexName = "myindex"_sd;
     makeCollectionForMultikey(nss, indexName);
 
@@ -297,7 +297,7 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
 }
 
 TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     auto indexName = "myindex"_sd;
     makeCollectionForMultikey(nss, indexName);
 
@@ -351,7 +351,7 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
 }
 
 TEST_F(CollectionTest, SetIndexIsMultikey) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     auto indexName = "myindex"_sd;
     makeCollectionForMultikey(nss, indexName);
 
@@ -373,7 +373,7 @@ TEST_F(CollectionTest, SetIndexIsMultikey) {
 }
 
 TEST_F(CollectionTest, SetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     auto indexName = "myindex"_sd;
     makeCollectionForMultikey(nss, indexName);
 
@@ -398,7 +398,7 @@ TEST_F(CollectionTest, SetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
 }
 
 TEST_F(CollectionTest, ForceSetIndexIsMultikey) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     auto indexName = "myindex"_sd;
     makeCollectionForMultikey(nss, indexName);
 
@@ -421,7 +421,7 @@ TEST_F(CollectionTest, ForceSetIndexIsMultikey) {
 }
 
 TEST_F(CollectionTest, ForceSetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     auto indexName = "myindex"_sd;
     makeCollectionForMultikey(nss, indexName);
 
@@ -448,7 +448,7 @@ TEST_F(CollectionTest, ForceSetIndexIsMultikeyRemovesUncommittedChangesOnRollbac
 }
 
 TEST_F(CollectionTest, CheckTimeseriesBucketDocsForMixedSchemaData) {
-    NamespaceString nss("test.system.buckets.ts");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
     makeTimeseries(nss);
 
     auto opCtx = operationContext();
@@ -568,8 +568,8 @@ TEST_F(CollectionTest, CheckTimeseriesBucketDocsForMixedSchemaData) {
 }
 
 TEST_F(CatalogTestFixture, CollectionPtrYieldable) {
-    CollectionMock beforeYield(NamespaceString("test.t"));
-    CollectionMock afterYield(NamespaceString("test.t"));
+    CollectionMock beforeYield(NamespaceString::createNamespaceString_forTest("test.t"));
+    CollectionMock afterYield(NamespaceString::createNamespaceString_forTest("test.t"));
 
     int numRestoreCalls = 0;
 
@@ -612,7 +612,7 @@ TEST_F(CatalogTestFixture, CollectionPtrYieldable) {
 }
 
 TEST_F(CatalogTestFixture, IsNotCapped) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     CollectionOptions options;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
@@ -623,7 +623,7 @@ TEST_F(CatalogTestFixture, IsNotCapped) {
 
 TEST_F(CatalogTestFixture, CappedDeleteRecord) {
     // Insert a document into a capped collection that has a maximum document size of 1.
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     CollectionOptions options;
     options.capped = true;
     options.cappedMaxDocs = 1;
@@ -667,7 +667,7 @@ TEST_F(CatalogTestFixture, CappedDeleteRecord) {
 
 TEST_F(CatalogTestFixture, CappedDeleteMultipleRecords) {
     // Insert multiple records at once, requiring multiple deletes.
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     CollectionOptions options;
     options.capped = true;
     options.cappedMaxDocs = 10;
@@ -719,7 +719,7 @@ TEST_F(CatalogTestFixture, CappedDeleteMultipleRecords) {
 }
 
 TEST_F(CatalogTestFixture, CappedVisibilityEmptyInitialState) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     CollectionOptions options;
     options.capped = true;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
@@ -780,7 +780,7 @@ TEST_F(CatalogTestFixture, CappedVisibilityEmptyInitialState) {
 }
 
 TEST_F(CatalogTestFixture, CappedVisibilityNonEmptyInitialState) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     CollectionOptions options;
     options.capped = true;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
@@ -861,7 +861,7 @@ TEST_F(CatalogTestFixture, CappedVisibilityNonEmptyInitialState) {
 }
 
 TEST_F(CollectionTest, CappedCursorRollover) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     CollectionOptions options;
     options.capped = true;
     options.cappedMaxDocs = 5;
@@ -911,7 +911,7 @@ TEST_F(CollectionTest, CappedCursorRollover) {
 }
 
 TEST_F(CatalogTestFixture, CappedCursorYieldFirst) {
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     CollectionOptions options;
     options.capped = true;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));

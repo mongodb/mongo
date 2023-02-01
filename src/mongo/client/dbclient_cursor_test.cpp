@@ -145,7 +145,7 @@ protected:
 TEST_F(DBClientCursorTest, DBClientCursorCallsMetaDataReaderOncePerBatch) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
-    const NamespaceString nss("test", "coll");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
     cursor.setBatchSize(2);
@@ -192,7 +192,8 @@ TEST_F(DBClientCursorTest, DBClientCursorGetMoreWithTenant) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const TenantId tenantId(OID::gen());
-    const NamespaceString nss(tenantId, "test", "coll");
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(tenantId, "test", "coll");
     FindCommandRequest findCmd{nss};
 
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
@@ -237,7 +238,7 @@ TEST_F(DBClientCursorTest, DBClientCursorHandlesOpMsgExhaustCorrectly) {
 
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
-    const NamespaceString nss("test", "coll");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
     cursor.setBatchSize(0);
@@ -301,7 +302,7 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
 
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
-    const NamespaceString nss("test", "coll");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
     cursor.setBatchSize(0);
@@ -385,7 +386,7 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
 TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionOnNonOKResponse) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
-    const NamespaceString nss("test", "coll");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
     cursor.setBatchSize(0);
@@ -416,7 +417,7 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionOnNonOKResponse) {
 TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionWhenMoreToComeFlagSetWithZeroCursorId) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
-    const NamespaceString nss("test", "coll");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
     cursor.setBatchSize(0);
@@ -449,7 +450,7 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionWhenMoreToComeFlagSe
 TEST_F(DBClientCursorTest, DBClientCursorPassesReadOnceFlag) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
-    const NamespaceString nss("test", "coll");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     findCmd.setReadOnce(true);
     DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
@@ -476,7 +477,7 @@ TEST_F(DBClientCursorTest, DBClientCursorPassesReadOnceFlag) {
 TEST_F(DBClientCursorTest, DBClientCursorPassesResumeFields) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
-    const NamespaceString nss("test", "coll");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     findCmd.setRequestResumeToken(true);
     findCmd.setResumeAfter(BSON("$recordId" << 5LL));
@@ -512,7 +513,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailable) {
 
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
-    const NamespaceString nss("test", "coll");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     findCmd.setTailable(true);
     DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
@@ -606,7 +607,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitData) {
 
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
-    const NamespaceString nss("test", "coll");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     findCmd.setTailable(true);
     findCmd.setAwaitData(true);
@@ -668,7 +669,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitDataExhaust) {
 
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
-    const NamespaceString nss("test", "coll");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     findCmd.setTailable(true);
     findCmd.setAwaitData(true);

@@ -274,7 +274,7 @@ TEST(CursorResponseTest, roundTripThroughCursorResponseBuilderWithPartialResults
     CursorResponseBuilder crb(&builder, options);
     crb.append(testDoc);
     crb.setPartialResultsReturned(true);
-    crb.done(CursorId(123), NamespaceString(boost::none, "db.coll"));
+    crb.done(CursorId(123), NamespaceString::createNamespaceString_forTest(boost::none, "db.coll"));
 
     // Confirm that the resulting BSONObj response matches the expected body.
     auto msg = builder.done();
@@ -312,7 +312,7 @@ TEST(CursorResponseTest,
     CursorResponseBuilder::Options options;
     options.isInitialResponse = true;
     TenantId tid(OID::gen());
-    NamespaceString nss(tid, "db.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "db.coll");
 
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
@@ -382,7 +382,8 @@ TEST(CursorResponseTest, parseFromBSONHandleErrorResponse) {
 
 TEST(CursorResponseTest, toBSONInitialResponse) {
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
-    CursorResponse response(NamespaceString("testdb.testcoll"), CursorId(123), batch);
+    CursorResponse response(
+        NamespaceString::createNamespaceString_forTest("testdb.testcoll"), CursorId(123), batch);
     BSONObj responseObj = response.toBSON(CursorResponse::ResponseType::InitialResponse);
     BSONObj expectedResponse = BSON(
         "cursor" << BSON("id" << CursorId(123) << "ns"
@@ -394,7 +395,8 @@ TEST(CursorResponseTest, toBSONInitialResponse) {
 
 TEST(CursorResponseTest, toBSONSubsequentResponse) {
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
-    CursorResponse response(NamespaceString("testdb.testcoll"), CursorId(123), batch);
+    CursorResponse response(
+        NamespaceString::createNamespaceString_forTest("testdb.testcoll"), CursorId(123), batch);
     BSONObj responseObj = response.toBSON(CursorResponse::ResponseType::SubsequentResponse);
     BSONObj expectedResponse = BSON(
         "cursor" << BSON("id" << CursorId(123) << "ns"
@@ -406,7 +408,7 @@ TEST(CursorResponseTest, toBSONSubsequentResponse) {
 
 TEST(CursorResponseTest, toBSONPartialResultsReturned) {
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
-    CursorResponse response(NamespaceString("testdb.testcoll"),
+    CursorResponse response(NamespaceString::createNamespaceString_forTest("testdb.testcoll"),
                             CursorId(123),
                             batch,
                             boost::none,
@@ -427,7 +429,8 @@ TEST(CursorResponseTest, toBSONPartialResultsReturned) {
 
 TEST(CursorResponseTest, addToBSONInitialResponse) {
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
-    CursorResponse response(NamespaceString("testdb.testcoll"), CursorId(123), batch);
+    CursorResponse response(
+        NamespaceString::createNamespaceString_forTest("testdb.testcoll"), CursorId(123), batch);
 
     BSONObjBuilder builder;
     response.addToBSON(CursorResponse::ResponseType::InitialResponse, &builder);
@@ -443,7 +446,8 @@ TEST(CursorResponseTest, addToBSONInitialResponse) {
 
 TEST(CursorResponseTest, addToBSONSubsequentResponse) {
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
-    CursorResponse response(NamespaceString("testdb.testcoll"), CursorId(123), batch);
+    CursorResponse response(
+        NamespaceString::createNamespaceString_forTest("testdb.testcoll"), CursorId(123), batch);
 
     BSONObjBuilder builder;
     response.addToBSON(CursorResponse::ResponseType::SubsequentResponse, &builder);
@@ -459,7 +463,7 @@ TEST(CursorResponseTest, addToBSONSubsequentResponse) {
 
 TEST(CursorResponseTest, addToBSONInitialResponseWithTenantId) {
     TenantId tid(OID::gen());
-    NamespaceString nss(tid, "testdb.testcoll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "testdb.testcoll");
 
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
@@ -489,8 +493,11 @@ TEST(CursorResponseTest, serializePostBatchResumeToken) {
         ResumeToken::makeHighWaterMarkToken(Timestamp(1, 2), ResumeTokenData::kDefaultTokenVersion)
             .toDocument()
             .toBson();
-    CursorResponse response(
-        NamespaceString("db.coll"), CursorId(123), batch, boost::none, postBatchResumeToken);
+    CursorResponse response(NamespaceString::createNamespaceString_forTest("db.coll"),
+                            CursorId(123),
+                            batch,
+                            boost::none,
+                            postBatchResumeToken);
     auto serialized = response.toBSON(CursorResponse::ResponseType::SubsequentResponse);
     ASSERT_BSONOBJ_EQ(serialized,
                       BSON("cursor" << BSON("id" << CursorId(123) << "ns"

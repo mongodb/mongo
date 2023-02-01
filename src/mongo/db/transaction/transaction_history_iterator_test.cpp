@@ -61,24 +61,24 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 BSONObj docToInsert,
                                 boost::optional<repl::OpTime> prevWriteOpTimeInTransaction) {
     return {repl::DurableOplogEntry(
-        opTime,                           // optime
-        repl::OpTypeEnum::kInsert,        // opType
-        NamespaceString("a.b"),           // namespace
-        boost::none,                      // uuid
-        boost::none,                      // fromMigrate
-        repl::OplogEntry::kOplogVersion,  // version
-        docToInsert,                      // o
-        boost::none,                      // o2
-        {},                               // sessionInfo
-        boost::none,                      // upsert
-        Date_t(),                         // wall clock time
-        {},                               // statement ids
-        prevWriteOpTimeInTransaction,     // optime of previous write within same transaction
-        boost::none,                      // pre-image optime
-        boost::none,                      // post-image optime
-        boost::none,                      // ShardId of resharding recipient
-        boost::none,                      // _id
-        boost::none)};                    // needsRetryImage
+        opTime,                                                 // optime
+        repl::OpTypeEnum::kInsert,                              // opType
+        NamespaceString::createNamespaceString_forTest("a.b"),  // namespace
+        boost::none,                                            // uuid
+        boost::none,                                            // fromMigrate
+        repl::OplogEntry::kOplogVersion,                        // version
+        docToInsert,                                            // o
+        boost::none,                                            // o2
+        {},                                                     // sessionInfo
+        boost::none,                                            // upsert
+        Date_t(),                                               // wall clock time
+        {},                                                     // statement ids
+        prevWriteOpTimeInTransaction,  // optime of previous write within same transaction
+        boost::none,                   // pre-image optime
+        boost::none,                   // post-image optime
+        boost::none,                   // ShardId of resharding recipient
+        boost::none,                   // _id
+        boost::none)};                 // needsRetryImage
 }
 
 }  // namespace

@@ -435,7 +435,9 @@ void FreeMonControllerTest::setUp() {
     collectionOptions.uuid = UUID::gen();
 
     auto statusCC = repl::StorageInterface::get(service)->createCollection(
-        _opCtx.get(), NamespaceString("admin", "system.version"), collectionOptions);
+        _opCtx.get(),
+        NamespaceString::createNamespaceString_forTest("admin", "system.version"),
+        collectionOptions);
     ASSERT_OK(statusCC);
 }
 

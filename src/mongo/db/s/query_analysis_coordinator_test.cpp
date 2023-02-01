@@ -143,9 +143,12 @@ protected:
         }
     }
 
-    const NamespaceString nss0{"testDb", "testColl0"};
-    const NamespaceString nss1{"testDb", "testColl1"};
-    const NamespaceString nss2{"testDb", "testColl2"};
+    const NamespaceString nss0 =
+        NamespaceString::createNamespaceString_forTest("testDb", "testColl0");
+    const NamespaceString nss1 =
+        NamespaceString::createNamespaceString_forTest("testDb", "testColl1");
+    const NamespaceString nss2 =
+        NamespaceString::createNamespaceString_forTest("testDb", "testColl2");
 
     const UUID collUuid0 = UUID::gen();
     const UUID collUuid1 = UUID::gen();

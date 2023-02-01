@@ -81,7 +81,7 @@ protected:
     }
 
     const ShardId testPrimaryShard{"shard0"};
-    const NamespaceString kNamespace{"db1.foo"};
+    const NamespaceString kNamespace = NamespaceString::createNamespaceString_forTest("db1.foo");
 
 private:
     const HostAndPort configHost{"configHost1"};

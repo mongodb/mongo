@@ -43,7 +43,7 @@ TEST(WriteOpsDocSeq, InsertDocStreamWorks) {
     uassertStatusOK(swConn.getStatus());
     auto conn = std::move(swConn.getValue());
 
-    NamespaceString ns("test", "doc_seq");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test", "doc_seq");
     conn->dropCollection(ns);
     ASSERT_EQ(conn->count(ns), 0u);
 

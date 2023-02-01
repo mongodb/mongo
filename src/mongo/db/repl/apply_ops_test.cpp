@@ -139,7 +139,7 @@ TEST_F(ApplyOpsTest, CommandInNestedApplyOpsReturnsSuccess) {
     auto opCtx = cc().makeOperationContext();
     auto mode = OplogApplication::Mode::kApplyOpsCmd;
     BSONObjBuilder resultBuilder;
-    NamespaceString nss("test", "foo");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "foo");
     auto innerCmdObj =
         BSON("op"
              << "c"
@@ -172,7 +172,7 @@ BSONObj makeApplyOpsWithInsertOperation(const NamespaceString& nss,
 TEST_F(ApplyOpsTest, ApplyOpsInsertIntoNonexistentCollectionReturnsNamespaceNotFoundInResult) {
     auto opCtx = cc().makeOperationContext();
     auto mode = OplogApplication::Mode::kApplyOpsCmd;
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     auto documentToInsert = BSON("_id" << 0);
     auto cmdObj = makeApplyOpsWithInsertOperation(nss, boost::none, documentToInsert);
     BSONObjBuilder resultBuilder;
@@ -186,7 +186,7 @@ TEST_F(ApplyOpsTest, ApplyOpsInsertIntoNonexistentCollectionReturnsNamespaceNotF
 TEST_F(ApplyOpsTest, ApplyOpsInsertWithUuidIntoCollectionWithOtherUuid) {
     auto opCtx = cc().makeOperationContext();
     auto mode = OplogApplication::Mode::kApplyOpsCmd;
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
 
     auto applyOpsUuid = UUID::gen();
 
@@ -214,7 +214,7 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
 
     // Test that the 'applyOps' function passes the oplog application mode through correctly to the
     // underlying op application functions.
-    NamespaceString nss("test.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
     auto uuid = UUID::gen();
 
     // Create a collection for us to insert documents into.
@@ -254,18 +254,18 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
 OplogEntry makeOplogEntry(OpTypeEnum opType,
                           const BSONObj& oField,
                           const std::vector<StmtId>& stmtIds = {}) {
-    return {DurableOplogEntry(OpTime(Timestamp(1, 1), 1),  // optime
-                              opType,                      // op type
-                              NamespaceString("a.a"),      // namespace
-                              boost::none,                 // uuid
-                              boost::none,                 // fromMigrate
-                              OplogEntry::kOplogVersion,   // version
-                              oField,                      // o
-                              boost::none,                 // o2
-                              {},                          // sessionInfo
-                              boost::none,                 // upsert
-                              Date_t(),                    // wall clock time
-                              stmtIds,                     // statement ids
+    return {DurableOplogEntry(OpTime(Timestamp(1, 1), 1),                             // optime
+                              opType,                                                 // op type
+                              NamespaceString::createNamespaceString_forTest("a.a"),  // namespace
+                              boost::none,                                            // uuid
+                              boost::none,                                            // fromMigrate
+                              OplogEntry::kOplogVersion,                              // version
+                              oField,                                                 // o
+                              boost::none,                                            // o2
+                              {},                                                     // sessionInfo
+                              boost::none,                                            // upsert
+                              Date_t(),       // wall clock time
+                              stmtIds,        // statement ids
                               boost::none,    // optime of previous write within same transaction
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime
@@ -296,19 +296,19 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsEmptyArrayIfApplyOpsContainsNoOpera
 }
 
 TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps) {
-    NamespaceString ns1("test.a");
+    NamespaceString ns1 = NamespaceString::createNamespaceString_forTest("test.a");
     auto ui1 = UUID::gen();
     auto op1 = BSON("op"
                     << "i"
                     << "ns" << ns1.ns() << "ui" << ui1 << "o" << BSON("_id" << 1));
 
-    NamespaceString ns2("test.b");
+    NamespaceString ns2 = NamespaceString::createNamespaceString_forTest("test.b");
     auto ui2 = UUID::gen();
     auto op2 = BSON("op"
                     << "i"
                     << "ns" << ns2.ns() << "ui" << ui2 << "o" << BSON("_id" << 2));
 
-    NamespaceString ns3("test.c");
+    NamespaceString ns3 = NamespaceString::createNamespaceString_forTest("test.c");
     auto ui3 = UUID::gen();
     auto op3 = BSON("op"
                     << "u"
@@ -371,13 +371,13 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
 }
 
 TEST_F(ApplyOpsTest, ExtractOperationsFromApplyOpsMultiStmtIds) {
-    NamespaceString ns1("test.a");
+    NamespaceString ns1 = NamespaceString::createNamespaceString_forTest("test.a");
     auto ui1 = UUID::gen();
     auto op1 = BSON("op"
                     << "i"
                     << "ns" << ns1.ns() << "ui" << ui1 << "o" << BSON("_id" << 1));
 
-    NamespaceString ns2("test.b");
+    NamespaceString ns2 = NamespaceString::createNamespaceString_forTest("test.b");
     auto ui2 = UUID::gen();
     auto op2 = BSON("op"
                     << "u"
@@ -431,7 +431,7 @@ TEST_F(ApplyOpsTest, ApplyOpsFailsToDropAdmin) {
     auto mode = OplogApplication::Mode::kApplyOpsCmd;
 
     // Create a collection on the admin database.
-    NamespaceString nss("admin.foo");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("admin.foo");
     CollectionOptions options;
     options.uuid = UUID::gen();
     ASSERT_OK(_storage->createCollection(opCtx.get(), nss, options));

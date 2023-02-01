@@ -409,7 +409,7 @@ TEST_F(UpdateRetryTest, NotWritablePrimaryOnceSuccessAfterRetry) {
     HostAndPort host2("TestHost2");
     configTargeter()->setFindHostReturnValue(host1);
 
-    CollectionType collection(NamespaceString("db.coll"),
+    CollectionType collection(NamespaceString::createNamespaceString_forTest("db.coll"),
                               OID::gen(),
                               Timestamp(1, 1),
                               network()->now(),

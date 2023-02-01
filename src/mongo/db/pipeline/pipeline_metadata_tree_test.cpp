@@ -68,7 +68,8 @@ protected:
 
         ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
         auto rawPipeline = parsePipelineFromBSON(inputBson["pipeline"]);
-        NamespaceString testNss("test", "collection");
+        NamespaceString testNss =
+            NamespaceString::createNamespaceString_forTest("test", "collection");
         AggregateCommandRequest request(testNss, rawPipeline);
         getExpCtx()->ns = testNss;
 
@@ -84,7 +85,8 @@ protected:
     }
 
     void introduceCollection(StringData collectionName) {
-        NamespaceString fromNs("test", collectionName);
+        NamespaceString fromNs =
+            NamespaceString::createNamespaceString_forTest("test", collectionName);
         _resolvedNamespaces.insert({fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}});
         getExpCtx()->setResolvedNamespaces(_resolvedNamespaces);
     }
@@ -117,7 +119,9 @@ TEST_F(PipelineMetadataTreeTest, LinearPipelinesConstructProperTrees) {
     ASSERT([&]() {
         auto pipePtr = jsonToPipeline("[{$project: {name: 1}}]");
         return makeTree<TestThing>(
-            {{NamespaceString("test.collection"), initial}}, *pipePtr, ignoreDocumentSourceAddOne);
+            {{NamespaceString::createNamespaceString_forTest("test.collection"), initial}},
+            *pipePtr,
+            ignoreDocumentSourceAddOne);
     }()
                .first.value() == Stage(TestThing{23}, {}, {}));
 
@@ -126,7 +130,9 @@ TEST_F(PipelineMetadataTreeTest, LinearPipelinesConstructProperTrees) {
             "[{$project: {name: 1, status: 1}}, "
             "{$match: {status: \"completed\"}}]");
         return makeTree<TestThing>(
-            {{NamespaceString("test.collection"), initial}}, *pipePtr, ignoreDocumentSourceAddOne);
+            {{NamespaceString::createNamespaceString_forTest("test.collection"), initial}},
+            *pipePtr,
+            ignoreDocumentSourceAddOne);
     }()
                .first.value() == Stage(TestThing{24}, makeUniqueStage(TestThing{23}, {}, {}), {}));
 
@@ -139,7 +145,9 @@ TEST_F(PipelineMetadataTreeTest, LinearPipelinesConstructProperTrees) {
             "{$match: {status: \"completed\"}}, "
             "{$match: {status: \"completed\"}}]");
         return makeTree<TestThing>(
-            {{NamespaceString("test.collection"), initial}}, *pipePtr, ignoreDocumentSourceAddOne);
+            {{NamespaceString::createNamespaceString_forTest("test.collection"), initial}},
+            *pipePtr,
+            ignoreDocumentSourceAddOne);
     }()
                .first.value() ==
            Stage(TestThing{28},
@@ -233,12 +241,13 @@ TEST_F(PipelineMetadataTreeTest, BranchingPipelinesConstructProperTrees) {
             "{$unwind: \"$instr\"}, "
             "{$group: {_id: {PositionID: \"$trade.mvtident\", \"InstrumentReference\": "
             "\"$instr.libelle\"}, NumberOfSecurities: {$sum:\"$trade.quantite\"}}}]");
-        return makeTree<TestThing>({{NamespaceString("test.collection"), {"1"}},
-                                    {NamespaceString("test.folios"), {"2"}},
-                                    {NamespaceString("test.trades"), {"2"}},
-                                    {NamespaceString("test.instruments"), {"2"}}},
-                                   *pipePtr,
-                                   buildRepresentativeString);
+        return makeTree<TestThing>(
+            {{NamespaceString::createNamespaceString_forTest("test.collection"), {"1"}},
+             {NamespaceString::createNamespaceString_forTest("test.folios"), {"2"}},
+             {NamespaceString::createNamespaceString_forTest("test.trades"), {"2"}},
+             {NamespaceString::createNamespaceString_forTest("test.instruments"), {"2"}}},
+            *pipePtr,
+            buildRepresentativeString);
     }()
                .first.value() ==
            Stage(TestThing{"1mpxul[2m]ulu"},
@@ -275,7 +284,9 @@ TEST_F(PipelineMetadataTreeTest, BranchingPipelinesConstructProperTrees) {
             "\"categorizedByYears(Auto)\": [{$bucketAuto: {groupBy: \"$year\", buckets: 2}}]}}, "
             "{$limit: 12}]");
         return makeTree<TestThing>(
-            {{NamespaceString("test.collection"), {""}}}, *pipePtr, buildRepresentativeString);
+            {{NamespaceString::createNamespaceString_forTest("test.collection"), {""}}},
+            *pipePtr,
+            buildRepresentativeString);
     }()
                .first.value() ==
            Stage(TestThing{"f[tugs, tmgs, tb]"},
@@ -349,12 +360,13 @@ TEST_F(PipelineMetadataTreeTest, ZipWalksAPipelineAndTreeInTandemAndInOrder) {
             "{$unwind: \"$instr\"}, "
             "{$group: {_id: {PositionID: \"$trade.mvtident\", \"InstrumentReference\": "
             "\"$instr.libelle\"}, NumberOfSecurities: {$sum:\"$trade.quantite\"}}}]");
-        auto tree = makeTree<TestThing>({{NamespaceString("test.collection"), {}},
-                                         {NamespaceString("test.folios"), {}},
-                                         {NamespaceString("test.trades"), {}},
-                                         {NamespaceString("test.instruments"), {}}},
-                                        *pipePtr,
-                                        takeTypeInfo)
+        auto tree = makeTree<TestThing>(
+                        {{NamespaceString::createNamespaceString_forTest("test.collection"), {}},
+                         {NamespaceString::createNamespaceString_forTest("test.folios"), {}},
+                         {NamespaceString::createNamespaceString_forTest("test.trades"), {}},
+                         {NamespaceString::createNamespaceString_forTest("test.instruments"), {}}},
+                        *pipePtr,
+                        takeTypeInfo)
                         .first;
         zip<TestThing>(&tree.value(), &*pipePtr, tookTypeInfoOrThrow);
         previousStack.pop();
@@ -369,10 +381,11 @@ TEST_F(PipelineMetadataTreeTest, ZipWalksAPipelineAndTreeInTandemAndInOrder) {
             "{$bucket: {groupBy: \"$year\", boundaries: [ 2000, 2010, 2015, 2020]}}], "
             "\"categorizedByYears(Auto)\": [{$bucketAuto: {groupBy: \"$year\", buckets: 2}}]}}, "
             "{$limit: 12}]");
-        auto tree = makeTree<TestThing>({{NamespaceString("test.collection"), {}},
-                                         {NamespaceString("test.collection"), {}}},
-                                        *pipePtr,
-                                        takeTypeInfo)
+        auto tree = makeTree<TestThing>(
+                        {{NamespaceString::createNamespaceString_forTest("test.collection"), {}},
+                         {NamespaceString::createNamespaceString_forTest("test.collection"), {}}},
+                        *pipePtr,
+                        takeTypeInfo)
                         .first;
         zip<TestThing>(&tree.value(), &*pipePtr, tookTypeInfoOrThrow);
         previousStack.pop();
@@ -381,12 +394,13 @@ TEST_F(PipelineMetadataTreeTest, ZipWalksAPipelineAndTreeInTandemAndInOrder) {
 
 TEST_F(PipelineMetadataTreeTest, MakeTreeWithEmptyPipeline) {
     auto pipeline = Pipeline::parse({}, getExpCtx());
-    auto result =
-        makeTree<std::string>({{NamespaceString("unittests.pipeline_test"), std::string("input")}},
-                              *pipeline,
-                              [](const auto&, const auto&, const DocumentSource& source) {
-                                  return std::string("not called");
-                              });
+    auto result = makeTree<std::string>(
+        {{NamespaceString::createNamespaceString_forTest("unittests.pipeline_test"),
+          std::string("input")}},
+        *pipeline,
+        [](const auto&, const auto&, const DocumentSource& source) {
+            return std::string("not called");
+        });
     ASSERT_FALSE(result.first);
     ASSERT_EQ(result.second, "input"_sd);
 }
@@ -397,7 +411,8 @@ TEST_F(PipelineMetadataTreeTest, BranchingPipelineMissesInitialStageContents) {
         "[{$lookup: {from: \"trades\", as: \"trade\", let: {sp: \"sub_positions.ident\"}, "
         "pipeline: [{$match: {$expr: {$eq: [\"$$sp\", \"$opcvm\"]}}}]}}]");
     ASSERT_THROWS_CODE(
-        makeTree<std::string>({{NamespaceString("test.collection"), std::string("input")}},
+        makeTree<std::string>({{NamespaceString::createNamespaceString_forTest("test.collection"),
+                                std::string("input")}},
                               *pipeline,
                               [](const auto&, const auto&, const DocumentSource& source) {
                                   return std::string("not called");

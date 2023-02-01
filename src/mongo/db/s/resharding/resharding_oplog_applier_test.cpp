@@ -345,12 +345,16 @@ protected:
     }
 
     static constexpr int kWriterPoolSize = 4;
-    const NamespaceString kOplogNs{"config.localReshardingOplogBuffer.xxx.yyy"};
-    const NamespaceString kCrudNs{"foo.bar"};
+    const NamespaceString kOplogNs =
+        NamespaceString::createNamespaceString_forTest("config.localReshardingOplogBuffer.xxx.yyy");
+    const NamespaceString kCrudNs = NamespaceString::createNamespaceString_forTest("foo.bar");
     const UUID kCrudUUID = UUID::gen();
-    const NamespaceString kAppliedToNs{"foo", "system.resharding.{}"_format(kCrudUUID.toString())};
-    const NamespaceString kStashNs{"foo", "{}.{}"_format(kCrudNs.coll(), kOplogNs.coll())};
-    const NamespaceString kOtherDonorStashNs{"foo", "{}.{}"_format("otherstash", "otheroplog")};
+    const NamespaceString kAppliedToNs = NamespaceString::createNamespaceString_forTest(
+        "foo", "system.resharding.{}"_format(kCrudUUID.toString()));
+    const NamespaceString kStashNs = NamespaceString::createNamespaceString_forTest(
+        "foo", "{}.{}"_format(kCrudNs.coll(), kOplogNs.coll()));
+    const NamespaceString kOtherDonorStashNs = NamespaceString::createNamespaceString_forTest(
+        "foo", "{}.{}"_format("otherstash", "otheroplog"));
     const std::vector<NamespaceString> kStashCollections{kStashNs, kOtherDonorStashNs};
     const ShardId kMyShardId{"shard1"};
     const ShardId kOtherShardId{"shard2"};

@@ -55,7 +55,8 @@ class ReshardingDonorRecipientCommonInternalsTest : public ShardServerTestFixtur
 public:
     const UUID kExistingUUID = UUID::gen();
     const Timestamp kExistingTimestamp = Timestamp(10, 5);
-    const NamespaceString kOriginalNss = NamespaceString("db", "foo");
+    const NamespaceString kOriginalNss =
+        NamespaceString::createNamespaceString_forTest("db", "foo");
 
     const NamespaceString kTemporaryReshardingNss =
         resharding::constructTemporaryReshardingNss("db", kExistingUUID);
@@ -643,10 +644,10 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
 
 TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMetaDataForActiveOp) {
     OperationContext* opCtx = operationContext();
-    NamespaceString sourceNss1 = NamespaceString("db", "one");
+    NamespaceString sourceNss1 = NamespaceString::createNamespaceString_forTest("db", "one");
     NamespaceString tempReshardingNss1 =
         resharding::constructTemporaryReshardingNss(sourceNss1.db(), UUID::gen());
-    NamespaceString sourceNss2 = NamespaceString("db", "two");
+    NamespaceString sourceNss2 = NamespaceString::createNamespaceString_forTest("db", "two");
     NamespaceString tempReshardingNss2 =
         resharding::constructTemporaryReshardingNss(sourceNss2.db(), UUID::gen());
     ShardId shardId1 = ShardId{"recipient1"};

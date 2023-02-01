@@ -41,7 +41,8 @@
 namespace mongo {
 namespace {
 
-static const NamespaceString nss("testdb.testcoll");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("testdb.testcoll");
 
 using unittest::assertGet;
 

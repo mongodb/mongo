@@ -98,7 +98,7 @@ protected:
 
 private:
     boost::optional<AutoGetCollection> _coll;
-    NamespaceString _nss{"fooDB.barColl"};
+    NamespaceString _nss = NamespaceString::createNamespaceString_forTest("fooDB.barColl");
 };
 
 TEST_F(IndexSignatureTest, CanCreateMultipleIndexesOnSameKeyPatternWithDifferentCollations) {

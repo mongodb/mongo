@@ -42,7 +42,7 @@ class ClusterCommandTestFixture : public CatalogCacheTestFixture {
 protected:
     const size_t numShards = 2;
 
-    const NamespaceString kNss = NamespaceString("test", "coll");
+    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test", "coll");
 
     const LogicalTime kInMemoryLogicalTime = LogicalTime(Timestamp(10, 1));
 

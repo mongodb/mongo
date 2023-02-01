@@ -195,7 +195,7 @@ public:
 
     Status removeEntry(OperationContext* opCtx, StringData collNs, DurableCatalog* catalog) {
         CollectionPtr collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-            opCtx, NamespaceString(collNs));
+            opCtx, NamespaceString::createNamespaceString_forTest(collNs));
         return dynamic_cast<DurableCatalogImpl*>(catalog)->_removeEntry(opCtx,
                                                                         collection->getCatalogId());
     }

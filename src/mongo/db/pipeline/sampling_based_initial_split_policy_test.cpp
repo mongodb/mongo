@@ -321,7 +321,7 @@ TEST_F(SamplingBasedSplitPolicyTest, SamplingSucceedsWithLimitedMemoryForSortOpe
     const int numSamplesPerChunk = 2;
 
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
-    const NamespaceString ns("foo", "bar");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     auto pipelineDocSource =
         SamplingBasedSplitPolicy::makePipelineDocumentSource_forTest(operationContext(),
                                                                      kTestAggregateNss,

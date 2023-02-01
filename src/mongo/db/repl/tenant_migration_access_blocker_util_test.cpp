@@ -222,29 +222,38 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, TestValidateNssBeingMigrated) {
 
     // No tenantId should work for an adminDB.
     tenant_migration_access_blocker::validateNssIsBeingMigrated(
-        boost::none, NamespaceString{NamespaceString::kAdminDb, "test"}, UUID::gen());
+        boost::none,
+        NamespaceString::createNamespaceString_forTest(NamespaceString::kAdminDb, "test"),
+        UUID::gen());
 
     // No tenantId will throw if it's not an adminDB.
     ASSERT_THROWS_CODE(tenant_migration_access_blocker::validateNssIsBeingMigrated(
-                           boost::none, NamespaceString{"foo", "test"}, migrationId),
+                           boost::none,
+                           NamespaceString::createNamespaceString_forTest("foo", "test"),
+                           migrationId),
                        DBException,
                        ErrorCodes::InvalidTenantId);
 
     // A different tenantId will throw.
     ASSERT_THROWS_CODE(tenant_migration_access_blocker::validateNssIsBeingMigrated(
-                           TenantId(OID::gen()), NamespaceString{"foo", "test"}, migrationId),
+                           TenantId(OID::gen()),
+                           NamespaceString::createNamespaceString_forTest("foo", "test"),
+                           migrationId),
                        DBException,
                        ErrorCodes::InvalidTenantId);
 
     // A different migrationId will throw.
-    ASSERT_THROWS_CODE(tenant_migration_access_blocker::validateNssIsBeingMigrated(
-                           kTenantId, NamespaceString{"foo", "test"}, UUID::gen()),
-                       DBException,
-                       ErrorCodes::InvalidTenantId);
+    ASSERT_THROWS_CODE(
+        tenant_migration_access_blocker::validateNssIsBeingMigrated(
+            kTenantId, NamespaceString::createNamespaceString_forTest("foo", "test"), UUID::gen()),
+        DBException,
+        ErrorCodes::InvalidTenantId);
 
     // Finally everything works.
     tenant_migration_access_blocker::validateNssIsBeingMigrated(
-        kTenantId, NamespaceString{NamespaceString::kAdminDb, "test"}, migrationId);
+        kTenantId,
+        NamespaceString::createNamespaceString_forTest(NamespaceString::kAdminDb, "test"),
+        migrationId);
 }
 
 class RecoverAccessBlockerTest : public ServiceContextMongoDTest {

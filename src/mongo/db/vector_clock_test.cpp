@@ -49,7 +49,8 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kDummyNamespaceString("test", "foo");
+const NamespaceString kDummyNamespaceString =
+    NamespaceString::createNamespaceString_forTest("test", "foo");
 
 using VectorClockTest = VectorClockTestFixture;
 

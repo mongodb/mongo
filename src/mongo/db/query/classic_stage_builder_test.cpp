@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-const static NamespaceString kNss("db.dummy");
+const static NamespaceString kNss = NamespaceString::createNamespaceString_forTest("db.dummy");
 
 class ClassicStageBuilderTest : public ServiceContextMongoDTest {
 public:

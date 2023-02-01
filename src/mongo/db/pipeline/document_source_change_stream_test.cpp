@@ -394,7 +394,7 @@ public:
     std::unique_ptr<Pipeline, PipelineDeleter> buildTestPipeline(
         const std::vector<BSONObj>& rawPipeline) {
         auto expCtx = getExpCtx();
-        expCtx->ns = NamespaceString(boost::none, "a.collection");
+        expCtx->ns = NamespaceString::createNamespaceString_forTest(boost::none, "a.collection");
         expCtx->inMongos = true;
 
         auto pipeline = Pipeline::parse(rawPipeline, expCtx);
@@ -601,7 +601,8 @@ TEST_F(ChangeStreamStageTestNoSetup, FailsWithNoReplicationCoordinator) {
 
 TEST_F(ChangeStreamStageTest, CannotCreateStageForSystemCollection) {
     auto expressionContext = getExpCtx();
-    expressionContext->ns = NamespaceString{"db", "system.namespace"};
+    expressionContext->ns =
+        NamespaceString::createNamespaceString_forTest("db", "system.namespace");
     const auto spec = fromjson("{$changeStream: {allowToRunOnSystemNS: false}}");
     ASSERT_THROWS_CODE(DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
@@ -610,7 +611,8 @@ TEST_F(ChangeStreamStageTest, CannotCreateStageForSystemCollection) {
 
 TEST_F(ChangeStreamStageTest, CanCreateStageForSystemCollectionWhenAllowToRunOnSystemNSIsTrue) {
     auto expressionContext = getExpCtx();
-    expressionContext->ns = NamespaceString{"db", "system.namespace"};
+    expressionContext->ns =
+        NamespaceString::createNamespaceString_forTest("db", "system.namespace");
     expressionContext->inMongos = false;
     const auto spec = fromjson("{$changeStream: {allowToRunOnSystemNS: true}}");
     DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx());
@@ -619,7 +621,8 @@ TEST_F(ChangeStreamStageTest, CanCreateStageForSystemCollectionWhenAllowToRunOnS
 TEST_F(ChangeStreamStageTest,
        CannotCreateStageForSystemCollectionWhenAllowToRunOnSystemNSIsTrueAndInMongos) {
     auto expressionContext = getExpCtx();
-    expressionContext->ns = NamespaceString{"db", "system.namespace"};
+    expressionContext->ns =
+        NamespaceString::createNamespaceString_forTest("db", "system.namespace");
     expressionContext->inMongos = true;
     const auto spec = fromjson("{$changeStream: {allowToRunOnSystemNS: true}}");
     ASSERT_THROWS_CODE(DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
@@ -1188,7 +1191,7 @@ TEST_F(ChangeStreamStageTest, TransformCreate) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformRename) {
-    NamespaceString otherColl("test.bar");
+    NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
     OplogEntry rename =
         createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()), testUuid());
 
@@ -1219,7 +1222,7 @@ TEST_F(ChangeStreamStageTest, TransformRename) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformRenameShowExpandedEvents) {
-    NamespaceString otherColl("test.bar");
+    NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
     auto dropTarget = UUID::gen();
     OplogEntry rename = createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()
                                                               << "dropTarget" << dropTarget),
@@ -1257,7 +1260,7 @@ TEST_F(ChangeStreamStageTest, TransformRenameShowExpandedEvents) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformInvalidateFromMigrate) {
-    NamespaceString otherColl("test.bar");
+    NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
 
     bool dropCollFromMigrate = true;
     OplogEntry dropColl =
@@ -1276,7 +1279,7 @@ TEST_F(ChangeStreamStageTest, TransformInvalidateFromMigrate) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformRenameTarget) {
-    NamespaceString otherColl("test.bar");
+    NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
     OplogEntry rename =
         createCommand(BSON("renameCollection" << otherColl.ns() << "to" << nss.ns()), testUuid());
 
@@ -2474,7 +2477,7 @@ TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
     checkTransformation(dropColl, expectedDrop);
 
     // Test the 'clusterTime' field is copied from the oplog entry for a collection rename.
-    NamespaceString otherColl("test.bar");
+    NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
     OplogEntry rename =
         createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()),
                       testUuid(),
@@ -2871,7 +2874,8 @@ TEST_F(ChangeStreamStageTest, ResumeAfterFailsIfResumeTokenDoesNotContainUUID) {
 
 TEST_F(ChangeStreamStageTest, RenameFromSystemToUserCollectionShouldIncludeNotification) {
     // Renaming to a non-system collection will include a notification in the stream.
-    NamespaceString systemColl(nss.db() + ".system.users");
+    NamespaceString systemColl =
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "system.users");
     OplogEntry rename =
         createCommand(BSON("renameCollection" << systemColl.ns() << "to" << nss.ns()), testUuid());
 
@@ -2891,7 +2895,8 @@ TEST_F(ChangeStreamStageTest, RenameFromSystemToUserCollectionShouldIncludeNotif
 
 TEST_F(ChangeStreamStageTest, RenameFromUserToSystemCollectionShouldIncludeNotification) {
     // Renaming to a system collection will include a notification in the stream.
-    NamespaceString systemColl(nss.db() + ".system.users");
+    NamespaceString systemColl =
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "system.users");
     OplogEntry rename =
         createCommand(BSON("renameCollection" << nss.ns() << "to" << systemColl.ns()), testUuid());
 
@@ -3018,7 +3023,8 @@ TEST_F(ChangeStreamStageDBTest, TransformInsertShowExpandedEvents) {
 }
 
 TEST_F(ChangeStreamStageDBTest, InsertOnOtherCollections) {
-    NamespaceString otherNss("unittests.other_collection.");
+    NamespaceString otherNss =
+        NamespaceString::createNamespaceString_forTest("unittests.other_collection.");
     auto insertOtherColl = makeOplogEntry(OpTypeEnum::kInsert,
                                           otherNss,
                                           BSON("_id" << 1 << "x" << 2),
@@ -3044,13 +3050,13 @@ TEST_F(ChangeStreamStageDBTest, InsertOnOtherCollections) {
 TEST_F(ChangeStreamStageDBTest, MatchFiltersChangesOnOtherDatabases) {
     std::set<NamespaceString> unmatchedNamespaces = {
         // Namespace starts with the db name, but is longer.
-        NamespaceString("unittests2.coll"),
+        NamespaceString::createNamespaceString_forTest("unittests2.coll"),
         // Namespace contains the db name, but not at the front.
-        NamespaceString("test.unittests"),
+        NamespaceString::createNamespaceString_forTest("test.unittests"),
         // Namespace contains the db name + dot.
-        NamespaceString("test.unittests.coll"),
+        NamespaceString::createNamespaceString_forTest("test.unittests.coll"),
         // Namespace contains the db name + dot but is followed by $.
-        NamespaceString("unittests.$cmd"),
+        NamespaceString::createNamespaceString_forTest("unittests.$cmd"),
     };
 
     // Insert into another database.
@@ -3061,28 +3067,28 @@ TEST_F(ChangeStreamStageDBTest, MatchFiltersChangesOnOtherDatabases) {
 }
 
 TEST_F(ChangeStreamStageDBTest, MatchFiltersAllSystemDotCollections) {
-    auto nss = NamespaceString("unittests.system.coll");
+    auto nss = NamespaceString::createNamespaceString_forTest("unittests.system.coll");
     auto insert = makeOplogEntry(OpTypeEnum::kInsert, nss, BSON("_id" << 1));
     checkTransformation(insert, boost::none);
 
-    nss = NamespaceString("unittests.system.users");
+    nss = NamespaceString::createNamespaceString_forTest("unittests.system.users");
     insert = makeOplogEntry(OpTypeEnum::kInsert, nss, BSON("_id" << 1));
     checkTransformation(insert, boost::none);
 
-    nss = NamespaceString("unittests.system.roles");
+    nss = NamespaceString::createNamespaceString_forTest("unittests.system.roles");
     insert = makeOplogEntry(OpTypeEnum::kInsert, nss, BSON("_id" << 1));
     checkTransformation(insert, boost::none);
 
-    nss = NamespaceString("unittests.system.keys");
+    nss = NamespaceString::createNamespaceString_forTest("unittests.system.keys");
     insert = makeOplogEntry(OpTypeEnum::kInsert, nss, BSON("_id" << 1));
     checkTransformation(insert, boost::none);
 }
 
 TEST_F(ChangeStreamStageDBTest, TransformsEntriesForLegalClientCollectionsWithSystem) {
     std::set<NamespaceString> allowedNamespaces = {
-        NamespaceString("unittests.coll.system"),
-        NamespaceString("unittests.coll.system.views"),
-        NamespaceString("unittests.systemx"),
+        NamespaceString::createNamespaceString_forTest("unittests.coll.system"),
+        NamespaceString::createNamespaceString_forTest("unittests.coll.system.views"),
+        NamespaceString::createNamespaceString_forTest("unittests.systemx"),
     };
 
     for (auto& ns : allowedNamespaces) {
@@ -3260,7 +3266,7 @@ TEST_F(ChangeStreamStageDBTest, TransformDrop) {
 }
 
 TEST_F(ChangeStreamStageDBTest, TransformRename) {
-    NamespaceString otherColl("test.bar");
+    NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
     OplogEntry rename =
         createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()), testUuid());
 
@@ -3333,7 +3339,8 @@ TEST_F(ChangeStreamStageDBTest, TransformDropDatabaseShowExpandedEvents) {
 }
 
 TEST_F(ChangeStreamStageDBTest, MatchFiltersOperationsOnSystemCollections) {
-    NamespaceString systemColl(nss.db() + ".system.users");
+    NamespaceString systemColl =
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "system.users");
     OplogEntry insert = makeOplogEntry(OpTypeEnum::kInsert, systemColl, BSON("_id" << 1));
     checkTransformation(insert, boost::none);
 
@@ -3350,8 +3357,10 @@ TEST_F(ChangeStreamStageDBTest, MatchFiltersOperationsOnSystemCollections) {
 
 TEST_F(ChangeStreamStageDBTest, RenameFromSystemToUserCollectionShouldIncludeNotification) {
     // Renaming to a non-system collection will include a notification in the stream.
-    NamespaceString systemColl(nss.db() + ".system.users");
-    NamespaceString renamedColl(nss.db() + ".non_system_coll");
+    NamespaceString systemColl =
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "system.users");
+    NamespaceString renamedColl =
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "non_system_coll");
     OplogEntry rename = createCommand(
         BSON("renameCollection" << systemColl.ns() << "to" << renamedColl.ns()), testUuid());
 
@@ -3372,7 +3381,8 @@ TEST_F(ChangeStreamStageDBTest, RenameFromSystemToUserCollectionShouldIncludeNot
 
 TEST_F(ChangeStreamStageDBTest, RenameFromUserToSystemCollectionShouldIncludeNotification) {
     // Renaming to a system collection will include a notification in the stream.
-    NamespaceString systemColl(nss.db() + ".system.users");
+    NamespaceString systemColl =
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "system.users");
     OplogEntry rename =
         createCommand(BSON("renameCollection" << nss.ns() << "to" << systemColl.ns()), testUuid());
 

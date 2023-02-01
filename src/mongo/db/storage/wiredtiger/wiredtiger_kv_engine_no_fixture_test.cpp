@@ -164,7 +164,7 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
     auto client = serviceContext->makeClient("myclient");
     auto opCtx = serviceContext->makeOperationContext(client.get());
 
-    NamespaceString nss("test.t");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     StringData ident("rollback_to_stable40");
     CollectionOptions collectionOptions;
     auto keyFormat = KeyFormat::Long;

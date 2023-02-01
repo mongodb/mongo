@@ -43,7 +43,8 @@ TEST_F(CreateIndexesTest, CreateIndexesFailsWhenIndexBuildsCollectionIsMissing) 
     ASSERT_OK(
         storageInterface()->dropCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace));
 
-    NamespaceString nss("unittests.timestampMultiIndexBuilds");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittests.timestampMultiIndexBuilds");
 
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, {}));
 

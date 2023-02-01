@@ -70,7 +70,7 @@ TEST(BatchedCommandResponseTest, Basic) {
 TEST(BatchedCommandResponseTest, StaleConfigInfo) {
     OID epoch = OID::gen();
 
-    StaleConfigInfo staleInfo(NamespaceString("TestDB.TestColl"),
+    StaleConfigInfo staleInfo(NamespaceString::createNamespaceString_forTest("TestDB.TestColl"),
                               ShardVersion(ChunkVersion({epoch, Timestamp(100, 0)}, {1, 0}),
                                            boost::optional<CollectionIndexes>(boost::none)),
                               ShardVersion(ChunkVersion({epoch, Timestamp(100, 0)}, {2, 0}),
@@ -166,7 +166,8 @@ TEST(BatchedCommandResponseTest, CompatibilityFromWriteErrorToBatchCommandRespon
     reply.getWriteCommandReplyBase().setN(1);
     reply.getWriteCommandReplyBase().setWriteErrors(std::vector<write_ops::WriteError>{
         write_ops::WriteError(1,
-                              Status(StaleConfigInfo(NamespaceString("TestDB", "TestColl"),
+                              Status(StaleConfigInfo(NamespaceString::createNamespaceString_forTest(
+                                                         "TestDB", "TestColl"),
                                                      versionReceived,
                                                      boost::none,
                                                      ShardId("TestShard")),

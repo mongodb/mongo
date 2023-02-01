@@ -334,13 +334,17 @@ protected:
         return ChangeStreamPreImage::parse(IDLParserContext("pre-image"), *container);
     }
 
-    const NamespaceString nss{TenantId(OID::gen()), "testDB", "testColl"};
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(TenantId(OID::gen()), "testDB", "testColl");
     const UUID uuid{UUID::gen()};
-    const NamespaceString nss1{TenantId(OID::gen()), "testDB1", "testColl1"};
+    const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest(
+        TenantId(OID::gen()), "testDB1", "testColl1");
     const UUID uuid1{UUID::gen()};
-    const NamespaceString nss2{TenantId(OID::gen()), "testDB2", "testColl2"};
+    const NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(
+        TenantId(OID::gen()), "testDB2", "testColl2");
     const UUID uuid2{UUID::gen()};
-    const NamespaceString nss3{boost::none, "testDB3", "testColl3"};
+    const NamespaceString nss3 =
+        NamespaceString::createNamespaceString_forTest(boost::none, "testDB3", "testColl3");
     const UUID uuid3{UUID::gen()};
 
     const std::string kTenantId = OID::gen().toString();
@@ -364,7 +368,7 @@ TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
     OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
     auto uuid = UUID::gen();
-    NamespaceString nss(boost::none, "test.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "test.coll");
     UUID indexBuildUUID = UUID::gen();
 
     BSONObj specX = BSON("key" << BSON("x" << 1) << "name"
@@ -404,7 +408,7 @@ TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
     OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
     auto uuid = UUID::gen();
-    NamespaceString nss(boost::none, "test.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "test.coll");
     UUID indexBuildUUID = UUID::gen();
 
     BSONObj specX = BSON("key" << BSON("x" << 1) << "name"
@@ -444,7 +448,7 @@ TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
     OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
     auto uuid = UUID::gen();
-    NamespaceString nss(boost::none, "test.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "test.coll");
     UUID indexBuildUUID = UUID::gen();
 
     BSONObj specX = BSON("key" << BSON("x" << 1) << "name"
@@ -495,7 +499,7 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
     auto uuid = UUID::gen();
 
     // Create 'collMod' command.
-    NamespaceString nss(boost::none, "test.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "test.coll");
     BSONObj collModCmd = BSON("collMod" << nss.coll() << "validationLevel"
                                         << "off"
                                         << "validationAction"
@@ -555,7 +559,7 @@ TEST_F(OpObserverTest, CollModWithOnlyCollectionOptions) {
     auto uuid = UUID::gen();
 
     // Create 'collMod' command.
-    NamespaceString nss(boost::none, "test.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "test.coll");
     BSONObj collModCmd = BSON("collMod" << nss.coll() << "validationLevel"
                                         << "off"
                                         << "validationAction"
@@ -597,7 +601,7 @@ TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
     auto uuid = UUID::gen();
 
     // Create 'drop' command.
-    NamespaceString nss(boost::none, "test.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "test.coll");
     auto dropCmd = BSON("drop" << nss.coll());
 
     // Write to the oplog.
@@ -631,7 +635,7 @@ TEST_F(OpObserverTest, OnDropCollectionInlcudesTenantId) {
 
     // Create 'drop' command.
     TenantId tid{TenantId(OID::gen())};
-    NamespaceString nss(tid, "test.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "test.coll");
     auto dropCmd = BSON("drop" << nss.coll());
 
     // Write to the oplog.
@@ -655,8 +659,10 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
     auto uuid = UUID::gen();
     auto dropTargetUuid = UUID::gen();
     auto stayTemp = false;
-    NamespaceString sourceNss(boost::none, "test.foo");
-    NamespaceString targetNss(boost::none, "test.bar");
+    NamespaceString sourceNss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test.foo");
+    NamespaceString targetNss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test.bar");
 
     // Write to the oplog.
     repl::OpTime renameOpTime;
@@ -693,8 +699,8 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
     auto dropTargetUuid = UUID::gen();
     auto stayTemp = false;
     auto tid{TenantId(OID::gen())};  // rename should not occur across tenants
-    NamespaceString sourceNss(tid, "test.foo");
-    NamespaceString targetNss(tid, "test.bar");
+    NamespaceString sourceNss = NamespaceString::createNamespaceString_forTest(tid, "test.foo");
+    NamespaceString targetNss = NamespaceString::createNamespaceString_forTest(tid, "test.bar");
 
     // Write to the oplog.
     {
@@ -729,8 +735,8 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOn) {
     auto dropTargetUuid = UUID::gen();
     auto stayTemp = false;
     auto tid{TenantId(OID::gen())};  // rename should not occur across tenants
-    NamespaceString sourceNss(tid, "test.foo");
-    NamespaceString targetNss(tid, "test.bar");
+    NamespaceString sourceNss = NamespaceString::createNamespaceString_forTest(tid, "test.foo");
+    NamespaceString targetNss = NamespaceString::createNamespaceString_forTest(tid, "test.bar");
 
     // Write to the oplog.
     {
@@ -761,8 +767,10 @@ TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsN
 
     auto uuid = UUID::gen();
     auto stayTemp = true;
-    NamespaceString sourceNss(boost::none, "test.foo");
-    NamespaceString targetNss(boost::none, "test.bar");
+    NamespaceString sourceNss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test.foo");
+    NamespaceString targetNss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test.bar");
 
     // Write to the oplog.
     {
@@ -802,7 +810,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
     auto opCtx = cc().makeOperationContext();
 
     auto importUUID = UUID::gen();
-    NamespaceString nss(boost::none, "test.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "test.coll");
     long long numRecords = 1;
     long long dataSize = 2;
     // A dummy invalid catalog entry. We do not need a valid catalog entry for this test.
@@ -845,7 +853,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntryIncludesTenantId) {
 
     auto importUUID = UUID::gen();
     TenantId tid{TenantId(OID::gen())};
-    NamespaceString nss(tid, "test.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "test.coll");
     long long numRecords = 1;
     long long dataSize = 2;
     // A dummy invalid catalog entry. We do not need a valid catalog entry for this test.
@@ -1010,7 +1018,8 @@ public:
 
 TEST_F(OpObserverSessionCatalogRollbackTest,
        OnRollbackDoesntInvalidateSessionCatalogIfNoSessionOpsRolledBack) {
-    const NamespaceString nss(boost::none, "testDB", "testColl");
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "testDB", "testColl");
 
     auto sessionId = makeLogicalSessionIdForTest();
 
@@ -2050,7 +2059,8 @@ public:
 
 protected:
     void testRetryableFindAndModifyUpdateRequestingPostImageHasNeedsRetryImage() {
-        NamespaceString nss = {boost::none /* tenantId */, "test", "coll"};
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+            boost::none /* tenantId */, "test", "coll");
         const auto criteria = BSON("_id" << 0);
         const auto preImageDoc = criteria;
         CollectionUpdateArgs updateArgs{preImageDoc};
@@ -2082,7 +2092,8 @@ protected:
     }
 
     void testRetryableFindAndModifyUpdateRequestingPreImageHasNeedsRetryImage() {
-        NamespaceString nss = {boost::none, "test", "coll"};
+        NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
         const auto criteria = BSON("_id" << 0);
         const auto preImageDoc = BSON("_id" << 0 << "data"
                                             << "y");
@@ -2137,7 +2148,8 @@ protected:
         finish();
     }
 
-    NamespaceString nss = {boost::none, "test", "coll"};
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     UUID uuid = UUID::gen();
 
     virtual void commit() = 0;
@@ -2452,7 +2464,8 @@ protected:
         {kFaMPost, kChangeStreamImagesEnabled, kNotRetryable, 1},
         {kFaMPost, kChangeStreamImagesEnabled, kRecordInSideCollection, 1}};
 
-    const NamespaceString _nss{boost::none, "test", "coll"};
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     const UUID _uuid = UUID::gen();
 
     const BSONObj kCriteria = BSON("_id" << 0);
@@ -2694,8 +2707,10 @@ protected:
     // See maxNumberOfBatchedOperationsInSingleOplogEntry and
     // maxSizeOfBatchedOperationsInSingleOplogEntryBytes.
     static const int maxDeleteOpsInBatch = 202000;
-    const NamespaceString _nss{boost::none, "test", "coll"};
-    const NamespaceString _nssWithTid{TenantId(OID::gen()), "test", "coll"};
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    const NamespaceString _nssWithTid =
+        NamespaceString::createNamespaceString_forTest(TenantId(OID::gen()), "test", "coll");
 };
 
 // Verifies that a WriteUnitOfWork with groupOplogEntries=true replicates its writes as a single
@@ -3149,7 +3164,8 @@ protected:
                                        {kChangeStreamImagesEnabled, kNotRetryable, 1},
                                        {kChangeStreamImagesEnabled, kRecordInSideCollection, 1}};
 
-    const NamespaceString _nss{boost::none, "test", "coll"};
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     const UUID _uuid = UUID::gen();
     const BSONObj _deletedDoc = BSON("_id" << 0 << "valuePriorToDelete"
                                            << "marvelous");

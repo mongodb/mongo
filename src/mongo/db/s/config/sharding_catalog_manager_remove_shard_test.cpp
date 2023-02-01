@@ -230,7 +230,7 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
 
     setupShards(std::vector<ShardType>{shard1, shard2});
     setupDatabase("testDB", shard1.getName());
-    setupCollection(NamespaceString("testDB.testColl"),
+    setupCollection(NamespaceString::createNamespaceString_forTest("testDB.testColl"),
                     kKeyPattern,
                     std::vector<ChunkType>{chunk1, chunk2, chunk3});
 
@@ -313,7 +313,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
 
     setupShards(std::vector<ShardType>{shard1, shard2});
     setupDatabase("testDB", shard2.getName());
-    setupCollection(NamespaceString("testDB.testColl"),
+    setupCollection(NamespaceString::createNamespaceString_forTest("testDB.testColl"),
                     kKeyPattern,
                     std::vector<ChunkType>{chunk1, chunk2, chunk3});
 

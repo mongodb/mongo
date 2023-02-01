@@ -1792,7 +1792,7 @@ TEST_F(TxnAPITest, CommitAfterTransientErrorAfterRetryCommitUsesOriginalWriteCon
 }
 
 TEST_F(TxnAPITest, TestExhaustiveFindWithSingleBatch) {
-    FindCommandRequest findCommand(NamespaceString("foo.bar"));
+    FindCommandRequest findCommand(NamespaceString::createNamespaceString_forTest("foo.bar"));
     findCommand.setBatchSize(1);
     findCommand.setSingleBatch(true);
 
@@ -1817,7 +1817,7 @@ TEST_F(TxnAPITest, TestExhaustiveFindWithSingleBatch) {
 }
 
 TEST_F(TxnAPITest, TestExhaustiveFindWithMultipleBatches) {
-    FindCommandRequest findCommand(NamespaceString("foo.bar"));
+    FindCommandRequest findCommand(NamespaceString::createNamespaceString_forTest("foo.bar"));
     findCommand.setBatchSize(1);
     findCommand.setSingleBatch(false);
 
@@ -1850,7 +1850,7 @@ TEST_F(TxnAPITest, TestExhaustiveFindWithMultipleBatches) {
 }
 
 TEST_F(TxnAPITest, TestExhaustiveFindErrorOnFind) {
-    FindCommandRequest findCommand(NamespaceString("foo.bar"));
+    FindCommandRequest findCommand(NamespaceString::createNamespaceString_forTest("foo.bar"));
     findCommand.setBatchSize(1);
     findCommand.setSingleBatch(true);
 
@@ -1875,7 +1875,7 @@ TEST_F(TxnAPITest, TestExhaustiveFindErrorOnFind) {
 }
 
 TEST_F(TxnAPITest, TestExhaustiveFindErrorOnGetMore) {
-    FindCommandRequest findCommand(NamespaceString("foo.bar"));
+    FindCommandRequest findCommand(NamespaceString::createNamespaceString_forTest("foo.bar"));
     findCommand.setBatchSize(2);
     findCommand.setSingleBatch(false);
 
@@ -2031,16 +2031,20 @@ TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadlineAndIgnoresDefaultR
 }
 
 TEST_F(TxnAPITest, CannotBeUsedWithinShardedOperationsIfClientDoesNotSupportIt) {
-    OperationShardingState::setShardRole(
-        opCtx(), NamespaceString("foo.bar"), ShardVersion(), boost::none);
+    OperationShardingState::setShardRole(opCtx(),
+                                         NamespaceString::createNamespaceString_forTest("foo.bar"),
+                                         ShardVersion(),
+                                         boost::none);
 
     ASSERT_THROWS_CODE(
         resetTxnWithRetries(), DBException, ErrorCodes::duplicateCodeForTest(6638800));
 }
 
 TEST_F(TxnAPITest, CanBeUsedWithinShardedOperationsIfClientSupportsIt) {
-    OperationShardingState::setShardRole(
-        opCtx(), NamespaceString("foo.bar"), ShardVersion(), boost::none);
+    OperationShardingState::setShardRole(opCtx(),
+                                         NamespaceString::createNamespaceString_forTest("foo.bar"),
+                                         ShardVersion(),
+                                         boost::none);
 
     // Should not throw.
     resetTxnWithRetriesWithClient(std::make_unique<MockClusterOperationTransactionClient>());

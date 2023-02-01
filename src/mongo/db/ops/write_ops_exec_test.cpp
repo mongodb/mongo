@@ -111,7 +111,8 @@ TEST_F(WriteOpsExecTest, TestDeleteSizeEstimationLogic) {
 }
 
 TEST_F(WriteOpsExecTest, PerformAtomicTimeseriesWritesWithTransform) {
-    NamespaceString ns{"db_write_ops_exec_test", "ts"};
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "ts");
     auto opCtx = operationContext();
     ASSERT_OK(createCollection(opCtx,
                                ns.dbName(),

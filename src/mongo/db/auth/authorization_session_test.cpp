@@ -134,12 +134,12 @@ public:
         }
         rolesBSON.doneFast();
 
-        return managerState->insert(_opCtx.get(),
-                                    NamespaceString(username.getTenant(),
-                                                    NamespaceString::kAdminDb,
-                                                    NamespaceString::kSystemUsers),
-                                    userDoc.obj(),
-                                    {});
+        return managerState->insert(
+            _opCtx.get(),
+            NamespaceString::createNamespaceString_forTest(
+                username.getTenant(), NamespaceString::kAdminDb, NamespaceString::kSystemUsers),
+            userDoc.obj(),
+            {});
     }
 
     void assertLogout(const ResourcePattern& resource, ActionType action) {
@@ -197,9 +197,9 @@ protected:
     BSONObj credentials;
 };
 
-const NamespaceString testFooNss("test.foo");
-const NamespaceString testBarNss("test.bar");
-const NamespaceString testQuxNss("test.qux");
+const NamespaceString testFooNss = NamespaceString::createNamespaceString_forTest("test.foo");
+const NamespaceString testBarNss = NamespaceString::createNamespaceString_forTest("test.bar");
+const NamespaceString testQuxNss = NamespaceString::createNamespaceString_forTest("test.qux");
 
 const ResourcePattern testDBResource(ResourcePattern::forDatabaseName("test"));
 const ResourcePattern otherDBResource(ResourcePattern::forDatabaseName("other"));
@@ -207,24 +207,24 @@ const ResourcePattern adminDBResource(ResourcePattern::forDatabaseName("admin"))
 const ResourcePattern testFooCollResource(ResourcePattern::forExactNamespace(testFooNss));
 const ResourcePattern testBarCollResource(ResourcePattern::forExactNamespace(testBarNss));
 const ResourcePattern testQuxCollResource(ResourcePattern::forExactNamespace(testQuxNss));
-const ResourcePattern otherFooCollResource(
-    ResourcePattern::forExactNamespace(NamespaceString("other.foo")));
-const ResourcePattern thirdFooCollResource(
-    ResourcePattern::forExactNamespace(NamespaceString("third.foo")));
-const ResourcePattern adminFooCollResource(
-    ResourcePattern::forExactNamespace(NamespaceString("admin.foo")));
-const ResourcePattern testUsersCollResource(
-    ResourcePattern::forExactNamespace(NamespaceString("test.system.users")));
-const ResourcePattern otherUsersCollResource(
-    ResourcePattern::forExactNamespace(NamespaceString("other.system.users")));
-const ResourcePattern thirdUsersCollResource(
-    ResourcePattern::forExactNamespace(NamespaceString("third.system.users")));
-const ResourcePattern testProfileCollResource(
-    ResourcePattern::forExactNamespace(NamespaceString("test.system.profile")));
-const ResourcePattern otherProfileCollResource(
-    ResourcePattern::forExactNamespace(NamespaceString("other.system.profile")));
-const ResourcePattern thirdProfileCollResource(
-    ResourcePattern::forExactNamespace(NamespaceString("third.system.profile")));
+const ResourcePattern otherFooCollResource(ResourcePattern::forExactNamespace(
+    NamespaceString::createNamespaceString_forTest("other.foo")));
+const ResourcePattern thirdFooCollResource(ResourcePattern::forExactNamespace(
+    NamespaceString::createNamespaceString_forTest("third.foo")));
+const ResourcePattern adminFooCollResource(ResourcePattern::forExactNamespace(
+    NamespaceString::createNamespaceString_forTest("admin.foo")));
+const ResourcePattern testUsersCollResource(ResourcePattern::forExactNamespace(
+    NamespaceString::createNamespaceString_forTest("test.system.users")));
+const ResourcePattern otherUsersCollResource(ResourcePattern::forExactNamespace(
+    NamespaceString::createNamespaceString_forTest("other.system.users")));
+const ResourcePattern thirdUsersCollResource(ResourcePattern::forExactNamespace(
+    NamespaceString::createNamespaceString_forTest("third.system.users")));
+const ResourcePattern testProfileCollResource(ResourcePattern::forExactNamespace(
+    NamespaceString::createNamespaceString_forTest("test.system.profile")));
+const ResourcePattern otherProfileCollResource(ResourcePattern::forExactNamespace(
+    NamespaceString::createNamespaceString_forTest("other.system.profile")));
+const ResourcePattern thirdProfileCollResource(ResourcePattern::forExactNamespace(
+    NamespaceString::createNamespaceString_forTest("third.system.profile")));
 
 const UserName kUser1Test("user1"_sd, "test"_sd);
 const UserRequest kUser1TestRequest(kUser1Test, boost::none);
@@ -295,7 +295,8 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kAdminAdminRequest, boost::none));
 
     ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
-        ResourcePattern::forExactNamespace(NamespaceString("anydb.somecollection")),
+        ResourcePattern::forExactNamespace(
+            NamespaceString::createNamespaceString_forTest("anydb.somecollection")),
         ActionType::insert));
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(otherDBResource, ActionType::insert));
@@ -327,7 +328,8 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
         std::initializer_list<Privilege>{
             Privilege(ResourcePattern::forDatabaseName("ignored"),
                       {ActionType::insert, ActionType::dbStats}),
-            Privilege(ResourcePattern::forExactNamespace(NamespaceString("ignored.ignored")),
+            Privilege(ResourcePattern::forExactNamespace(
+                          NamespaceString::createNamespaceString_forTest("ignored.ignored")),
                       {ActionType::insert, ActionType::collMod}),
         });
 
@@ -1397,7 +1399,8 @@ TEST_F(AuthorizationSessionTest, ExpiredSessionWithReauth) {
 
     // Check that explicit logout from an expired connection works as expected.
     authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
-    assertLogout(ResourcePattern::forExactNamespace(NamespaceString("anydb.somecollection")),
+    assertLogout(ResourcePattern::forExactNamespace(
+                     NamespaceString::createNamespaceString_forTest("anydb.somecollection")),
                  ActionType::insert);
 }
 
@@ -1442,12 +1445,14 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
     // Assert that a connection-based user with an expiration policy can be authorized after token
     // logout.
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), adminUserRequest, expirationTime));
-    assertActive(ResourcePattern::forExactNamespace(NamespaceString("anydb.somecollection")),
+    assertActive(ResourcePattern::forExactNamespace(
+                     NamespaceString::createNamespaceString_forTest("anydb.somecollection")),
                  ActionType::insert);
 
     // Check that logout proceeds normally.
     authzSession->logoutDatabase(_client.get(), "admin", "Kill the test!");
-    assertLogout(ResourcePattern::forExactNamespace(NamespaceString("anydb.somecollection")),
+    assertLogout(ResourcePattern::forExactNamespace(
+                     NamespaceString::createNamespaceString_forTest("anydb.somecollection")),
                  ActionType::insert);
 }
 
@@ -1471,18 +1476,24 @@ protected:
 };
 
 const ResourcePattern SystemBucketsTest::testMissingSystemBucketResource(
-    ResourcePattern::forExactNamespace(NamespaceString("sb_db_test.sb_coll_test")));
+    ResourcePattern::forExactNamespace(
+        NamespaceString::createNamespaceString_forTest("sb_db_test.sb_coll_test")));
 const ResourcePattern SystemBucketsTest::otherMissingSystemBucketResource(
-    ResourcePattern::forExactNamespace(NamespaceString("sb_db_test.sb_coll_other")));
+    ResourcePattern::forExactNamespace(
+        NamespaceString::createNamespaceString_forTest("sb_db_test.sb_coll_other")));
 const ResourcePattern SystemBucketsTest::otherDbMissingSystemBucketResource(
-    ResourcePattern::forExactNamespace(NamespaceString("sb_db_other.sb_coll_test")));
+    ResourcePattern::forExactNamespace(
+        NamespaceString::createNamespaceString_forTest("sb_db_other.sb_coll_test")));
 
 const ResourcePattern SystemBucketsTest::testSystemBucketResource(
-    ResourcePattern::forExactNamespace(NamespaceString("sb_db_test.system.buckets.sb_coll_test")));
+    ResourcePattern::forExactNamespace(
+        NamespaceString::createNamespaceString_forTest("sb_db_test.system.buckets.sb_coll_test")));
 const ResourcePattern SystemBucketsTest::otherSystemBucketResource(
-    ResourcePattern::forExactNamespace(NamespaceString("sb_db_test.system.buckets.sb_coll_other")));
+    ResourcePattern::forExactNamespace(
+        NamespaceString::createNamespaceString_forTest("sb_db_test.system.buckets.sb_coll_other")));
 const ResourcePattern SystemBucketsTest::otherDbSystemBucketResource(
-    ResourcePattern::forExactNamespace(NamespaceString("sb_db_other.system.buckets.sb_coll_test")));
+    ResourcePattern::forExactNamespace(
+        NamespaceString::createNamespaceString_forTest("sb_db_other.system.buckets.sb_coll_test")));
 
 const ResourcePattern SystemBucketsTest::testBucketResource(
     ResourcePattern::forExactSystemBucketsCollection("sb_db_test", "sb_coll_test"));

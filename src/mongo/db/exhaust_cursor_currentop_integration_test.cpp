@@ -51,7 +51,8 @@ const auto parallelWaitTimeoutMS = stdx::chrono::milliseconds(5 * 60 * 1000);
 // Obtain a pointer to the global system clock. Used to enforce timeouts in the parallel thread.
 auto* const clock = SystemClockSource::get();
 
-const NamespaceString testNSS{"exhaust_cursor_currentop.testColl"};
+const NamespaceString testNSS =
+    NamespaceString::createNamespaceString_forTest("exhaust_cursor_currentop.testColl");
 
 const StringData testAppName = "curop_exhaust_cursor_test";
 std::unique_ptr<DBClientBase> connect(StringData appName = testAppName) {

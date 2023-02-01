@@ -52,7 +52,8 @@ TEST(ConfigSvrMergeChunks, BasicValidConfigCommand) {
              << "shard0000"
              << "$db"
              << "admin"));
-    ASSERT_EQ(NamespaceString("TestDB", "TestColl"), request.getCommandParameter());
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
+              request.getCommandParameter());
     ASSERT_TRUE(collUUID == request.getCollectionUUID());
     ASSERT_TRUE(chunkRange == request.getChunkRange());
     ASSERT_EQ("shard0000", request.getShard().toString());

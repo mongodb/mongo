@@ -44,7 +44,7 @@ TEST(NamespaceStringUtilTest, SerializeMultitenancySupportOnFeatureFlagRequireTe
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     TenantId tenantId(OID::gen());
-    NamespaceString nss(tenantId, "foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
     ASSERT_EQ(NamespaceStringUtil::serialize(nss), "foo.bar");
 }
 
@@ -55,14 +55,14 @@ TEST(NamespaceStringUtilTest, SerializeMultitenancySupportOnFeatureFlagRequireTe
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
     TenantId tenantId(OID::gen());
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
-    NamespaceString nss(tenantId, "foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
     ASSERT_EQ(NamespaceStringUtil::serialize(nss), tenantNsStr);
 }
 
 // Serialize correctly when multitenancySupport is disabled.
 TEST(NamespaceStringUtilTest, SerializeMultitenancySupportOff) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
-    NamespaceString nss(boost::none, "foo.bar");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar");
     ASSERT_EQ(NamespaceStringUtil::serialize(nss), "foo.bar");
 }
 
@@ -86,7 +86,7 @@ TEST(NamespaceStringUtilTest,
     NamespaceString nss = NamespaceStringUtil::deserialize(tenantId, "foo.bar");
     ASSERT_EQ(nss.ns(), "foo.bar");
     ASSERT(nss.tenantId());
-    ASSERT_EQ(nss, NamespaceString(tenantId, "foo.bar"));
+    ASSERT_EQ(nss, NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar"));
 }
 
 // Assert that if multitenancySupport is enabled and featureFlagRequireTenantID is disabled,
@@ -113,7 +113,7 @@ TEST(NamespaceStringUtilTest, DeserializeMultitenancySupportOnFeatureFlagRequire
     NamespaceString nss1 = NamespaceStringUtil::deserialize(tenantId, tenantNsStr);
     ASSERT_EQ(nss.ns(), "foo.bar");
     ASSERT(nss.tenantId());
-    ASSERT_EQ(nss, NamespaceString(tenantId, "foo.bar"));
+    ASSERT_EQ(nss, NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar"));
     ASSERT_EQ(nss, nss1);
 }
 
@@ -145,7 +145,7 @@ TEST(NamespaceStringUtilTest, DeserializeMultitenancySupportOffFeatureFlagRequir
     NamespaceString nss = NamespaceStringUtil::deserialize(boost::none, "foo.bar");
     ASSERT_EQ(nss.ns(), "foo.bar");
     ASSERT(!nss.tenantId());
-    ASSERT_EQ(nss, NamespaceString(boost::none, "foo.bar"));
+    ASSERT_EQ(nss, NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar"));
 }
 
 }  // namespace mongo

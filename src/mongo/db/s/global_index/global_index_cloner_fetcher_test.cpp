@@ -103,7 +103,7 @@ public:
     }
 
 private:
-    const NamespaceString _ns{"test", "user"};
+    const NamespaceString _ns = NamespaceString::createNamespaceString_forTest("test", "user");
     const UUID _indexUUID{UUID::gen()};
     const UUID _collUUID{UUID::gen()};
     const ShardId _shard{"shardA"};

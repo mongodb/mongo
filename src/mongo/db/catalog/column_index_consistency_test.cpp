@@ -37,7 +37,7 @@ namespace mongo {
 
 namespace {
 
-const NamespaceString kNss = NamespaceString("test.t");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.t");
 
 class ColumnIndexConsistencyTest : public CatalogTestFixture {
 protected:

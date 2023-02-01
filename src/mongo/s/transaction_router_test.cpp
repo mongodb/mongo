@@ -111,7 +111,7 @@ protected:
     const BSONObj kDummyResWithWriteConcernError =
         BSON("ok" << 1 << "writeConcernError" << kDummyWriteConcernError);
 
-    const NamespaceString kViewNss = NamespaceString("test.foo");
+    const NamespaceString kViewNss = NamespaceString::createNamespaceString_forTest("test.foo");
 
     const Status kStaleConfigStatus = {
         StaleConfigInfo(kViewNss, ShardVersion::UNSHARDED(), boost::none, shard1),

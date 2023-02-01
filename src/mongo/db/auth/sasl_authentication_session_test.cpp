@@ -128,7 +128,8 @@ SaslConversation::SaslConversation(std::string mech)
 
     ASSERT_OK(
         authManagerExternalState->insert(opCtx.get(),
-                                         NamespaceString("admin.system.users"),
+                                         NamespaceString::createNamespaceString_forTest(
+                                             "admin.system.users"),
                                          BSON("_id"
                                               << "test.andy"
                                               << "user"

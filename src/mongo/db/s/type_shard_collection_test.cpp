@@ -39,7 +39,7 @@ namespace {
 
 using unittest::assertGet;
 
-const NamespaceString kNss = NamespaceString("db.coll");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("db.coll");
 const BSONObj kKeyPattern = BSON("a" << 1);
 const BSONObj kDefaultCollation = BSON("locale"
                                        << "fr_CA");

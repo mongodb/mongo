@@ -92,9 +92,12 @@ protected:
     StringData _timeField = "time";
     StringData _metaField = "meta";
 
-    NamespaceString _ns1{"bucket_catalog_test_1", "t_1"};
-    NamespaceString _ns2{"bucket_catalog_test_1", "t_2"};
-    NamespaceString _ns3{"bucket_catalog_test_2", "t_1"};
+    NamespaceString _ns1 =
+        NamespaceString::createNamespaceString_forTest("bucket_catalog_test_1", "t_1");
+    NamespaceString _ns2 =
+        NamespaceString::createNamespaceString_forTest("bucket_catalog_test_1", "t_2");
+    NamespaceString _ns3 =
+        NamespaceString::createNamespaceString_forTest("bucket_catalog_test_2", "t_1");
 };
 
 class BucketCatalogWithoutMetadataTest : public BucketCatalogTest {
@@ -1791,7 +1794,7 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
 
     // If we advance the catalog era, then we shouldn't use a bucket that was fetched during a
     // previous era.
-    const NamespaceString fakeNs{"test.foo"};
+    const NamespaceString fakeNs = NamespaceString::createNamespaceString_forTest("test.foo");
     const auto fakeId = OID();
     _bucketCatalog->directWriteStart(fakeNs, fakeId);
     _bucketCatalog->directWriteFinish(fakeNs, fakeId);

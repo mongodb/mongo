@@ -33,7 +33,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss("test.foo");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.foo");
 const ShardId kShardOne("shardOne");
 const ShardId kShardTwo("shardTwo");
 const KeyPattern kShardKeyPattern(BSON("a" << 1));

@@ -191,7 +191,8 @@ protected:
             .toBSON(CursorResponse::ResponseType::InitialResponse);
     }
 
-    const NamespaceString kNss{"catalgoCacheTestDB.foo"};
+    const NamespaceString kNss =
+        NamespaceString::createNamespaceString_forTest("catalgoCacheTestDB.foo");
     const UUID kUUID = UUID::gen();
     const std::string kPattern{"_id"};
     const ShardKeyPattern kShardKeyPattern{BSON(kPattern << 1)};

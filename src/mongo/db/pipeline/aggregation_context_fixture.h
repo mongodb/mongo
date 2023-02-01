@@ -47,7 +47,8 @@ namespace mongo {
 class AggregationContextFixture : public ServiceContextTest {
 public:
     AggregationContextFixture()
-        : AggregationContextFixture(NamespaceString(boost::none, "unittests", "pipeline_test")) {}
+        : AggregationContextFixture(NamespaceString::createNamespaceString_forTest(
+              boost::none, "unittests", "pipeline_test")) {}
 
     AggregationContextFixture(NamespaceString nss) {
         auto service = getServiceContext();
@@ -88,8 +89,8 @@ struct DocumentSourceDeleter {
 class ServerlessAggregationContextFixture : public AggregationContextFixture {
 public:
     ServerlessAggregationContextFixture()
-        : AggregationContextFixture(
-              NamespaceString(TenantId(OID::gen()), "unittests", "pipeline_test")) {}
+        : AggregationContextFixture(NamespaceString::createNamespaceString_forTest(
+              TenantId(OID::gen()), "unittests", "pipeline_test")) {}
 
     const std::string _targetDb = "test";
     const std::string _targetColl = "target_collection";

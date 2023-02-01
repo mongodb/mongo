@@ -67,7 +67,8 @@ using std::vector;
 using unittest::assertGet;
 
 const int kMaxCommandRetry = 3;
-const NamespaceString kNamespace("TestDB", "TestColl");
+const NamespaceString kNamespace =
+    NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
 BSONObj getReplSecondaryOkMetadata() {
     BSONObjBuilder o;
@@ -81,7 +82,7 @@ using ShardingCatalogClientTest = ShardingTestFixture;
 TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    CollectionType expectedColl(NamespaceString("TestDB.TestNS"),
+    CollectionType expectedColl(NamespaceString::createNamespaceString_forTest("TestDB.TestNS"),
                                 OID::gen(),
                                 Timestamp(1, 1),
                                 Date_t::now(),
@@ -138,7 +139,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionNotExisting) {
 
     auto future = launchAsync([this] {
         ASSERT_THROWS_CODE(
-            catalogClient()->getCollection(operationContext(), NamespaceString("NonExistent")),
+            catalogClient()->getCollection(
+                operationContext(), NamespaceString::createNamespaceString_forTest("NonExistent")),
             DBException,
             ErrorCodes::NamespaceNotFound);
     });
@@ -773,14 +775,14 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotWritablePrimar
 TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    CollectionType coll1(NamespaceString{"test.coll1"},
+    CollectionType coll1(NamespaceString::createNamespaceString_forTest("test.coll1"),
                          OID::gen(),
                          Timestamp(1, 1),
                          network()->now(),
                          UUID::gen(),
                          BSON("_id" << 1));
 
-    CollectionType coll2(NamespaceString{"anotherdb.coll1"},
+    CollectionType coll2(NamespaceString::createNamespaceString_forTest("anotherdb.coll1"),
                          OID::gen(),
                          Timestamp(1, 1),
                          network()->now(),
@@ -831,7 +833,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
 TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    CollectionType coll1(NamespaceString{"test.coll1"},
+    CollectionType coll1(NamespaceString::createNamespaceString_forTest("test.coll1"),
                          OID::gen(),
                          Timestamp(1, 1),
                          network()->now(),
@@ -839,7 +841,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
                          BSON("_id" << 1));
     coll1.setUnique(true);
 
-    CollectionType coll2(NamespaceString{"test.coll2"},
+    CollectionType coll2(NamespaceString::createNamespaceString_forTest("test.coll2"),
                          OID::gen(),
                          Timestamp(1, 1),
                          network()->now(),
@@ -885,7 +887,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
         ASSERT_THROWS(catalogClient()->getCollections(operationContext(), "test"), DBException);
     });
 
-    CollectionType validColl(NamespaceString{"test.coll1"},
+    CollectionType validColl(NamespaceString::createNamespaceString_forTest("test.coll1"),
                              OID::gen(),
                              Timestamp(1, 1),
                              network()->now(),
@@ -983,20 +985,20 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollection) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     TagsType tagA;
-    tagA.setNS(NamespaceString("TestDB.TestColl"));
+    tagA.setNS(NamespaceString::createNamespaceString_forTest("TestDB.TestColl"));
     tagA.setTag("TagA");
     tagA.setMinKey(BSON("a" << 100));
     tagA.setMaxKey(BSON("a" << 200));
 
     TagsType tagB;
-    tagB.setNS(NamespaceString("TestDB.TestColl"));
+    tagB.setNS(NamespaceString::createNamespaceString_forTest("TestDB.TestColl"));
     tagB.setTag("TagB");
     tagB.setMinKey(BSON("a" << 200));
     tagB.setMaxKey(BSON("a" << 300));
 
     auto future = launchAsync([this] {
         const auto& tags = assertGet(catalogClient()->getTagsForCollection(
-            operationContext(), NamespaceString("TestDB.TestColl")));
+            operationContext(), NamespaceString::createNamespaceString_forTest("TestDB.TestColl")));
 
         ASSERT_EQ(2U, tags.size());
 
@@ -1032,7 +1034,7 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollectionNoTags) {
 
     auto future = launchAsync([this] {
         const auto& tags = assertGet(catalogClient()->getTagsForCollection(
-            operationContext(), NamespaceString("TestDB.TestColl")));
+            operationContext(), NamespaceString::createNamespaceString_forTest("TestDB.TestColl")));
 
         ASSERT_EQ(0U, tags.size());
 
@@ -1049,20 +1051,20 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollectionInvalidTag) {
 
     auto future = launchAsync([this] {
         const auto swTags = catalogClient()->getTagsForCollection(
-            operationContext(), NamespaceString("TestDB.TestColl"));
+            operationContext(), NamespaceString::createNamespaceString_forTest("TestDB.TestColl"));
 
         ASSERT_EQUALS(ErrorCodes::NoSuchKey, swTags.getStatus());
     });
 
     onFindCommand([](const RemoteCommandRequest& request) {
         TagsType tagA;
-        tagA.setNS(NamespaceString("TestDB.TestColl"));
+        tagA.setNS(NamespaceString::createNamespaceString_forTest("TestDB.TestColl"));
         tagA.setTag("TagA");
         tagA.setMinKey(BSON("a" << 100));
         tagA.setMaxKey(BSON("a" << 200));
 
         TagsType tagB;
-        tagB.setNS(NamespaceString("TestDB.TestColl"));
+        tagB.setNS(NamespaceString::createNamespaceString_forTest("TestDB.TestColl"));
         tagB.setTag("TagB");
         tagB.setMinKey(BSON("a" << 200));
         // Missing maxKey

@@ -47,7 +47,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss = NamespaceString("test.t");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.t");
 
 class CollectionValidationTest : public CatalogTestFixture {
 protected:
@@ -881,7 +881,8 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleInvalidIndexEntryCSI) {
         for (int numDocs = 1; numDocs <= kMaxNumDocs; ++numDocs) {
             for (int corruptedFldIndex = 1; corruptedFldIndex <= numFields; ++corruptedFldIndex) {
                 for (int corruptedDocIndex = 0; corruptedDocIndex < numDocs; ++corruptedDocIndex) {
-                    const NamespaceString nss(kNss.toString() + std::to_string(++testCaseIdx));
+                    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+                        kNss.toString() + std::to_string(++testCaseIdx));
 
                     // Create collection nss for unit tests to use.
                     const CollectionOptions defaultCollectionOptions;
@@ -1003,7 +1004,8 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleExtraIndexEntry) {
                 const int corruptedFldIndex = corruption.first;
                 const int corruptedDocIndex = corruption.second;
 
-                const auto nss = NamespaceString(kNss.toString() + std::to_string(++testCaseIdx));
+                const auto nss = NamespaceString::createNamespaceString_forTest(
+                    kNss.toString() + std::to_string(++testCaseIdx));
 
                 // Create collection nss for unit tests to use.
                 const CollectionOptions defaultCollectionOptions;
@@ -1090,7 +1092,8 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleMissingIndexEntryCSI) {
         for (int numDocs = 1; numDocs <= kMaxNumDocs; ++numDocs) {
             for (int corruptedFldIndex = 1; corruptedFldIndex <= numFields; ++corruptedFldIndex) {
                 for (int corruptedDocIndex = 0; corruptedDocIndex < numDocs; ++corruptedDocIndex) {
-                    const NamespaceString nss(kNss.toString() + std::to_string(++testCaseIdx));
+                    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+                        kNss.toString() + std::to_string(++testCaseIdx));
 
                     // Create collection nss for unit tests to use.
                     const CollectionOptions defaultCollectionOptions;

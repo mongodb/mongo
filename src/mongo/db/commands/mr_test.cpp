@@ -393,8 +393,10 @@ protected:
     MapReduceOpObserver* _opObserver = nullptr;
 };
 
-const NamespaceString MapReduceCommandTest::inputNss("myDB.myCollection");
-const NamespaceString MapReduceCommandTest::outputNss(inputNss.getSisterNS("outCollection"));
+const NamespaceString MapReduceCommandTest::inputNss =
+    NamespaceString::createNamespaceString_forTest("myDB.myCollection");
+const NamespaceString MapReduceCommandTest::outputNss =
+    NamespaceString::createNamespaceString_forTest(inputNss.getSisterNS("outCollection"));
 
 void MapReduceCommandTest::setUp() {
     ServiceContextMongoDTest::setUp();

@@ -252,7 +252,8 @@ protected:
         EqLookupNode::LookupStrategy::kNestedLoopJoin, EqLookupNode::LookupStrategy::kHashJoin};
 
 private:
-    const NamespaceString _foreignNss{"testdb.sbe_stage_builder_foreign"};
+    const NamespaceString _foreignNss =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
 };
 
 TEST_F(LookupStageBuilderTest, NestedLoopJoin_Basic) {

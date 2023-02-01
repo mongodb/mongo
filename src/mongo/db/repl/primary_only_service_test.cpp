@@ -79,7 +79,7 @@ public:
     }
 
     NamespaceString getStateDocumentsNS() const override {
-        return NamespaceString("admin", "test_service");
+        return NamespaceString::createNamespaceString_forTest("admin", "test_service");
     }
 
     ThreadPool::Limits getThreadPoolLimits() const override {
@@ -318,8 +318,8 @@ public:
 
         _service = _registry->lookupServiceByName("TestService");
         ASSERT(_service);
-        auto serviceByNamespace =
-            _registry->lookupServiceByNamespace(NamespaceString("admin.test_service"));
+        auto serviceByNamespace = _registry->lookupServiceByNamespace(
+            NamespaceString::createNamespaceString_forTest("admin.test_service"));
         ASSERT_EQ(_service, serviceByNamespace);
 
         _testExecutor = makeTestExecutor();

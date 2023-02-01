@@ -40,7 +40,7 @@ namespace mongo {
 namespace write_without_shard_key {
 namespace {
 
-const NamespaceString kNss("TestDB", "TestColl");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const int splitPoint = 50;
 
 class WriteWithoutShardKeyUtilTest : public CatalogCacheTestFixture {

@@ -167,7 +167,7 @@ TEST_F(ParseNsOrUUID, ParseValidColl) {
     auto cmd = BSON("query"
                     << "coll");
     auto parsedNss = CommandHelpers::parseNsOrUUID(DatabaseName(boost::none, "test"), cmd);
-    ASSERT_EQ(*parsedNss.nss(), NamespaceString("test.coll"));
+    ASSERT_EQ(*parsedNss.nss(), NamespaceString::createNamespaceString_forTest("test.coll"));
 }
 
 TEST_F(ParseNsOrUUID, ParseValidUUID) {
@@ -435,7 +435,7 @@ protected:
 
     template <typename T>
     void runIncr(T& command, std::function<void(int, const BSONObj&)> postAssert) {
-        const NamespaceString ns("testdb.coll");
+        const NamespaceString ns = NamespaceString::createNamespaceString_forTest("testdb.coll");
 
         for (std::int32_t i : {123, 12345, 0, -456}) {
             const OpMsgRequest request = [&] {

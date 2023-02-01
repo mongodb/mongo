@@ -356,8 +356,10 @@ private:
 };
 
 TEST_F(ReshardingOplogFetcherTest, TestBasic) {
-    const NamespaceString outputCollectionNss("dbtests.outputCollection");
-    const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
 
     setupBasic(outputCollectionNss, dataCollectionNss, _destinationShard);
 
@@ -386,8 +388,10 @@ TEST_F(ReshardingOplogFetcherTest, TestBasic) {
 }
 
 TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
-    const NamespaceString outputCollectionNss("dbtests.outputCollection");
-    const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
 
     setupBasic(outputCollectionNss, dataCollectionNss, _destinationShard);
 
@@ -423,8 +427,10 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
 }
 
 TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
-    const NamespaceString outputCollectionNss("dbtests.outputCollection");
-    const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
 
     setupBasic(outputCollectionNss, dataCollectionNss, _destinationShard);
 
@@ -463,8 +469,10 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
 }
 
 TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
-    const NamespaceString outputCollectionNss("dbtests.outputCollection");
-    const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
 
     create(outputCollectionNss);
     create(dataCollectionNss);
@@ -539,8 +547,10 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
 }
 
 TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
-    const NamespaceString outputCollectionNss("dbtests.outputCollection");
-    const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
     const NamespaceString otherCollection("dbtests.collectionNotBeingResharded");
 
     create(outputCollectionNss);
@@ -634,8 +644,10 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
 }
 
 TEST_F(ReshardingOplogFetcherTest, RetriesOnRemoteInterruptionError) {
-    const NamespaceString outputCollectionNss("dbtests.outputCollection");
-    const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
 
     create(outputCollectionNss);
     create(dataCollectionNss);
@@ -674,8 +686,10 @@ TEST_F(ReshardingOplogFetcherTest, RetriesOnRemoteInterruptionError) {
 }
 
 TEST_F(ReshardingOplogFetcherTest, ImmediatelyDoneWhenFinalOpHasAlreadyBeenFetched) {
-    const NamespaceString outputCollectionNss("dbtests.outputCollection");
-    const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
 
     create(outputCollectionNss);
     create(dataCollectionNss);
@@ -704,8 +718,10 @@ TEST_F(ReshardingOplogFetcherTest, ImmediatelyDoneWhenFinalOpHasAlreadyBeenFetch
 DEATH_TEST_REGEX_F(ReshardingOplogFetcherTest,
                    CannotFetchMoreWhenFinalOpHasAlreadyBeenFetched,
                    "Invariant failure.*_startAt != kFinalOpAlreadyFetched") {
-    const NamespaceString outputCollectionNss("dbtests.outputCollection");
-    const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
 
     create(outputCollectionNss);
     create(dataCollectionNss);

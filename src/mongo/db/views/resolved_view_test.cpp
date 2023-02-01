@@ -45,8 +45,9 @@
 namespace mongo {
 namespace {
 
-const NamespaceString viewNss("testdb.testview");
-const NamespaceString backingNss("testdb.testcoll");
+const NamespaceString viewNss = NamespaceString::createNamespaceString_forTest("testdb.testview");
+const NamespaceString backingNss =
+    NamespaceString::createNamespaceString_forTest("testdb.testcoll");
 const std::vector<BSONObj> emptyPipeline;
 const BSONObj kDefaultCursorOptionDocument = BSON(aggregation_request_helper::kBatchSizeField
                                                   << aggregation_request_helper::kDefaultBatchSize);

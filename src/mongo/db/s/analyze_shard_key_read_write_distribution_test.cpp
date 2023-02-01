@@ -282,7 +282,8 @@ protected:
         assertWriteMetrics(writeDistributionCalculator, expectedMetrics);
     }
 
-    const NamespaceString nss{"testDb", "testColl"};
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("testDb", "testColl");
     const UUID collUuid = UUID::gen();
 
     // Define two set of ChunkSplintInfo's for testing.

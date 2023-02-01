@@ -122,7 +122,7 @@ TEST(OpMsg, FireAndForgetInsertWorks) {
         ]
     })")));
 
-    ASSERT_EQ(conn->count(NamespaceString("test.collection")), 1u);
+    ASSERT_EQ(conn->count(NamespaceString::createNamespaceString_forTest("test.collection")), 1u);
 }
 
 TEST(OpMsg, DocumentSequenceLargeDocumentMultiInsertWorks) {
@@ -152,8 +152,8 @@ TEST(OpMsg, DocumentSequenceLargeDocumentMultiInsertWorks) {
     Message reply;
     conn->call(request, reply);
 
-    ASSERT_EQ(conn->count(NamespaceString("test.collection")), 3u);
-    conn->dropCollection(NamespaceString("test.collection"));
+    ASSERT_EQ(conn->count(NamespaceString::createNamespaceString_forTest("test.collection")), 3u);
+    conn->dropCollection(NamespaceString::createNamespaceString_forTest("test.collection"));
 }
 
 TEST(OpMsg, DocumentSequenceMaxWriteBatchWorks) {
@@ -185,8 +185,9 @@ TEST(OpMsg, DocumentSequenceMaxWriteBatchWorks) {
     Message reply;
     conn->call(request, reply);
 
-    ASSERT_EQ(conn->count(NamespaceString("test.collection")), write_ops::kMaxWriteBatchSize);
-    conn->dropCollection(NamespaceString("test.collection"));
+    ASSERT_EQ(conn->count(NamespaceString::createNamespaceString_forTest("test.collection")),
+              write_ops::kMaxWriteBatchSize);
+    conn->dropCollection(NamespaceString::createNamespaceString_forTest("test.collection"));
 }
 
 TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
@@ -331,7 +332,7 @@ void exhaustGetMoreTest(bool enableChecksum) {
 
     ON_BLOCK_EXIT([&] { enableClientChecksum(); });
 
-    NamespaceString nss("test", "coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
 
     conn->dropCollection(nss);
 
@@ -418,7 +419,7 @@ TEST(OpMsg, FindIgnoresExhaust) {
         return;
     }
 
-    NamespaceString nss("test", "coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
 
     conn->dropCollection(nss);
 
@@ -450,7 +451,7 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
         return;
     }
 
-    NamespaceString nss("test", "coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
 
     conn->dropCollection(nss);
 
@@ -497,7 +498,7 @@ TEST(OpMsg, MongosIgnoresExhaustForGetMore) {
         return;
     }
 
-    NamespaceString nss("test", "coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
 
     conn->dropCollection(nss);
 
@@ -548,7 +549,7 @@ TEST(OpMsg, ExhaustWorksForAggCursor) {
         return;
     }
 
-    NamespaceString nss("test", "coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
 
     conn->dropCollection(nss);
 
@@ -1226,7 +1227,7 @@ TEST(OpMsg, ExhaustWithDBClientCursorBehavesCorrectly) {
         return;
     }
 
-    NamespaceString nss("test", "coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     conn->dropCollection(nss);
 
     const int nDocs = 5;

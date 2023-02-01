@@ -130,7 +130,7 @@ private:
         return executor;
     }
 
-    const NamespaceString _nss{"test", "user"};
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test", "user");
     const std::string _indexName{"global_x"};
     const UUID _indexUUID{UUID::gen()};
     const RAIIServerParameterControllerForTest _enableFeature{"featureFlagGlobalIndexes", true};

@@ -129,16 +129,17 @@ TEST_F(FindAndModifyImageLookupTest, NoopWhenEntryDoesNotHaveNeedsRetryImageFiel
     const auto stmtId = 1;
     const auto opTime = repl::OpTime(Timestamp(2, 1), 1);
     const auto preImageOpTime = repl::OpTime(Timestamp(1, 1), 1);
-    const auto oplogEntryBson = makeOplogEntry(opTime,
-                                               repl::OpTypeEnum::kNoop,
-                                               NamespaceString("test.foo"),
-                                               UUID::gen(),
-                                               BSON("a" << 1),
-                                               sessionInfo,
-                                               {stmtId},
-                                               preImageOpTime)
-                                    .getEntry()
-                                    .toBSON();
+    const auto oplogEntryBson =
+        makeOplogEntry(opTime,
+                       repl::OpTypeEnum::kNoop,
+                       NamespaceString::createNamespaceString_forTest("test.foo"),
+                       UUID::gen(),
+                       BSON("a" << 1),
+                       sessionInfo,
+                       {stmtId},
+                       preImageOpTime)
+            .getEntry()
+            .toBSON();
     auto mock = DocumentSourceMock::createForTest(Document(oplogEntryBson), getExpCtx());
     imageLookup->setSource(mock.get());
     // Mock out the foreign collection.
@@ -163,18 +164,19 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocMissing
     sessionInfo.setTxnNumber(1);
     const auto stmtId = 1;
     const auto opTime = repl::OpTime(Timestamp(2, 1), 1);
-    const auto oplogEntryDoc = Document(makeOplogEntry(opTime,
-                                                       repl::OpTypeEnum::kUpdate,
-                                                       NamespaceString("test.foo"),
-                                                       UUID::gen(),
-                                                       BSON("a" << 1),
-                                                       sessionInfo,
-                                                       {stmtId},
-                                                       boost::none /* preImageOpTime */,
-                                                       boost::none /* postImageOpTime */,
-                                                       repl::RetryImageEnum::kPreImage)
-                                            .getEntry()
-                                            .toBSON());
+    const auto oplogEntryDoc =
+        Document(makeOplogEntry(opTime,
+                                repl::OpTypeEnum::kUpdate,
+                                NamespaceString::createNamespaceString_forTest("test.foo"),
+                                UUID::gen(),
+                                BSON("a" << 1),
+                                sessionInfo,
+                                {stmtId},
+                                boost::none /* preImageOpTime */,
+                                boost::none /* postImageOpTime */,
+                                repl::RetryImageEnum::kPreImage)
+                     .getEntry()
+                     .toBSON());
     auto mock = DocumentSourceMock::createForTest(oplogEntryDoc, getExpCtx());
     imageLookup->setSource(mock.get());
 
@@ -204,18 +206,19 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocHasDiff
     const auto stmtId = 1;
     const auto ts = Timestamp(2, 1);
     const auto opTime = repl::OpTime(ts, 1);
-    const auto oplogEntryDoc = Document(makeOplogEntry(opTime,
-                                                       repl::OpTypeEnum::kUpdate,
-                                                       NamespaceString("test.foo"),
-                                                       UUID::gen(),
-                                                       BSON("a" << 1),
-                                                       sessionInfo,
-                                                       {stmtId},
-                                                       boost::none /* preImageOpTime */,
-                                                       boost::none /* postImageOpTime */,
-                                                       repl::RetryImageEnum::kPreImage)
-                                            .getEntry()
-                                            .toBSON());
+    const auto oplogEntryDoc =
+        Document(makeOplogEntry(opTime,
+                                repl::OpTypeEnum::kUpdate,
+                                NamespaceString::createNamespaceString_forTest("test.foo"),
+                                UUID::gen(),
+                                BSON("a" << 1),
+                                sessionInfo,
+                                {stmtId},
+                                boost::none /* preImageOpTime */,
+                                boost::none /* postImageOpTime */,
+                                repl::RetryImageEnum::kPreImage)
+                     .getEntry()
+                     .toBSON());
     auto mock = DocumentSourceMock::createForTest(oplogEntryDoc, getExpCtx());
     imageLookup->setSource(mock.get());
 
@@ -260,7 +263,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         sessionInfo.setTxnNumber(txnNum);
         const auto ts = Timestamp(2, 1);
         const auto opTime = repl::OpTime(ts, 1);
-        const auto nss = NamespaceString("test.foo");
+        const auto nss = NamespaceString::createNamespaceString_forTest("test.foo");
         const auto uuid = UUID::gen();
 
         // Define a findAndModify/update oplog entry with the 'needsRetryImage' field set.
@@ -348,7 +351,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         const auto applyOpsOpTime = repl::OpTime(applyOpsTs, 1);
         const auto commitTxnTs = Timestamp(3, 1);
         const auto commitTxnTsFieldName = CommitTransactionOplogObject::kCommitTimestampFieldName;
-        const auto nss = NamespaceString("test.foo");
+        const auto nss = NamespaceString::createNamespaceString_forTest("test.foo");
         const auto uuid = UUID::gen();
 
         // Define an applyOps oplog entry containing a findAndModify/update operation entry with
@@ -456,7 +459,7 @@ TEST_F(FindAndModifyImageLookupTest,
     const auto applyOpsOpTime = repl::OpTime(applyOpsTs, 1);
     const auto commitTxnTs = Timestamp(3, 1);
     const auto commitTxnTsFieldName = CommitTransactionOplogObject::kCommitTimestampFieldName;
-    const auto nss = NamespaceString("test.foo");
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.foo");
     const auto uuid = UUID::gen();
 
     // Define an applyOps oplog entry containing a findAndModify/update operation entry with

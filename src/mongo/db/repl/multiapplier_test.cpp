@@ -66,18 +66,18 @@ void MultiApplierTest::setUp() {
  * Generates oplog entries with the given number used for the timestamp.
  */
 OplogEntry makeOplogEntry(int ts) {
-    return {DurableOplogEntry(OpTime(Timestamp(ts, 1), 1),  // optime
-                              OpTypeEnum::kNoop,            // op type
-                              NamespaceString("a.a"),       // namespace
-                              boost::none,                  // uuid
-                              boost::none,                  // fromMigrate
-                              OplogEntry::kOplogVersion,    // version
-                              BSONObj(),                    // o
-                              boost::none,                  // o2
-                              {},                           // sessionInfo
-                              boost::none,                  // upsert
-                              Date_t(),                     // wall clock time
-                              {},                           // statement ids
+    return {DurableOplogEntry(OpTime(Timestamp(ts, 1), 1),                            // optime
+                              OpTypeEnum::kNoop,                                      // op type
+                              NamespaceString::createNamespaceString_forTest("a.a"),  // namespace
+                              boost::none,                                            // uuid
+                              boost::none,                                            // fromMigrate
+                              OplogEntry::kOplogVersion,                              // version
+                              BSONObj(),                                              // o
+                              boost::none,                                            // o2
+                              {},                                                     // sessionInfo
+                              boost::none,                                            // upsert
+                              Date_t(),       // wall clock time
+                              {},             // statement ids
                               boost::none,    // optime of previous write within same transaction
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime

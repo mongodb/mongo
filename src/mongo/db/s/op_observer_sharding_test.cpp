@@ -45,7 +45,8 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kTestNss("TestDB", "TestColl");
+const NamespaceString kTestNss =
+    NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const NamespaceString kUnshardedNss("TestDB", "UnshardedColl");
 
 void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata metadata) {

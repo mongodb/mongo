@@ -632,12 +632,13 @@ public:
 
     repl::PrimaryOnlyServiceRegistry* _registry = nullptr;
 
-    NamespaceString _originalNss = NamespaceString("db.foo");
+    NamespaceString _originalNss = NamespaceString::createNamespaceString_forTest("db.foo");
     UUID _originalUUID = UUID::gen();
     OID _originalEpoch = OID::gen();
     Timestamp _originalTimestamp = Timestamp(1);
 
-    NamespaceString _tempNss = NamespaceString("db.system.resharding." + _originalUUID.toString());
+    NamespaceString _tempNss = NamespaceString::createNamespaceString_forTest(
+        "db.system.resharding." + _originalUUID.toString());
     UUID _reshardingUUID = UUID::gen();
     OID _tempEpoch = OID::gen();
     Timestamp _tempTimestamp = Timestamp(2);
@@ -956,27 +957,29 @@ TEST_F(ReshardingCoordinatorServiceTest, MultipleReshardingOperationsFail) {
 
     // Asserts that a resharding op with different namespace and different shard key fails with
     // ConflictingOperationInProgress.
-    ASSERT_THROWS_CODE(initializeAndGetCoordinator(
-                           UUID::gen(),
-                           NamespaceString("db.moo"),
-                           NamespaceString("db.system.resharding." + UUID::gen().toString()),
-                           ShardKeyPattern(BSON("shardKeyV1" << 1)),
-                           UUID::gen(),
-                           ShardKeyPattern(BSON("shardKeyV2" << 1))),
-                       DBException,
-                       ErrorCodes::ConflictingOperationInProgress);
+    ASSERT_THROWS_CODE(
+        initializeAndGetCoordinator(UUID::gen(),
+                                    NamespaceString::createNamespaceString_forTest("db.moo"),
+                                    NamespaceString::createNamespaceString_forTest(
+                                        "db.system.resharding." + UUID::gen().toString()),
+                                    ShardKeyPattern(BSON("shardKeyV1" << 1)),
+                                    UUID::gen(),
+                                    ShardKeyPattern(BSON("shardKeyV2" << 1))),
+        DBException,
+        ErrorCodes::ConflictingOperationInProgress);
 
     // Asserts that a resharding op with same namespace and different shard key fails with
     // ConflictingOperationInProgress.
-    ASSERT_THROWS_CODE(initializeAndGetCoordinator(
-                           UUID::gen(),
-                           _originalNss,
-                           NamespaceString("db.system.resharding." + UUID::gen().toString()),
-                           ShardKeyPattern(BSON("shardKeyV1" << 1)),
-                           UUID::gen(),
-                           _oldShardKey),
-                       DBException,
-                       ErrorCodes::ConflictingOperationInProgress);
+    ASSERT_THROWS_CODE(
+        initializeAndGetCoordinator(UUID::gen(),
+                                    _originalNss,
+                                    NamespaceString::createNamespaceString_forTest(
+                                        "db.system.resharding." + UUID::gen().toString()),
+                                    ShardKeyPattern(BSON("shardKeyV1" << 1)),
+                                    UUID::gen(),
+                                    _oldShardKey),
+        DBException,
+        ErrorCodes::ConflictingOperationInProgress);
 
     runReshardingToCompletion(TransitionFunctionMap{}, std::move(stateTransitionsGuard));
 }

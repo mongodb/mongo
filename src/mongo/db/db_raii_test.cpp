@@ -59,7 +59,7 @@ public:
         return std::make_pair(std::move(client), std::move(opCtx));
     }
 
-    const NamespaceString nss = NamespaceString("test", "coll");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     const Milliseconds timeoutMs = Seconds(1);
     const ClientAndCtx client1 = makeClientWithLocker("client1");
     const ClientAndCtx client2 = makeClientWithLocker("client2");
@@ -273,7 +273,8 @@ TEST_F(DBRAIITestFixture,
 
     // Simulate using a DBDirectClient to test this behavior for user reads.
     client2.first->setInDirectClient(true);
-    AutoGetCollectionForRead coll(client2.second.get(), NamespaceString("local.system.js"));
+    AutoGetCollectionForRead coll(
+        client2.second.get(), NamespaceString::createNamespaceString_forTest("local.system.js"));
     // Reading from an unreplicated collection does not change the ReadSource to kLastApplied.
     ASSERT_EQ(client2.second.get()->recoveryUnit()->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kNoTimestamp);

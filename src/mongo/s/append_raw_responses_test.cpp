@@ -196,7 +196,7 @@ protected:
         [] {
             OID epoch{OID::gen()};
             Timestamp timestamp{1, 0};
-            return StaleConfigInfo(NamespaceString("Foo.Bar"),
+            return StaleConfigInfo(NamespaceString::createNamespaceString_forTest("Foo.Bar"),
                                    ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
                                                 boost::optional<CollectionIndexes>(boost::none)),
                                    boost::none,

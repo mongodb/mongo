@@ -40,7 +40,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss("foo.bar");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("foo.bar");
 
 write_ops::DeleteOpEntry buildDelete(const BSONObj& query, bool multi) {
     write_ops::DeleteOpEntry entry;

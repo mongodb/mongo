@@ -50,61 +50,64 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
     t1.addTicks(100);
     VectorClockMutable::get(opCtx->getServiceContext())->tickClusterTimeTo(t1);
     {
-        const auto expCtx = ExpressionContext{opCtx.get(),
-                                              {},     // explain
-                                              false,  // fromMongos
-                                              false,  // needsMerge
-                                              false,  // allowDiskUse
-                                              false,  // bypassDocumentValidation
-                                              false,  // isMapReduce
-                                              NamespaceString{"test"_sd, "namespace"_sd},
-                                              {},  // runtime constants
-                                              {},  // collator
-                                              std::make_shared<StubMongoProcessInterface>(),
-                                              {},  // resolvedNamespaces
-                                              {},  // collUUID
-                                              {},  // let
-                                              false};
+        const auto expCtx = ExpressionContext{
+            opCtx.get(),
+            {},     // explain
+            false,  // fromMongos
+            false,  // needsMerge
+            false,  // allowDiskUse
+            false,  // bypassDocumentValidation
+            false,  // isMapReduce
+            NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+            {},  // runtime constants
+            {},  // collator
+            std::make_shared<StubMongoProcessInterface>(),
+            {},  // resolvedNamespaces
+            {},  // collUUID
+            {},  // let
+            false};
         ASSERT_DOES_NOT_THROW(static_cast<void>(expCtx.variables.getValue(Variables::kNowId)));
         ASSERT_DOES_NOT_THROW(
             static_cast<void>(expCtx.variables.getValue(Variables::kClusterTimeId)));
     }
     {
-        const auto expCtx = ExpressionContext{opCtx.get(),
-                                              {},     // explain
-                                              false,  // fromMongos
-                                              false,  // needsMerge
-                                              false,  // allowDiskUse
-                                              false,  // bypassDocumentValidation
-                                              false,  // isMapReduce
-                                              NamespaceString{"test"_sd, "namespace"_sd},
-                                              LegacyRuntimeConstants{Date_t::now(), {}},
-                                              {},  // collator
-                                              std::make_shared<StubMongoProcessInterface>(),
-                                              {},  // resolvedNamespaces
-                                              {},  // collUUID
-                                              {},  // let
-                                              false};
+        const auto expCtx = ExpressionContext{
+            opCtx.get(),
+            {},     // explain
+            false,  // fromMongos
+            false,  // needsMerge
+            false,  // allowDiskUse
+            false,  // bypassDocumentValidation
+            false,  // isMapReduce
+            NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+            LegacyRuntimeConstants{Date_t::now(), {}},
+            {},  // collator
+            std::make_shared<StubMongoProcessInterface>(),
+            {},  // resolvedNamespaces
+            {},  // collUUID
+            {},  // let
+            false};
         ASSERT_DOES_NOT_THROW(static_cast<void>(expCtx.variables.getValue(Variables::kNowId)));
         ASSERT_DOES_NOT_THROW(
             static_cast<void>(expCtx.variables.getValue(Variables::kClusterTimeId)));
     }
     {
-        const auto expCtx = ExpressionContext{opCtx.get(),
-                                              {},     // explain
-                                              false,  // fromMongos
-                                              false,  // needsMerge
-                                              false,  // allowDiskUse
-                                              false,  // bypassDocumentValidation
-                                              false,  // isMapReduce
-                                              NamespaceString{"test"_sd, "namespace"_sd},
-                                              LegacyRuntimeConstants{{}, Timestamp(1, 0)},
-                                              {},  // collator
-                                              std::make_shared<StubMongoProcessInterface>(),
-                                              {},  // resolvedNamespaces
-                                              {},  // collUUID
-                                              {},  // let
-                                              false};
+        const auto expCtx = ExpressionContext{
+            opCtx.get(),
+            {},     // explain
+            false,  // fromMongos
+            false,  // needsMerge
+            false,  // allowDiskUse
+            false,  // bypassDocumentValidation
+            false,  // isMapReduce
+            NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+            LegacyRuntimeConstants{{}, Timestamp(1, 0)},
+            {},  // collator
+            std::make_shared<StubMongoProcessInterface>(),
+            {},  // resolvedNamespaces
+            {},  // collUUID
+            {},  // let
+            false};
         ASSERT_DOES_NOT_THROW(static_cast<void>(expCtx.variables.getValue(Variables::kNowId)));
         ASSERT_DOES_NOT_THROW(
             static_cast<void>(expCtx.variables.getValue(Variables::kClusterTimeId)));
@@ -113,21 +116,22 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
 
 TEST_F(ExpressionContextTest, ParametersCanContainExpressionsWhichAreFolded) {
     auto opCtx = makeOperationContext();
-    const auto expCtx = ExpressionContext{opCtx.get(),
-                                          {},     // explain
-                                          false,  // fromMongos
-                                          false,  // needsMerge
-                                          false,  // allowDiskUse
-                                          false,  // bypassDocumentValidation
-                                          false,  // isMapReduce
-                                          NamespaceString{"test"_sd, "namespace"_sd},
-                                          {},  // runtime constants
-                                          {},  // collator
-                                          std::make_shared<StubMongoProcessInterface>(),
-                                          {},  // resolvedNamespaces
-                                          {},  // collUUID
-                                          BSON("atan2" << BSON("$atan2" << BSON_ARRAY(0 << 1))),
-                                          false};
+    const auto expCtx =
+        ExpressionContext{opCtx.get(),
+                          {},     // explain
+                          false,  // fromMongos
+                          false,  // needsMerge
+                          false,  // allowDiskUse
+                          false,  // bypassDocumentValidation
+                          false,  // isMapReduce
+                          NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+                          {},  // runtime constants
+                          {},  // collator
+                          std::make_shared<StubMongoProcessInterface>(),
+                          {},  // resolvedNamespaces
+                          {},  // collUUID
+                          BSON("atan2" << BSON("$atan2" << BSON_ARRAY(0 << 1))),
+                          false};
     ASSERT_EQUALS(
         0.0,
         expCtx.variables.getValue(expCtx.variablesParseState.getVariable("atan2")).getDouble());
@@ -135,45 +139,47 @@ TEST_F(ExpressionContextTest, ParametersCanContainExpressionsWhichAreFolded) {
 
 TEST_F(ExpressionContextTest, ParametersCanReferToAlreadyDefinedParameters) {
     auto opCtx = makeOperationContext();
-    const auto expCtx = ExpressionContext{opCtx.get(),
-                                          {},     // explain
-                                          false,  // fromMongos
-                                          false,  // needsMerge
-                                          false,  // allowDiskUse
-                                          false,  // bypassDocumentValidation
-                                          false,  // isMapReduce
-                                          NamespaceString{"test"_sd, "namespace"_sd},
-                                          {},  // runtime constants
-                                          {},  // collator
-                                          std::make_shared<StubMongoProcessInterface>(),
-                                          {},  // resolvedNamespaces
-                                          {},  // collUUID
-                                          BSON("a" << 12 << "b"
-                                                   << "$$a"
-                                                   << "c"
-                                                   << "$$b"),
-                                          false};
+    const auto expCtx =
+        ExpressionContext{opCtx.get(),
+                          {},     // explain
+                          false,  // fromMongos
+                          false,  // needsMerge
+                          false,  // allowDiskUse
+                          false,  // bypassDocumentValidation
+                          false,  // isMapReduce
+                          NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+                          {},  // runtime constants
+                          {},  // collator
+                          std::make_shared<StubMongoProcessInterface>(),
+                          {},  // resolvedNamespaces
+                          {},  // collUUID
+                          BSON("a" << 12 << "b"
+                                   << "$$a"
+                                   << "c"
+                                   << "$$b"),
+                          false};
     ASSERT_EQUALS(
         12.0, expCtx.variables.getValue(expCtx.variablesParseState.getVariable("c")).getDouble());
 }
 
 TEST_F(ExpressionContextTest, ParametersCanOverwriteInLeftToRightOrder) {
     auto opCtx = makeOperationContext();
-    const auto expCtx = ExpressionContext{opCtx.get(),
-                                          {},     // explain
-                                          false,  // fromMongos
-                                          false,  // needsMerge
-                                          false,  // allowDiskUse
-                                          false,  // bypassDocumentValidation
-                                          false,  // isMapReduce
-                                          NamespaceString{"test"_sd, "namespace"_sd},
-                                          {},  // runtime constants
-                                          {},  // collator
-                                          std::make_shared<StubMongoProcessInterface>(),
-                                          {},  // resolvedNamespaces
-                                          {},  // collUUID
-                                          BSON("x" << 12 << "b" << 10 << "x" << 20),
-                                          false};
+    const auto expCtx =
+        ExpressionContext{opCtx.get(),
+                          {},     // explain
+                          false,  // fromMongos
+                          false,  // needsMerge
+                          false,  // allowDiskUse
+                          false,  // bypassDocumentValidation
+                          false,  // isMapReduce
+                          NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+                          {},  // runtime constants
+                          {},  // collator
+                          std::make_shared<StubMongoProcessInterface>(),
+                          {},  // resolvedNamespaces
+                          {},  // collUUID
+                          BSON("x" << 12 << "b" << 10 << "x" << 20),
+                          false};
     ASSERT_EQUALS(
         20, expCtx.variables.getValue(expCtx.variablesParseState.getVariable("x")).getDouble());
 }
@@ -188,7 +194,8 @@ TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfNonConstant) {
                                             false,  // allowDiskUse
                                             false,  // bypassDocumentValidation
                                             false,  // isMapReduce
-                                            NamespaceString{"test"_sd, "namespace"_sd},
+                                            NamespaceString::createNamespaceString_forTest(
+                                                "test"_sd, "namespace"_sd),
                                             {},  // runtime constants
                                             {},  // collator
                                             std::make_shared<StubMongoProcessInterface>(),
@@ -204,21 +211,22 @@ TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfNonConstant) {
 TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfUppercase) {
     auto opCtx = makeOperationContext();
     ASSERT_THROWS_CODE(
-        static_cast<void>(ExpressionContext{opCtx.get(),
-                                            {},     // explain
-                                            false,  // fromMongos
-                                            false,  // needsMerge
-                                            false,  // allowDiskUse
-                                            false,  // bypassDocumentValidation
-                                            false,  // isMapReduce
-                                            NamespaceString{"test"_sd, "namespace"_sd},
-                                            {},  // runtime constants
-                                            {},  // collator
-                                            std::make_shared<StubMongoProcessInterface>(),
-                                            {},  // resolvedNamespaces
-                                            {},  // collUUID
-                                            BSON("A" << 12),
-                                            false}),
+        static_cast<void>(ExpressionContext{
+            opCtx.get(),
+            {},     // explain
+            false,  // fromMongos
+            false,  // needsMerge
+            false,  // allowDiskUse
+            false,  // bypassDocumentValidation
+            false,  // isMapReduce
+            NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+            {},  // runtime constants
+            {},  // collator
+            std::make_shared<StubMongoProcessInterface>(),
+            {},  // resolvedNamespaces
+            {},  // collUUID
+            BSON("A" << 12),
+            false}),
         DBException,
         ErrorCodes::FailedToParse);
 }

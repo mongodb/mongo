@@ -41,7 +41,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString nss("test.collection");
+const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.collection");
 const HostAndPort hostAndPort("testhost", 27017);
 const ShardId shardId("testshard");
 

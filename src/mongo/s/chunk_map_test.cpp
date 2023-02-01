@@ -33,7 +33,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss("TestDB", "TestColl");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const ShardId kThisShard("testShard");
 
 class ChunkMapTest : public unittest::Test {

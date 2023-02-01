@@ -103,7 +103,8 @@ ServiceContext::UniqueOperationContext makeOpCtx() {
 
 void CreateCollectionTest::validateValidator(const std::string& validatorStr,
                                              const int expectedError) {
-    NamespaceString newNss("test.newCollWithValidation");
+    NamespaceString newNss =
+        NamespaceString::createNamespaceString_forTest("test.newCollWithValidation");
 
     auto opCtx = makeOpCtx();
 
@@ -171,7 +172,7 @@ UUID getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
 }
 
 TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsWithSpecificUuidNoExistingCollection) {
-    NamespaceString newNss("test.newColl");
+    NamespaceString newNss = NamespaceString::createNamespaceString_forTest("test.newColl");
 
     auto opCtx = makeOpCtx();
     ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
@@ -189,8 +190,8 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsWithSpecificUuidNoExisti
 
 TEST_F(CreateCollectionTest,
        CreateCollectionForApplyOpsWithSpecificUuidNonDropPendingCurrentCollectionHasSameUuid) {
-    NamespaceString curNss("test.curColl");
-    NamespaceString newNss("test.newColl");
+    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
+    NamespaceString newNss = NamespaceString::createNamespaceString_forTest("test.newColl");
 
     auto opCtx = makeOpCtx();
     auto uuid = UUID::gen();
@@ -219,7 +220,7 @@ TEST_F(CreateCollectionTest,
 
 TEST_F(CreateCollectionTest,
        CreateCollectionForApplyOpsWithSpecificUuidRenamesExistingCollectionWithSameNameOutOfWay) {
-    NamespaceString newNss("test.newColl");
+    NamespaceString newNss = NamespaceString::createNamespaceString_forTest("test.newColl");
 
     auto opCtx = makeOpCtx();
     auto uuid = UUID::gen();
@@ -256,10 +257,10 @@ TEST_F(CreateCollectionTest,
 
 TEST_F(CreateCollectionTest,
        CreateCollectionForApplyOpsWithSpecificUuidReturnsNamespaceExistsIfCollectionIsDropPending) {
-    NamespaceString curNss("test.curColl");
+    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
     repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
     auto dropPendingNss = curNss.makeDropPendingNamespace(dropOpTime);
-    NamespaceString newNss("test.newColl");
+    NamespaceString newNss = NamespaceString::createNamespaceString_forTest("test.newColl");
 
     auto opCtx = makeOpCtx();
     auto uuid = UUID::gen();
@@ -305,7 +306,8 @@ TEST_F(CreateCollectionTest, ValidationOptions) {
 // <database>.system.resharding.* collection. The primary donor is responsible for validating
 // documents before they are inserted into the recipient's temporary resharding collection.
 TEST_F(CreateCollectionTest, ValidationDisabledForTemporaryReshardingCollection) {
-    NamespaceString reshardingNss("myDb", "system.resharding.yay");
+    NamespaceString reshardingNss =
+        NamespaceString::createNamespaceString_forTest("myDb", "system.resharding.yay");
     auto opCtx = makeOpCtx();
 
     Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
@@ -328,7 +330,7 @@ const auto kValidUrl1 = ExternalDataSourceMetadata::kUrlProtocolFile + "named_pi
 const auto kValidUrl2 = ExternalDataSourceMetadata::kUrlProtocolFile + "named_pipe2"s;
 
 TEST_F(CreateVirtualCollectionTest, VirtualCollectionOptionsWithOneSource) {
-    NamespaceString vcollNss("myDb", "vcoll.name");
+    NamespaceString vcollNss = NamespaceString::createNamespaceString_forTest("myDb", "vcoll.name");
     auto opCtx = makeOpCtx();
 
     Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
@@ -350,7 +352,7 @@ TEST_F(CreateVirtualCollectionTest, VirtualCollectionOptionsWithOneSource) {
 }
 
 TEST_F(CreateVirtualCollectionTest, VirtualCollectionOptionsWithMultiSource) {
-    NamespaceString vcollNss("myDb", "vcoll.name");
+    NamespaceString vcollNss = NamespaceString::createNamespaceString_forTest("myDb", "vcoll.name");
     auto opCtx = makeOpCtx();
 
     Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
@@ -378,7 +380,7 @@ TEST_F(CreateVirtualCollectionTest, VirtualCollectionOptionsWithMultiSource) {
 TEST_F(CreateVirtualCollectionTest, InvalidVirtualCollectionOptions) {
     using namespace fmt::literals;
 
-    NamespaceString vcollNss("myDb", "vcoll.name");
+    NamespaceString vcollNss = NamespaceString::createNamespaceString_forTest("myDb", "vcoll.name");
     auto opCtx = makeOpCtx();
 
     Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.

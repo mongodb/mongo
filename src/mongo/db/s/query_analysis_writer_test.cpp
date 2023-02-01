@@ -434,8 +434,10 @@ protected:
         assertBsonObjEqualUnordered(parsedDiffDoc.getDiff(), expectedDiff);
     }
 
-    const NamespaceString nss0{"testDb", "testColl0"};
-    const NamespaceString nss1{"testDb", "testColl1"};
+    const NamespaceString nss0 =
+        NamespaceString::createNamespaceString_forTest("testDb", "testColl0");
+    const NamespaceString nss1 =
+        NamespaceString::createNamespaceString_forTest("testDb", "testColl1");
 
     // Test with both empty and non-empty filter and collation to verify that the
     // QueryAnalysisWriter doesn't require filter or collation to be non-empty.

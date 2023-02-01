@@ -44,7 +44,8 @@ using std::string;
 using std::unique_ptr;
 using unittest::assertGet;
 
-static const NamespaceString nss("testdb.testcoll");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("testdb.testcoll");
 
 /**
  * Helper function to parse the given BSON object as a MatchExpression, checks the status,

@@ -75,8 +75,10 @@ protected:
     }
 
     const ShardId _shardId{_shardName};
-    const NamespaceString _nss1{"TestDB.TestColl1"};
-    const NamespaceString _nss2{"TestDB.TestColl2"};
+    const NamespaceString _nss1 =
+        NamespaceString::createNamespaceString_forTest("TestDB.TestColl1");
+    const NamespaceString _nss2 =
+        NamespaceString::createNamespaceString_forTest("TestDB.TestColl2");
     const KeyPattern _keyPattern{BSON("x" << 1)};
 };
 
@@ -467,13 +469,14 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
     setupCollection(_nss1, _keyPattern, {chunk, chunk2});
 
     ASSERT_THROWS(ShardingCatalogManager::get(operationContext())
-                      ->commitChunksMerge(operationContext(),
-                                          NamespaceString("TestDB.NonExistingColl"),
-                                          collEpoch,
-                                          collTimestamp,
-                                          collUuidAtRequest,
-                                          rangeToBeMerged,
-                                          _shardId),
+                      ->commitChunksMerge(
+                          operationContext(),
+                          NamespaceString::createNamespaceString_forTest("TestDB.NonExistingColl"),
+                          collEpoch,
+                          collTimestamp,
+                          collUuidAtRequest,
+                          rangeToBeMerged,
+                          _shardId),
                   DBException);
 }
 
@@ -920,7 +923,7 @@ protected:
     inline const static auto _shards =
         std::vector<ShardType>{ShardType{"shard0", "host0:123"}, ShardType{"shard1", "host1:123"}};
 
-    const NamespaceString _nss{"test.coll"};
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test.coll");
     const UUID _collUuid = UUID::gen();
 
     const OID _epoch = OID::gen();

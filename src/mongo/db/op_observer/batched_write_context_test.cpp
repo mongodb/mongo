@@ -66,7 +66,8 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTest,
     auto& bwc = BatchedWriteContext::get(opCtx);
     ASSERT(!bwc.writesAreBatched());
 
-    const NamespaceString nss{boost::none, "test", "coll"};
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     auto op = repl::MutableOplogEntry::makeDeleteOperation(nss, UUID::gen(), BSON("_id" << 0));
     bwc.addBatchedOperation(opCtx, op);
 }
@@ -81,7 +82,8 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTest,
     // Need to explicitly set writes are batched to simulate op observer starting batched write.
     bwc.setWritesAreBatched(true);
 
-    const NamespaceString nss{boost::none, "test", "coll"};
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     auto op = repl::MutableOplogEntry::makeDeleteOperation(nss, UUID::gen(), BSON("_id" << 0));
     bwc.addBatchedOperation(opCtx, op);
 }
@@ -97,7 +99,8 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTest,
     // Need to explicitly set writes are batched to simulate op observer starting batched write.
     bwc.setWritesAreBatched(true);
 
-    const NamespaceString nss{NamespaceString(boost::none, "other", "coll")};
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "other", "coll");
     auto op = repl::MutableOplogEntry::makeCreateCommand(nss, CollectionOptions(), BSON("v" << 2));
     bwc.addBatchedOperation(opCtx, op);
 }
@@ -115,7 +118,8 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTest,
     // Need to explicitly set writes are batched to simulate op observer starting batched write.
     bwc.setWritesAreBatched(true);
 
-    const NamespaceString nss{boost::none, "test", "coll"};
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     auto op = repl::MutableOplogEntry::makeDeleteOperation(nss, UUID::gen(), BSON("_id" << 0));
     op.setChangeStreamPreImageRecordingMode(
         repl::ReplOperation::ChangeStreamPreImageRecordingMode::kPreImagesCollection);
@@ -134,7 +138,8 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTest,
     // Need to explicitly set writes are batched to simulate op observer starting batched write.
     bwc.setWritesAreBatched(true);
 
-    const NamespaceString nss{boost::none, "test", "coll"};
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     auto op = repl::MutableOplogEntry::makeDeleteOperation(nss, UUID::gen(), BSON("_id" << 0));
     bwc.addBatchedOperation(opCtx, op);
 }
@@ -152,7 +157,8 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTest,
     // Need to explicitly set writes are batched to simulate op observer starting batched write.
     bwc.setWritesAreBatched(true);
 
-    const NamespaceString nss{boost::none, "test", "coll"};
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     auto op = repl::MutableOplogEntry::makeDeleteOperation(nss, UUID::gen(), BSON("_id" << 0));
     bwc.addBatchedOperation(opCtx, op);
 }
@@ -169,7 +175,8 @@ TEST_F(BatchedWriteContextTest, TestAcceptedBatchOperationsSucceeds) {
     BatchedWriteContext::BatchedOperations* ops = bwc.getBatchedOperations(opCtx);
     ASSERT(ops->isEmpty());
 
-    const NamespaceString nss{boost::none, "test", "coll"};
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     auto op = repl::MutableOplogEntry::makeDeleteOperation(nss, UUID::gen(), BSON("_id" << 0));
     bwc.addBatchedOperation(opCtx, op);
     ASSERT_FALSE(ops->isEmpty());

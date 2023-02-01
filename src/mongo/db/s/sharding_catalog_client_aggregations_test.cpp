@@ -78,7 +78,7 @@ public:
             for (const auto& shardId : entry.shardsIds) {
                 shardIds.push_back(ShardId(shardId));
             }
-            auto nss = NamespaceString(entry.ns);
+            auto nss = NamespaceString::createNamespaceString_forTest(entry.ns);
             auto uuid = [&] {
                 if (nss.coll().empty()) {
                     // no uuid for database
@@ -156,13 +156,13 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_S
 
     // 2 shards must own collection1
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(4, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(4, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"});
 
     // 2 shards must own collection2
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection2"), Timestamp(4, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection2"), Timestamp(4, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard3", "shard4"});
 }
@@ -183,7 +183,7 @@ TEST_F(CatalogClientAggregationsTest,
 
     // 3 shards must own collection1 at timestamp 4
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(4, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(4, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 }
@@ -202,17 +202,17 @@ TEST_F(CatalogClientAggregationsTest,
     setupConfigShard(opCtx, 3 /*nShards*/);
 
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection"), Timestamp(3, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection"), Timestamp(3, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db2.collection"), Timestamp(3, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db2.collection"), Timestamp(3, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard2"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db3.collection"), Timestamp(3, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db3.collection"), Timestamp(3, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard3"});
 }
@@ -234,27 +234,27 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_D
 
     // no shards at timestamp 0
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(0, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(0, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(1, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(1, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(2, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(2, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(4, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(4, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(5, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(5, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
 }
@@ -276,17 +276,17 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_S
     setupConfigShard(opCtx, 9 /*nShards*/);
 
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection"), Timestamp(1, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection"), Timestamp(1, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection2"), Timestamp(1, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection2"), Timestamp(1, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard4", "shard5"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db2.collection"), Timestamp(1, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db2.collection"), Timestamp(1, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard6", "shard7", "shard8", "shard9"});
 }
@@ -308,7 +308,7 @@ TEST_F(CatalogClientAggregationsTest,
     setupConfigShard(opCtx, 8 /*nShards*/);
 
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(4, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(4, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
 }
@@ -331,13 +331,13 @@ TEST_F(CatalogClientAggregationsTest,
     setupConfigShard(opCtx, 3 /*nShards*/);
 
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection2"), Timestamp(4, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection2"), Timestamp(4, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
 
     // Note: at timestamp 3 the collection's shard list is not empty
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection2"), Timestamp(3, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection2"), Timestamp(3, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 }
@@ -358,13 +358,13 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_A
     setupConfigShard(opCtx, 5 /*nShards*/);
 
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(2, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(2, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
 
     // Note: the primary shard is shard5 at timestamp 3
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(3, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(3, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard5", "shard2", "shard3", "shard4"});
 }
@@ -387,7 +387,7 @@ TEST_F(CatalogClientAggregationsTest,
     setupConfigShard(opCtx, 8 /*nShards*/);
 
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(1, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(1, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
 }
@@ -455,7 +455,7 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_Sin
     setupConfigShard(opCtx, 5 /*nShards*/);
 
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(3, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(3, 0));
 
     assertSameHistoricalPlacement(historicalPlacement,
                                   {"shard1", "shard2", "shard3", "shard4", "shard5"});
@@ -478,17 +478,17 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_Mul
     setupConfigShard(opCtx, 7 /*nShards*/);
 
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(5, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(5, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db2"), Timestamp(5, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db2"), Timestamp(5, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard4", "shard5", "shard6"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db3"), Timestamp(5, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db3"), Timestamp(5, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard7"});
 }
@@ -510,27 +510,27 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_Dif
 
     // no shards at timestamp 0
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(0, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(0, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(1, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(1, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(2, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(2, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(4, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(4, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(5, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(5, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
 }
@@ -552,13 +552,13 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_Sam
     setupConfigShard(opCtx, 9 /*nShards*/);
 
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(1, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(1, 0));
 
     assertSameHistoricalPlacement(historicalPlacement,
                                   {"shard1", "shard2", "shard3", "shard4", "shard5"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db2"), Timestamp(1, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db2"), Timestamp(1, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard6", "shard7", "shard8", "shard9"});
 }
@@ -580,7 +580,7 @@ TEST_F(CatalogClientAggregationsTest,
     setupConfigShard(opCtx, 8 /*nShards*/);
 
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(4, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(4, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
 }
@@ -602,13 +602,13 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_NoS
     setupConfigShard(opCtx, 3 /*nShards*/);
 
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(4, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(4, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {});
 
     // Note: at timestamp 3 the collection's shard list was not empty
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(3, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(3, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 }
@@ -628,13 +628,13 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_New
     setupConfigShard(opCtx, 4 /*nShards*/);
 
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(2, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(2, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     // At timestamp 3 the db shard list was updated with a new primary
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(3, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(3, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard4", "shard1", "shard2", "shard3"});
 }
@@ -910,7 +910,9 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_RegexSta
 
     // testing config.system.collections
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("config.system.collections"), Timestamp(7, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("config.system.collections"),
+        Timestamp(7, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 }
@@ -942,26 +944,26 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_RegexSta
     setupConfigShard(opCtx, 9 /*nShards*/);
 
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(12, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(12, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     // no data must be returned since the namespace is not found
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("d.collection1"), Timestamp(12, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("d.collection1"), Timestamp(12, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {});
 
     // database exists
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(12, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(12, 0));
 
     assertSameHistoricalPlacement(historicalPlacement,
                                   {"shard1", "shard2", "shard3", "shard7", "shard8", "shard9"});
 
     // database does not exist
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("d"), Timestamp(12, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("d"), Timestamp(12, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {});
 }
@@ -991,13 +993,13 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_RegexSta
 
     // db|db , db*db  etc... must not be found when quering by database
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(10, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(10, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     // db|db , db*db  etc... must not be found when quering by collection
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection"), Timestamp(10, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection"), Timestamp(10, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 }
@@ -1018,13 +1020,16 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_Snapshot
 
     setupConfigShard(opCtx, 2 /*nShards*/);
 
-    ASSERT_THROWS_CODE(catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-                           opCtx, NamespaceString("db"), Timestamp(4, 0)),
-                       DBException,
-                       ErrorCodes::SnapshotTooOld);
+    ASSERT_THROWS_CODE(
+        catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
+            opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(4, 0)),
+        DBException,
+        ErrorCodes::SnapshotTooOld);
 
     ASSERT_THROWS_CODE(catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-                           opCtx, NamespaceString("db.collection1"), Timestamp(4, 0)),
+                           opCtx,
+                           NamespaceString::createNamespaceString_forTest("db.collection1"),
+                           Timestamp(4, 0)),
                        DBException,
                        ErrorCodes::SnapshotTooOld);
 
@@ -1042,13 +1047,13 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_EmptyHis
 
     // no shards must be returned
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(4, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(4, 0));
 
     assertSameHistoricalPlacement(historicalPlacement, {});
 
     // no shards must be returned
     auto historicalPlacement2 = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(4, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(4, 0));
 
     ASSERT_EQ(0U, historicalPlacement.getShards().size());
 
@@ -1066,31 +1071,36 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_InvalidO
     auto opCtx = operationContext();
 
     // a namespace with collection must be provided
-    ASSERT_THROWS_CODE(catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-                           opCtx, NamespaceString(""), Timestamp(0, 0)),
-                       DBException,
-                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
+            opCtx, NamespaceString::createNamespaceString_forTest(""), Timestamp(0, 0)),
+        DBException,
+        ErrorCodes::InvalidOptions);
 
-    ASSERT_THROWS_CODE(catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-                           opCtx, NamespaceString("db"), Timestamp(0, 0)),
-                       DBException,
-                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
+            opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(0, 0)),
+        DBException,
+        ErrorCodes::InvalidOptions);
 
     // a namespace with only db must be provided
     ASSERT_THROWS_CODE(catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-                           opCtx, NamespaceString("db.collection"), Timestamp(0, 0)),
+                           opCtx,
+                           NamespaceString::createNamespaceString_forTest("db.collection"),
+                           Timestamp(0, 0)),
                        DBException,
                        ErrorCodes::InvalidOptions);
-    ASSERT_THROWS_CODE(catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-                           opCtx, NamespaceString(""), Timestamp(0, 0)),
-                       DBException,
-                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
+            opCtx, NamespaceString::createNamespaceString_forTest(""), Timestamp(0, 0)),
+        DBException,
+        ErrorCodes::InvalidOptions);
 }
 
 
 // ############################# Indexes #############################
 TEST_F(CatalogClientAggregationsTest, TestCollectionAndIndexesAggregationWithNoIndexes) {
-    const NamespaceString nss{"TestDB.TestColl"};
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("TestDB.TestColl");
     const ChunkVersion placementVersion{{OID::gen(), Timestamp(1, 0)}, {1, 0}};
     const std::string shardName = "shard01";
     const UUID uuid{UUID::gen()};
@@ -1113,7 +1123,7 @@ TEST_F(CatalogClientAggregationsTest, TestCollectionAndIndexesAggregationWithNoI
 }
 
 TEST_F(CatalogClientAggregationsTest, TestCollectionAndIndexesWithIndexes) {
-    const NamespaceString nss{"TestDB.TestColl"};
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("TestDB.TestColl");
     const ChunkVersion placementVersion{{OID::gen(), Timestamp(1, 0)}, {1, 0}};
     const std::string shardName = "shard01";
     const UUID uuid{UUID::gen()};
@@ -1143,8 +1153,10 @@ TEST_F(CatalogClientAggregationsTest, TestCollectionAndIndexesWithIndexes) {
 }
 
 TEST_F(CatalogClientAggregationsTest, TestCollectionAndIndexesWithMultipleCollections) {
-    const NamespaceString nssColl1{"TestDB.Collection1"};
-    const NamespaceString nssColl2{"TestDB.Collection2"};
+    const NamespaceString nssColl1 =
+        NamespaceString::createNamespaceString_forTest("TestDB.Collection1");
+    const NamespaceString nssColl2 =
+        NamespaceString::createNamespaceString_forTest("TestDB.Collection2");
     const ChunkVersion placementVersion{{OID::gen(), Timestamp(1, 0)}, {1, 0}};
     const std::string shardName = "shard01";
     const UUID uuidColl1{UUID::gen()};

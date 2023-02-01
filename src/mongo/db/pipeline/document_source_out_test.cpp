@@ -119,7 +119,8 @@ using DocumentSourceOutServerlessTest = ServerlessAggregationContextFixture;
 TEST_F(DocumentSourceOutServerlessTest,
        LiteParsedDocumentSourceLookupContainsExpectedNamespacesInServerless) {
     auto tenantId = TenantId(OID::gen());
-    NamespaceString nss(tenantId, "test", "testColl");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(tenantId, "test", "testColl");
     std::vector<BSONObj> pipeline;
 
     auto stageSpec = BSON("$out"
@@ -127,7 +128,9 @@ TEST_F(DocumentSourceOutServerlessTest,
     auto liteParsedLookup = DocumentSourceOut::LiteParsed::parse(nss, stageSpec.firstElement());
     auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
     ASSERT_EQ(1, namespaceSet.size());
-    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, "test", "some_collection")));
+    ASSERT_EQ(1ul,
+              namespaceSet.count(NamespaceString::createNamespaceString_forTest(
+                  tenantId, "test", "some_collection")));
 
     // The tenantId for the outputNs should be the same as that on the expCtx despite outputting
     // into different dbs.
@@ -138,7 +141,9 @@ TEST_F(DocumentSourceOutServerlessTest,
     liteParsedLookup = DocumentSourceOut::LiteParsed::parse(nss, stageSpec.firstElement());
     namespaceSet = liteParsedLookup->getInvolvedNamespaces();
     ASSERT_EQ(1, namespaceSet.size());
-    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, "target_db", "some_collection")));
+    ASSERT_EQ(1ul,
+              namespaceSet.count(NamespaceString::createNamespaceString_forTest(
+                  tenantId, "target_db", "some_collection")));
 }
 
 TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespacesInServerless) {
@@ -151,7 +156,8 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
     auto outStage = DocumentSourceOut::createFromBson(spec.firstElement(), expCtx);
     auto outSource = static_cast<DocumentSourceOut*>(outStage.get());
     ASSERT(outSource);
-    ASSERT_EQ(outSource->getOutputNs(), NamespaceString(defaultDb, targetColl));
+    ASSERT_EQ(outSource->getOutputNs(),
+              NamespaceString::createNamespaceString_forTest(defaultDb, targetColl));
 
     // Assert the tenantId is not included in the serialized namespace.
     auto serialized = outSource->serialize().getDocument();

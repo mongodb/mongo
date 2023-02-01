@@ -71,7 +71,8 @@ CollectionPtr coll(OperationContext* opCtx, const NamespaceString& nss) {
 
 TEST_F(IndexBuildsCoordinatorTest, ForegroundUniqueEnforce) {
     auto opCtx = operationContext();
-    NamespaceString nss("IndexBuildsCoordinatorTest.ForegroundUniqueEnforce");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.ForegroundUniqueEnforce");
     createCollectionWithDuplicateDocs(opCtx, nss);
 
     AutoGetCollection collection(opCtx, nss, MODE_X);
@@ -92,7 +93,8 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundUniqueEnforce) {
 
 TEST_F(IndexBuildsCoordinatorTest, ForegroundUniqueRelax) {
     auto opCtx = operationContext();
-    NamespaceString nss("IndexBuildsCoordinatorTest.ForegroundUniqueRelax");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.ForegroundUniqueRelax");
     createCollectionWithDuplicateDocs(opCtx, nss);
 
     AutoGetCollection collection(opCtx, nss, MODE_X);
@@ -111,7 +113,8 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundUniqueRelax) {
 
 TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexAlreadyExists) {
     auto opCtx = operationContext();
-    NamespaceString nss("IndexBuildsCoordinatorTest.ForegroundIndexAlreadyExists");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.ForegroundIndexAlreadyExists");
     createCollectionWithDuplicateDocs(opCtx, nss);
 
     AutoGetCollection collection(opCtx, nss, MODE_X);
@@ -135,7 +138,8 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexAlreadyExists) {
 
 TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexOptionsConflictEnforce) {
     auto opCtx = operationContext();
-    NamespaceString nss("IndexBuildsCoordinatorTest.ForegroundIndexOptionsConflictEnforce");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.ForegroundIndexOptionsConflictEnforce");
     createCollectionWithDuplicateDocs(opCtx, nss);
 
     AutoGetCollection collection(opCtx, nss, MODE_X);
@@ -162,7 +166,8 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexOptionsConflictEnforce) {
 
 TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexOptionsConflictRelax) {
     auto opCtx = operationContext();
-    NamespaceString nss("IndexBuildsCoordinatorTest.ForegroundIndexOptionsConflictRelax");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.ForegroundIndexOptionsConflictRelax");
     createCollectionWithDuplicateDocs(opCtx, nss);
 
     AutoGetCollection collection(opCtx, nss, MODE_X);

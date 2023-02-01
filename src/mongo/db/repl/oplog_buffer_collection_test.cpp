@@ -102,7 +102,8 @@ Client* OplogBufferCollectionTest::getClient() const {
  */
 template <typename T>
 NamespaceString makeNamespace(const T& t, const char* suffix = "") {
-    return NamespaceString("local." + t.getSuiteName() + "_" + t.getTestName() + suffix);
+    return NamespaceString::createNamespaceString_forTest("local." + t.getSuiteName() + "_" +
+                                                          t.getTestName() + suffix);
 }
 
 /**
@@ -150,7 +151,9 @@ TEST_F(OplogBufferCollectionTest, StartupWithUserProvidedNamespaceCreatesCollect
 
 TEST_F(OplogBufferCollectionTest, StartupWithOplogNamespaceTriggersUassert) {
     ASSERT_THROWS_CODE(testStartupCreatesCollection(
-                           _opCtx.get(), _storageInterface, NamespaceString("local.oplog.Z")),
+                           _opCtx.get(),
+                           _storageInterface,
+                           NamespaceString::createNamespaceString_forTest("local.oplog.Z")),
                        DBException,
                        28838);
 }

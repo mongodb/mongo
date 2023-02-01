@@ -254,16 +254,17 @@ TEST_F(ABTOptimizationTest, OptimizePipelineTests) {
     std::string scanDefA = "collA";
     std::string scanDefB = "collB";
     Metadata metadata{{{scanDefA, {}}, {scanDefB, {}}}};
-    testABTTranslationAndOptimization("optimized union",
-                                      "[{$unionWith: 'collB'}, {$match: {_id: 1}}]",
-                                      scanDefA,
-                                      {OptPhase::MemoSubstitutionPhase,
-                                       OptPhase::MemoExplorationPhase,
-                                       OptPhase::MemoImplementationPhase},
-                                      metadata,
-                                      {},
-                                      false,
-                                      {{NamespaceString("a." + scanDefB), {}}});
+    testABTTranslationAndOptimization(
+        "optimized union",
+        "[{$unionWith: 'collB'}, {$match: {_id: 1}}]",
+        scanDefA,
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        metadata,
+        {},
+        false,
+        {{NamespaceString::createNamespaceString_forTest("a." + scanDefB), {}}});
 
     testABTTranslationAndOptimization(
         "optimized common expression elimination",

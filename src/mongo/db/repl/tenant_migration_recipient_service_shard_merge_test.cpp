@@ -522,7 +522,8 @@ TEST_F(TenantMigrationRecipientServiceShardMergeTestInsert,
 
 TEST_F(TenantMigrationRecipientServiceShardMergeTest, CannotCreateServiceWithoutTenants) {
     const UUID migrationUUID = UUID::gen();
-    const NamespaceString aggregateNs = NamespaceString("admin.$cmd.aggregate");
+    const NamespaceString aggregateNs =
+        NamespaceString::createNamespaceString_forTest("admin.$cmd.aggregate");
 
     MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
 
@@ -547,7 +548,8 @@ TEST_F(TenantMigrationRecipientServiceShardMergeTest, OpenBackupCursorSuccessful
     stopFailPointEnableBlock fp("fpBeforeAdvancingStableTimestamp");
     const UUID migrationUUID = UUID::gen();
     const CursorId backupCursorId = 12345;
-    const NamespaceString aggregateNs = NamespaceString("admin.$cmd.aggregate");
+    const NamespaceString aggregateNs =
+        NamespaceString::createNamespaceString_forTest("admin.$cmd.aggregate");
 
     auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
     auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
@@ -616,7 +618,8 @@ TEST_F(TenantMigrationRecipientServiceShardMergeTest, OpenBackupCursorAndRetries
     stopFailPointEnableBlock fp("fpBeforeAdvancingStableTimestamp");
     const UUID migrationUUID = UUID::gen();
     const CursorId backupCursorId = 12345;
-    const NamespaceString aggregateNs = NamespaceString("admin.$cmd.aggregate");
+    const NamespaceString aggregateNs =
+        NamespaceString::createNamespaceString_forTest("admin.$cmd.aggregate");
 
     auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
     auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);

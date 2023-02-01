@@ -422,7 +422,7 @@ TEST(QueryRequestTest, OplogReplayFlagIsAllowedButIgnored) {
                        << "testns"
                        << "oplogReplay" << true << "tailable" << true << "$db"
                        << "test");
-    const NamespaceString nss{"test.testns"};
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.testns");
     auto findCommand = query_request_helper::makeFromFindCommandForTests(cmdObj);
 
     // Verify that the 'oplogReplay' flag does not appear if we reserialize the request.
@@ -1567,7 +1567,7 @@ TEST_F(QueryRequestTest, ParseFromUUID) {
 
     NamespaceStringOrUUID nssOrUUID("test", uuid);
     FindCommandRequest findCommand(nssOrUUID);
-    const NamespaceString nss("test.testns");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.testns");
     // Ensure a call to refreshNSS succeeds.
     query_request_helper::refreshNSS(nss, &findCommand);
     ASSERT_EQ(nss, *findCommand.getNamespaceOrUUID().nss());

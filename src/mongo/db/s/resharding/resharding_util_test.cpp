@@ -92,7 +92,7 @@ protected:
     }
 
 private:
-    const NamespaceString _nss{"test.foo"};
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test.foo");
     const std::string _shardKey = "x";
     const ShardKeyPattern _shardKeyPattern = ShardKeyPattern(BSON("x"
                                                                   << "hashed"));

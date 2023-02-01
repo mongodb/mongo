@@ -45,7 +45,8 @@ using namespace mongo;
 
 using projection_ast::Projection;
 
-const NamespaceString kTestNss = NamespaceString("db.projection_test");
+const NamespaceString kTestNss =
+    NamespaceString::createNamespaceString_forTest("db.projection_test");
 
 /**
  * Helper for creating projections.

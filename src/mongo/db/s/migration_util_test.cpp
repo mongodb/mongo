@@ -104,9 +104,15 @@ TEST_F(MigrationUtilsTest, TestOverlappingRangeQueryWithIntegerShardKey) {
     const auto uuid = UUID::gen();
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
-    store.add(opCtx, createDeletionTask(opCtx, NamespaceString{"one"}, uuid, 0, 10));
-    store.add(opCtx, createDeletionTask(opCtx, NamespaceString{"two"}, uuid, 10, 20));
-    store.add(opCtx, createDeletionTask(opCtx, NamespaceString{"three"}, uuid, 40, 50));
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("one"), uuid, 0, 10));
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("two"), uuid, 10, 20));
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("three"), uuid, 40, 50));
 
     ASSERT_EQ(store.count(opCtx), 3);
 
@@ -162,17 +168,17 @@ TEST_F(MigrationUtilsTest, TestOverlappingRangeQueryWithCompoundShardKeyWhereFir
 
     auto deletionTasks = {
         createDeletionTask(opCtx,
-                           NamespaceString{"one"},
+                           NamespaceString::createNamespaceString_forTest("one"),
                            uuid,
                            BSON("a" << 0 << "b" << 0),
                            BSON("a" << 0 << "b" << 10)),
         createDeletionTask(opCtx,
-                           NamespaceString{"two"},
+                           NamespaceString::createNamespaceString_forTest("two"),
                            uuid,
                            BSON("a" << 0 << "b" << 10),
                            BSON("a" << 0 << "b" << 20)),
         createDeletionTask(opCtx,
-                           NamespaceString{"one"},
+                           NamespaceString::createNamespaceString_forTest("one"),
                            uuid,
                            BSON("a" << 0 << "b" << 40),
                            BSON("a" << 0 << "b" << 50)),
@@ -245,17 +251,17 @@ TEST_F(MigrationUtilsTest,
 
     auto deletionTasks = {
         createDeletionTask(opCtx,
-                           NamespaceString{"one"},
+                           NamespaceString::createNamespaceString_forTest("one"),
                            uuid,
                            BSON("a" << 0 << "b" << 0),
                            BSON("a" << 10 << "b" << 0)),
         createDeletionTask(opCtx,
-                           NamespaceString{"two"},
+                           NamespaceString::createNamespaceString_forTest("two"),
                            uuid,
                            BSON("a" << 10 << "b" << 0),
                            BSON("a" << 20 << "b" << 0)),
         createDeletionTask(opCtx,
-                           NamespaceString{"one"},
+                           NamespaceString::createNamespaceString_forTest("one"),
                            uuid,
                            BSON("a" << 40 << "b" << 0),
                            BSON("a" << 50 << "b" << 0)),
@@ -325,9 +331,15 @@ TEST_F(MigrationUtilsTest, TestInvalidUUID) {
     const auto uuid = UUID::gen();
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
-    store.add(opCtx, createDeletionTask(opCtx, NamespaceString{"one"}, uuid, 0, 10));
-    store.add(opCtx, createDeletionTask(opCtx, NamespaceString{"two"}, uuid, 10, 20));
-    store.add(opCtx, createDeletionTask(opCtx, NamespaceString{"three"}, uuid, 40, 50));
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("one"), uuid, 0, 10));
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("two"), uuid, 10, 20));
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("three"), uuid, 40, 50));
 
     ASSERT_EQ(store.count(opCtx), 3);
 

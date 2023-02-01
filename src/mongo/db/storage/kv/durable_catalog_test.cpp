@@ -66,7 +66,7 @@ public:
     void setUp() override {
         CatalogTestFixture::setUp();
 
-        _nss = NamespaceString("unittests.durable_catalog");
+        _nss = NamespaceString::createNamespaceString_forTest("unittests.durable_catalog");
         _collectionUUID = createCollection(_nss, CollectionOptions()).uuid;
     }
 
@@ -271,7 +271,7 @@ protected:
         return res;
     }
 
-    NamespaceString nss{"unittest", "import"};
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("unittest", "import");
     std::string ident;
     std::string idxIdent;
     std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md;
@@ -806,7 +806,7 @@ TEST_F(DurableCatalogTest, IdentSuffixUsesRand) {
     const std::string rand = "0000000000000000000";
     getCatalog()->setRand_forTest(rand);
 
-    const NamespaceString nss = NamespaceString("a.b");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
 
     auto uuid = (createCollection(nss, CollectionOptions())).uuid;
     auto collection = CollectionCatalog::get(operationContext())
@@ -832,7 +832,7 @@ TEST_F(ImportCollectionTest, ImportCollectionRandConflict) {
 
     {
         // Check that a newly created collection doesn't use 'rand' as the suffix in the ident.
-        const NamespaceString nss = NamespaceString("a.b");
+        const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
         auto catalogId = (createCollection(nss, CollectionOptions())).catalogId;
 
         ASSERT(!StringData(getCatalog()->getEntry(catalogId).ident).endsWith(rand));
@@ -846,7 +846,8 @@ TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLa
     serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
 
     {
-        const NamespaceString regularNss = NamespaceString("test.regular");
+        const NamespaceString regularNss =
+            NamespaceString::createNamespaceString_forTest("test.regular");
         createCollection(regularNss, CollectionOptions());
 
         Lock::GlobalLock globalLock{operationContext(), MODE_IS};
@@ -859,7 +860,8 @@ TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLa
     }
 
     {
-        const NamespaceString bucketsNss = NamespaceString("system.buckets.ts");
+        const NamespaceString bucketsNss =
+            NamespaceString::createNamespaceString_forTest("system.buckets.ts");
         CollectionOptions options;
         options.timeseries = TimeseriesOptions(/*timeField=*/"t");
         createCollection(bucketsNss, options);
@@ -881,7 +883,8 @@ TEST_F(DurableCatalogTest, CreateCollectionCatalogEntryHasCorrectTenantNamespace
     gMultitenancySupport = true;
 
     auto tenantId = TenantId(OID::gen());
-    const NamespaceString nss = NamespaceString(tenantId, "test.regular");
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(tenantId, "test.regular");
     createCollection(nss, CollectionOptions());
 
     auto collection = CollectionCatalog::get(operationContext())
@@ -910,15 +913,17 @@ TEST_F(DurableCatalogTest, ScanForCatalogEntryByNssBasic) {
      */
 
     auto tenantId = TenantId(OID::gen());
-    const NamespaceString nssFirst = NamespaceString(tenantId, "test.first");
+    const NamespaceString nssFirst =
+        NamespaceString::createNamespaceString_forTest(tenantId, "test.first");
     auto catalogIdAndUUIDFirst = createCollection(nssFirst, CollectionOptions());
 
-    const NamespaceString nssSecond = NamespaceString("system.buckets.ts");
+    const NamespaceString nssSecond =
+        NamespaceString::createNamespaceString_forTest("system.buckets.ts");
     CollectionOptions options;
     options.timeseries = TimeseriesOptions(/*timeField=*/"t");
     auto catalogIdAndUUIDSecond = createCollection(nssSecond, options);
 
-    const NamespaceString nssThird = NamespaceString("test.third");
+    const NamespaceString nssThird = NamespaceString::createNamespaceString_forTest("test.third");
     auto catalogIdAndUUIDThird = createCollection(nssThird, CollectionOptions());
 
     /**
@@ -954,8 +959,8 @@ TEST_F(DurableCatalogTest, ScanForCatalogEntryByNssBasic) {
               nssFirst);
     ASSERT_EQ(getCatalog()->getEntry(catalogIdAndUUIDFirst.catalogId).nss, nssFirst);
 
-    auto catalogEntryDoesNotExist =
-        getCatalog()->scanForCatalogEntryByNss(operationContext(), NamespaceString("foo", "bar"));
+    auto catalogEntryDoesNotExist = getCatalog()->scanForCatalogEntryByNss(
+        operationContext(), NamespaceString::createNamespaceString_forTest("foo", "bar"));
     ASSERT(catalogEntryDoesNotExist == boost::none);
 }
 

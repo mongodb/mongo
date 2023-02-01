@@ -71,7 +71,9 @@ ShardsvrMoveRange createMoveRangeRequest(const NamespaceString& nss,
 
 TEST_F(MoveChunkRegistration, ScopedDonateChunkMoveConstructorAndAssignment) {
     auto originalScopedDonateChunk = assertGet(_registry.registerDonateChunk(
-        _opCtx, createMoveRangeRequest(NamespaceString("TestDB", "TestColl"))));
+        _opCtx,
+        createMoveRangeRequest(
+            NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"))));
     ASSERT(originalScopedDonateChunk.mustExecute());
 
     ScopedDonateChunk movedScopedDonateChunk(std::move(originalScopedDonateChunk));
@@ -87,7 +89,8 @@ TEST_F(MoveChunkRegistration, ScopedDonateChunkMoveConstructorAndAssignment) {
 TEST_F(MoveChunkRegistration, GetActiveMigrationNamespace) {
     ASSERT(!_registry.getActiveDonateChunkNss());
 
-    const NamespaceString nss("TestDB", "TestColl");
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
     auto originalScopedDonateChunk =
         assertGet(_registry.registerDonateChunk(operationContext(), createMoveRangeRequest(nss)));
@@ -100,10 +103,14 @@ TEST_F(MoveChunkRegistration, GetActiveMigrationNamespace) {
 
 TEST_F(MoveChunkRegistration, SecondMigrationReturnsConflictingOperationInProgress) {
     auto originalScopedDonateChunk = assertGet(_registry.registerDonateChunk(
-        operationContext(), createMoveRangeRequest(NamespaceString("TestDB", "TestColl1"))));
+        operationContext(),
+        createMoveRangeRequest(
+            NamespaceString::createNamespaceString_forTest("TestDB", "TestColl1"))));
 
     auto secondScopedDonateChunkStatus = _registry.registerDonateChunk(
-        operationContext(), createMoveRangeRequest(NamespaceString("TestDB", "TestColl2")));
+        operationContext(),
+        createMoveRangeRequest(
+            NamespaceString::createNamespaceString_forTest("TestDB", "TestColl2")));
     ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
               secondScopedDonateChunkStatus.getStatus());
 
@@ -116,14 +123,17 @@ TEST_F(MoveChunkRegistration, SecondMigrationWithSameArgumentsJoinsFirst) {
     auto swOriginalScopedDonateChunkPtr =
         std::make_unique<StatusWith<ScopedDonateChunk>>(_registry.registerDonateChunk(
             operationContext(),
-            createMoveRangeRequest(NamespaceString("TestDB", "TestColl"), epoch)));
+            createMoveRangeRequest(
+                NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"), epoch)));
 
     ASSERT_OK(swOriginalScopedDonateChunkPtr->getStatus());
     auto& originalScopedDonateChunk = swOriginalScopedDonateChunkPtr->getValue();
     ASSERT(originalScopedDonateChunk.mustExecute());
 
     auto secondScopedDonateChunk = assertGet(_registry.registerDonateChunk(
-        operationContext(), createMoveRangeRequest(NamespaceString("TestDB", "TestColl"), epoch)));
+        operationContext(),
+        createMoveRangeRequest(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
+                               epoch)));
     ASSERT(!secondScopedDonateChunk.mustExecute());
 
     originalScopedDonateChunk.signalComplete({ErrorCodes::InternalError, "Test error"});
@@ -177,7 +187,9 @@ TEST_F(MoveChunkRegistration, TestBlockingDonateChunk) {
         // 6. Now that we're woken up by the registry thread, let's attempt to start to donate.
         // This will block and call the lambda set on the baton above.
         auto scopedDonateChunk = _registry.registerDonateChunk(
-            opCtx.get(), createMoveRangeRequest(NamespaceString("TestDB", "TestColl")));
+            opCtx.get(),
+            createMoveRangeRequest(
+                NamespaceString::createNamespaceString_forTest("TestDB", "TestColl")));
 
         ASSERT_OK(scopedDonateChunk.getStatus());
         scopedDonateChunk.getValue().signalComplete(Status::OK());
@@ -238,12 +250,12 @@ TEST_F(MoveChunkRegistration, TestBlockingReceiveChunk) {
 
         // 6. Now that we're woken up by the registry thread, let's attempt to start to receive.
         // This will block and call the lambda set on the baton above.
-        auto scopedReceiveChunk =
-            _registry.registerReceiveChunk(opCtx.get(),
-                                           NamespaceString("TestDB", "TestColl"),
-                                           ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
-                                           ShardId("shard0001"),
-                                           false);
+        auto scopedReceiveChunk = _registry.registerReceiveChunk(
+            opCtx.get(),
+            NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
+            ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
+            ShardId("shard0001"),
+            false);
 
         ASSERT_OK(scopedReceiveChunk.getStatus());
 
@@ -273,7 +285,9 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileDonateInProgress) {
     auto result = stdx::async(stdx::launch::async, [&] {
         // 2. Start a migration so that the registry lock will block when acquired.
         auto scopedDonateChunk = _registry.registerDonateChunk(
-            operationContext(), createMoveRangeRequest(NamespaceString("TestDB", "TestColl")));
+            operationContext(),
+            createMoveRangeRequest(
+                NamespaceString::createNamespaceString_forTest("TestDB", "TestColl")));
         ASSERT_OK(scopedDonateChunk.getStatus());
 
         // 3. Signal the registry locking thread that the registry is ready to be locked.
@@ -334,12 +348,12 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileReceiveInProgress) {
     // Migration thread.
     auto result = stdx::async(stdx::launch::async, [&] {
         // 2. Start a migration so that the registry lock will block when acquired.
-        auto scopedReceiveChunk =
-            _registry.registerReceiveChunk(operationContext(),
-                                           NamespaceString("TestDB", "TestColl"),
-                                           ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
-                                           ShardId("shard0001"),
-                                           false);
+        auto scopedReceiveChunk = _registry.registerReceiveChunk(
+            operationContext(),
+            NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
+            ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
+            ShardId("shard0001"),
+            false);
         ASSERT_OK(scopedReceiveChunk.getStatus());
 
         // 3. Signal the registry locking thread that the registry is ready to be locked.

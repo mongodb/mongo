@@ -70,7 +70,7 @@ TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfNotRunOnAdmin) {
 }
 
 TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfNotRunWithAggregateOne) {
-    getExpCtx()->ns = NamespaceString("admin.foo");
+    getExpCtx()->ns = NamespaceString::createNamespaceString_forTest("admin.foo");
     ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(
                            fromjson("{$telemetry: {}}").firstElement(), getExpCtx()),
                        AssertionException,

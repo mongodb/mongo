@@ -50,7 +50,7 @@ public:
 };
 
 TEST_F(DocumentShardKeyUpdateTest, constructShardKeyDeleteCmdObj) {
-    NamespaceString nss("test.foo");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
     BSONObj updatePreImage = BSON("x" << 4 << "y" << 3 << "_id" << 20);
 
     auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, updatePreImage);
@@ -66,7 +66,7 @@ TEST_F(DocumentShardKeyUpdateTest, constructShardKeyDeleteCmdObj) {
 }
 
 TEST_F(DocumentShardKeyUpdateTest, constructShardKeyInsertCmdObj) {
-    NamespaceString nss("test.foo");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
     BSONObj updatePostImage = BSON("x" << 4 << "y" << 3 << "_id" << 20);
 
     auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage, false);

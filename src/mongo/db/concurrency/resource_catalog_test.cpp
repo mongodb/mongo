@@ -41,13 +41,16 @@ public:
     }
 
 protected:
-    NamespaceString firstCollection{boost::none, "1661880728"};
+    NamespaceString firstCollection =
+        NamespaceString::createNamespaceString_forTest(boost::none, "1661880728");
     ResourceId firstResourceId{RESOURCE_COLLECTION, firstCollection};
 
-    NamespaceString secondCollection{boost::none, "1626936312"};
+    NamespaceString secondCollection =
+        NamespaceString::createNamespaceString_forTest(boost::none, "1626936312");
     ResourceId secondResourceId{RESOURCE_COLLECTION, secondCollection};
 
-    NamespaceString thirdCollection{boost::none, "2930102946"};
+    NamespaceString thirdCollection =
+        NamespaceString::createNamespaceString_forTest(boost::none, "2930102946");
     ResourceId thirdResourceId{RESOURCE_COLLECTION, thirdCollection};
 
     ResourceCatalog catalog;
@@ -81,7 +84,8 @@ TEST_F(ResourceCatalogTest, RemoveTest) {
     catalog.add(thirdResourceId, thirdCollection);
 
     // This fails to remove the resource because of an invalid namespace.
-    catalog.remove(firstResourceId, NamespaceString(boost::none, "BadNamespace"));
+    catalog.remove(firstResourceId,
+                   NamespaceString::createNamespaceString_forTest(boost::none, "BadNamespace"));
     auto resource = catalog.name(firstResourceId);
     ASSERT_EQ(firstCollection.toStringWithTenantId(), *resource);
 
@@ -147,7 +151,7 @@ DEATH_TEST_F(ResourceCatalogTest, AddDatabaseInvalidResourceType, "invariant") {
 }
 
 DEATH_TEST_F(ResourceCatalogTest, AddCollectionInvalidResourceType, "invariant") {
-    catalog.add({RESOURCE_GLOBAL, 0}, NamespaceString{"db.coll"});
+    catalog.add({RESOURCE_GLOBAL, 0}, NamespaceString::createNamespaceString_forTest("db.coll"));
 }
 }  // namespace
 }  // namespace mongo

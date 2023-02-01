@@ -81,7 +81,8 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
 
 TEST(BatchedCommandRequest, InsertCloneWithIds) {
     BatchedCommandRequest batchedRequest([&] {
-        write_ops::InsertCommandRequest insertOp(NamespaceString("xyz.abc"));
+        write_ops::InsertCommandRequest insertOp(
+            NamespaceString::createNamespaceString_forTest("xyz.abc"));
         insertOp.setWriteCommandRequestBase([] {
             write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(true);

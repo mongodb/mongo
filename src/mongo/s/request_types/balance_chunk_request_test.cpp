@@ -43,14 +43,14 @@ TEST(BalanceChunkRequest, RoundTrip) {
     UUID uuid{UUID::gen()};
     ChunkVersion version({OID::gen(), Timestamp(2, 0)}, {30, 1});
     auto obj = BalanceChunkRequest::serializeToRebalanceCommandForConfig(
-        NamespaceString("DB.Test"),
+        NamespaceString::createNamespaceString_forTest("DB.Test"),
         ChunkRange(BSON("A" << 100), BSON("A" << 200)),
         uuid,
         ShardId("TestShard"),
         version);
 
     auto request = assertGet(BalanceChunkRequest::parseFromConfigCommand(obj));
-    ASSERT_EQ(NamespaceString("DB.Test"), request.getNss());
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest("DB.Test"), request.getNss());
     ASSERT_BSONOBJ_EQ(ChunkRange(BSON("A" << 100), BSON("A" << 200)).toBSON(),
                       request.getChunk().getRange().toBSON());
     ASSERT_EQ(uuid, request.getChunk().getCollectionUUID());

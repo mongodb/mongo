@@ -1091,7 +1091,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
 
     ASSERT(opCtx.get());
     const std::string ns = "testRecordStore";
-    const NamespaceString nss(ns);
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
     const std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
     const StatusWith<std::string> result =
         WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName,

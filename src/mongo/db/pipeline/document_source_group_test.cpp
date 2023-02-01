@@ -258,8 +258,9 @@ class Base : public ServiceContextTest {
 public:
     Base(GroupStageType groupStageType = GroupStageType::Default)
         : _opCtx(makeOperationContext()),
-          _ctx(new ExpressionContextForTest(_opCtx.get(),
-                                            AggregateCommandRequest(NamespaceString(ns), {}))),
+          _ctx(new ExpressionContextForTest(
+              _opCtx.get(),
+              AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(ns), {}))),
           _tempDir("DocumentSourceGroupTest"),
           _groupStageType(groupStageType) {}
 
@@ -298,7 +299,8 @@ protected:
         BSONElement specElement = namedSpec.firstElement();
 
         intrusive_ptr<ExpressionContextForTest> expressionContext = new ExpressionContextForTest(
-            _opCtx.get(), AggregateCommandRequest(NamespaceString(ns), {}));
+            _opCtx.get(),
+            AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(ns), {}));
         expressionContext->allowDiskUse = true;
         // For $group, 'inShard' implies 'fromMongos' and 'needsMerge'.
         expressionContext->fromMongos = expressionContext->needsMerge = inShard;

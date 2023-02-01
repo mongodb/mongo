@@ -122,9 +122,11 @@ protected:
     const DatabaseName dbNameTestDb{"test"};
     const DatabaseVersion dbVersionTestDb{UUID::gen(), Timestamp(1, 0)};
 
-    const NamespaceString nssUnshardedCollection1{dbNameTestDb, "unsharded"};
+    const NamespaceString nssUnshardedCollection1 =
+        NamespaceString::createNamespaceString_forTest(dbNameTestDb, "unsharded");
 
-    const NamespaceString nssShardedCollection1{dbNameTestDb, "sharded"};
+    const NamespaceString nssShardedCollection1 =
+        NamespaceString::createNamespaceString_forTest(dbNameTestDb, "sharded");
     const ShardVersion shardVersionShardedCollection1{
         ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(5, 0)}, CollectionPlacement(10, 1)),
         boost::optional<CollectionIndexes>(boost::none)};
@@ -178,7 +180,8 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
     }
 
     {
-        const NamespaceString anotherCollection("test2.foo");
+        const NamespaceString anotherCollection =
+            NamespaceString::createNamespaceString_forTest("test2.foo");
         ScopedSetShardRole setShardRole(
             opCtx(), anotherCollection, ShardVersion::UNSHARDED(), dbVersionTestDb);
         NamespaceOrViewAcquisitionRequest acquisitionRequest(opCtx(), nss, {});
@@ -486,7 +489,8 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithoutSpecifyingPlacementVersion) {
 // Acquire inexistent collections
 
 TEST_F(ShardRoleTest, AcquireCollectionFailsIfItDoesNotExist) {
-    const NamespaceString inexistentNss(dbNameTestDb, "inexistent");
+    const NamespaceString inexistentNss =
+        NamespaceString::createNamespaceString_forTest(dbNameTestDb, "inexistent");
     NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern;
     ASSERT_THROWS_CODE(
         acquireCollectionsOrViews(opCtx(),
@@ -501,7 +505,8 @@ TEST_F(ShardRoleTest, AcquireCollectionFailsIfItDoesNotExist) {
 
 TEST_F(ShardRoleTest, AcquireInexistentCollectionWithWrongPlacementThrowsBecauseWrongPlacement) {
     const auto incorrectDbVersion = dbVersionTestDb.makeUpdated();
-    const NamespaceString inexistentNss(dbNameTestDb, "inexistent");
+    const NamespaceString inexistentNss =
+        NamespaceString::createNamespaceString_forTest(dbNameTestDb, "inexistent");
 
     NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern{incorrectDbVersion, {}};
     ASSERT_THROWS_WITH_CHECK(

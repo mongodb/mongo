@@ -99,7 +99,7 @@ void DatabaseTest::setUp() {
     opObserverRegistry->addObserver(
         std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterMock>()));
 
-    _nss = NamespaceString("test.foo");
+    _nss = NamespaceString::createNamespaceString_forTest("test.foo");
 }
 
 void DatabaseTest::tearDown() {
@@ -287,7 +287,7 @@ TEST_F(DatabaseTest,
 TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUuidCatalog) {
     auto opCtx = _opCtx.get();
     auto fromNss = _nss;
-    auto toNss = NamespaceString(fromNss.getSisterNS("bar"));
+    auto toNss = NamespaceString::createNamespaceString_forTest(fromNss.getSisterNS("bar"));
     ASSERT_NOT_EQUALS(fromNss, toNss);
 
     AutoGetDb autoDb(opCtx, fromNss.dbName(), MODE_X);
@@ -398,7 +398,8 @@ TEST_F(
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             "abcdefghijklmnopqrstuvwxyz"_sd;
         for (const auto c : charsToChooseFrom) {
-            NamespaceString nss(_nss.db(), model.substr(0, model.find('%')) + std::string(1U, c));
+            NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+                _nss.dbName(), model.substr(0, model.find('%')) + std::string(1U, c));
             WriteUnitOfWork wuow(_opCtx.get());
             ASSERT_TRUE(db->createCollection(_opCtx.get(), nss));
             wuow.commit();
@@ -412,7 +413,7 @@ TEST_F(
 }
 
 TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineNow) {
-    NamespaceString nss("test", "coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     Lock::DBLock lock(_opCtx.get(), nss.dbName(), MODE_X);
     ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     try {
@@ -424,7 +425,7 @@ TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineNow) {
 }
 
 TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineMin) {
-    NamespaceString nss("test", "coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     Lock::DBLock lock(_opCtx.get(), nss.dbName(), MODE_X);
     ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     try {
@@ -436,7 +437,7 @@ TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineMin) {
 }
 
 TEST_F(DatabaseTest, AutoGetCollectionForReadCommandSucceedsWithDeadlineNow) {
-    NamespaceString nss("test", "coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     Lock::DBLock dbLock(_opCtx.get(), nss.dbName(), MODE_X);
     ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     Lock::CollectionLock collLock(_opCtx.get(), nss, MODE_X);
@@ -450,7 +451,7 @@ TEST_F(DatabaseTest, AutoGetCollectionForReadCommandSucceedsWithDeadlineNow) {
 }
 
 TEST_F(DatabaseTest, AutoGetCollectionForReadCommandSucceedsWithDeadlineMin) {
-    NamespaceString nss("test", "coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     Lock::DBLock dbLock(_opCtx.get(), nss.dbName(), MODE_X);
     ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     Lock::CollectionLock collLock(_opCtx.get(), nss, MODE_X);

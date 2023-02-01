@@ -203,30 +203,30 @@ public:
 };
 
 TEST_F(ViewCatalogFixture, CreateExistingView) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     ASSERT_NOT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 }
 
 TEST_F(ViewCatalogFixture, CreateViewOnDifferentDatabase) {
-    const NamespaceString viewName("db1.view");
-    const NamespaceString viewOn("db2.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db1.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db2.coll");
 
     ASSERT_NOT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 }
 
 TEST_F(ViewCatalogFixture, CanCreateViewWithExprPredicate) {
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
     ASSERT_OK(createView(operationContext(),
-                         NamespaceString("db.view1"),
+                         NamespaceString::createNamespaceString_forTest("db.view1"),
                          viewOn,
                          BSON_ARRAY(BSON("$match" << BSON("$expr" << 1))),
                          emptyCollation));
 
     ASSERT_OK(createView(operationContext(),
-                         NamespaceString("db.view2"),
+                         NamespaceString::createNamespaceString_forTest("db.view2"),
                          viewOn,
                          BSON_ARRAY(BSON("$facet" << BSON("output" << BSON_ARRAY(BSON(
                                                               "$match" << BSON("$expr" << 1)))))),
@@ -234,17 +234,17 @@ TEST_F(ViewCatalogFixture, CanCreateViewWithExprPredicate) {
 }
 
 TEST_F(ViewCatalogFixture, CanCreateViewWithJSONSchemaPredicate) {
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
     ASSERT_OK(createView(
         operationContext(),
-        NamespaceString("db.view1"),
+        NamespaceString::createNamespaceString_forTest("db.view1"),
         viewOn,
         BSON_ARRAY(BSON("$match" << BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("x"))))),
         emptyCollation));
 
     ASSERT_OK(createView(
         operationContext(),
-        NamespaceString("db.view2"),
+        NamespaceString::createNamespaceString_forTest("db.view2"),
         viewOn,
         BSON_ARRAY(BSON(
             "$facet" << BSON(
@@ -254,9 +254,9 @@ TEST_F(ViewCatalogFixture, CanCreateViewWithJSONSchemaPredicate) {
 }
 
 TEST_F(ViewCatalogFixture, CanCreateViewWithLookupUsingPipelineSyntax) {
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
     ASSERT_OK(createView(operationContext(),
-                         NamespaceString("db.view"),
+                         NamespaceString::createNamespaceString_forTest("db.view"),
                          viewOn,
                          BSON_ARRAY(BSON("$lookup" << BSON("from"
                                                            << "fcoll"
@@ -267,8 +267,8 @@ TEST_F(ViewCatalogFixture, CanCreateViewWithLookupUsingPipelineSyntax) {
 }
 
 TEST_F(ViewCatalogFixture, CreateViewWithPipelineFailsOnInvalidStageName) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
     auto invalidPipeline = BSON_ARRAY(BSON("INVALID_STAGE_NAME" << 1));
     ASSERT_THROWS(createView(operationContext(), viewName, viewOn, invalidPipeline, emptyCollation),
@@ -276,8 +276,8 @@ TEST_F(ViewCatalogFixture, CreateViewWithPipelineFailsOnInvalidStageName) {
 }
 
 TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnChangeStreamsStage) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
     // $changeStream cannot be used in a view definition pipeline.
     auto invalidPipeline = BSON_ARRAY(BSON("$changeStream" << BSONObj()));
@@ -289,8 +289,8 @@ TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnChangeStreamsStage) 
 }
 
 TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnCollectionlessStage) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
     auto invalidPipeline = BSON_ARRAY(BSON("$currentOp" << BSONObj()));
 
@@ -301,8 +301,8 @@ TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnCollectionlessStage)
 }
 
 TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnIneligibleStagePersistentWrite) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
     // $out cannot be used in a view definition pipeline.
     auto invalidPipeline = BSON_ARRAY(BSON("$out"
@@ -323,8 +323,8 @@ TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnIneligibleStagePersi
 }
 
 TEST_F(ViewCatalogFixture, CreateViewOnInvalidCollectionName) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.$coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.$coll");
 
     ASSERT_NOT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 }
@@ -334,14 +334,18 @@ TEST_F(ViewCatalogFixture, ExceedMaxViewDepthInOrder) {
     int i = 0;
 
     for (; i < ViewGraph::kMaxViewDepth; i++) {
-        const NamespaceString viewName(str::stream() << ns << i);
-        const NamespaceString viewOn(str::stream() << ns << (i + 1));
+        const NamespaceString viewName =
+            NamespaceString::createNamespaceString_forTest(str::stream() << ns << i);
+        const NamespaceString viewOn =
+            NamespaceString::createNamespaceString_forTest(str::stream() << ns << (i + 1));
 
         ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     }
 
-    const NamespaceString viewName(str::stream() << ns << i);
-    const NamespaceString viewOn(str::stream() << ns << (i + 1));
+    const NamespaceString viewName =
+        NamespaceString::createNamespaceString_forTest(str::stream() << ns << i);
+    const NamespaceString viewOn =
+        NamespaceString::createNamespaceString_forTest(str::stream() << ns << (i + 1));
 
     ASSERT_NOT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 }
@@ -352,38 +356,44 @@ TEST_F(ViewCatalogFixture, ExceedMaxViewDepthByJoining) {
     int size = ViewGraph::kMaxViewDepth * 2 / 3;
 
     for (; i < size; i++) {
-        const NamespaceString viewName(str::stream() << ns << i);
-        const NamespaceString viewOn(str::stream() << ns << (i + 1));
+        const NamespaceString viewName =
+            NamespaceString::createNamespaceString_forTest(str::stream() << ns << i);
+        const NamespaceString viewOn =
+            NamespaceString::createNamespaceString_forTest(str::stream() << ns << (i + 1));
 
         ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     }
 
     for (i = 1; i < size + 1; i++) {
-        const NamespaceString viewName(str::stream() << ns << (size + i));
-        const NamespaceString viewOn(str::stream() << ns << (size + i + 1));
+        const NamespaceString viewName =
+            NamespaceString::createNamespaceString_forTest(str::stream() << ns << (size + i));
+        const NamespaceString viewOn =
+            NamespaceString::createNamespaceString_forTest(str::stream() << ns << (size + i + 1));
 
         ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     }
 
-    const NamespaceString viewName(str::stream() << ns << size);
-    const NamespaceString viewOn(str::stream() << ns << (size + 1));
+    const NamespaceString viewName =
+        NamespaceString::createNamespaceString_forTest(str::stream() << ns << size);
+    const NamespaceString viewOn =
+        NamespaceString::createNamespaceString_forTest(str::stream() << ns << (size + 1));
 
     ASSERT_NOT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 }
 
 TEST_F(ViewCatalogFixture, CreateViewCycles) {
     {
-        const NamespaceString viewName("db.view1");
-        const NamespaceString viewOn("db.view1");
+        const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view1");
+        const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.view1");
 
         ASSERT_NOT_OK(
             createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     }
 
     {
-        const NamespaceString view1("db.view1");
-        const NamespaceString view2("db.view2");
-        const NamespaceString view3("db.view3");
+        const NamespaceString view1 = NamespaceString::createNamespaceString_forTest("db.view1");
+        const NamespaceString view2 = NamespaceString::createNamespaceString_forTest("db.view2");
+        const NamespaceString view3 = NamespaceString::createNamespaceString_forTest("db.view3");
 
         ASSERT_OK(createView(operationContext(), view1, view2, emptyPipeline, emptyCollation));
         ASSERT_OK(createView(operationContext(), view2, view3, emptyPipeline, emptyCollation));
@@ -406,8 +416,8 @@ TEST_F(ViewCatalogFixture, CanSuccessfullyCreateViewWhosePipelineIsExactlyAtMaxS
 
     ASSERT_EQ(pipelineSize, ViewGraph::kMaxViewPipelineSizeBytes);
 
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
     const BSONObj collation;
 
     ASSERT_OK(createView(operationContext(), viewName, viewOn, builder.arr(), collation));
@@ -426,8 +436,8 @@ TEST_F(ViewCatalogFixture, CannotCreateViewWhosePipelineExceedsMaxSizeInBytes) {
     }
     builder << kTinyMatchStage;
 
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
     const BSONObj collation;
 
     ASSERT_NOT_OK(createView(operationContext(), viewName, viewOn, builder.arr(), collation));
@@ -447,9 +457,9 @@ TEST_F(ViewCatalogFixture, CannotCreateViewIfItsFullyResolvedPipelineWouldExceed
     }
     builder2 << kTinyMatchStage;
 
-    const NamespaceString view1("db.view1");
-    const NamespaceString view2("db.view2");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString view1 = NamespaceString::createNamespaceString_forTest("db.view1");
+    const NamespaceString view2 = NamespaceString::createNamespaceString_forTest("db.view2");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
     const BSONObj collation1;
     const BSONObj collation2;
 
@@ -458,34 +468,34 @@ TEST_F(ViewCatalogFixture, CannotCreateViewIfItsFullyResolvedPipelineWouldExceed
 }
 
 TEST_F(ViewCatalogFixture, DropMissingView) {
-    NamespaceString viewName("db.view");
+    NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
     ASSERT_NOT_OK(dropView(operationContext(), viewName));
 }
 
 TEST_F(ViewCatalogFixture, ModifyMissingView) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
     ASSERT_NOT_OK(modifyView(operationContext(), viewName, viewOn, emptyPipeline));
 }
 
 TEST_F(ViewCatalogFixture, ModifyViewOnDifferentDatabase) {
-    const NamespaceString viewName("db1.view");
-    const NamespaceString viewOn("db2.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db1.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db2.coll");
 
     ASSERT_NOT_OK(modifyView(operationContext(), viewName, viewOn, emptyPipeline));
 }
 
 TEST_F(ViewCatalogFixture, ModifyViewOnInvalidCollectionName) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.$coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.$coll");
 
     ASSERT_NOT_OK(modifyView(operationContext(), viewName, viewOn, emptyPipeline));
 }
 
 TEST_F(ReplViewCatalogFixture, ModifyViewWithPipelineFailsOnIneligibleStage) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
     auto validPipeline = BSON_ARRAY(BSON("$match" << BSON("_id" << 1)));
     auto invalidPipeline = BSON_ARRAY(BSON("$changeStream" << BSONObj()));
@@ -500,12 +510,12 @@ TEST_F(ReplViewCatalogFixture, ModifyViewWithPipelineFailsOnIneligibleStage) {
 }
 
 TEST_F(ViewCatalogFixture, LookupMissingView) {
-    ASSERT(!lookup(operationContext(), NamespaceString("db.view")));
+    ASSERT(!lookup(operationContext(), NamespaceString::createNamespaceString_forTest("db.view")));
 }
 
 TEST_F(ViewCatalogFixture, LookupExistingView) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 
@@ -513,18 +523,20 @@ TEST_F(ViewCatalogFixture, LookupExistingView) {
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDExistingView) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 
-    auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
+    auto resourceID =
+        ResourceId(RESOURCE_COLLECTION,
+                   NamespaceString::createNamespaceString_forTest(boost::none, "db.view"));
     ASSERT_EQ(ResourceCatalog::get(getServiceContext()).name(resourceID), std::string{"db.view"});
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
     {
         Lock::DBLock dbLock(operationContext(), viewName.dbName(), MODE_X);
         Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
@@ -541,26 +553,32 @@ TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
                                            view_catalog_helpers::validatePipeline,
                                            emptyCollation));
     }
-    auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
+    auto resourceID =
+        ResourceId(RESOURCE_COLLECTION,
+                   NamespaceString::createNamespaceString_forTest(boost::none, "db.view"));
     ASSERT(!ResourceCatalog::get(getServiceContext()).name(resourceID));
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDAfterDrop) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     ASSERT_OK(dropView(operationContext(), viewName));
 
-    auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
+    auto resourceID =
+        ResourceId(RESOURCE_COLLECTION,
+                   NamespaceString::createNamespaceString_forTest(boost::none, "db.view"));
     ASSERT(!ResourceCatalog::get(getServiceContext()).name(resourceID));
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
-    auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
+    auto resourceID =
+        ResourceId(RESOURCE_COLLECTION,
+                   NamespaceString::createNamespaceString_forTest(boost::none, "db.view"));
     {
         WriteUnitOfWork wunit(operationContext());
         ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
@@ -586,20 +604,24 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDAfterModify) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
-    auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
+    auto resourceID =
+        ResourceId(RESOURCE_COLLECTION,
+                   NamespaceString::createNamespaceString_forTest(boost::none, "db.view"));
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     ASSERT_OK(modifyView(operationContext(), viewName, viewOn, emptyPipeline));
     ASSERT_EQ(ResourceCatalog::get(getServiceContext()).name(resourceID), viewName.ns());
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
-    auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
+    auto resourceID =
+        ResourceId(RESOURCE_COLLECTION,
+                   NamespaceString::createNamespaceString_forTest(boost::none, "db.view"));
     {
         WriteUnitOfWork wunit(operationContext());
         ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
@@ -629,8 +651,8 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
 }
 
 TEST_F(ViewCatalogFixture, CreateViewThenDropAndLookup) {
-    NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
+    NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     ASSERT_OK(dropView(operationContext(), viewName));
@@ -639,10 +661,10 @@ TEST_F(ViewCatalogFixture, CreateViewThenDropAndLookup) {
 }
 
 TEST_F(ViewCatalogFixture, Iterate) {
-    const NamespaceString view1("db.view1");
-    const NamespaceString view2("db.view2");
-    const NamespaceString view3("db.view3");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString view1 = NamespaceString::createNamespaceString_forTest("db.view1");
+    const NamespaceString view2 = NamespaceString::createNamespaceString_forTest("db.view2");
+    const NamespaceString view3 = NamespaceString::createNamespaceString_forTest("db.view3");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
 
     ASSERT_OK(createView(operationContext(), view1, viewOn, emptyPipeline, emptyCollation));
     ASSERT_OK(createView(operationContext(), view2, viewOn, emptyPipeline, emptyCollation));
@@ -663,10 +685,10 @@ TEST_F(ViewCatalogFixture, Iterate) {
 }
 
 TEST_F(ViewCatalogFixture, ResolveViewCorrectPipeline) {
-    const NamespaceString view1("db.view1");
-    const NamespaceString view2("db.view2");
-    const NamespaceString view3("db.view3");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString view1 = NamespaceString::createNamespaceString_forTest("db.view1");
+    const NamespaceString view2 = NamespaceString::createNamespaceString_forTest("db.view2");
+    const NamespaceString view3 = NamespaceString::createNamespaceString_forTest("db.view3");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
     BSONArrayBuilder pipeline1;
     BSONArrayBuilder pipeline3;
     BSONArrayBuilder pipeline2;
@@ -709,9 +731,9 @@ TEST_F(ViewCatalogFixture, ResolveViewOnCollectionNamespace) {
 }
 
 TEST_F(ViewCatalogFixture, ResolveViewCorrectlyExtractsDefaultCollation) {
-    const NamespaceString view1("db.view1");
-    const NamespaceString view2("db.view2");
-    const NamespaceString viewOn("db.coll");
+    const NamespaceString view1 = NamespaceString::createNamespaceString_forTest("db.view1");
+    const NamespaceString view2 = NamespaceString::createNamespaceString_forTest("db.view2");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
     BSONArrayBuilder pipeline1;
     BSONArrayBuilder pipeline2;
 
@@ -753,8 +775,10 @@ public:
 
 TEST_F(ServerlessViewCatalogFixture, LookupExistingViewBeforeAndAfterDropFeatureFlagOff) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    const NamespaceString viewName(db()->name(), "view");
-    const NamespaceString viewOn(db()->name(), "coll");
+    const NamespaceString viewName =
+        NamespaceString::createNamespaceString_forTest(db()->name(), "view");
+    const NamespaceString viewOn =
+        NamespaceString::createNamespaceString_forTest(db()->name(), "coll");
 
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     ASSERT(lookup(operationContext(), viewName));
@@ -766,8 +790,10 @@ TEST_F(ServerlessViewCatalogFixture, LookupExistingViewBeforeAndAfterDropFeature
 TEST_F(ServerlessViewCatalogFixture, LookupExistingViewBeforeAndAfterDropFeatureFlagOn) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-    const NamespaceString viewName(db()->name(), "view");
-    const NamespaceString viewOn(db()->name(), "coll");
+    const NamespaceString viewName =
+        NamespaceString::createNamespaceString_forTest(db()->name(), "view");
+    const NamespaceString viewOn =
+        NamespaceString::createNamespaceString_forTest(db()->name(), "coll");
 
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     ASSERT(lookup(operationContext(), viewName));
@@ -778,8 +804,10 @@ TEST_F(ServerlessViewCatalogFixture, LookupExistingViewBeforeAndAfterDropFeature
 
 TEST_F(ServerlessViewCatalogFixture, ModifyViewBelongingToTenantFeatureFlagOff) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    const NamespaceString viewName(db()->name(), "db1.view");
-    const NamespaceString viewOn(db()->name(), "db2.coll");
+    const NamespaceString viewName =
+        NamespaceString::createNamespaceString_forTest(db()->name(), "db1.view");
+    const NamespaceString viewOn =
+        NamespaceString::createNamespaceString_forTest(db()->name(), "db2.coll");
 
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     ASSERT_EQ(lookup(operationContext(), viewName)->pipeline().size(), 0);
@@ -794,8 +822,10 @@ TEST_F(ServerlessViewCatalogFixture, ModifyViewBelongingToTenantFeatureFlagOff) 
 TEST_F(ServerlessViewCatalogFixture, ModifyViewBelongingToTenantFeatureFlagOn) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-    const NamespaceString viewName(db()->name(), "db1.view");
-    const NamespaceString viewOn(db()->name(), "db2.coll");
+    const NamespaceString viewName =
+        NamespaceString::createNamespaceString_forTest(db()->name(), "db1.view");
+    const NamespaceString viewOn =
+        NamespaceString::createNamespaceString_forTest(db()->name(), "db2.coll");
 
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     ASSERT_EQ(lookup(operationContext(), viewName)->pipeline().size(), 0);

@@ -44,7 +44,8 @@ TEST(SplitChunkRequest, BasicValidConfigCommand) {
              << BSON("a" << 10) << "splitPoints" << BSON_ARRAY(BSON("a" << 5)) << "shard"
              << "shard0000"
              << "fromChunkSplitter" << true)));
-    ASSERT_EQ(NamespaceString("TestDB", "TestColl"), request.getNamespace());
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
+              request.getNamespace());
     ASSERT_EQ(OID("7fffffff0000000000000001"), request.getEpoch());
     ASSERT(ChunkRange(BSON("a" << 1), BSON("a" << 10)) == request.getChunkRange());
     ASSERT_BSONOBJ_EQ(BSON("a" << 5), request.getSplitPoints().at(0));
@@ -60,7 +61,8 @@ TEST(SplitChunkRequest, ValidWithMultipleSplits) {
              << BSON("a" << 10) << "splitPoints" << BSON_ARRAY(BSON("a" << 5) << BSON("a" << 7))
              << "shard"
              << "shard0000")));
-    ASSERT_EQ(NamespaceString("TestDB", "TestColl"), request.getNamespace());
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
+              request.getNamespace());
     ASSERT_EQ(OID("7fffffff0000000000000001"), request.getEpoch());
     ASSERT(ChunkRange(BSON("a" << 1), BSON("a" << 10)) == request.getChunkRange());
     ASSERT_BSONOBJ_EQ(BSON("a" << 5), request.getSplitPoints().at(0));

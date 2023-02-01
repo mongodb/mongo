@@ -92,7 +92,9 @@ TEST_F(StatsCacheTest, KeyDoesNotExist) {
     auto cache = CacheWithThreadPool(getServiceContext(), std::move(cacheLoaderMock), 1);
     cache.getStatsCacheLoader()->setStatsReturnValueForTest(
         std::move(namespaceNotFoundErrorStatus));
-    auto handle = cache.acquire(_opCtx, std::make_pair(NamespaceString("db", "coll"), "somePath"));
+    auto handle = cache.acquire(
+        _opCtx,
+        std::make_pair(NamespaceString::createNamespaceString_forTest("db", "coll"), "somePath"));
     ASSERT(!handle);
 }
 
@@ -106,9 +108,8 @@ TEST_F(StatsCacheTest, LoadStats) {
 
     cache.getStatsCacheLoader()->setStatsReturnValueForTest(std::move(stats1));
 
-    auto handle = cache.acquire(_opCtx, NamespaceString("db", "coll1"));
-    ASSERT(handle.isValid());
-    ASSERT_EQ(1, handle->getCardinality());
+    auto handle = cache.acquire(_opCtx, NamespaceString::createNamespaceString_forTest("db",
+"coll1")); ASSERT(handle.isValid()); ASSERT_EQ(1, handle->getCardinality());
 
     // Make all requests to StatsCacheLoader to throw an exception to ensre that test returns value
     // from cache.
@@ -116,12 +117,12 @@ TEST_F(StatsCacheTest, LoadStats) {
                                   "Stats cache loader received unexpected request"};
     cache.getStatsCacheLoader()->setStatsReturnValueForTest(std::move(internalErrorStatus));
 
-    handle = cache.acquire(_opCtx, NamespaceString("db", "coll1"));
+    handle = cache.acquire(_opCtx, NamespaceString::createNamespaceString_forTest("db", "coll1"));
     ASSERT(handle.isValid());
     ASSERT_EQ(1, handle->getCardinality());
 
     cache.getStatsCacheLoader()->setStatsReturnValueForTest(std::move(stats2));
-    handle = cache.acquire(_opCtx, NamespaceString("db", "coll2"));
+    handle = cache.acquire(_opCtx, NamespaceString::createNamespaceString_forTest("db", "coll2"));
     ASSERT(handle.isValid());
     ASSERT_EQ(2, handle->getCardinality());
 }

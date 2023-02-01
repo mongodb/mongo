@@ -132,7 +132,7 @@ Status _insertBSON(OperationContext* opCtx, const CollectionPtr& coll, RecordId 
 }
 
 TEST_F(CappedCollectionTest, SeekNear) {
-    NamespaceString nss("local.non.oplog");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("local.non.oplog");
     makeCapped(nss);
 
     {
@@ -283,7 +283,7 @@ TEST_F(CappedCollectionTest, SeekNear) {
 }
 
 TEST_F(CappedCollectionTest, InsertOutOfOrder) {
-    NamespaceString nss("local.non.oplog");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("local.non.oplog");
     makeCapped(nss);
     {
         // RecordId's are inserted out-of-order.
@@ -306,7 +306,7 @@ TEST_F(CappedCollectionTest, InsertOutOfOrder) {
 }
 
 TEST_F(CappedCollectionTest, OplogOrder) {
-    NamespaceString nss("local.non.oplog");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("local.non.oplog");
     makeCapped(nss);
 
     auto id1 = RecordId(1);

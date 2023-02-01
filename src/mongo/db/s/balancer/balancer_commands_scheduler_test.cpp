@@ -51,8 +51,9 @@ public:
         ShardType(kShardId0.toString(), kShardHost0.toString()),
         ShardType(kShardId1.toString(), kShardHost1.toString())};
 
-    const NamespaceString kNss{"testDb.testColl"};
-    const NamespaceString kNssWithCustomizedSize{"testDb.testCollCustomized"};
+    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
+    const NamespaceString kNssWithCustomizedSize =
+        NamespaceString::createNamespaceString_forTest("testDb.testCollCustomized");
 
     const UUID kUuid = UUID::gen();
 

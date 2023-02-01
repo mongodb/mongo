@@ -46,7 +46,7 @@ namespace {
 using executor::RemoteCommandRequest;
 using unittest::assertGet;
 
-const NamespaceString kNss("TestDB", "TestColl");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
 class CatalogCacheRefreshTest : public CatalogCacheTestFixture {
 protected:

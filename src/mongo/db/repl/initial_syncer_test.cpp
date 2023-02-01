@@ -636,18 +636,18 @@ OplogEntry makeOplogEntry(int t,
         oField = BSON("dropIndexes"
                       << "a_1");
     }
-    return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
-                              opType,                      // op type
-                              NamespaceString("a.a"),      // namespace
-                              boost::none,                 // uuid
-                              boost::none,                 // fromMigrate
-                              version,                     // version
-                              oField,                      // o
-                              boost::none,                 // o2
-                              {},                          // sessionInfo
-                              boost::none,                 // upsert
-                              Date_t() + Seconds(t),       // wall clock time
-                              {},                          // statement ids
+    return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),                             // optime
+                              opType,                                                 // op type
+                              NamespaceString::createNamespaceString_forTest("a.a"),  // namespace
+                              boost::none,                                            // uuid
+                              boost::none,                                            // fromMigrate
+                              version,                                                // version
+                              oField,                                                 // o
+                              boost::none,                                            // o2
+                              {},                                                     // sessionInfo
+                              boost::none,                                            // upsert
+                              Date_t() + Seconds(t),  // wall clock time
+                              {},                     // statement ids
                               boost::none,    // optime of previous write within same transaction
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime
@@ -3582,7 +3582,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
         // Instead of fast forwarding to AllDatabaseCloner completion by returning an empty list of
         // database names, we'll simulate copying a single database with a single collection on the
         // sync source.  We must do this setup before responding to the FCV, to avoid a race.
-        NamespaceString nss("a.a");
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.a");
         _mockServer->setCommandReply("listDatabases",
                                      makeListDatabasesResponse({nss.db().toString()}));
 
@@ -4266,7 +4266,7 @@ TEST_F(InitialSyncerTest,
         // Instead of fast forwarding to AllDatabaseCloner completion by returning an empty list of
         // database names, we'll simulate copying a single database with a single collection on the
         // sync source.  We must do this setup before responding to the FCV, to avoid a race.
-        NamespaceString nss("a.a");
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.a");
         _mockServer->setCommandReply("listDatabases",
                                      makeListDatabasesResponse({nss.db().toString()}));
 
@@ -4431,7 +4431,7 @@ TEST_F(InitialSyncerTest, TestRemainingInitialSyncEstimatedMillisMetric) {
     const auto dbSize = 10000;
     const auto numDocs = 5;
     const auto avgObjSize = dbSize / numDocs;
-    NamespaceString nss("a.a");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.a");
 
     auto hangDuringCloningFailPoint =
         globalFailPointRegistry().find("initialSyncHangDuringCollectionClone");
@@ -4718,7 +4718,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
         // Set up the successful cloner run.
         // listDatabases: a
-        NamespaceString nss("a.a");
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.a");
         _mockServer->setCommandReply("listDatabases",
                                      makeListDatabasesResponse({nss.db().toString()}));
         // The AllDatabaseCloner post stage calls dbStats to record initial sync progress metrics.
@@ -5095,7 +5095,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
 
             // Set up the cloner data.  This must be done before providing the FCV to avoid races.
             // listDatabases
-            NamespaceString nss("a.a");
+            NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.a");
             _mockServer->setCommandReply("listDatabases",
                                          makeListDatabasesResponse({nss.db().toString()}));
 

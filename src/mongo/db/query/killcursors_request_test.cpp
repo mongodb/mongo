@@ -105,7 +105,7 @@ TEST(KillCursorsRequestTest, parseCursorFieldArrayWithNonCursorIdValue) {
 }
 
 TEST(KillCursorsRequestTest, toBSON) {
-    const NamespaceString nss("db.coll");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("db.coll");
     std::vector<CursorId> cursorIds = {CursorId(123)};
     KillCursorsCommandRequest request(nss, cursorIds);
     BSONObj requestObj = request.toBSON(BSONObj{});

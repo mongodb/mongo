@@ -41,7 +41,7 @@ namespace mongo {
 
 namespace {
 
-const NamespaceString kTestNss("testdb.testcoll");
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("testdb.testcoll");
 const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
 const std::vector<ShardId> kTestShardIds = {
     ShardId("FakeShard1"), ShardId("FakeShard2"), ShardId("FakeShard3")};

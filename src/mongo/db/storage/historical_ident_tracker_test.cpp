@@ -36,25 +36,42 @@ TEST(HistoricalIdentTracker, RecordHistoricalIdents) {
     HistoricalIdentTracker tracker;
 
     const std::string ident = "ident";
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.a"), UUID::gen(), Timestamp(10, 10));
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.b"), UUID::gen(), Timestamp(20, 20));
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.c"), UUID::gen(), Timestamp(21, 21));
-    tracker.recordDrop(ident, /*nss=*/NamespaceString("test.d"), UUID::gen(), Timestamp(25, 25));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.a"),
+                         UUID::gen(),
+                         Timestamp(10, 10));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.b"),
+                         UUID::gen(),
+                         Timestamp(20, 20));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.c"),
+                         UUID::gen(),
+                         Timestamp(21, 21));
+    tracker.recordDrop(ident,
+                       /*nss=*/NamespaceString::createNamespaceString_forTest("test.d"),
+                       UUID::gen(),
+                       Timestamp(25, 25));
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first, NamespaceString("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(15, 15))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first, NamespaceString("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(15, 15))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first, NamespaceString("test.c"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first,
+              NamespaceString::createNamespaceString_forTest("test.c"));
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(21, 21))->first, NamespaceString("test.d"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(24, 24))->first, NamespaceString("test.d"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(21, 21))->first,
+              NamespaceString::createNamespaceString_forTest("test.d"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(24, 24))->first,
+              NamespaceString::createNamespaceString_forTest("test.d"));
 
     ASSERT(!tracker.lookup(ident, Timestamp(25, 25)));
     ASSERT(!tracker.lookup(ident, Timestamp::max()));
@@ -64,9 +81,18 @@ TEST(HistoricalIdentTracker, SkipRecordingNullTimestamps) {
     HistoricalIdentTracker tracker;
 
     const std::string ident = "ident";
-    tracker.recordRename(ident, /*oldNss=*/NamespaceString("test.a"), UUID::gen(), Timestamp(1));
-    tracker.recordRename(ident, /*oldNss=*/NamespaceString("test.b"), UUID::gen(), Timestamp(2));
-    tracker.recordDrop(ident, /*nss=*/NamespaceString("test.c"), UUID::gen(), Timestamp(3));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.a"),
+                         UUID::gen(),
+                         Timestamp(1));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.b"),
+                         UUID::gen(),
+                         Timestamp(2));
+    tracker.recordDrop(ident,
+                       /*nss=*/NamespaceString::createNamespaceString_forTest("test.c"),
+                       UUID::gen(),
+                       Timestamp(3));
 
     ASSERT(!tracker.lookup(ident, Timestamp::min()));
     ASSERT(!tracker.lookup(ident, Timestamp(1)));
@@ -79,19 +105,25 @@ TEST(HistoricalIdentTracker, RemoveEntriesOlderThanSingle) {
     HistoricalIdentTracker tracker;
 
     const std::string ident = "ident";
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.a"), UUID::gen(), Timestamp(50, 50));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.a"),
+                         UUID::gen(),
+                         Timestamp(50, 50));
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(49, 49))->first, NamespaceString("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(49, 49))->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
 
     ASSERT(!tracker.lookup(ident, Timestamp(50, 50)));
 
     tracker.removeEntriesOlderThan(Timestamp::min());
     tracker.removeEntriesOlderThan(Timestamp(49, 49));
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(49, 49))->first, NamespaceString("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(49, 49))->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
 
     tracker.removeEntriesOlderThan(Timestamp(50, 50));
 
@@ -104,30 +136,44 @@ TEST(HistoricalIdentTracker, RemoveEntriesOlderThanMultiple) {
     HistoricalIdentTracker tracker;
 
     const std::string ident = "ident";
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.a"), UUID::gen(), Timestamp(10, 10));
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.b"), UUID::gen(), Timestamp(20, 20));
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.c"), UUID::gen(), Timestamp(21, 21));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.a"),
+                         UUID::gen(),
+                         Timestamp(10, 10));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.b"),
+                         UUID::gen(),
+                         Timestamp(20, 20));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.c"),
+                         UUID::gen(),
+                         Timestamp(21, 21));
 
     tracker.removeEntriesOlderThan(Timestamp::min());
     tracker.removeEntriesOlderThan(Timestamp(5, 5));
     tracker.removeEntriesOlderThan(Timestamp(9, 9));
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first, NamespaceString("test.c"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first,
+              NamespaceString::createNamespaceString_forTest("test.c"));
 
     tracker.removeEntriesOlderThan(Timestamp(15, 15));
 
     ASSERT(!tracker.lookup(ident, Timestamp::min()));
     ASSERT(!tracker.lookup(ident, Timestamp(9, 9)));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first, NamespaceString("test.c"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first,
+              NamespaceString::createNamespaceString_forTest("test.c"));
 
     tracker.removeEntriesOlderThan(Timestamp(21, 21));
 
@@ -143,14 +189,18 @@ TEST(HistoricalIdentTracker, RollbackToSingle) {
     HistoricalIdentTracker tracker;
 
     const std::string ident = "ident";
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.a"), UUID::gen(), Timestamp(10, 10));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.a"),
+                         UUID::gen(),
+                         Timestamp(10, 10));
 
     tracker.rollbackTo(Timestamp(10, 10));
     tracker.rollbackTo(Timestamp::max());
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first, NamespaceString("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
 
     tracker.rollbackTo(Timestamp(9, 9));
 
@@ -164,27 +214,40 @@ TEST(HistoricalIdentTracker, RollbackToMultiple) {
     HistoricalIdentTracker tracker;
 
     const std::string ident = "ident";
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.a"), UUID::gen(), Timestamp(10, 10));
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.b"), UUID::gen(), Timestamp(20, 20));
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.c"), UUID::gen(), Timestamp(21, 21));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.a"),
+                         UUID::gen(),
+                         Timestamp(10, 10));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.b"),
+                         UUID::gen(),
+                         Timestamp(20, 20));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.c"),
+                         UUID::gen(),
+                         Timestamp(21, 21));
 
     tracker.rollbackTo(Timestamp::max());
     tracker.rollbackTo(Timestamp(22, 22));
     tracker.rollbackTo(Timestamp(21, 21));
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first, NamespaceString("test.c"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first,
+              NamespaceString::createNamespaceString_forTest("test.c"));
 
     tracker.rollbackTo(Timestamp(15, 15));
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first, NamespaceString("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
     ASSERT(!tracker.lookup(ident, Timestamp(10, 10)));
     ASSERT(!tracker.lookup(ident, Timestamp(19, 19)));
     ASSERT(!tracker.lookup(ident, Timestamp(20, 20)));
@@ -203,20 +266,26 @@ TEST(HistoricalIdentTracker, PinAndUnpinTimestamp) {
     HistoricalIdentTracker tracker;
 
     const std::string ident = "ident";
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.a"), UUID::gen(), Timestamp(10, 10));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.a"),
+                         UUID::gen(),
+                         Timestamp(10, 10));
 
     tracker.pinAtTimestamp(Timestamp(5, 5));
     tracker.removeEntriesOlderThan(Timestamp::max());
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first, NamespaceString("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
 
     tracker.pinAtTimestamp(Timestamp(9, 9));
     tracker.removeEntriesOlderThan(Timestamp::max());
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first, NamespaceString("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
 
     tracker.unpin();
     tracker.removeEntriesOlderThan(Timestamp::max());
@@ -231,41 +300,60 @@ TEST(HistoricalIdentTracker, PinnedTimestampRemoveEntriesOlderThan) {
     HistoricalIdentTracker tracker;
 
     const std::string ident = "ident";
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.a"), UUID::gen(), Timestamp(10, 10));
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.b"), UUID::gen(), Timestamp(20, 20));
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.c"), UUID::gen(), Timestamp(21, 21));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.a"),
+                         UUID::gen(),
+                         Timestamp(10, 10));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.b"),
+                         UUID::gen(),
+                         Timestamp(20, 20));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.c"),
+                         UUID::gen(),
+                         Timestamp(21, 21));
 
     tracker.pinAtTimestamp(Timestamp(5, 5));
     tracker.removeEntriesOlderThan(Timestamp::max());
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first, NamespaceString("test.c"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first,
+              NamespaceString::createNamespaceString_forTest("test.c"));
 
     tracker.pinAtTimestamp(Timestamp(9, 9));
     tracker.removeEntriesOlderThan(Timestamp(9, 9));
     tracker.removeEntriesOlderThan(Timestamp(10, 10));
     tracker.removeEntriesOlderThan(Timestamp::max());
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first, NamespaceString("test.c"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first,
+              NamespaceString::createNamespaceString_forTest("test.c"));
 
     tracker.pinAtTimestamp(Timestamp(15, 15));
     tracker.removeEntriesOlderThan(Timestamp::max());
 
     ASSERT(!tracker.lookup(ident, Timestamp::min()));
     ASSERT(!tracker.lookup(ident, Timestamp(9, 9)));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first, NamespaceString("test.c"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first,
+              NamespaceString::createNamespaceString_forTest("test.c"));
 
     tracker.pinAtTimestamp(Timestamp(21, 21));
     tracker.removeEntriesOlderThan(Timestamp::max());
@@ -281,38 +369,58 @@ TEST(HistoricalIdentTracker, PinnedTimestampRollbackTo) {
     HistoricalIdentTracker tracker;
 
     const std::string ident = "ident";
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.a"), UUID::gen(), Timestamp(10, 10));
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.b"), UUID::gen(), Timestamp(20, 20));
-    tracker.recordRename(
-        ident, /*oldNss=*/NamespaceString("test.c"), UUID::gen(), Timestamp(21, 21));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.a"),
+                         UUID::gen(),
+                         Timestamp(10, 10));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.b"),
+                         UUID::gen(),
+                         Timestamp(20, 20));
+    tracker.recordRename(ident,
+                         /*oldNss=*/NamespaceString::createNamespaceString_forTest("test.c"),
+                         UUID::gen(),
+                         Timestamp(21, 21));
 
     tracker.pinAtTimestamp(Timestamp(30, 30));
     tracker.rollbackTo(Timestamp::min());
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first, NamespaceString("test.c"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first,
+              NamespaceString::createNamespaceString_forTest("test.c"));
 
     tracker.pinAtTimestamp(Timestamp(21, 21));
     tracker.rollbackTo(Timestamp::min());
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first, NamespaceString("test.c"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(20, 20))->first,
+              NamespaceString::createNamespaceString_forTest("test.c"));
 
     tracker.pinAtTimestamp(Timestamp(20, 20));
     tracker.rollbackTo(Timestamp::min());
 
-    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first, NamespaceString("test.a"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first, NamespaceString("test.b"));
-    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first, NamespaceString("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp::min())->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(9, 9))->first,
+              NamespaceString::createNamespaceString_forTest("test.a"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(10, 10))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
+    ASSERT_EQ(tracker.lookup(ident, Timestamp(19, 19))->first,
+              NamespaceString::createNamespaceString_forTest("test.b"));
     ASSERT(!tracker.lookup(ident, Timestamp(20, 20)));
 
 

@@ -431,7 +431,9 @@ TEST_F(ReplicationRecoveryTest, RecoveryWithNoOplogSucceeds) {
 
     // Create the database.
     ASSERT_OK(getStorageInterface()->createCollection(
-        opCtx, NamespaceString("local.other"), generateOptionsWithUuid()));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("local.other"),
+        generateOptionsWithUuid()));
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
@@ -445,7 +447,9 @@ TEST_F(ReplicationRecoveryTest, RecoveryWithNoOplogSucceedsWithStableTimestamp) 
 
     // Create the database.
     ASSERT_OK(getStorageInterface()->createCollection(
-        opCtx, NamespaceString("local.other"), generateOptionsWithUuid()));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("local.other"),
+        generateOptionsWithUuid()));
 
     Timestamp stableTimestamp(3, 3);
     recovery.recoverFromOplog(opCtx, stableTimestamp);

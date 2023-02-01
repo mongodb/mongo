@@ -41,9 +41,9 @@ namespace {
 using namespace cluster_server_parameter_test_util;
 
 const std::vector<NamespaceString> kIgnoredNamespaces = {
-    NamespaceString("config"_sd, "settings"_sd),
-    NamespaceString("local"_sd, "clusterParameters"_sd),
-    NamespaceString("test"_sd, "foo"_sd)};
+    NamespaceString::createNamespaceString_forTest("config"_sd, "settings"_sd),
+    NamespaceString::createNamespaceString_forTest("local"_sd, "clusterParameters"_sd),
+    NamespaceString::createNamespaceString_forTest("test"_sd, "foo"_sd)};
 
 typedef ClusterParameterWithStorage<ClusterServerParameterTest> ClusterTestParameter;
 
@@ -429,7 +429,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onDropDatabase) {
 TEST_F(ClusterServerParameterOpObserverTest, onRenameCollection) {
     initializeState();
 
-    const NamespaceString kTestFoo("test", "foo");
+    const NamespaceString kTestFoo = NamespaceString::createNamespaceString_forTest("test", "foo");
     // Rename ignorable collections.
     assertIgnoredOtherNamespaces([&](const auto& nss) { doRenameCollection(nss, kTestFoo); },
                                  boost::none);
@@ -482,7 +482,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onRenameCollection) {
 TEST_F(ClusterServerParameterOpObserverTest, onImportCollection) {
     initializeState();
 
-    const NamespaceString kTestFoo("test", "foo");
+    const NamespaceString kTestFoo = NamespaceString::createNamespaceString_forTest("test", "foo");
     // Import ignorable collections.
     assertIgnoredOtherNamespaces([&](const auto& nss) { doImportCollection(nss); }, boost::none);
 
@@ -512,7 +512,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onImportCollection) {
 TEST_F(ClusterServerParameterOpObserverTest, onReplicationRollback) {
     initializeState();
 
-    const NamespaceString kTestFoo("test", "foo");
+    const NamespaceString kTestFoo = NamespaceString::createNamespaceString_forTest("test", "foo");
     // Import ignorable collections.
     assertIgnoredOtherNamespaces([&](const auto& nss) { doReplicationRollback({nss}); },
                                  boost::none);

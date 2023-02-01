@@ -148,9 +148,9 @@ TEST_F(DatabaseClonerTest, ListCollections) {
     auto collections = getCollectionsFromCloner(cloner.get());
 
     ASSERT_EQUALS(2U, collections.size());
-    ASSERT_EQ(NamespaceString(_dbName, "a"), collections[0].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "a"), collections[0].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid1), collections[0].second.toBSON());
-    ASSERT_EQ(NamespaceString(_dbName, "b"), collections[1].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "b"), collections[1].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid2), collections[1].second.toBSON());
 }
 
@@ -189,9 +189,9 @@ TEST_F(DatabaseClonerTest, ListCollectionsAllowsExtraneousFields) {
     auto collections = getCollectionsFromCloner(cloner.get());
 
     ASSERT_EQUALS(2U, collections.size());
-    ASSERT_EQ(NamespaceString(_dbName, "a"), collections[0].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "a"), collections[0].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid1), collections[0].second.toBSON());
-    ASSERT_EQ(NamespaceString(_dbName, "b"), collections[1].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "b"), collections[1].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid2), collections[1].second.toBSON());
 }
 
@@ -387,12 +387,12 @@ TEST_F(DatabaseClonerTest, CreateCollections) {
 
     ASSERT_EQUALS(2U, _collections.size());
 
-    auto collInfo = _collections[NamespaceString{_dbName, "a"}];
+    auto collInfo = _collections[NamespaceString::createNamespaceString_forTest(_dbName, "a")];
     auto stats = *collInfo.stats;
     ASSERT_EQUALS(0, stats.insertCount);
     ASSERT(stats.commitCalled);
 
-    collInfo = _collections[NamespaceString{_dbName, "b"}];
+    collInfo = _collections[NamespaceString::createNamespaceString_forTest(_dbName, "b")];
     stats = *collInfo.stats;
     ASSERT_EQUALS(0, stats.insertCount);
     ASSERT(stats.commitCalled);
@@ -456,8 +456,10 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
     ASSERT_EQ(2, stats.collections);
     ASSERT_EQ(0, stats.clonedCollections);
     ASSERT_EQ(2, stats.collectionStats.size());
-    ASSERT_EQ(NamespaceString(_dbName, "a"), stats.collectionStats[0].nss);
-    ASSERT_EQ(NamespaceString(_dbName, "b"), stats.collectionStats[1].nss);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "a"),
+              stats.collectionStats[0].nss);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "b"),
+              stats.collectionStats[1].nss);
     ASSERT_EQ(_clock.now(), stats.collectionStats[0].start);
     ASSERT_EQ(Date_t(), stats.collectionStats[0].end);
     ASSERT_EQ(Date_t(), stats.collectionStats[1].start);
@@ -479,8 +481,10 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
     ASSERT_EQ(2, stats.collections);
     ASSERT_EQ(1, stats.clonedCollections);
     ASSERT_EQ(2, stats.collectionStats.size());
-    ASSERT_EQ(NamespaceString(_dbName, "a"), stats.collectionStats[0].nss);
-    ASSERT_EQ(NamespaceString(_dbName, "b"), stats.collectionStats[1].nss);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "a"),
+              stats.collectionStats[0].nss);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "b"),
+              stats.collectionStats[1].nss);
     ASSERT_EQ(2, stats.collectionStats[0].indexes);
     ASSERT_EQ(0, stats.collectionStats[1].indexes);
     ASSERT_EQ(_clock.now(), stats.collectionStats[0].end);
@@ -498,8 +502,10 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
     ASSERT_EQ(2, stats.collections);
     ASSERT_EQ(2, stats.clonedCollections);
     ASSERT_EQ(2, stats.collectionStats.size());
-    ASSERT_EQ(NamespaceString(_dbName, "a"), stats.collectionStats[0].nss);
-    ASSERT_EQ(NamespaceString(_dbName, "b"), stats.collectionStats[1].nss);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "a"),
+              stats.collectionStats[0].nss);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "b"),
+              stats.collectionStats[1].nss);
     ASSERT_EQ(2, stats.collectionStats[0].indexes);
     ASSERT_EQ(1, stats.collectionStats[1].indexes);
     ASSERT_EQ(_clock.now(), stats.collectionStats[1].end);
@@ -552,9 +558,9 @@ TEST_F(DatabaseClonerMultitenancyTest, ListCollectionsMultitenancySupport) {
     auto collections = getCollectionsFromCloner(cloner.get());
 
     ASSERT_EQUALS(2U, collections.size());
-    ASSERT_EQ(NamespaceString(_dbName, "a"), collections[0].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "a"), collections[0].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid1), collections[0].second.toBSON());
-    ASSERT_EQ(NamespaceString(_dbName, "b"), collections[1].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "b"), collections[1].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid2), collections[1].second.toBSON());
 }
 
@@ -585,9 +591,9 @@ TEST_F(DatabaseClonerMultitenancyTest,
     auto collections = getCollectionsFromCloner(cloner.get());
 
     ASSERT_EQUALS(2U, collections.size());
-    ASSERT_EQ(NamespaceString(_dbName, "a"), collections[0].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "a"), collections[0].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid1), collections[0].second.toBSON());
-    ASSERT_EQ(NamespaceString(_dbName, "b"), collections[1].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "b"), collections[1].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid2), collections[1].second.toBSON());
 }
 

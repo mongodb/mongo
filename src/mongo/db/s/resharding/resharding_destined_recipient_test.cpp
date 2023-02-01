@@ -82,7 +82,7 @@ void runInTransaction(OperationContext* opCtx, Callable&& func) {
 
 class DestinedRecipientTest : public ShardServerTestFixture {
 public:
-    const NamespaceString kNss{"test.foo"};
+    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.foo");
     const std::string kShardKey = "x";
     const HostAndPort kConfigHostAndPort{"DummyConfig", 12345};
     const std::vector<ShardType> kShardList = {ShardType("shard0", "Host0:12345"),
@@ -200,11 +200,11 @@ protected:
         CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
         env.version = ShardVersion(ChunkVersion(gen, {1, 0}),
                                    boost::optional<CollectionIndexes>(boost::none));
-        env.tempNss =
-            NamespaceString(kNss.db(),
-                            fmt::format("{}{}",
-                                        NamespaceString::kTemporaryReshardingCollectionPrefix,
-                                        env.sourceUuid.toString()));
+        env.tempNss = NamespaceString::createNamespaceString_forTest(
+            kNss.db(),
+            fmt::format("{}{}",
+                        NamespaceString::kTemporaryReshardingCollectionPrefix,
+                        env.sourceUuid.toString()));
 
         uassertStatusOK(createCollection(
             operationContext(), env.tempNss.dbName(), BSON("create" << env.tempNss.coll())));

@@ -50,7 +50,7 @@ public:
     void createCollection(const NamespaceString& nss);
 
     const UUID _buildUUID = UUID::gen();
-    const NamespaceString _nss = NamespaceString("test.foo");
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test.foo");
     IndexBuildsManager _indexBuildsManager;
 };
 

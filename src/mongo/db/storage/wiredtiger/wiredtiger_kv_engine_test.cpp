@@ -140,7 +140,7 @@ public:
 TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     auto opCtxPtr = _makeOperationContext();
 
-    NamespaceString nss("a.b");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     std::string ident = "collection-1234";
     std::string record = "abcd";
     CollectionOptions defaultCollectionOptions;
@@ -197,7 +197,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
 TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     auto opCtxPtr = _makeOperationContext();
 
-    NamespaceString nss("a.b");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     std::string ident = "collection-1234";
     std::string record = "abcd";
     CollectionOptions defaultCollectionOptions;
@@ -369,7 +369,7 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
 
     auto opCtxPtr = _makeOperationContext();
 
-    NamespaceString nss("a.b");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     std::string ident = "collection-1234";
     CollectionOptions defaultCollectionOptions;
 

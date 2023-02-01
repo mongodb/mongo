@@ -963,7 +963,8 @@ TEST_F(DocumentSourceMergeServerlessTest,
                                                                    flagStatus);
 
         auto tenantId = TenantId(OID::gen());
-        NamespaceString nss(tenantId, _targetDb, "testColl");
+        NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest(tenantId, _targetDb, "testColl");
 
         // Pass collection name as a string.
         auto stageSpec = BSON("$merge" << _targetColl);
@@ -971,7 +972,9 @@ TEST_F(DocumentSourceMergeServerlessTest,
             DocumentSourceMerge::LiteParsed::parse(nss, stageSpec.firstElement());
         auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
         ASSERT_EQ(1, namespaceSet.size());
-        ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, _targetDb, _targetColl)));
+        ASSERT_EQ(1ul,
+                  namespaceSet.count(NamespaceString::createNamespaceString_forTest(
+                      tenantId, _targetDb, _targetColl)));
     }
 }
 
@@ -984,7 +987,8 @@ TEST_F(DocumentSourceMergeServerlessTest,
                                                                    flagStatus);
 
         auto tenantId = TenantId(OID::gen());
-        NamespaceString nss(tenantId, _targetDb, "testColl");
+        NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest(tenantId, _targetDb, "testColl");
 
         // Pass collection name as a db + coll object.
         auto stageSpec =
@@ -993,7 +997,9 @@ TEST_F(DocumentSourceMergeServerlessTest,
             DocumentSourceMerge::LiteParsed::parse(nss, stageSpec.firstElement());
         auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
         ASSERT_EQ(1, namespaceSet.size());
-        ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, _targetDb, _targetColl)));
+        ASSERT_EQ(1ul,
+                  namespaceSet.count(NamespaceString::createNamespaceString_forTest(
+                      tenantId, _targetDb, _targetColl)));
     }
 }
 
@@ -1004,7 +1010,8 @@ TEST_F(DocumentSourceMergeServerlessTest,
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
 
     auto tenantId = TenantId(OID::gen());
-    NamespaceString nss(tenantId, _targetDb, "testColl");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(tenantId, _targetDb, "testColl");
 
     // Pass collection name as a db + coll object.
     auto stageSpec =
@@ -1013,7 +1020,9 @@ TEST_F(DocumentSourceMergeServerlessTest,
     auto liteParsedLookup = DocumentSourceMerge::LiteParsed::parse(nss, stageSpec.firstElement());
     auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
     ASSERT_EQ(1, namespaceSet.size());
-    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, _targetDb, _targetColl)));
+    ASSERT_EQ(1ul,
+              namespaceSet.count(NamespaceString::createNamespaceString_forTest(
+                  tenantId, _targetDb, _targetColl)));
 }
 
 TEST_F(DocumentSourceMergeServerlessTest,

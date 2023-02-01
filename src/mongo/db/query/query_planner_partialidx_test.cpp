@@ -36,7 +36,7 @@
 namespace mongo {
 namespace {
 
-const static NamespaceString kNs("db.dummyNs");
+const static NamespaceString kNs = NamespaceString::createNamespaceString_forTest("db.dummyNs");
 
 TEST_F(QueryPlannerTest, PartialIndexEq) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;

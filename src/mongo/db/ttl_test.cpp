@@ -171,7 +171,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
 
     SimpleClient client(opCtx());
 
-    NamespaceString nss("testDB.coll0");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
 
     client.createCollection(nss);
 
@@ -203,8 +203,8 @@ TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
 
     SimpleClient client(opCtx());
 
-    NamespaceString nss0("testDB.coll0");
-    NamespaceString nss1("testDB.coll1");
+    NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+    NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("testDB.coll1");
 
     client.createCollection(nss0);
     client.createCollection(nss1);
@@ -265,7 +265,7 @@ TEST_F(TTLTest, TTLSingleSubPass) {
     // expected sub-passes differs from the expected sub-passes in the indidual test.
     int nInitialSubPasses = getTTLSubPasses();
 
-    NamespaceString nss("testDB.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll");
 
     client.createCollection(nss);
 
@@ -323,7 +323,7 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
     // expected sub-passes differs from the expected sub-passes in the indidual test.
     int nInitialSubPasses = getTTLSubPasses();
 
-    NamespaceString nss("testDB.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll");
 
     client.createCollection(nss);
 
@@ -400,7 +400,7 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
 
     SimpleClient client(opCtx());
 
-    NamespaceString nss("testDB.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll");
 
     client.createCollection(nss);
 
@@ -489,7 +489,7 @@ TEST_F(TTLTest, TTLSubPassesStartRemovingFromNewTTLIndex) {
     // expected sub-passes differs from the expected sub-passes in the indidual test.
     int nInitialSubPasses = getTTLSubPasses();
 
-    NamespaceString nss("testDB.coll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll");
 
     client.createCollection(nss);
 

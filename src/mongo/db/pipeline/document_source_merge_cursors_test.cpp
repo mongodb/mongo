@@ -415,7 +415,8 @@ public:
     DocumentSourceMergeCursorsMultiTenancyTest()
         : _multitenancyController(
               std::make_unique<RAIIServerParameterControllerForTest>("multitenancySupport", true)) {
-        _nss = NamespaceString(TenantId(OID::gen()), kMergeCursorNsStr);
+        _nss =
+            NamespaceString::createNamespaceString_forTest(TenantId(OID::gen()), kMergeCursorNsStr);
     }
 
 protected:

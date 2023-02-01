@@ -62,7 +62,8 @@ using PauseDuringStateTransitions =
     resharding_service_test_helpers::PauseDuringStateTransitions<GlobalIndexClonerStateEnum>;
 
 const ShardId kRecipientShardId{"myShardId"};
-const NamespaceString kSourceNss{"sourcedb", "sourcecollection"};
+const NamespaceString kSourceNss =
+    NamespaceString::createNamespaceString_forTest("sourcedb", "sourcecollection");
 constexpr auto kSourceShardKey = "key"_sd;
 
 class GlobalIndexExternalStateForTest : public GlobalIndexCloningService::CloningExternalState {

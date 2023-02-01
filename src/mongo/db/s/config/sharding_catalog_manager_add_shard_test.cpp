@@ -349,13 +349,13 @@ protected:
                                               << BSON("level"
                                                       << "majority")));
                 auto cursorRes =
-                    CursorResponse(
-                        NamespaceString(DatabaseName(request.dbname),
-                                        NamespaceString::kClusterParametersNamespace.coll()),
-                        0,
-                        {BSON("_id"
-                              << "testStrClusterParameter"
-                              << "strData" << request.dbname)});
+                    CursorResponse(NamespaceString::createNamespaceString_forTest(
+                                       DatabaseName(request.dbname),
+                                       NamespaceString::kClusterParametersNamespace.coll()),
+                                   0,
+                                   {BSON("_id"
+                                         << "testStrClusterParameter"
+                                         << "strData" << request.dbname)});
                 return cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse);
             });
         }
@@ -522,7 +522,7 @@ protected:
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
-            NamespaceString("config.changelog"),
+            NamespaceString::createNamespaceString_forTest("config.changelog"),
             BSON("what"
                  << "addShard"
                  << "details.name" << addedShard.getName()),
@@ -620,7 +620,8 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
-    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
+    expectCollectionDrop(
+        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -706,7 +707,8 @@ TEST_F(AddShardTest, StandaloneBasicPushSuccess) {
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
-    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
+    expectCollectionDrop(
+        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -786,7 +788,8 @@ TEST_F(AddShardTest, StandaloneMultitenantPullSuccess) {
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
-    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
+    expectCollectionDrop(
+        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -888,7 +891,8 @@ TEST_F(AddShardTest, StandaloneMultitenantPushSuccess) {
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
-    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
+    expectCollectionDrop(
+        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -978,7 +982,8 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
-    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
+    expectCollectionDrop(
+        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -1377,7 +1382,8 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
 
-    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
+    expectCollectionDrop(
+        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -1449,7 +1455,8 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
 
-    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
+    expectCollectionDrop(
+        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -1534,7 +1541,8 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
-    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
+    expectCollectionDrop(
+        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);

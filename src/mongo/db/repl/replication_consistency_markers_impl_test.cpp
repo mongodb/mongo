@@ -55,9 +55,12 @@ namespace {
 
 using namespace mongo::repl;
 
-NamespaceString kMinValidNss("local", "replset.minvalid");
-NamespaceString kOplogTruncateAfterPointNss("local", "replset.oplogTruncateAfterPoint");
-NamespaceString kInitialSyncIdNss("local", "replset.initialSyncId");
+NamespaceString kMinValidNss =
+    NamespaceString::createNamespaceString_forTest("local", "replset.minvalid");
+NamespaceString kOplogTruncateAfterPointNss =
+    NamespaceString::createNamespaceString_forTest("local", "replset.oplogTruncateAfterPoint");
+NamespaceString kInitialSyncIdNss =
+    NamespaceString::createNamespaceString_forTest("local", "replset.initialSyncId");
 
 /**
  * Returns min valid document.

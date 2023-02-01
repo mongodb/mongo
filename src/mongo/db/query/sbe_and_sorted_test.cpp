@@ -35,7 +35,8 @@
 
 namespace mongo {
 
-const NamespaceString kTestNss("TestDB", "TestColl");
+const NamespaceString kTestNss =
+    NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
 class SbeAndSortedTest : public SbeStageBuilderTestFixture {
 protected:

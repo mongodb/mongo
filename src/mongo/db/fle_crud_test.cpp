@@ -264,10 +264,10 @@ protected:
 
     TestKeyVault _keyVault;
 
-    NamespaceString _edcNs{"test.edc"};
-    NamespaceString _escNs{"test.esc"};
-    NamespaceString _eccNs{"test.ecc"};
-    NamespaceString _ecocNs{"test.ecoc"};
+    NamespaceString _edcNs = NamespaceString::createNamespaceString_forTest("test.edc");
+    NamespaceString _escNs = NamespaceString::createNamespaceString_forTest("test.esc");
+    NamespaceString _eccNs = NamespaceString::createNamespaceString_forTest("test.ecc");
+    NamespaceString _ecocNs = NamespaceString::createNamespaceString_forTest("test.ecoc");
 };
 
 void FleCrudTest::setUp() {
@@ -299,7 +299,9 @@ void FleCrudTest::createCollection(const NamespaceString& ns) {
     CollectionOptions collectionOptions;
     collectionOptions.uuid = UUID::gen();
     auto statusCC = _storage->createCollection(
-        _opCtx.get(), NamespaceString(ns.db(), ns.coll()), collectionOptions);
+        _opCtx.get(),
+        NamespaceString::createNamespaceString_forTest(ns.dbName(), ns.coll()),
+        collectionOptions);
     ASSERT_OK(statusCC);
 }
 
@@ -722,7 +724,7 @@ void FleCrudTest::doFindAndModify(write_ops::FindAndModifyCommandRequest& reques
 class CollectionReader : public FLEStateCollectionReader {
 public:
     CollectionReader(std::string&& coll, FLEQueryInterfaceMock& queryImpl)
-        : _coll(NamespaceString(coll)), _queryImpl(queryImpl) {}
+        : _coll(NamespaceString::createNamespaceString_forTest(coll)), _queryImpl(queryImpl) {}
 
     uint64_t getDocumentCount() const override {
         return _queryImpl.countDocuments(_coll);

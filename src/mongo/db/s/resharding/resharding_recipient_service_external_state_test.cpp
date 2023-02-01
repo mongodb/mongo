@@ -57,12 +57,12 @@ class RecipientServiceExternalStateTest : public CatalogCacheTestFixture,
 public:
     const ShardKeyPattern kShardKey = ShardKeyPattern(BSON("_id" << 1));
 
-    const NamespaceString kOrigNss = NamespaceString("db.foo");
+    const NamespaceString kOrigNss = NamespaceString::createNamespaceString_forTest("db.foo");
     const OID kOrigEpoch = OID::gen();
     const Timestamp kOrigTimestamp = Timestamp(1);
     const UUID kOrigUUID = UUID::gen();
 
-    const NamespaceString kReshardingNss = NamespaceString(
+    const NamespaceString kReshardingNss = NamespaceString::createNamespaceString_forTest(
         str::stream() << "db." << NamespaceString::kTemporaryReshardingCollectionPrefix
                       << kOrigUUID);
     const ShardKeyPattern kReshardingKey = ShardKeyPattern(BSON("newKey" << 1));

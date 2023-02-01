@@ -53,7 +53,8 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kTestNss("TestDB", "TestColl");
+const NamespaceString kTestNss =
+    NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const std::string kShardKey = "_id";
 const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
 
@@ -205,7 +206,8 @@ TEST_F(CollectionShardingRuntimeTest,
 }
 
 TEST_F(CollectionShardingRuntimeTest, ReturnUnshardedMetadataInServerlessMode) {
-    const NamespaceString testNss("TestDBForServerless", "TestColl");
+    const NamespaceString testNss =
+        NamespaceString::createNamespaceString_forTest("TestDBForServerless", "TestColl");
     OperationContext* opCtx = operationContext();
 
     // Enable serverless mode in global settings.
@@ -257,7 +259,7 @@ TEST_F(CollectionShardingRuntimeTest, ReturnUnshardedMetadataInServerlessMode) {
 
 class CollectionShardingRuntimeTestWithMockedLoader : public ShardServerTestFixture {
 public:
-    const NamespaceString kNss{"test.foo"};
+    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.foo");
     const UUID kCollUUID = UUID::gen();
     const std::string kShardKey = "x";
     const HostAndPort kConfigHostAndPort{"DummyConfig", 12345};

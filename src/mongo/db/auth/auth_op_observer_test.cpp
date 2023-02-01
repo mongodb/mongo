@@ -90,7 +90,7 @@ public:
         });
     }
 
-    NamespaceString _nss = {"test", "coll"};
+    NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test", "coll");
 
 private:
     // Creates a reasonable set of ReplSettings for most tests.  We need to be able to
@@ -145,7 +145,7 @@ TEST_F(AuthOpObserverTest, OnRollbackDoesntInvalidateAuthCacheWhenNoAuthNamespac
 TEST_F(AuthOpObserverTest, MultipleAboutToDeleteAndOnDelete) {
     AuthOpObserver opObserver;
     auto opCtx = cc().makeOperationContext();
-    NamespaceString nss = {"test", "coll"};
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     WriteUnitOfWork wunit(opCtx.get());
     AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
     opObserver.aboutToDelete(opCtx.get(), *autoColl, BSON("_id" << 1));
@@ -158,7 +158,7 @@ DEATH_TEST_F(AuthOpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") 
     AuthOpObserver opObserver;
     auto opCtx = cc().makeOperationContext();
     cc().swapLockState(std::make_unique<LockerNoop>());
-    NamespaceString nss = {"test", "coll"};
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
     opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
 }

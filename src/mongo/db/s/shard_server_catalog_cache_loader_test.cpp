@@ -43,7 +43,7 @@ using std::vector;
 using unittest::assertGet;
 using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 
-const NamespaceString kNss = NamespaceString("foo.bar");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("foo.bar");
 const std::string kPattern = "_id";
 const ShardId kShardId = ShardId("shard0");
 

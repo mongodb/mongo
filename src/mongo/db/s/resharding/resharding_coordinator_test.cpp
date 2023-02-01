@@ -712,12 +712,13 @@ protected:
         writeStateTransitionUpdateExpectSuccess(operationContext(), expectedCoordinatorDoc);
     }
 
-    NamespaceString _originalNss = NamespaceString("db.foo");
+    NamespaceString _originalNss = NamespaceString::createNamespaceString_forTest("db.foo");
     UUID _originalUUID = UUID::gen();
     OID _originalEpoch = OID::gen();
     Timestamp _originalTimestamp{3};
 
-    NamespaceString _tempNss = NamespaceString("db.system.resharding." + _originalUUID.toString());
+    NamespaceString _tempNss = NamespaceString::createNamespaceString_forTest(
+        "db.system.resharding." + _originalUUID.toString());
     UUID _reshardingUUID = UUID::gen();
     OID _tempEpoch = OID::gen();
 

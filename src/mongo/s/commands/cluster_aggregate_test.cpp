@@ -94,7 +94,7 @@ protected:
      */
     Status testRunAggregateEarlyExit(const BSONObj& inputBson) {
         BSONObjBuilder result;
-        NamespaceString nss{"a.collection"};
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
         auto client = getServiceContext()->makeClient("ClusterCmdClient");
         auto opCtx = client->makeOperationContext();
         auto request = aggregation_request_helper::parseFromBSONForTests(nss, inputBson);

@@ -58,7 +58,7 @@ TEST(CollectionType, Basic) {
                                      << "fr_CA")
                              << CollectionType::kUniqueFieldName << true));
 
-    ASSERT(coll.getNss() == NamespaceString{"db.coll"});
+    ASSERT(coll.getNss() == NamespaceString::createNamespaceString_forTest("db.coll"));
     ASSERT_EQUALS(coll.getEpoch(), oid);
     ASSERT_EQUALS(coll.getUuid(), uuid);
     ASSERT_EQUALS(coll.getTimestamp(), timestamp);
@@ -91,7 +91,7 @@ TEST(CollectionType, AllFieldsPresent) {
         << CollectionType::kUniqueFieldName << true << CollectionType::kUuidFieldName << uuid
         << CollectionType::kReshardingFieldsFieldName << reshardingFields.toBSON()));
 
-    ASSERT(coll.getNss() == NamespaceString{"db.coll"});
+    ASSERT(coll.getNss() == NamespaceString::createNamespaceString_forTest("db.coll"));
     ASSERT_EQUALS(coll.getEpoch(), oid);
     ASSERT_EQUALS(coll.getTimestamp(), timestamp);
     ASSERT_EQUALS(coll.getUpdatedAt(), Date_t::fromMillisSinceEpoch(1));
@@ -146,7 +146,7 @@ TEST(CollectionType, Pre22Format) {
                              << Date_t::fromMillisSinceEpoch(1) << "dropped" << false << "key"
                              << BSON("a" << 1) << "unique" << false));
 
-    ASSERT(coll.getNss() == NamespaceString{"db.coll"});
+    ASSERT(coll.getNss() == NamespaceString::createNamespaceString_forTest("db.coll"));
     ASSERT(!coll.getEpoch().isSet());
     ASSERT_EQUALS(coll.getUpdatedAt(), Date_t::fromMillisSinceEpoch(1));
     ASSERT_BSONOBJ_EQ(coll.getKeyPattern().toBSON(), BSON("a" << 1));

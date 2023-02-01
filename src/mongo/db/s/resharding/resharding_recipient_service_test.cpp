@@ -164,7 +164,8 @@ private:
 
     const StringData _currentShardKey = "oldKey";
 
-    const NamespaceString _sourceNss{"sourcedb", "sourcecollection"};
+    const NamespaceString _sourceNss =
+        NamespaceString::createNamespaceString_forTest("sourcedb", "sourcecollection");
     const UUID _sourceUUID = UUID::gen();
 
     const ShardId _someDonorId{"myDonorId"};
@@ -263,7 +264,8 @@ public:
                                          ShardId{"donor3"}},
                                         durationCount<Milliseconds>(Milliseconds{5}));
 
-        NamespaceString sourceNss("sourcedb", "sourcecollection");
+        NamespaceString sourceNss =
+            NamespaceString::createNamespaceString_forTest("sourcedb", "sourcecollection");
         auto sourceUUID = UUID::gen();
         auto commonMetadata = CommonReshardingMetadata(
             UUID::gen(),

@@ -57,7 +57,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss("TestDB", "TestColl");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
 /**
  * Creates an OplogEntry with given parameters and preset defaults for this test suite.

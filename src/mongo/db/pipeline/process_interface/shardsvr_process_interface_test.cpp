@@ -46,7 +46,8 @@ TEST_F(ShardedProcessInterfaceTest, TestInsert) {
     // Need a real locker for storage operations.
     getClient()->swapLockState(std::make_unique<LockerImpl>(expCtx()->opCtx->getServiceContext()));
 
-    const NamespaceString kOutNss = NamespaceString{"unittests-out", "sharded_agg_test"};
+    const NamespaceString kOutNss =
+        NamespaceString::createNamespaceString_forTest("unittests-out", "sharded_agg_test");
     auto outStage = DocumentSourceOut::create(kOutNss, expCtx());
 
     // Attach a write concern, and make sure it is forwarded below.

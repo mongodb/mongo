@@ -371,6 +371,39 @@ public:
     static NamespaceString parseFromStringExpectTenantIdInMultitenancyMode(StringData ns);
 
     /**
+     * These functions construct a NamespaceString without checking for presence of TenantId.
+     *
+     * MUST only be used for tests.
+     */
+    static NamespaceString createNamespaceString_forTest(StringData ns) {
+        return NamespaceString(boost::none, ns);
+    }
+
+    static NamespaceString createNamespaceString_forTest(const DatabaseName& dbName) {
+        return NamespaceString(dbName);
+    }
+
+    static NamespaceString createNamespaceString_forTest(StringData db, StringData coll) {
+        return NamespaceString(boost::none, db, coll);
+    }
+
+    static NamespaceString createNamespaceString_forTest(const DatabaseName& dbName,
+                                                         StringData coll) {
+        return NamespaceString(dbName, coll);
+    }
+
+    static NamespaceString createNamespaceString_forTest(const boost::optional<TenantId>& tenantId,
+                                                         StringData ns) {
+        return NamespaceString(tenantId, ns);
+    }
+
+    static NamespaceString createNamespaceString_forTest(const boost::optional<TenantId>& tenantId,
+                                                         StringData db,
+                                                         StringData coll) {
+        return NamespaceString(tenantId, db, coll);
+    }
+
+    /**
      * Constructs the namespace '<dbName>.$cmd.aggregate', which we use as the namespace for
      * aggregation commands with the format {aggregate: 1}.
      */

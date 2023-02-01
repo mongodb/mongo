@@ -2189,7 +2189,7 @@ EncryptedFieldConfig getTestEncryptedFieldConfig() {
 }
 
 TEST(EncryptionInformation, RoundTrip) {
-    NamespaceString ns("test.test");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
 
     EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
     auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
@@ -2210,7 +2210,7 @@ TEST(EncryptionInformation, BadSchema) {
 
     auto obj = ei.toBSON();
 
-    NamespaceString ns("test.test");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
     ASSERT_THROWS_CODE(EncryptionInformationHelpers::getAndValidateSchema(
                            ns, EncryptionInformation::parse(IDLParserContext("foo"), obj)),
                        DBException,
@@ -2218,7 +2218,7 @@ TEST(EncryptionInformation, BadSchema) {
 }
 
 TEST(EncryptionInformation, MissingStateCollection) {
-    NamespaceString ns("test.test");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
 
     {
         EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
@@ -2319,7 +2319,7 @@ TEST(IndexedFields, DuplicateIndexKeyIds) {
 
 TEST(DeleteTokens, Basic) {
     TestKeyVault keyVault;
-    NamespaceString ns("test.test");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
     EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
 
     auto obj =
@@ -2330,7 +2330,7 @@ TEST(DeleteTokens, Basic) {
 
 TEST(DeleteTokens, Fetch) {
     TestKeyVault keyVault;
-    NamespaceString ns("test.test");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
     EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
 
     auto obj =
@@ -2347,7 +2347,7 @@ TEST(DeleteTokens, Fetch) {
 
 TEST(DeleteTokens, CorruptDelete) {
     TestKeyVault keyVault;
-    NamespaceString ns("test.test");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
     EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
 
     EncryptionInformation ei;
@@ -2741,7 +2741,7 @@ TEST(FLE_Update, PushToOtherfield) {
 
 TEST(FLE_Update, PullTokens) {
     TestKeyVault keyVault;
-    NamespaceString ns("test.test");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
     EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
 
     auto obj =

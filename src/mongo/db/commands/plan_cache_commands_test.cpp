@@ -38,7 +38,8 @@
 namespace mongo {
 namespace {
 
-static const NamespaceString nss{"test.collection"_sd};
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("test.collection"_sd);
 
 PlanCacheKey makeClassicKey(const CanonicalQuery& cq) {
     CollectionMock coll(nss);

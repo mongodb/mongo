@@ -52,7 +52,8 @@ namespace mongo {
 
 using std::unique_ptr;
 
-static const NamespaceString nss("unittests.PlanExecutorInvalidationTest");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.PlanExecutorInvalidationTest");
 
 /**
  * Test fixture for verifying that plan executors correctly raise errors when invalidating events

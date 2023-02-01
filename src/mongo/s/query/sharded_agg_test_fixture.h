@@ -53,7 +53,8 @@ public:
 
 class ShardedAggTestFixture : public CatalogCacheTestFixture {
 public:
-    const NamespaceString kTestAggregateNss = NamespaceString{"unittests", "sharded_agg_test"};
+    const NamespaceString kTestAggregateNss =
+        NamespaceString::createNamespaceString_forTest("unittests", "sharded_agg_test");
 
     void setUp() {
         CatalogCacheTestFixture::setUp();

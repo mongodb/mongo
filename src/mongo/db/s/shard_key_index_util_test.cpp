@@ -80,7 +80,7 @@ protected:
     }
 
 private:
-    const NamespaceString _nss{"test.user"};
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test.user");
     boost::optional<AutoGetCollection> _coll;
 };
 

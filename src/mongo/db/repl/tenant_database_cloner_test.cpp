@@ -169,9 +169,9 @@ TEST_F(TenantDatabaseClonerTest, ListCollections) {
     auto collections = getCollectionsFromCloner(cloner.get());
 
     ASSERT_EQUALS(2U, collections.size());
-    ASSERT_EQ(NamespaceString(_dbName, "a"), collections[0].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "a"), collections[0].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid1), collections[0].second.toBSON());
-    ASSERT_EQ(NamespaceString(_dbName, "b"), collections[1].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "b"), collections[1].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid2), collections[1].second.toBSON());
 }
 
@@ -212,9 +212,9 @@ TEST_F(TenantDatabaseClonerTest, ListCollectionsAllowsExtraneousFields) {
     auto collections = getCollectionsFromCloner(cloner.get());
 
     ASSERT_EQUALS(2U, collections.size());
-    ASSERT_EQ(NamespaceString(_dbName, "a"), collections[0].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "a"), collections[0].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid1), collections[0].second.toBSON());
-    ASSERT_EQ(NamespaceString(_dbName, "b"), collections[1].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "b"), collections[1].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid2), collections[1].second.toBSON());
 }
 
@@ -522,11 +522,11 @@ TEST_F(TenantDatabaseClonerTest, CreateCollections) {
 
     ASSERT_EQUALS(2U, _collections.size());
 
-    auto collInfo = _collections[NamespaceString{_dbName, "a"}];
+    auto collInfo = _collections[NamespaceString::createNamespaceString_forTest(_dbName, "a")];
     ASSERT(collInfo.collCreated);
     ASSERT_EQUALS(0, collInfo.numDocsInserted);
 
-    collInfo = _collections[NamespaceString{_dbName, "b"}];
+    collInfo = _collections[NamespaceString::createNamespaceString_forTest(_dbName, "b")];
     ASSERT(collInfo.collCreated);
     ASSERT_EQUALS(0, collInfo.numDocsInserted);
 }
@@ -641,7 +641,8 @@ TEST_F(TenantDatabaseClonerTest, TenantCollectionsAlreadyExist) {
 
     CollectionOptions options;
     options.uuid = uuid;
-    ASSERT_OK(createCollection(NamespaceString(_dbName, "a"), options));
+    ASSERT_OK(
+        createCollection(NamespaceString::createNamespaceString_forTest(_dbName, "a"), options));
 
     auto cloner = makeDatabaseCloner();
     cloner->setStopAfterStage_forTest("listExistingCollections");
@@ -666,8 +667,8 @@ TEST_F(TenantDatabaseClonerTest, ResumingFromLastClonedCollection) {
     uuid.push_back(UUID::gen());
     std::sort(uuid.begin(), uuid.end());
 
-    auto aNss = NamespaceString(_dbName, "a");
-    auto bNss = NamespaceString(_dbName, "b");
+    auto aNss = NamespaceString::createNamespaceString_forTest(_dbName, "a");
+    auto bNss = NamespaceString::createNamespaceString_forTest(_dbName, "b");
     CollectionOptions options;
     options.uuid = uuid[0];
     ASSERT_OK(createCollection(aNss, options));
@@ -720,7 +721,7 @@ TEST_F(TenantDatabaseClonerTest, ResumingFromLastClonedCollection) {
     auto collections = getCollectionsFromCloner(cloner.get());
 
     ASSERT_EQUALS(1U, collections.size());
-    ASSERT_EQ(NamespaceString(_dbName, "b"), collections[0].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "b"), collections[0].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid[1]), collections[0].second.toBSON());
 
     auto stats = cloner->getStats();
@@ -739,7 +740,7 @@ TEST_F(TenantDatabaseClonerTest, LastClonedCollectionDeleted_AllGreater) {
     uuid.push_back(UUID::gen());
     std::sort(uuid.begin(), uuid.end());
 
-    auto aNss = NamespaceString(_dbName, "a");
+    auto aNss = NamespaceString::createNamespaceString_forTest(_dbName, "a");
     CollectionOptions options;
     options.uuid = uuid[0];
     ASSERT_OK(createCollection(aNss, options));
@@ -784,9 +785,9 @@ TEST_F(TenantDatabaseClonerTest, LastClonedCollectionDeleted_AllGreater) {
     auto collections = getCollectionsFromCloner(cloner.get());
 
     ASSERT_EQUALS(2U, collections.size());
-    ASSERT_EQ(NamespaceString(_dbName, "b"), collections[0].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "b"), collections[0].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid[1]), collections[0].second.toBSON());
-    ASSERT_EQ(NamespaceString(_dbName, "c"), collections[1].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "c"), collections[1].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid[2]), collections[1].second.toBSON());
 
     auto stats = cloner->getStats();
@@ -805,8 +806,8 @@ TEST_F(TenantDatabaseClonerTest, LastClonedCollectionDeleted_SomeGreater) {
     uuid.push_back(UUID::gen());
     std::sort(uuid.begin(), uuid.end());
 
-    auto aNss = NamespaceString(_dbName, "a");
-    auto bNss = NamespaceString(_dbName, "b");
+    auto aNss = NamespaceString::createNamespaceString_forTest(_dbName, "a");
+    auto bNss = NamespaceString::createNamespaceString_forTest(_dbName, "b");
     CollectionOptions options;
     options.uuid = uuid[0];
     ASSERT_OK(createCollection(aNss, options));
@@ -863,7 +864,7 @@ TEST_F(TenantDatabaseClonerTest, LastClonedCollectionDeleted_SomeGreater) {
     auto collections = getCollectionsFromCloner(cloner.get());
 
     ASSERT_EQUALS(1U, collections.size());
-    ASSERT_EQ(NamespaceString(_dbName, "c"), collections[0].first);
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "c"), collections[0].first);
     ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid[2]), collections[0].second.toBSON());
 
     auto stats = cloner->getStats();
@@ -882,9 +883,9 @@ TEST_F(TenantDatabaseClonerTest, LastClonedCollectionDeleted_AllLess) {
     uuid.push_back(UUID::gen());
     std::sort(uuid.begin(), uuid.end());
 
-    auto aNss = NamespaceString(_dbName, "a");
-    auto bNss = NamespaceString(_dbName, "b");
-    auto cNss = NamespaceString(_dbName, "c");
+    auto aNss = NamespaceString::createNamespaceString_forTest(_dbName, "a");
+    auto bNss = NamespaceString::createNamespaceString_forTest(_dbName, "b");
+    auto cNss = NamespaceString::createNamespaceString_forTest(_dbName, "c");
     CollectionOptions options;
     options.uuid = uuid[0];
     ASSERT_OK(createCollection(aNss, options));

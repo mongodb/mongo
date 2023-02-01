@@ -83,7 +83,7 @@ public:
     virtual std::unique_ptr<RecordStore> createRecordStore(OperationContext* opCtx,
                                                            const std::string& ns) final {
         std::string ident = ns;
-        NamespaceString nss(ns);
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
         StatusWith<std::string> result =
             WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName,

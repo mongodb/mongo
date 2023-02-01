@@ -87,7 +87,8 @@ struct ThreadInfo {
 };
 }  // namespace
 
-const NamespaceString kTestNss = NamespaceString("test.docSourceExchange"_sd);
+const NamespaceString kTestNss =
+    NamespaceString::createNamespaceString_forTest("test.docSourceExchange"_sd);
 
 class DocumentSourceExchangeTest : public AggregationContextFixture {
 protected:

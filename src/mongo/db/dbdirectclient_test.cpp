@@ -34,7 +34,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNs("a.b");
+const NamespaceString kNs = NamespaceString::createNamespaceString_forTest("a.b");
 
 class DBDirectClientTest : public ServiceContextMongoDTest {
 protected:

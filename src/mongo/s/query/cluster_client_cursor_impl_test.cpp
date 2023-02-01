@@ -64,7 +64,8 @@ TEST_F(ClusterClientCursorImplTest, NumReturnedSoFar) {
     ClusterClientCursorImpl cursor(
         _opCtx.get(),
         std::move(mockStage),
-        ClusterClientCursorParams(NamespaceString("unused"), APIParameters(), {}),
+        ClusterClientCursorParams(
+            NamespaceString::createNamespaceString_forTest("unused"), APIParameters(), {}),
         boost::none);
 
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 0);
@@ -87,10 +88,11 @@ TEST_F(ClusterClientCursorImplTest, QueueResult) {
     mockStage->queueResult(BSON("a" << 1));
     mockStage->queueResult(BSON("a" << 4));
 
-    ClusterClientCursorImpl cursor(_opCtx.get(),
-                                   std::move(mockStage),
-                                   ClusterClientCursorParams(NamespaceString("unused"), {}),
-                                   boost::none);
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::move(mockStage),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"), {}),
+        boost::none);
 
     auto firstResult = cursor.next();
     ASSERT_OK(firstResult.getStatus());
@@ -128,10 +130,11 @@ TEST_F(ClusterClientCursorImplTest, RemotesExhausted) {
     mockStage->queueResult(BSON("a" << 2));
     mockStage->markRemotesExhausted();
 
-    ClusterClientCursorImpl cursor(_opCtx.get(),
-                                   std::move(mockStage),
-                                   ClusterClientCursorParams(NamespaceString("unused"), {}),
-                                   boost::none);
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::move(mockStage),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"), {}),
+        boost::none);
     ASSERT_TRUE(cursor.remotesExhausted());
 
     auto firstResult = cursor.next();
@@ -160,10 +163,11 @@ TEST_F(ClusterClientCursorImplTest, RemoteTimeoutPartialResultsDisallowed) {
     mockStage->queueError(Status(ErrorCodes::MaxTimeMSExpired, "timeout"));
     mockStage->markRemotesExhausted();
 
-    ClusterClientCursorImpl cursor(_opCtx.get(),
-                                   std::move(mockStage),
-                                   ClusterClientCursorParams(NamespaceString("unused"), {}),
-                                   boost::none);
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::move(mockStage),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"), {}),
+        boost::none);
     ASSERT_TRUE(cursor.remotesExhausted());
 
     auto firstResult = cursor.next();
@@ -185,7 +189,8 @@ TEST_F(ClusterClientCursorImplTest, RemoteTimeoutPartialResultsAllowed) {
     mockStage->queueError(Status(ErrorCodes::MaxTimeMSExpired, "timeout"));
     mockStage->markRemotesExhausted();
 
-    auto params = ClusterClientCursorParams(NamespaceString("unused"), {});
+    auto params =
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"), {});
     params.isAllowPartialResults = true;
 
     ClusterClientCursorImpl cursor(
@@ -210,10 +215,11 @@ TEST_F(ClusterClientCursorImplTest, ForwardsAwaitDataTimeout) {
     auto mockStagePtr = mockStage.get();
     ASSERT_NOT_OK(mockStage->getAwaitDataTimeout().getStatus());
 
-    ClusterClientCursorImpl cursor(_opCtx.get(),
-                                   std::move(mockStage),
-                                   ClusterClientCursorParams(NamespaceString("unused"), {}),
-                                   boost::none);
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::move(mockStage),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"), {}),
+        boost::none);
     ASSERT_OK(cursor.setAwaitDataTimeout(Milliseconds(789)));
 
     auto awaitDataTimeout = mockStagePtr->getAwaitDataTimeout();
@@ -227,10 +233,11 @@ TEST_F(ClusterClientCursorImplTest, ChecksForInterrupt) {
         mockStage->queueResult(BSON("a" << i));
     }
 
-    ClusterClientCursorImpl cursor(_opCtx.get(),
-                                   std::move(mockStage),
-                                   ClusterClientCursorParams(NamespaceString("unused"), {}),
-                                   boost::none);
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::move(mockStage),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"), {}),
+        boost::none);
 
     // Pull one result out of the cursor.
     auto result = cursor.next();
@@ -252,14 +259,14 @@ TEST_F(ClusterClientCursorImplTest, ChecksForInterrupt) {
 TEST_F(ClusterClientCursorImplTest, LogicalSessionIdsOnCursors) {
     // Make a cursor with no lsid
     auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
-    ClusterClientCursorParams params(NamespaceString("test"), {});
+    ClusterClientCursorParams params(NamespaceString::createNamespaceString_forTest("test"), {});
     ClusterClientCursorImpl cursor{
         _opCtx.get(), std::move(mockStage), std::move(params), boost::none};
     ASSERT(!cursor.getLsid());
 
     // Make a cursor with an lsid
     auto mockStage2 = std::make_unique<RouterStageMock>(_opCtx.get());
-    ClusterClientCursorParams params2(NamespaceString("test"), {});
+    ClusterClientCursorParams params2(NamespaceString::createNamespaceString_forTest("test"), {});
     auto lsid = makeLogicalSessionIdForTest();
     ClusterClientCursorImpl cursor2{_opCtx.get(), std::move(mockStage2), std::move(params2), lsid};
     ASSERT(*(cursor2.getLsid()) == lsid);
@@ -270,7 +277,8 @@ TEST_F(ClusterClientCursorImplTest, ShouldStoreLSIDIfSetOnOpCtx) {
 
     {
         // Make a cursor with no lsid or txnNumber.
-        ClusterClientCursorParams params(NamespaceString("test"), {});
+        ClusterClientCursorParams params(NamespaceString::createNamespaceString_forTest("test"),
+                                         {});
         params.lsid = _opCtx->getLogicalSessionId();
         params.txnNumber = _opCtx->getTxnNumber();
 
@@ -284,7 +292,8 @@ TEST_F(ClusterClientCursorImplTest, ShouldStoreLSIDIfSetOnOpCtx) {
 
     {
         // Make a cursor with an lsid and no txnNumber.
-        ClusterClientCursorParams params(NamespaceString("test"), {});
+        ClusterClientCursorParams params(NamespaceString::createNamespaceString_forTest("test"),
+                                         {});
         params.lsid = _opCtx->getLogicalSessionId();
         params.txnNumber = _opCtx->getTxnNumber();
 
@@ -298,7 +307,8 @@ TEST_F(ClusterClientCursorImplTest, ShouldStoreLSIDIfSetOnOpCtx) {
 
     {
         // Make a cursor with an lsid and txnNumber.
-        ClusterClientCursorParams params(NamespaceString("test"), {});
+        ClusterClientCursorParams params(NamespaceString::createNamespaceString_forTest("test"),
+                                         {});
         params.lsid = _opCtx->getLogicalSessionId();
         params.txnNumber = _opCtx->getTxnNumber();
 
@@ -316,7 +326,8 @@ TEST_F(ClusterClientCursorImplTest, ShouldStoreAPIParameters) {
     apiParams.setAPIStrict(true);
     apiParams.setAPIDeprecationErrors(true);
 
-    ClusterClientCursorParams params(NamespaceString("test"), apiParams, {});
+    ClusterClientCursorParams params(
+        NamespaceString::createNamespaceString_forTest("test"), apiParams, {});
     ClusterClientCursorImpl cursor(
         _opCtx.get(), std::move(mockStage), std::move(params), boost::none);
 

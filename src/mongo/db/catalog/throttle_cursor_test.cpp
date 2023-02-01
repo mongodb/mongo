@@ -43,7 +43,7 @@ namespace mongo {
 
 namespace {
 
-const NamespaceString kNss = NamespaceString("test.throttleCursor");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.throttleCursor");
 const uint8_t kTickDelay = 200;
 
 class ThrottleCursorTest : public CatalogTestFixture {

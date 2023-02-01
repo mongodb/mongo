@@ -137,7 +137,8 @@ public:
                                  bh);
     }
 
-    const NamespaceString testNS = NamespaceString("testdb", "testcoll");
+    const NamespaceString testNS =
+        NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
     const FindCommandRequest testFindCmd = FindCommandRequest(testNS);
     const BSONObj testFirstBatch = BSON("x" << 1);
 

@@ -386,8 +386,8 @@ public:
 private:
     // Used for pre/post image oplog entry lookup.
     const ShardId _donorShardId{"donor-0"};
-    const NamespaceString _oplogBufferNss{NamespaceString::kReshardingLocalOplogBufferPrefix +
-                                          _donorShardId.toString()};
+    const NamespaceString _oplogBufferNss = NamespaceString::createNamespaceString_forTest(
+        NamespaceString::kReshardingLocalOplogBufferPrefix + _donorShardId.toString());
 };
 
 TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSession) {

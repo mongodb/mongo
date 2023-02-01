@@ -400,7 +400,8 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
     auto shards = setupNShards(2);
     auto cm = loadRoutingTableWithTwoChunksAndTwoShards(kTestAggregateNss);
 
-    NamespaceString nsToUnionWith(expCtx()->ns.db(), "view");
+    NamespaceString nsToUnionWith =
+        NamespaceString::createNamespaceString_forTest(expCtx()->ns.db(), "view");
     // Mock out the view namespace as emtpy for now - this is what it would be when parsing in a
     // sharded cluster - only later would we learn the actual view definition.
     expCtx()->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{

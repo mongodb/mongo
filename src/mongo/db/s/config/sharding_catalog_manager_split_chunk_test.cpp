@@ -66,8 +66,10 @@ protected:
         ConfigServerTestFixture::tearDown();
     }
 
-    const NamespaceString _nss1{"TestDB", "TestColl1"};
-    const NamespaceString _nss2{"TestDB", "TestColl2"};
+    const NamespaceString _nss1 =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl1");
+    const NamespaceString _nss2 =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl2");
     const KeyPattern _keyPattern{BSON("a" << 1)};
 };
 
@@ -385,7 +387,8 @@ TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
 
         ASSERT_EQUALS(ShardingCatalogManager::get(operationContext())
                           ->commitChunkSplit(operationContext(),
-                                             NamespaceString("TestDB.NonExistingColl"),
+                                             NamespaceString::createNamespaceString_forTest(
+                                                 "TestDB.NonExistingColl"),
                                              collEpoch,
                                              Timestamp{50, 0},
                                              ChunkRange(chunkMin, chunkMax),

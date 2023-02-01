@@ -42,7 +42,7 @@ namespace mongo {
 namespace {
 
 const ShardId kThisShard("thisShard");
-const NamespaceString kNss("TestDB", "TestColl");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
 /**
  * Creates a new routing table from the input routing table by inserting the chunks specified by

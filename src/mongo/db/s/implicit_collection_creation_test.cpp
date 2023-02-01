@@ -44,7 +44,8 @@ namespace {
 class ImplicitCollectionCreationTest : public ShardServerTestFixture {};
 
 TEST_F(ImplicitCollectionCreationTest, ImplicitCreateDisallowedByDefault) {
-    NamespaceString nss("ImplicitCreateDisallowedByDefaultDB.TestColl");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "ImplicitCreateDisallowedByDefaultDB.TestColl");
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
     auto db = autoColl.ensureDbExists(operationContext());
     WriteUnitOfWork wuow(operationContext());
@@ -56,7 +57,8 @@ TEST_F(ImplicitCollectionCreationTest, ImplicitCreateDisallowedByDefault) {
 }
 
 TEST_F(ImplicitCollectionCreationTest, AllowImplicitCollectionCreate) {
-    NamespaceString nss("AllowImplicitCollectionCreateDB.TestColl");
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("AllowImplicitCollectionCreateDB.TestColl");
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
         operationContext());
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);

@@ -49,7 +49,7 @@ namespace {
 
 using unittest::assertGet;
 
-const NamespaceString kNss("TestDB", "TestColl");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
 auto buildUpdate(const NamespaceString& nss, BSONObj query, BSONObj update, bool upsert) {
     write_ops::UpdateCommandRequest updateOp(nss);

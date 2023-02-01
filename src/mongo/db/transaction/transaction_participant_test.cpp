@@ -74,7 +74,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss("TestDB", "TestColl");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
 /**
  * Creates an OplogEntry with given parameters and preset defaults for this test suite.
@@ -691,7 +691,8 @@ TEST_F(TxnParticipantTest, PrepareSucceedsWithNestedLocks) {
 }
 
 TEST_F(TxnParticipantTest, PrepareFailsOnTemporaryCollection) {
-    NamespaceString tempCollNss(kNss.db(), "tempCollection");
+    NamespaceString tempCollNss =
+        NamespaceString::createNamespaceString_forTest(kNss.db(), "tempCollection");
     UUID tempCollUUID = UUID::gen();
 
     // Create a temporary collection so that we can write to it.
@@ -1010,7 +1011,8 @@ TEST_F(TxnParticipantTest, UnstashFailsShouldLeaveTxnResourceStashUnchanged) {
     // Simulate the locking of an insert.
     {
         Lock::DBLock dbLock(opCtx(), DatabaseName(boost::none, "test"), MODE_IX);
-        Lock::CollectionLock collLock(opCtx(), NamespaceString("test.foo"), MODE_IX);
+        Lock::CollectionLock collLock(
+            opCtx(), NamespaceString::createNamespaceString_forTest("test.foo"), MODE_IX);
     }
 
     auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
@@ -1166,7 +1168,8 @@ TEST_F(TxnParticipantTest, StepDownDuringPreparedAbortReleasesRSTL) {
     // Simulate the locking of an insert.
     {
         Lock::DBLock dbLock(opCtx(), DatabaseName(boost::none, "test"), MODE_IX);
-        Lock::CollectionLock collLock(opCtx(), NamespaceString("test.foo"), MODE_IX);
+        Lock::CollectionLock collLock(
+            opCtx(), NamespaceString::createNamespaceString_forTest("test.foo"), MODE_IX);
     }
 
     ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
@@ -1219,7 +1222,8 @@ TEST_F(TxnParticipantTest, StepDownDuringPreparedCommitReleasesRSTL) {
     // Simulate the locking of an insert.
     {
         Lock::DBLock dbLock(opCtx(), DatabaseName(boost::none, "test"), MODE_IX);
-        Lock::CollectionLock collLock(opCtx(), NamespaceString("test.foo"), MODE_IX);
+        Lock::CollectionLock collLock(
+            opCtx(), NamespaceString::createNamespaceString_forTest("test.foo"), MODE_IX);
     }
 
     ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
@@ -1888,7 +1892,8 @@ TEST_F(TxnParticipantTest, ReacquireLocksForPreparedTransactionsOnStepUp) {
         // Simulate the locking of an insert.
         {
             Lock::DBLock dbLock(opCtx(), DatabaseName(boost::none, "test"), MODE_IX);
-            Lock::CollectionLock collLock(opCtx(), NamespaceString("test.foo"), MODE_IX);
+            Lock::CollectionLock collLock(
+                opCtx(), NamespaceString::createNamespaceString_forTest("test.foo"), MODE_IX);
         }
         txnParticipant.prepareTransaction(opCtx(), repl::OpTime({1, 1}, 1));
         txnParticipant.stashTransactionResources(opCtx());

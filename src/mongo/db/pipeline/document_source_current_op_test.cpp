@@ -109,7 +109,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIfNotRunOnAdmin) {
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIfNotRunWithAggregateOne) {
     const auto specObj = fromjson("{$currentOp:{}}");
-    getExpCtx()->ns = NamespaceString("admin.foo");
+    getExpCtx()->ns = NamespaceString::createNamespaceString_forTest("admin.foo");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::InvalidNamespace);

@@ -41,7 +41,7 @@
 namespace mongo {
 namespace {
 
-static const NamespaceString testNss("db.col");
+static const NamespaceString testNss = NamespaceString::createNamespaceString_forTest("db.col");
 static const CursorId testCursor(1);
 
 TEST(ViewResponseFormatter, FormatInitialCountResponseSuccessfully) {
@@ -62,7 +62,8 @@ TEST(ViewResponseFormatter, FormatSubsequentCountResponseSuccessfully) {
 
 TEST(ViewResponseFormatter, FormatInitialCountResponseWithTenantIdSuccessfully) {
     const TenantId tenantId(OID::gen());
-    const NamespaceString nss(tenantId, testNss.toString());
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(tenantId, testNss.toString());
 
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
@@ -119,7 +120,8 @@ TEST(ViewResponseFormatter, FormatSubsequentDistinctResponseSuccessfully) {
 
 TEST(ViewResponseFormatter, FormatInitialDistinctResponseWithTenantIdSuccessfully) {
     const TenantId tenantId(OID::gen());
-    const NamespaceString nss(tenantId, testNss.toString());
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(tenantId, testNss.toString());
 
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 

@@ -48,7 +48,8 @@
 namespace mongo {
 namespace {
 
-static const NamespaceString kConfigNss("local.system.replset");
+static const NamespaceString kConfigNss =
+    NamespaceString::createNamespaceString_forTest("local.system.replset");
 static const std::string kRepairIncompleteFileName = "_repair_incomplete";
 
 using boost::filesystem::path;
@@ -69,13 +70,17 @@ public:
         BSONObj replConfig;
         Lock::DBLock dbLock(opCtx, DatabaseName(boost::none, "local"), MODE_X);
         Helpers::putSingleton(
-            opCtx, NamespaceString(boost::none, "local.system.replset"), replConfig);
+            opCtx,
+            NamespaceString::createNamespaceString_forTest(boost::none, "local.system.replset"),
+            replConfig);
     }
 
     void assertReplConfigValid(OperationContext* opCtx, bool valid) {
         BSONObj replConfig;
         ASSERT(Helpers::getSingleton(
-            opCtx, NamespaceString(boost::none, "local.system.replset"), replConfig));
+            opCtx,
+            NamespaceString::createNamespaceString_forTest(boost::none, "local.system.replset"),
+            replConfig));
         if (valid) {
             ASSERT(!replConfig.hasField("repaired"));
         } else {
@@ -87,7 +92,9 @@ public:
         BSONObj replConfig;
         Lock::DBLock dbLock(opCtx, DatabaseName(boost::none, "local"), MODE_IS);
         return Helpers::getSingleton(
-            opCtx, NamespaceString(boost::none, "local.system.replset"), replConfig);
+            opCtx,
+            NamespaceString::createNamespaceString_forTest(boost::none, "local.system.replset"),
+            replConfig);
     }
 
     path repairFilePath() {

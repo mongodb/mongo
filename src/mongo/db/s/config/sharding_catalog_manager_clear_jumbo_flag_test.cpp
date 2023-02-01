@@ -88,8 +88,10 @@ protected:
     }
 
     const std::string _shardName = "shard";
-    const NamespaceString _nss1{"TestDB.TestColl1"};
-    const NamespaceString _nss2{"TestDB.TestColl2"};
+    const NamespaceString _nss1 =
+        NamespaceString::createNamespaceString_forTest("TestDB.TestColl1");
+    const NamespaceString _nss2 =
+        NamespaceString::createNamespaceString_forTest("TestDB.TestColl2");
 };
 
 TEST_F(ClearJumboFlagTest, ClearJumboShouldBumpVersion) {

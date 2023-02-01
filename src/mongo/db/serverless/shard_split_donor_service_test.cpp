@@ -457,7 +457,8 @@ protected:
         "donorSetForTest", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
     MockReplicaSet _recipientSet{
         "recipientSetForTest", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
-    const NamespaceString _nss{"testDB2", "testColl2"};
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("testDB2", "testColl2");
     std::vector<TenantId> _tenantIds = {TenantId(OID::gen()), TenantId(OID::gen())};
     std::string _recipientTagName{"$recipientNode"};
     std::string _recipientSetName{_recipientSet.getURI().getSetName()};

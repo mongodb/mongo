@@ -46,11 +46,13 @@ namespace mongo {
 
 class ShardingRecoveryServiceTest : public ShardServerTestFixture {
 public:
-    inline static const NamespaceString collNss{"TestDB", "TestCollection"};
+    inline static const NamespaceString collNss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestCollection");
     inline static const BSONObj collOpReason =
         BSON("Dummy operation on collection" << collNss.ns());
 
-    inline static const NamespaceString dbName{"TestDB"};
+    inline static const NamespaceString dbName =
+        NamespaceString::createNamespaceString_forTest("TestDB");
     inline static const BSONObj dbOpReason = BSON("Dummy operation on database" << dbName.ns());
 
     inline static const BSONObj differentOpReason = BSON("Yet another dummy operation" << true);

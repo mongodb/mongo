@@ -1227,7 +1227,7 @@ TEST_F(DConcurrencyTestFixture, IsDbLockedForXMode) {
 }
 
 TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IS) {
-    const NamespaceString ns("db1.coll");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db1.coll");
 
     auto opCtx = makeOperationContext();
     getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
@@ -1255,7 +1255,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IS) {
 }
 
 TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IX) {
-    const NamespaceString ns("db1.coll");
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db1.coll");
 
     auto opCtx = makeOperationContext();
     getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
@@ -1874,9 +1874,11 @@ TEST_F(DConcurrencyTestFixture, CollectionLockInInterruptedContextThrowsEvenWhen
 
     {
         boost::optional<Lock::CollectionLock> collLock;
-        ASSERT_THROWS_CODE(collLock.emplace(opCtx, NamespaceString("db.coll"), MODE_IX),
-                           AssertionException,
-                           ErrorCodes::Interrupted);
+        ASSERT_THROWS_CODE(
+            collLock.emplace(
+                opCtx, NamespaceString::createNamespaceString_forTest("db.coll"), MODE_IX),
+            AssertionException,
+            ErrorCodes::Interrupted);
     }
 }
 
@@ -1886,15 +1888,18 @@ TEST_F(DConcurrencyTestFixture,
     auto opCtx = clients[0].second.get();
 
     Lock::DBLock dbLock(opCtx, DatabaseName(boost::none, "db"), MODE_IX);
-    Lock::CollectionLock collLock(opCtx, NamespaceString("db.coll"), MODE_IX);
+    Lock::CollectionLock collLock(
+        opCtx, NamespaceString::createNamespaceString_forTest("db.coll"), MODE_IX);
 
     opCtx->markKilled();
 
     {
         boost::optional<Lock::CollectionLock> recursiveCollLock;
-        ASSERT_THROWS_CODE(recursiveCollLock.emplace(opCtx, NamespaceString("db.coll"), MODE_X),
-                           AssertionException,
-                           ErrorCodes::Interrupted);
+        ASSERT_THROWS_CODE(
+            recursiveCollLock.emplace(
+                opCtx, NamespaceString::createNamespaceString_forTest("db.coll"), MODE_X),
+            AssertionException,
+            ErrorCodes::Interrupted);
     }
 }
 
@@ -1906,8 +1911,10 @@ TEST_F(DConcurrencyTestFixture, CollectionLockInInterruptedContextRespectsUninte
 
     opCtx->markKilled();
 
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());                   // NOLINT.
-    Lock::CollectionLock collLock(opCtx, NamespaceString("db.coll"), MODE_IX);  // Does not throw.
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+    Lock::CollectionLock collLock(opCtx,
+                                  NamespaceString::createNamespaceString_forTest("db.coll"),
+                                  MODE_IX);  // Does not throw.
 }
 
 TEST_F(DConcurrencyTestFixture, CollectionLockTimeout) {
@@ -1921,15 +1928,21 @@ TEST_F(DConcurrencyTestFixture, CollectionLockTimeout) {
 
     Lock::DBLock DBL1(opctx1, testDb, MODE_IX, Date_t::max());
     ASSERT(opctx1->lockState()->isDbLockedForMode(testDb, MODE_IX));
-    Lock::CollectionLock CL1(opctx1, NamespaceString("testdb.test"), MODE_X, Date_t::max());
-    ASSERT(opctx1->lockState()->isCollectionLockedForMode(NamespaceString("testdb.test"), MODE_X));
+    Lock::CollectionLock CL1(opctx1,
+                             NamespaceString::createNamespaceString_forTest("testdb.test"),
+                             MODE_X,
+                             Date_t::max());
+    ASSERT(opctx1->lockState()->isCollectionLockedForMode(
+        NamespaceString::createNamespaceString_forTest("testdb.test"), MODE_X));
 
     Date_t t1 = Date_t::now();
     Lock::DBLock DBL2(opctx2, testDb, MODE_IX, Date_t::max());
     ASSERT(opctx2->lockState()->isDbLockedForMode(testDb, MODE_IX));
     ASSERT_THROWS_CODE(
-        Lock::CollectionLock(
-            opctx2, NamespaceString("testdb.test"), MODE_X, Date_t::now() + timeoutMillis),
+        Lock::CollectionLock(opctx2,
+                             NamespaceString::createNamespaceString_forTest("testdb.test"),
+                             MODE_X,
+                             Date_t::now() + timeoutMillis),
         AssertionException,
         ErrorCodes::LockTimeout);
     Date_t t2 = Date_t::now();
@@ -2388,7 +2401,9 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonInte
     LockerImpl locker3(opCtx->getServiceContext());
 
     // Granted MODE_X lock, fail incoming MODE_S and MODE_X.
-    const ResourceId resId(RESOURCE_COLLECTION, NamespaceString(boost::none, "TestDB.collection"));
+    const ResourceId resId(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
 
     locker1.lockGlobal(opCtx.get(), MODE_IX);
 

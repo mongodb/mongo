@@ -38,7 +38,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss = NamespaceString("test", "foo");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test", "foo");
 
 struct TestTask {
     std::string key;

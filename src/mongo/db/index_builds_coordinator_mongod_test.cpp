@@ -58,13 +58,15 @@ public:
     void createCollection(const NamespaceString& nss, UUID uuid);
 
     const UUID _testFooUUID = UUID::gen();
-    const NamespaceString _testFooNss = NamespaceString("test.foo");
+    const NamespaceString _testFooNss = NamespaceString::createNamespaceString_forTest("test.foo");
     const UUID _testBarUUID = UUID::gen();
-    const NamespaceString _testBarNss = NamespaceString("test.bar");
+    const NamespaceString _testBarNss = NamespaceString::createNamespaceString_forTest("test.bar");
     const UUID _othertestFooUUID = UUID::gen();
-    const NamespaceString _othertestFooNss = NamespaceString("othertest.foo");
+    const NamespaceString _othertestFooNss =
+        NamespaceString::createNamespaceString_forTest("othertest.foo");
     const TenantId _tenantId{OID::gen()};
-    const NamespaceString _testTenantFooNss{_tenantId, "test.test"};
+    const NamespaceString _testTenantFooNss =
+        NamespaceString::createNamespaceString_forTest(_tenantId, "test.test");
     const UUID _testFooTenantUUID = UUID::gen();
     const IndexBuildsCoordinator::IndexBuildOptions _indexBuildOptions = {
         CommitQuorumOptions(CommitQuorumOptions::kDisabled)};
@@ -279,7 +281,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumWithBadArguments) {
     ASSERT_EQUALS(ErrorCodes::IndexNotFound, status);
 
     // Use an invalid collection namespace.
-    NamespaceString nss("bad.collection");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("bad.collection");
     status = _indexBuildsCoord->setCommitQuorum(
         operationContext(), nss, {"a_1", "b_1"}, newCommitQuorum);
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);

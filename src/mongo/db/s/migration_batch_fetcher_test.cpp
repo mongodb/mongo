@@ -172,7 +172,7 @@ auto getOnMigrateCloneCommandCb(BSONObj ret) {
 }
 
 TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTest) {
-    NamespaceString nss{"test", "foo"};
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "foo");
     ShardId fromShard{"Donor"};
     auto msid = MigrationSessionId::generate(fromShard, "Recipient");
     auto outerOpCtx = operationContext();
@@ -218,7 +218,7 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTest) {
 }
 
 TEST_F(MigrationBatchFetcherTestFixture, BasicFetching) {
-    NamespaceString nss{"test", "foo"};
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "foo");
     ShardId fromShard{"Donor"};
     auto msid = MigrationSessionId::generate(fromShard, "Recipient");
 

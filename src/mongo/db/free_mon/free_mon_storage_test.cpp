@@ -116,7 +116,9 @@ TEST_F(FreeMonStorageTest, TestStorage) {
     CollectionOptions collectionOptions;
     collectionOptions.uuid = UUID::gen();
     auto statusCC = _storage->createCollection(
-        _opCtx.get(), NamespaceString("admin", "system.version"), collectionOptions);
+        _opCtx.get(),
+        NamespaceString::createNamespaceString_forTest("admin", "system.version"),
+        collectionOptions);
     ASSERT_OK(statusCC);
 
 
@@ -167,7 +169,9 @@ TEST_F(FreeMonStorageTest, TestSecondary) {
     CollectionOptions collectionOptions;
     collectionOptions.uuid = UUID::gen();
     auto statusCC = _storage->createCollection(
-        _opCtx.get(), NamespaceString("admin", "system.version"), collectionOptions);
+        _opCtx.get(),
+        NamespaceString::createNamespaceString_forTest("admin", "system.version"),
+        collectionOptions);
     ASSERT_OK(statusCC);
 
 
@@ -244,7 +248,8 @@ void insertDoc(OperationContext* optCtx, const NamespaceString nss, StringData i
 
 // Positive: Test local.clustermanager
 TEST_F(FreeMonStorageTest, TestClusterManagerStorage) {
-    const NamespaceString localClusterManagerNss("local.clustermanager");
+    const NamespaceString localClusterManagerNss =
+        NamespaceString::createNamespaceString_forTest("local.clustermanager");
 
     // Verify read of non-existent collection works
     ASSERT_FALSE(FreeMonStorage::readClusterManagerState(_opCtx.get()).has_value());

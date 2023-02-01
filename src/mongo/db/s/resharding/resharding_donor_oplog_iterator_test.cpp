@@ -181,9 +181,10 @@ public:
     }
 
 private:
-    const NamespaceString _oplogNss{"{}.{}xxx.yyy"_format(
-        NamespaceString::kConfigDb, NamespaceString::kReshardingLocalOplogBufferPrefix)};
-    const NamespaceString _crudNss{"test.foo"};
+    const NamespaceString _oplogNss =
+        NamespaceString::createNamespaceString_forTest("{}.{}xxx.yyy"_format(
+            NamespaceString::kConfigDb, NamespaceString::kReshardingLocalOplogBufferPrefix));
+    const NamespaceString _crudNss = NamespaceString::createNamespaceString_forTest("test.foo");
     const UUID _uuid{UUID::gen()};
 
     RAIIServerParameterControllerForTest controller{"reshardingOplogBatchLimitOperations", 1};

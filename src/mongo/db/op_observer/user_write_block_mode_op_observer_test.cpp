@@ -60,14 +60,24 @@ public:
         auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
-        ASSERT_OK(createCollection(opCtx.get(), CreateCommand(NamespaceString("userDB.coll"))));
-        ASSERT_OK(
-            createCollection(opCtx.get(), CreateCommand(NamespaceString("userDB.system.profile"))));
-        ASSERT_OK(createCollection(opCtx.get(), CreateCommand(NamespaceString("admin.coll"))));
-        ASSERT_OK(
-            createCollection(opCtx.get(), CreateCommand(NamespaceString("admin.collForRename"))));
-        ASSERT_OK(createCollection(opCtx.get(), CreateCommand(NamespaceString("local.coll"))));
-        ASSERT_OK(createCollection(opCtx.get(), CreateCommand(NamespaceString("config.coll"))));
+        ASSERT_OK(createCollection(
+            opCtx.get(),
+            CreateCommand(NamespaceString::createNamespaceString_forTest("userDB.coll"))));
+        ASSERT_OK(createCollection(opCtx.get(),
+                                   CreateCommand(NamespaceString::createNamespaceString_forTest(
+                                       "userDB.system.profile"))));
+        ASSERT_OK(createCollection(
+            opCtx.get(),
+            CreateCommand(NamespaceString::createNamespaceString_forTest("admin.coll"))));
+        ASSERT_OK(createCollection(
+            opCtx.get(),
+            CreateCommand(NamespaceString::createNamespaceString_forTest("admin.collForRename"))));
+        ASSERT_OK(createCollection(
+            opCtx.get(),
+            CreateCommand(NamespaceString::createNamespaceString_forTest("local.coll"))));
+        ASSERT_OK(createCollection(
+            opCtx.get(),
+            CreateCommand(NamespaceString::createNamespaceString_forTest("config.coll"))));
     }
 
 protected:
@@ -122,7 +132,8 @@ protected:
         runCUD(opCtx, nss, shouldSucceed, fromMigrate);
         UserWriteBlockModeOpObserver opObserver;
         auto uuid = UUID::gen();
-        NamespaceString adminNss = NamespaceString("admin.collForRename");
+        NamespaceString adminNss =
+            NamespaceString::createNamespaceString_forTest("admin.collForRename");
 
         if (shouldSucceed) {
             try {
@@ -209,10 +220,10 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingDisabledNoBypass) {
     ASSERT(!WriteBlockBypass::get(opCtx.get()).isWriteBlockBypassEnabled());
 
     // Ensure writes succeed
-    runCheckedOps(opCtx.get(), NamespaceString("userDB.coll"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("admin.coll"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("local.coll"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("config.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("userDB.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("admin.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("local.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("config.coll"), true);
 }
 
 TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingDisabledWithBypass) {
@@ -229,10 +240,10 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingDisabledWithBypass) {
     ASSERT(WriteBlockBypass::get(opCtx.get()).isWriteBlockBypassEnabled());
 
     // Ensure writes succeed
-    runCheckedOps(opCtx.get(), NamespaceString("userDB.coll"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("admin.coll"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("local.coll"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("config.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("userDB.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("admin.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("local.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("config.coll"), true);
 }
 
 TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledNoBypass) {
@@ -244,17 +255,21 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledNoBypass) {
     ASSERT(!WriteBlockBypass::get(opCtx.get()).isWriteBlockBypassEnabled());
 
     // Ensure user writes now fail, while non-user writes still succeed
-    runCheckedOps(opCtx.get(), NamespaceString("userDB.coll"), false);
-    runCheckedOps(opCtx.get(), NamespaceString("admin.coll"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("local.coll"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("config.coll"), true);
+    runCheckedOps(
+        opCtx.get(), NamespaceString::createNamespaceString_forTest("userDB.coll"), false);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("admin.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("local.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("config.coll"), true);
 
     // Ensure that CUD ops from migrations succeed
-    runCUD(opCtx.get(), NamespaceString("userDB.coll"), true, true /* fromMigrate */);
+    runCUD(opCtx.get(),
+           NamespaceString::createNamespaceString_forTest("userDB.coll"),
+           true,
+           true /* fromMigrate */);
 
     // Ensure that writes to the <db>.system.profile collections are always allowed
     runCUD(opCtx.get(),
-           NamespaceString("userDB.system.profile"),
+           NamespaceString::createNamespaceString_forTest("userDB.system.profile"),
            true /* shouldSucceed */,
            false /* fromMigrate */);
 }
@@ -274,10 +289,10 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledWithBypass) {
 
     // Ensure user writes succeed
 
-    runCheckedOps(opCtx.get(), NamespaceString("userDB.coll"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("admin.coll"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("local.coll"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("config.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("userDB.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("admin.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("local.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("config.coll"), true);
 }
 
 }  // namespace

@@ -359,7 +359,7 @@ TEST(IDLOneTypeTests, TestNamespaceString) {
     auto testStruct = One_namespacestring::parse(ctxt, testDoc);
     assert_same_types<decltype(testStruct.getValue()), const NamespaceString&>();
 
-    ASSERT_EQUALS(testStruct.getValue(), NamespaceString("foo.bar"));
+    ASSERT_EQUALS(testStruct.getValue(), NamespaceString::createNamespaceString_forTest("foo.bar"));
 
     // Positive: Test we can roundtrip from the just parsed document
     {
@@ -374,7 +374,7 @@ TEST(IDLOneTypeTests, TestNamespaceString) {
     {
         BSONObjBuilder builder;
         One_namespacestring one_new;
-        one_new.setValue(NamespaceString("foo.bar"));
+        one_new.setValue(NamespaceString::createNamespaceString_forTest("foo.bar"));
         one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();
@@ -2478,7 +2478,8 @@ TEST(IDLCommand, TestConcatentateWithDb) {
     auto testStruct = BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
-    ASSERT_EQUALS(testStruct.getNamespace(), NamespaceString("db.coll1"));
+    ASSERT_EQUALS(testStruct.getNamespace(),
+                  NamespaceString::createNamespaceString_forTest("db.coll1"));
 
     assert_same_types<decltype(testStruct.getNamespace()), const NamespaceString&>();
 
@@ -2493,7 +2494,8 @@ TEST(IDLCommand, TestConcatentateWithDb) {
                                                              << "five");
 
         BSONObjBuilder builder;
-        BasicConcatenateWithDbCommand one_new(NamespaceString("db.coll1"));
+        BasicConcatenateWithDbCommand one_new(
+            NamespaceString::createNamespaceString_forTest("db.coll1"));
         one_new.setField1(3);
         one_new.setField2("five");
         one_new.serialize(BSONObj(), &builder);
@@ -2504,7 +2506,8 @@ TEST(IDLCommand, TestConcatentateWithDb) {
 
     // Positive: Test we can serialize from nothing the same document
     {
-        BasicConcatenateWithDbCommand one_new(NamespaceString("db.coll1"));
+        BasicConcatenateWithDbCommand one_new(
+            NamespaceString::createNamespaceString_forTest("db.coll1"));
         one_new.setField1(3);
         one_new.setField2("five");
         ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
@@ -2528,7 +2531,8 @@ TEST(IDLCommand, TestConcatentateWithDb_WithTenant) {
     auto testStruct =
         BasicConcatenateWithDbCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(tenantId, "db"));
-    ASSERT_EQUALS(testStruct.getNamespace(), NamespaceString(tenantId, "db.coll1"));
+    ASSERT_EQUALS(testStruct.getNamespace(),
+                  NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));
 
     assert_same_types<decltype(testStruct.getNamespace()), const NamespaceString&>();
 
@@ -2540,7 +2544,7 @@ TEST(IDLCommand, TestConcatentateWithDb_TestConstructor) {
     const auto tenantId = TenantId(OID::gen());
     const DatabaseName dbName(tenantId, "db");
 
-    const NamespaceString nss(NamespaceString(dbName, "coll1"));
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "coll1");
     BasicConcatenateWithDbCommand testRequest(nss);
     ASSERT_EQUALS(testRequest.getDbName().tenantId(), dbName.tenantId());
     ASSERT_EQUALS(testRequest.getDbName(), dbName);
@@ -2557,7 +2561,8 @@ TEST(IDLCommand, TestConcatentateWithDbSymbol) {
                                                  << "$db"
                                                  << "db");
         auto testStruct = BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc));
-        ASSERT_EQUALS(testStruct.getNamespace(), NamespaceString("db.coll1"));
+        ASSERT_EQUALS(testStruct.getNamespace(),
+                      NamespaceString::createNamespaceString_forTest("db.coll1"));
     }
 }
 
@@ -2623,7 +2628,8 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
     auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().value(), NamespaceString("db.coll1"));
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().value(),
+                  NamespaceString::createNamespaceString_forTest("db.coll1"));
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
 
@@ -2638,7 +2644,8 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
                                                                    << "five");
 
         BSONObjBuilder builder;
-        BasicConcatenateWithDbOrUUIDCommand one_new(NamespaceString("db.coll1"));
+        BasicConcatenateWithDbOrUUIDCommand one_new(
+            NamespaceString::createNamespaceString_forTest("db.coll1"));
         one_new.setField1(3);
         one_new.setField2("five");
         one_new.serialize(BSONObj(), &builder);
@@ -2649,7 +2656,8 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
 
     // Positive: Test we can serialize from nothing the same document
     {
-        BasicConcatenateWithDbOrUUIDCommand one_new(NamespaceString("db.coll1"));
+        BasicConcatenateWithDbOrUUIDCommand one_new(
+            NamespaceString::createNamespaceString_forTest("db.coll1"));
         one_new.setField1(3);
         one_new.setField2("five");
         ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
@@ -2674,7 +2682,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
         BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(tenantId, "db"));
     ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().value(),
-                  NamespaceString(tenantId, "db.coll1"));
+                  NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
 
@@ -2766,7 +2774,8 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestConstructor) {
     ASSERT_EQUALS(testRequest1.getDbName().tenantId(), dbName.tenantId());
     ASSERT_EQUALS(testRequest1.getDbName(), dbName);
 
-    const NamespaceStringOrUUID withNss(NamespaceString(dbName, "coll1"));
+    const NamespaceStringOrUUID withNss(
+        NamespaceString::createNamespaceString_forTest(dbName, "coll1"));
     BasicConcatenateWithDbOrUUIDCommand testRequest2(withNss);
     ASSERT_EQUALS(testRequest2.getDbName().tenantId(), dbName.tenantId());
     ASSERT_EQUALS(testRequest2.getDbName(), dbName);
@@ -2957,7 +2966,8 @@ TEST(IDLDocSequence, TestBasic) {
     auto testStruct = DocSequenceCommand::parse(ctxt, request);
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
-    ASSERT_EQUALS(testStruct.getNamespace(), NamespaceString("db.coll1"));
+    ASSERT_EQUALS(testStruct.getNamespace(),
+                  NamespaceString::createNamespaceString_forTest("db.coll1"));
 
     ASSERT_EQUALS(2UL, testStruct.getStructs().size());
     ASSERT_EQUALS("hello", testStruct.getStructs()[0].getValue());
@@ -2986,7 +2996,7 @@ TEST(IDLDocSequence, TestBasic) {
     // Positive: Test we can serialize from nothing the same document
     {
         BSONObjBuilder builder;
-        DocSequenceCommand one_new(NamespaceString("db.coll1"));
+        DocSequenceCommand one_new(NamespaceString::createNamespaceString_forTest("db.coll1"));
         one_new.setField1(3);
         one_new.setField2("five");
 
@@ -3048,7 +3058,8 @@ void TestDocSequence(StringData name) {
     auto testStruct = TestT::parse(ctxt, request);
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
-    ASSERT_EQUALS(testStruct.getNamespace(), NamespaceString("db.coll1"));
+    ASSERT_EQUALS(testStruct.getNamespace(),
+                  NamespaceString::createNamespaceString_forTest("db.coll1"));
 
     ASSERT_EQUALS(2UL, testStruct.getStructs().size());
     ASSERT_EQUALS("hello", testStruct.getStructs()[0].getValue());
@@ -3994,7 +4005,7 @@ TEST(IDLCommand, BasicNamespaceConstGetterCommand_TestNonConstGetterGeneration) 
     // Test mutable getter modifies the command object.
     {
         auto& nssOrUuid = testStruct.getNamespaceOrUUID();
-        const auto nss = NamespaceString("test.coll");
+        const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
         nssOrUuid.setNss(nss);
         nssOrUuid.preferNssForSerialization();
 
@@ -4107,7 +4118,8 @@ TEST(IDLCommand,
     auto testStruct =
         CommandTypeNamespaceCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(tenantId, "admin"));
-    ASSERT_EQUALS(testStruct.getCommandParameter(), NamespaceString(tenantId, "db.coll1"));
+    ASSERT_EQUALS(testStruct.getCommandParameter(),
+                  NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));
     assert_same_types<decltype(testStruct.getCommandParameter()), const NamespaceString&>();
     // Positive: Test we can roundtrip from the just parsed document
     ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
@@ -4131,7 +4143,8 @@ TEST(IDLCommand, TestCommandTypeNamespaceCommand_WithMultitenancySupportOn) {
 
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(tenantId, "admin"));
     // Deserialize called from parse correctly sets the tenantId field.
-    ASSERT_EQUALS(testStruct.getCommandParameter(), NamespaceString(tenantId, "db.coll1"));
+    ASSERT_EQUALS(testStruct.getCommandParameter(),
+                  NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));
     assert_same_types<decltype(testStruct.getCommandParameter()), const NamespaceString&>();
     // Positive: Test we can roundtrip from the just parsed document
     ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
@@ -4159,9 +4172,11 @@ TEST(IDLTypeCommand, TestCommandWithNamespaceMember_WithTenant) {
     assert_same_types<decltype(testStruct.getField2()),
                       const std::vector<mongo::NamespaceString>&>();
 
-    ASSERT_EQUALS(testStruct.getField1(), NamespaceString(tenantId, ns1));
-    std::vector<NamespaceString> field2{NamespaceString(tenantId, ns2),
-                                        NamespaceString(tenantId, ns3)};
+    ASSERT_EQUALS(testStruct.getField1(),
+                  NamespaceString::createNamespaceString_forTest(tenantId, ns1));
+    std::vector<NamespaceString> field2{
+        NamespaceString::createNamespaceString_forTest(tenantId, ns2),
+        NamespaceString::createNamespaceString_forTest(tenantId, ns3)};
     ASSERT_TRUE(field2 == testStruct.getField2());
 
     // Positive: Test we can roundtrip from the just parsed document
@@ -4194,9 +4209,11 @@ TEST(IDLTypeCommand, TestCommandWithNamespaceStruct_WithTenant) {
     assert_same_types<decltype(testStruct.getField1()), NamespaceInfoStruct&>();
     assert_same_types<decltype(testStruct.getField2()), std::vector<NamespaceInfoStruct>&>();
 
-    ASSERT_EQUALS(testStruct.getField1().getNs(), NamespaceString(tenantId, ns1));
-    std::vector<NamespaceString> field2Nss{NamespaceString(tenantId, ns2),
-                                           NamespaceString(tenantId, ns3)};
+    ASSERT_EQUALS(testStruct.getField1().getNs(),
+                  NamespaceString::createNamespaceString_forTest(tenantId, ns1));
+    std::vector<NamespaceString> field2Nss{
+        NamespaceString::createNamespaceString_forTest(tenantId, ns2),
+        NamespaceString::createNamespaceString_forTest(tenantId, ns3)};
     std::vector<NamespaceInfoStruct>& field2 = testStruct.getField2();
     ASSERT_TRUE(field2Nss[0] == field2[0].getNs());
     ASSERT_TRUE(field2Nss[1] == field2[1].getNs());

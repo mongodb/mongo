@@ -204,7 +204,8 @@ protected:
                                                        << "a_1"),
                                               BSON("v" << 1 << "key" << BSON("b" << 1) << "name"
                                                        << "b_1")};
-    const NamespaceString _nss = {_tenantId + "_testDb", "testcoll"};
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest(_tenantId + "_testDb", "testcoll");
 };
 
 TEST_F(TenantCollectionClonerTest, CountStage) {
@@ -964,7 +965,8 @@ TEST_F(TenantCollectionClonerTest, ResumeFromRenamedCollection) {
     auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
 
     // Simulate that the collection already exists under a different name with no index and no data.
-    const NamespaceString oldNss = {_nss.db(), "testcoll_old"};
+    const NamespaceString oldNss =
+        NamespaceString::createNamespaceString_forTest(_nss.db(), "testcoll_old");
     ASSERT_OK(createCollection(oldNss, _options));
 
     _mockServer->setCommandReply("count", createCountResponse(1));

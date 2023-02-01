@@ -71,7 +71,7 @@ public:
     }
 
 private:
-    const NamespaceString _nss{"foo.bar"};
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     const UUID _uuid = UUID::gen();
     const OID _epoch{OID::gen()};
     const Timestamp _timestamp{Timestamp(1, 1)};

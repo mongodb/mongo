@@ -37,7 +37,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss("TestDB", "TestColl");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
 class CollectionMetadataFilteringTest : public ShardServerTestFixture {
 protected:

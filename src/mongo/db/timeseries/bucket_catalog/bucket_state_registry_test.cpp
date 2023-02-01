@@ -81,9 +81,9 @@ public:
     }
 
     WithLock withLock = WithLock::withoutLock();
-    NamespaceString ns1{"db.test1"};
-    NamespaceString ns2{"db.test2"};
-    NamespaceString ns3{"db.test3"};
+    NamespaceString ns1 = NamespaceString::createNamespaceString_forTest("db.test1");
+    NamespaceString ns2 = NamespaceString::createNamespaceString_forTest("db.test2");
+    NamespaceString ns3 = NamespaceString::createNamespaceString_forTest("db.test3");
     BSONElement elem;
     BucketMetadata bucketMetadata{elem, nullptr};
     BucketKey bucketKey1{ns1, bucketMetadata};

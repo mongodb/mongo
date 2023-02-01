@@ -161,7 +161,7 @@ void DropDatabaseTest::setUp() {
     _opObserver = mockObserver.get();
     opObserverRegistry->addObserver(std::move(mockObserver));
 
-    _nss = NamespaceString("test.foo");
+    _nss = NamespaceString::createNamespaceString_forTest("test.foo");
 }
 
 void DropDatabaseTest::tearDown() {
@@ -261,7 +261,8 @@ TEST_F(DropDatabaseTest, DropDatabaseNotifiesOpObserverOfDroppedUserCollection) 
 }
 
 TEST_F(DropDatabaseTest, DropDatabaseNotifiesOpObserverOfDroppedReplicatedSystemCollection) {
-    NamespaceString replicatedSystemNss(_nss.getSisterNS("system.js"));
+    NamespaceString replicatedSystemNss =
+        NamespaceString::createNamespaceString_forTest(_nss.getSisterNS("system.js"));
     _testDropDatabase(_opCtx.get(), _opObserver, replicatedSystemNss, true);
 }
 
@@ -302,7 +303,8 @@ TEST_F(DropDatabaseTest, DropDatabasePassedThroughAwaitReplicationErrorForDropPe
 
 TEST_F(DropDatabaseTest, DropDatabaseSkipsSystemProfileCollectionWhenDroppingCollections) {
     repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
-    NamespaceString profileNss(_nss.getSisterNS("system.profile"));
+    NamespaceString profileNss =
+        NamespaceString::createNamespaceString_forTest(_nss.getSisterNS("system.profile"));
     _testDropDatabase(_opCtx.get(), _opObserver, profileNss, false);
 }
 
@@ -426,7 +428,8 @@ TEST_F(DropDatabaseTest,
 }
 
 TEST_F(DropDatabaseTest, DropDatabaseFailsToDropAdmin) {
-    NamespaceString adminNSS(NamespaceString::kAdminDb, "foo");
+    NamespaceString adminNSS =
+        NamespaceString::createNamespaceString_forTest(NamespaceString::kAdminDb, "foo");
     _createCollection(_opCtx.get(), adminNSS);
     ASSERT_THROWS_CODE_AND_WHAT(dropDatabaseForApplyOps(_opCtx.get(), adminNSS.dbName()),
                                 AssertionException,

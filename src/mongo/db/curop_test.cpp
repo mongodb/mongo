@@ -206,8 +206,11 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     BSONObj command = BSON("a" << 3);
 
     // Set dummy 'ns' and 'command'.
-    curop->setGenericOpRequestDetails(
-        opCtx.get(), NamespaceString("myDb.coll"), nullptr, command, NetworkOp::dbQuery);
+    curop->setGenericOpRequestDetails(opCtx.get(),
+                                      NamespaceString::createNamespaceString_forTest("myDb.coll"),
+                                      nullptr,
+                                      command,
+                                      NetworkOp::dbQuery);
 
     BSONObjBuilder builder;
     od.append(opCtx.get(), ls, {}, builder);

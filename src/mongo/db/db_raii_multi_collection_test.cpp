@@ -73,14 +73,18 @@ public:
             opCtx, _secondaryNssOtherDbNss, defaultCollectionOptions));
     }
 
-    const NamespaceString _primaryNss = NamespaceString("db1.primary1");
-    const NamespaceString _secondaryNss1 = NamespaceString("db1.secondary1");
-    const NamespaceString _secondaryNss2 = NamespaceString("db1.secondary2");
+    const NamespaceString _primaryNss =
+        NamespaceString::createNamespaceString_forTest("db1.primary1");
+    const NamespaceString _secondaryNss1 =
+        NamespaceString::createNamespaceString_forTest("db1.secondary1");
+    const NamespaceString _secondaryNss2 =
+        NamespaceString::createNamespaceString_forTest("db1.secondary2");
 
     const std::vector<NamespaceStringOrUUID> _secondaryNssOrUUIDVec = {
         NamespaceStringOrUUID(_secondaryNss1), NamespaceStringOrUUID(_secondaryNss2)};
 
-    const NamespaceString _secondaryNssOtherDbNss = NamespaceString("db2.secondary1");
+    const NamespaceString _secondaryNssOtherDbNss =
+        NamespaceString::createNamespaceString_forTest("db2.secondary1");
     const std::vector<NamespaceStringOrUUID> _secondaryNssOtherDbNssVec = {
         NamespaceStringOrUUID(_secondaryNssOtherDbNss)};
 

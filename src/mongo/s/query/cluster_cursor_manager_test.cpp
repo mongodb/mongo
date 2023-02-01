@@ -45,7 +45,7 @@ namespace mongo {
 namespace {
 
 using unittest::assertGet;
-const NamespaceString nss("test.collection");
+const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.collection");
 
 class ClusterCursorManagerTest : public ServiceContextTest {
 protected:

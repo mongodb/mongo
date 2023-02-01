@@ -454,7 +454,7 @@ TEST_F(AsyncRPCTestFixture, SuccessfulFind) {
     std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     auto opCtxHolder = makeOperationContext();
     DatabaseName testDbName = DatabaseName("testdb", boost::none);
-    NamespaceString nss(testDbName);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     FindCommandRequest findCmd(nss);
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
@@ -766,7 +766,7 @@ TEST_F(AsyncRPCTestFixture, SendTxnCommandWithoutTxnRouterAppendsNoTxnFields) {
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
         shardId, opCtxHolder.get(), readPref, getExecutorPtr(), testHost);
     DatabaseName testDbName = DatabaseName("testdb", boost::none);
-    NamespaceString nss(testDbName);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     FindCommandRequest findCmd(nss);
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
@@ -799,7 +799,7 @@ TEST_F(AsyncRPCTxnTestFixture, MultipleSendTxnCommand) {
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
         shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
     DatabaseName testDbName = DatabaseName("testdb", boost::none);
-    NamespaceString nss(testDbName);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     // Set up the transaction metadata.
     TxnNumber txnNum{3};
@@ -862,7 +862,7 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandWithGenericArgs) {
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
         shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
     DatabaseName testDbName = DatabaseName("testdb", boost::none);
-    NamespaceString nss(testDbName);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     // Set up the transaction metadata.
     TxnNumber txnNum{3};
@@ -927,7 +927,7 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandReturnsRemoteError) {
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
         shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
     DatabaseName testDbName = DatabaseName("testdb", boost::none);
-    NamespaceString nss(testDbName);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     // Set up the transaction metadata.
     TxnNumber txnNum{3};
@@ -964,7 +964,7 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandReturnsLocalError) {
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
         shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
     DatabaseName testDbName = DatabaseName("testdb", boost::none);
-    NamespaceString nss(testDbName);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     // Set up the transaction metadata.
     TxnNumber txnNum{3};

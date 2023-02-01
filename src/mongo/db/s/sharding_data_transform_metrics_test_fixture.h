@@ -239,7 +239,8 @@ protected:
     constexpr static auto kOldestTime =
         Date_t::fromMillisSinceEpoch(std::numeric_limits<int64_t>::min());
     constexpr static int64_t kOldestTimeLeft = 3000;
-    const NamespaceString kTestNamespace = NamespaceString("test.source");
+    const NamespaceString kTestNamespace =
+        NamespaceString::createNamespaceString_forTest("test.source");
     const BSONObj kTestCommand = BSON("command"
                                       << "test");
 

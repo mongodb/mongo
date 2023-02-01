@@ -144,7 +144,8 @@ public:
     }
 
 private:
-    const NamespaceString _testNss{"test", "testing"};
+    const NamespaceString _testNss =
+        NamespaceString::createNamespaceString_forTest("test", "testing");
     ServiceContext::UniqueOperationContext _opCtx;
 };
 

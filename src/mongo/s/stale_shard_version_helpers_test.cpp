@@ -41,7 +41,7 @@ namespace {
 class AsyncShardVersionRetry : public ShardingTestFixture {
 public:
     NamespaceString nss() const {
-        return NamespaceString("test", "foo");
+        return NamespaceString::createNamespaceString_forTest("test", "foo");
     }
 
     StringData desc() const {
