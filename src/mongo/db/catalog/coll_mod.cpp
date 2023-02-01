@@ -29,6 +29,7 @@
 
 #include "mongo/db/catalog/coll_mod.h"
 
+#include "mongo/db/stats/counters.h"
 #include <boost/optional.hpp>
 
 #include "mongo/db/catalog/clustered_collection_util.h"
@@ -460,6 +461,11 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
                                                     validatorObj.getOwned(),
                                                     MatchExpressionParser::kDefaultSpecialFeatures,
                                                     maxFeatureCompatibilityVersion);
+
+        // Increment counters to track the usage of schema validators.
+        validatorCounters.incrementCounters(
+            cmd.kCommandName, parsed.collValidator->validatorDoc, parsed.collValidator->isOK());
+
         if (!parsed.collValidator->isOK()) {
             return parsed.collValidator->getStatus();
         }

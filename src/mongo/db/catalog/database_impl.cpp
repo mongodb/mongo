@@ -991,6 +991,10 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
                                                               ExtensionsCallbackNoop(),
                                                               allowedFeatures);
 
+        // Increment counters to track the usage of schema validators.
+        validatorCounters.incrementCounters(
+            "create", collectionOptions.validator, statusWithMatcher.isOK());
+
         // We check the status of the parse to see if there are any banned features, but we don't
         // actually need the result for now.
         if (!statusWithMatcher.isOK()) {
