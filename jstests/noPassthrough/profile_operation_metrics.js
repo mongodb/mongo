@@ -11,6 +11,7 @@
 "use strict";
 
 load("jstests/libs/fixture_helpers.js");  // For isReplSet().
+load("jstests/libs/sbe_util.js");         // For checkSBEEnabled().
 
 const dbName = jsTestName();
 const collName = 'coll';
@@ -18,15 +19,6 @@ const collName = 'coll';
 const isLinux = getBuildInfo().buildEnvironment.target_os == "linux";
 const isDebugBuild = (db) => {
     return db.adminCommand('buildInfo').debug;
-};
-const isGroupPushdownEnabled = (db) => {
-    const internalQueryForceClassicEngine =
-        assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1}))
-            .internalQueryForceClassicEngine;
-    const featureFlagSBEGroupPushdown =
-        assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagSBEGroupPushdown: 1}))
-            .featureFlagSBEGroupPushdown.value;
-    return !internalQueryForceClassicEngine && featureFlagSBEGroupPushdown;
 };
 
 const assertMetricsExist = (profilerEntry) => {
@@ -1044,7 +1036,57 @@ const operations = [
     },
     resetProfileColl,
     {
-        name: 'groupStage',
+        name: 'groupStageAllowDiskUse',
+        command: (db) => {
+            // There should be 10 distinct values for 'a'.
+            let cur = db[collName].aggregate([{$group: {_id: "$a", count: {$sum: 1}}}],
+                                             {allowDiskUse: true});
+            assert.eq(cur.itcount(), 10);
+        },
+        profileFilter: {op: 'command', 'command.aggregate': collName},
+        profileAssert: (db, profileDoc) => {
+            // TODO SERVER-71684: We currently erroneously account for reads from and writes to
+            // temporary record stores used as spill tables. This test accommodates the erroneous
+            // behavior. Such accommodation is only necessary for debug builds, since we spill
+            // artificially in debug builds in order to exercise the query execution engine's
+            // spilling logic.
+            //
+            // The classic engine spills to files outside the storage engine rather than to a
+            // temporary record store, so it is not subject to SERVER-71684.
+            if (isDebugBuild(db) && checkSBEEnabled(db)) {
+                // For $group, we incorporate the number of items spilled into "keysSorted" and the
+                // number of individual spill events into "sorterSpills".
+                assert.gt(profileDoc.keysSorted, 0);
+                assert.gt(profileDoc.sorterSpills, 0);
+
+                assert.gt(profileDoc.docBytesWritten, 0);
+                assert.gt(profileDoc.docUnitsWritten, 0);
+                assert.gt(profileDoc.totalUnitsWritten, 0);
+                assert.eq(profileDoc.totalUnitsWritten, profileDoc.docUnitsWritten);
+                assert.eq(profileDoc.docBytesRead, 29 * 100 + profileDoc.docBytesWritten);
+                assert.eq(profileDoc.docUnitsRead, 100 + profileDoc.docUnitsWritten);
+            } else {
+                assert.eq(profileDoc.keysSorted, 0);
+                assert.eq(profileDoc.sorterSpills, 0);
+
+                assert.eq(profileDoc.docBytesRead, 29 * 100);
+                assert.eq(profileDoc.docUnitsRead, 100);
+                assert.eq(profileDoc.docBytesWritten, 0);
+                assert.eq(profileDoc.docUnitsWritten, 0);
+                assert.eq(profileDoc.totalUnitsWritten, 0);
+            }
+
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.docUnitsReturned, 10);
+        },
+    },
+    resetProfileColl,
+    {
+        name: 'groupStageDisallowDiskUse',
         command: (db) => {
             // There should be 10 distinct values for 'a'.
             let cur = db[collName].aggregate([{$group: {_id: "$a", count: {$sum: 1}}}],
@@ -1053,29 +1095,30 @@ const operations = [
         },
         profileFilter: {op: 'command', 'command.aggregate': collName},
         profileAssert: (db, profileDoc) => {
-            assert.eq(profileDoc.docBytesRead, 29 * 100);
-            assert.eq(profileDoc.docUnitsRead, 100);
-            assert.eq(profileDoc.idxEntryBytesRead, 0);
-            assert.eq(profileDoc.idxEntryUnitsRead, 0);
-            assert.eq(profileDoc.cursorSeeks, 0);
-            assert.eq(profileDoc.docBytesWritten, 0);
-            assert.eq(profileDoc.docUnitsWritten, 0);
-            assert.eq(profileDoc.idxEntryBytesWritten, 0);
-            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
-            assert.eq(profileDoc.totalUnitsWritten, 0);
-            if (isDebugBuild(db) && !isGroupPushdownEnabled(db)) {
-                // In debug builds we sort and spill for each of the first 20 documents. Once we
-                // reach that limit, we stop spilling as often. This 26 is the sum of 20 debug sorts
-                // and spills of documents in groups 0 through 3 plus 6 debug spills and sorts for
-                // groups 4 through 10.
+            if (isDebugBuild(db) && !checkSBEEnabled(db)) {
+                // In debug builds, the classic engine does some special spilling for test purposes
+                // when disk use is disabled. We spill for each of the first 20 documents, spilling
+                // less often after we reach that limit. This 26 is the sum of 20 spills of
+                // documents in groups 0 through 3 plus 6 additional items spilled for groups 4
+                // through 10.
                 assert.eq(profileDoc.keysSorted, 26);
-                // This 21 is the sum of 20 debug spills plus 1 final debug spill
+                // This 21 is the sum of 20 debug spills plus 1 final debug spill.
                 assert.eq(profileDoc.sorterSpills, 21);
             } else {
-                // No sorts required.
                 assert.eq(profileDoc.keysSorted, 0);
                 assert.eq(profileDoc.sorterSpills, 0);
             }
+
+            assert.eq(profileDoc.docBytesRead, 29 * 100);
+            assert.eq(profileDoc.docUnitsRead, 100);
+            assert.eq(profileDoc.docBytesWritten, 0);
+            assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
             assert.eq(profileDoc.docUnitsReturned, 10);
         },
     },
