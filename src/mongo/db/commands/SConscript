@@ -608,6 +608,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/tenant_migration_donor_service',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_recipient_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
+        '$BUILD_DIR/mongo/db/s/sharding_catalog',
         '$BUILD_DIR/mongo/db/s/sharding_catalog_manager',
         '$BUILD_DIR/mongo/db/s/sharding_commands_d',
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',

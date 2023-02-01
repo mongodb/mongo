@@ -67,6 +67,7 @@
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
@@ -978,27 +979,27 @@ private:
         // TODO SERVER-67392: Remove when 7.0 branches-out.
         // Coordinators that commits indexes to the csrs must be drained before this point. Older
         // FCV's must not find cluster-wide indexes.
+        DropReply dropReply;
         if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
-            NamespaceString indexCatalogNss;
-            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                indexCatalogNss = NamespaceString::kConfigsvrIndexCatalogNamespace;
-            } else {
-                indexCatalogNss = NamespaceString::kShardIndexCatalogNamespace;
-            }
-            LOGV2(6280502, "Dropping global indexes collection", "nss"_attr = indexCatalogNss);
-            DropReply dropReply;
-            const auto deletionStatus =
-                dropCollection(opCtx,
-                               indexCatalogNss,
-                               &dropReply,
-                               DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
-            uassert(deletionStatus.code(),
-                    str::stream() << "Failed to drop " << indexCatalogNss
-                                  << causedBy(deletionStatus.reason()),
-                    deletionStatus.isOK() ||
-                        deletionStatus.code() == ErrorCodes::NamespaceNotFound);
-
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+                // There cannot be any global indexes at this point, but calling clearGlobalIndexes
+                // removes the index version from config.shard.collections and the csr
+                // transactionally.
+                LOGV2(7013200, "Clearing global indexes for all collections");
+                DBDirectClient client(opCtx);
+                FindCommandRequest findCmd{NamespaceString::kShardCollectionCatalogNamespace};
+                findCmd.setFilter(
+                    BSON(CollectionType::kIndexVersionFieldName << BSON("$exists" << true)));
+                auto cursor = client.find(std::move(findCmd));
+                while (cursor->more()) {
+                    const auto collectionDoc = cursor->next();
+                    auto collUUID =
+                        uassertStatusOK(UUID::parse(collectionDoc[CollectionType::kUuidFieldName]));
+                    auto collNss =
+                        NamespaceString(collectionDoc[CollectionType::kNssFieldName].String());
+                    clearGlobalIndexes(opCtx, collNss, collUUID);
+                }
+
                 LOGV2(6711905,
                       "Droping collection catalog collection",
                       "nss"_attr = NamespaceString::kShardCollectionCatalogNamespace);
@@ -1031,6 +1032,24 @@ private:
                 update.getWriteCommandRequestBase().setOrdered(false);
                 client.update(update);
             }
+
+            NamespaceString indexCatalogNss;
+            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                indexCatalogNss = NamespaceString::kConfigsvrIndexCatalogNamespace;
+            } else {
+                indexCatalogNss = NamespaceString::kShardIndexCatalogNamespace;
+            }
+            LOGV2(6280502, "Dropping global indexes collection", "nss"_attr = indexCatalogNss);
+            const auto deletionStatus =
+                dropCollection(opCtx,
+                               indexCatalogNss,
+                               &dropReply,
+                               DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+            uassert(deletionStatus.code(),
+                    str::stream() << "Failed to drop " << indexCatalogNss
+                                  << causedBy(deletionStatus.reason()),
+                    deletionStatus.isOK() ||
+                        deletionStatus.code() == ErrorCodes::NamespaceNotFound);
         }
     }
 
