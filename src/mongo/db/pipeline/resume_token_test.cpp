@@ -500,5 +500,51 @@ TEST(ResumeToken, StringEncodingSortsCorrectly) {
              {ts10_4, 2, 0, lower_uuid, higherEventIdentifer});
 }
 
+TEST(ResumeToken, FragmentNumRoundTripsThroughEncodingAndDecoding) {
+    ResumeTokenData resumeTokenDataIn{
+        Timestamp(1000, 1), 2, 0, UUID::gen(), Value(Document{{"_id", 1}})};
+
+    auto resumeTokenDataFragmentNone =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument()).getData();
+
+    ASSERT_EQ(resumeTokenDataIn, resumeTokenDataFragmentNone);
+    ASSERT_EQ(ResumeToken(resumeTokenDataIn).toBSON().objsize(),
+              ResumeToken(resumeTokenDataFragmentNone).toBSON().objsize());
+
+    resumeTokenDataIn.fragmentNum = 0UL;
+    auto resumeTokenDataFragment0 =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument()).getData();
+
+    ASSERT_EQ(resumeTokenDataIn, resumeTokenDataFragment0);
+    ASSERT_EQ(ResumeToken(resumeTokenDataIn).toBSON().objsize(),
+              ResumeToken(resumeTokenDataFragment0).toBSON().objsize());
+
+    resumeTokenDataIn.fragmentNum = 1UL;
+    auto resumeTokenDataFragment1 =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument()).getData();
+
+    ASSERT_EQ(resumeTokenDataIn, resumeTokenDataFragment1);
+    ASSERT_EQ(ResumeToken(resumeTokenDataIn).toBSON().objsize(),
+              ResumeToken(resumeTokenDataFragment1).toBSON().objsize());
+}
+
+TEST(ResumeToken, NegativeFragmentNumThrows) {
+    ResumeTokenData resumeTokenDataIn{
+        Timestamp(1000, 1), 2, 0, UUID::gen(), Value(Document{{"_id", 1}})};
+
+    // Large 'ResumeTokenData::fragmentNum' value will be serialized as a negative integer.
+    resumeTokenDataIn.fragmentNum = std::numeric_limits<size_t>::max();
+    auto resumeToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument());
+
+    ASSERT_THROWS_CODE(resumeToken.getData(), DBException, 7182501);
+}
+
+TEST(ResumeToken, FragmentNumInV1Throws) {
+    ResumeTokenData resumeTokenDataV1{
+        Timestamp(1000, 1), 1, 0, UUID::gen(), Value(Document{{"_id", 1}})};
+
+    resumeTokenDataV1.fragmentNum = 0UL;
+    ASSERT_THROWS_CODE(ResumeToken(resumeTokenDataV1), DBException, 7182504);
+}
 }  // namespace
 }  // namespace mongo
