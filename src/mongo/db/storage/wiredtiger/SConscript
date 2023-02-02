@@ -77,7 +77,7 @@ wtEnv.Library(
         'storage_wiredtiger_customization_hooks',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/health_log',
+        '$BUILD_DIR/mongo/db/catalog/health_log_interface',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/mongod_options',

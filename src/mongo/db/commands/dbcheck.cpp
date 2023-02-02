@@ -35,7 +35,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/health_log.h"
+#include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -94,7 +94,7 @@ public:
                                                               OplogEntriesEnum::Start,
                                                               boost::none /*data*/
             );
-            HealthLog::get(_opCtx->getServiceContext()).log(*healthLogEntry);
+            HealthLogInterface::get(_opCtx->getServiceContext())->log(*healthLogEntry);
 
             DbCheckOplogStartStop oplogEntry;
             const auto nss = NamespaceString("admin.$cmd");
@@ -120,7 +120,7 @@ public:
                                                               OplogEntriesEnum::Stop,
                                                               boost::none /*data*/
             );
-            HealthLog::get(_opCtx->getServiceContext()).log(*healthLogEntry);
+            HealthLogInterface::get(_opCtx->getServiceContext())->log(*healthLogEntry);
         } catch (const DBException&) {
             LOGV2(6202201, "Could not log stop event");
         }
@@ -300,7 +300,7 @@ protected:
             } catch (const DBException& e) {
                 auto logEntry = dbCheckErrorHealthLogEntry(
                     coll.nss, "dbCheck failed", OplogEntriesEnum::Batch, e.toStatus());
-                HealthLog::get(Client::getCurrent()->getServiceContext()).log(*logEntry);
+                HealthLogInterface::get(Client::getCurrent()->getServiceContext())->log(*logEntry);
                 return;
             }
 
@@ -333,7 +333,7 @@ private:
                     "abandoning dbCheck batch because collection no longer exists",
                     OplogEntriesEnum::Batch,
                     Status(ErrorCodes::NamespaceNotFound, "collection not found"));
-                HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
+                HealthLogInterface::get(Client::getCurrent()->getServiceContext())->log(*entry);
                 return;
             }
         }
@@ -411,7 +411,7 @@ private:
                                                        OplogEntriesEnum::Batch,
                                                        result.getStatus());
                 }
-                HealthLog::get(opCtx).log(*entry);
+                HealthLogInterface::get(opCtx)->log(*entry);
                 if (retryable) {
                     continue;
                 }
@@ -434,7 +434,7 @@ private:
                 (_batchesProcessed % gDbCheckHealthLogEveryNBatches.load() == 0)) {
                 // On debug builds, health-log every batch result; on release builds, health-log
                 // every N batches.
-                HealthLog::get(opCtx).log(*entry);
+                HealthLogInterface::get(opCtx)->log(*entry);
             }
 
             WriteConcernResult unused;
@@ -444,7 +444,7 @@ private:
                                                           "dbCheck failed waiting for writeConcern",
                                                           OplogEntriesEnum::Batch,
                                                           status);
-                HealthLog::get(opCtx).log(*entry);
+                HealthLogInterface::get(opCtx)->log(*entry);
             }
 
             start = stats.lastKey;

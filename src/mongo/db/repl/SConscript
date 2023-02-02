@@ -213,7 +213,7 @@ env.Library(
         'dbcheck.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/health_log',
+        '$BUILD_DIR/mongo/db/catalog/health_log_interface',
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],

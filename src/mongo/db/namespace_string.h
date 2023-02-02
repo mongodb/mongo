@@ -284,6 +284,9 @@ public:
     // Namespace used for storing the diffs for sampled update queries.
     static const NamespaceString kConfigSampledQueriesDiffNamespace;
 
+    // Namespace used for the health log.
+    static const NamespaceString kLocalHealthLogNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

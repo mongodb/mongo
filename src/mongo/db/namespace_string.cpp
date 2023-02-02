@@ -202,6 +202,9 @@ const NamespaceString NamespaceString::kConfigSampledQueriesNamespace(NamespaceS
 const NamespaceString NamespaceString::kConfigSampledQueriesDiffNamespace(
     NamespaceString::kConfigDb, "sampledQueriesDiff");
 
+const NamespaceString NamespaceString::kLocalHealthLogNamespace(NamespaceString::kLocalDb,
+                                                                "system.healthlog");
+
 NamespaceString NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(StringData ns) {
     if (!gMultitenancySupport) {
         return NamespaceString(boost::none, ns);
@@ -262,7 +265,7 @@ bool NamespaceString::isLegalClientSystemNS(
     } else if (dbname == kLocalDb) {
         if (coll() == kSystemReplSetNamespace.coll())
             return true;
-        if (coll() == "system.healthlog")
+        if (coll() == kLocalHealthLogNamespace.coll())
             return true;
         if (coll() == kConfigsvrRestoreNamespace.coll())
             return true;

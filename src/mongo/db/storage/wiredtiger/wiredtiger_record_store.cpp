@@ -42,8 +42,8 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/health_log_gen.h"
+#include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/locker.h"
@@ -2242,7 +2242,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
         bob.appendElements(getStackTrace().getBSONRepresentation());
         entry.setData(bob.obj());
 
-        HealthLog::get(_opCtx).log(entry);
+        HealthLogInterface::get(_opCtx)->log(entry);
 
         // Crash when testing diagnostics are enabled.
         invariant(!TestingProctor::instance().isEnabled(), "cursor returned out-of-order keys");
