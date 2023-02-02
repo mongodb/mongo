@@ -105,24 +105,4 @@ DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId, S
     return dbName;
 }
 
-boost::optional<TenantId> DatabaseNameUtil::parseTenantIdFromDatabaseName(
-    const DatabaseName& dbName) {
-    if (gMultitenancySupport) {
-        return dbName.tenantId();
-    }
-
-    const auto pos = dbName.db().find('_');
-    if (pos == std::string::npos || pos == 0) {
-        // Not a tenant database.
-        return boost::none;
-    }
-
-    const auto statusWith = OID::parse(dbName.db().substr(0, pos));
-    if (!statusWith.isOK()) {
-        return boost::none;
-    }
-
-    return TenantId(statusWith.getValue());
-}
-
 }  // namespace mongo

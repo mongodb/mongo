@@ -12,6 +12,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
 import {
     makeX509OptionsForTest,
     runMigrationAsync
@@ -164,12 +165,23 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     return {res: res.getRawResponse ? res.getRawResponse() : res, ops: updateBulk.getOperations()};
 }
 
+function makeTenantId(donorRst) {
+    const isMerge = isShardMergeEnabled(donorRst.getPrimary().getDB("admin"));
+
+    if (isMerge) {
+        return ObjectId().str;
+    } else {
+        // We need to support non-ObjectId tenants until CLOUDP-146505 is merged.
+        return "nonObjectIdTenant";
+    }
+}
+
 (() => {
     jsTestLog("Testing unordered bulk insert against a tenant migration that commits.");
 
     const {tenantMigrationTest, donorRst, teardown} = setup();
 
-    const tenantId = ObjectId().str;
+    const tenantId = makeTenantId(donorRst);
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         tenantId,
@@ -220,7 +232,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const {tenantMigrationTest, donorRst, recipientRst, teardown} = setup();
 
-    const tenantId = ObjectId().str;
+    const tenantId = makeTenantId(donorRst);
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: recipientRst.getURL(),
@@ -284,7 +296,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const {tenantMigrationTest, donorRst, teardown} = setup();
 
-    const tenantId = ObjectId().str;
+    const tenantId = makeTenantId(donorRst);
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
@@ -354,7 +366,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const {tenantMigrationTest, donorRst, teardown} = setup();
 
-    const tenantId = ObjectId().str;
+    const tenantId = makeTenantId(donorRst);
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         tenantId,
@@ -399,7 +411,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const {tenantMigrationTest, donorRst, teardown} = setup();
 
-    const tenantId = ObjectId().str;
+    const tenantId = makeTenantId(donorRst);
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
@@ -455,7 +467,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const {tenantMigrationTest, donorRst, teardown} = setup();
 
-    const tenantId = ObjectId().str;
+    const tenantId = makeTenantId(donorRst);
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
@@ -519,7 +531,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const {tenantMigrationTest, donorRst, recipientRst, teardown} = setup();
 
-    const tenantId = ObjectId().str;
+    const tenantId = makeTenantId(donorRst);
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: recipientRst.getURL(),
@@ -571,7 +583,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const {tenantMigrationTest, donorRst, recipientRst, teardown} = setup();
 
-    const tenantId = ObjectId().str;
+    const tenantId = makeTenantId(donorRst);
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: recipientRst.getURL(),
@@ -623,7 +635,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const {tenantMigrationTest, donorRst, teardown} = setup();
 
-    const tenantId = ObjectId().str;
+    const tenantId = makeTenantId(donorRst);
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         tenantId,
@@ -662,7 +674,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const {tenantMigrationTest, donorRst, teardown} = setup();
 
-    const tenantId = ObjectId().str;
+    const tenantId = makeTenantId(donorRst);
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         tenantId,

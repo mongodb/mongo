@@ -221,7 +221,7 @@ boost::optional<MtabPair> TenantMigrationAccessBlockerRegistry::getAccessBlocker
     const DatabaseName& dbName) {
     stdx::lock_guard<Latch> lg(_mutex);
     auto donorAccessBlocker = _getAllTenantDonorAccessBlocker(lg, dbName);
-    const auto tenantId = DatabaseNameUtil::parseTenantIdFromDatabaseName(dbName);
+    const auto tenantId = tenant_migration_access_blocker::extractTenantFromDatabaseName(dbName);
 
     if (!tenantId && donorAccessBlocker) {
         return MtabPair{donorAccessBlocker};
@@ -231,7 +231,7 @@ boost::optional<MtabPair> TenantMigrationAccessBlockerRegistry::getAccessBlocker
         return boost::none;
     }
 
-    const auto& it = _tenantMigrationAccessBlockers.find(tenantId->toString());
+    const auto& it = _tenantMigrationAccessBlockers.find(*tenantId);
 
     if (it != _tenantMigrationAccessBlockers.end() && donorAccessBlocker) {
         return MtabPair{donorAccessBlocker, it->second.getRecipientAccessBlocker()};

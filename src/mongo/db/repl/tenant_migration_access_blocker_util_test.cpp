@@ -239,4 +239,39 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, TestValidateNssBeingMigrated) {
     tenant_migration_access_blocker::validateNssIsBeingMigrated(
         kTenantId, NamespaceString{NamespaceString::kAdminDb, "test"}, migrationId);
 }
+
+TEST_F(TenantMigrationAccessBlockerUtilTest, TestAccessBlockerWithNonTenantIdString) {
+    // Ensure we support non-OID tenantIds until all clients use OID.
+    const std::string tenantId{"nonOIDTenant"};
+    auto migrationId = UUID::gen();
+    auto recipientMtab =
+        std::make_shared<TenantMigrationRecipientAccessBlocker>(getServiceContext(), migrationId);
+    auto& registry = TenantMigrationAccessBlockerRegistry::get(getServiceContext());
+    registry.add(tenantId, recipientMtab);
+
+    ASSERT_EQ(recipientMtab,
+              registry.getTenantMigrationAccessBlockerForDbName(
+                  DatabaseName(boost::none, tenantId + "_foo"),
+                  TenantMigrationAccessBlocker::BlockerType::kRecipient));
+    auto recipientMtabPair =
+        registry.getAccessBlockersForDbName(DatabaseName(boost::none, tenantId + "_foo"));
+    ASSERT_EQ(recipientMtab, recipientMtabPair->getRecipientAccessBlocker());
+
+    registry.remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+
+    auto donorMtab =
+        std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), migrationId);
+    registry.add(tenantId, donorMtab);
+
+    ASSERT_EQ(donorMtab,
+              registry.getTenantMigrationAccessBlockerForDbName(
+                  DatabaseName(boost::none, tenantId + "_foo"),
+                  TenantMigrationAccessBlocker::BlockerType::kDonor));
+    auto donorMtabPair =
+        registry.getAccessBlockersForDbName(DatabaseName(boost::none, tenantId + "_foo"));
+    ASSERT_EQ(donorMtab, donorMtabPair->getDonorAccessBlocker());
+
+    registry.remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
+}
+
 }  // namespace mongo

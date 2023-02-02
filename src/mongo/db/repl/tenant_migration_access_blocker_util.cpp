@@ -579,6 +579,43 @@ bool shouldExcludeRead(OperationContext* opCtx) {
          (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient));
 }
 
+boost::optional<TenantId> parseTenantIdFromDatabaseName(const DatabaseName& dbName) {
+    if (gMultitenancySupport) {
+        return dbName.tenantId();
+    }
+
+    const auto pos = dbName.db().find('_');
+    if (pos == std::string::npos || pos == 0) {
+        // Not a tenant database.
+        return boost::none;
+    }
+
+    const auto statusWith = OID::parse(dbName.db().substr(0, pos));
+    if (!statusWith.isOK()) {
+        return boost::none;
+    }
+
+    return TenantId(statusWith.getValue());
+}
+
+boost::optional<std::string> extractTenantFromDatabaseName(const DatabaseName& dbName) {
+    if (gMultitenancySupport) {
+        if (dbName.tenantId()) {
+            return dbName.tenantId()->toString();
+        } else {
+            return boost::none;
+        }
+    }
+
+    const auto pos = dbName.db().find('_');
+    if (pos == std::string::npos || pos == 0) {
+        // Not a tenant database.
+        return boost::none;
+    }
+
+    return dbName.db().substr(0, pos);
+}
+
 }  // namespace tenant_migration_access_blocker
 
 }  // namespace mongo

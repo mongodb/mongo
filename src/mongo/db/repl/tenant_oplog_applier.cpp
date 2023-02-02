@@ -248,7 +248,8 @@ bool TenantOplogApplier::_shouldIgnore(const OplogEntry& entry) {
 
     // TODO SERVER-62491: Update this code path to handle TenantId::kSystemTenantId for internal
     // collections.
-    const auto tenantId = DatabaseNameUtil::parseTenantIdFromDatabaseName(entry.getNss().dbName());
+    const auto tenantId =
+        tenant_migration_access_blocker::parseTenantIdFromDatabaseName(entry.getNss().dbName());
     tenant_migration_access_blocker::validateNssIsBeingMigrated(
         tenantId, entry.getNss(), _migrationUuid);
 

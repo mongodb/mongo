@@ -144,6 +144,16 @@ bool inRecoveryMode(OperationContext* opCtx);
  */
 bool shouldExcludeRead(OperationContext* opCtx);
 
+/**
+ * Parse the 'TenantId' from the provided DatabaseName.
+ */
+boost::optional<TenantId> parseTenantIdFromDatabaseName(const DatabaseName& dbName);
+
+/**
+ * Retrieves the 'tenant id' from the provided DatabaseName.
+ */
+boost::optional<std::string> extractTenantFromDatabaseName(const DatabaseName& dbName);
+
 }  // namespace tenant_migration_access_blocker
 
 }  // namespace mongo
