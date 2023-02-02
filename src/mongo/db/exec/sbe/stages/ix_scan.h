@@ -153,7 +153,7 @@ protected:
     value::SlotAccessorMap _accessorMap;
 
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
-    const IndexCatalogEntry* _entry;
+    const IndexCatalogEntry* _entry{nullptr};
     std::string _indexIdent;
     boost::optional<Ordering> _ordering{boost::none};
     boost::optional<KeyStringEntry> _nextRecord;
