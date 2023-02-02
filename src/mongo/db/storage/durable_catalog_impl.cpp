@@ -283,8 +283,11 @@ boost::optional<DurableCatalogEntry> DurableCatalogImpl::scanForCatalogEntryByNs
         auto entryNss =
             NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(obj["ns"].String());
         if (entryNss == nss) {
-            return DurableCatalogEntry{
-                record->id, obj["ident"].String(), _parseMetaData(obj["md"])};
+            BSONElement idxIdent = obj["idxIdent"];
+            return DurableCatalogEntry{record->id,
+                                       obj["ident"].String(),
+                                       idxIdent.eoo() ? BSONObj() : idxIdent.Obj().getOwned(),
+                                       _parseMetaData(obj["md"])};
         }
     }
 
@@ -407,7 +410,11 @@ boost::optional<DurableCatalogEntry> DurableCatalogImpl::getParsedCatalogEntry(
         return boost::none;
     }
 
-    return DurableCatalogEntry{catalogId, obj["ident"].String(), _parseMetaData(obj["md"])};
+    BSONElement idxIdent = obj["idxIdent"];
+    return DurableCatalogEntry{catalogId,
+                               obj["ident"].String(),
+                               idxIdent.eoo() ? BSONObj() : idxIdent.Obj().getOwned(),
+                               _parseMetaData(obj["md"])};
 }
 
 std::shared_ptr<BSONCollectionCatalogEntry::MetaData> DurableCatalogImpl::getMetaData(

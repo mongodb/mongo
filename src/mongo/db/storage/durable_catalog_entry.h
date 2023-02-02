@@ -40,6 +40,7 @@ namespace mongo {
 struct DurableCatalogEntry {
     RecordId catalogId;
     std::string ident;
+    const BSONObj indexIdents;
     std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata;
 };
 
