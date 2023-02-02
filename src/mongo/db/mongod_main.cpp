@@ -142,7 +142,6 @@
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/s/query_analysis_op_observer.h"
-#include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/s/rename_collection_participant_service.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
@@ -1359,6 +1358,11 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     if (auto lsc = LogicalSessionCache::get(serviceContext)) {
         LOGV2(4784903, "Shutting down the LogicalSessionCache");
         lsc->joinOnShutDown();
+    }
+
+    if (analyze_shard_key::supportsSamplingQueriesIgnoreFCV()) {
+        LOGV2_OPTIONS(7350601, {LogComponent::kDefault}, "Shutting down the QueryAnalysisSampler");
+        analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
     }
 
     // Shutdown the TransportLayer so that new connections aren't accepted
