@@ -199,10 +199,8 @@ public:
         // The cost is the sum of the costs of its children and the cost to union each child.
         for (size_t childIdx = 0; childIdx < children.size(); childIdx++) {
             CostAndCEInternal childResult = deriveChild(children[childIdx], childIdx);
-            const double childCost = childResult._cost +
-                (childIdx > 0 ? _coefficients.getUnionIncrementalCost() * childResult._ce._value
-                              : 0);
-            totalCost += childCost;
+            totalCost += childResult._cost +
+                _coefficients.getUnionIncrementalCost() * childResult._ce._value;
         }
         return {totalCost, _cardinalityEstimate};
     }
