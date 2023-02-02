@@ -54,14 +54,14 @@ const auto kSampledReadCommandNames =
                                         SampledCommandNameEnum::kCount,
                                         SampledCommandNameEnum::kDistinct};
 
-struct ReadTargetMetricsBundle {
+struct ReadMetrics {
     int64_t numSingleShard = 0;
     int64_t numVariableShard = 0;
     int64_t numScatterGather = 0;
     std::vector<int64_t> numDispatchedByRange;
 };
 
-struct WriteTargetMetricsBundle {
+struct WriteMetrics {
     int64_t numSingleShard = 0;
     int64_t numVariableShard = 0;
     int64_t numScatterGather = 0;
@@ -209,7 +209,7 @@ protected:
     }
 
     void assertReadMetrics(const ReadDistributionMetricsCalculator& calculator,
-                           const ReadTargetMetricsBundle& expectedMetrics) const {
+                           const ReadMetrics& expectedMetrics) const {
         auto actualMetrics = calculator.getMetrics();
         auto expectedNumTotal = expectedMetrics.numSingleShard + expectedMetrics.numVariableShard +
             expectedMetrics.numScatterGather;
@@ -231,14 +231,14 @@ protected:
 
     void assertMetricsForReadQuery(const CollectionRoutingInfoTargeter& targeter,
                                    const SampledQueryDocument& queryDoc,
-                                   const ReadTargetMetricsBundle& expectedMetrics) const {
+                                   const ReadMetrics& expectedMetrics) const {
         ReadDistributionMetricsCalculator readDistributionCalculator(targeter);
         readDistributionCalculator.addQuery(operationContext(), queryDoc);
         assertReadMetrics(readDistributionCalculator, expectedMetrics);
     }
 
     void assertWriteMetrics(const WriteDistributionMetricsCalculator& calculator,
-                            const WriteTargetMetricsBundle& expectedMetrics) const {
+                            const WriteMetrics& expectedMetrics) const {
         auto actualMetrics = calculator.getMetrics();
         auto expectedNumTotal = expectedMetrics.numSingleShard + expectedMetrics.numVariableShard +
             expectedMetrics.numScatterGather;
@@ -276,7 +276,7 @@ protected:
 
     void assertMetricsForWriteQuery(const CollectionRoutingInfoTargeter& targeter,
                                     const SampledQueryDocument& queryDoc,
-                                    const WriteTargetMetricsBundle& expectedMetrics) const {
+                                    const WriteMetrics& expectedMetrics) const {
         WriteDistributionMetricsCalculator writeDistributionCalculator(targeter);
         writeDistributionCalculator.addQuery(operationContext(), queryDoc);
         assertWriteMetrics(writeDistributionCalculator, expectedMetrics);
@@ -550,7 +550,7 @@ protected:
                              const std::vector<int64_t>& numDispatchedByRange,
                              bool hasSimpleCollation,
                              bool hasCollatableType) const {
-        ReadTargetMetricsBundle metrics;
+        ReadMetrics metrics;
         if (hasSimpleCollation || !hasCollatableType) {
             metrics.numSingleShard = 1;
         } else {
@@ -825,7 +825,7 @@ protected:
     void assertTargetMetrics(const CollectionRoutingInfoTargeter& targeter,
                              const SampledQueryDocument& queryDoc,
                              const std::vector<int64_t>& numDispatchedByRange) const {
-        ReadTargetMetricsBundle metrics;
+        ReadMetrics metrics;
         metrics.numVariableShard = 1;
         metrics.numDispatchedByRange = numDispatchedByRange;
         assertMetricsForReadQuery(targeter, queryDoc, metrics);
@@ -833,7 +833,7 @@ protected:
 
     void assertTargetMetrics(const CollectionRoutingInfoTargeter& targeter,
                              const SampledQueryDocument& queryDoc) const {
-        ReadTargetMetricsBundle metrics;
+        ReadMetrics metrics;
         metrics.numScatterGather = 1;
         metrics.numDispatchedByRange = std::vector<int64_t>({1, 1, 1});
         assertMetricsForReadQuery(targeter, queryDoc, metrics);
@@ -919,7 +919,7 @@ class ReadDistributionNotFilterByShardKeyTest : public ReadWriteDistributionTest
 protected:
     void assertTargetMetrics(const CollectionRoutingInfoTargeter& targeter,
                              const SampledQueryDocument& queryDoc) const {
-        ReadTargetMetricsBundle metrics;
+        ReadMetrics metrics;
         metrics.numScatterGather = 1;
         metrics.numDispatchedByRange = std::vector<int64_t>({1, 1, 1});
         assertMetricsForReadQuery(targeter, queryDoc, metrics);
@@ -972,7 +972,7 @@ protected:
                              const std::vector<int64_t>& numDispatchedByRange,
                              bool hasSimpleCollation,
                              bool hasCollatableType) const {
-        WriteTargetMetricsBundle metrics;
+        WriteMetrics metrics;
         if (hasSimpleCollation || !hasCollatableType) {
             metrics.numSingleShard = 1;
         } else {
@@ -1353,7 +1353,7 @@ protected:
                              const SampledQueryDocument& queryDoc,
                              bool multi,
                              const std::vector<int64_t>& numDispatchedByRange) const {
-        WriteTargetMetricsBundle metrics;
+        WriteMetrics metrics;
         metrics.numVariableShard = 1;
         metrics.numDispatchedByRange = numDispatchedByRange;
         if (multi) {
@@ -1367,7 +1367,7 @@ protected:
     void assertTargetMetrics(const CollectionRoutingInfoTargeter& targeter,
                              const SampledQueryDocument& queryDoc,
                              bool multi) const {
-        WriteTargetMetricsBundle metrics;
+        WriteMetrics metrics;
         metrics.numScatterGather = 1;
         metrics.numDispatchedByRange = std::vector<int64_t>({1, 1, 1});
         if (multi) {
@@ -1575,7 +1575,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsert) {
                                       << "A")
                               << "c" << 0);
 
-    WriteTargetMetricsBundle metrics;
+    WriteMetrics metrics;
     metrics.numSingleShard = 1;
     metrics.numDispatchedByRange = std::vector<int64_t>({0, 1, 0});
     assertMetricsForWriteQuery(
@@ -1587,7 +1587,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertEve
     auto filter = BSON("a.x" << BSON("$lt" << 0));
     auto updateMod = BSON("a" << BSON("x" << 0));
 
-    WriteTargetMetricsBundle metrics;
+    WriteMetrics metrics;
     metrics.numSingleShard = 1;
     metrics.numDispatchedByRange = std::vector<int64_t>({0, 1, 0});
     assertMetricsForWriteQuery(
@@ -1600,7 +1600,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertPre
     auto updateMod = BSON("b" << BSON("y"
                                       << "A"));
 
-    WriteTargetMetricsBundle metrics;
+    WriteMetrics metrics;
     metrics.numSingleShard = 1;
     metrics.numDispatchedByRange = std::vector<int64_t>({1, 0, 0});
     assertMetricsForWriteQuery(
@@ -1612,7 +1612,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertSuf
     auto filter = BSON("a.x" << BSON("$lt" << 0));
     auto updateMod = BSON("a" << BSON("x" << 0));
 
-    WriteTargetMetricsBundle metrics;
+    WriteMetrics metrics;
     metrics.numSingleShard = 1;
     metrics.numDispatchedByRange = std::vector<int64_t>({0, 1, 0});
     assertMetricsForWriteQuery(
@@ -1627,7 +1627,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, Upsert) {
                                       << "A")
                               << "c" << 0);
 
-    WriteTargetMetricsBundle metrics;
+    WriteMetrics metrics;
     metrics.numVariableShard = 1;
     metrics.numDispatchedByRange = std::vector<int64_t>({1, 1, 0});
     metrics.numSingleWritesWithoutShardKey = 1;
@@ -1640,7 +1640,7 @@ protected:
     void assertTargetMetrics(const CollectionRoutingInfoTargeter& targeter,
                              const SampledQueryDocument& queryDoc,
                              bool multi) const {
-        WriteTargetMetricsBundle metrics;
+        WriteMetrics metrics;
         metrics.numScatterGather = 1;
         metrics.numDispatchedByRange = std::vector<int64_t>({1, 1, 1});
         if (multi) {
@@ -1751,7 +1751,7 @@ TEST_F(WriteDistributionNotFilterByShardKeyReplacementUpdateTest, NotUpsert) {
     auto assertTargetMetrics = [&](const CollectionRoutingInfoTargeter& targeter,
                                    const SampledQueryDocument& queryDoc,
                                    const std::vector<int64_t> numDispatchedByRange) {
-        WriteTargetMetricsBundle metrics;
+        WriteMetrics metrics;
         metrics.numSingleShard = 1;
         metrics.numDispatchedByRange = numDispatchedByRange;
         assertMetricsForWriteQuery(targeter, queryDoc, metrics);
@@ -1772,7 +1772,7 @@ TEST_F(WriteDistributionNotFilterByShardKeyReplacementUpdateTest, NotUpsert) {
 TEST_F(WriteDistributionNotFilterByShardKeyReplacementUpdateTest, Upsert) {
     auto assertTargetMetrics = [&](const CollectionRoutingInfoTargeter& targeter,
                                    const SampledQueryDocument& queryDoc) {
-        WriteTargetMetricsBundle metrics;
+        WriteMetrics metrics;
         metrics.numScatterGather = 1;
         metrics.numDispatchedByRange = std::vector<int64_t>({1, 1, 1});
         metrics.numSingleWritesWithoutShardKey = 1;
@@ -1787,6 +1787,47 @@ TEST_F(WriteDistributionNotFilterByShardKeyReplacementUpdateTest, Upsert) {
                                 << "c" << 0);
     assertTargetMetrics(targeter,
                         makeSampledUpdateQueryDocument(filter, updateMod, true /* upsert */));
+}
+
+TEST_F(ReadWriteDistributionTest, WriteDistributionShardKeyUpdates) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    WriteDistributionMetricsCalculator writeDistributionCalculator(targeter);
+
+    // Add two updates.
+    auto filter0 = BSON("a.x" << 0 << "b.y"
+                              << "A");
+    auto updateOp0 = write_ops::UpdateOpEntry(
+        filter0, write_ops::UpdateModification(BSON("$set" << BSON("c" << 0))));
+    auto filter1 = BSON("a.x" << 1 << "b.y"
+                              << "A");
+    auto updateOp1 = write_ops::UpdateOpEntry(
+        filter1, write_ops::UpdateModification(BSON("$set" << BSON("c" << 1))));
+    writeDistributionCalculator.addQuery(operationContext(),
+                                         makeSampledUpdateQueryDocument({updateOp0, updateOp1}));
+
+    WriteMetrics metrics;
+    metrics.numSingleShard = 2;
+    metrics.numDispatchedByRange = std::vector<int64_t>({0, 2, 0});
+
+    // Can set number of shard key updates to > 0.
+    auto numShardKeyUpdates = 1;
+    writeDistributionCalculator.setNumShardKeyUpdates(numShardKeyUpdates);
+    metrics.numShardKeyUpdates = numShardKeyUpdates;
+    assertWriteMetrics(writeDistributionCalculator, metrics);
+
+    // Can set number of shard key updates to 0.
+    numShardKeyUpdates = 0;
+    writeDistributionCalculator.setNumShardKeyUpdates(numShardKeyUpdates);
+    metrics.numShardKeyUpdates = numShardKeyUpdates;
+    assertWriteMetrics(writeDistributionCalculator, metrics);
+}
+
+DEATH_TEST_F(ReadWriteDistributionTest,
+             WriteDistributionCannotSetNumShardKeyUpdatesToNegative,
+             "invariant") {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    WriteDistributionMetricsCalculator writeDistributionCalculator(targeter);
+    writeDistributionCalculator.setNumShardKeyUpdates(-1);
 }
 
 TEST(ReadDistributionMetricsTest, AddOperator) {

@@ -186,6 +186,69 @@ void processSampledQueries(OperationContext* opCtx,
     }
 }
 
+/**
+ * Calculates the read and write distribution metrics for the collection 'collUuid' based on its
+ * sampled diffs. Currently, this only involves calculating the number of shard key updates.
+ */
+void processSampledDiffs(OperationContext* opCtx,
+                         ReadDistributionMetricsCalculator* readDistributionCalculator,
+                         WriteDistributionMetricsCalculator* writeDistributionCalculator,
+                         const UUID& collUuid,
+                         const KeyPattern& shardKey) {
+    std::vector<BSONObj> pipeline;
+
+    BSONObjBuilder orBuilder;
+    BSONArrayBuilder orArrayBuilder(orBuilder.subarrayStart("$or"));
+    for (const auto& element : shardKey.toBSON()) {
+        const auto shardKeyFieldName = element.fieldNameStringData();
+        const auto path = SampledQueryDiffDocument::kDiffFieldName + "." + shardKeyFieldName;
+        orArrayBuilder.append(BSON(path << BSON("$exists" << true)));
+
+        size_t startIndex = 0;
+        while (startIndex < shardKeyFieldName.size()) {
+            const size_t lastDotIndex = shardKeyFieldName.find(".", startIndex);
+            if (lastDotIndex == std::string::npos) {
+                break;
+            }
+
+            BSONObjBuilder andBuilder;
+            BSONArrayBuilder andArrayBuilder(andBuilder.subarrayStart("$and"));
+            const auto shardKeyPrefixFieldName = shardKeyFieldName.substr(0, lastDotIndex);
+            const auto prefixPath =
+                SampledQueryDiffDocument::kDiffFieldName + "." + shardKeyPrefixFieldName;
+            andArrayBuilder.append(BSON(prefixPath << BSON("$exists" << true)));
+            andArrayBuilder.append(BSON(prefixPath << BSON("$not" << BSON("$type"
+                                                                          << "object"))));
+            andArrayBuilder.done();
+            orArrayBuilder.append(andBuilder.done());
+
+            startIndex = lastDotIndex + 1;
+        }
+    }
+    orArrayBuilder.done();
+
+    pipeline.push_back(BSON(
+        "$match" << BSON("$and" << BSON_ARRAY(
+                             BSON(SampledQueryDiffDocument::kCollectionUuidFieldName << collUuid)
+                             << orBuilder.done()))));
+    pipeline.push_back(BSON("$count" << WriteDistributionMetrics::kNumShardKeyUpdatesFieldName));
+    AggregateCommandRequest aggRequest(NamespaceString::kConfigSampledQueriesDiffNamespace,
+                                       pipeline);
+
+    DBDirectClient client(opCtx);
+    auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
+        &client, aggRequest, true /* secondaryOk */, false /* useExhaust*/));
+
+    if (cursor->more()) {
+        const auto doc = cursor->next();
+        const auto numShardKeyUpdates =
+            doc.getField(WriteDistributionMetrics::kNumShardKeyUpdatesFieldName).exactNumberLong();
+        writeDistributionCalculator->setNumShardKeyUpdates(numShardKeyUpdates);
+    }
+
+    invariant(!cursor->more());
+}
+
 }  // namespace
 
 REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(
@@ -233,8 +296,21 @@ DocumentSource::GetNextResult DocumentSourceAnalyzeShardKeyReadWriteDistribution
     ReadDistributionMetricsCalculator readDistributionCalculator(targeter);
     WriteDistributionMetricsCalculator writeDistributionCalculator(targeter);
 
+    processSampledDiffs(pExpCtx->opCtx,
+                        &readDistributionCalculator,
+                        &writeDistributionCalculator,
+                        collUuid,
+                        _spec.getKey());
     processSampledQueries(
         pExpCtx->opCtx, &readDistributionCalculator, &writeDistributionCalculator, collUuid);
+
+    // The config.sampledQueries and config.sampleQueriesDiff collections are not written to (and
+    // read from) transactionally so it is possible for the number of shard key updates found above
+    // to be greater than the total number of writes. Therefore, we need to cap it in order to to
+    // keep the percentage between 0 and 100.
+    writeDistributionCalculator.setNumShardKeyUpdates(
+        std::min(writeDistributionCalculator.getNumShardKeyUpdates(),
+                 writeDistributionCalculator.getNumTotal()));
 
     DocumentSourceAnalyzeShardKeyReadWriteDistributionResponse response;
     response.setReadDistribution(readDistributionCalculator.getMetrics());

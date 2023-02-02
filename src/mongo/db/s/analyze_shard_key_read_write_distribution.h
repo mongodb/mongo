@@ -67,24 +67,29 @@ public:
      */
     virtual DistributionMetricsType getMetrics() const = 0;
 
+    /**
+     * Returns the total number of sampled queries added so far.
+     */
+    virtual int64_t getNumTotal() const = 0;
+
 protected:
     virtual SampleSizeType _getSampleSize() const = 0;
 
     DistributionMetricsType _getMetrics() const;
 
-    void _incrementSingleShard() {
+    void _incrementNumSingleShard() {
         _numSingleShard++;
     }
 
-    void _incrementVariableShard() {
+    void _incrementNumVariableShard() {
         _numVariableShard++;
     }
 
-    void _incrementScatterGather() {
+    void _incrementNumScatterGather() {
         _numScatterGather++;
     }
 
-    void _incrementTargetedRanges(const std::set<ChunkRange>& chunkRanges) {
+    void _incrementNumDispatchedByRanges(const std::set<ChunkRange>& chunkRanges) {
         for (const auto& chunkRange : chunkRanges) {
             auto it = _numDispatchedByRange.find(chunkRange);
             invariant(it != _numDispatchedByRange.end());
@@ -140,6 +145,10 @@ public:
 
     ReadDistributionMetrics getMetrics() const override;
 
+    int64_t getNumTotal() const override {
+        return _numFind + _numAggregate + _numCount + _numDistinct;
+    }
+
 private:
     ReadSampleSize _getSampleSize() const override;
 
@@ -159,6 +168,19 @@ public:
 
     WriteDistributionMetrics getMetrics() const override;
 
+    int64_t getNumTotal() const override {
+        return _numUpdate + _numDelete + _numFindAndModify;
+    }
+
+    int64_t getNumShardKeyUpdates() const {
+        return _numShardKeyUpdates;
+    }
+
+    void setNumShardKeyUpdates(int64_t num) {
+        invariant(num >= 0);
+        _numShardKeyUpdates = num;
+    }
+
 private:
     WriteSampleSize _getSampleSize() const override;
 
@@ -169,15 +191,11 @@ private:
     void _addFindAndModifyQuery(OperationContext* opCtx,
                                 const write_ops::FindAndModifyCommandRequest& cmd);
 
-    void _incrementShardKeyUpdates() {
-        _numShardKeyUpdates++;
-    }
-
-    void _incrementSingleWritesWithoutShardKey() {
+    void _incrementNumSingleWritesWithoutShardKey() {
         _numSingleWritesWithoutShardKey++;
     }
 
-    void _incrementMultiWritesWithoutShardKey() {
+    void _incrementNumMultiWritesWithoutShardKey() {
         _numMultiWritesWithoutShardKey++;
     }
 

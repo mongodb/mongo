@@ -244,7 +244,7 @@ structs:
         validator: { gte: 0 }
         optional: true
       percentageOfShardKeyUpdates:
-        type: long
+        type: double
         validator:
           gte: 0
           lte: 100

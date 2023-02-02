@@ -136,7 +136,7 @@ DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_increme
     bool targetMinkeyToMaxKey = false;
     _getChunkManager().getShardIdsForQuery(
         expCtx, filter, collation, &shardIds, &chunkRanges, &targetMinkeyToMaxKey);
-    _incrementTargetedRanges(chunkRanges);
+    _incrementNumDispatchedByRanges(chunkRanges);
 
     // Increment metrics about sharding targeting.
     if (!shardKey.isEmpty()) {
@@ -148,21 +148,21 @@ DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_increme
         invariant(!targetMinkeyToMaxKey);
         if (hasSimpleCollation(_getDefaultCollator(), collation) ||
             !shardKeyHasCollatableType(_getShardKeyPattern(), shardKey)) {
-            _incrementSingleShard();
+            _incrementNumSingleShard();
             invariant(chunkRanges.size() == 1U);
         } else {
-            _incrementVariableShard();
+            _incrementNumVariableShard();
         }
     } else if (targetMinkeyToMaxKey) {
         // This query targets the entire shard key space. Therefore, it always targets all
         // shards and chunks.
-        _incrementScatterGather();
+        _incrementNumScatterGather();
         invariant((int)chunkRanges.size() == _getChunkManager().numChunks());
     } else {
         // This query targets a subset of the shard key space. Therefore, the number of shards
         // that it targets depends on how the matching shard key ranges are distributed among
         // shards.
-        _incrementVariableShard();
+        _incrementNumVariableShard();
     }
 
     return shardKey;
@@ -323,9 +323,9 @@ void WriteDistributionMetricsCalculator::_incrementMetricsForQuery(
     if (shardKey.isEmpty()) {
         // Increment metrics about writes without shard key.
         if (isMulti) {
-            _incrementMultiWritesWithoutShardKey();
+            _incrementNumMultiWritesWithoutShardKey();
         } else {
-            _incrementSingleWritesWithoutShardKey();
+            _incrementNumSingleWritesWithoutShardKey();
         }
     }
 }

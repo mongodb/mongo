@@ -91,11 +91,9 @@ function assertWriteMetricsNonEmptySampleSize(actual, expected, isHashed) {
                    {actual, expected});
     }
 
-    // TODO (SERVER-68759): Make analyzeShardKey command calculate metrics about the shard key
-    // updates.
-    // assertApprox(actual.percentageOfShardKeyUpdates,
-    //              calculatePercentage(expected.numShardKeyUpdates, expected.sampleSize.total),
-    //              {actual, expected});
+    assertApprox(actual.percentageOfShardKeyUpdates,
+                 calculatePercentage(expected.numShardKeyUpdates, expected.sampleSize.total),
+                 {actual, expected});
     assertApprox(
         actual.percentageOfSingleWritesWithoutShardKey,
         calculatePercentage(expected.numSingleWritesWithoutShardKey, expected.sampleSize.total),
@@ -465,30 +463,35 @@ const analyzeShardKeyNumRanges = 10;
             QuerySamplingUtil.waitForInactiveSampling(st["s" + String(i)]);
         }
 
-        // Wait for all sampled queries to flushed to disk.
+        // Wait for all sampled queries and diffs to get flushed to disk.
         let numTries = 0;
         assert.soon(() => {
             numTries++;
 
             res = assert.commandWorked(st.s0.adminCommand({analyzeShardKey: ns, key: shardKey}));
+            const numShardKeyUpdates = res.writeDistribution.percentageOfShardKeyUpdates *
+                res.writeDistribution.sampleSize.total / 100;
 
             if (numTries % 100 == 0) {
-                jsTest.log("Waiting for sampled queries" + tojsononeline({
+                jsTest.log("Waiting for sampled queries and diffs" + tojsononeline({
                                actual: {
                                    readSampleSize: res.readDistribution.sampleSize,
-                                   writeSampleSize: res.writeDistribution.sampleSize
+                                   writeSampleSize: res.writeDistribution.sampleSize,
+                                   diffSampleSize: numShardKeyUpdates,
                                },
                                expected: {
                                    readSampleSize: metrics.readDistribution.sampleSize,
-                                   writeSampleSize: metrics.writeDistribution.sampleSize
+                                   writeSampleSize: metrics.writeDistribution.sampleSize,
+                                   diffSampleSize: metrics.writeDistribution.numShardKeyUpdates
                                }
                            }));
             }
 
-            return res.readDistribution.sampleSize.total >=
-                metrics.readDistribution.sampleSize.total &&
-                res.writeDistribution.sampleSize.total >=
-                metrics.writeDistribution.sampleSize.total;
+            return (res.readDistribution.sampleSize.total >=
+                    metrics.readDistribution.sampleSize.total) &&
+                (res.writeDistribution.sampleSize.total >=
+                 metrics.writeDistribution.sampleSize.total) &&
+                (numShardKeyUpdates >= metrics.writeDistribution.numShardKeyUpdates);
         });
 
         // Verify that the metrics are as expected and that the temporary collections for storing
