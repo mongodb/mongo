@@ -73,6 +73,10 @@ public:
         return _keyValue;
     }
 
+    const FoundValue& getFoundValue() const {
+        return _foundValue;
+    }
+
     boost::optional<RecordId> getDuplicateRid() const {
         return _duplicateRid;
     }

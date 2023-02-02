@@ -174,9 +174,28 @@ Status insertDocumentsImpl(OperationContext* opCtx,
     }
 
     Status status = collection->getRecordStore()->insertRecords(opCtx, &records, timestamps);
-    if (!status.isOK())
+    if (!status.isOK()) {
+        if (auto extraInfo = status.extraInfo<DuplicateKeyErrorInfo>();
+            extraInfo && collection->isClustered()) {
+            // Generate a useful error message that is consistent with duplicate key error messages
+            // on indexes. This transforms the error from a duplicate clustered key error into a
+            // duplicate key error. We have to perform this in order to maintain compatibility with
+            // already existing user code.
+            const auto& rId = extraInfo->getDuplicateRid();
+            const auto& foundValue = extraInfo->getFoundValue();
+            invariant(rId,
+                      "Clustered Collections must return the RecordId when returning a duplicate "
+                      "key error");
+            BSONObj obj = record_id_helpers::toBSONAs(*rId, "");
+            status = buildDupKeyErrorStatus(obj,
+                                            NamespaceString(collection->ns()),
+                                            "" /* indexName */,
+                                            BSON("_id" << 1),
+                                            collection->getCollectionOptions().collation,
+                                            DuplicateKeyErrorInfo::FoundValue{foundValue});
+        }
         return status;
-
+    }
     std::vector<BsonRecord> bsonRecords;
     bsonRecords.reserve(count);
     int recordIndex = 0;
