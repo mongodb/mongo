@@ -401,6 +401,7 @@ def _bind_struct_type(struct):
     ast_type.name = struct.name
     ast_type.cpp_type = _get_struct_qualified_cpp_name(struct)
     ast_type.bson_serialization_type = ["object"]
+    ast_type.first_element_field_name = struct.fields[0].name if struct.fields else None
     return ast_type
 
 
@@ -433,8 +434,11 @@ def _bind_variant_field(ctxt, ast_field, idl_type):
         ast_alternative = _bind_type(alternative)
         ast_field.type.variant_types.append(ast_alternative)
 
-    if idl_type.variant_struct_type:
-        ast_field.type.variant_struct_type = _bind_struct_type(idl_type.variant_struct_type)
+    if idl_type.variant_struct_types:
+        ast_field.type.variant_struct_types = []
+
+    for struct_type in idl_type.variant_struct_types:
+        ast_field.type.variant_struct_types.append(_bind_struct_type(struct_type))
 
     def gen_cpp_types():
         for alternative in ast_field.type.variant_types:
@@ -443,8 +447,9 @@ def _bind_variant_field(ctxt, ast_field, idl_type):
             else:
                 yield alternative.cpp_type
 
-        if ast_field.type.variant_struct_type:
-            yield ast_field.type.variant_struct_type.cpp_type
+        if ast_field.type.variant_struct_types:
+            for variant_type in ast_field.type.variant_struct_types:
+                yield variant_type.cpp_type
 
     ast_field.type.cpp_type = f'stdx::variant<{", ".join(gen_cpp_types())}>'
 
@@ -759,7 +764,7 @@ def _validate_variant_type(ctxt, syntax_symbol, field):
         else:
             add_to_count(type_count, alternative.bson_serialization_type)
 
-    if syntax_symbol.variant_struct_type:
+    if syntax_symbol.variant_struct_types:
         type_count["object"] += 1
 
     for type_name, count in type_count.items():
@@ -770,7 +775,7 @@ def _validate_variant_type(ctxt, syntax_symbol, field):
         if count > 1:
             ctxt.add_variant_duplicate_types_error(syntax_symbol, field.name, f'array<{type_name}>')
 
-    types = len(syntax_symbol.variant_types) + (1 if syntax_symbol.variant_struct_type else 0)
+    types = len(syntax_symbol.variant_types) + len(syntax_symbol.variant_struct_types)
     if types < 2:
         ctxt.add_useless_variant_error(syntax_symbol)
 

@@ -703,6 +703,26 @@ class TestBinder(testcase.IDLTestcase):
                         default: 1
             """))
 
+        # Test multiple BSON serialization type Object.
+        self.assert_bind(test_preamble + textwrap.dedent("""
+        structs:
+            insert_type:
+                description: foo
+                fields: {insert: string}
+            update_type:
+                description: foo
+                fields: {update: int}
+            foo:
+                description: foo
+                fields:
+                    my_variant_field:
+                        type:
+                            variant:
+                            - insert_type
+                            - update_type
+                            - int
+            """))
+
     def test_variant_negative(self):
         # type: () -> None
         """Negative variant test cases."""
@@ -854,7 +874,8 @@ class TestBinder(testcase.IDLTestcase):
                             - int
             """), idl.errors.ERROR_ID_VARIANT_STRUCTS)
 
-        # At most one type can have BSON serialization type Object.
+        # For multiple BSON serialization type Objects they must have different field names
+        # for their first field.
         self.assert_bind_fail(
             test_preamble + textwrap.dedent("""
         structs:

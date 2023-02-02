@@ -105,9 +105,8 @@ class Type(common.SourceLocation):
         self.is_variant = False  # type: bool
         self.is_struct = False  # type: bool
         self.variant_types = []  # type: List[Type]
-        # A variant can have at most one alternative type which is a struct. Otherwise, if we saw
-        # a sub-object while parsing BSON, we wouldn't know which struct to interpret it as.
-        self.variant_struct_type = None  # type: Type
+        self.variant_struct_types = None  # type: List[Type]
+        self.first_element_field_name = None  # type: str
         self.deserialize_with_tenant = False  # type: bool
         super(Type, self).__init__(file_name, line, column)
 

@@ -266,6 +266,16 @@ structs:
                 type:
                     variant: [int, string, array<string>]
 
+    NewVariantSubsetReplyThree:
+        description: "This reply contains a field whose new variant types are a subset
+                      of the old variant types"
+        is_command_reply: true
+        fields:
+            variantSubsetReplyFieldThree:
+                stability: stable
+                type:
+                    variant: [int, string, intStringBoolToIntString]
+
     VariantRecursiveReply:
         description: "This reply contains a field that has a new variant type that is compatible
                       with the old variant type"
@@ -370,6 +380,22 @@ structs:
     NewCommandParameterStruct:
         description: "The new command parameter's type and the
                      old command parameter's type are both structs"
+
+    InsertParameterStruct:
+        description: "The new command parameter's type and the
+                     old command parameter's type are both structs"
+        fields:
+            insert:
+                type: int
+                stability: stable
+
+    UpdateParameterStruct:
+        description: "The new command parameter's type and the
+                     old command parameter's type are both structs"
+        fields:
+            update:
+                type: int
+                stability: stable
 
     AddedOptionalTypeFieldStruct:
         description: "This struct contains a field that is added and optional in the new version"
@@ -489,6 +515,15 @@ structs:
                 type:
                     variant: [int, string, NewCommandParameterStruct,
                               array<NewCommandParameterStruct>, array<string>]
+
+    VariantStructSupersetTwoStruct:
+        description: "This struct contains a field where the new variant types contains two structs
+                      while the old one contains one"
+        fields:
+            variantStructSupersetField:
+                stability: stable
+                type:
+                    variant: [int, string, InsertParameterStruct, UpdateParameterStruct]
 
     VariantStructRecursiveStruct:
         description: "This struct contains a field where the old variant struct and the new
@@ -1446,6 +1481,16 @@ commands:
         api_version: "1"
         reply_type: NewVariantSubsetReplyTwo
 
+    newReplyFieldVariantSubsetThree:
+        description: "new command when its reply field type is a variant type that is
+                      a subset of the old reply field variant types"
+        command_name: newReplyFieldVariantSubsetThree
+        namespace: ignored
+        cpp_name: newReplyFieldVariantSubsetThree
+        strict: true
+        api_version: "1"
+        reply_type: NewVariantSubsetReplyThree
+
     replyFieldVariantRecursive:
         description: "new command passes when its reply field type is a variant type that is
                       compatible with the old reply field variant type"
@@ -1714,6 +1759,17 @@ commands:
         namespace: type
         type: VariantStructSupersetStruct
         cpp_name: newCommandTypeVariantStructSuperset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newCommandTypeVariantStructSupersetTwo:
+        description: "new command passes because its type is a variant type that is
+                      a superset of the old command type variant types"
+        command_name: newCommandTypeVariantStructTwoSuperset
+        namespace: type
+        type: VariantStructSupersetTwoStruct
+        cpp_name: newCommandTypeVariantStructTwoSuperset
         strict: true
         api_version: "1"
         reply_type: OkReply

@@ -245,11 +245,16 @@ class SymbolTable(object):
                     return None
 
                 if isinstance(alternative_type, Struct):
-                    if variant.variant_struct_type:
-                        ctxt.add_variant_structs_error(location, field_name)
-                        continue
-
-                    variant.variant_struct_type = alternative_type
+                    if len(variant.variant_struct_types) > 0:
+                        # Check if we are adding a duplicate first field name since that would
+                        # cause parsing ambiguity.
+                        first_element = alternative_type.fields[0].name
+                        if first_element in [
+                                elem.fields[0].name for elem in variant.variant_struct_types
+                        ]:
+                            ctxt.add_variant_structs_error(location, field_name)
+                            continue
+                    variant.variant_struct_types.append(alternative_type)
                     bson_serialization_type = ["object"]
                 else:
                     variant.variant_types.append(alternative_type)
@@ -393,9 +398,7 @@ class VariantType(Type):
         super(VariantType, self).__init__(file_name, line, column)
         self.name = 'variant'
         self.variant_types = []  # type: List[Type]
-        # A variant can have at most one alternative type which is a struct. Otherwise, if we see
-        # a sub-object while parsing BSON, we don't know which struct to interpret it as.
-        self.variant_struct_type = None  # type: Struct
+        self.variant_struct_types = []  # type: List[Struct]
 
 
 class Validator(common.SourceLocation):

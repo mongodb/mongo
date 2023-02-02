@@ -578,20 +578,40 @@ def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
                     ctxt.add_new_reply_field_variant_type_not_subset_error(
                         cmd_name, field_name, new_variant_type.name, new_field.idl_file_path)
 
-        # If new type is variant and has a struct as a variant type, compare old and new variant_struct_type.
+        # If new type is variant and has a struct as a variant type, compare old and new variant_struct_types.
         # Since enums can't be part of variant types, we don't explicitly check for enums.
         if isinstance(new_field_type,
-                      syntax.VariantType) and new_field_type.variant_struct_type is not None:
-            if old_field_type.variant_struct_type is None and not is_unstable(
+                      syntax.VariantType) and new_field_type.variant_struct_types is not None:
+            if old_field_type.variant_struct_types is None and not is_unstable(
                     old_field.stability) and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
-                ctxt.add_new_reply_field_variant_type_not_subset_error(
-                    cmd_name, field_name, new_field_type.variant_struct_type.name,
-                    new_field.idl_file_path)
-            else:
-                check_reply_fields(ctxt, old_field_type.variant_struct_type,
-                                   new_field_type.variant_struct_type, cmd_name, old_field.idl_file,
-                                   new_field.idl_file, old_field.idl_file_path,
+                for variant_type in new_field_type.variant_struct_types:
+                    ctxt.add_new_reply_field_variant_type_not_subset_error(
+                        cmd_name, field_name, variant_type.name, new_field.idl_file_path)
+                return
+            # If the length of both variant_struct_types is 1 then we want to check the struct fields
+            # since an idl name change with the same field names is legal. We do not do this for
+            # lengths > 1 because it would be too ambiguous to tell which pair of variant
+            # types no longer comply with each other.
+            elif (len(old_field_type.variant_struct_types) == 1) and (len(
+                    new_field_type.variant_struct_types) == 1):
+                check_reply_fields(ctxt, old_field_type.variant_struct_types[0],
+                                   new_field_type.variant_struct_types[0], cmd_name,
+                                   old_field.idl_file, new_field.idl_file, old_field.idl_file_path,
                                    new_field.idl_file_path)
+                return
+            for new_variant_type in new_field_type.variant_struct_types:
+                for old_variant_type in old_field_type.variant_struct_types:
+                    if old_variant_type.name == new_variant_type.name:
+                        check_reply_fields(ctxt, old_variant_type, new_variant_type, cmd_name,
+                                           old_field.idl_file, new_field.idl_file,
+                                           old_field.idl_file_path, new_field.idl_file_path)
+                        break
+                else:
+                    if not is_unstable(old_field.stability
+                                       ) and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
+                        # new_variant_type was not found in old_variant_struct_types
+                        ctxt.add_new_reply_field_variant_type_not_subset_error(
+                            cmd_name, field_name, new_variant_type.name, new_field.idl_file_path)
 
     elif not is_unstable(
             old_field.stability) and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
@@ -915,19 +935,52 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
 
             # If old and new types both have a struct as a variant type, compare old and new variant_struct_type.
             # Since enums can't be part of variant types, we don't explicitly check for enums.
-            if old_type.variant_struct_type is not None:
-                if new_type.variant_struct_type is not None:
-                    check_command_params_or_type_struct_fields(
-                        ctxt, old_type.variant_struct_type, new_type.variant_struct_type, cmd_name,
-                        old_field.idl_file, new_field.idl_file, old_field.idl_file_path,
-                        new_field.idl_file_path, is_command_parameter)
+            if old_type.variant_struct_types is None:
+                return
 
-                # If old type has a variant struct type and new type does not have a variant struct type.
-                elif not is_unstable(old_field.stability
-                                     ) and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
+            if new_type.variant_struct_types is None:
+                if is_unstable(
+                        old_field.stability) or ignore_list_name in IGNORE_STABLE_TO_UNSTABLE_LIST:
+                    return
+
+                # If new_type.variant_struct_types in None then add a
+                # new_command_or_param_variant_type_not_superset_error for every type in
+                # old_type.variant_struct_types.
+                for old_variant in old_type.variant_struct_types:
                     ctxt.add_new_command_or_param_variant_type_not_superset_error(
-                        cmd_name, old_type.variant_struct_type.name, new_field.idl_file_path,
-                        param_name, is_command_parameter)
+                        cmd_name, old_variant.name, new_field.idl_file_path, param_name,
+                        is_command_parameter)
+                return
+
+            # If the length of both variant_struct_types is 1 then we want to check the struct fields
+            # since an idl name change with the same field names is legal. We do not do this for
+            # lengths > 1 because it would be too ambiguous to tell which pair of variant
+            # types no longer comply with each other.
+            if (len(old_type.variant_struct_types) == 1) and (len(
+                    new_type.variant_struct_types) == 1):
+                check_command_params_or_type_struct_fields(
+                    ctxt, old_type.variant_struct_types[0], new_type.variant_struct_types[0],
+                    cmd_name, old_field.idl_file, new_field.idl_file, old_field.idl_file_path,
+                    new_field.idl_file_path, is_command_parameter)
+                return
+            for old_variant in old_type.variant_struct_types:
+                for new_variant in new_type.variant_struct_types:
+                    # Item with the same name found in both old_type.variant_struct_types and
+                    # new_type.variant_struct_types, call check_command_params_or_type_struct_fields.
+                    if new_variant.name == old_variant.name:
+                        check_command_params_or_type_struct_fields(
+                            ctxt, old_variant, new_variant, cmd_name, old_field.idl_file,
+                            new_field.idl_file, old_field.idl_file_path, new_field.idl_file_path,
+                            is_command_parameter)
+                        break
+                # If an item in old_type.variant_struct_types was not found in
+                # new_type.variant_struct_types then add a new_command_or_param_variant_type_not_superset_error.
+                else:
+                    if not is_unstable(old_field.stability
+                                       ) and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
+                        ctxt.add_new_command_or_param_variant_type_not_superset_error(
+                            cmd_name, old_variant.name, new_field.idl_file_path, param_name,
+                            is_command_parameter)
 
     elif not is_unstable(
             old_field.stability) and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:

@@ -663,6 +663,18 @@ structs:
 # Test struct with variant
 #
 ##################################################################################################
+    insert_variant_struct:
+        description: Struct with first field name insert
+        strict: false
+        fields:
+            insert: int
+
+    update_variant_struct:
+        description: Struct with first field name update
+        strict: false
+        fields:
+            update: string
+    
     one_variant:
         description: UnitTest for a single variant which accepts int or string
         strict: false
@@ -728,6 +740,16 @@ structs:
                     variant:
                     - int
                     - array<one_string>
+
+    one_variant_two_structs:
+        description: UnitTest for a single variant which accepts a one_string or one_int
+        strict: false
+        fields:
+            value:
+                type:
+                    variant:
+                    - insert_variant_struct
+                    - update_variant_struct
 
     one_variant_two_arrays:
         description: UnitTest for a single variant which accepts array of int or array of string

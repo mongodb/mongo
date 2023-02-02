@@ -758,6 +758,19 @@ TEST(IDLVariantTests, TestVariantSafeIntArray) {
                                 .getValue()) == (int32vec{1, 2, 3, 4}));
 }
 
+TEST(IDLVariantTests, TestVariantTwoStructs) {
+    auto obj = BSON("value" << BSON("insert" << 1));
+    auto parsed = One_variant_two_structs::parse(IDLParserContext{"root"}, obj);
+    ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+    ASSERT_EQ(stdx::get<Insert_variant_struct>(parsed.getValue()).getInsert(), 1);
+
+    obj = BSON("value" << BSON("update"
+                               << "foo"));
+    parsed = One_variant_two_structs::parse(IDLParserContext{"root"}, obj);
+    ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+    ASSERT_EQ(stdx::get<Update_variant_struct>(parsed.getValue()).getUpdate(), "foo");
+}
+
 TEST(IDLVariantTests, TestVariantTwoArrays) {
     TestLoopbackVariant<One_variant_two_arrays, std::vector<int>, Array>({});
     TestLoopbackVariant<One_variant_two_arrays, std::vector<int>, Array>({1});

@@ -937,6 +937,14 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             str(new_reply_field_variant_struct_not_subset_error),
             "newReplyFieldVariantStructNotSubset")
 
+        new_reply_field_variant_struct_not_subset_two_error = error_collection.get_error_by_command_name(
+            "newReplyFieldVariantStructNotSubsetTwo")
+        self.assertTrue(new_reply_field_variant_struct_not_subset_two_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE_NOT_SUBSET)
+        self.assertRegex(
+            str(new_reply_field_variant_struct_not_subset_two_error),
+            "newReplyFieldVariantStructNotSubsetTwo")
+
         new_reply_field_variant_struct_recursive_error = error_collection.get_error_by_command_name(
             "replyFieldVariantStructRecursive")
         self.assertTrue(new_reply_field_variant_struct_recursive_error.error_id ==
@@ -1036,6 +1044,14 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         for error in new_param_variant_not_superset_two_errors:
             self.assertTrue(error.error_id == idl_compatibility_errors.
                             ERROR_ID_NEW_COMMAND_PARAMETER_VARIANT_TYPE_NOT_SUPERSET)
+
+        new_param_variant_not_superset_three_error = error_collection.get_error_by_command_name(
+            "newParamVariantNotSupersetThree")
+        self.assertTrue(
+            new_param_variant_not_superset_three_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_PARAMETER_VARIANT_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_param_variant_not_superset_three_error), "newParamVariantNotSupersetThree")
 
         new_param_type_not_variant_error = error_collection.get_error_by_command_name(
             "newParamTypeNotVariant")
@@ -1477,7 +1493,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertRegex(
             str(new_command_type_field_added_as_stable_error), "newStableTypeFieldAdded")
 
-        self.assertEqual(error_collection.count(), 209)
+        self.assertEqual(error_collection.count(), 211)
 
     def test_generic_argument_compatibility_pass(self):
         """Tests that compatible old and new generic_argument.idl files should pass."""

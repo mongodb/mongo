@@ -1389,19 +1389,46 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                                                 None, tenant, check_type=False)
                     self._writer.write_line('break;')
 
-        if field.type.variant_struct_type:
+        if field.type.variant_struct_types:
             self._writer.write_line('case Object:')
             self._writer.indent()
-            object_value = '%s::parse(ctxt, %s.Obj())' % (field.type.variant_struct_type.cpp_type,
-                                                          bson_element)
 
-            if field.chained_struct_field:
+            is_multiple_structs = len(field.type.variant_struct_types) > 1
+            if is_multiple_structs:
+                self._writer.write_line('{')
+                self._writer.indent()
+                self._writer.write_line('auto firstElement = element.Obj().firstElement();')
+                beginning_str = ''
+
+            for variant_type in field.type.variant_struct_types:
+                if is_multiple_structs:
+                    struct_type = variant_type.first_element_field_name
+                    self._writer.write_line('%sif (firstElement.fieldNameStringData() == "%s") {' %
+                                            (beginning_str, struct_type))
+                    beginning_str = '} else '
+                    self._writer.indent()
+                object_value = '%s::parse(ctxt, %s.Obj())' % (variant_type.cpp_type, bson_element)
+
+                if field.chained_struct_field:
+                    self._writer.write_line(
+                        '%s.%s(%s);' % (_get_field_member_name(field.chained_struct_field),
+                                        _get_field_member_setter_name(field), object_value))
+                else:
+                    self._writer.write_line(
+                        '%s = %s;' % (_get_field_member_name(field), object_value))
+                if is_multiple_structs:
+                    self._writer.unindent()
+            if is_multiple_structs:
+                self._writer.write_line('} else {')
+                self._writer.indent()
                 self._writer.write_line(
-                    '%s.%s(%s);' % (_get_field_member_name(field.chained_struct_field),
-                                    _get_field_member_setter_name(field), object_value))
-            else:
-                self._writer.write_line('%s = %s;' % (_get_field_member_name(field), object_value))
+                    'ctxt.throwUnknownField(firstElement.fieldNameStringData());')
+                self._writer.unindent()
+                self._writer.write_line('}')
             self._writer.write_line('break;')
+            if is_multiple_structs:
+                self._writer.unindent()
+                self._writer.write_line('}')
             self._writer.unindent()
 
         self._writer.write_line('default:')
@@ -2057,7 +2084,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             with self._block('stdx::visit(OverloadedVisitor{', '}, ${access_member});'):
                 for variant_type in itertools.chain(
                         field.type.variant_types,
-                    [field.type.variant_struct_type] if field.type.variant_struct_type else []):
+                        field.type.variant_struct_types if field.type.variant_struct_types else []):
 
                     template_params[
                         'cpp_type'] = 'std::vector<' + variant_type.cpp_type + '>' if variant_type.is_array else variant_type.cpp_type
