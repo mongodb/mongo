@@ -84,6 +84,8 @@ namespace executor {
 class ScopedTaskExecutor {
 public:
     explicit ScopedTaskExecutor(std::shared_ptr<TaskExecutor> executor);
+    // Tasks respond with the supplied status on shutdown. Status must be in the CancellationError
+    // category.
     ScopedTaskExecutor(std::shared_ptr<TaskExecutor> executor, Status shutdownError);
 
     // Delete all move/copy-ability

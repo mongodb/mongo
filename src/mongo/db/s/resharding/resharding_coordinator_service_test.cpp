@@ -738,8 +738,7 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpDuringInitializing) {
     auto coordinator = getCoordinator(opCtx, instanceId);
     stepDown(opCtx);
     pauseBeforeInsertCoordinatorDoc->setMode(FailPoint::off, 0);
-    ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(),
-              ErrorCodes::InterruptedDueToReplStateChange);
+    ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
 
     coordinator.reset();
     stepUp(opCtx);
@@ -756,8 +755,7 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpDuringInitializing) {
     ASSERT_FALSE(newObserver->awaitAllRecipientsDone().isReady());
 
     stepDown(opCtx);
-    ASSERT_EQ(newCoordinator->getCompletionFuture().getNoThrow(),
-              ErrorCodes::InterruptedDueToReplStateChange);
+    ASSERT_EQ(newCoordinator->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
 }
 
 /**
@@ -836,8 +834,7 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
 
         stepDown(opCtx);
 
-        ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(),
-                  ErrorCodes::InterruptedDueToReplStateChange);
+        ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
 
         coordinator.reset();
 

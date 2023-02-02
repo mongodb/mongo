@@ -808,10 +808,9 @@ TEST_F(ShardSplitDonorServiceTest, StepDownTest) {
 
     auto result = serviceInstance->decisionFuture().getNoThrow();
     ASSERT_FALSE(result.isOK());
-    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange, result.getStatus());
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, result.getStatus());
 
-    ASSERT_EQ(serviceInstance->completionFuture().getNoThrow(),
-              ErrorCodes::InterruptedDueToReplStateChange);
+    ASSERT_EQ(serviceInstance->completionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
     ASSERT_FALSE(serviceInstance->isGarbageCollectable());
 }
 
@@ -978,7 +977,7 @@ TEST_F(ShardSplitDonorServiceTest, ResumeAfterStepdownTest) {
     stepDown();
     auto result = firstSplitInstance->completionFuture().getNoThrow();
     ASSERT_FALSE(result.isOK());
-    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange, result.code());
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, result.code());
 
     auto secondSplitInstance = [&]() {
         FailPointEnableBlock fp("pauseShardSplitAfterBlocking");

@@ -34,6 +34,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future.h"
 
@@ -332,16 +333,24 @@ TEST_F(ScopedTaskExecutorTest, SetShutdownCode) {
         ASSERT_EQUALS(event.getStatus(), ErrorCodes::ShutdownInProgress);
     }
 
-    // Now make an executor with a provided non-default shutdown code and check that we get that
-    // code instead of the default one.
+    // Make an executor with a provided CancellationError shutdown code and check the code
+    // returned is the provided code.
     {
-        Status stepDownStatus(ErrorCodes::InterruptedDueToReplStateChange, "node stepped down");
+        Status stepDownStatus(ErrorCodes::CallbackCanceled, "CancellationError status");
         ScopedTaskExecutor executor(getUnderlying(), stepDownStatus);
         executor->shutdown();
 
         auto event = executor->makeEvent();
-        ASSERT_EQUALS(event.getStatus(), ErrorCodes::InterruptedDueToReplStateChange);
+        ASSERT_EQUALS(event.getStatus(), ErrorCodes::CallbackCanceled);
     }
+}
+
+DEATH_TEST_F(ScopedTaskExecutorTest, SetShutdownCodeNonCancellation, "invariant") {
+    // Make an executor with a provided non-CancellationError shutdown code and check
+    // that an invariant is hit.
+    Status stepDownStatus(ErrorCodes::InterruptedDueToReplStateChange,
+                          "Non-CancellationError status");
+    ScopedTaskExecutor executor(getUnderlying(), stepDownStatus);
 }
 
 TEST_F(ScopedTaskExecutorTest, joinAllBecomesReadyOnShutdown) {

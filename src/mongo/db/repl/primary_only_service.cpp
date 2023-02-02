@@ -72,7 +72,7 @@ const auto _registryRegisterer =
     ReplicaSetAwareServiceRegistry::Registerer<PrimaryOnlyServiceRegistry>(
         "PrimaryOnlyServiceRegistry");
 
-const Status kExecutorShutdownStatus(ErrorCodes::InterruptedDueToReplStateChange,
+const Status kExecutorShutdownStatus(ErrorCodes::CallbackCanceled,
                                      "PrimaryOnlyService executor shut down due to stepDown");
 
 const auto primaryOnlyServiceStateForClient =

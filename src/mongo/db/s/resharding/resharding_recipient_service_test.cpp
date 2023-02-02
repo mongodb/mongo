@@ -493,8 +493,7 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
             stateTransitionsGuard.wait(state);
             stepDown();
 
-            ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
-                      ErrorCodes::InterruptedDueToReplStateChange);
+            ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
 
             prevState = state;
 
@@ -604,8 +603,7 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
         doneTransitionGuard->wait(RecipientStateEnum::kDone);
         stepDown();
 
-        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
-                  ErrorCodes::InterruptedDueToReplStateChange);
+        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
 
         recipient.reset();
         stepUp(opCtx.get());
@@ -689,8 +687,7 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
 
     stepDown();
     doneTransitionGuard.reset();
-    ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
-              ErrorCodes::InterruptedDueToReplStateChange);
+    ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
 
     DBDirectClient client(opCtx.get());
     NamespaceString sourceNss =
@@ -736,8 +733,7 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardColle
 
     stepDown();
     doneTransitionGuard.reset();
-    ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
-              ErrorCodes::InterruptedDueToReplStateChange);
+    ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
 
     DBDirectClient client(opCtx.get());
     NamespaceString sourceNss =
@@ -954,8 +950,7 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
         }
         stepDown();
 
-        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
-                  ErrorCodes::InterruptedDueToReplStateChange);
+        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
 
         prevState = state;
         if (state == RecipientStateEnum::kApplying ||
