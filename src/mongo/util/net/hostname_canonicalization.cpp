@@ -113,7 +113,6 @@ StatusWith<std::vector<std::string>> getHostFQDNs(std::string hostName,
 
     std::vector<std::string> getNameInfoErrors;
     for (shim_addrinfo* p = info; p; p = p->ai_next) {
-        std::stringstream getNameInfoError;
         shim_char host[NI_MAXHOST] = {};
         if ((err = shim_getnameinfo(
                  p->ai_addr, p->ai_addrlen, host, sizeof(host), nullptr, 0, NI_NAMEREQD)) == 0) {
@@ -132,6 +131,7 @@ StatusWith<std::vector<std::string>> getHostFQDNs(std::string hostName,
                 sin_addr = reinterpret_cast<void*>(&addr_in6->sin6_addr);
             }
 
+            std::stringstream getNameInfoError;
             if (sin_addr) {
                 invariant(inet_ntop(p->ai_family, sin_addr, ip_str, sizeof(ip_str)) != nullptr);
                 getNameInfoError << ip_str;
@@ -140,8 +140,8 @@ StatusWith<std::vector<std::string>> getHostFQDNs(std::string hostName,
             }
 
             getNameInfoError << ": \"" << errorMessage(addrInfoError(err));
+            getNameInfoErrors.push_back(getNameInfoError.str());
         }
-        getNameInfoErrors.push_back(getNameInfoError.str());
     }
 
     if (!getNameInfoErrors.empty()) {
@@ -151,6 +151,8 @@ StatusWith<std::vector<std::string>> getHostFQDNs(std::string hostName,
                     "Failed to obtain name info",
                     "errors"_attr = getNameInfoErrors);
     }
+
+    LOGV2_DEBUG(7317600, 4, "Name info: {results}", "Name info", "results"_attr = results);
 
     // Deduplicate the results list
     std::sort(results.begin(), results.end());
