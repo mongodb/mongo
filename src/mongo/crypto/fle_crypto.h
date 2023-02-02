@@ -49,6 +49,7 @@
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto_types.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/crypto/fle_stats.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
@@ -448,6 +449,39 @@ public:
      */
     static StatusWith<ESCDocument> decryptAnchorDocument(
         const ESCTwiceDerivedValueToken& valueToken, BSONObj& doc);
+
+    /*
+     * Note on EmuBinaryV2 results:
+     *    i = non-anchor position (cpos)
+     *    x = anchor position (apos)
+     *
+     *    (i == 0) means no non-anchors AND no anchors exist at all. (implies x == 0).
+     *    (i == null) means no new non-anchors since the last-recorded cpos in an anchor.
+     *                Implies at least one anchor exists (x == null OR x > 0).
+     *    (i > 0) means only non-anchors exist OR new non-anchors have been added since
+     *            the last-recorded cpos in an anchor.
+     *    (x == 0) means no anchors exist.
+     *    (x == null) means a null anchor exists, and no new anchors since the apos in
+     *                the null anchor.
+     *    (x > 0) means only non-null anchors exist OR new non-null anchors have been added
+     *            since the last-recorded apos in the null anchor.
+     */
+    struct EmuBinaryResult {
+        boost::optional<uint64_t> cpos;
+        boost::optional<uint64_t> apos;
+    };
+    static EmuBinaryResult emuBinaryV2(const FLEStateCollectionReader& reader,
+                                       const ESCTwiceDerivedTagToken& tagToken,
+                                       const ESCTwiceDerivedValueToken& valueToken);
+    static boost::optional<uint64_t> anchorBinaryHops(const FLEStateCollectionReader& reader,
+                                                      const ESCTwiceDerivedTagToken& tagToken,
+                                                      const ESCTwiceDerivedValueToken& valueToken,
+                                                      FLEStatusSection::EmuBinaryTracker& tracker);
+    static boost::optional<uint64_t> binaryHops(const FLEStateCollectionReader& reader,
+                                                const ESCTwiceDerivedTagToken& tagToken,
+                                                const ESCTwiceDerivedValueToken& valueToken,
+                                                boost::optional<uint64_t> x,
+                                                FLEStatusSection::EmuBinaryTracker& tracker);
 };
 
 

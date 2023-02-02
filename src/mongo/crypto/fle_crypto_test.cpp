@@ -666,6 +666,317 @@ TEST(FLE_ESC, EmuBinary_Empty) {
     ASSERT_EQ(i.value(), 0);
 }
 
+namespace {
+
+std::tuple<ESCTwiceDerivedTagToken, ESCTwiceDerivedValueToken> generateEmuBinaryTokens(
+    ConstDataRange value, uint64_t contention = 0) {
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
+    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
+
+    ESCDerivedFromDataToken escDatakey =
+        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+
+    auto escDerivedToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+        generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, contention);
+
+    auto escTwiceTag =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDerivedToken);
+    auto escTwiceValue =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDerivedToken);
+    return std::tie(escTwiceTag, escTwiceValue);
+}
+
+mongo::ESCCollection::EmuBinaryResult EmuBinaryV2Test(
+    boost::optional<std::pair<uint64_t, uint64_t>> nullAnchor,
+    uint64_t anchorStart,
+    uint64_t anchorCount,
+    uint64_t anchorCposStart,
+    uint64_t anchorCposEnd,
+    uint64_t nonAnchorStart,
+    uint64_t nonAnchorCount) {
+
+    TestDocumentCollection coll;
+    ConstDataRange value(testValue);
+    auto [tagToken, valueToken] = generateEmuBinaryTokens(value, 0);
+
+    if (nullAnchor.has_value()) {
+        auto nullApos = nullAnchor->first;
+        auto nullCpos = nullAnchor->second;
+        // insert null anchor
+        auto doc =
+            ESCCollection::generateNullAnchorDocument(tagToken, valueToken, nullApos, nullCpos);
+        coll.insert(doc);
+    }
+
+    ASSERT_LESS_THAN_OR_EQUALS(anchorCposStart, anchorCposEnd);
+
+    // insert regular anchors with positions between anchorStart and anchorEnd (exclusive)
+    uint64_t lastAnchorCpos = anchorCposStart;
+    auto anchorEnd = anchorStart + anchorCount;
+    for (auto apos = anchorStart; apos < anchorEnd; apos++) {
+        auto doc =
+            ESCCollection::generateAnchorDocument(tagToken, valueToken, apos, lastAnchorCpos);
+        coll.insert(doc);
+        if (lastAnchorCpos < anchorCposEnd) {
+            lastAnchorCpos++;
+        }
+    }
+
+    // insert non-anchors with positions between nonAnchorStart and nonAnchorEnd (exclusive)
+    uint64_t nonAnchorEnd = nonAnchorStart + nonAnchorCount;
+    for (auto cpos = nonAnchorStart; cpos < nonAnchorEnd; cpos++) {
+        auto doc = ESCCollection::generateNonAnchorDocument(tagToken, cpos);
+        coll.insert(doc);
+    }
+
+    auto res = ESCCollection::emuBinaryV2(coll, tagToken, valueToken);
+
+    return res;
+}
+}  // namespace
+
+// Test EmuBinaryV2 on empty collection
+TEST(FLE_ESC, EmuBinaryV2_Empty) {
+    auto res = EmuBinaryV2Test(boost::none, 0, 0, 0, 0, 0, 0);
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 0);
+    ASSERT_TRUE(res.cpos.has_value());
+    ASSERT_EQ(res.cpos.value(), 0);
+}
+
+// Test EmuBinaryV2 on ESC containing non-anchors only
+TEST(FLE_ESC, EmuBinaryV2_NonAnchorsOnly) {
+    auto res = EmuBinaryV2Test(boost::none, 0, 0, 0, 0, 1, 5);
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 0);
+    ASSERT_TRUE(res.cpos.has_value());
+    ASSERT_EQ(res.cpos.value(), 5);
+}
+
+// Test EmuBinaryV2 on ESC containing non-null anchors only
+TEST(FLE_ESC, EmuBinaryV2_RegularAnchorsOnly) {
+    // insert anchors 1-10, with cpos all at 0
+    auto res = EmuBinaryV2Test(boost::none, 1, 10, 0, 0, 0, 0);
+    ASSERT_FALSE(res.cpos.has_value());
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 10);
+
+    // insert anchors 1-17 with cpos from 31 thru 47
+    res = EmuBinaryV2Test(boost::none, 1, 17, 31, 48, 0, 0);
+    ASSERT_FALSE(res.cpos.has_value());
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 17);
+}
+
+// Test EmuBinaryV2 on ESC containing both non-anchors and regular (non-null) anchors only
+TEST(FLE_ESC, EmuBinaryV2_NonAnchorsAndRegularAnchorsOnly) {
+
+    // insert regular anchors 1-7, with cpos all at 0; non-anchors 1-20
+    auto res = EmuBinaryV2Test(boost::none, 1, 7, 0, 0, 1, 20);
+    ASSERT_TRUE(res.cpos.has_value());
+    ASSERT_EQ(res.cpos.value(), 20);
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 7);
+
+    // insert regular anchors 1-7, with cpos between 41-47; non-anchors 1-20
+    res = EmuBinaryV2Test(boost::none, 1, 7, 41, 47, 1, 20);
+    ASSERT_FALSE(res.cpos.has_value());
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 7);
+
+    // insert regular anchors 1-7, with cpos between 41-47; non-anchors 30-47
+    res = EmuBinaryV2Test(boost::none, 1, 7, 41, 47, 30, 18);
+    ASSERT_FALSE(res.cpos.has_value());
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 7);
+
+    // insert regular anchors 1-7, with cpos between 41-47; non-anchors 48-59
+    res = EmuBinaryV2Test(boost::none, 1, 7, 41, 47, 48, 12);
+    ASSERT_TRUE(res.cpos.has_value());
+    ASSERT_EQ(res.cpos.value(), 59);
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 7);
+}
+
+// Test EmuBinaryV2 on ESC containing the null anchor only
+TEST(FLE_ESC, EmuBinaryV2_NullAnchorOnly) {
+    std::vector<std::pair<uint64_t, uint64_t>> nullAnchors = {
+        {0, 0}, {0, 10}, {10, 0}, {10, 10}, {5, 10}, {10, 5}};
+
+    for (auto& anchor : nullAnchors) {
+        auto res = EmuBinaryV2Test(anchor, 0, 0, 0, 0, 0, 0);
+        ASSERT_FALSE(res.apos.has_value());
+        ASSERT_FALSE(res.cpos.has_value());
+    }
+}
+
+// Test EmuBinaryV2 on ESC containing null anchor and non-anchors only
+TEST(FLE_ESC, EmuBinaryV2_NullAnchorAndNonAnchorsOnly) {
+
+    // insert null anchor with apos = 0, cpos = 23; non-anchors 1-20
+    auto res = EmuBinaryV2Test({{0, 23}}, 0, 0, 0, 0, 1, 20);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // insert null anchor with apos = 0, cpos = 23; non-anchor at 23
+    res = EmuBinaryV2Test({{0, 23}}, 0, 0, 0, 0, 23, 1);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // insert null anchor with apos = 0, cpos = 23; non-anchors 24-29
+    res = EmuBinaryV2Test({{0, 23}}, 0, 0, 0, 0, 24, 6);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_TRUE(res.cpos.has_value());
+    ASSERT_EQ(res.cpos.value(), 29);
+
+    // insert null anchor with apos = 0, cpos = 0; non-anchors 1-20
+    res = EmuBinaryV2Test({{0, 0}}, 0, 0, 0, 0, 1, 20);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_TRUE(res.cpos.has_value());
+    ASSERT_EQ(res.cpos.value(), 20);
+
+    // insert null anchor with apos = 10, cpos = 0; non-anchors 1-20
+    res = EmuBinaryV2Test({{10, 0}}, 0, 0, 0, 0, 1, 20);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_TRUE(res.cpos.has_value());
+    ASSERT_EQ(res.cpos.value(), 20);
+}
+
+// Test EmuBinaryV2 on ESC containing null and non-null anchors only
+TEST(FLE_ESC, EmuBinaryV2_NullAndRegularAnchorsOnly) {
+
+    // insert null anchor with apos = 47, cpos = 123; regular anchors 1-20
+    auto res = EmuBinaryV2Test({{47, 123}}, 1, 20, 41, 60, 0, 0);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // insert null anchor with apos = 47, cpos = 123; regular anchors 20-47
+    res = EmuBinaryV2Test({{47, 123}}, 20, 28, 40, 57, 0, 0);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // insert null anchor with apos = 47, cpos = 123; regular anchors 40-59
+    res = EmuBinaryV2Test({{47, 123}}, 40, 20, 40, 60, 0, 0);
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 59);
+    ASSERT_FALSE(res.cpos.has_value());
+}
+
+// Test EmuBinaryV2 on ESC containing all kinds of records, where the positions in the
+// null anchor are ahead of all existing anchor positions.
+// e.g. (null_apos > last_apos && null_cpos >= last_anchor_cpos)
+TEST(FLE_ESC, EmuBinaryV2_AllRecordTypes_NullAnchorHasNewerPositions) {
+    // all tests have null anchor with null_apos=40 and null_cpos=60
+    auto nullAnchor = std::make_pair<uint64_t, uint64_t>(40, 60);
+
+    // regular anchors 1-39 (cpos 12 thru 50); non-anchors 1-49
+    auto res = EmuBinaryV2Test(nullAnchor, 1, 39, 12, 50, 1, 49);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // regular anchors 1-39 (cpos 12 thru 50); non-anchor at 50
+    res = EmuBinaryV2Test(nullAnchor, 1, 39, 12, 50, 50, 1);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // regular anchors 1-39 (cpos 12 thru 50); non-anchors at 51-59
+    res = EmuBinaryV2Test(nullAnchor, 1, 39, 12, 50, 51, 9);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // regular anchors 1-39 (cpos 12 thru 50); non-anchor at 60
+    res = EmuBinaryV2Test(nullAnchor, 1, 39, 12, 50, 60, 1);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // regular anchors 1-39 (cpos 12 thru 50); non-anchors at 61-69
+    res = EmuBinaryV2Test(nullAnchor, 1, 39, 12, 50, 61, 9);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_TRUE(res.cpos.has_value());
+    ASSERT_EQ(res.cpos.value(), 69);
+
+    // regular anchors 1-39 (cpos 22 thru 60); non-anchors at 50-60
+    res = EmuBinaryV2Test(nullAnchor, 1, 39, 22, 60, 50, 11);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // regular anchors 1-39 (cpos 22 thru 60); non-anchors at 50-69
+    res = EmuBinaryV2Test(nullAnchor, 1, 39, 22, 60, 50, 20);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_TRUE(res.cpos.has_value());
+    ASSERT_EQ(res.cpos.value(), 69);
+}
+
+// Test EmuBinaryV2 on ESC containing all kinds of records, where the positions in the
+// null anchor are similar to the most recent regular anchor's positions.
+// e.g. (null_apos == last_apos && null_cpos == last_anchor_cpos)
+TEST(FLE_ESC, EmuBinaryV2_AllRecordTypes_NullAnchorHasLastAnchorPositions) {
+    // all tests have null anchor with null_apos=40 and null_cpos=60
+    auto nullAnchor = std::make_pair<uint64_t, uint64_t>(40, 60);
+
+    // regular anchors 1-40 (cpos 21 thru 60); non-anchors 1-59
+    auto res = EmuBinaryV2Test(nullAnchor, 1, 40, 21, 60, 1, 59);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // regular anchors 1-40 (cpos 21 thru 60); non-anchor at 60
+    res = EmuBinaryV2Test(nullAnchor, 1, 40, 21, 60, 60, 1);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // regular anchors 1-40 (cpos 21 thru 60); non-anchors 61-69
+    res = EmuBinaryV2Test(nullAnchor, 1, 40, 21, 60, 61, 9);
+    ASSERT_FALSE(res.apos.has_value());
+    ASSERT_TRUE(res.cpos.has_value());
+    ASSERT_EQ(res.cpos.value(), 69);
+}
+
+// Test EmuBinaryV2 on ESC containing all kinds of records, where the positions in the null
+// anchor are less than the most recent regular anchor's positions.
+// e.g. (null_apos < last_apos && null_cpos <= last_anchor_cpos)
+TEST(FLE_ESC, EmuBinaryV2_AllRecordTypes_NullAnchorHasOldAnchorPositions) {
+    // all tests have null anchor with null_apos=40 and null_cpos=60
+    auto nullAnchor = std::make_pair<uint64_t, uint64_t>(40, 60);
+
+    // regular anchors 1-50 (cpos 11 thru 60); non-anchors 1-59
+    auto res = EmuBinaryV2Test(nullAnchor, 1, 50, 11, 60, 1, 59);
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 50);
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // regular anchors 1-50 (cpos 11 thru 60); non-anchor at 60
+    res = EmuBinaryV2Test(nullAnchor, 1, 50, 11, 60, 60, 1);
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 50);
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // regular anchors 1-50 (cpos 11 thru 60); non-anchors 61-69
+    res = EmuBinaryV2Test(nullAnchor, 1, 50, 11, 60, 61, 9);
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 50);
+    ASSERT_TRUE(res.cpos.has_value());
+    ASSERT_EQ(res.cpos.value(), 69);
+
+    // regular anchors 1-50 (cpos 21 thru 70); non-anchors 1-69
+    res = EmuBinaryV2Test(nullAnchor, 1, 50, 21, 70, 1, 69);
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 50);
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // regular anchors 1-50 (cpos 21 thru 70); non-anchor at 70
+    res = EmuBinaryV2Test(nullAnchor, 1, 50, 21, 70, 70, 1);
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 50);
+    ASSERT_FALSE(res.cpos.has_value());
+
+    // regular anchors 1-50 (cpos 21 thru 70); non-anchors at 71-79
+    res = EmuBinaryV2Test(nullAnchor, 1, 50, 21, 70, 71, 9);
+    ASSERT_TRUE(res.apos.has_value());
+    ASSERT_EQ(res.apos.value(), 50);
+    ASSERT_TRUE(res.cpos.has_value());
+    ASSERT_EQ(res.cpos.value(), 79);
+}
+
 // Test one new field in esc
 TEST(FLE_ESC, EmuBinary) {
     TestKeyVault keyVault;

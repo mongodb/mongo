@@ -74,7 +74,6 @@ extern "C" {
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_fields_util.h"
-#include "mongo/crypto/fle_stats.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/crypto/symmetric_key.h"
 #include "mongo/db/basic_types_gen.h"
@@ -2476,6 +2475,167 @@ boost::optional<uint64_t> ESCCollection::emuBinary(const FLEStateCollectionReade
         reader, tagToken, valueToken);
 }
 
+namespace {
+boost::optional<uint64_t> binarySearchCommon(const FLEStateCollectionReader& reader,
+                                             uint64_t rho,
+                                             uint64_t lambda,
+                                             boost::optional<uint64_t> i,
+                                             std::function<PrfBlock(uint64_t)> idGenerator,
+                                             FLEStatusSection::EmuBinaryTracker& tracker) {
+
+    bool flag = true;
+    while (flag) {
+        auto doc = reader.getById(idGenerator(rho + lambda));
+
+#ifdef DEBUG_ENUM_BINARY
+        std::cout << fmt::format("search1: rho: {},  doc: {}", rho, doc.toString()) << std::endl;
+#endif
+        if (!doc.isEmpty()) {
+            rho = 2 * rho;
+        } else {
+            flag = false;
+        }
+    }
+
+    uint64_t median = 0, min = 1, max = rho;
+    uint64_t maxIterations = ceil(log2(rho));
+
+    for (uint64_t j = 1; j <= maxIterations; j++) {
+        tracker.recordSuboperation();
+        median = ceil(static_cast<double>(max - min) / 2) + min;
+
+        BSONObj doc = reader.getById(idGenerator(median + lambda));
+
+#ifdef DEBUG_ENUM_BINARY
+        std::cout << fmt::format("search_stat: min: {}, median: {}, max: {}, i: {}, doc: {}",
+                                 min,
+                                 median,
+                                 max,
+                                 i,
+                                 doc.toString())
+                  << std::endl;
+#endif
+
+        if (!doc.isEmpty()) {
+            min = median;
+            if (j == maxIterations) {
+                i = min + lambda;
+            }
+        } else {
+            max = median;
+
+            // Binary search has ended without finding a document, check for the first document
+            // explicitly
+            if (j == maxIterations && min == 1) {
+                BSONObj doc2 = reader.getById(idGenerator(1 + lambda));
+                if (!doc2.isEmpty()) {
+                    i = 1 + lambda;
+                }
+            } else if (j == maxIterations && min != 1) {
+                i = min + lambda;
+            }
+        }
+    }
+
+    return i;
+}
+}  // namespace
+
+ESCCollection::EmuBinaryResult ESCCollection::emuBinaryV2(
+    const FLEStateCollectionReader& reader,
+    const ESCTwiceDerivedTagToken& tagToken,
+    const ESCTwiceDerivedValueToken& valueToken) {
+    auto tracker = FLEStatusSection::get().makeEmuBinaryTracker();
+
+    auto x = ESCCollection::anchorBinaryHops(reader, tagToken, valueToken, tracker);
+    auto i = ESCCollection::binaryHops(reader, tagToken, valueToken, x, tracker);
+    return EmuBinaryResult{i, x};
+}
+
+boost::optional<uint64_t> ESCCollection::anchorBinaryHops(
+    const FLEStateCollectionReader& reader,
+    const ESCTwiceDerivedTagToken& tagToken,
+    const ESCTwiceDerivedValueToken& valueToken,
+    FLEStatusSection::EmuBinaryTracker& tracker) {
+
+    uint64_t lambda;
+    boost::optional<uint64_t> x;
+
+    // 1. find null anchor
+    PrfBlock nullAnchorId = ESCCollection::generateNullAnchorId(tagToken);
+    BSONObj nullAnchorDoc = reader.getById(nullAnchorId);
+
+    // 2. case: null anchor exists
+    if (!nullAnchorDoc.isEmpty()) {
+        auto swAnchor = ESCCollection::decryptDocument(valueToken, nullAnchorDoc);
+        uassertStatusOK(swAnchor.getStatus());
+        lambda = swAnchor.getValue().position;
+        x = boost::none;
+    }
+    // 3. case: null anchor does not exist
+    else {
+        lambda = 0;
+        x = 0;
+    }
+
+    // 4. initialize rho at 2
+    uint64_t rho = 2;
+
+    // 5-8. perform binary searches
+    auto idGenerator = [&tagToken](uint64_t value) -> PrfBlock {
+        return ESCCollection::generateAnchorId(tagToken, value);
+    };
+
+#ifdef DEBUG_ENUM_BINARY
+    std::cout << fmt::format(
+                     "anchor binary search start: lambda: {}, i: {}, rho: {}", lambda, x, rho)
+              << std::endl;
+#endif
+    return binarySearchCommon(reader, rho, lambda, x, idGenerator, tracker);
+}
+
+boost::optional<uint64_t> ESCCollection::binaryHops(const FLEStateCollectionReader& reader,
+                                                    const ESCTwiceDerivedTagToken& tagToken,
+                                                    const ESCTwiceDerivedValueToken& valueToken,
+                                                    boost::optional<uint64_t> x,
+                                                    FLEStatusSection::EmuBinaryTracker& tracker) {
+    uint64_t lambda;
+    boost::optional<uint64_t> i;
+
+    // 1. If no anchors present, then i = lambda = 0.
+    //    Otherwise, get the anchor (either null or non-null),
+    //    and set i = null and lambda = anchor.cpos
+    if (x.has_value() && *x == 0) {
+        i = 0;
+        lambda = 0;
+    } else {
+        auto id = x.has_value() ? ESCCollection::generateAnchorId(tagToken, *x)
+                                : ESCCollection::generateNullAnchorId(tagToken);
+        auto doc = reader.getById(id);
+        uassert(7291501, "ESC anchor document not found", !doc.isEmpty());
+
+        auto swAnchor = ESCCollection::decryptDocument(valueToken, doc);
+        uassertStatusOK(swAnchor.getStatus());
+        lambda = swAnchor.getValue().count;
+        i = boost::none;
+    }
+
+    // 2-4. initialize rho based on ESC
+    uint64_t rho = reader.getDocumentCount();
+    if (rho < 2) {
+        rho = 2;
+    }
+
+    auto idGenerator = [&tagToken](uint64_t value) -> PrfBlock {
+        return ESCCollection::generateNonAnchorId(tagToken, value);
+    };
+
+#ifdef DEBUG_ENUM_BINARY
+    std::cout << fmt::format("binary search start: lambda: {}, i: {}, rho: {}", lambda, i, rho)
+              << std::endl;
+#endif
+    return binarySearchCommon(reader, rho, lambda, i, idGenerator, tracker);
+}
 
 PrfBlock ECCCollection::generateId(ECCTwiceDerivedTagToken tagToken,
                                    boost::optional<uint64_t> index) {
