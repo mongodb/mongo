@@ -139,8 +139,8 @@ OS_DOCKER_LOOKUP = {
     'windows_x86_64-2012plus': None,
 }
 
-# TODO: Remove 6.1.1 from VERSIONS_TO_SKIP when 6.2.0 is released
-VERSIONS_TO_SKIP: Set[str] = set(['3.0.15', '3.2.22', '3.4.24', '3.6.23', '4.0.28', '6.1.1'])
+# These versions are marked "current" but in fact are EOL
+VERSIONS_TO_SKIP: Set[str] = set(['3.0.15', '3.2.22', '3.4.24', '3.6.23', '4.0.28'])
 DISABLED_TESTS: Set[Tuple[str, str]] = set()
 
 
