@@ -90,6 +90,15 @@ structs:
         type: MonotonicityType
         description: "The monotonicity of the shard key values in insertion order."
         optional: true
+      recordIdCorrelationCoefficient:
+        type: double
+        description: "The RecordId correlation coefficient calculated by the monotonicity check.
+                      This is only set if the monotonicity check occurred, i.e. if the shard key
+                      has a supporting index and the collection is not clustered."
+        validator:
+          gte: -1
+          lte: 1
+        optional: true
       numOrphanDocs:
         type: long
         description: "The number of the orphan documents in the collection."

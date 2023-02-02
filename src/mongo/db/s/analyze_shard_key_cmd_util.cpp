@@ -198,7 +198,7 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
     return boost::none;
 }
 
-struct CardinalityFrequencyMetricsBundle {
+struct CardinalityFrequencyMetrics {
     long long numDocs = 0;
     long long cardinality = 0;
     PercentileMetrics frequency;
@@ -207,25 +207,25 @@ struct CardinalityFrequencyMetricsBundle {
 /**
  * Returns the cardinality and frequency of the given shard key.
  */
-CardinalityFrequencyMetricsBundle calculateCardinalityAndFrequency(OperationContext* opCtx,
-                                                                   const NamespaceString& nss,
-                                                                   const BSONObj& shardKey,
-                                                                   const BSONObj& hintIndexKey,
-                                                                   bool isShardKeyUnique) {
-    CardinalityFrequencyMetricsBundle bundle;
+CardinalityFrequencyMetrics calculateCardinalityAndFrequency(OperationContext* opCtx,
+                                                             const NamespaceString& nss,
+                                                             const BSONObj& shardKey,
+                                                             const BSONObj& hintIndexKey,
+                                                             bool isShardKeyUnique) {
+    CardinalityFrequencyMetrics metrics;
 
     if (isShardKeyUnique) {
         long long numDocs = getNumDocuments(opCtx, nss);
 
-        bundle.numDocs = numDocs;
-        bundle.cardinality = numDocs;
-        bundle.frequency.setP99(1);
-        bundle.frequency.setP95(1);
-        bundle.frequency.setP90(1);
-        bundle.frequency.setP80(1);
-        bundle.frequency.setP50(1);
+        metrics.numDocs = numDocs;
+        metrics.cardinality = numDocs;
+        metrics.frequency.setP99(1);
+        metrics.frequency.setP95(1);
+        metrics.frequency.setP90(1);
+        metrics.frequency.setP80(1);
+        metrics.frequency.setP50(1);
 
-        return bundle;
+        return metrics;
     }
 
     auto aggRequest = makeAggregateRequestForCardinalityAndFrequency(nss, shardKey, hintIndexKey);
@@ -239,56 +239,67 @@ CardinalityFrequencyMetricsBundle calculateCardinalityAndFrequency(OperationCont
         invariant(cardinality > 0);
         invariant(frequency > 0);
 
-        if (bundle.numDocs == 0) {
-            bundle.numDocs = numDocs;
+        if (metrics.numDocs == 0) {
+            metrics.numDocs = numDocs;
         } else {
-            invariant(bundle.numDocs == numDocs);
+            invariant(metrics.numDocs == numDocs);
         }
 
-        if (bundle.cardinality == 0) {
-            bundle.cardinality = cardinality;
+        if (metrics.cardinality == 0) {
+            metrics.cardinality = cardinality;
         } else {
-            invariant(bundle.cardinality == cardinality);
+            invariant(metrics.cardinality == cardinality);
         }
 
         if (index == std::ceil(0.99 * cardinality)) {
-            bundle.frequency.setP99(frequency);
+            metrics.frequency.setP99(frequency);
         }
         if (index == std::ceil(0.95 * cardinality)) {
-            bundle.frequency.setP95(frequency);
+            metrics.frequency.setP95(frequency);
         }
         if (index == std::ceil(0.9 * cardinality)) {
-            bundle.frequency.setP90(frequency);
+            metrics.frequency.setP90(frequency);
         }
         if (index == std::ceil(0.8 * cardinality)) {
-            bundle.frequency.setP80(frequency);
+            metrics.frequency.setP80(frequency);
         }
         if (index == std::ceil(0.5 * cardinality)) {
-            bundle.frequency.setP50(frequency);
+            metrics.frequency.setP50(frequency);
         }
     });
 
     uassert(ErrorCodes::InvalidOptions,
             "Cannot analyze the cardinality and frequency of a shard key for an empty collection",
-            bundle.numDocs > 0);
+            metrics.numDocs > 0);
 
-    return bundle;
+    return metrics;
 }
+
+struct MonotonicityMetrics {
+    MonotonicityTypeEnum type;
+    boost::optional<double> correlationCoefficient = boost::none;
+};
 
 /**
  * Returns the monotonicity metrics for the given shard key, i.e. whether the value of the given
- * shard key is monotonically changing in insertion order. If the collection is clustered or the
- * shard key does not have a supporting index, returns 'unknown'.
+ * shard key is monotonically changing in insertion order and the RecordId correlation coefficient
+ * calculated by the monotonicity check. If the collection is clustered or the shard key does not
+ * have a supporting index, returns 'unknown' and none.
  */
-MonotonicityTypeEnum calculateMonotonicity(OperationContext* opCtx,
-                                           const CollectionPtr& collection,
-                                           const BSONObj& shardKey) {
+MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
+                                          const CollectionPtr& collection,
+                                          const BSONObj& shardKey) {
+    MonotonicityMetrics metrics;
+
     if (collection->isClustered()) {
-        return MonotonicityTypeEnum::kUnknown;
+        metrics.type = MonotonicityTypeEnum::kUnknown;
+        return metrics;
     }
 
     if (KeyPattern::isHashedKeyPattern(shardKey) && shardKey.nFields() == 1) {
-        return MonotonicityTypeEnum::kNotMonotonic;
+        metrics.type = MonotonicityTypeEnum::kNotMonotonic;
+        metrics.correlationCoefficient = 0;
+        return metrics;
     }
 
     auto index = findShardKeyPrefixedIndex(opCtx,
@@ -298,7 +309,8 @@ MonotonicityTypeEnum calculateMonotonicity(OperationContext* opCtx,
                                            /*requireSingleKey=*/true);
 
     if (!index) {
-        return MonotonicityTypeEnum::kUnknown;
+        metrics.type = MonotonicityTypeEnum::kUnknown;
+        return metrics;
     }
     // Non-clustered indexes always have an associated IndexDescriptor.
     invariant(index->descriptor());
@@ -334,7 +346,13 @@ MonotonicityTypeEnum calculateMonotonicity(OperationContext* opCtx,
 
     invariant(recordIds.size() > 0);
 
-    auto coefficient = [&] {
+    if (recordIds.size() == 1) {
+        metrics.type = MonotonicityTypeEnum::kNotMonotonic;
+        metrics.correlationCoefficient = 0;
+        return metrics;
+    }
+
+    metrics.correlationCoefficient = [&] {
         auto& y = recordIds;
         std::vector<int64_t> x(y.size());
         std::iota(x.begin(), x.end(), 1);
@@ -343,11 +361,14 @@ MonotonicityTypeEnum calculateMonotonicity(OperationContext* opCtx,
     auto coefficientThreshold = gMonotonicityCorrelationCoefficientThreshold.load();
     LOGV2(6875302,
           "Calculating monotonicity",
-          "coefficient"_attr = coefficient,
+          "coefficient"_attr = metrics.correlationCoefficient,
           "coefficientThreshold"_attr = coefficientThreshold);
 
-    return abs(coefficient) >= coefficientThreshold ? MonotonicityTypeEnum::kMonotonic
-                                                    : MonotonicityTypeEnum::kNotMonotonic;
+    metrics.type = abs(*metrics.correlationCoefficient) >= coefficientThreshold
+        ? MonotonicityTypeEnum::kMonotonic
+        : MonotonicityTypeEnum::kNotMonotonic;
+
+    return metrics;
 }
 
 /**
@@ -501,14 +522,16 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
         indexKeyBson = indexSpec->keyPattern.getOwned();
         metrics.setIsUnique(shardKeyBson.nFields() == indexKeyBson.nFields() ? indexSpec->isUnique
                                                                              : false);
-        metrics.setMonotonicity(calculateMonotonicity(opCtx, *collection, shardKeyBson));
+        auto monotonicityMetrics = calculateMonotonicity(opCtx, *collection, shardKeyBson);
+        metrics.setMonotonicity(monotonicityMetrics.type);
+        metrics.setRecordIdCorrelationCoefficient(monotonicityMetrics.correlationCoefficient);
     }
 
-    auto bundle = calculateCardinalityAndFrequency(
+    auto cardinalityFrequencyMetrics = calculateCardinalityAndFrequency(
         opCtx, nss, shardKeyBson, indexKeyBson, *metrics.getIsUnique());
-    metrics.setNumDocs(bundle.numDocs);
-    metrics.setNumDistinctValues(bundle.cardinality);
-    metrics.setFrequency(bundle.frequency);
+    metrics.setNumDocs(cardinalityFrequencyMetrics.numDocs);
+    metrics.setNumDistinctValues(cardinalityFrequencyMetrics.cardinality);
+    metrics.setFrequency(cardinalityFrequencyMetrics.frequency);
 
     metrics.setNumOrphanDocs(getNumOrphanDocuments(opCtx, nss));
 
