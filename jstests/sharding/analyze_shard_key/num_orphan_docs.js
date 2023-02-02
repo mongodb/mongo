@@ -19,13 +19,12 @@ function testAnalyzeShardKeyUnshardedCollection(conn) {
     assert.commandWorked(coll.createIndex(candidateKey));
     assert.commandWorked(coll.insert([{candidateKey: 1}]));
 
-    const res = conn.adminCommand({analyzeShardKey: ns, key: candidateKey});
-    assert.commandWorked(res);
+    const res = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: candidateKey}));
     assert.eq(res.numDocs, 1, res);
     assert.eq(res.numDistinctValues, 1, res);
     assert.eq(bsonWoCompare(res.frequency, {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}), 0, res);
     assert(!res.hasOwnProperty("numOrphanDocs"), res);
-    assert(res.hasOwnProperty("note"), res);
+    assert(!res.hasOwnProperty("note"), res);
 
     assert(coll.drop());
 }
@@ -58,7 +57,7 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {currentKey: 0}}));
     assert.commandWorked(st.s.adminCommand(
         {moveChunk: ns, find: {currentKey: 0}, to: st.shard1.shardName, _waitForDelete: true}));
-    let res = st.s.adminCommand({analyzeShardKey: ns, key: candidateKey});
+    let res = assert.commandWorked(st.s.adminCommand({analyzeShardKey: ns, key: candidateKey}));
     assert.eq(res.numDocs, 5, res);
     assert.eq(res.numDistinctValues, 5, res);
     assert.eq(bsonWoCompare(res.frequency, {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}), 0, res);
@@ -75,7 +74,7 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {currentKey: -5}}));
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {currentKey: -5}, to: st.shard1.shardName}));
-    res = st.s.adminCommand({analyzeShardKey: ns, key: candidateKey});
+    res = assert.commandWorked(st.s.adminCommand({analyzeShardKey: ns, key: candidateKey}));
     assert.eq(res.numDocs, 6, res);
     assert.eq(res.numDistinctValues, 5, res);
     assert.eq(bsonWoCompare(res.frequency, {p99: 2, p95: 2, p90: 2, p80: 1, p50: 1}), 0, res);
@@ -88,7 +87,7 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {currentKey: 5}}));
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {currentKey: 5}, to: st.shard0.shardName}));
-    res = st.s.adminCommand({analyzeShardKey: ns, key: candidateKey});
+    res = assert.commandWorked(st.s.adminCommand({analyzeShardKey: ns, key: candidateKey}));
     assert.eq(res.numDocs, 8, res);
     assert.eq(res.numDistinctValues, 5, res);
     assert.eq(bsonWoCompare(res.frequency, {p99: 2, p95: 2, p90: 2, p80: 2, p50: 2}), 0, res);

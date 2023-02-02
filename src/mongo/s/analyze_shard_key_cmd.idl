@@ -277,6 +277,7 @@ structs:
       note:
         description: "The note about how to interpret the metrics."
         type: string
+        optional: true
 
 commands:
   analyzeShardKey:

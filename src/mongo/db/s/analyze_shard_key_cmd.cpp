@@ -43,11 +43,11 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics);
-
 namespace {
 
-std::string makeCommandNote() {
+MONGO_FAIL_POINT_DEFINE(analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics);
+
+StringData makeOrphanDocsWarningMsg() {
     return str::stream() << "If \"" << KeyCharacteristicsMetrics::kNumOrphanDocsFieldName
                          << "\" is large relative to \""
                          << KeyCharacteristicsMetrics::kNumDocsFieldName
@@ -97,7 +97,9 @@ public:
             auto keyCharacteristics =
                 analyze_shard_key::calculateKeyCharacteristicsMetrics(opCtx, nss, key);
             response.setKeyCharacteristics(keyCharacteristics);
-            response.setNote(makeCommandNote());
+            if (response.getNumOrphanDocs()) {
+                response.setNote(makeOrphanDocsWarningMsg());
+            }
 
             if (!serverGlobalParams.clusterRole.isShardRole() ||
                 MONGO_unlikely(
