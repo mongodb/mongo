@@ -174,7 +174,7 @@ TEST(ArrayHistograms, LargeNumberOfScalarValuesBucketRanges) {
                   [](auto&& bucket) { ASSERT_GT(bucket._rangeFreq, 1); });
 }
 
-TEST(ArrayHistograms, LargeArraysHistrogram) {
+TEST(ArrayHistograms, LargeArraysHistogram) {
     std::mt19937_64 seed(42);
     MixedDistributionDescriptor uniform{{DistrType::kUniform, 1.0}};
 
@@ -199,7 +199,7 @@ TEST(ArrayHistograms, LargeArraysHistrogram) {
     ASSERT_FALSE(ah->getArrayMax().empty());
 }
 
-TEST(ArrayHistrograms, LargeNumberOfArraysHistrogram) {
+TEST(ArrayHistrograms, LargeNumberOfArraysHistogram) {
     std::mt19937_64 seed(42);
     MixedDistributionDescriptor uniform{{DistrType::kUniform, 1.0}};
 

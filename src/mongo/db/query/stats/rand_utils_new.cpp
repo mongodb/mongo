@@ -280,16 +280,18 @@ ArrDistribution::ArrDistribution(MixedDistributionDescriptor distrDescriptor,
 void ArrDistribution::init(DatasetDescriptorNew* parentDesc, std::mt19937_64& gen) {
     uassert(6660513, "There must always be a parent data descriptor.", parentDesc);
 
-    // Extract the per-type probabilities from the parent descriptor, but set the array probability
-    // to 0 to avoid self-recursion.
+    // Extract the per-type probabilities from the parent descriptor, only if we need them.
     std::vector<double> parentProbabilities;
-    for (const auto& dtd : parentDesc->_dataTypeDistributions) {
-        double prob = (dtd->tag() == value::TypeTags::Array) ? 0 : dtd->weight();
-        parentProbabilities.push_back(prob);
-    }
     std::discrete_distribution<size_t> parentDataTypeSelector;
-    parentDataTypeSelector.param(std::discrete_distribution<size_t>::param_type(
-        parentProbabilities.begin(), parentProbabilities.end()));
+    if (_reuseScalarsRatio > 0.0) {
+        for (const auto& dtd : parentDesc->_dataTypeDistributions) {
+            // Set the array probability to 0 to avoid self-recursion.
+            double prob = (dtd->tag() == value::TypeTags::Array) ? 0 : dtd->weight();
+            parentProbabilities.push_back(prob);
+        }
+        parentDataTypeSelector.param(std::discrete_distribution<size_t>::param_type(
+            parentProbabilities.begin(), parentProbabilities.end()));
+    }
 
     // Generate _ndv distinct arrays, and store them in _valSet.
     for (size_t i = 0; i < _ndv; ++i) {
