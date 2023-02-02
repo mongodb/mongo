@@ -48,6 +48,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/yieldable.h"
@@ -230,6 +231,7 @@ public:
      */
     virtual Status initFromExisting(OperationContext* opCtx,
                                     const std::shared_ptr<Collection>& collection,
+                                    const DurableCatalogEntry& catalogEntry,
                                     boost::optional<Timestamp> readTimestamp) = 0;
 
     virtual bool isCommitted() const {

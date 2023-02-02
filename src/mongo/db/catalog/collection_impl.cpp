@@ -214,12 +214,7 @@ bool doesMinMaxHaveMixedSchemaData(const BSONObj& min, const BSONObj& max) {
 StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opCtx,
                                                            StorageEngine* storageEngine,
                                                            Collection* collection,
-                                                           RecordId catalogId,
-                                                           StringData indexName) {
-    // TODO(SERVER-72111): Remove the need for this durable catalog lookup.
-    const std::string ident =
-        DurableCatalog::get(opCtx)->getIndexIdent(opCtx, catalogId, indexName);
-
+                                                           StringData ident) {
     // First check the index catalog of the existing collection for the index entry.
     auto latestEntry = [&]() -> std::shared_ptr<IndexCatalogEntry> {
         if (!collection)
@@ -236,7 +231,7 @@ StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opC
     }
 
     // Next check the CollectionCatalog for a compatible drop pending index.
-    auto dropPendingEntry = CollectionCatalog::get(opCtx)->findDropPendingIndex(ident);
+    auto dropPendingEntry = CollectionCatalog::get(opCtx)->findDropPendingIndex(ident.toString());
 
     // The index entries are incompatible with the read timestamp, but we need to use the same
     // shared ident to prevent the reaper from dropping idents prematurely.
@@ -246,7 +241,7 @@ StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opC
 
     // The index ident is expired, but it could still be drop pending. Mark it as in use if
     // possible.
-    auto newIdent = storageEngine->markIdentInUse(ident);
+    auto newIdent = storageEngine->markIdentInUse(ident.toString());
     if (newIdent) {
         return newIdent;
     }
@@ -396,6 +391,7 @@ void CollectionImpl::init(OperationContext* opCtx) {
 
 Status CollectionImpl::initFromExisting(OperationContext* opCtx,
                                         const std::shared_ptr<Collection>& collection,
+                                        const DurableCatalogEntry& catalogEntry,
                                         boost::optional<Timestamp> readTimestamp) {
     // We are per definition committed if we initialize from an existing collection.
     _cachedCommitted = true;
@@ -420,13 +416,25 @@ Status CollectionImpl::initFromExisting(OperationContext* opCtx,
 
     // Determine which indexes from the existing collection can be shared with this newly
     // initialized collection. The remaining indexes will be initialized by the IndexCatalog.
-    for (const auto& index : _metadata->indexes) {
+    auto it = catalogEntry.indexIdents.begin();
+    for (size_t offset = 0; offset < _metadata->indexes.size(); ++offset, ++it) {
+        invariant(it != catalogEntry.indexIdents.end());
+
+        const auto& index = _metadata->indexes[offset];
         const auto indexName = index.nameStringData();
         if (!isIndexReady(indexName)) {
             continue;
         }
-        auto swIndexIdent =
-            findSharedIdentForIndex(opCtx, storageEngine, collection.get(), _catalogId, indexName);
+
+        BSONElement identElem = *it;
+        if (indexName != identElem.fieldName()) {
+            // If the indexes don't have the same ordering in 'idxIdent' and 'md', we perform a
+            // search instead. There's no guarantee these are in order, but they typically are.
+            identElem = catalogEntry.indexIdents.getField(indexName);
+        }
+
+        auto swIndexIdent = findSharedIdentForIndex(
+            opCtx, storageEngine, collection.get(), identElem.checkAndGetStringData());
         if (!swIndexIdent.isOK()) {
             return swIndexIdent.getStatus();
         }

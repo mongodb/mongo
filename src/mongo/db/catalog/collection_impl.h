@@ -82,6 +82,7 @@ public:
     void init(OperationContext* opCtx) final;
     Status initFromExisting(OperationContext* opCtx,
                             const std::shared_ptr<Collection>& collection,
+                            const DurableCatalogEntry& catalogEntry,
                             boost::optional<Timestamp> readTimestamp) final;
     bool isInitialized() const final;
     bool isCommitted() const final;

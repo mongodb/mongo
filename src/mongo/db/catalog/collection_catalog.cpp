@@ -1089,8 +1089,11 @@ std::shared_ptr<Collection> CollectionCatalog::_createCompatibleCollection(
                                                   catalogEntry.catalogId,
                                                   catalogEntry.metadata,
                                                   /*rs=*/nullptr);
-        Status status = collToReturn->initFromExisting(
-            opCtx, latestCollection ? latestCollection : dropPendingColl, readTimestamp);
+        Status status =
+            collToReturn->initFromExisting(opCtx,
+                                           latestCollection ? latestCollection : dropPendingColl,
+                                           catalogEntry,
+                                           readTimestamp);
         if (!status.isOK()) {
             LOGV2_DEBUG(
                 6857100, 1, "Failed to instantiate collection", "reason"_attr = status.reason());
@@ -1142,7 +1145,8 @@ std::shared_ptr<Collection> CollectionCatalog::_createNewPITCollection(
                                               catalogEntry.catalogId,
                                               catalogEntry.metadata,
                                               std::move(rs));
-    Status status = collToReturn->initFromExisting(opCtx, /*collection=*/nullptr, readTimestamp);
+    Status status =
+        collToReturn->initFromExisting(opCtx, /*collection=*/nullptr, catalogEntry, readTimestamp);
     if (!status.isOK()) {
         LOGV2_DEBUG(
             6857102, 1, "Failed to instantiate collection", "reason"_attr = status.reason());
