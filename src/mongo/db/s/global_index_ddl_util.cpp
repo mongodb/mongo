@@ -69,13 +69,8 @@ void renameGlobalIndexesMetadata(OperationContext* opCtx,
         [&]() {
             boost::optional<UUID> toUuid;
             WriteUnitOfWork wunit(opCtx);
-            AutoGetCollection collsColl(opCtx,
-                                        NamespaceString::kShardCollectionCatalogNamespace,
-                                        MODE_IX,
-                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                            {NamespaceString::kShardIndexCatalogNamespace}));
-            AutoGetCollection fromToColl(
-                opCtx, fromNss, MODE_IX, AutoGetCollection::Options{}.secondaryNssOrUUIDs({toNss}));
+            AutoGetCollection collsColl(
+                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
             {
                 // First get the document to check the index version if the document already exists
                 const auto queryTo = BSON(CollectionType::kNssFieldName << toNss.ns());
@@ -167,12 +162,8 @@ void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
     writeConflictRetry(
         opCtx, "AddIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
             WriteUnitOfWork wunit(opCtx);
-            AutoGetCollection collsColl(opCtx,
-                                        NamespaceString::kShardCollectionCatalogNamespace,
-                                        MODE_IX,
-                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                            {NamespaceString::kShardIndexCatalogNamespace}));
-            AutoGetCollection userColl(opCtx, userCollectionNss, MODE_IX);
+            AutoGetCollection collsColl(
+                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
 
             {
                 // First get the document to check the index version if the document already exists
@@ -234,24 +225,21 @@ void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
 }
 
 void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
+                                                 const NamespaceString& userCollectionNss,
                                                  const UUID& collectionUUID,
                                                  const std::string& indexName,
                                                  const Timestamp& lastmod) {
     writeConflictRetry(
         opCtx, "RemoveIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
             WriteUnitOfWork wunit(opCtx);
-            AutoGetCollection collsColl(opCtx,
-                                        NamespaceString::kShardCollectionCatalogNamespace,
-                                        MODE_IX,
-                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                            {NamespaceString::kShardIndexCatalogNamespace}));
-            AutoGetCollection userColl(opCtx, nss, MODE_IX);
+            AutoGetCollection collsColl(
+                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
+
             {
                 // First get the document to check the index version if the document already exists
-                const auto query =
-                    BSON(CollectionType::kNssFieldName << nss.ns() << CollectionType::kUuidFieldName
-                                                       << collectionUUID);
+                const auto query = BSON(CollectionType::kNssFieldName
+                                        << userCollectionNss.ns() << CollectionType::kUuidFieldName
+                                        << collectionUUID);
                 BSONObj collectionDoc;
                 bool docExists =
                     Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc);
@@ -275,8 +263,8 @@ void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
                 request.setQuery(query);
                 request.setUpdateModification(
                     BSON(CollectionType::kNssFieldName
-                         << nss.ns() << CollectionType::kUuidFieldName << collectionUUID
-                         << CollectionType::kIndexVersionFieldName << lastmod));
+                         << userCollectionNss.ns() << CollectionType::kUuidFieldName
+                         << collectionUUID << CollectionType::kIndexVersionFieldName << lastmod));
                 request.setUpsert(true);
                 request.setFromOplogApplication(true);
                 mongo::update(opCtx, collsColl.getDb(), request);
@@ -306,7 +294,7 @@ void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
             opCtx->getServiceContext()
                 ->getOpObserver()
                 ->onModifyShardedCollectionGlobalIndexCatalogEntry(
-                    opCtx, nss, idxColl->uuid(), entryObj);
+                    opCtx, userCollectionNss, idxColl->uuid(), entryObj);
             wunit.commit();
         });
 }
@@ -319,12 +307,8 @@ void replaceGlobalIndexes(OperationContext* opCtx,
     writeConflictRetry(
         opCtx, "ReplaceIndexCatalog", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
             WriteUnitOfWork wunit(opCtx);
-            AutoGetCollection collsColl(opCtx,
-                                        NamespaceString::kShardCollectionCatalogNamespace,
-                                        MODE_IX,
-                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                            {NamespaceString::kShardIndexCatalogNamespace}));
-            AutoGetCollection userColl(opCtx, nss, MODE_IX);
+            AutoGetCollection collsColl(
+                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
             {
                 // Set final indexVersion
                 const auto query = BSON(CollectionType::kNssFieldName
@@ -384,20 +368,16 @@ void replaceGlobalIndexes(OperationContext* opCtx,
         });
 }
 
-void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx, const NamespaceString& nss) {
+void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx,
+                                         const NamespaceString& userCollectionNss) {
     writeConflictRetry(
         opCtx, "DropIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
             boost::optional<UUID> collectionUUID;
             WriteUnitOfWork wunit(opCtx);
-            AutoGetCollection collsColl(opCtx,
-                                        NamespaceString::kShardCollectionCatalogNamespace,
-                                        MODE_IX,
-                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                            {NamespaceString::kShardIndexCatalogNamespace}));
-            AutoGetCollection userColl(opCtx, nss, MODE_IX);
+            AutoGetCollection collsColl(
+                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
             {
-                // First unset the index version.
-                const auto query = BSON(CollectionType::kNssFieldName << nss.ns());
+                const auto query = BSON(CollectionType::kNssFieldName << userCollectionNss.ns());
                 BSONObj collectionDoc;
                 // Return if there is nothing to clear.
                 if (!Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc)) {
@@ -424,33 +404,29 @@ void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx, const Namespac
                                  << "entry"
                                  << BSON(IndexCatalogType::kCollectionUUIDFieldName
                                          << *collectionUUID << CollectionType::kNssFieldName
-                                         << nss.toString()));
+                                         << userCollectionNss.toString()));
 
             opCtx->getServiceContext()
                 ->getOpObserver()
                 ->onModifyShardedCollectionGlobalIndexCatalogEntry(
-                    opCtx, nss, idxColl->uuid(), entryObj);
+                    opCtx, userCollectionNss, idxColl->uuid(), entryObj);
             wunit.commit();
         });
 }
 
 void clearGlobalIndexes(OperationContext* opCtx,
-                        const NamespaceString& nss,
+                        const NamespaceString& userCollectionNss,
                         const UUID& collectionUUID) {
     writeConflictRetry(
         opCtx, "ClearIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
             WriteUnitOfWork wunit(opCtx);
-            AutoGetCollection collsColl(opCtx,
-                                        NamespaceString::kShardCollectionCatalogNamespace,
-                                        MODE_IX,
-                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                            {NamespaceString::kShardIndexCatalogNamespace}));
-            AutoGetCollection userColl(opCtx, nss, MODE_IX);
+            AutoGetCollection collsColl(
+                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
             {
                 // First unset the index version.
-                const auto query =
-                    BSON(CollectionType::kNssFieldName << nss.ns() << CollectionType::kUuidFieldName
-                                                       << collectionUUID);
+                const auto query = BSON(CollectionType::kNssFieldName
+                                        << userCollectionNss.ns() << CollectionType::kUuidFieldName
+                                        << collectionUUID);
                 BSONObj collectionDoc;
                 bool docExists =
                     Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc);
@@ -481,12 +457,12 @@ void clearGlobalIndexes(OperationContext* opCtx,
                                  << "entry"
                                  << BSON(IndexCatalogType::kCollectionUUIDFieldName
                                          << collectionUUID << CollectionType::kNssFieldName
-                                         << nss.toString()));
+                                         << userCollectionNss.toString()));
 
             opCtx->getServiceContext()
                 ->getOpObserver()
                 ->onModifyShardedCollectionGlobalIndexCatalogEntry(
-                    opCtx, nss, idxColl->uuid(), entryObj);
+                    opCtx, userCollectionNss, idxColl->uuid(), entryObj);
             wunit.commit();
         });
 }
