@@ -42,6 +42,7 @@
 
 
 namespace mongo {
+namespace analyze_shard_key {
 
 namespace {
 
@@ -194,4 +195,5 @@ MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(AnalyzeShardKeyCmd,
 
 }  // namespace
 
+}  // namespace analyze_shard_key
 }  // namespace mongo

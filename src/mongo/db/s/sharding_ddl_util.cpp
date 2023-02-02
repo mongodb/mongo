@@ -433,14 +433,16 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx,
     if (uuid) {
         deleteCmd.setDeletes({[&] {
             write_ops::DeleteOpEntry entry;
-            entry.setQ(BSON(QueryAnalyzerDocument::kCollectionUuidFieldName << *uuid));
+            entry.setQ(
+                BSON(analyze_shard_key::QueryAnalyzerDocument::kCollectionUuidFieldName << *uuid));
             entry.setMulti(false);
             return entry;
         }()});
     } else {
         deleteCmd.setDeletes({[&] {
             write_ops::DeleteOpEntry entry;
-            entry.setQ(BSON(QueryAnalyzerDocument::kNsFieldName << nss.toString()));
+            entry.setQ(
+                BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName << nss.toString()));
             entry.setMulti(true);
             return entry;
         }()});

@@ -27,7 +27,7 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+  cpp_namespace: "mongo::analyze_shard_key"
 
 imports:
   - "mongo/db/basic_types.idl"
