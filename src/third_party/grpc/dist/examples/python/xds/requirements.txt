@@ -1,5 +1,0 @@
-grpcio>=1.37.1
-protobuf
-grpcio-reflection
-grpcio-health-checking
-

@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package foo_bar;
-
-option ruby_package = "A::B";
-
-message TestRubyPackageMessage {}

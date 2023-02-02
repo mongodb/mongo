@@ -1,5 +1,0 @@
-*.proto
-*_pb2.py
-build/
-grpcio_reflection.egg-info/
-dist/

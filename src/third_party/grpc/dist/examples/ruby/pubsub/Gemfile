@@ -1,4 +1,0 @@
-source 'https://rubygems.org/'
-
-gem 'grpc', '~> 1.0'
-gem 'googleauth', '>= 0.5.1', '< 0.7'

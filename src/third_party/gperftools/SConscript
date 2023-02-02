@@ -9,9 +9,7 @@ Import("selected_experimental_optimizations")
 env = env.Clone(
     # Building with hidden visibility interferes with intercepting the
     # libc allocation functions.
-    DISALLOW_VISHIDDEN=True,
-    NINJA_GENSOURCE_INDEPENDENT=True,
-)
+    DISALLOW_VISHIDDEN=True, )
 
 # If we don't have a frame pointer, we need to tell tcmalloc so that
 # it doesn't try to select a frame pointer based unwinder like
@@ -79,8 +77,7 @@ if env.TargetOSIs('windows'):
 
     # warning C4141: 'inline': used more than once
     # warning C4305: 'argument': truncation from 'ssize_t' to 'double'
-    # warning C4003: not enough arguments for function-like macro invocation
-    env.Append(CXXFLAGS=["/wd4141", "/wd4305", '/wd4003'])
+    env.Append(CXXFLAGS=["/wd4141", "/wd4305"])
 
 else:
     files += [
