@@ -300,6 +300,7 @@ std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBE
     double emptyArrayCount = 0;
     double trueCount = 0;
     double falseCount = 0;
+    double nanCount = 0;
 
     // Tracks whether we should use the scalar constructor.
     bool isScalar = true;
@@ -339,6 +340,16 @@ std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBE
                     // the array type counters; we cannot add this value to the histogram.
                     continue;
                 }
+                double doubleVal = valueToDouble(elemTag, elemVal);
+                if (std::isnan(doubleVal)) {
+                    if (!sbe::value::isNumber(elemTag)) {
+                        uasserted(7280701,
+                                  str::stream() << "Non numeric tag type"
+                                                << " is interpreted as NaN");
+                    }
+                    // Do not add NaNs to array elements.
+                    continue;
+                }
 
                 const auto [tagCopy, valCopy] = value::copyValue(elemTag, elemVal);
                 arrayElements.emplace_back(tagCopy, valCopy);
@@ -363,12 +374,19 @@ std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBE
                 falseCount++;
             }
             continue;
-
         } else if (!canEstimateTypeViaHistogram(tag)) {
             // If we have a non-histogrammable type, we can only increment the type counters for it;
             // we cannot build a scalar histogram on it.
             continue;
 
+        } else if (double dVal = valueToDouble(tag, val); std::isnan(dVal)) {
+            if (!sbe::value::isNumber(tag)) {
+                uasserted(7280702,
+                          str::stream()
+                              << "Non numeric tag type " << tag << " is interpreted as NaN");
+            }
+            // We count NaNs separately, check for NaN here.
+            nanCount++;
         } else {
             // Assume non-arrays are scalars. Emit values for the scalar histogram.
             scalarData.push_back(v);
@@ -387,7 +405,8 @@ std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBE
                                     std::move(typeCounts),
                                     arrayData.size(),
                                     trueCount,
-                                    falseCount);
+                                    falseCount,
+                                    nanCount);
     }
 
     return ArrayHistogram::make(makeHistogram(scalarData),
@@ -399,7 +418,8 @@ std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBE
                                 arrayData.size(),
                                 emptyArrayCount,
                                 trueCount,
-                                falseCount);
+                                falseCount,
+                                nanCount);
 }
 
 }  // namespace mongo::stats

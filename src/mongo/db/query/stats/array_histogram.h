@@ -65,6 +65,7 @@ public:
                                                       double sampleSize,
                                                       double trueCount = 0.0,
                                                       double falseCount = 0.0,
+                                                      double nanCount = 0.0,
                                                       bool validate = true);
 
     /**
@@ -81,6 +82,7 @@ public:
                                                       double emptyArrayCount = 0.0,
                                                       double trueCount = 0.0,
                                                       double falseCount = 0.0,
+                                                      double nanCount = 0.0,
                                                       bool validate = true);
 
     // ArrayHistogram is neither copy-constructible nor copy-assignable.
@@ -125,6 +127,11 @@ public:
         return _falseCount;
     }
 
+    // Get the count of NaNs.
+    double getNanCount() const {
+        return _nanCount;
+    }
+
     // Returns the count of a type as known by the respective type counter. If the type is not
     // present in the TypeCounts map, returns 0.
     double getTypeCount(sbe::value::TypeTags tag) const;
@@ -149,7 +156,8 @@ private:
                    TypeCounts typeCounts,
                    double sampleSize,
                    double trueCount = 0.0,
-                   double falseCount = 0.0);
+                   double falseCount = 0.0,
+                   double nanCount = 0.0);
 
     // Constructor for array field histograms. We have to initialize all array fields in this case.
     ArrayHistogram(ScalarHistogram scalar,
@@ -161,7 +169,8 @@ private:
                    double sampleSize,
                    double emptyArrayCount = 0.0,
                    double trueCount = 0.0,
-                   double falseCount = 0.0);
+                   double falseCount = 0.0,
+                   double nanCount = 0.0);
 
     /* Fields for all paths. */
 
@@ -174,6 +183,8 @@ private:
     // The counts of true & false booleans.
     double _trueCount;
     double _falseCount;
+    // The count of NaNs.
+    double _nanCount;
     // The exact number of documents in the sample used to build the histogram.
     double _sampleSize;
 

@@ -86,6 +86,8 @@ structs:
                 type: double
             falseCount:
                 type: double
+            nanCount:
+                type: double
             emptyArrayCount:
                 type: double
             typeCount:

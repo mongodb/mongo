@@ -22,6 +22,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -844,6 +845,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -1666,6 +1668,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -2488,6 +2491,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -3314,6 +3318,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -4140,6 +4145,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -4966,6 +4972,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -5788,6 +5795,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -6074,6 +6082,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -6360,6 +6369,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -7182,6 +7192,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -8011,6 +8022,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -8729,6 +8741,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -9431,6 +9444,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -10013,6 +10027,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -10763,6 +10778,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -11489,6 +11505,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -12223,6 +12240,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -12957,6 +12975,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -13219,6 +13238,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -13497,6 +13517,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{
@@ -14223,6 +14244,7 @@ Indexing collection: ce_data_1000
 			"sampleRate" : 1,
 			"trueCount" : 0,
 			"falseCount" : 0,
+			"nanCount" : 0,
 			"emptyArrayCount" : 0,
 			"typeCount" : [
 				{

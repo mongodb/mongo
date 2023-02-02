@@ -150,7 +150,9 @@ private:
  */
 void validateHistogramTypeCounts(const TypeCounts& tc,
                                  const ScalarHistogram& s,
-                                 std::function<bool(double /*tc*/, double /*s*/)> isValid) {
+                                 std::function<bool(double /*tc*/, double /*s*/)> isValid,
+                                 double nanCount = 0.0) {
+
     // Ensure that all histogrammable type brackets are accounted for in the histogram.
     TypeBracketFrequencyIterator it{s};
     sbe::value::TypeTags tag;
@@ -158,6 +160,14 @@ void validateHistogramTypeCounts(const TypeCounts& tc,
     while (it.hasNext()) {
         std::tie(tag, freq) = it.getNext();
         const double tcFreq = getTypeBracketTypeCount(tc, tag);
+
+        if (sbe::value::isNumber(tag)) {
+            // We may see a type-bracket tag that is any numeric type (all numerics fall in the
+            // same type bracket)  but because we put nans in a separate counter and not in
+            // histogram buckets, we should add them to the histogram frequency.
+            freq += nanCount;
+        }
+
         if (!isValid(tcFreq, freq)) {
             uasserted(7105700,
                       str::stream() << "Type count frequency " << tcFreq << " of type bracket for "
@@ -166,7 +176,9 @@ void validateHistogramTypeCounts(const TypeCounts& tc,
     }
 
     // Ensure that all histogrammable type counts are accounted for in the type counters.
-    const double totalTC = getTotalCount(tc, true /* histogrammable*/);
+    // While typeCount include types for nans but nans are in a separate counts the typeCounts needs
+    // to subtract nan counts.
+    const double totalTC = getTotalCount(tc, true /* histogrammable*/) - nanCount;
     const double totalCard = s.getCardinality();
     if (!isValid(totalTC, totalCard)) {
         uasserted(7105701,
@@ -235,7 +247,8 @@ void validate(const ScalarHistogram& scalar,
               boost::optional<ArrayFields> arrayFields,
               double sampleSize,
               double trueCount,
-              double falseCount) {
+              double falseCount,
+              double nanCount) {
     const double numArrays = getTagTypeCount(typeCounts, sbe::value::TypeTags::Array);
     if (arrayFields) {
         if (numArrays <= 0.0) {
@@ -259,11 +272,14 @@ void validate(const ScalarHistogram& scalar,
         validateHistogramTypeCounts(arrayFields->typeCounts,
                                     arrayFields->arrayMin,
                                     // Type counts are an upper bound on ArrayMin.
-                                    std::greater_equal<double>());
+                                    std::greater_equal<double>(),
+                                    0.0);
+
         validateHistogramTypeCounts(arrayFields->typeCounts,
                                     arrayFields->arrayMax,
                                     // Type counts are an upper bound on ArrayMax.
-                                    std::greater_equal<double>());
+                                    std::greater_equal<double>(),
+                                    0.0);
 
         // Conversely, unique histograms are an upper bound on type counts, since they may count
         // multiple values per type bracket. Furthermore, the min/max histograms are a "lower bound"
@@ -271,7 +287,9 @@ void validate(const ScalarHistogram& scalar,
         validateHistogramTypeCounts(arrayFields->typeCounts,
                                     arrayFields->arrayUnique,
                                     // Type counts are a lower bound on ArrayUnique.
-                                    std::less_equal<double>());
+                                    std::less_equal<double>(),
+                                    0.0);
+
         validateHistogramFrequencies(arrayFields->arrayMin,
                                      arrayFields->arrayUnique,
                                      // ArrayMin is a lower bound on ArrayUnique.
@@ -298,7 +316,8 @@ void validate(const ScalarHistogram& scalar,
     validateHistogramTypeCounts(typeCounts,
                                 scalar,
                                 // Type-bracket type counts should equal scalar type-bracket counts.
-                                std::equal_to<double>());
+                                std::equal_to<double>(),
+                                nanCount);
 
     // Validate total count.
     const auto totalCard = getTotalCount(typeCounts);
@@ -306,6 +325,18 @@ void validate(const ScalarHistogram& scalar,
         uasserted(7261500,
                   str::stream() << "Expected sum of type counts " << totalCard
                                 << " to equal sample size " << sampleSize);
+    }
+
+    // Validate NaN count. It is invalid to have more NaNs than numeric types that can contain
+    // doubles in the type counters.
+    auto nanAbleTypeCount = getTagTypeCount(typeCounts, sbe::value::TypeTags::NumberDouble) +
+        getTagTypeCount(typeCounts, sbe::value::TypeTags::NumberDecimal);
+
+    if (nanCount > nanAbleTypeCount) {
+        uasserted(7289700,
+                  str::stream() << "Expected sum of numeric type counts " << nanAbleTypeCount
+                                << " to be no less than"
+                                << " NaN counts " << nanCount);
     }
 }
 
@@ -333,12 +364,14 @@ ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
                                double sampleSize,
                                double emptyArrayCount,
                                double trueCount,
-                               double falseCount)
+                               double falseCount,
+                               double nanCount)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
       _emptyArrayCount(emptyArrayCount),
       _trueCount(trueCount),
       _falseCount(falseCount),
+      _nanCount(nanCount),
       _sampleSize(sampleSize),
       _arrayUnique(std::move(arrayUnique)),
       _arrayMin(std::move(arrayMin)),
@@ -349,12 +382,14 @@ ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
                                TypeCounts typeCounts,
                                double sampleSize,
                                double trueCount,
-                               double falseCount)
+                               double falseCount,
+                               double nanCount)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
       _emptyArrayCount(0.0),
       _trueCount(trueCount),
       _falseCount(falseCount),
+      _nanCount(nanCount),
       _sampleSize(sampleSize),
       _arrayUnique(boost::none),
       _arrayMin(boost::none),
@@ -371,12 +406,13 @@ std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(ScalarHistogram scala
                                                            double sampleSize,
                                                            double trueCount,
                                                            double falseCount,
+                                                           double nanCount,
                                                            bool doValidation) {
     if (doValidation) {
-        validate(scalar, typeCounts, boost::none, sampleSize, trueCount, falseCount);
+        validate(scalar, typeCounts, boost::none, sampleSize, trueCount, falseCount, nanCount);
     }
     return std::shared_ptr<const ArrayHistogram>(new ArrayHistogram(
-        std::move(scalar), std::move(typeCounts), sampleSize, trueCount, falseCount));
+        std::move(scalar), std::move(typeCounts), sampleSize, trueCount, falseCount, nanCount));
 }
 
 std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(ScalarHistogram scalar,
@@ -389,6 +425,7 @@ std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(ScalarHistogram scala
                                                            double emptyArrayCount,
                                                            double trueCount,
                                                            double falseCount,
+                                                           double nanCount,
                                                            bool doValidation) {
     if (doValidation) {
         validate(scalar,
@@ -396,7 +433,8 @@ std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(ScalarHistogram scala
                  ArrayFields{arrayUnique, arrayMin, arrayMax, arrayTypeCounts, emptyArrayCount},
                  sampleSize,
                  trueCount,
-                 falseCount);
+                 falseCount,
+                 nanCount);
     }
     return std::shared_ptr<const ArrayHistogram>(new ArrayHistogram(std::move(scalar),
                                                                     std::move(typeCounts),
@@ -407,7 +445,8 @@ std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(ScalarHistogram scala
                                                                     sampleSize,
                                                                     emptyArrayCount,
                                                                     trueCount,
-                                                                    falseCount));
+                                                                    falseCount,
+                                                                    nanCount));
 }
 
 std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(Statistics stats) {
@@ -417,6 +456,7 @@ std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(Statistics stats) {
     const auto typeCounts = mapStatsTypeCountToTypeCounts(stats.getTypeCount());
     const double trueCount = stats.getTrueCount();
     const double falseCount = stats.getFalseCount();
+    const double nanCount = stats.getNanCount();
     const double sampleSize = stats.getDocuments();
 
     // If we have ArrayStatistics, we will need to initialize the array-only fields.
@@ -431,13 +471,14 @@ std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(Statistics stats) {
                                sampleSize,
                                stats.getEmptyArrayCount(),
                                trueCount,
-                               falseCount));
+                               falseCount,
+                               nanCount));
     }
 
     // If we don't have ArrayStatistics available, we should construct a histogram with only scalar
     // fields.
     return std::shared_ptr<const ArrayHistogram>(new ArrayHistogram(
-        std::move(scalar), std::move(typeCounts), sampleSize, trueCount, falseCount));
+        std::move(scalar), std::move(typeCounts), sampleSize, trueCount, falseCount, nanCount));
 }
 
 bool ArrayHistogram::isArray() const {
@@ -533,6 +574,8 @@ BSONObj ArrayHistogram::serialize() const {
     // Serialize boolean type counters.
     histogramBuilder.append("trueCount", getTrueCount());
     histogramBuilder.append("falseCount", getFalseCount());
+    // Serialize NaN type counter.
+    histogramBuilder.append("nanCount", getNanCount());
 
     // Serialize empty array counts.
     histogramBuilder.appendNumber("emptyArrayCount", getEmptyArrayCount());

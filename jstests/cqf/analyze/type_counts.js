@@ -35,6 +35,8 @@ runHistogramsTest(function testTypeCounts() {
         {_id: 13, a: []},
         {_id: 14, a: []},
         {_id: 15, a: [1, 2, 3]},
+        /* NaN */
+        {_id: 16, a: NaN},
     ]));
 
     createAndValidateHistogram({
@@ -46,6 +48,7 @@ runHistogramsTest(function testTypeCounts() {
                     {typeName: "Boolean", count: 3},
                     {typeName: "Null", count: 3},
                     {typeName: "Nothing", count: 2},
+                    {typeName: "NumberDouble", count: 1},
                     {typeName: "Object", count: 3},
                     {typeName: "Array", count: 5},
                 ],
@@ -103,8 +106,9 @@ runHistogramsTest(function testTypeCounts() {
                 emptyArrayCount: 4,
                 trueCount: 1,
                 falseCount: 2,
+                nanCount: 1,
                 sampleRate: 1.0,
-                documents: 16,
+                documents: 17,
             }
         }
     });
@@ -346,6 +350,7 @@ runHistogramsTest(function testTypeCounts() {
                 emptyArrayCount: 1,
                 trueCount: 2,
                 falseCount: 1,
+                nanCount: 0,
                 sampleRate: 1.0,
                 documents: 19,
             }
@@ -563,6 +568,7 @@ runHistogramsTest(function testTypeCounts() {
                 emptyArrayCount: 1,
                 trueCount: 1,
                 falseCount: 1,
+                nanCount: 0,
                 sampleRate: 1.0,
                 documents: 28,
             }
@@ -832,6 +838,7 @@ runHistogramsTest(function testTypeCounts() {
         emptyArrayCount: 0,
         trueCount: 0,
         falseCount: 0,
+        nanCount: 0,
         sampleRate: 1.0,
         documents: 28,
     };
