@@ -36,12 +36,25 @@
 namespace mongo {
 namespace metadata_consistency_util {
 
+
+/**
+ * Creates a cursor with given inconsistencies.
+ *
+ * The cursor is returned as a CheckMetadataConsistencyResponseCursor object.
+ */
+CheckMetadataConsistencyResponseCursor _makeCursor(
+    OperationContext* opCtx,
+    const std::vector<MetadataInconsistencyItem>& inconsistencies,
+    const NamespaceString& nss,
+    const BSONObj& cmdObj,
+    const boost::optional<SimpleCursorOptions>& cursorOpts = boost::none);
+
 /**
  * Returns a list of inconsistencies between the collections' metadata on the shard and the
  * collections' metadata in the config server.
  *
- * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If there
- * is no inconsistency, it is returned an empty vector.
+ * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
+ * there is no inconsistency, it is returned an empty vector.
  */
 std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
     OperationContext* opCtx,

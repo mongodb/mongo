@@ -58,15 +58,6 @@ structs:
                 type: object_owned
                 description: "Info about the inconsistency."
 
-    MetadataInconsistencies:
-        description: "Object representing a list of metadata inconsistencies"
-        is_command_reply: true
-        strict: false
-        fields:
-            inconsistencies:
-                type: array<MetadataInconsistencyItem>
-                description: "Array of inconsistencies found."
-
     CheckMetadataConsistencyResponseCursor:
         description: "Cursor object of the checkMetadataConsistency command"
         strict: false

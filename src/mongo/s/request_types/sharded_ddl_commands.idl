@@ -543,9 +543,12 @@ commands:
         namespace: concatenate_with_db
         allow_global_collection_name: true
         api_version: ""
-        reply_type: MetadataInconsistencies
+        reply_type: CheckMetadataConsistencyResponse
         strict: false
         fields:
+            cursor:
+                type: SimpleCursorOptions
+                optional: true
             primaryShardId:
                 description: "The shard id of the db primary shard"
                 type: shard_id

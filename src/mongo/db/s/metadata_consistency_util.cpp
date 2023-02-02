@@ -29,8 +29,14 @@
 
 
 #include "mongo/db/s/metadata_consistency_util.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/cursor_manager.h"
+#include "mongo/db/exec/queued_data_stage.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
+#include "mongo/db/query/find_common.h"
+#include "mongo/db/query/plan_executor_factory.h"
 
 
 namespace mongo {
@@ -69,6 +75,95 @@ void _appendUUIDMismatchInconsistency(const ShardId& shardId,
     inconsistencies.emplace_back(std::move(val));
 }
 }  // namespace
+
+CheckMetadataConsistencyResponseCursor _makeCursor(
+    OperationContext* opCtx,
+    const std::vector<MetadataInconsistencyItem>& inconsistencies,
+    const NamespaceString& nss,
+    const BSONObj& cmdObj,
+    const boost::optional<SimpleCursorOptions>& cursorOpts) {
+    const auto batchSize = [&] {
+        if (cursorOpts && cursorOpts->getBatchSize()) {
+            return (long long)*cursorOpts->getBatchSize();
+        } else {
+            return std::numeric_limits<long long>::max();
+        }
+    }();
+
+    auto expCtx =
+        make_intrusive<ExpressionContext>(opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
+    auto ws = std::make_unique<WorkingSet>();
+    auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
+
+    for (auto&& inconsistency : inconsistencies) {
+        WorkingSetID id = ws->allocate();
+        WorkingSetMember* member = ws->get(id);
+        member->keyData.clear();
+        member->recordId = RecordId();
+        member->resetDocument(SnapshotId(), inconsistency.toBSON().getOwned());
+        member->transitionToOwnedObj();
+        root->pushBack(id);
+    }
+
+    auto exec =
+        uassertStatusOK(plan_executor_factory::make(expCtx,
+                                                    std::move(ws),
+                                                    std::move(root),
+                                                    &CollectionPtr::null,
+                                                    PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                    false, /* whether returned BSON must be owned */
+                                                    nss));
+
+    std::vector<MetadataInconsistencyItem> firstBatch;
+    size_t bytesBuffered = 0;
+    for (long long objCount = 0; objCount < batchSize; objCount++) {
+        BSONObj nextDoc;
+        PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
+        if (state == PlanExecutor::IS_EOF) {
+            break;
+        }
+        invariant(state == PlanExecutor::ADVANCED);
+
+        // If we can't fit this result inside the current batch, then we stash it for
+        // later.
+        if (!FindCommon::haveSpaceForNext(nextDoc, objCount, bytesBuffered)) {
+            exec->stashResult(nextDoc);
+            break;
+        }
+
+        const auto objsize = nextDoc.objsize();
+        firstBatch.push_back(MetadataInconsistencyItem::parseOwned(
+            IDLParserContext("MetadataInconsistencyItem"), std::move(nextDoc)));
+        bytesBuffered += objsize;
+    }
+
+    if (exec->isEOF()) {
+        return CheckMetadataConsistencyResponseCursor(0 /* cursorId */, nss, std::move(firstBatch));
+    }
+
+    exec->saveState();
+    exec->detachFromOperationContext();
+
+    // TODO: SERVER-72667: Add privileges for getMore()
+    // Global cursor registration must be done without holding any locks.
+    auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
+        opCtx,
+        {std::move(exec),
+         nss,
+         AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
+         APIParameters::get(opCtx),
+         opCtx->getWriteConcern(),
+         repl::ReadConcernArgs::get(opCtx),
+         ReadPreferenceSetting::get(opCtx),
+         cmdObj,
+         {}});
+
+    pinnedCursor->incNBatches();
+    pinnedCursor->incNReturnedSoFar(firstBatch.size());
+
+    return CheckMetadataConsistencyResponseCursor(
+        pinnedCursor.getCursor()->cursorid(), nss, std::move(firstBatch));
+}
 
 std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
     OperationContext* opCtx,

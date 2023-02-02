@@ -46,7 +46,7 @@ class ShardsvrCheckMetadataConsistencyParticipantCommand final
     : public TypedCommand<ShardsvrCheckMetadataConsistencyParticipantCommand> {
 public:
     using Request = ShardsvrCheckMetadataConsistencyParticipant;
-    using Response = MetadataInconsistencies;
+    using Response = CheckMetadataConsistencyResponse;
 
     bool adminOnly() const override {
         return false;
@@ -96,12 +96,12 @@ public:
             }
 
             // Check consistency between local metadata and configsvr metadata
-            Response response;
             auto inconsistencies =
                 metadata_consistency_util::checkCollectionMetadataInconsistencies(
                     opCtx, shardId, primaryShardId, catalogClientCollections, localCollection);
-            response.setInconsistencies(std::move(inconsistencies));
-            return response;
+
+            return metadata_consistency_util::_makeCursor(
+                opCtx, std::move(inconsistencies), nss, request().toBSON({}));
         }
 
     private:
