@@ -173,17 +173,13 @@ var ShardingTest = function(params) {
                           'Please select a different function name.');
 
             self[fn] = function() {
-                if (typeof db == "undefined") {
-                    db = undefined;
-                }
-
-                var oldDb = db;
-                db = self.getDB('test');
+                const oldDb = globalThis.db;
+                globalThis.db = self.getDB('test');
 
                 try {
                     return sh[fn].apply(sh, arguments);
                 } finally {
-                    db = oldDb;
+                    globalThis.db = oldDb;
                 }
             };
         });
@@ -1421,7 +1417,7 @@ var ShardingTest = function(params) {
         var protocolVersion = rsDefaults.protocolVersion;
         delete rsDefaults.protocolVersion;
 
-        var rs = new ReplSetTest({
+        const rs = new ReplSetTest({
             name: setName,
             nodes: numReplicas,
             host: hostName,

@@ -1913,7 +1913,7 @@ var ReplSetTest = function(opts) {
                     if (friendlyEqual(rcmOpTime, {ts: Timestamp(0, 0), t: NumberLong(0)})) {
                         return false;
                     }
-                    if (rs.compareOpTimes(rcmOpTime, primaryOpTime) < 0) {
+                    if (globalThis.rs.compareOpTimes(rcmOpTime, primaryOpTime) < 0) {
                         return false;
                     }
                 }
@@ -2170,7 +2170,7 @@ var ReplSetTest = function(opts) {
 
             // If the node doesn't have a valid opTime, it likely hasn't received any writes from
             // the primary yet.
-            if (!rs.isValidOpTime(secondaryOpTime)) {
+            if (!globalThis.rs.isValidOpTime(secondaryOpTime)) {
                 print("ReplSetTest awaitReplication: optime for secondary #" + secondaryCount +
                       ", " + secondaryName + ", is " + tojson(secondaryOpTime) +
                       ", which is NOT valid.");
@@ -2179,11 +2179,12 @@ var ReplSetTest = function(opts) {
 
             // See if the node made progress. We count it as progress even if the node's last optime
             // went backwards because that means the node is in rollback.
-            let madeProgress = (nodeProgress[index] &&
-                                (rs.compareOpTimes(nodeProgress[index], secondaryOpTime) != 0));
+            let madeProgress =
+                (nodeProgress[index] &&
+                 (globalThis.rs.compareOpTimes(nodeProgress[index], secondaryOpTime) != 0));
             nodeProgress[index] = secondaryOpTime;
 
-            if (rs.compareOpTimes(primaryLatestOpTime, secondaryOpTime) < 0) {
+            if (globalThis.rs.compareOpTimes(primaryLatestOpTime, secondaryOpTime) < 0) {
                 primaryLatestOpTime = _getLastOpTime(primary);
                 print("ReplSetTest awaitReplication: optime for " + secondaryName +
                       " is newer, resetting latest primary optime to " +

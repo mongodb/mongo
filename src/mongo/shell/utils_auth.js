@@ -33,7 +33,7 @@ authutil.assertAuthenticate = function(conns, dbName, authParams) {
         for (i = 0; i < conns.length; ++i) {
             conn = conns[i];
             // Bypass the implicit auth call in getDB();
-            var db = new DB(conn, dbName);
+            const db = new DB(conn, dbName);
             try {
                 retryOnNetworkError(db._authOrThrow.bind(db, authParams));
             } catch (ex3) {
@@ -63,7 +63,7 @@ authutil.assertAuthenticateFails = function(conns, dbName, authParams) {
     for (i = 0; i < conns.length; ++i) {
         conn = conns[i];
         // Bypass the implicit auth call in getDB();
-        var db = new DB(conn, dbName);
+        const db = new DB(conn, dbName);
         const ex = assert.throws(retryOnNetworkError,
                                  [db._authOrThrow.bind(db, authParams)],
                                  "Unexpectedly authenticated " + conn + " to " + dbName +

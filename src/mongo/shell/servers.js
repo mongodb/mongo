@@ -1774,7 +1774,7 @@ startMongoProgramNoConnect = function() {
 };
 
 myPort = function() {
-    const hosts = db.getMongo().host.split(',');
+    const hosts = globalThis.db.getMongo().host.split(',');
 
     const ip6Numeric = hosts[0].match(/^\[[0-9A-Fa-f:]+\]:(\d+)$/);
     if (ip6Numeric) {
