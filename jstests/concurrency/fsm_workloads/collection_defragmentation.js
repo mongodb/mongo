@@ -265,6 +265,11 @@ var $config = (function() {
                 });
             }
         }
+
+        cluster.executeOnConfigNodes((db) => {
+            assert.commandWorked(
+                db.adminCommand({configureFailPoint: 'overrideBalanceRoundInterval', mode: 'off'}));
+        });
     }
 
     return {
