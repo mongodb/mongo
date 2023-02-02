@@ -97,3 +97,8 @@ feature_flags:
       description: "Feature flag to enable compound wildcard indexes."
       cpp_varname: gFeatureFlagCompoundWildcardIndexes
       default: false
+
+    featureFlagShardedSearchCustomSort:
+      description: "Feature flag to enable user specified sort for sharded $search queries."
+      cpp_varname: gFeatureFlagShardedSearchCustomSort
+      default: false
