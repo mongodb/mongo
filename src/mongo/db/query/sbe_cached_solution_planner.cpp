@@ -52,24 +52,45 @@ CandidatePlans CachedSolutionPlanner::plan(
     std::vector<std::unique_ptr<QuerySolution>> solutions,
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) {
     if (!_cq.pipeline().empty()) {
-        // We'd like to check if there is any foreign collection in the hash_lookup stage that is no
-        // longer eligible for using a hash_lookup plan. In this case we invalidate the cache and
-        // immediately replan without ever running a trial period.
+        // When "featureFlagSbeFull" is enabled we use the SBE plan cache. If the plan cache is
+        // enabled we'd like to check if there is any foreign collection in the hash_lookup stage
+        // that is no longer eligible for it. In this case we invalidate the cache and immediately
+        // replan without ever running a trial period.
         auto secondaryCollectionsInfo =
             fillOutSecondaryCollectionsInformation(_opCtx, _collections, &_cq);
 
-        for (const auto& foreignCollection : roots[0].second.foreignHashJoinCollections) {
-            const auto collectionInfo = secondaryCollectionsInfo.find(foreignCollection);
-            tassert(6693500,
-                    "Foreign collection must be present in the collections info",
-                    collectionInfo != secondaryCollectionsInfo.end());
-            tassert(6693501, "Foreign collection must exist", collectionInfo->second.exists);
+        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
+            for (const auto& foreignCollection : roots[0].second.foreignHashJoinCollections) {
+                const auto collectionInfo = secondaryCollectionsInfo.find(foreignCollection);
+                tassert(6693500,
+                        "Foreign collection must be present in the collections info",
+                        collectionInfo != secondaryCollectionsInfo.end());
+                tassert(6693501, "Foreign collection must exist", collectionInfo->second.exists);
 
-            if (!QueryPlannerAnalysis::isEligibleForHashJoin(collectionInfo->second)) {
-                return replan(/* shouldCache */ true,
-                              str::stream() << "Foreign collection " << foreignCollection
-                                            << " is not eligible for hash join anymore");
+                if (!QueryPlannerAnalysis::isEligibleForHashJoin(collectionInfo->second)) {
+                    return replan(/* shouldCache */ true,
+                                  str::stream() << "Foreign collection " << foreignCollection
+                                                << " is not eligible for hash join anymore");
+                }
             }
+        } else {
+            // The SBE plan cache is not enabled. If the cached plan is accepted we'd like to keep
+            // the results from the trials even if there are parts of agg pipelines being lowered
+            // into SBE, so we run the trial with the extended plan. This works because
+            // TrialRunTracker, attached to HashAgg stage in $group queries, tracks as "results" the
+            // results of its child stage. For $lookup queries, the TrialRunTracker will only track
+            // the number of reads from the local side. Thus, we can use the number of reads the
+            // plan was cached with during multiplanning even though multiplanning ran trials of
+            // pre-extended plans.
+            //
+            // The SBE plan cache stores the entire plan, including the part for any agg pipeline
+            // pushed down to SBE. Therefore, this logic is only necessary when "featureFlagSbeFull"
+            // is disabled.
+            _yieldPolicy->clearRegisteredPlans();
+            solutions[0] = QueryPlanner::extendWithAggPipeline(
+                _cq, std::move(solutions[0]), secondaryCollectionsInfo);
+            roots[0] = stage_builder::buildSlotBasedExecutableTree(
+                _opCtx, _collections, _cq, *solutions[0], _yieldPolicy);
         }
     }
     // If the '_decisionReads' is not present then we do not run a trial period, keeping the current
@@ -206,9 +227,18 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     _yieldPolicy->clearRegisteredPlans();
 
     if (shouldCache) {
+        const auto& mainColl = _collections.getMainCollection();
         // Deactivate the current cache entry.
-        auto&& sbePlanCache = sbe::getPlanCache(_opCtx);
-        sbePlanCache.deactivate(plan_cache_key_factory::make(_cq, _collections));
+        //
+        // TODO SERVER-64882: We currently deactivate cache entries in both the classic and SBE plan
+        // caches. Once we always use the SBE plan cache for queries eligible for SBE, this code can
+        // be simplified to only deactivate the entry in the SBE plan cache.
+        auto cache = CollectionQueryInfo::get(mainColl).getPlanCache();
+        cache->deactivate(plan_cache_key_factory::make<mongo::PlanCacheKey>(_cq, mainColl));
+        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
+            auto&& sbePlanCache = sbe::getPlanCache(_opCtx);
+            sbePlanCache.deactivate(plan_cache_key_factory::make(_cq, _collections));
+        }
     }
 
     auto buildExecutableTree = [&](const QuerySolution& sol) {

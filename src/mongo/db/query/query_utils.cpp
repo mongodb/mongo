@@ -34,21 +34,6 @@
 
 namespace mongo {
 
-bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern) {
-    StringDataSet prefixSet;
-    for (const auto& part : sortPattern) {
-        // Ignore any $meta sorts that may be present.
-        if (!part.fieldPath) {
-            continue;
-        }
-        auto [_, inserted] = prefixSet.insert(part.fieldPath->getFieldName(0));
-        if (!inserted) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& query) {
     const auto& findCommand = query.getFindCommandRequest();
     return !findCommand.getShowRecordId() && findCommand.getHint().isEmpty() &&
@@ -81,11 +66,10 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
     const bool isQueryNotAgainstClusteredCollection =
         !(collection->get() && collection->get()->isClustered());
 
-    const auto* proj = cq->getProj();
+    const bool doesNotRequireMatchDetails =
+        !cq->getProj() || !cq->getProj()->requiresMatchDetails();
 
-    const bool doesNotRequireMatchDetails = !proj || !proj->requiresMatchDetails();
-
-    const bool doesNotHaveElemMatchProject = !proj || !proj->containsElemMatch();
+    const bool doesNotHaveElemMatchProject = !cq->getProj() || !cq->getProj()->containsElemMatch();
 
     const bool isNotInnerSideOfLookup = !(expCtx && expCtx->inLookup);
 

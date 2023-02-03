@@ -790,8 +790,8 @@ const keyPatterns = [
 ];
 
 // Include Columnstore Index only if FF is enabled and collection is not clustered.
-const columnstoreEnabled =
-    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"], true /* checkAllNodes */);
+const columnstoreEnabled = checkSBEEnabled(
+    db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true /* checkAllNodes */);
 if (columnstoreEnabled && setUpServerForColumnStoreIndexTest(db)) {
     keyPatterns.push({keyPattern: {"$**": "columnstore"}});
 }

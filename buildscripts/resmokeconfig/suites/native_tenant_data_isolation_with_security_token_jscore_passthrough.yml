@@ -15,6 +15,7 @@ selector:
   - uses_parallel_shell
   # columnstore indexes are under development and cannot be used without enabling the feature flag
   - featureFlagColumnstoreIndexes
+  - featureFlagSbeFull
   # Server side javascript not allowed in Serverless.
   - requires_scripting
   exclude_files:

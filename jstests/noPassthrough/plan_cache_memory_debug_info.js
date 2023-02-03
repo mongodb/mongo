@@ -83,8 +83,8 @@ assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB("test");
 const coll = db.plan_cache_memory_debug_info;
 
-if (checkSBEEnabled(db)) {
-    jsTest.log("Skipping test because SBE is enabled");
+if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    jsTest.log("Skipping test because SBE is fully enabled");
     MongoRunner.stopMongod(conn);
     return;
 }

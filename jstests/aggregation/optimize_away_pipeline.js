@@ -639,65 +639,32 @@ function assertProjectionIsNotRemoved(pipeline, projectionType = "PROJECTION_SIM
 assertProjectionCanBeRemovedBeforeGroup(
     [{$project: {a: 1, b: 1}}, {$group: {_id: "$a", s: {$sum: "$b"}}}]);
 
-// Test that an inclusion projection is NOT optimized away if it is NOT redundant. This one
-// fails to include a dependency of the $group and so will have an impact on the query results.
+assertProjectionCanBeRemovedBeforeGroup(
+    [{$project: {'a.b': 1, 'b.c': 1}}, {$group: {_id: "$a.b", s: {$sum: "$b.c"}}}],
+    "PROJECTION_DEFAULT");
+
+// Test that an inclusion projection is NOT optimized away if it is NOT redundant. This one fails to
+// include a dependency of the $group and so will have an impact on the query results.
 assertProjectionIsNotRemoved([{$project: {a: 1}}, {$group: {_id: "$a", s: {$sum: "$b"}}}]);
+// Test similar cases with dotted paths.
+assertProjectionIsNotRemoved([{$project: {'a.b': 1}}, {$group: {_id: "$a.b", s: {$sum: "$b"}}}],
+                             "PROJECTION_DEFAULT");
+assertProjectionIsNotRemoved([{$project: {'a.b': 1}}, {$group: {_id: "$a.b", s: {$sum: "$a.c"}}}],
+                             "PROJECTION_DEFAULT");
 
 // TODO SERVER-67323 This one could be removed, but is left for future work.
 assertProjectionIsNotRemoved(
     [{$project: {a: 1, b: 1}}, {$group: {_id: "$a.b", s: {$sum: "$b.c"}}}]);
 
-// If the $group depends on both "path" and "path.subpath" then it will generate a $project on only
-// "path" to express its dependency set. We then fail to optimize that out. As a future improvement,
-// we could improve the optimizer to ensure that a projection stage is not present in the resulting
-// plan.
+// Spinoff on the one above: Without supporting this kind of prefixing analysis, we can confuse
+// ourselves with our dependency analysis. If the $group depends on both "path" and "path.subpath"
+// then it will generate a $project on only "path" to express its dependency set. We then fail to
+// optimize that out.
 pipeline = [{$group: {_id: "$a.b", s: {$first: "$a"}}}];
 // TODO SERVER-XYZ Assert this can be optimized out.
 // assertProjectionCanBeRemovedBeforeGroup(pipeline, "PROJECTION_DEFAULT");
 // assertProjectionCanBeRemovedBeforeGroup(pipeline, "PROJECTION_SIMPLE");
 assertProjectionIsNotRemoved(pipeline);
-
-// Though $group is generally eligible for pushdown into SBE, such a pushdown may be inhibited by
-// dotted as well as computed projections. As such we only run the test cases below if SBE is fully
-// enabled.
-const sbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"], true /* checkAllNodes */);
-if (sbeFull) {
-    assertProjectionCanBeRemovedBeforeGroup(
-        [{$project: {'a.b': 1, 'b.c': 1}}, {$group: {_id: "$a.b", s: {$sum: "$b.c"}}}],
-        "PROJECTION_DEFAULT");
-
-    // Test that a computed projection at the front of the pipeline is pushed down, even if there's
-    // no finite dependency set.
-    pipeline = [{$project: {x: {$add: ["$a", 1]}}}];
-    assertPipelineDoesNotUseAggregation(
-        {pipeline: pipeline, expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT"]});
-
-    // The projections below are not removed because they fail to include the $group's dependencies.
-    assertProjectionIsNotRemoved([{$project: {'a.b': 1}}, {$group: {_id: "$a.b", s: {$sum: "$b"}}}],
-                                 "PROJECTION_DEFAULT");
-    assertProjectionIsNotRemoved(
-        [{$project: {'a.b': 1}}, {$group: {_id: "$a.b", s: {$sum: "$a.c"}}}], "PROJECTION_DEFAULT");
-
-    pipeline = [{$project: {a: {$add: ["$a", 1]}}}, {$group: {_id: "$a", s: {$sum: "$b"}}}];
-    assertPipelineIfGroupPushdown(
-        // Test that a computed projection at the front of the pipeline is pushed down when there's
-        // a finite dependency set. Additionally, the group pushdown shouldn't erase the computed
-        // projection.
-        function() {
-            explain = coll.explain().aggregate(pipeline);
-            assertPipelineDoesNotUseAggregation(
-                {pipeline: pipeline, expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT", "GROUP"]});
-        },
-        // Test that a computed projection at the front of the pipeline is pushed down when there's
-        // a finite dependency set.
-        function() {
-            explain = coll.explain().aggregate(pipeline);
-            assertPipelineUsesAggregation({
-                pipeline: pipeline,
-                expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT", "$group"],
-            });
-        });
-}
 
 // We generate a projection stage from dependency analysis, even if the pipeline begins with an
 // exclusion projection.
@@ -728,6 +695,32 @@ assertTransformByShape({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
 pipeline = [{$project: {x: 0}}];
 assertPipelineDoesNotUseAggregation(
     {pipeline: pipeline, expectedStages: ["PROJECTION_SIMPLE", "COLLSCAN"]});
+
+// Test that a computed projection at the front of the pipeline is pushed down, even if there's no
+// finite dependency set.
+pipeline = [{$project: {x: {$add: ["$a", 1]}}}];
+assertPipelineDoesNotUseAggregation(
+    {pipeline: pipeline, expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT"]});
+
+pipeline = [{$project: {a: {$add: ["$a", 1]}}}, {$group: {_id: "$a", s: {$sum: "$b"}}}];
+assertPipelineIfGroupPushdown(
+    // Test that a computed projection at the front of the pipeline is pushed down when there's a
+    // finite dependency set. Additionally, the group pushdown shouldn't erase the computed
+    // projection.
+    function() {
+        explain = coll.explain().aggregate(pipeline);
+        assertPipelineDoesNotUseAggregation(
+            {pipeline: pipeline, expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT", "GROUP"]});
+    },
+    // Test that a computed projection at the front of the pipeline is pushed down when there's a
+    // finite dependency set.
+    function() {
+        explain = coll.explain().aggregate(pipeline);
+        assertPipelineUsesAggregation({
+            pipeline: pipeline,
+            expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT", "$group"],
+        });
+    });
 
 // getMore cases.
 

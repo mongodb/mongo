@@ -23,8 +23,8 @@ const conn = MongoRunner.runMongod();
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB("sbe_plan_cache_size_metric");
 
-if (!checkSBEEnabled(db)) {
-    jsTest.log("Skipping test because SBE is not enabled");
+if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    jsTest.log("Skipping test because SBE is not fully enabled");
     MongoRunner.stopMongod(conn);
     return;
 }

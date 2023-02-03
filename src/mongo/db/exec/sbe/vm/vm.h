@@ -349,6 +349,8 @@ struct Instruction {
 
         fail,
 
+        applyClassicMatcher,  // Instruction which calls into the classic engine MatchExpression.
+
         dateTruncImm,
 
         lastInstruction  // this is just a marker used to calculate number of instructions
@@ -575,6 +577,8 @@ struct Instruction {
                 return "allocStack";
             case fail:
                 return "fail";
+            case applyClassicMatcher:
+                return "applyClassicMatcher";
             case dateTruncImm:
                 return "dateTruncImm";
             default:
@@ -886,6 +890,7 @@ public:
     void appendAllocStack(uint32_t size);
     void appendFail();
     void appendNumericConvert(value::TypeTags targetTag);
+    void appendApplyClassicMatcher(const MatchExpression*);
 
     // For printing from an interactive debugger.
     std::string toString() const;
@@ -994,6 +999,7 @@ private:
     void runLambdaInternal(const CodeFragment* code, int64_t position);
 
     MONGO_COMPILER_NORETURN void runFailInstruction();
+    void runClassicMatcher(const MatchExpression* matcher);
 
     template <typename T>
     void runTagCheck(const uint8_t*& pcPointer, T&& predicate);

@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/analyze_regex.h"
 #include "mongo/db/query/projection.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/logv2/log.h"
@@ -1088,6 +1089,9 @@ void encodeKeyForAutoParameterizedMatchSBE(MatchExpression* matchExpr, BufBuilde
 }  // namespace
 
 std::string encodeSBE(const CanonicalQuery& cq) {
+    tassert(6512900,
+            "using the SBE plan cache key encoding requires SBE to be fully enabled",
+            feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV());
     tassert(6142104,
             "attempting to encode SBE plan cache key for SBE-incompatible query",
             cq.isSbeCompatible());

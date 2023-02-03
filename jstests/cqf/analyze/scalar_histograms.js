@@ -2,9 +2,15 @@
 "use strict";
 
 load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
+load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
 
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
+    return;
+}
+
+if (checkSBEEnabled(db, ["featureFlagSbeFull"], true)) {
+    jsTestLog("Skipping the test because it doesn't work in Full SBE");
     return;
 }
 

@@ -21,7 +21,7 @@ assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(o
 
 const testDb = conn.getDB("test");
 const collection = testDb.external_sort_find;
-const isSBEEnabled = checkSBEEnabled(testDb);
+const isSBEEnabled = checkSBEEnabled(testDb, ["featureFlagSbeFull"]);
 
 // Construct a document that is just over 1 kB.
 const charToRepeat = "-";

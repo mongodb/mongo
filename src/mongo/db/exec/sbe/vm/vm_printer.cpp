@@ -49,12 +49,20 @@ struct CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Debug> {
         return SlotAccessorFmt{accessor};
     }
 
+    auto matchExpression(const MatchExpression* matcher) {
+        return MatchExpressionFmt{matcher};
+    }
+
     struct PcPointerFmt {
         const uint8_t* pcPointer;
     };
 
     struct SlotAccessorFmt {
         value::SlotAccessor* accessor;
+    };
+
+    struct MatchExpressionFmt {
+        const MatchExpression* matcher;
     };
 };
 
@@ -72,6 +80,13 @@ std::basic_ostream<charT, traits>& operator<<(
     return os << static_cast<const void*>(a.accessor);
 }
 
+template <typename charT, typename traits>
+std::basic_ostream<charT, traits>& operator<<(
+    std::basic_ostream<charT, traits>& os,
+    const CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Debug>::MatchExpressionFmt& a) {
+    return os << static_cast<const void*>(a.matcher);
+}
+
 template <>
 struct CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Stable> {
     CodeFragmentFormatter(const CodeFragment& code) : code(code) {}
@@ -84,6 +99,10 @@ struct CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Stable> {
         return SlotAccessorFmt{accessor};
     }
 
+    auto matchExpression(const MatchExpression* matcher) {
+        return MatchExpressionFmt{matcher};
+    }
+
     struct PcPointerFmt {
         const uint8_t* pcPointer;
         const uint8_t* pcBegin;
@@ -91,6 +110,10 @@ struct CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Stable> {
 
     struct SlotAccessorFmt {
         value::SlotAccessor* accessor;
+    };
+
+    struct MatchExpressionFmt {
+        const MatchExpression* matcher;
     };
 
     const CodeFragment& code;
@@ -112,6 +135,13 @@ std::basic_ostream<charT, traits>& operator<<(
     std::basic_ostream<charT, traits>& os,
     const CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Stable>::SlotAccessorFmt& a) {
     return os << "<accessor>";
+}
+
+template <typename charT, typename traits>
+std::basic_ostream<charT, traits>& operator<<(
+    std::basic_ostream<charT, traits>& os,
+    const CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Stable>::MatchExpressionFmt& a) {
+    return os << "<matchExpression>";
 }
 
 template <typename Formatter>
@@ -296,6 +326,12 @@ public:
                     auto accessor = readFromMemory<value::SlotAccessor*>(pcPointer);
                     pcPointer += sizeof(accessor);
                     os << "accessor: " << _formatter.slotAccessor(accessor);
+                    break;
+                }
+                case Instruction::applyClassicMatcher: {
+                    const auto* matcher = readFromMemory<const MatchExpression*>(pcPointer);
+                    pcPointer += sizeof(matcher);
+                    os << "matcher: " << _formatter.matchExpression(matcher);
                     break;
                 }
                 case Instruction::numConvert: {

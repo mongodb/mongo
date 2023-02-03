@@ -933,6 +933,21 @@ vm::CodeFragment generateTraverseCellTypes(CompileCtx& ctx,
     return generatorLegacy<&vm::CodeFragment::appendTraverseCellTypes>(ctx, nodes, false);
 }
 
+vm::CodeFragment generateClassicMatcher(CompileCtx& ctx, const EExpression::Vector& nodes, bool) {
+    tassert(6681400,
+            "First argument to applyClassicMatcher must be constant",
+            nodes[0]->as<EConstant>());
+    auto [matcherTag, matcherVal] = nodes[0]->as<EConstant>()->getConstant();
+    tassert(6681409,
+            "First argument to applyClassicMatcher must be a classic matcher",
+            matcherTag == value::TypeTags::classicMatchExpresion);
+
+    vm::CodeFragment code;
+    code.append(nodes[1]->compileDirect(ctx));
+    code.appendApplyClassicMatcher(value::getClassicMatchExpressionView(matcherVal));
+    return code;
+}
+
 /**
  * The map of functions that resolve directly to instructions.
  */
@@ -971,6 +986,7 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
     {"isMinKey", InstrFn{1, generator<1, &vm::CodeFragment::appendIsMinKey>, false}},
     {"isMaxKey", InstrFn{1, generator<1, &vm::CodeFragment::appendIsMaxKey>, false}},
     {"isTimestamp", InstrFn{1, generator<1, &vm::CodeFragment::appendIsTimestamp>, false}},
+    {"applyClassicMatcher", InstrFn{2, generateClassicMatcher, false}},
 };
 }  // namespace
 

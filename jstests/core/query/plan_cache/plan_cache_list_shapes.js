@@ -20,8 +20,8 @@
 'use strict';
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-if (checkSBEEnabled(db)) {
-    jsTest.log("Skipping test because SBE is enabled.");
+if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    jsTest.log("Skipping test because SBE is fully enabled.");
     return;
 }
 

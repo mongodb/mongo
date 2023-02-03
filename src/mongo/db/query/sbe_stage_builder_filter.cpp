@@ -1194,6 +1194,37 @@ public:
 private:
     MatchExpressionVisitorContext* _context;
 };
+
+EvalExpr applyClassicMatcher(const MatchExpression* root,
+                             EvalExpr inputExpr,
+                             StageBuilderState& state) {
+    return makeFunction("applyClassicMatcher",
+                        makeConstant(sbe::value::TypeTags::classicMatchExpresion,
+                                     sbe::value::bitcastFrom<const MatchExpression*>(
+                                         root->shallowClone().release())),
+                        inputExpr.extractExpr(state));
+}
+
+EvalExpr applyClassicMatcherOverIndexScan(const MatchExpression* root,
+                                          const PlanStageSlots* slots,
+                                          const std::vector<std::string>& keyFields) {
+    BSONObjBuilder keyPatternBuilder;
+    auto keySlots = sbe::makeSV();
+    for (const auto& field : keyFields) {
+        keyPatternBuilder.append(field, 1);
+        keySlots.emplace_back(
+            slots->get(std::make_pair(PlanStageSlots::kField, StringData(field))));
+    }
+
+    auto keyPatternTree = buildKeyPatternTree(keyPatternBuilder.obj(), keySlots);
+    auto mkObjExpr = buildNewObjExpr(keyPatternTree.get());
+
+    return makeFunction("applyClassicMatcher",
+                        makeConstant(sbe::value::TypeTags::classicMatchExpresion,
+                                     sbe::value::bitcastFrom<const MatchExpression*>(
+                                         root->shallowClone().release())),
+                        std::move(mkObjExpr));
+}
 }  // namespace
 
 EvalExpr generateFilter(StageBuilderState& state,
@@ -1206,6 +1237,18 @@ EvalExpr generateFilter(StageBuilderState& state,
     // out early without generating the filter plan stage if this is the case.
     if (root->matchType() == MatchExpression::AND && root->numChildren() == 0) {
         return EvalExpr{};
+    }
+
+    // We only use the classic matcher path (aka "franken matcher") when SBE is not fully enabled.
+    // Fully enabling SBE turns on the SBE plan cache, and embedding the classic matcher into the
+    // query execution tree is not compatible with the plan cache's use of auto-parameterization.
+    // This is because when embedding the classic matcher all of the constants used in the filter
+    // are in the MatchExpression itself rather than in slots.
+    if (!feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
+        tassert(7097207, "Expected input slot to be defined", rootSlot || isFilterOverIxscan);
+
+        return isFilterOverIxscan ? applyClassicMatcherOverIndexScan(root, slots, keyFields)
+                                  : applyClassicMatcher(root, toEvalExpr(rootSlot), state);
     }
 
     MatchExpressionVisitorContext context{state, rootSlot, root, slots, isFilterOverIxscan};

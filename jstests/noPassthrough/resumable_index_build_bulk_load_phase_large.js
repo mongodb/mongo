@@ -23,8 +23,9 @@ const rst = new ReplSetTest(
 rst.startSet();
 rst.initiate();
 
-const columnstoreEnabled =
-    checkSBEEnabled(rst.getPrimary().getDB(dbName), ["featureFlagColumnstoreIndexes"], true) &&
+const columnstoreEnabled = checkSBEEnabled(rst.getPrimary().getDB(dbName),
+                                           ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"],
+                                           true) &&
     setUpServerForColumnStoreIndexTest(rst.getPrimary().getDB(dbName));
 
 // Insert enough data so that the collection scan spills to disk.

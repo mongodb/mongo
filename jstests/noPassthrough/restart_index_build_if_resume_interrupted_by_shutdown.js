@@ -25,7 +25,8 @@ rst.initiate();
 
 let primary = rst.getPrimary();
 const columnstoreEnabled =
-    checkSBEEnabled(primary.getDB(dbName), ["featureFlagColumnstoreIndexes"], true) &&
+    checkSBEEnabled(
+        primary.getDB(dbName), ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true) &&
     setUpServerForColumnStoreIndexTest(primary.getDB(dbName));
 
 ResumableIndexBuildTest.runResumeInterruptedByShutdown(

@@ -12,8 +12,8 @@
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection,
- *   # The SBE plan cache was first enabled in 6.3.
- *   requires_fcv_63,
+ *   # The SBE plan cache was introduced in 6.0.
+ *   requires_fcv_60,
  *   # Plan cache state is node-local and will not get migrated alongside tenant data.
  *   tenant_migration_incompatible,
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
@@ -30,7 +30,7 @@ load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const coll = db.plan_cache_sbe;
 coll.drop();
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"], true /* checkAllNodes */);
 
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 

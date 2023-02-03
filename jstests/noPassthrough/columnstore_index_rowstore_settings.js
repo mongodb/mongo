@@ -3,8 +3,9 @@
  * reconstruct the result of a query.
  *
  * @tags: [
- *   # column store indexes are still under a feature flag
- *   featureFlagColumnstoreIndexes
+ *   # column store indexes are still under a feature flag and require full sbe
+ *   featureFlagColumnstoreIndexes,
+ *   featureFlagSbeFull,
  * ]
  */
 

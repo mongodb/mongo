@@ -1,9 +1,6 @@
 /**
  * Tests that SBE reports correct rejected plans when calling explain().
- * @tags: [
- *    assumes_unsharded_collection,
- *    requires_fcv_63,
- * ]
+ * @tags: [assumes_unsharded_collection, requires_fcv_62]
  */
 (function() {
 "use strict";
@@ -12,9 +9,9 @@ load("jstests/libs/analyze_plan.js");
 load("jstests/libs/collection_drop_recreate.js");
 load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled'.
 
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 if (!isSBEEnabled) {
-    jsTestLog("Skipping test because SBE is disabled");
+    jsTestLog("Skipping test because the SBE feature flag is disabled");
     return;
 }
 

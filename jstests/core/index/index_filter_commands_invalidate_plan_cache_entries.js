@@ -27,7 +27,7 @@ load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
 // For testing convenience this variable is made an integer "1" if SBE is fully enabled, because the
 // expected amount of plan cache entries differs between the SBE plan cache and the classic one.
-const isSbeEnabled = checkSBEEnabled(db) ? 1 : 0;
+const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]) ? 1 : 0;
 
 const collName = "index_filter_commands_invalidate_plan_cache_entries";
 const coll = db[collName];

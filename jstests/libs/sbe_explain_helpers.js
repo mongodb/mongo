@@ -41,6 +41,24 @@ function getSbePlanStages(queryLayerOutput, stage) {
 }
 
 /**
+ * Helper to make an assertion depending on the engine being used. If we're in a mixed version
+ * cluster, then we assert that either 'classicAssert' or 'sbeAssert' is true because the outcome
+ * will depend on which node we're making assertions against. If we're not in a mixed version
+ * scenario, then we make an assertion depending on the return value of 'checkSBEEnabled'.
+ */
+function engineSpecificAssertion(classicAssert, sbeAssert, theDB, msg) {
+    if (checkBothEnginesAreRunOnCluster(theDB)) {
+        assert(classicAssert || sbeAssert, msg);
+    } else if (checkSBEEnabled(theDB, ["featureFlagSbeFull"])) {
+        // This function assumes that SBE is fully enabled, and will fall back to the classic
+        // assert if it is not.
+        assert(sbeAssert, msg);
+    } else {
+        assert(classicAssert, msg);
+    }
+}
+
+/**
  * Gets the query info object at either the top level or the first stage from a v2
  * explainOutput. If a query is a find query or some prefix stage(s) of a pipeline is pushed down to
  * SBE, then plan information will be in the 'queryPlanner' object. Currently, this supports find

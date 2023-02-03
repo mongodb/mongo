@@ -110,7 +110,7 @@ const testList = [
         test: function(db, comment) {
             assert.eq(200, db.test.find().comment(comment).itcount());
         },
-        hasPlanCacheKey: checkSBEEnabled(testDB)
+        hasPlanCacheKey: checkSBEEnabled(testDB, ["featureFlagSbeFull"])
     },
     {
         comment: "Test1 find query",

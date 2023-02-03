@@ -11,7 +11,7 @@
  *   # If all chunks are moved off of a shard, it can cause the plan cache to miss commands.
  *   assumes_balancer_off,
  *   assumes_unsharded_collection,
- *   requires_fcv_63,
+ *   requires_fcv_62,
  *   # Plan cache state is node-local and will not get migrated alongside tenant data.
  *   tenant_migration_incompatible,
  *   # Part of this test does different checks depending on the engine used.  If an implicit index
@@ -65,7 +65,7 @@ const sortSpec = {
 
 // TODO SERVER-67576: remove this branch once explode for sort plans are supported by the SBE plan
 // cache.
-if (checkSBEEnabled(db)) {
+if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
     // Run the query for the first time and make sure the plan hasn't been cached.
     assert.eq(0, coll.find(querySpec).sort(sortSpec).itcount());
     assertCacheEntryDoesNotExist(querySpec, sortSpec);

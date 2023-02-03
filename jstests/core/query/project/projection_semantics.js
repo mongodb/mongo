@@ -6,8 +6,7 @@
  *   # We could potentially need to resume an index build in the event of a stepdown, which is not
  *   # yet implemented.
  *   does_not_support_stepdowns,
- *   # Columnstore indexes were first enabled by default on 6.3.
- *   requires_fcv_63,
+ *   requires_fcv_62,
  *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
  *   # server parameters are stored in-memory only so are not transferred onto the recipient.
  *   tenant_migration_incompatible,
@@ -20,7 +19,7 @@
 load("jstests/libs/sbe_util.js");          // For checkSBEEnabled.
 load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
 
-if (!checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"])) {
+if (!checkSBEEnabled(db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"])) {
     jsTestLog("Skipping test since columnstore Indexes are not enabled");
     return;
 }

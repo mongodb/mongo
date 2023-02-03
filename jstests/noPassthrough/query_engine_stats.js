@@ -15,8 +15,8 @@ assert.neq(null, conn, "mongod was unable to start up");
 let db = conn.getDB(jsTestName());
 
 // This test assumes that SBE is being used for most queries.
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is not enabled");
+if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    jsTestLog("Skipping test because SBE is not fully enabled");
     MongoRunner.stopMongod(conn);
     return;
 }

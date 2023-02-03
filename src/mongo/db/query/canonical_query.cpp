@@ -208,7 +208,8 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     _root = MatchExpression::normalize(std::move(root));
 
     // If caching is disabled, do not perform any autoparameterization.
-    if (!internalQueryDisablePlanCache.load()) {
+    if (!internalQueryDisablePlanCache.load() &&
+        feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
         const bool hasNoTextNodes =
             !QueryPlannerCommon::hasNode(_root.get(), MatchExpression::TEXT);
         if (hasNoTextNodes) {
@@ -547,8 +548,10 @@ std::string CanonicalQuery::toStringShort() const {
 }
 
 CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
-    return (!_forceClassicEngine && _sbeCompatible) ? canonical_query_encoder::encodeSBE(*this)
-                                                    : canonical_query_encoder::encode(*this);
+    return (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV() && !_forceClassicEngine &&
+            _sbeCompatible)
+        ? canonical_query_encoder::encodeSBE(*this)
+        : canonical_query_encoder::encode(*this);
 }
 
 CanonicalQuery::QueryShapeString CanonicalQuery::encodeKeyForPlanCacheCommand() const {

@@ -21,7 +21,7 @@ load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
 load("jstests/libs/analyze_plan.js");         // For getPlanCacheKeyFromShape.
 load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 var coll = db.jstests_plan_cache_shell_helpers;
 coll.drop();
 

@@ -15,8 +15,6 @@
 //   assumes_unsharded_collection,
 //   # Plan cache state is node-local and will not get migrated alongside tenant data.
 //   tenant_migration_incompatible,
-//   # The SBE plan cache was first enabled in 6.3.
-//   requires_fcv_63,
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_incompatible,
 // ]
@@ -106,7 +104,7 @@ const nonExistentColl = db.plan_cache_clear_nonexistent;
 nonExistentColl.drop();
 assert.commandWorked(nonExistentColl.runCommand('planCacheClear'));
 
-if (checkSBEEnabled(db)) {
+if (checkSBEEnabled(db, ["featureFlagSbeFull"], true /* checkAllNodes */)) {
     // Plan cache commands should work against the main collection only, not foreignColl
     // collections, when $lookup is pushed down into SBE.
     const foreignColl = db.plan_cache_clear_foreign;

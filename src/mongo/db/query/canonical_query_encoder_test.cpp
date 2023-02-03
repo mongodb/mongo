@@ -427,6 +427,9 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBE) {
     // SBE must be enabled in order to generate SBE plan cache keys.
     RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
                                                        "trySbeEngine");
+
+    RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbeFull", true);
+
     testComputeSBEKey(gctx, "{}", "{}", "{}");
     testComputeSBEKey(gctx, "{$or: [{a: 1}, {b: 2}]}", "{}", "{}");
     testComputeSBEKey(gctx, "{a: 1}", "{}", "{}");
@@ -499,6 +502,7 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBEWithPipeline) {
     RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
                                                        "trySbeEngine");
 
+    RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbeFull", true);
 
     auto getLookupBson = [](StringData localField, StringData foreignField, StringData asField) {
         return BSON("$lookup" << BSON("from" << foreignNss.coll() << "localField" << localField
@@ -528,6 +532,7 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBEWithReadConcern) {
     // SBE must be enabled in order to generate SBE plan cache keys.
     RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
                                                        "trySbeEngine");
+    RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbeFull", true);
 
     // Find command without read concern.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);

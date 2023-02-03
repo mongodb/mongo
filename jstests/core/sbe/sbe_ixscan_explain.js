@@ -3,8 +3,7 @@
 //
 // @tags: [
 //   assumes_against_mongod_not_mongos,
-//   # The SBE plan cache was first enabled in 6.3.
-//   requires_fcv_63,
+//   requires_fcv_51,
 // ]
 
 (function() {
@@ -13,9 +12,9 @@
 load('jstests/libs/analyze_plan.js');  // For getPlanStages
 load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"], true /* checkAllNodes */);
 if (!isSBEEnabled) {
-    jsTestLog("Skipping test because SBE is disabled");
+    jsTestLog("Skipping test because the SBE feature flag is disabled");
     return;
 }
 

@@ -22,6 +22,8 @@ if (!checkSBEEnabled(db)) {
     return;
 }
 
+const sbeFullEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
+
 assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.createIndex({a: 1, a1: 1}));
 assert.commandWorked(coll.createIndex({a: 1, a2: 1}));
@@ -121,7 +123,7 @@ const groupStage = {
 
 (function testLoweredPipelineCombination() {
     setupForeignColl();
-    const expectedVersion = 2;
+    const expectedVersion = sbeFullEnabled ? 2 : 1;
 
     coll.getPlanCache().clear();
     testLoweredPipeline(
@@ -145,11 +147,16 @@ const groupStage = {
     setupForeignColl();
     testLoweredPipeline({
         pipeline: [multiPlanningQueryStage, lookupStage, {$_internalInhibitOptimization: {}}],
-        version: 2
+        version: sbeFullEnabled ? 2 : 1
     });
 })();
 
 (function testNonExistentForeignCollectionCache() {
+    if (!sbeFullEnabled) {
+        jsTestLog("Skipping testNonExistentForeignCollectionCache when SBE is not fully enabled");
+        return;
+    }
+
     coll.getPlanCache().clear();
     foreignColl.drop();
     const entryWithoutForeignColl =
@@ -169,6 +176,12 @@ const groupStage = {
 })();
 
 (function testForeignCollectionDropCacheInvalidation() {
+    if (!sbeFullEnabled) {
+        jsTestLog(
+            "Skipping testForeignCollectionDropCacheInvalidation when SBE is not fully enabled");
+        return;
+    }
+
     coll.getPlanCache().clear();
     setupForeignColl();
     testLoweredPipeline({pipeline: [multiPlanningQueryStage, lookupStage], version: 2});
@@ -178,6 +191,11 @@ const groupStage = {
 })();
 
 (function testForeignIndexDropCacheInvalidation() {
+    if (!sbeFullEnabled) {
+        jsTestLog("Skipping testForeignIndexDropCacheInvalidation when SBE is not fully enabled");
+        return;
+    }
+
     coll.getPlanCache().clear();
     setupForeignColl({b: 1} /* index */);
     testLoweredPipeline({pipeline: [multiPlanningQueryStage, lookupStage], version: 2});
@@ -187,6 +205,11 @@ const groupStage = {
 })();
 
 (function testForeignIndexBuildCacheInvalidation() {
+    if (!sbeFullEnabled) {
+        jsTestLog("Skipping testForeignIndexBuildCacheInvalidation when SBE is not fully enabled");
+        return;
+    }
+
     coll.getPlanCache().clear();
     setupForeignColl({b: 1} /* index */);
     testLoweredPipeline({pipeline: [multiPlanningQueryStage, lookupStage], version: 2});
@@ -196,6 +219,11 @@ const groupStage = {
 })();
 
 (function testLookupSbeAndClassicPlanCacheKey() {
+    if (!sbeFullEnabled) {
+        jsTestLog("Skipping testLookupWithClassicPlanCache when SBE is not fully enabled");
+        return;
+    }
+
     setupForeignColl({b: 1} /* index */);
 
     // When using SBE engine, the plan cache key of $match vs. $match + $lookup should be different.
