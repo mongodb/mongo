@@ -55,7 +55,6 @@
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/fle/server_rewrite.h"
-#include "mongo/db/query/telemetry.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/resolved_view.h"
@@ -332,10 +331,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto shouldDoFLERewrite = ::mongo::shouldDoFLERewrite(request);
     auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();
 
-    if (!shouldDoFLERewrite) {
-        telemetry::registerAggRequest(request, opCtx);
-    }
-
     // If the routing table is not already taken by the higher level, fill it now.
     if (!cm) {
         // If the routing table is valid, we obtain a reference to it. If the table is not valid,
@@ -558,7 +553,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         updateHostsTargetedMetrics(opCtx, namespaces.executionNss, cm, involvedNamespaces);
         // Report usage statistics for each stage in the pipeline.
         liteParsedPipeline.tickGlobalStageCounters();
-        telemetry::recordExecution(opCtx, shouldDoFLERewrite);
 
         // Add 'command' object to explain output.
         if (expCtx->explain) {

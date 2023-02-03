@@ -38,7 +38,6 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/telemetry.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -225,10 +224,6 @@ public:
                                              ExtensionsCallbackNoop(),
                                              MatchExpressionParser::kAllowAllSpecialFeatures));
 
-            if (!_didDoFLERewrite) {
-                telemetry::registerFindRequest(cq->getFindCommandRequest(), cq->nss(), opCtx);
-            }
-
             try {
                 // Do the work to generate the first batch of results. This blocks waiting to get
                 // responses from the shard(s).
@@ -250,7 +245,6 @@ public:
                 }
                 firstBatch.setPartialResultsReturned(partialResultsReturned);
                 firstBatch.done(cursorId, cq->nss());
-                telemetry::recordExecution(opCtx, _didDoFLERewrite);
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 result->reset();
 
@@ -283,7 +277,7 @@ public:
          * were supplied with the command, and sets the constant runtime values that will be
          * forwarded to each shard.
          */
-        std::unique_ptr<FindCommandRequest> _parseCmdObjectToFindCommandRequest(
+        static std::unique_ptr<FindCommandRequest> _parseCmdObjectToFindCommandRequest(
             OperationContext* opCtx, NamespaceString nss, BSONObj cmdObj) {
             auto findCommand = query_request_helper::makeFromFindCommand(
                 std::move(cmdObj),
@@ -307,7 +301,6 @@ public:
                 invariant(findCommand->getNamespaceOrUUID().nss());
                 processFLEFindS(
                     opCtx, findCommand->getNamespaceOrUUID().nss().get(), findCommand.get());
-                _didDoFLERewrite = true;
             }
 
             return findCommand;
@@ -315,7 +308,6 @@ public:
 
         const OpMsgRequest& _request;
         const DatabaseName _dbName;
-        bool _didDoFLERewrite{false};
     };
 };
 
