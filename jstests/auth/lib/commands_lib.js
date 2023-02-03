@@ -3652,6 +3652,10 @@ export const authCommandsLib = {
         {
           testname: "createSearchIndex",
           command: {createSearchIndex: "x", indexDefinition: {"testBlob": "blob"}},
+          // Only enterprise knows of this command.
+          skipTest: (conn) => {
+              return !getBuildInfo().modules.includes("enterprise");
+          },
           skipSharded: true,  // TODO (SERVER-73274): add mongos cmds
           testcases: [{
               runOnDb: firstDbName,
@@ -4029,6 +4033,10 @@ export const authCommandsLib = {
         {
           testname: "dropSearchIndex",
           command: {dropSearchIndex: "x", indexDefinition: {"testBlob": "blob"}},
+          // Only enterprise knows of this command.
+          skipTest: (conn) => {
+              return !getBuildInfo().modules.includes("enterprise");
+          },
           skipSharded: true,  // TODO (SERVER-73274): add mongos cmds
           testcases: [
             {
@@ -5136,6 +5144,10 @@ export const authCommandsLib = {
         {
           testname: "listSearchIndexes",
           command: {listSearchIndexes: "x"},
+          // Only enterprise knows of this command.
+          skipTest: (conn) => {
+              return !getBuildInfo().modules.includes("enterprise");
+          },
           skipSharded: true,  // TODO (SERVER-73274): add mongos cmds
           testcases: [{
               runOnDb: firstDbName,
@@ -5291,6 +5303,10 @@ export const authCommandsLib = {
         {
           testname: "modifySearchIndex",
           command: {modifySearchIndex: "foo", indexDefinition: {"textBlob": "blob"}},
+          // Only enterprise knows of this command.
+          skipTest: (conn) => {
+              return !getBuildInfo().modules.includes("enterprise");
+          },
           skipSharded: true,  // TODO (SERVER-73274): add mongos cmds
           testcases: [
               {
