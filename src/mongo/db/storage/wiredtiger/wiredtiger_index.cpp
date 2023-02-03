@@ -943,8 +943,7 @@ public:
           _indexName(idx.indexName()),
           _collectionUUID(idx.getCollectionUUID()),
           _key(idx.getKeyStringVersion()),
-          _typeBits(idx.getKeyStringVersion()),
-          _query(idx.getKeyStringVersion()) {
+          _typeBits(idx.getKeyStringVersion()) {
         _cursor.emplace(_uri, _tableId, false, _opCtx);
     }
 
@@ -1352,8 +1351,6 @@ protected:
     KeyString::Builder _key;
     KeyString::TypeBits _typeBits;
     RecordId _id;
-
-    KeyString::Builder _query;
 
     std::unique_ptr<KeyString::Builder> _endPosition;
 
