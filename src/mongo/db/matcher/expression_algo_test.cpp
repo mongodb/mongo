@@ -63,6 +63,10 @@ public:
         return _expr.get();
     }
 
+    std::unique_ptr<MatchExpression> extractExpr() {
+        return std::move(_expr);
+    }
+
 private:
     const BSONObj _obj;
     std::unique_ptr<MatchExpression> _expr;
@@ -1447,6 +1451,78 @@ TEST(SplitMatchExpression, ShouldNotSplitWhenRand) {
 
     // This is equivalent to 'randExpr'.
     assertMatchDoesNotSplit("{$sampleRate: 0.25}");
+}
+
+TEST(SplitMatchExpression, ShouldSplitJsonSchemaRequiredByMetaField) {
+    ParsedMatchExpression matcher(R"({$and: [{b: 1}, {$jsonSchema: {required: ["a"]}}]})");
+    auto [splitOutExpr, residualExpr] =
+        expression::splitMatchExpressionBy(matcher.extractExpr(), {"a"}, {});
+
+    ASSERT_TRUE(splitOutExpr.get());
+    BSONObjBuilder splitOutBob;
+    splitOutExpr->serialize(&splitOutBob, true);
+    ASSERT_BSONOBJ_EQ(splitOutBob.obj(), fromjson("{b: {$eq: 1}}"));
+
+    ASSERT_TRUE(residualExpr.get());
+    BSONObjBuilder residualBob;
+    residualExpr->serialize(&residualBob, true);
+    ASSERT_BSONOBJ_EQ(residualBob.obj(), fromjson("{a: {$exists: true}}"));
+}
+
+TEST(SplitMatchExpression,
+     ShouldSplitOutAndRenameJsonSchemaRequiredAndTheRestIsNullByIsOnlyDependentOn) {
+    ParsedMatchExpression matcher(R"({$jsonSchema: {required: ["a"]}})");
+
+    // $jsonSchema expression will be split out by the meta field "a" and the meta field "a" will be
+    // renamed to "meta".
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        matcher.extractExpr(), {"a"}, {{"a", "meta"}}, expression::isOnlyDependentOn);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    BSONObjBuilder splitOutBob;
+    splitOutExpr->serialize(&splitOutBob, true);
+    ASSERT_BSONOBJ_EQ(splitOutBob.obj(), fromjson("{$and: [{$and: [{meta: {$exists: true}}]}]}"));
+
+    ASSERT_FALSE(residualExpr.get());
+}
+
+TEST(SplitMatchExpression,
+     ShouldSplitOutAndRenameJsonSchemaRequiredAndTheRestIs_NOT_NullByIsOnlyDependentOn) {
+    ParsedMatchExpression matcher(R"({$jsonSchema: {required: ["a", "b"]}})");
+
+    // $jsonSchema expression will be split out by the meta field "a" and the meta field "a" will be
+    // renamed to "meta". The expression for the non-meta field "b" remains.
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        matcher.extractExpr(), {"a"}, {{"a", "meta"}}, expression::isOnlyDependentOn);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    BSONObjBuilder splitOutBob;
+    splitOutExpr->serialize(&splitOutBob, true);
+    ASSERT_BSONOBJ_EQ(splitOutBob.obj(), fromjson("{meta: {$exists: true}}"));
+
+    ASSERT_TRUE(residualExpr.get());
+    BSONObjBuilder residualBob;
+    residualExpr->serialize(&residualBob, true);
+    ASSERT_BSONOBJ_EQ(residualBob.obj(), fromjson("{b: {$exists: true}}"));
+}
+
+TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaRequiredByIsOnlyDependentOn) {
+    ParsedMatchExpression matcher(R"({$and: [{b: 1}, {$jsonSchema: {required: ["a"]}}]})");
+
+    // $jsonSchema expression will be split out by the meta field "a" and the meta field "a" will be
+    // renamed to "meta". We have a residual expression too in this test case.
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        matcher.extractExpr(), {"a"}, {{"a", "meta"}}, expression::isOnlyDependentOn);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    BSONObjBuilder splitOutBob;
+    splitOutExpr->serialize(&splitOutBob, true);
+    ASSERT_BSONOBJ_EQ(splitOutBob.obj(), fromjson("{$and: [{$and: [{meta: {$exists: true}}]}]}"));
+
+    ASSERT_TRUE(residualExpr.get());
+    BSONObjBuilder residualBob;
+    residualExpr->serialize(&residualBob, true);
+    ASSERT_BSONOBJ_EQ(residualBob.obj(), fromjson("{b: {$eq: 1}}"));
 }
 
 TEST(ApplyRenamesToExpression, ShouldApplyBasicRenamesForAMatchWithExpr) {
