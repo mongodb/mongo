@@ -48,9 +48,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-linux-64-amazon-ami
@@ -104,9 +101,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .crypt
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: amazon2
@@ -156,9 +150,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -214,9 +205,6 @@ buildvariants:
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -262,9 +250,6 @@ buildvariants:
   - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -382,9 +367,6 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - amazon2-arm64-large
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -434,9 +416,6 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -488,9 +467,6 @@ buildvariants:
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -540,9 +516,6 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -594,9 +567,6 @@ buildvariants:
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -644,9 +614,6 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: selinux_rhel7_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -732,9 +699,6 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -847,9 +811,6 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-large
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: selinux_rhel8_enterprise
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -895,9 +856,6 @@ buildvariants:
   - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -953,9 +911,6 @@ buildvariants:
     distros:
     - rhel82-arm64-large
   - name: .publish_crypt
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1002,9 +957,6 @@ buildvariants:
   - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: selinux_rhel9_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -1079,9 +1031,6 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: selinux_rhel9_enterprise
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -1127,9 +1076,6 @@ buildvariants:
   - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1185,9 +1131,6 @@ buildvariants:
     distros:
     - rhel90-arm64-large
   - name: .publish_crypt
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1284,9 +1227,6 @@ buildvariants:
     distros:
     - suse12-sp5-large
   - name: .publish_crypt
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1432,9 +1372,6 @@ buildvariants:
   - name: watchdog_wiredtiger
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1500,9 +1437,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .watchdog
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1555,9 +1489,6 @@ buildvariants:
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1589,9 +1520,6 @@ buildvariants:
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1640,9 +1568,6 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1691,9 +1616,6 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1745,9 +1667,6 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1799,9 +1718,6 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1853,9 +1769,6 @@ buildvariants:
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1886,9 +1799,6 @@ buildvariants:
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1941,9 +1851,6 @@ buildvariants:
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1974,9 +1881,6 @@ buildvariants:
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 

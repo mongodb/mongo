@@ -188,9 +188,6 @@ variables:
   - name: .crypt
   - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: selinux_rhel7_enterprise
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -1943,9 +1940,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: selinux_rhel8_enterprise
   - name: generate_buildid_to_debug_symbols_mapping
 

@@ -6564,26 +6564,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
 
-- name: test_packages
-  tags: []
-  depends_on:
-  - name: package
-  commands:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - *f_expansions_write
-  - *kill_processes
-  - *cleanup_environment
-  - *set_up_venv
-  - func: "fetch packages"
-  - func: "set up remote credentials"
-    vars:
-      private_key_file: ~/.ssh/kitchen.pem
-      private_key_remote: ${kitchen_private_key}
-      aws_key_remote: ${kitchen_aws_key}
-      aws_secret_remote: ${kitchen_aws_secret}
-  - func: "run kitchen"
-
 - name: package
   tags: []
   depends_on:
