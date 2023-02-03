@@ -321,7 +321,8 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         if (findCommand.getAllowPartialResults() && findCommand.getMaxTimeMS()) {
             // Reserve 10% of the time budget (up to 100,000 microseconds max) for processing
             // buffered partial results.
-            deadline -= Microseconds{std::min(1000 * (*findCommand.getMaxTimeMS()) / 10, 100000)};
+            deadline -=
+                Microseconds{std::min(1000LL * (*findCommand.getMaxTimeMS()) / 10, 100'000LL)};
             LOGV2_DEBUG(
                 5746901,
                 0,
