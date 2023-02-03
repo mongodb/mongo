@@ -8,7 +8,7 @@ Random.setRandomSeed();
 
 var params = ParallelTester.createJstestsLists(4);
 var t = new ParallelTester();
-for (i in params) {
+for (let i in params) {
     t.add(ParallelTester.fileTester, params[i]);
 }
 
@@ -28,7 +28,7 @@ for (var i = 4; i < 8; ++i) {
     t.add(EventGenerator.dispatch, g.getEvents());
 }
 try {
-    t.run("one or more tests failed");
+    await t.run("one or more tests failed");
 } finally {
     print(
         "If the failure here is due to a test unexpected being run, " +
