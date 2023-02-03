@@ -54,6 +54,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/kill_cursors_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
@@ -795,7 +796,7 @@ namespace {
  */
 BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid,
                                bool includeBuildUUIDs,
-                               const boost::optional<TenantId>& dollarTenant) {
+                               bool appendDollarTenant) {
     BSONObjBuilder bob;
     if (nsOrUuid.nss()) {
         bob.append("listIndexes", (*nsOrUuid.nss()).coll());
@@ -808,8 +809,9 @@ BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid,
     if (includeBuildUUIDs) {
         bob.appendBool("includeBuildUUIDs", true);
     }
-    if (dollarTenant) {
-        dollarTenant->serializeToBSON("$tenant"_sd, &bob);
+    const auto& dbName = nsOrUuid.dbName() ? nsOrUuid.dbName().value() : nsOrUuid.nss()->dbName();
+    if (dbName.tenantId() && appendDollarTenant) {
+        dbName.tenantId()->serializeToBSON("$tenant", &bob);
     }
     return bob.obj();
 }
@@ -819,24 +821,16 @@ BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid,
 std::list<BSONObj> DBClientBase::getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
                                                bool includeBuildUUIDs,
                                                int options,
-                                               const boost::optional<TenantId>& dollarTenant) {
-    return _getIndexSpecs(nsOrUuid,
-                          makeListIndexesCommand(nsOrUuid, includeBuildUUIDs, dollarTenant),
-                          options,
-                          dollarTenant);
+                                               bool appendDollarTenant) {
+    return _getIndexSpecs(
+        nsOrUuid, makeListIndexesCommand(nsOrUuid, includeBuildUUIDs, appendDollarTenant), options);
 }
 
 std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
                                                 const BSONObj& cmd,
-                                                int options,
-                                                const boost::optional<TenantId>& dollarTenant) {
+                                                int options) {
     list<BSONObj> specs;
     auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbName() : (*nsOrUuid.nss()).dbName());
-    massert(7043200,
-            str::stream() << "TenantIds in dbName and $tenant must match. dbName: "
-                          << dbName->tenantId()->toString()
-                          << ", $tenant: " << dollarTenant->toString(),
-            (dbName->tenantId() && dollarTenant) ? (dbName->tenantId() == dollarTenant) : true);
 
     BSONObj res;
     if (runCommand(*dbName, cmd, res, options)) {
@@ -881,31 +875,30 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
 }
 
 
-void DBClientBase::dropIndex(const string& ns,
+void DBClientBase::dropIndex(const NamespaceString& nss,
                              BSONObj keys,
                              boost::optional<BSONObj> writeConcernObj,
-                             boost::optional<TenantId> tenantId) {
-    dropIndex(ns, genIndexName(keys), writeConcernObj, tenantId);
+                             bool appendDollarTenant) {
+    dropIndex(nss, genIndexName(keys), writeConcernObj, appendDollarTenant);
 }
 
 
-void DBClientBase::dropIndex(const string& ns,
+void DBClientBase::dropIndex(const NamespaceString& nss,
                              const string& indexName,
                              boost::optional<BSONObj> writeConcernObj,
-                             boost::optional<TenantId> tenantId) {
+                             bool appendDollarTenant) {
     BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("dropIndexes", nsToCollectionSubstring(ns));
+    cmdBuilder.append("dropIndexes", nss.coll());
     cmdBuilder.append("index", indexName);
     if (writeConcernObj) {
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
-    if (tenantId) {
-        tenantId->serializeToBSON("$tenant"_sd, &cmdBuilder);
+    if (nss.tenantId() && appendDollarTenant) {
+        nss.tenantId()->serializeToBSON("$tenant", &cmdBuilder);
     }
 
     BSONObj info;
-    // TODO SERVER-72946: Use ns.dbName() which is DatabaseName object already.
-    if (!runCommand(DatabaseName(boost::none, nsToDatabase(ns)), cmdBuilder.obj(), info)) {
+    if (!runCommand(nss.dbName(), cmdBuilder.obj(), info)) {
         LOGV2_DEBUG(20118,
                     _logLevel.toInt(),
                     "dropIndex failed: {info}",
@@ -915,28 +908,24 @@ void DBClientBase::dropIndex(const string& ns,
     }
 }
 
-void DBClientBase::dropIndexes(const string& ns, boost::optional<BSONObj> writeConcernObj) {
+void DBClientBase::dropIndexes(const NamespaceString& nss,
+                               boost::optional<BSONObj> writeConcernObj) {
     BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("dropIndexes", nsToCollectionSubstring(ns));
+    cmdBuilder.append("dropIndexes", nss.coll());
     cmdBuilder.append("index", "*");
     if (writeConcernObj) {
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
+
     BSONObj info;
-    // TODO SERVER-72946: Use ns.dbName() which is DatabaseName object already.
-    uassert(10008,
-            "dropIndexes failed",
-            runCommand(DatabaseName(boost::none, nsToDatabase(ns)), cmdBuilder.obj(), info));
+    uassert(10008, "dropIndexes failed", runCommand(nss.dbName(), cmdBuilder.obj(), info));
 }
 
-void DBClientBase::reIndex(const string& ns) {
+void DBClientBase::reIndex(const NamespaceString& nss) {
     BSONObj info;
-    // TODO SERVER-72946: Use ns.dbName() which is DatabaseName object already.
     uassert(18908,
             str::stream() << "reIndex failed: " << info,
-            runCommand(DatabaseName(boost::none, nsToDatabase(ns)),
-                       BSON("reIndex" << nsToCollectionSubstring(ns)),
-                       info));
+            runCommand(nss.dbName(), BSON("reIndex" << nss.coll()), info));
 }
 
 
@@ -961,14 +950,14 @@ string DBClientBase::genIndexName(const BSONObj& keys) {
     return ss.str();
 }
 
-void DBClientBase::createIndexes(StringData ns,
+void DBClientBase::createIndexes(const NamespaceString& nss,
                                  const std::vector<const IndexSpec*>& descriptors,
                                  boost::optional<BSONObj> writeConcernObj,
-                                 boost::optional<TenantId> tenantId) {
+                                 bool appendDollarTenant) {
     BSONObjBuilder command;
-    command.append("createIndexes", nsToCollectionSubstring(ns));
-    if (tenantId) {
-        tenantId->serializeToBSON("$tenant", &command);
+    command.append("createIndexes", nss.coll());
+    if (nss.tenantId() && appendDollarTenant) {
+        nss.tenantId()->serializeToBSON("$tenant", &command);
     }
 
     {
@@ -983,22 +972,21 @@ void DBClientBase::createIndexes(StringData ns,
     const BSONObj commandObj = command.done();
 
     BSONObj infoObj;
-    // TODO SERVER-72946: Use the ns.dbName() which is DatabaseName object already.
-    if (!runCommand(DatabaseName(boost::none, nsToDatabase(ns)), commandObj, infoObj)) {
+    if (!runCommand(nss.dbName(), commandObj, infoObj)) {
         Status runCommandStatus = getStatusFromCommandResult(infoObj);
         invariant(!runCommandStatus.isOK());
         uassertStatusOK(runCommandStatus);
     }
 }
 
-void DBClientBase::createIndexes(StringData ns,
+void DBClientBase::createIndexes(const NamespaceString& nss,
                                  const std::vector<BSONObj>& specs,
                                  boost::optional<BSONObj> writeConcernObj,
-                                 boost::optional<TenantId> tenantId) {
+                                 bool appendDollarTenant) {
     BSONObjBuilder command;
-    command.append("createIndexes", nsToCollectionSubstring(ns));
-    if (tenantId) {
-        tenantId->serializeToBSON("$tenant", &command);
+    command.append("createIndexes", nss.coll());
+    if (nss.tenantId() && appendDollarTenant) {
+        nss.tenantId()->serializeToBSON("$tenant", &command);
     }
 
     {
@@ -1013,8 +1001,7 @@ void DBClientBase::createIndexes(StringData ns,
     const BSONObj commandObj = command.done();
 
     BSONObj infoObj;
-    // TODO SERVER-72946: Use the ns.dbName() which is DatabaseName object already.
-    if (!runCommand(DatabaseName(boost::none, nsToDatabase(ns)), commandObj, infoObj)) {
+    if (!runCommand(nss.dbName(), commandObj, infoObj)) {
         Status runCommandStatus = getStatusFromCommandResult(infoObj);
         invariant(!runCommandStatus.isOK());
         uassertStatusOK(runCommandStatus);

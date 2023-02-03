@@ -215,14 +215,12 @@ BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
 BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
     const bool includeBuildUUIDs = true;
 
-    const auto dollarTenant = gMultitenancySupport &&
-            serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)
-        ? _sourceNss.tenantId()
-        : boost::none;
+    const auto appendDollarTenant = gMultitenancySupport &&
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility);
 
     auto indexSpecs = getClient()->getIndexSpecs(
-        _sourceDbAndUuid, includeBuildUUIDs, QueryOption_SecondaryOk, dollarTenant);
+        _sourceDbAndUuid, includeBuildUUIDs, QueryOption_SecondaryOk, appendDollarTenant);
     if (indexSpecs.empty()) {
         LOGV2_WARNING(21143,
                       "No indexes found for collection {namespace} while cloning from {source}",

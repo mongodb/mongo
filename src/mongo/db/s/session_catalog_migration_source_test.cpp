@@ -2702,7 +2702,7 @@ TEST_F(SessionCatalogMigrationSourceTest, UntransferredDataSizeWithCommittedWrit
 
     DBDirectClient client(opCtx());
     client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
-    client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+    client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                          {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
     // Enter an oplog entry before creating SessionCatalogMigrationSource to set config.transactions
     // average object size to the size of this entry.

@@ -83,7 +83,7 @@ public:
         }
 
         DBDirectClient client(opCtx);
-        client.createIndex(kNss.ns(), BSON(kPattern << 1));
+        client.createIndex(kNss, BSON(kPattern << 1));
     }
 
     /*

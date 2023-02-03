@@ -65,7 +65,7 @@ public:
         }
         setUnshardedFilteringMetadata(opCtx, kNss);
         DBDirectClient client(opCtx);
-        client.createIndex(kNss.ns(), BSON(kPattern << 1));
+        client.createIndex(kNss, BSON(kPattern << 1));
 
         // Insert 100 documents into the collection so the tests can test splitting with different
         // constraints.
@@ -309,7 +309,7 @@ public:
         }
         setUnshardedFilteringMetadata(opCtx, kJumboNss);
         DBDirectClient client(opCtx);
-        client.createIndex(kJumboNss.ns(), BSON(kJumboPattern << 1));
+        client.createIndex(kJumboNss, BSON(kJumboPattern << 1));
 
         // Insert 10000 documents into the collection with the same shard key value.
         BSONObjBuilder builder;
@@ -373,7 +373,7 @@ public:
         }
         setUnshardedFilteringMetadata(opCtx, kMaxResponseNss);
         DBDirectClient client(opCtx);
-        client.createIndex(kMaxResponseNss.ns(), BSON("a" << 1));
+        client.createIndex(kMaxResponseNss, BSON("a" << 1));
 
         for (int i = 0; i < numDocs; ++i) {
             BSONObjBuilder builder;

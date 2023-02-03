@@ -53,7 +53,7 @@ protected:
 
         DBDirectClient client(operationContext());
         client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
-        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
 
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());

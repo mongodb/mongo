@@ -72,11 +72,11 @@ protected:
         auto opCtx = operationContext();
         DBDirectClient client(opCtx);
         client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
-        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
         client.createCollection(NamespaceString::kConfigReshardingOperationsNamespace.ns());
         client.createCollection(CollectionType::ConfigNS.ns());
-        client.createIndex(TagsType::ConfigNS.ns(), BSON("ns" << 1 << "min" << 1));
+        client.createIndex(TagsType::ConfigNS, BSON("ns" << 1 << "min" << 1));
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())
             ->onShardingInitialization(operationContext(), true);

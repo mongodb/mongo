@@ -59,7 +59,7 @@ class ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest
         auto opCtx = operationContext();
         DBDirectClient client(opCtx);
         client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
-        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
         client.createCollection(CollectionType::ConfigNS.ns());
 

@@ -429,61 +429,55 @@ public:
     bool exists(const std::string& ns);
 
     /**
-     * Creates an index on the collection 'ns' as described by the given keys. If you wish to
+     * Creates an index on the collection 'nss' as described by the given keys. If you wish to
      * specify options, see the more flexible overload of 'createIndex' which takes an IndexSpec
      * object. Failure to construct the index is reported by throwing a AssertionException.
      *
-     *  'ns': Namespace on which to create the index
+     *  'nss': NamespaceString on which to create the index
      *  'keys': Document describing keys and index types. You must provide at least one field and
      *          its direction.
-     *
-     * SERVER-70433 Remove 'tenantId' as parameter.
+     * TODO SERVER-73189: Remove 'appendDollarTenant' as parameter.
      */
-    void createIndex(StringData ns,
+    void createIndex(const NamespaceString& nss,
                      const BSONObj& keys,
                      boost::optional<BSONObj> writeConcernObj = boost::none,
-                     boost::optional<TenantId> tenantId = boost::none) {
-        return createIndex(ns, IndexSpec().addKeys(keys), writeConcernObj, tenantId);
+                     bool appendDollarTenant = false) {
+        return createIndex(nss, IndexSpec().addKeys(keys), writeConcernObj, appendDollarTenant);
     }
 
     /**
-     * Creates an index on the collection 'ns' as described by the given descriptor. Failure to
+     * Creates an index on the collection 'nss' as described by the given descriptor. Failure to
      * construct the index is reported by throwing a AssertionException.
      *
-     *  'ns': Namespace on which to create the index
+     *  'nss': NamespaceString on which to create the index
      *  'descriptor': Configuration object describing the index to create. The descriptor must
      *                describe at least one key and index type.
-     *
-     * SERVER-70433 Remove 'tenantId' as parameter.
+     * TODO SERVER-73189: Remove 'appendDollarTenant' as parameter.
      */
-    virtual void createIndex(StringData ns,
+    virtual void createIndex(const NamespaceString& nss,
                              const IndexSpec& descriptor,
                              boost::optional<BSONObj> writeConcernObj = boost::none,
-                             boost::optional<TenantId> tenantId = boost::none) {
+                             bool appendDollarTenant = false) {
         std::vector<const IndexSpec*> toBuild;
         toBuild.push_back(&descriptor);
-        createIndexes(ns, toBuild, writeConcernObj, tenantId);
+        createIndexes(nss, toBuild, writeConcernObj, appendDollarTenant);
     }
 
-    /**
-     * SERVER-70433 Remove 'tenantId' as parameter.
-     */
-    virtual void createIndexes(StringData ns,
+    virtual void createIndexes(const NamespaceString& nss,
                                const std::vector<const IndexSpec*>& descriptor,
                                boost::optional<BSONObj> writeConcernObj = boost::none,
-                               boost::optional<TenantId> tenantId = boost::none);
+                               bool appendDollarTenant = false);
 
     /**
-     * Creates indexes on the collection 'ns' as described by 'specs'.
+     * Creates indexes on the collection 'nss' as described by 'specs'.
      *
      * Failure to construct the indexes is reported by throwing an AssertionException.
-     *
-     * SERVER-70433 Remove 'tenantId' as parameter.
+     * TODO SERVER-73189: Remove 'appendDollarTenant' as parameter.
      */
-    virtual void createIndexes(StringData ns,
+    virtual void createIndexes(const NamespaceString& nss,
                                const std::vector<BSONObj>& specs,
                                boost::optional<BSONObj> writeConcernObj = boost::none,
-                               boost::optional<TenantId> tenantId = boost::none);
+                               bool appendDollarTenant = false);
 
     /**
      * Lists indexes on the collection 'nsOrUuid'.
@@ -498,31 +492,29 @@ public:
      *
      * If 'includeBuildUUIDs' is false, only the index spec will be returned without a way to
      * distinguish between ready and in-progress index specs.
+     * TODO SERVER-73189: Remove 'appendDollarTenant' as parameter.
      */
-    virtual std::list<BSONObj> getIndexSpecs(
-        const NamespaceStringOrUUID& nsOrUuid,
-        bool includeBuildUUIDs,
-        int options,
-        const boost::optional<TenantId>& dollarTenant = boost::none);
-    /*
-     * SERVER-70433 Remove 'tenantId' as parameter.
-     */
-    virtual void dropIndex(const std::string& ns,
+    virtual std::list<BSONObj> getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
+                                             bool includeBuildUUIDs,
+                                             int options,
+                                             bool appendDollarTenant = false);
+
+    virtual void dropIndex(const NamespaceString& nss,
                            BSONObj keys,
                            boost::optional<BSONObj> writeConcernObj = boost::none,
-                           boost::optional<TenantId> tenantId = boost::none);
-    virtual void dropIndex(const std::string& ns,
+                           bool appendDollarTenant = false);
+    virtual void dropIndex(const NamespaceString& nss,
                            const std::string& indexName,
                            boost::optional<BSONObj> writeConcernObj = boost::none,
-                           boost::optional<TenantId> tenantId = boost::none);
+                           bool appendDollarTenant = false);
 
     /**
      * Drops all indexes for the collection.
      */
-    virtual void dropIndexes(const std::string& ns,
+    virtual void dropIndexes(const NamespaceString& nss,
                              boost::optional<BSONObj> writeConcernObj = boost::none);
 
-    virtual void reIndex(const std::string& ns);
+    virtual void reIndex(const NamespaceString& nss);
 
     static std::string genIndexName(const BSONObj& keys);
 
@@ -760,8 +752,7 @@ private:
      */
     std::list<BSONObj> _getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
                                       const BSONObj& cmd,
-                                      int options,
-                                      const boost::optional<TenantId>& dollarTenant);
+                                      int options);
 
     auth::RunCommandHook _makeAuthRunCommandHook();
 

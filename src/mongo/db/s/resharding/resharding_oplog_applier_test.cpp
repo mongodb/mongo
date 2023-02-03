@@ -139,7 +139,7 @@ public:
             NamespaceString::kSessionTransactionsTableNamespace.dbName(),
             BSON("create" << NamespaceString::kSessionTransactionsTableNamespace.coll())));
         DBDirectClient client(operationContext());
-        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
 
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(

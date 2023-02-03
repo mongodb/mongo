@@ -103,7 +103,7 @@ TenantCollectionCloner::TenantCollectionCloner(const NamespaceString& sourceNss,
     invariant(sourceNss.isValid());
     invariant(ClonerUtils::isNamespaceForTenant(sourceNss, tenantId));
     invariant(collectionOptions.uuid);
-    _sourceDbAndUuid = NamespaceStringOrUUID(sourceNss.db().toString(), *collectionOptions.uuid);
+    _sourceDbAndUuid = NamespaceStringOrUUID(sourceNss.dbName(), *collectionOptions.uuid);
     _stats.ns = _sourceNss.ns();
 }
 

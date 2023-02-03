@@ -184,7 +184,7 @@ protected:
     ReshardingEnv setupReshardingEnv(OperationContext* opCtx, bool refreshTempNss) {
         DBDirectClient client(opCtx);
         ASSERT(client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns()));
-        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
 
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(

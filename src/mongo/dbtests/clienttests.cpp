@@ -91,13 +91,13 @@ public:
         ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1)));
         ASSERT_EQUALS(2u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
-        db.dropIndex(ns(), BSON("x" << 1));
+        db.dropIndex(nss(), BSON("x" << 1));
         ASSERT_EQUALS(1u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1)));
         ASSERT_EQUALS(2u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
-        db.dropIndexes(ns());
+        db.dropIndexes(nss());
         ASSERT_EQUALS(1u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
     }
 };
@@ -257,7 +257,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(), IndexSpec().addKey("aField").version(1));
+        db.createIndex(nss(), IndexSpec().addKey("aField").version(1));
     }
 };
 
@@ -269,7 +269,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(), IndexSpec().addKey("aField").version(1).name("aFieldV1Index"));
+        db.createIndex(nss(), IndexSpec().addKey("aField").version(1).name("aFieldV1Index"));
     }
 };
 
@@ -281,7 +281,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(),
+        db.createIndex(nss(),
                        IndexSpec()
                            .addKey("aField")
                            .addKey("bField", IndexSpec::kIndexTypeDescending)
@@ -300,7 +300,7 @@ public:
         DBDirectClient db(&opCtx);
 
         db.createIndex(
-            ns(), IndexSpec().addKey("aField").background().unique().sparse().dropDuplicates());
+            nss(), IndexSpec().addKey("aField").background().unique().sparse().dropDuplicates());
     }
 };
 
@@ -312,7 +312,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(),
+        db.createIndex(nss(),
                        IndexSpec()
                            .addKey("aField", IndexSpec::kIndexTypeText)
                            .addKey("bField", IndexSpec::kIndexTypeText)
@@ -331,7 +331,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(),
+        db.createIndex(nss(),
                        IndexSpec()
                            .addKey("aField", IndexSpec::kIndexTypeGeo2D)
                            .geo2DBits(20)
@@ -348,7 +348,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(),
+        db.createIndex(nss(),
                        IndexSpec()
                            .addKey("aField", IndexSpec::kIndexTypeGeo2DSphere)
                            .geo2DSphereIndexVersion(2));
@@ -363,7 +363,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(), IndexSpec().addKey("aField", IndexSpec::kIndexTypeHashed));
+        db.createIndex(nss(), IndexSpec().addKey("aField", IndexSpec::kIndexTypeHashed));
     }
 };
 
@@ -375,8 +375,8 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(), IndexSpec().addKey("aField"));
-        ASSERT_THROWS(db.createIndex(ns(), IndexSpec().addKey("aField").unique()),
+        db.createIndex(nss(), IndexSpec().addKey("aField"));
+        ASSERT_THROWS(db.createIndex(nss(), IndexSpec().addKey("aField").unique()),
                       AssertionException);
     }
 };

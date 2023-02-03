@@ -136,7 +136,7 @@ public:
         auto opCtx = operationContext();
         DBDirectClient client(opCtx);
         client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
-        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
         client.createCollection(NamespaceString::kConfigReshardingOperationsNamespace.ns());
         client.createCollection(CollectionType::ConfigNS.ns());

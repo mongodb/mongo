@@ -1351,11 +1351,16 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 22801, 5, "Result from benchRun thread [safe remove]", "result"_attr = result);
         } break;
         case OpType::CREATEINDEX:
-            conn->createIndex(
-                this->ns, this->key, boost::none /* writeConcernObj */, this->tenantId);
+            conn->createIndex(NamespaceString(this->tenantId, this->ns),
+                              this->key,
+                              boost::none /* writeConcernObj */,
+                              true);
             break;
         case OpType::DROPINDEX:
-            conn->dropIndex(this->ns, this->key, boost::none /* writeConcernObj */, this->tenantId);
+            conn->dropIndex(NamespaceString(this->tenantId, this->ns),
+                            this->key,
+                            boost::none /* writeConcernObj */,
+                            true);
             break;
         case OpType::LET: {
             BSONObjBuilder templateBuilder;

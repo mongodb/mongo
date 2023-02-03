@@ -290,7 +290,7 @@ public:
         auto opCtx = serviceContext->makeOperationContext(Client::getCurrent());
         DBDirectClient client(opCtx.get());
         client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
-        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
 
         MongoDSessionCatalog::set(

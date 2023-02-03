@@ -133,13 +133,13 @@ public:
         return res;
     }
 
-    void dropIndexes(const std::string& ns) {
-        _client.dropIndexes(ns);
+    void dropIndexes(const NamespaceString& nss) {
+        _client.dropIndexes(nss);
         _refreshCollection();
     }
 
-    void dropIndex(const std::string& ns, BSONObj keys) {
-        _client.dropIndex(ns, keys);
+    void dropIndex(const NamespaceString& nss, BSONObj keys) {
+        _client.dropIndex(nss, keys);
         _refreshCollection();
     }
 
@@ -267,7 +267,7 @@ TEST_F(PlanExecutorInvalidationTest, CollScanExecutorDoesNotDieWhenAllIndicesDro
     }
 
     exec->saveState();
-    dropIndexes(nss.ns());
+    dropIndexes(nss);
     exec->restoreState(&collection());
 
     // Read the rest of the collection.
@@ -290,7 +290,7 @@ TEST_F(PlanExecutorInvalidationTest, CollScanExecutorDoesNotDieWhenOneIndexDropp
     }
 
     exec->saveState();
-    dropIndex(nss.ns(), BSON("foo" << 1));
+    dropIndex(nss, BSON("foo" << 1));
     exec->restoreState(&collection());
 
     // Read the rest of the collection.
@@ -318,7 +318,7 @@ TEST_F(PlanExecutorInvalidationTest, IxscanExecutorDiesWhenAllIndexesDropped) {
 
     // Drop the index which the plan executor is scanning while the executor is in a saved state.
     exec->saveState();
-    dropIndexes(nss.ns());
+    dropIndexes(nss);
 
     // Restoring the executor should throw.
     ASSERT_THROWS_CODE(exec->restoreState(&collection()), DBException, ErrorCodes::QueryPlanKilled);
@@ -339,7 +339,7 @@ TEST_F(PlanExecutorInvalidationTest, IxscanExecutorDiesWhenIndexBeingScannedIsDr
 
     // Drop all indexes while the executor is saved.
     exec->saveState();
-    dropIndex(nss.ns(), keyPattern);
+    dropIndex(nss, keyPattern);
 
     // Restoring the executor should throw.
     ASSERT_THROWS_CODE(exec->restoreState(&collection()), DBException, ErrorCodes::QueryPlanKilled);
@@ -363,7 +363,7 @@ TEST_F(PlanExecutorInvalidationTest, IxscanExecutorSurvivesWhenUnrelatedIndexIsD
     // Drop an index which the plan executor is *not* scanning while the executor is in a saved
     // state.
     exec->saveState();
-    dropIndex(nss.ns(), keyPatternBar);
+    dropIndex(nss, keyPatternBar);
     exec->restoreState(&collection());
 
     // Scan the rest of the index.

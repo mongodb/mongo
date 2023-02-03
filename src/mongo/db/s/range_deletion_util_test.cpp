@@ -845,7 +845,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotCrashWhenShardKeyIndexDoes
     }
 
     DBDirectClient client(_opCtx);
-    client.createIndex(kNss.ns(), BSON("x" << 1));
+    client.createIndex(kNss, BSON("x" << 1));
 
     cleanupComplete.get();
 }

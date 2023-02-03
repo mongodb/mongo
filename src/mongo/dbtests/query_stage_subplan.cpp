@@ -68,7 +68,7 @@ public:
     }
 
     void dropIndex(BSONObj keyPattern) {
-        _client.dropIndex(nss.ns(), std::move(keyPattern));
+        _client.dropIndex(nss, std::move(keyPattern));
     }
 
     void insert(const BSONObj& doc) {
