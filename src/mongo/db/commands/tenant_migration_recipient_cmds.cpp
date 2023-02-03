@@ -45,22 +45,30 @@ namespace {
 
 // This function requires the definition of MigrationDecision. It cannot be moved to
 // tenant_migration_util.h as this would cause a dependency cycle.
-inline void protocolCheckRecipientForgetDecision(
-    const MigrationProtocolEnum protocol, const boost::optional<MigrationDecisionEnum>& committed) {
+inline TenantMigrationRecipientStateEnum protocolCheckRecipientForgetDecision(
+    const MigrationProtocolEnum protocol, const boost::optional<MigrationDecisionEnum>& decision) {
     switch (protocol) {
         case MigrationProtocolEnum::kShardMerge: {
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "'decision' is required for protocol '"
                                   << MigrationProtocol_serializer(protocol) << "'",
-                    committed.has_value());
-            break;
+                    decision.has_value());
+
+            // For 'shard merge', return 'kAborted' or 'kCommitted' to allow garbage collection to
+            // proceed.
+            if (decision == MigrationDecisionEnum::kCommitted) {
+                return TenantMigrationRecipientStateEnum::kCommitted;
+            } else {
+                return TenantMigrationRecipientStateEnum::kAborted;
+            }
         }
         case MigrationProtocolEnum::kMultitenantMigrations: {
+            // For 'multitenant migration' simply return kDone.
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "'decision' must be empty for protocol '"
                                   << MigrationProtocol_serializer(protocol) << "'",
-                    !committed.has_value());
-            break;
+                    !decision.has_value());
+            return TenantMigrationRecipientStateEnum::kDone;
         }
         default:
             MONGO_UNREACHABLE;
@@ -280,7 +288,8 @@ public:
             tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol, tenantId);
             tenant_migration_util::protocolTenantIdsCompatibilityCheck(migrationProtocol,
                                                                        tenantIds);
-            protocolCheckRecipientForgetDecision(migrationProtocol, cmd.getDecision());
+            auto nextState =
+                protocolCheckRecipientForgetDecision(migrationProtocol, cmd.getDecision());
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             auto recipientService =
@@ -309,11 +318,11 @@ public:
                 stateDoc.setRecipientCertificateForDonor(cmd.getRecipientCertificateForDonor());
             }
             stateDoc.setProtocol(migrationProtocol);
-            // Set the state to 'kDone' so that we don't create a recipient access blocker
-            // unnecessarily if this recipientForgetMigration command is received before a
-            // recipientSyncData command or after the state doc is garbage collected.
-            stateDoc.setState(TenantMigrationRecipientStateEnum::kDone);
-
+            // Set the state to 'kDone' for 'multitenant migration' or 'kCommitted'/'kAborted' for
+            // 'shard merge' so that we don't create a recipient access blocker unnecessarily if
+            // this recipientForgetMigration command is received before a recipientSyncData command
+            // or after the state doc is garbage collected.
+            stateDoc.setState(nextState);
 
             if (MONGO_unlikely(returnResponseOkForRecipientForgetMigrationCmd.shouldFail())) {
                 LOGV2(5949502,
@@ -327,7 +336,7 @@ public:
                 opCtx, recipientService, stateDoc.toBSON(), false);
 
             // Instruct the instance run() function to mark this migration garbage collectable.
-            recipientInstance->onReceiveRecipientForgetMigration(opCtx);
+            recipientInstance->onReceiveRecipientForgetMigration(opCtx, nextState);
             recipientInstance->getForgetMigrationDurableFuture().get(opCtx);
         }
 

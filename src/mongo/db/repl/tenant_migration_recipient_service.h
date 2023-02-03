@@ -109,7 +109,8 @@ public:
         /**
          * Interrupts the migration for garbage collection.
          */
-        void onReceiveRecipientForgetMigration(OperationContext* opCtx);
+        void onReceiveRecipientForgetMigration(OperationContext* opCtx,
+                                               const TenantMigrationRecipientStateEnum& nextState);
 
         /**
          * Returns a Future that will be resolved when data sync associated with this Instance has
@@ -589,6 +590,13 @@ public:
          */
         void _stopOrHangOnFailPoint(FailPoint* fp, OperationContext* opCtx = nullptr);
 
+        /*
+         * Parse the "state" field contained in the failpoint into a
+         * TenantMigrationRecipientStateEnum. The field must be present and be a valid terminal
+         * state.
+         */
+        TenantMigrationRecipientStateEnum _getTerminalStateFromFailpoint(FailPoint* fp);
+
         /**
          * Updates the state doc in the database and waits for that to be propagated to a majority.
          */
@@ -714,7 +722,8 @@ public:
         SharedPromise<void> _dataSyncCompletionPromise;  // (W)
         // Promise that is resolved when the recipientForgetMigration command is received or on
         // stepDown/shutDown with errors.
-        SharedPromise<void> _receivedRecipientForgetMigrationPromise;  // (W)
+        SharedPromise<TenantMigrationRecipientStateEnum>
+            _receivedRecipientForgetMigrationPromise;  // (W)
         // Promise that is resolved when the instance has been durably marked garbage collectable
         SharedPromise<void> _forgetMigrationDurablePromise;  // (W)
         // Waiters are notified when 'tenantOplogApplier' is valid on restart.

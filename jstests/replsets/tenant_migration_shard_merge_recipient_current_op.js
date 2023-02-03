@@ -240,7 +240,7 @@ forgetMigrationThread.start();
     currOp = res.inprog[0];
     assert.eq(currOp.dataSyncCompleted, true, res);
     // State, completion status and expireAt should have changed.
-    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kDone, res);
+    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kCommitted, res);
     assert.eq(currOp.garbageCollectable, true, res);
     assert(currOp.hasOwnProperty("expireAt") && currOp.expireAt instanceof Date, res);
 }

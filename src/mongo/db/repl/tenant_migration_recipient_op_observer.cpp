@@ -91,6 +91,8 @@ void handleMTMStateChange(OperationContext* opCtx,
             }
             break;
         case TenantMigrationRecipientStateEnum::kDone:
+        case TenantMigrationRecipientStateEnum::kCommitted:
+        case TenantMigrationRecipientStateEnum::kAborted:
             break;
         default:
             MONGO_UNREACHABLE_TASSERT(6112900);
@@ -118,6 +120,8 @@ void handleShardMergeStateChange(OperationContext* opCtx,
             }
             break;
         case TenantMigrationRecipientStateEnum::kDone:
+        case TenantMigrationRecipientStateEnum::kCommitted:
+        case TenantMigrationRecipientStateEnum::kAborted:
             break;
     }
 }
@@ -147,6 +151,8 @@ void handleShardMergeDocInsertion(const TenantMigrationRecipientDocument& doc,
             });
         } break;
         case TenantMigrationRecipientStateEnum::kDone:
+        case TenantMigrationRecipientStateEnum::kAborted:
+        case TenantMigrationRecipientStateEnum::kCommitted:
             break;
         default:
             MONGO_UNREACHABLE;

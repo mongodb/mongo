@@ -669,6 +669,8 @@ TenantMigrationTest.RecipientState = {
     kConsistent: "consistent",
     kDone: "done",
     kLearnedFilenames: "learned filenames",
+    kCommitted: "committed",
+    kAborted: "aborted",
 };
 
 TenantMigrationTest.RecipientStateEnum =

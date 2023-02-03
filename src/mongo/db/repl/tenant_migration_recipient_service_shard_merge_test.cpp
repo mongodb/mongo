@@ -145,7 +145,10 @@ public:
         // Automatically mark the state doc garbage collectable after data sync completion.
         globalFailPointRegistry()
             .find("autoRecipientForgetMigration")
-            ->setMode(FailPoint::alwaysOn);
+            ->setMode(FailPoint::alwaysOn,
+                      0,
+                      BSON("state"
+                           << "aborted"));
 
         {
             auto opCtx = cc().makeOperationContext();
@@ -690,6 +693,102 @@ TEST_F(TenantMigrationRecipientServiceShardMergeTest, OpenBackupCursorAndRetries
 
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
     ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
+}
+
+TEST_F(TenantMigrationRecipientServiceShardMergeTestInsert, TestInsertAbortedDocument) {
+    const UUID migrationUUID = UUID::gen();
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+
+    auto fp = globalFailPointRegistry().find("pauseTenantMigrationRecipientBeforeDeletingStateDoc");
+    auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "",
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setProtocol(MigrationProtocolEnum::kShardMerge);
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+    initialStateDocument.setTenantIds(_tenants);
+    initialStateDocument.setState(TenantMigrationRecipientStateEnum::kAborted);
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
+    {
+        instance = TenantMigrationRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+    }
+
+    ASSERT_EQ(ErrorCodes::TenantMigrationForgotten,
+              instance->getDataSyncCompletionFuture().getNoThrow().code());
+
+    fp->waitForTimesEntered(initialTimesEntered + 1);
+    checkStateDocPersisted(opCtx.get(), instance.get());
+    auto stateDoc = getStateDoc(instance.get());
+    ASSERT_EQ(stateDoc.getState(), TenantMigrationRecipientStateEnum::kAborted);
+
+    fp->setMode(FailPoint::off);
+
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow().code());
+}
+
+TEST_F(TenantMigrationRecipientServiceShardMergeTest, TestForgetMigrationAborted) {
+    const UUID migrationUUID = UUID::gen();
+
+    auto deletionFp =
+        globalFailPointRegistry().find("pauseTenantMigrationRecipientBeforeDeletingStateDoc");
+    auto deletionFpTimesEntered = deletionFp->setMode(FailPoint::alwaysOn);
+
+    auto fp =
+        globalFailPointRegistry().find("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
+    auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn,
+                                           0,
+                                           BSON("action"
+                                                << "hang"));
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+    getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
+    insertTopOfOplog(&replSet, OpTime(Timestamp(5, 1), 1));
+
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "",
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setProtocol(MigrationProtocolEnum::kShardMerge);
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+    initialStateDocument.setTenantIds(_tenants);
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
+    {
+        instance = TenantMigrationRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        fp->waitForTimesEntered(initialTimesEntered + 1);
+
+        instance->onReceiveRecipientForgetMigration(opCtx.get(),
+                                                    TenantMigrationRecipientStateEnum::kAborted);
+
+        fp->setMode(FailPoint::off);
+    }
+
+    ASSERT_EQ(ErrorCodes::TenantMigrationForgotten,
+              instance->getDataSyncCompletionFuture().getNoThrow().code());
+
+    deletionFp->waitForTimesEntered(deletionFpTimesEntered + 1);
+    checkStateDocPersisted(opCtx.get(), instance.get());
+    auto stateDoc = getStateDoc(instance.get());
+    ASSERT_EQ(stateDoc.getState(), TenantMigrationRecipientStateEnum::kAborted);
+
+    deletionFp->setMode(FailPoint::off);
+
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow().code());
 }
 
 #endif

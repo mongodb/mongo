@@ -38,6 +38,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/config.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
@@ -46,6 +47,7 @@
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/ops/write_ops_exec.h"
@@ -100,6 +102,12 @@ constexpr int kCloseCursorBeforeOpenErrorCode = 50886;
 NamespaceString getOplogBufferNs(const UUID& migrationUUID) {
     return NamespaceString(NamespaceString::kConfigDb,
                            kOplogBufferPrefix + migrationUUID.toString());
+}
+
+bool isMigrationCompleted(TenantMigrationRecipientStateEnum state) {
+    return state == TenantMigrationRecipientStateEnum::kDone ||
+        state == TenantMigrationRecipientStateEnum::kAborted ||
+        state == TenantMigrationRecipientStateEnum::kCommitted;
 }
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx) {
@@ -348,8 +356,7 @@ void TenantMigrationRecipientService::checkIfConflictsWithOtherInstances(
         auto existingTypedInstance =
             checked_cast<const TenantMigrationRecipientService::Instance*>(instance);
         auto existingState = existingTypedInstance->getState();
-        auto isDone = existingState.getState() == TenantMigrationRecipientStateEnum::kDone &&
-            existingState.getExpireAt();
+        auto isDone = isMigrationCompleted(existingState.getState()) && existingState.getExpireAt();
 
         if (isDone) {
             continue;
@@ -913,7 +920,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
                 "connectionString"_attr = _donorConnectionString,
                 "readPreference"_attr = _readPreference);
 
-    if (_stateDoc.getState() != TenantMigrationRecipientStateEnum::kDone) {
+    if (!isMigrationCompleted(_stateDoc.getState())) {
         _stateDoc.setState(TenantMigrationRecipientStateEnum::kStarted);
     } else {
         // If we don't have a startAt field, we shouldn't have an expireAt either.
@@ -1997,6 +2004,41 @@ void TenantMigrationRecipientService::Instance::_stopOrHangOnFailPoint(FailPoint
     }
 }
 
+TenantMigrationRecipientStateEnum
+TenantMigrationRecipientService::Instance::_getTerminalStateFromFailpoint(FailPoint* fp) {
+    TenantMigrationRecipientStateEnum state{TenantMigrationRecipientStateEnum::kUninitialized};
+
+    fp->executeIf(
+        [&](const BSONObj& data) {
+            LOGV2(7221600,
+                  "Tenant migration recipient instance: parsing state from failpoint",
+                  "tenantId"_attr = getTenantId(),
+                  "migrationId"_attr = getMigrationUUID(),
+                  "name"_attr = fp->getName(),
+                  "args"_attr = data);
+            auto fpState = TenantMigrationRecipientState_parse(
+                IDLParserContext("TenantMigrationRecipientStateEnum"), data["state"].str());
+            switch (fpState) {
+                case TenantMigrationRecipientStateEnum::kDone:
+                case TenantMigrationRecipientStateEnum::kCommitted:
+                case TenantMigrationRecipientStateEnum::kAborted:
+                    state = fpState;
+                    break;
+                default:
+                    LOGV2(7221601,
+                          "Ignoring failpoint state because it is not a terminal state",
+                          "fpState"_attr = fpState);
+                    break;
+            }
+        },
+        [&](const BSONObj& data) {
+            auto state = data["state"].str();
+            return !state.empty();
+        });
+
+    return state;
+}
+
 OpTime TenantMigrationRecipientService::Instance::_getOplogResumeApplyingDonorOptime(
     const OpTime& cloneFinishedRecipientOpTime) const {
     auto opCtx = cc().makeOperationContext();
@@ -2243,6 +2285,15 @@ void setPromiseOkifNotReady(WithLock lk, Promise& promise) {
     promise.emplaceValue();
 }
 
+template <class Promise, class Value>
+void setPromiseValueIfNotReady(WithLock lk, Promise& promise, Value& value) {
+    if (promise.getFuture().isReady()) {
+        return;
+    }
+
+    promise.emplaceValue(value);
+}
+
 }  // namespace
 
 void TenantMigrationRecipientService::Instance::onMemberImportedFiles(
@@ -2294,42 +2345,99 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarba
     invariant(_stateDocPersistedPromise.getFuture().isReady());
     _stateDocPersistedPromise.getFuture().get();
 
-    stdx::lock_guard lk(_mutex);
+    invariant(_receivedRecipientForgetMigrationPromise.getFuture().isReady());
+    auto nextState = _receivedRecipientForgetMigrationPromise.getFuture().get();
 
+    stdx::lock_guard lk(_mutex);
     if (_stateDoc.getExpireAt()) {
         // Nothing to do if the state doc already has the expireAt set.
         return SemiFuture<void>::makeReady();
     }
 
-    _stateDoc.setState(TenantMigrationRecipientStateEnum::kDone);
-    _stateDoc.setExpireAt(_serviceContext->getFastClockSource()->now() +
-                          Milliseconds{repl::tenantMigrationGarbageCollectionDelayMS.load()});
+    auto preImageDoc = _stateDoc.toBSON();
 
     return ExecutorFuture(**_scopedExecutor)
-        .then([this, self = shared_from_this(), stateDoc = _stateDoc] {
-            auto opCtx = cc().makeOperationContext();
-            auto status = [&]() {
-                try {
-                    // Update the state doc with the expireAt set.
-                    return tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(),
-                                                                                stateDoc);
-                } catch (DBException& ex) {
-                    return ex.toStatus();
-                }
-            }();
+        .then([this, self = shared_from_this(), nextState, preImageDoc] {
+            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtx = opCtxHolder.get();
+            AutoGetCollection collection(
+                opCtx, NamespaceString::kTenantMigrationRecipientsNamespace, MODE_IX);
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << NamespaceString::kTenantMigrationRecipientsNamespace.ns()
+                                  << " does not exist",
+                    collection);
 
-            if (!status.isOK()) {
-                // We assume that we only fail with shutDown/stepDown errors (i.e. for failovers).
-                // Otherwise, the whole chain would stop running without marking the state doc
-                // garbage collectable while we are still the primary.
-                invariant(ErrorCodes::isShutdownError(status) ||
-                          ErrorCodes::isNotPrimaryError(status));
-                uassertStatusOK(status);
-            }
+            writeConflictRetry(
+                opCtx,
+                "markTenantMigrationRecipientStateDocGarbageCollectable",
+                NamespaceString::kTenantMigrationRecipientsNamespace.ns(),
+                [&]() {
+                    WriteUnitOfWork wuow(opCtx);
+                    auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
 
-            auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-            return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(writeOpTime, CancellationToken::uncancelable());
+                    auto stateDoc = [&]() {
+                        stdx::lock_guard<Latch> lg(_mutex);
+                        switch (nextState) {
+                            case TenantMigrationRecipientStateEnum::kAborted:
+                                _stateDoc.setAbortOpTime(oplogSlot);
+                                break;
+                            case TenantMigrationRecipientStateEnum::kCommitted:
+                            case TenantMigrationRecipientStateEnum::kDone:
+                                break;
+                            default:
+                                uasserted(ErrorCodes::InternalError,
+                                          "Invalid state when marking state document "
+                                          "as garbage collectable");
+                                break;
+                        }
+                        _stateDoc.setState(nextState);
+                        _stateDoc.setExpireAt(
+                            _serviceContext->getFastClockSource()->now() +
+                            Milliseconds{repl::tenantMigrationGarbageCollectionDelayMS.load()});
+
+                        return _stateDoc.toBSON();
+                    }();
+
+                    const auto originalRecordId = Helpers::findOne(
+                        opCtx, collection.getCollection(), BSON("_id" << _migrationUuid));
+                    const auto originalSnapshot =
+                        Snapshotted<BSONObj>(opCtx->recoveryUnit()->getSnapshotId(), preImageDoc);
+
+                    invariant(!originalRecordId.isNull(),
+                              str::stream() << "Existing tenant migration state document "
+                                               "not found for id: "
+                                            << getMigrationUUID());
+
+                    CollectionUpdateArgs args{originalSnapshot.value()};
+                    args.criteria = BSON("_id" << _migrationUuid);
+                    args.oplogSlots = {oplogSlot};
+                    args.update = stateDoc;
+
+                    collection_internal::updateDocument(opCtx,
+                                                        *collection,
+                                                        originalRecordId,
+                                                        originalSnapshot,
+                                                        stateDoc,
+                                                        collection_internal::kUpdateAllIndexes,
+                                                        nullptr /* OpDebug* */,
+                                                        &args);
+
+
+                    wuow.commit();
+                });
+
+            return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+        })
+        .then([this, self = shared_from_this()](repl::OpTime opTime) {
+            return WaitForMajorityService::get(_serviceContext)
+                .waitUntilMajority(opTime, CancellationToken::uncancelable());
+        })
+        .onError([](Status status) {
+            // We assume that we only fail with shutDown/stepDown errors (i.e. for
+            // failovers). Otherwise, the whole chain would stop running without marking the
+            // state doc garbage collectable while we are still the primary
+            invariant(ErrorCodes::isShutdownError(status) || ErrorCodes::isNotPrimaryError(status));
+            uassertStatusOK(status);
         })
         .semi();
 }
@@ -2410,7 +2518,20 @@ void TenantMigrationRecipientService::Instance::cancelMigration() {
 }
 
 void TenantMigrationRecipientService::Instance::onReceiveRecipientForgetMigration(
-    OperationContext* opCtx) {
+    OperationContext* opCtx, const TenantMigrationRecipientStateEnum& nextState) {
+
+    switch (_protocol) {
+        case MigrationProtocolEnum::kMultitenantMigrations:
+            invariant(nextState == TenantMigrationRecipientStateEnum::kDone);
+            break;
+        case MigrationProtocolEnum::kShardMerge:
+            invariant(nextState == TenantMigrationRecipientStateEnum::kAborted ||
+                      nextState == TenantMigrationRecipientStateEnum::kCommitted);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
     LOGV2(4881400,
           "Forgetting migration due to recipientForgetMigration command",
           "migrationId"_attr = getMigrationUUID(),
@@ -2424,7 +2545,7 @@ void TenantMigrationRecipientService::Instance::onReceiveRecipientForgetMigratio
         if (_receivedRecipientForgetMigrationPromise.getFuture().isReady()) {
             return;
         }
-        _receivedRecipientForgetMigrationPromise.emplaceValue();
+        _receivedRecipientForgetMigrationPromise.emplaceValue(nextState);
     }
 
     // Interrupt the chain to mark the state doc garbage collectable.
@@ -2896,7 +3017,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
 
                        if (_stateDoc.getState() !=
                                TenantMigrationRecipientStateEnum::kUninitialized &&
-                           _stateDoc.getState() != TenantMigrationRecipientStateEnum::kDone &&
+                           !isMigrationCompleted(_stateDoc.getState()) &&
                            !_stateDocPersistedPromise.getFuture().isReady() &&
                            !_stateDoc.getExpireAt()) {
                            // If our state is initialized and we haven't fulfilled the
@@ -2937,8 +3058,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            uassert(ErrorCodes::TenantMigrationForgotten,
                                    str::stream() << "Migration " << getMigrationUUID()
                                                  << " already marked for garbage collection",
-                                   _stateDoc.getState() !=
-                                           TenantMigrationRecipientStateEnum::kDone &&
+                                   !isMigrationCompleted(_stateDoc.getState()) &&
                                        !_stateDoc.getExpireAt());
                        }
 
@@ -3088,11 +3208,19 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
 
             // Handle recipientForgetMigration.
             stdx::lock_guard lk(_mutex);
-            if (_stateDoc.getExpireAt() ||
-                MONGO_unlikely(autoRecipientForgetMigration.shouldFail()) ||
-                status.code() == ErrorCodes::ConflictingServerlessOperation) {
-                // Skip waiting for the recipientForgetMigration command.
-                setPromiseOkifNotReady(lk, _receivedRecipientForgetMigrationPromise);
+            if (_stateDoc.getExpireAt()) {
+                auto state = _stateDoc.getState();
+                setPromiseValueIfNotReady(lk, _receivedRecipientForgetMigrationPromise, state);
+            } else if (status.code() == ErrorCodes::ConflictingServerlessOperation) {
+                auto state = _protocol == MigrationProtocolEnum::kShardMerge
+                    ? TenantMigrationRecipientStateEnum::kAborted
+                    : TenantMigrationRecipientStateEnum::kDone;
+                setPromiseValueIfNotReady(lk, _receivedRecipientForgetMigrationPromise, state);
+            } else if (MONGO_unlikely(autoRecipientForgetMigration.shouldFail())) {
+                auto state = _getTerminalStateFromFailpoint(&autoRecipientForgetMigration);
+                if (state != TenantMigrationRecipientStateEnum::kUninitialized) {
+                    setPromiseValueIfNotReady(lk, _receivedRecipientForgetMigrationPromise, state);
+                }
             }
         })
         .thenRunOn(**_scopedExecutor)
@@ -3101,7 +3229,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             // waiting for the recipientForgetMigration command.
             return _receivedRecipientForgetMigrationPromise.getFuture();
         })
-        .then([this, self = shared_from_this(), token] {
+        .then([this, self = shared_from_this(), token](
+                  const boost::optional<TenantMigrationRecipientStateEnum>& state) {
             auto expireAt = [&]() {
                 stdx::lock_guard<Latch> lg(_mutex);
                 return _stateDoc.getExpireAt();

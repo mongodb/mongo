@@ -61,6 +61,8 @@ enums:
             kConsistent: "consistent"
             kDone: "done"
             kLearnedFilenames: "learned filenames"
+            kCommitted: "committed"
+            kAborted: "aborted"
 
 structs:
     tenantMigrationDonorDocument:
@@ -274,3 +276,9 @@ structs:
                 type: array<tenant_id>
                 optional: true
                 description: "The tenants list for Shard Merge."
+            abortOpTime:
+                type: optime
+                description:
+                    The opTime at which the donor's state document was set to 'aborted'. Only set
+                    for 'shard merge' when it goes into 'aborted' state.
+                optional: true

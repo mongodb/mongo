@@ -27,11 +27,18 @@
  *    it in the license file.
  */
 
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -238,6 +245,266 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, TestValidateNssBeingMigrated) {
     // Finally everything works.
     tenant_migration_access_blocker::validateNssIsBeingMigrated(
         kTenantId, NamespaceString{NamespaceString::kAdminDb, "test"}, migrationId);
+}
+
+class RecoverAccessBlockerTest : public ServiceContextMongoDTest {
+public:
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+
+        auto serviceContext = getServiceContext();
+        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
+        repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
+
+        {
+            auto opCtx = makeOperationContext();
+            repl::createOplog(opCtx.get());
+        }
+
+        stepUp();
+    }
+
+protected:
+    void insertStateDocument(const NamespaceString& nss, const BSONObj& obj) {
+        auto opCtx = makeOperationContext();
+
+        AutoGetCollection collection(opCtx.get(), nss, MODE_IX);
+
+        writeConflictRetry(opCtx.get(), "insertStateDocument", nss.ns(), [&]() {
+            const auto filter = BSON("_id" << obj["_id"]);
+            const auto updateMod = BSON("$setOnInsert" << obj);
+            auto updateResult =
+                Helpers::upsert(opCtx.get(), nss, filter, updateMod, /*fromMigrate=*/false);
+
+            invariant(!updateResult.numDocsModified);
+            invariant(!updateResult.upsertedId.isEmpty());
+        });
+    }
+
+    void stepUp() {
+        auto opCtx = makeOperationContext();
+        auto replCoord = repl::ReplicationCoordinator::get(getServiceContext());
+        auto currOpTime = replCoord->getMyLastAppliedOpTime();
+
+        // Advance the term and last applied opTime. We retain the timestamp component of the
+        // current last applied opTime to avoid log messages from
+        // ReplClientInfo::setLastOpToSystemLastOpTime() about the opTime having moved backwards.
+        ++_term;
+        auto newOpTime = repl::OpTime{currOpTime.getTimestamp(), _term};
+
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+        ASSERT_OK(replCoord->updateTerm(opCtx.get(), _term));
+        replCoord->setMyLastAppliedOpTimeAndWallTime({newOpTime, {}});
+    }
+
+    long long _term = 0;
+    UUID _uuid = UUID::gen();
+    MockReplicaSet _replSet{
+        "donorSetForTest", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
+    Timestamp _startMigration{10, 1};
+    TenantMigrationRecipientDocument _recipientDoc{
+        _uuid,
+        _replSet.getConnectionString(),
+        "" /* tenantId */,
+        _startMigration,
+        mongo::ReadPreferenceSetting(ReadPreference::PrimaryOnly)};
+    std::vector<TenantId> _tenantIds{TenantId{OID::gen()}, TenantId{OID::gen()}};
+};
+
+TEST_F(RecoverAccessBlockerTest, RecoverRecipientBlockerStarted) {
+    _recipientDoc.setProtocol(MigrationProtocolEnum::kShardMerge);
+    _recipientDoc.setTenantIds(_tenantIds);
+    _recipientDoc.setState(TenantMigrationRecipientStateEnum::kStarted);
+
+    insertStateDocument(NamespaceString::kTenantMigrationRecipientsNamespace,
+                        _recipientDoc.toBSON());
+
+    auto opCtx = makeOperationContext();
+    tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx.get());
+
+    for (const auto& tenantId : _tenantIds) {
+        auto mtab = TenantMigrationAccessBlockerRegistry::get(getServiceContext())
+                        .getTenantMigrationAccessBlockerForTenantId(
+                            tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+        ASSERT(mtab);
+        auto readFuture = mtab->getCanReadFuture(opCtx.get(), "dummyCmd");
+        ASSERT_TRUE(readFuture.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(readFuture.get(),
+                                    DBException,
+                                    ErrorCodes::SnapshotTooOld,
+                                    "Tenant read is not allowed before migration completes");
+    }
+}
+
+TEST_F(RecoverAccessBlockerTest, ShardMergeAbortedWithoutFCV) {
+    _recipientDoc.setProtocol(MigrationProtocolEnum::kShardMerge);
+    _recipientDoc.setTenantIds(_tenantIds);
+    _recipientDoc.setState(TenantMigrationRecipientStateEnum::kAborted);
+
+    insertStateDocument(NamespaceString::kTenantMigrationRecipientsNamespace,
+                        _recipientDoc.toBSON());
+
+    auto opCtx = makeOperationContext();
+    tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx.get());
+
+    for (const auto& tenantId : _tenantIds) {
+        auto mtab = TenantMigrationAccessBlockerRegistry::get(getServiceContext())
+                        .getTenantMigrationAccessBlockerForTenantId(
+                            tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+        ASSERT(!mtab);
+    }
+}
+
+TEST_F(RecoverAccessBlockerTest, ShardMergeAbortedWithFCV) {
+    _recipientDoc.setProtocol(MigrationProtocolEnum::kShardMerge);
+    _recipientDoc.setTenantIds(_tenantIds);
+    _recipientDoc.setState(TenantMigrationRecipientStateEnum::kAborted);
+    _recipientDoc.setRecipientPrimaryStartingFCV(
+        multiversion::FeatureCompatibilityVersion::kVersion_6_3);
+
+    insertStateDocument(NamespaceString::kTenantMigrationRecipientsNamespace,
+                        _recipientDoc.toBSON());
+
+    auto opCtx = makeOperationContext();
+    tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx.get());
+
+    for (const auto& tenantId : _tenantIds) {
+        auto mtab = TenantMigrationAccessBlockerRegistry::get(getServiceContext())
+                        .getTenantMigrationAccessBlockerForTenantId(
+                            tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+        ASSERT(mtab);
+        auto readFuture = mtab->getCanReadFuture(opCtx.get(), "dummyCmd");
+        ASSERT_TRUE(readFuture.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(readFuture.get(),
+                                    DBException,
+                                    ErrorCodes::SnapshotTooOld,
+                                    "Tenant read is not allowed before migration completes");
+    }
+}
+
+TEST_F(RecoverAccessBlockerTest, ShardMergeCommittedWithoutFCV) {
+    _recipientDoc.setProtocol(MigrationProtocolEnum::kShardMerge);
+    _recipientDoc.setTenantIds(_tenantIds);
+    _recipientDoc.setState(TenantMigrationRecipientStateEnum::kCommitted);
+
+    insertStateDocument(NamespaceString::kTenantMigrationRecipientsNamespace,
+                        _recipientDoc.toBSON());
+
+    auto opCtx = makeOperationContext();
+    tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx.get());
+
+    for (const auto& tenantId : _tenantIds) {
+        auto mtab = TenantMigrationAccessBlockerRegistry::get(getServiceContext())
+                        .getTenantMigrationAccessBlockerForTenantId(
+                            tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+        ASSERT(!mtab);
+    }
+}
+
+TEST_F(RecoverAccessBlockerTest, ShardMergeCommittedWithFCV) {
+    _recipientDoc.setProtocol(MigrationProtocolEnum::kShardMerge);
+    _recipientDoc.setTenantIds(_tenantIds);
+    _recipientDoc.setState(TenantMigrationRecipientStateEnum::kCommitted);
+    _recipientDoc.setRecipientPrimaryStartingFCV(
+        multiversion::FeatureCompatibilityVersion::kVersion_6_3);
+
+    insertStateDocument(NamespaceString::kTenantMigrationRecipientsNamespace,
+                        _recipientDoc.toBSON());
+
+    auto opCtx = makeOperationContext();
+    tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx.get());
+
+    for (const auto& tenantId : _tenantIds) {
+        auto mtab = TenantMigrationAccessBlockerRegistry::get(getServiceContext())
+                        .getTenantMigrationAccessBlockerForTenantId(
+                            tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+        ASSERT(mtab);
+        auto readFuture = mtab->getCanReadFuture(opCtx.get(), "dummyCmd");
+        ASSERT_TRUE(readFuture.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(readFuture.get(),
+                                    DBException,
+                                    ErrorCodes::SnapshotTooOld,
+                                    "Tenant read is not allowed before migration completes");
+    }
+}
+
+TEST_F(RecoverAccessBlockerTest, ShardMergeLearnedFiles) {
+    _recipientDoc.setProtocol(MigrationProtocolEnum::kShardMerge);
+    _recipientDoc.setTenantIds(_tenantIds);
+    _recipientDoc.setState(TenantMigrationRecipientStateEnum::kLearnedFilenames);
+
+    insertStateDocument(NamespaceString::kTenantMigrationRecipientsNamespace,
+                        _recipientDoc.toBSON());
+
+    auto opCtx = makeOperationContext();
+    tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx.get());
+
+    for (const auto& tenantId : _tenantIds) {
+        auto mtab = TenantMigrationAccessBlockerRegistry::get(getServiceContext())
+                        .getTenantMigrationAccessBlockerForTenantId(
+                            tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+        ASSERT(mtab);
+    }
+}
+
+TEST_F(RecoverAccessBlockerTest, ShardMergeConsistent) {
+    _recipientDoc.setProtocol(MigrationProtocolEnum::kShardMerge);
+    _recipientDoc.setTenantIds(_tenantIds);
+    _recipientDoc.setState(TenantMigrationRecipientStateEnum::kConsistent);
+
+    insertStateDocument(NamespaceString::kTenantMigrationRecipientsNamespace,
+                        _recipientDoc.toBSON());
+
+    auto opCtx = makeOperationContext();
+    tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx.get());
+
+    for (const auto& tenantId : _tenantIds) {
+        auto mtab = TenantMigrationAccessBlockerRegistry::get(getServiceContext())
+                        .getTenantMigrationAccessBlockerForTenantId(
+                            tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+        ASSERT(mtab);
+        auto readFuture = mtab->getCanReadFuture(opCtx.get(), "dummyCmd");
+        ASSERT_TRUE(readFuture.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(readFuture.get(),
+                                    DBException,
+                                    ErrorCodes::SnapshotTooOld,
+                                    "Tenant read is not allowed before migration completes");
+    }
+}
+
+TEST_F(RecoverAccessBlockerTest, ShardMergeRejectBeforeTimestamp) {
+    _recipientDoc.setProtocol(MigrationProtocolEnum::kShardMerge);
+    _recipientDoc.setTenantIds(_tenantIds);
+    _recipientDoc.setState(TenantMigrationRecipientStateEnum::kCommitted);
+    _recipientDoc.setRejectReadsBeforeTimestamp(Timestamp{20, 1});
+    _recipientDoc.setRecipientPrimaryStartingFCV(
+        multiversion::FeatureCompatibilityVersion::kVersion_6_3);
+
+    insertStateDocument(NamespaceString::kTenantMigrationRecipientsNamespace,
+                        _recipientDoc.toBSON());
+
+    {
+        auto opCtx = makeOperationContext();
+        tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx.get());
+    }
+
+    for (const auto& tenantId : _tenantIds) {
+        auto opCtx = makeOperationContext();
+        auto mtab = TenantMigrationAccessBlockerRegistry::get(getServiceContext())
+                        .getTenantMigrationAccessBlockerForTenantId(
+                            tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+        ASSERT(mtab);
+        auto readFuture = mtab->getCanReadFuture(opCtx.get(), "dummyCmd");
+        ASSERT_TRUE(readFuture.isReady());
+        ASSERT_OK(readFuture.getNoThrow());
+
+        repl::ReadConcernArgs::get(opCtx.get()) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+        repl::ReadConcernArgs::get(opCtx.get()).setArgsAtClusterTimeForSnapshot(Timestamp{15, 1});
+        auto readFutureAtClusterTime = mtab->getCanReadFuture(opCtx.get(), "dummyCmd");
+        ASSERT_TRUE(readFuture.isReady());
+        ASSERT_OK(readFuture.getNoThrow());
+    }
 }
 
 TEST_F(TenantMigrationAccessBlockerUtilTest, TestAccessBlockerWithNonTenantIdString) {

@@ -66,17 +66,21 @@ namespace tenant_migration_access_blocker {
 namespace {
 using MtabType = TenantMigrationAccessBlocker::BlockerType;
 
+bool noDataHasBeenCopiedByRecipient(const TenantMigrationRecipientDocument& doc) {
+    // We always set recipientPrimaryStartingFCV before copying any data. If it is not set, it means
+    // no data has been copied during the current instance's lifetime.
+    return !doc.getRecipientPrimaryStartingFCV();
+}
+
 bool recoverTenantMigrationRecipientAccessBlockers(const TenantMigrationRecipientDocument& doc,
                                                    OperationContext* opCtx) {
-    // The only case where we do not create the mtab is when we are sure
-    // 1) we have not copied any data
-    //      - We set startingFCV before copying any data
-    // 2) we won't copy any data
-    //      - The document is set to kDone only after data copy is finished or won't start (the
-    //      migration has completed or aborted)
-    // Therefore checking the state is kDone and startingFCV is not set ensures correctness.
-    if (doc.getState() == TenantMigrationRecipientStateEnum::kDone &&
-        !doc.getRecipientPrimaryStartingFCV()) {
+    // Do not create the mtab when:
+    // 1) The migration was forgotten before receiving a 'recipientSyncData'.
+    // 2) A delayed 'recipientForgetMigration' was received after the state doc was deleted.
+    if ((doc.getState() == TenantMigrationRecipientStateEnum::kDone ||
+         doc.getState() == TenantMigrationRecipientStateEnum::kAborted ||
+         doc.getState() == TenantMigrationRecipientStateEnum::kCommitted) &&
+        noDataHasBeenCopiedByRecipient(doc)) {
         return true;
     }
 
@@ -105,6 +109,8 @@ bool recoverTenantMigrationRecipientAccessBlockers(const TenantMigrationRecipien
             break;
         case TenantMigrationRecipientStateEnum::kConsistent:
         case TenantMigrationRecipientStateEnum::kDone:
+        case TenantMigrationRecipientStateEnum::kCommitted:
+        case TenantMigrationRecipientStateEnum::kAborted:
             if (doc.getRejectReadsBeforeTimestamp()) {
                 mtab->startRejectingReadsBefore(doc.getRejectReadsBeforeTimestamp().get());
             }

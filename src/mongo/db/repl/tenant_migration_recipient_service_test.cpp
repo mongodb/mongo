@@ -187,8 +187,10 @@ public:
         // Automatically mark the state doc garbage collectable after data sync completion.
         globalFailPointRegistry()
             .find("autoRecipientForgetMigration")
-            ->setMode(FailPoint::alwaysOn);
-
+            ->setMode(FailPoint::alwaysOn,
+                      0,
+                      BSON("state"
+                           << "done"));
         {
             auto opCtx = cc().makeOperationContext();
             auto replCoord = std::make_unique<ReplicationCoordinatorMock>(serviceContext);
@@ -2681,7 +2683,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_BeforeRun) 
 
     // Test that receiving recipientForgetMigration command after that should result in the same
     // error.
-    ASSERT_THROWS_CODE(instance->onReceiveRecipientForgetMigration(opCtx.get()),
+    ASSERT_THROWS_CODE(instance->onReceiveRecipientForgetMigration(
+                           opCtx.get(), TenantMigrationRecipientStateEnum::kDone),
                        AssertionException,
                        ErrorCodes::InterruptedDueToReplStateChange);
 
@@ -2712,7 +2715,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToIniti
     auto instance = repl::TenantMigrationRecipientService::Instance::getOrCreate(
         opCtx.get(), _service, initialStateDocument.toBSON());
 
-    ASSERT_THROWS_CODE(instance->onReceiveRecipientForgetMigration(opCtx.get()),
+    ASSERT_THROWS_CODE(instance->onReceiveRecipientForgetMigration(
+                           opCtx.get(), TenantMigrationRecipientStateEnum::kDone),
                        AssertionException,
                        ErrorCodes::NotWritablePrimary);
     // We should fail to mark the state doc garbage collectable if we have failed to initialize and
@@ -2760,7 +2764,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_WaitUntilSt
     opCtx->setDeadlineAfterNowBy(Seconds(2), opCtx->getTimeoutError());
     // Advance time past deadline.
     advanceTime(Milliseconds(3000));
-    ASSERT_THROWS_CODE(instance->onReceiveRecipientForgetMigration(opCtx.get()),
+    ASSERT_THROWS_CODE(instance->onReceiveRecipientForgetMigration(
+                           opCtx.get(), TenantMigrationRecipientStateEnum::kDone),
                        AssertionException,
                        opCtx->getTimeoutError());
 
@@ -2780,7 +2785,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_WaitUntilSt
 
         // Test that onReceiveRecipientForgetMigration goes through now that the state doc has been
         // persisted.
-        instance->onReceiveRecipientForgetMigration(opCtx.get());
+        instance->onReceiveRecipientForgetMigration(opCtx.get(),
+                                                    TenantMigrationRecipientStateEnum::kDone);
     }
 
     ASSERT_EQ(instance->getDataSyncCompletionFuture().getNoThrow(),
@@ -2842,7 +2848,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterStartO
     ASSERT(instance.get());
 
     fp->waitForTimesEntered(initialTimesEntered + 1);
-    instance->onReceiveRecipientForgetMigration(opCtx.get());
+    instance->onReceiveRecipientForgetMigration(opCtx.get(),
+                                                TenantMigrationRecipientStateEnum::kDone);
 
     // Skip the cloners in this test, so we provide an empty list of databases.
     MockRemoteDBServer* const _donorServer =
@@ -2937,10 +2944,12 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterConsis
         checkStateDocPersisted(opCtx.get(), instance.get());
     }
 
-    instance->onReceiveRecipientForgetMigration(opCtx.get());
+    instance->onReceiveRecipientForgetMigration(opCtx.get(),
+                                                TenantMigrationRecipientStateEnum::kDone);
 
     // Test receiving duplicating recipientForgetMigration requests.
-    instance->onReceiveRecipientForgetMigration(opCtx.get());
+    instance->onReceiveRecipientForgetMigration(opCtx.get(),
+                                                TenantMigrationRecipientStateEnum::kDone);
 
     // Continue after data being consistent.
     dataConsistentFp->setMode(FailPoint::off);
@@ -3037,7 +3046,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterFail) 
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
 
     // The instance should still be running and waiting for the recipientForgetMigration command.
-    instance->onReceiveRecipientForgetMigration(opCtx.get());
+    instance->onReceiveRecipientForgetMigration(opCtx.get(),
+                                                TenantMigrationRecipientStateEnum::kDone);
     ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     {
@@ -3100,7 +3110,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToMarkG
                                           ErrorCodes::NotWritablePrimary);
 
     // The instance should still be running and waiting for the recipientForgetMigration command.
-    instance->onReceiveRecipientForgetMigration(opCtx.get());
+    instance->onReceiveRecipientForgetMigration(opCtx.get(),
+                                                TenantMigrationRecipientStateEnum::kDone);
     // Check that it fails to mark the state doc garbage collectable.
     ASSERT_EQ(ErrorCodes::NotWritablePrimary,
               instance->getForgetMigrationDurableFuture().getNoThrow().code());
@@ -3599,7 +3610,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientWillNotRetryOnReceivingForg
     // After the migration is interrupted successfully, signal migration that we received
     // recipientForgetMigration command. And, that should make the migration not to retry
     // on retryable error.
-    instance->onReceiveRecipientForgetMigration(opCtx.get());
+    instance->onReceiveRecipientForgetMigration(opCtx.get(),
+                                                TenantMigrationRecipientStateEnum::kDone);
     hangMigrationBeforeRetryCheckFp->setMode(FailPoint::off);
 
     // Wait for task completion failure.
