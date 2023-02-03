@@ -112,6 +112,7 @@ private:
         auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
         uassertStatusOK(balancerConfig->setBalancerMode(opCtx, BalancerSettingsType::kFull));
         uassertStatusOK(balancerConfig->enableAutoSplit(opCtx, true));
+        uassertStatusOK(balancerConfig->changeAutoMergeSettings(opCtx, true));
         Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged(opCtx);
         ShardingLogging::get(opCtx)->logAction(opCtx, "balancer.start", "", BSONObj()).ignore();
     }
@@ -131,6 +132,7 @@ private:
         auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
         uassertStatusOK(balancerConfig->setBalancerMode(opCtx, BalancerSettingsType::kOff));
         uassertStatusOK(balancerConfig->enableAutoSplit(opCtx, false));
+        uassertStatusOK(balancerConfig->changeAutoMergeSettings(opCtx, false));
 
         Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged(opCtx);
         Balancer::get(opCtx)->joinCurrentRound(opCtx);

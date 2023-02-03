@@ -764,7 +764,7 @@ Status ShardingCatalogManager::_initConfigSettings(OperationContext* opCtx) {
         BSON("properties" << BSON(
                  "_id" << BSON("enum" << BSON_ARRAY(
                                    BalancerSettingsType::kKey
-                                   << AutoSplitSettingsType::kKey
+                                   << AutoSplitSettingsType::kKey << AutoMergeSettingsType::kKey
                                    << ReadWriteConcernDefaults::kPersistedDocumentId << "audit"))));
     const auto fullValidator =
         BSON("$jsonSchema" << BSON("oneOf" << BSON_ARRAY(chunkSizeValidator << noopValidator)));

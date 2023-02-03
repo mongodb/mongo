@@ -91,6 +91,9 @@ sh.help = function() {
     print("\tsh.disableAutoSplit()                   disable autoSplit on one collection");
     print("\tsh.enableAutoSplit()                    re-enable autoSplit on one collection");
     print("\tsh.getShouldAutoSplit()                 returns whether autosplit is enabled");
+    print("\tsh.disableAutoMerge()                   disable autoMerge on one collection");
+    print("\tsh.enableAutoMerge()                    re-enable autoMerge on one collection");
+    print("\tsh.shouldAutoMerge()                    returns whether autoMerge is enabled");
     print(
         "\tsh.balancerCollectionStatus(fullName)       " +
         "returns wheter the specified collection is balanced or the balancer needs to take more actions on it");
@@ -221,6 +224,34 @@ sh.getShouldAutoSplit = function(configDB) {
         return true;
     }
     return autosplit.enabled;
+};
+
+sh.enableAutoMerge = function(configDB) {
+    if (configDB === undefined)
+        configDB = sh._getConfigDB();
+    return assert.commandWorked(
+        configDB.settings.update({_id: 'automerge'},
+                                 {$set: {enabled: true}},
+                                 {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
+};
+
+sh.disableAutoMerge = function(configDB) {
+    if (configDB === undefined)
+        configDB = sh._getConfigDB();
+    return assert.commandWorked(
+        configDB.settings.update({_id: 'automerge'},
+                                 {$set: {enabled: false}},
+                                 {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
+};
+
+sh.shouldAutoMerge = function(configDB) {
+    if (configDB === undefined)
+        configDB = sh._getConfigDB();
+    var automerge = configDB.settings.findOne({_id: 'automerge'});
+    if (automerge == null) {
+        return true;
+    }
+    return automerge.enabled;
 };
 
 sh.waitForPingChange = function(activePings, timeout, interval) {
@@ -760,6 +791,10 @@ function printShardingStatus(configDB, verbose) {
 
     // Is autosplit currently enabled
     output(2, "Currently enabled: " + (sh.getShouldAutoSplit(configDB) ? "yes" : "no"));
+
+    output(1, "automerge:");
+
+    output(2, "Currently enabled: " + (sh.shouldAutoMerge(configDB) ? "yes" : "no"));
 
     output(1, "balancer:");
 

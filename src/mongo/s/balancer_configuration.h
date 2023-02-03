@@ -51,8 +51,8 @@ class StatusWith;
  *
  * balancer: {
  *  stopped: <true|false>,
- *  mode: <full|autoSplitOnly|off>,         // Only consulted if "stopped" is missing or false
- *  activeWindow: { start: "<HH:MM>", stop: "<HH:MM>" }
+ *  mode: <full|autoSplitOnly|autoMergeOnly|off>,  // Only consulted if "stopped" is missing or
+ * false activeWindow: { start: "<HH:MM>", stop: "<HH:MM>" }
  * }
  */
 class BalancerSettingsType {
@@ -61,7 +61,8 @@ public:
     enum BalancerMode {
         kFull,           // Balancer will always try to keep the cluster even
         kAutoSplitOnly,  // Only balance on auto splits
-        kOff,            // Balancer is completely off
+        kAutoMergeOnly,
+        kOff,  // Balancer is completely off
     };
 
     // The key under which this setting is stored on the config server
@@ -203,6 +204,39 @@ private:
 };
 
 /**
+ * Utility class to parse the sharding autoMerge settings document, which has the following format:
+ *
+ * automerge: { enabled: <true|false> }
+ */
+class AutoMergeSettingsType {
+public:
+    // The key under which this setting is stored on the config server
+    static const char kKey[];
+
+    AutoMergeSettingsType() = default;
+
+    /**
+     * Constructs a settings object with the default values. To be used when no AutoMerge settings
+     * have been specified.
+     */
+    static AutoMergeSettingsType createDefault() {
+        return AutoMergeSettingsType();
+    }
+
+    /**
+     * Interprets the BSON content as autoMerge settings and extracts the respective values
+     */
+    static StatusWith<AutoMergeSettingsType> fromBSON(const BSONObj& obj);
+
+    bool isEnabled() const {
+        return _isEnabled;
+    }
+
+private:
+    bool _isEnabled{true};
+};
+
+/**
  * Contains settings, which control the behaviour of the balancer.
  */
 class BalancerConfiguration {
@@ -234,6 +268,7 @@ public:
      */
     bool shouldBalance() const;
     bool shouldBalanceForAutoSplit() const;
+    bool shouldBalanceForAutoMerge() const;
 
     /**
      * Returns the secondary throttle options for the balancer.
@@ -270,6 +305,15 @@ public:
     }
 
     /**
+     * Change the cluster wide auto merge settings.
+     */
+    Status changeAutoMergeSettings(OperationContext* opCtx, bool enable);
+
+    bool shouldAutoMerge() const {
+        return _shouldAutoMerge.loadRelaxed();
+    }
+
+    /**
      * Blocking method, which refreshes the balancer configuration from the settings in the
      * config.settings collection. It will stop at the first bad configuration value and return an
      * error indicating what failed. The value for the bad configuration and the ones after it will
@@ -300,6 +344,12 @@ private:
      */
     Status _refreshAutoSplitSettings(OperationContext* opCtx);
 
+    /**
+     * Reloads the autoMerge configuration from the settings document. Fails if the settings
+     * document cannot be read.
+     */
+    Status _refreshAutoMergeSettings(OperationContext* opCtx);
+
     // The latest read balancer settings and a mutex to protect its swaps
     mutable Mutex _balancerSettingsMutex =
         MONGO_MAKE_LATCH("BalancerConfiguration::_balancerSettingsMutex");
@@ -309,6 +359,7 @@ private:
     // is read on the critical path after each write operation, that's why it is cached.
     AtomicWord<unsigned long long> _maxChunkSizeBytes;
     AtomicWord<bool> _shouldAutoSplit;
+    AtomicWord<bool> _shouldAutoMerge;
 };
 
 }  // namespace mongo
