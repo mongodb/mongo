@@ -22,9 +22,8 @@ const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 
-const columnstoreEnabled = checkSBEEnabled(rst.getPrimary().getDB(dbName),
-                                           ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"],
-                                           true) &&
+const columnstoreEnabled =
+    checkSBEEnabled(rst.getPrimary().getDB(dbName), ["featureFlagColumnstoreIndexes"], true) &&
     setUpServerForColumnStoreIndexTest(rst.getPrimary().getDB(dbName));
 
 const runTests = function(docs, indexSpecsFlat, collNameSuffix) {

@@ -8,8 +8,7 @@
 load("jstests/libs/sbe_util.js");      // For 'checkSBEEnabled()'.
 load("jstests/libs/analyze_plan.js");  // For 'getAggPlanStages' and other explain helpers.
 
-const conn =
-    MongoRunner.runMongod({setParameter: {featureFlagSbeFull: true, allowDiskUseByDefault: true}});
+const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: true}});
 assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB(jsTestName());

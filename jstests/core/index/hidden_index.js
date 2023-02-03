@@ -25,8 +25,7 @@ load("jstests/libs/sbe_util.js");                  // For checkSBEEnabled.
 load("jstests/libs/columnstore_util.js");          // For setUpServerForColumnStoreIndexTest.
 
 const columnstoreEnabled =
-    checkSBEEnabled(
-        db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true /* checkAllNodes */) &&
+    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"], true /* checkAllNodes */) &&
     setUpServerForColumnStoreIndexTest(db);
 
 const collName = "hidden_index";

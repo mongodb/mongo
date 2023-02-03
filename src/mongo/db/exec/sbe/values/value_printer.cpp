@@ -163,9 +163,6 @@ void ValuePrinter<T>::writeTagToStream(TypeTags tag) {
         case TypeTags::indexBounds:
             stream << "indexBounds";
             break;
-        case TypeTags::classicMatchExpresion:
-            stream << "classicMatchExpression";
-            break;
         case TypeTags::csiCell:
             stream << "csiCell";
             break;
@@ -538,9 +535,6 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             writeStringDataToStream(
                 getIndexBoundsView(val)->toString(true /* hasNonSimpleCollation */));
             stream << ")";
-            break;
-        case TypeTags::classicMatchExpresion:
-            stream << "ClassicMatcher(" << getClassicMatchExpressionView(val)->toString() << ")";
             break;
         case TypeTags::csiCell:
             stream << "CsiCell(" << getCsiCellView(val) << ")";

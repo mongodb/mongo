@@ -180,8 +180,8 @@ rst.initiate();
 const primaryDB = rst.getPrimary().getDB(dbName);
 const secondaryDB = rst.getSecondary().getDB(dbName);
 
-if (checkSBEEnabled(primaryDB, ["featureFlagSbeFull"])) {
-    jsTest.log("Skipping test because SBE is fully enabled");
+if (checkSBEEnabled(primaryDB)) {
+    jsTest.log("Skipping test because SBE is enabled");
     rst.stopSet();
     return;
 }

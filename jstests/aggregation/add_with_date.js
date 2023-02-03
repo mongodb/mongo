@@ -28,8 +28,6 @@ assert.commandWorked(coll.insert({
     nanDecimal: NumberDecimal("NaN"),
 }));
 
-const isSBEEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
-
 // Adding a Decimal128 value to a date literal.
 assert.eq(ISODate("2019-01-30T07:30:10.957Z"),
           getResultOfExpression({$add: ["$decimalVal", ISODate("2019-01-30T07:30:10.137Z")]}));

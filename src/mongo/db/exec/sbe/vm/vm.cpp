@@ -166,7 +166,6 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
 
     -1,  // fail
 
-    0,  // applyClassicMatcher
     0,  // dateTruncImm
 };
 
@@ -479,18 +478,6 @@ void CodeFragment::appendNumericConvert(value::TypeTags targetTag) {
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, targetTag);
-    adjustStackSimple(i);
-}
-
-void CodeFragment::appendApplyClassicMatcher(const MatchExpression* matcher) {
-    Instruction i;
-    i.tag = Instruction::applyClassicMatcher;
-
-    auto offset = allocateSpace(sizeof(Instruction) + sizeof(matcher));
-
-    offset += writeToMemory(offset, i);
-    offset += writeToMemory(offset, matcher);
-
     adjustStackSimple(i);
 }
 
@@ -5750,28 +5737,6 @@ MONGO_COMPILER_NORETURN void ByteCode::runFailInstruction() {
 
     uasserted(code, message);
 }
-
-void ByteCode::runClassicMatcher(const MatchExpression* matcher) {
-    auto [ownedObj, tagObj, valObj] = getFromStack(0);
-
-    BSONObj bsonObjForMatching;
-    if (tagObj == value::TypeTags::Object) {
-        BSONObjBuilder builder;
-        sbe::bson::convertToBsonObj(builder, sbe::value::getObjectView(valObj));
-        bsonObjForMatching = builder.obj();
-    } else if (tagObj == value::TypeTags::bsonObject) {
-        auto bson = value::getRawPointerView(valObj);
-        bsonObjForMatching = BSONObj(bson);
-    } else {
-        MONGO_UNREACHABLE_TASSERT(6681402);
-    }
-
-    bool res = matcher->matchesBSON(bsonObjForMatching);
-    if (ownedObj) {
-        value::releaseValue(tagObj, valObj);
-    }
-    topStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(res));
-}
 template <typename T>
 void ByteCode::runTagCheck(const uint8_t*& pcPointer, T&& predicate) {
     auto [popParam, offsetParam] = decodeParam(pcPointer);
@@ -6780,13 +6745,6 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             }
             case Instruction::fail: {
                 runFailInstruction();
-                break;
-            }
-            case Instruction::applyClassicMatcher: {
-                const auto* matcher = readFromMemory<const MatchExpression*>(pcPointer);
-                pcPointer += sizeof(matcher);
-
-                runClassicMatcher(matcher);
                 break;
             }
             case Instruction::dateTruncImm: {

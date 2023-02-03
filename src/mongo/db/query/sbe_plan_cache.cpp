@@ -48,27 +48,23 @@ const auto sbePlanCacheDecoration =
 class PlanCacheOnParamChangeUpdaterImpl final : public plan_cache_util::OnParamChangeUpdater {
 public:
     void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
-        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-            auto newSizeBytes = memory_util::getRequestedMemSizeInBytes(memSize);
-            auto cappedCacheSize = memory_util::capMemorySize(newSizeBytes /*requestedSizeBytes*/,
-                                                              500 /*maximumSizeGB*/,
-                                                              25 /*percentTotalSystemMemory*/);
-            if (cappedCacheSize < newSizeBytes) {
-                LOGV2_DEBUG(6007001,
-                            1,
-                            "The plan cache size has been capped",
-                            "cappedSize"_attr = cappedCacheSize);
-            }
-            auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
-            globalPlanCache->reset(cappedCacheSize);
+        auto newSizeBytes = memory_util::getRequestedMemSizeInBytes(memSize);
+        auto cappedCacheSize = memory_util::capMemorySize(newSizeBytes /*requestedSizeBytes*/,
+                                                          500 /*maximumSizeGB*/,
+                                                          25 /*percentTotalSystemMemory*/);
+        if (cappedCacheSize < newSizeBytes) {
+            LOGV2_DEBUG(6007001,
+                        1,
+                        "The plan cache size has been capped",
+                        "cappedSize"_attr = cappedCacheSize);
         }
+        auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
+        globalPlanCache->reset(cappedCacheSize);
     }
 
     void clearCache(ServiceContext* serviceCtx) final {
-        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-            auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
-            globalPlanCache->clear();
-        }
+        auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
+        globalPlanCache->clear();
     }
 };
 
@@ -77,38 +73,29 @@ ServiceContext::ConstructorActionRegisterer planCacheRegisterer{
         plan_cache_util::sbePlanCacheOnParamChangeUpdater(serviceCtx) =
             std::make_unique<PlanCacheOnParamChangeUpdaterImpl>();
 
-        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-            auto status = memory_util::MemorySize::parse(planCacheSize.get());
-            uassertStatusOK(status);
-            auto size = memory_util::getRequestedMemSizeInBytes(status.getValue());
-            auto cappedCacheSize = memory_util::capMemorySize(size /*requestedSizeBytes*/,
-                                                              500 /*maximumSizeGB*/,
-                                                              25 /*percentTotalSystemMemory*/);
-            if (cappedCacheSize < size) {
-                LOGV2_DEBUG(6007000,
-                            1,
-                            "The plan cache size has been capped",
-                            "cappedSize"_attr = cappedCacheSize);
-            }
-            auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
-            globalPlanCache =
-                std::make_unique<sbe::PlanCache>(cappedCacheSize, ProcessInfo::getNumCores());
+        auto status = memory_util::MemorySize::parse(planCacheSize.get());
+        uassertStatusOK(status);
+        auto size = memory_util::getRequestedMemSizeInBytes(status.getValue());
+        auto cappedCacheSize = memory_util::capMemorySize(
+            size /*requestedSizeBytes*/, 500 /*maximumSizeGB*/, 25 /*percentTotalSystemMemory*/);
+        if (cappedCacheSize < size) {
+            LOGV2_DEBUG(6007000,
+                        1,
+                        "The plan cache size has been capped",
+                        "cappedSize"_attr = cappedCacheSize);
         }
+        auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
+        globalPlanCache =
+            std::make_unique<sbe::PlanCache>(cappedCacheSize, ProcessInfo::getNumCores());
     }};
 
 }  // namespace
 
 sbe::PlanCache& getPlanCache(ServiceContext* serviceCtx) {
-    uassert(5933402,
-            "Cannot getPlanCache() if 'featureFlagSbeFull' is disabled",
-            feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV());
     return *sbePlanCacheDecoration(serviceCtx);
 }
 
 sbe::PlanCache& getPlanCache(OperationContext* opCtx) {
-    uassert(5933401,
-            "Cannot getPlanCache() if 'featureFlagSbeFull' is disabled",
-            feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV());
     tassert(5933400, "Cannot get the global SBE plan cache by a nullptr", opCtx);
     return getPlanCache(opCtx->getServiceContext());
 }
@@ -117,32 +104,29 @@ void clearPlanCacheEntriesWith(ServiceContext* serviceCtx,
                                UUID collectionUuid,
                                size_t collectionVersion,
                                bool matchSecondaryCollections) {
-    if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-        auto removed =
-            sbe::getPlanCache(serviceCtx)
-                .removeIf([&collectionUuid, collectionVersion, matchSecondaryCollections](
-                              const PlanCacheKey& key, const sbe::PlanCacheEntry& entry) {
-                    if (key.getMainCollectionState().version == collectionVersion &&
-                        key.getMainCollectionState().uuid == collectionUuid) {
-                        return true;
-                    }
-                    if (matchSecondaryCollections) {
-                        for (auto& collectionState : key.getSecondaryCollectionStates()) {
-                            if (collectionState.version == collectionVersion &&
-                                collectionState.uuid == collectionUuid) {
-                                return true;
-                            }
-                        }
-                    }
-                    return false;
-                });
+    auto removed = sbe::getPlanCache(serviceCtx)
+                       .removeIf([&collectionUuid, collectionVersion, matchSecondaryCollections](
+                                     const PlanCacheKey& key, const sbe::PlanCacheEntry& entry) {
+                           if (key.getMainCollectionState().version == collectionVersion &&
+                               key.getMainCollectionState().uuid == collectionUuid) {
+                               return true;
+                           }
+                           if (matchSecondaryCollections) {
+                               for (auto& collectionState : key.getSecondaryCollectionStates()) {
+                                   if (collectionState.version == collectionVersion &&
+                                       collectionState.uuid == collectionUuid) {
+                                       return true;
+                                   }
+                               }
+                           }
+                           return false;
+                       });
 
-        LOGV2_DEBUG(6006600,
-                    1,
-                    "Clearing SBE Plan Cache",
-                    "collectionUuid"_attr = collectionUuid,
-                    "collectionVersion"_attr = collectionVersion,
-                    "removedEntries"_attr = removed);
-    }
+    LOGV2_DEBUG(6006600,
+                1,
+                "Clearing SBE Plan Cache",
+                "collectionUuid"_attr = collectionUuid,
+                "collectionVersion"_attr = collectionVersion,
+                "removedEntries"_attr = removed);
 }
 }  // namespace mongo::sbe

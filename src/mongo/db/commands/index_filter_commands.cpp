@@ -203,12 +203,9 @@ Status ClearFilters::runIndexFilterCommand(OperationContext* opCtx,
     invariant(querySettings);
 
     PlanCache* planCacheClassic = CollectionQueryInfo::get(collection).getPlanCache();
-    sbe::PlanCache* planCacheSBE = nullptr;
     invariant(planCacheClassic);
-
-    if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-        planCacheSBE = &sbe::getPlanCache(opCtx);
-    }
+    sbe::PlanCache* planCacheSBE = &sbe::getPlanCache(opCtx);
+    invariant(planCacheSBE);
 
     return clear(opCtx, collection, cmdObj, querySettings, planCacheClassic, planCacheSBE);
 }
@@ -327,12 +324,9 @@ Status SetFilter::runIndexFilterCommand(OperationContext* opCtx,
     invariant(querySettings);
 
     PlanCache* planCacheClassic = CollectionQueryInfo::get(collection).getPlanCache();
-    sbe::PlanCache* planCacheSBE = nullptr;
     invariant(planCacheClassic);
-
-    if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-        planCacheSBE = &sbe::getPlanCache(opCtx);
-    }
+    sbe::PlanCache* planCacheSBE = &sbe::getPlanCache(opCtx);
+    invariant(planCacheSBE);
 
     return set(opCtx, collection, cmdObj, querySettings, planCacheClassic, planCacheSBE);
 }

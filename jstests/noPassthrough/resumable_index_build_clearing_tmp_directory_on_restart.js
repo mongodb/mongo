@@ -30,8 +30,7 @@ rst.initiate();
 // Insert enough data so that the collection scan spills to disk.
 const primary = rst.getPrimary();
 const columnstoreEnabled =
-    checkSBEEnabled(
-        primary.getDB(dbName), ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true) &&
+    checkSBEEnabled(primary.getDB(dbName), ["featureFlagColumnstoreIndexes"], true) &&
     setUpServerForColumnStoreIndexTest(primary.getDB(dbName));
 const coll = primary.getDB(dbName).getCollection(jsTestName());
 const bulk = coll.initializeUnorderedBulkOp();

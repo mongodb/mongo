@@ -849,9 +849,6 @@ class SbeCodeFragmentPrinter(object):
                     'Instruction::Constants: ' + str(const_enum) + \
                     ", offset: " + str(read_as_integer_signed(cur_op, int_size))
                 cur_op += int_size
-            elif op_name in ['applyClassicMatcher']:
-                args = 'MatchExpression* ' + hex(read_as_integer(cur_op, ptr_size))
-                cur_op += ptr_size
             elif op_name in ['dateTruncImm']:
                 unit = read_as_integer(cur_op, time_unit_size)
                 cur_op += time_unit_size

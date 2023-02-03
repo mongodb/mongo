@@ -666,7 +666,7 @@ public:
         _fromPlanCache = val;
     }
 
-    bool isRecoveredFromPlanCache() {
+    bool isRecoveredFromPlanCache() const {
         return _fromPlanCache;
     }
 
@@ -1148,64 +1148,25 @@ protected:
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildCachedPlan(
         const sbe::PlanCacheKey& planCacheKey) final {
         if (shouldCacheQuery(*_cq)) {
-            if (!feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-                return buildCachedPlanFromClassicCache();
-            } else {
-                getResult()->planCacheInfo().planCacheKey = planCacheKey.planCacheKeyHash();
+            getResult()->planCacheInfo().planCacheKey = planCacheKey.planCacheKeyHash();
 
-                auto&& planCache = sbe::getPlanCache(_opCtx);
-                auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
-                if (!cacheEntry) {
-                    return nullptr;
-                }
-
-                auto&& cachedPlan = std::move(cacheEntry->cachedPlan);
-                auto root = std::move(cachedPlan->root);
-                auto stageData = std::move(cachedPlan->planStageData);
-                stageData.debugInfo = cacheEntry->debugInfo;
-
-                auto result = releaseResult();
-                result->setDecisionWorks(cacheEntry->decisionWorks);
-                result->setRecoveredPinnedCacheEntry(cacheEntry->isPinned());
-                result->emplace(std::make_pair(std::move(root), std::move(stageData)));
-                result->setRecoveredFromPlanCache(true);
-                return result;
+            auto&& planCache = sbe::getPlanCache(_opCtx);
+            auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
+            if (!cacheEntry) {
+                return nullptr;
             }
-        }
 
-        return nullptr;
-    }
+            auto&& cachedPlan = std::move(cacheEntry->cachedPlan);
+            auto root = std::move(cachedPlan->root);
+            auto stageData = std::move(cachedPlan->planStageData);
+            stageData.debugInfo = cacheEntry->debugInfo;
 
-    // A temporary function to allow recovering SBE plans from the classic plan cache. When the
-    // feature flag for "SBE full" is disabled, we are still able to use the classic plan cache for
-    // queries that execute in SBE.
-    //
-    // TODO SERVER-64882: Remove this function when "featureFlagSbeFull" is removed.
-    std::unique_ptr<SlotBasedPrepareExecutionResult> buildCachedPlanFromClassicCache() {
-        const auto& mainColl = getMainCollection();
-        auto planCacheKey = plan_cache_key_factory::make<PlanCacheKey>(*_cq, mainColl);
-        getResult()->planCacheInfo().planCacheKey = planCacheKey.planCacheKeyHash();
-
-        // Try to look up a cached solution for the query.
-        if (auto cs = CollectionQueryInfo::get(mainColl).getPlanCache()->getCacheEntryIfActive(
-                planCacheKey)) {
-            initializePlannerParamsIfNeeded();
-            // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
-            auto statusWithQs = QueryPlanner::planFromCache(*_cq, _plannerParams, *cs);
-
-            if (statusWithQs.isOK()) {
-                auto querySolution = std::move(statusWithQs.getValue());
-                if (_cq->isCountLike() && turnIxscanIntoCount(querySolution.get())) {
-                    LOGV2_DEBUG(
-                        20923, 2, "Using fast count", "query"_attr = redact(_cq->toStringShort()));
-                }
-
-                auto result = releaseResult();
-                addSolutionToResult(result.get(), std::move(querySolution));
-                result->setDecisionWorks(cs->decisionWorks);
-                result->setRecoveredFromPlanCache(true);
-                return result;
-            }
+            auto result = releaseResult();
+            result->setDecisionWorks(cacheEntry->decisionWorks);
+            result->setRecoveredPinnedCacheEntry(cacheEntry->isPinned());
+            result->emplace(std::make_pair(std::move(root), std::move(stageData)));
+            result->setRecoveredFromPlanCache(true);
+            return result;
         }
 
         return nullptr;
@@ -1429,56 +1390,52 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
 }
 
 /**
- * Checks if the result of query planning is SBE compatible.
+ * Checks if the result of query planning is SBE compatible. In this function, 'sbeFull' indicates
+ * whether the full set of features supported by SBE is enabled, while 'canUseRegularSbe' indicates
+ * whether the query is compatible with the subset of SBE enabled by default.
  */
 bool shouldPlanningResultUseSbe(bool sbeFull,
+                                bool canUseRegularSbe,
                                 bool columnIndexPresent,
-                                bool aggSpecificStagesPushedDown,
                                 const SlotBasedPrepareExecutionResult& planningResult) {
+    // If we have an entry in the SBE plan cache, then we can use SBE.
+    if (planningResult.isRecoveredFromPlanCache()) {
+        return true;
+    }
+
     // For now this function assumes one of these is true. If all are false, we should not use
     // SBE.
     tassert(6164401,
-            "Expected sbeFull, or a CSI present, or agg specific stages pushed down",
-            sbeFull || columnIndexPresent || aggSpecificStagesPushedDown);
+            "Expected sbeFull, or a regular SBE compatiable query, or a CSI present",
+            sbeFull || canUseRegularSbe || columnIndexPresent);
 
     const auto& solutions = planningResult.solutions();
     if (solutions.empty()) {
         // Query needs subplanning (plans are generated later, we don't have access yet).
         invariant(planningResult.needsSubplanning());
 
-        // TODO: SERVER-71798 if the below conditions are not met, a column index will not be used
-        // even if it could be.
-        return sbeFull || aggSpecificStagesPushedDown;
+        // Use SBE for rooted $or queries if SBE is fully enabled or the query is SBE compatible to
+        // begin with.
+        return sbeFull || canUseRegularSbe;
     }
 
     // Check that the query solution is SBE compatible.
     const bool allStagesCompatible =
         std::all_of(solutions.begin(), solutions.end(), [](const auto& solution) {
-            return solution->root() ==
-                nullptr /* we won't have a query solution if we pulled it from the cache */
-                || isQueryPlanSbeCompatible(solution.get());
+            // We must have a solution, otherwise we would have early exited.
+            invariant(solution->root());
+            return isQueryPlanSbeCompatible(solution.get());
         });
 
     if (!allStagesCompatible) {
         return false;
     }
 
-    if (sbeFull || aggSpecificStagesPushedDown) {
+    if (sbeFull || canUseRegularSbe) {
         return true;
     }
 
-    // If no pipeline is pushed down and SBE full is off, the only other case we'll use SBE for
-    // is when a column index plan was constructed.
-    tassert(6164400, "Expected CSI to be present", columnIndexPresent);
-
-    // The only time a query solution is not available is when the plan comes from the SBE plan
-    // cache. The plan cache is gated by sbeFull, which was already checked earlier. So, at this
-    // point we're guaranteed sbeFull is off, and this further implies that the returned plan(s)
-    // did not come from the cache.
-    tassert(6164402,
-            "Did not expect a plan from the plan cache",
-            !sbeFull && solutions.front()->root());
-
+    // Return true if we have a column scan plan, and false otherwise.
     return solutions.size() == 1 &&
         solutions.front()->root()->hasNode(StageType::STAGE_COLUMN_SCAN);
 }
@@ -1518,6 +1475,38 @@ bool maybeQueryIsColumnScanEligible(OperationContext* opCtx,
 }
 
 /**
+ * Function which returns true if 'cq' uses features that are currently supported in SBE without
+ * 'featureFlagSbeFull' being set; false otherwise.
+ */
+bool shouldUseRegularSbe(const CanonicalQuery& cq) {
+    const auto* proj = cq.getProj();
+
+    // Disallow projections which use expressions.
+    if (proj && proj->hasExpressions()) {
+        return false;
+    }
+
+    // Disallow projections which have dotted paths.
+    if (proj && proj->hasDottedPaths()) {
+        return false;
+    }
+
+    // Disallow filters which feature $expr.
+    if (cq.countNodes(cq.root(), MatchExpression::MatchType::EXPRESSION) > 0) {
+        return false;
+    }
+
+    const auto& sortPattern = cq.getSortPattern();
+
+    // Disallow sorts which have a common prefix.
+    if (sortPattern && sortPatternHasPartsWithCommonPrefix(*sortPattern)) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
  * Attempts to create a slot-based executor for the query, if the query plan is eligible for SBE
  * execution. This function has three possible return values:
  *
@@ -1543,18 +1532,20 @@ attemptToGetSlotBasedExecutor(
     }
 
     const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV();
-    const bool aggSpecificStagesPushedDown = !canonicalQuery->pipeline().empty();
+    const bool canUseRegularSbe = shouldUseRegularSbe(*canonicalQuery);
 
-    // Attempt to use SBE if we find any $group/$lookup stages eligible for execution in SBE, if the
-    // query may be eligible for column scan, or if SBE is fully enabled. Otherwise, fallback to the
-    // classic engine right away.
-    if (aggSpecificStagesPushedDown || sbeFull ||
+    // Attempt to use SBE if the query may be eligible for column scan, if the currently supported
+    // subset of SBE is being used, or if SBE is fully enabled. Otherwise, fallback to the classic
+    // engine right away.
+    if (sbeFull || canUseRegularSbe ||
         maybeQueryIsColumnScanEligible(opCtx, collections, canonicalQuery.get())) {
+        // Create the SBE prepare execution helper and initialize the params for the planner. Our
+        // decision about using SBE will depend on whether there is a column index present.
+
         auto sbeYieldPolicy = makeSbeYieldPolicy(
             opCtx, yieldPolicy, &collections.getMainCollection(), canonicalQuery->nss());
         SlotBasedPrepareExecutionHelper helper{
             opCtx, collections, canonicalQuery.get(), sbeYieldPolicy.get(), plannerParams.options};
-
         auto planningResultWithStatus = helper.prepare();
         if (!planningResultWithStatus.isOK()) {
             return planningResultWithStatus.getStatus();
@@ -1563,10 +1554,8 @@ attemptToGetSlotBasedExecutor(
         const bool csiPresent =
             helper.plannerParams() && !helper.plannerParams()->columnStoreIndexes.empty();
 
-        if (shouldPlanningResultUseSbe(sbeFull,
-                                       csiPresent,
-                                       aggSpecificStagesPushedDown,
-                                       *planningResultWithStatus.getValue())) {
+        if (shouldPlanningResultUseSbe(
+                sbeFull, canUseRegularSbe, csiPresent, *planningResultWithStatus.getValue())) {
             if (extractAndAttachPipelineStages) {
                 // We know now that we will use SBE, so we need to remove the pushed-down stages
                 // from the original pipeline object.
@@ -1646,6 +1635,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
                     std::move(stdx::get<std::unique_ptr<CanonicalQuery>>(maybeExecutor));
             }
         }
+        // Ensure that 'sbeCompatible' is set accordingly.
+        canonicalQuery->setSbeCompatible(false);
         return getClassicExecutor(
             opCtx, mainColl, std::move(canonicalQuery), yieldPolicy, plannerParams);
     }();

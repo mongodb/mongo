@@ -456,7 +456,6 @@ TEST(CanonicalQueryTest, InvalidSortOrdersFailToCanonicalize) {
 }
 
 TEST(CanonicalQueryTest, DoNotParameterizeTextExpressions) {
-    RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbeFull", true);
     auto cq =
         canonicalize("{$text: {$search: \"Hello World!\"}}",
                      MatchExpressionParser::kDefaultSpecialFeatures | MatchExpressionParser::kText);
@@ -464,7 +463,6 @@ TEST(CanonicalQueryTest, DoNotParameterizeTextExpressions) {
 }
 
 TEST(CanonicalQueryTest, DoParameterizeRegularExpressions) {
-    RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbeFull", true);
     auto cq = canonicalize("{a: 1, b: {$lt: 5}}");
     ASSERT_TRUE(cq->isParameterized());
 }

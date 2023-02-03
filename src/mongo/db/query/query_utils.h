@@ -34,6 +34,12 @@
 
 namespace mongo {
 /**
+ * Returns 'true' if 'sortPattern' contains any sort pattern parts that share a common prefix, false
+ * otherwise.
+ */
+bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern);
+
+/**
  * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan.
  */
 bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& query);

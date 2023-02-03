@@ -30,8 +30,8 @@ load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
 
-const columnstoreEnabled = checkSBEEnabled(
-    db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true /* checkAllNodes */);
+const columnstoreEnabled =
+    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"], true /* checkAllNodes */);
 if (!columnstoreEnabled) {
     jsTestLog("Skipping columnstore index test since the feature flag is not enabled.");
     return;

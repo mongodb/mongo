@@ -20,8 +20,8 @@ assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB("plan_cache_key_reporting");
 const coll = db.coll;
 
-if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
-    jsTest.log("Skipping test because SBE is not fully enabled");
+if (!checkSBEEnabled(db)) {
+    jsTest.log("Skipping test because SBE is not enabled");
     MongoRunner.stopMongod(conn);
     return;
 }

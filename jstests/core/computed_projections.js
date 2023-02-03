@@ -2,14 +2,7 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For arrayEq and orderedArrayEq.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabledOnSomeNode.
-
-const isSBEEnabled = checkSBEEnabledOnSomeNode(db);
-if (isSBEEnabled) {
-    // Override error-code-checking APIs. We only load this when SBE is explicitly enabled, because
-    // it causes failures in the parallel suites.
-    load("jstests/libs/sbe_assert_error_override.js");
-}
+load("jstests/libs/sbe_assert_error_override.js");
 
 // It is safe for other tests to run while this failpoint is active, so long as those tests do not
 // use documents containing a field with "POISON" as their name. Note that this command can fail.

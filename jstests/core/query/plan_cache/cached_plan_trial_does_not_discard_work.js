@@ -12,7 +12,8 @@
 //   assumes_read_preference_unchanged,
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
-//   requires_fcv_52,
+//   # The SBE plan cache was first enabled in 6.3.
+//   requires_fcv_63,
 //   requires_profiling,
 //   # Plan cache state is node-local and will not get migrated alongside tenant data.
 //   tenant_migration_incompatible,
@@ -25,7 +26,7 @@
 load("jstests/libs/profiler.js");  // getLatestProfileEntry.
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because SBE is disabled");
     return;
 }

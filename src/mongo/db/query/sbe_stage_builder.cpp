@@ -60,6 +60,8 @@
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_accumulator.h"
 #include "mongo/db/query/sbe_stage_builder_coll_scan.h"
@@ -1215,19 +1217,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         return buildSortCovered(root, reqs);
     }
 
-    StringDataSet prefixSet;
-    bool hasPartsWithCommonPrefix = false;
+    // getExecutor() should never call into buildSlotBasedExecutableTree() when the query
+    // contains $meta, so this assertion should always be true.
     for (const auto& part : sortPattern) {
-        // getExecutor() should never call into buildSlotBasedExecutableTree() when the query
-        // contains $meta, so this assertion should always be true.
         tassert(5037002, "Sort with $meta is not supported in SBE", part.fieldPath);
-
-        if (!hasPartsWithCommonPrefix) {
-            auto [_, prefixWasNotPresent] = prefixSet.insert(part.fieldPath->getFieldName(0));
-            hasPartsWithCommonPrefix = !prefixWasNotPresent;
-        }
     }
 
+    const bool hasPartsWithCommonPrefix = sortPatternHasPartsWithCommonPrefix(sortPattern);
     auto fields = reqs.getFields();
 
     if (!hasPartsWithCommonPrefix) {

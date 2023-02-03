@@ -482,10 +482,16 @@ TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAggRequest) {
     pw.wait();
 
     DBDirectClient client(_opCtx);
+
+    // Normally, it would be useful to test an aggregation which features a match filter. However,
+    // when reading invalid BSON, we can potentially crash because the underlying query execution
+    // plan assumes that it is reading valid BSON. As such, this test case could be written to use a
+    // match filter when reading invalid BSON when it is the case that the underlying cursor can
+    // guarantee that any BSONObj given to the query execution plan is valid.
     auto aggCmdObj = fromjson(R"(
 {
     aggregate: "coll",
-    pipeline: [{$match: {a: {$lt: 5}}}],
+    pipeline: [],
     cursor: {},
     $_externalDataSources: [{
         collName: "coll",

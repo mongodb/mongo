@@ -8,7 +8,6 @@
  *   # Column store indexes are still under a feature flag and require full SBE.
  *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  *
  *   # In passthrough suites, this test makes direct connections to mongod instances that compose
  *   # the passthrough fixture in order to perform additional validation. Tenant migration,
@@ -28,8 +27,8 @@ load("jstests/libs/fixture_helpers.js");        // For isMongos
 load("jstests/libs/index_catalog_helpers.js");  // For IndexCatalogHelpers
 load("jstests/libs/sbe_util.js");               // For checkSBEEnabled.
 
-const columnstoreEnabled = checkSBEEnabled(
-    db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true /* checkAllNodes */);
+const columnstoreEnabled =
+    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"], true /* checkAllNodes */);
 if (!columnstoreEnabled) {
     jsTestLog("Skipping columnstore index test since the feature flag is not enabled.");
     return;

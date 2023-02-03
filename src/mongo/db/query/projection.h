@@ -118,6 +118,13 @@ public:
      */
     bool isFieldRetainedExactly(StringData path) const;
 
+
+    /**
+     * Returns true if this projection has any dotted paths; false otherwise.
+     */
+    bool hasDottedPaths() const {
+        return _deps.hasDottedPath;
+    }
     /**
      * A projection is considered "simple" if it operates only on top-level fields,
      * has no positional projection or expressions, and doesn't require metadata.
