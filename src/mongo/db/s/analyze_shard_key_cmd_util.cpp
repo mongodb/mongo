@@ -356,7 +356,8 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
         auto& y = recordIds;
         std::vector<int64_t> x(y.size());
         std::iota(x.begin(), x.end(), 1);
-        return boost::math::statistics::correlation_coefficient<std::vector<int64_t>>(x, y);
+        return round(boost::math::statistics::correlation_coefficient<std::vector<int64_t>>(x, y),
+                     kMaxNumDecimalPlaces);
     }();
     auto coefficientThreshold = gMonotonicityCorrelationCoefficientThreshold.load();
     LOGV2(6875302,

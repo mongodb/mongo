@@ -111,9 +111,9 @@ var AnalyzeShardKeyUtil = (function() {
         return (part * 100.0 / whole);
     }
 
-    // The analyzeShardKey command rounds the percentages two decimal places. The epsilon is chosen
+    // The analyzeShardKey command rounds numbers to 10 decimal places. The epsilon is chosen
     // to account for that.
-    function assertApprox(actual, expected, msg, epsilon = 0.015) {
+    function assertApprox(actual, expected, msg, epsilon = 1e-9) {
         return assert.lte(Math.abs(actual - expected), epsilon, {actual, expected, msg});
     }
 

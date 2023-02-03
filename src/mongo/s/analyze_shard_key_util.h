@@ -39,9 +39,17 @@
 namespace mongo {
 namespace analyze_shard_key {
 
+// The maximum number of decimal places for the metrics returned by the analyzeShardKey command.
+const int kMaxNumDecimalPlaces = 10;
+
 // The size limit for the documents to an insert in a single batch. Leave some padding for other
 // fields in the insert command.
 constexpr int kMaxBSONObjSizePerInsertBatch = BSONObjMaxUserSize - 100 * 1024;
+
+/*
+ * Rounds 'val' to 'n' decimal places.
+ */
+double round(double val, int n);
 
 /*
  * Returns the percentage between 'part' and 'whole' (between 0 and 100).

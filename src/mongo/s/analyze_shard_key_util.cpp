@@ -47,14 +47,6 @@ namespace analyze_shard_key {
 
 namespace {
 
-/*
- * Rounds 'val' to 'n' decimal places.
- */
-double round(double val, int n) {
-    const double multiplier = std::pow(10.0, n);
-    return std::ceil(val * multiplier) / multiplier;
-}
-
 /**
  * Runs the aggregate command 'aggRequest' locally and applies 'callbackFn' to each returned
  * document.
@@ -300,11 +292,16 @@ BSONObj executeWriteCommand(OperationContext* opCtx,
 
 }  // namespace
 
+double round(double val, int n) {
+    const double multiplier = std::pow(10.0, n);
+    return std::ceil(val * multiplier) / multiplier;
+}
+
 double calculatePercentage(double part, double whole) {
     invariant(part >= 0);
     invariant(whole > 0);
     invariant(part <= whole);
-    return round(part / whole * 100, 2);
+    return round(part / whole * 100, kMaxNumDecimalPlaces);
 }
 
 void runAggregate(OperationContext* opCtx,
