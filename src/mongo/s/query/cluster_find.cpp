@@ -53,6 +53,7 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/telemetry.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/overflow_arithmetic.h"
@@ -848,6 +849,8 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
                                                          opCtx,
                                                          "waitWithPinnedCursorDuringGetMoreBatch");
     }
+
+    telemetry::registerGetMoreRequest(opCtx);
 
     while (!FindCommon::enoughForGetMore(batchSize, batch.size())) {
         StatusWith<ClusterQueryResult> next =
