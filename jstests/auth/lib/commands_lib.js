@@ -3650,8 +3650,11 @@ export const authCommandsLib = {
           }]
         },
         {
-          testname: "createSearchIndex",
-          command: {createSearchIndex: "x", indexDefinition: {"testBlob": "blob"}},
+          testname: "createSearchIndexes",
+          command: {
+              createSearchIndexes: "x",
+              indexes: [{'definition': {'mappings': {'dynamic': true}}}],
+          },
           // Only enterprise knows of this command.
           skipTest: (conn) => {
               return !getBuildInfo().modules.includes("enterprise");
@@ -3670,7 +3673,8 @@ export const authCommandsLib = {
                   __system: 1
               }),
               privileges:
-                  [{resource: {db: firstDbName, collection: "x"}, actions: ["createSearchIndex"]}],
+                  [{resource: {db: firstDbName, collection: "x"}, actions: ["createSearchIndexes"]}],
+              expectFail: true,
           }]
         },
         {
@@ -4032,7 +4036,10 @@ export const authCommandsLib = {
         },
         {
           testname: "dropSearchIndex",
-          command: {dropSearchIndex: "x", indexDefinition: {"testBlob": "blob"}},
+          command: {
+              dropSearchIndex: "x",
+              name: 'indexName',
+          },
           // Only enterprise knows of this command.
           skipTest: (conn) => {
               return !getBuildInfo().modules.includes("enterprise");
@@ -4044,12 +4051,14 @@ export const authCommandsLib = {
               roles: roles_writeDbAdmin,
               privileges:
                   [{resource: {db: firstDbName, collection: "x"}, actions: ["dropSearchIndex"]}],
+              expectFail: true,
             },
             {
               runOnDb: secondDbName,
               roles: roles_writeDbAdminAny,
               privileges:
                   [{resource: {db: secondDbName, collection: "x"}, actions: ["dropSearchIndex"]}],
+              expectFail: true,
             }
           ]
         },
@@ -5165,6 +5174,7 @@ export const authCommandsLib = {
               },
               privileges:
                   [{resource: {db: firstDbName, collection: ""}, actions: ["listSearchIndexes"]}],
+              expectFail: true,
           }]
         },
         {
@@ -5301,8 +5311,12 @@ export const authCommandsLib = {
           ]
         },
         {
-          testname: "modifySearchIndex",
-          command: {modifySearchIndex: "foo", indexDefinition: {"textBlob": "blob"}},
+          testname: "updateSearchIndex",
+          command: {
+              updateSearchIndex: "foo",
+              indexID: 'index-ID-number',
+              indexDefinition: {"textBlob": "blob"},
+          },
           // Only enterprise knows of this command.
           skipTest: (conn) => {
               return !getBuildInfo().modules.includes("enterprise");
@@ -5313,14 +5327,15 @@ export const authCommandsLib = {
                 runOnDb: firstDbName,
                 roles: Object.extend({restore: 1}, roles_dbAdmin),
                 privileges:
-                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["modifySearchIndex"]}],
+                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["updateSearchIndex"]}],
                 expectFail: true,
               },
               {
                 runOnDb: secondDbName,
                 roles: Object.extend({restore: 1}, roles_dbAdminAny),
                 privileges:
-                    [{resource: {db: secondDbName, collection: "foo"}, actions: ["modifySearchIndex"]}],
+                    [{resource: {db: secondDbName, collection: "foo"}, actions: ["updateSearchIndex"]}],
+                expectFail: true,
               }
           ]
         },

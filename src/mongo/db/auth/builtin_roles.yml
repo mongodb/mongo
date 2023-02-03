@@ -55,7 +55,7 @@ roles:
                 - convertToCapped # db admin gets this also
                 - createCollection # db admin gets this also
                 - createIndex
-                - createSearchIndex
+                - createSearchIndexes
                 - dropCollection
                 - dropIndex
                 - dropSearchIndex
@@ -100,12 +100,12 @@ roles:
                 - dropIndex
                 - dropSearchIndex
                 - createIndex
-                - createSearchIndex
+                - createSearchIndexes
                 - enableProfiler
                 - listCollections
                 - listIndexes
                 - listSearchIndexes
-                - modifySearchIndex
+                - updateSearchIndex
                 - planCacheIndexFilter
                 - planCacheRead
                 - planCacheWrite
@@ -185,7 +185,7 @@ roles:
               actions: &readRoleAndIndexActions
                   - *readRoleActions
                   - createIndex
-                  - createSearchIndex
+                  - createSearchIndexes
                   - dropIndex
                   - dropSearchIndex
             - matchType: exact_namespace
@@ -509,10 +509,10 @@ roles:
                   - convertToCapped
                   - createCollection
                   - createIndex
-                  - createSearchIndex
+                  - createSearchIndexes
                   - dropCollection
                   - insert
-                  - modifySearchIndex
+                  - updateSearchIndex
             - matchType: database
               db: 'config'
               actions: *restoreRoleWriteActions

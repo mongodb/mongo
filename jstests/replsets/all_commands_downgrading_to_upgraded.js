@@ -470,7 +470,7 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({dropRole: "foo"}));
         }
     },
-    createSearchIndex: {
+    createSearchIndexes: {
         skip: isNotImplementedYet,
     },
     createUser: {
@@ -906,9 +906,6 @@ const allCommands = {
         // },
         // command: {mergeChunks: fullNs, bounds: [{_id: MinKey}, {_id: MaxKey}]}
     },
-    modifySearchIndex: {
-        skip: isNotImplementedYet,
-    },
     moveChunk: {
         skip: isNotImplementedYet,
         isShardedOnly: true,
@@ -1173,6 +1170,9 @@ const allCommands = {
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({dropRole: "foo"}));
         }
+    },
+    updateSearchIndex: {
+        skip: isNotImplementedYet,
     },
     updateUser: {
         setUp: function(conn) {

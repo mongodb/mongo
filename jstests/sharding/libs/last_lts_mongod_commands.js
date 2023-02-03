@@ -28,17 +28,17 @@ const commandsAddedToMongodSinceLastLTS = [
     "clusterInsert",
     "clusterUpdate",
     "configureQueryAnalyzer",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
-    "createSearchIndex",       // TODO (SERVER-73309): Remove once 7.0 becomes last LTS.
+    "createSearchIndexes",     // TODO (SERVER-73309): Remove once 7.0 becomes last LTS.
     "dropSearchIndex",         // TODO (SERVER-73309): Remove once 7.0 becomes last LTS.
     "getChangeStreamState",
     "getClusterParameter",
     "listDatabasesForAllTenants",
     "listSearchIndexes",  // TODO (SERVER-73309): Remove once 7.0 becomes last LTS.
-    "modifySearchIndex",  // TODO (SERVER-73309): Remove once 7.0 becomes last LTS.
     "oidcListKeys",
     "oidcRefreshKeys",
     "rotateCertificates",
     "setChangeStreamState",
     "setClusterParameter",
     "setUserWriteBlockMode",
+    "updateSearchIndex",  // TODO (SERVER-73309): Remove once 7.0 becomes last LTS.
 ];
