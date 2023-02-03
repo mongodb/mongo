@@ -92,6 +92,7 @@ void checkOplogFormatVersion(OperationContext* opCtx, const std::string& uri) {
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(WTCompactRecordStoreEBUSY);
+MONGO_FAIL_POINT_DEFINE(WTRecordStoreUassertOutOfOrder);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictException);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
 
@@ -1979,9 +1980,12 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
         return {};
     }
 
-    if (_forward && _lastReturnedId >= id) {
-        // Crash when test commands are enabled.
-        invariant(!getTestCommandsEnabled());
+    if ((_forward && _lastReturnedId >= id) ||
+        MONGO_unlikely(WTRecordStoreUassertOutOfOrder.shouldFail())) {
+        // Crash when test commands are enabled and not explicitly uasserting on out-of-order keys.
+        if (!WTRecordStoreUassertOutOfOrder.shouldFail()) {
+            invariant(!getTestCommandsEnabled());
+        }
 
         // uassert with 'DataCorruptionDetected' after logging.
         std::stringstream ss;

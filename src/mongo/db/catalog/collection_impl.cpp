@@ -1133,11 +1133,6 @@ void _genericRecordStoreValidate(OperationContext* opCtx,
         size_t validatedSize;
         Status status = indexValidator->validate(record->id, record->data, &validatedSize);
 
-        // Check to ensure isInRecordIdOrder() is being used properly.
-        if (prevRecordId.isValid()) {
-            invariant(prevRecordId < record->id);
-        }
-
         // ValidatedSize = dataSize is not a general requirement as some storage engines may use
         // padding, but we still require that they return the unpadded record data.
         if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {

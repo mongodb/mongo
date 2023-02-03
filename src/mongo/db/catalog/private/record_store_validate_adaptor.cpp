@@ -49,6 +49,9 @@
 namespace mongo {
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(failIndexKeyOrdering);
+
 // TODO SERVER-36385: Completely remove the key size check in 4.4
 bool isLargeKeyDisallowed() {
     return serverGlobalParams.featureCompatibility.getVersion() ==
@@ -153,7 +156,7 @@ void _validateKeyOrder(const IndexDescriptor* descriptor,
 
     // KeyStrings will be in strictly increasing order because all keys are sorted and they are in
     // the format (Key, RID), and all RecordIDs are unique.
-    if (currKey.compare(prevKey) <= 0) {
+    if (currKey.compare(prevKey) <= 0 || MONGO_unlikely(failIndexKeyOrdering.shouldFail())) {
         if (results && results->valid) {
             results->errors.push_back(str::stream()
                                       << "index '" << descriptor->indexName()
@@ -290,11 +293,6 @@ void RecordStoreValidateAdaptor::traverseRecordStore(RecordStore* recordStore,
         dataSizeTotal += dataSize;
         size_t validatedSize = 0;
         Status status = validate(record->id, record->data, &validatedSize);
-
-        // Checks to ensure isInRecordIdOrder() is being used properly.
-        if (prevRecordId.isValid()) {
-            invariant(prevRecordId < record->id);
-        }
 
         // While some storage engines may use padding, we still require that they return the
         // unpadded record data.
