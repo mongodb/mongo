@@ -49,9 +49,10 @@ public:
      * 'assertExprSort' and 'assertPathSort'
      */
     template <typename T, typename... Args>
-    inline auto push(Args&&... args) {
+    void push(Args&&... args) {
         push(ABT::make<T>(std::forward<Args>(args)...));
     }
+
     void push(ABT node);
 
     /*

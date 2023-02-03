@@ -142,8 +142,8 @@ ProjectionNameSet extractReferencedColumns(const properties::PhysProps& properti
     return PropertiesAffectedColumnsExtractor::extract(properties);
 }
 
-void restrictProjections(ProjectionNameVector projNames, ABT& input) {
-    input = make<UnionNode>(std::move(projNames), makeSeq(std::move(input)));
+void restrictProjections(ProjectionNameVector projNames, const CEType ce, PhysPlanBuilder& input) {
+    input.make<UnionNode>(ce, std::move(projNames), makeSeq(std::move(input._node)));
 }
 
 CollationSplitResult splitCollationSpec(const boost::optional<ProjectionName>& ridProjName,
@@ -1731,24 +1731,26 @@ private:
 
 void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
                                    const PartialSchemaRequirement& req,
-                                   ABT& node,
                                    const PathToIntervalFn& pathToInterval,
-                                   const std::function<void(const ABT& node)>& visitor) {
+                                   const boost::optional<CEType> residualCE,
+                                   PhysPlanBuilder& builder) {
     PartialSchemaReqLowerTransport transport(req.getBoundProjectionName().has_value(),
                                              pathToInterval);
     ABT path = transport.lower(req.getIntervals());
     const bool pathIsId = path.is<PathIdentity>();
 
     if (const auto& boundProjName = req.getBoundProjectionName()) {
-        node = make<EvaluationNode>(*boundProjName,
-                                    make<EvalPath>(key._path, make<Variable>(*key._projectionName)),
-                                    std::move(node));
-        visitor(node);
+        builder.make<EvaluationNode>(
+            residualCE,
+            *boundProjName,
+            make<EvalPath>(key._path, make<Variable>(*key._projectionName)),
+            std::move(builder._node));
 
         if (!pathIsId) {
-            node = make<FilterNode>(
-                make<EvalFilter>(std::move(path), make<Variable>(*boundProjName)), std::move(node));
-            visitor(node);
+            builder.make<FilterNode>(
+                residualCE,
+                make<EvalFilter>(std::move(path), make<Variable>(*boundProjName)),
+                std::move(builder._node));
         }
     } else {
         uassert(
@@ -1756,19 +1758,18 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
 
         path = PathAppender::append(key._path, std::move(path));
 
-        node = make<FilterNode>(
+        builder.make<FilterNode>(
+            residualCE,
             make<EvalFilter>(std::move(path), make<Variable>(*key._projectionName)),
-            std::move(node));
-        visitor(node);
+            std::move(builder._node));
     }
 }
 
 void lowerPartialSchemaRequirements(const CEType scanGroupCE,
                                     std::vector<SelectivityType> indexPredSels,
                                     ResidualRequirementsWithCE& requirements,
-                                    ABT& physNode,
                                     const PathToIntervalFn& pathToInterval,
-                                    NodeCEMap& nodeCEMap) {
+                                    PhysPlanBuilder& builder) {
     sortResidualRequirements(requirements);
 
     for (const auto& [residualKey, residualReq, ce] : requirements) {
@@ -1784,9 +1785,7 @@ void lowerPartialSchemaRequirements(const CEType scanGroupCE,
         }
 
         lowerPartialSchemaRequirement(
-            residualKey, residualReq, physNode, pathToInterval, [&](const ABT& node) {
-                nodeCEMap.emplace(node.cast<Node>(), residualCE);
-            });
+            residualKey, residualReq, pathToInterval, residualCE, builder);
     }
 }
 
@@ -1869,18 +1868,17 @@ void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& r
     }
 }
 
-ABT lowerRIDIntersectGroupBy(PrefixId& prefixId,
-                             const ProjectionName& ridProjName,
-                             const CEType intersectedCE,
-                             const CEType leftCE,
-                             const CEType rightCE,
-                             const properties::PhysProps& physProps,
-                             const properties::PhysProps& leftPhysProps,
-                             const properties::PhysProps& rightPhysProps,
-                             ABT leftChild,
-                             ABT rightChild,
-                             NodeCEMap& nodeCEMap,
-                             ChildPropsType& childProps) {
+PhysPlanBuilder lowerRIDIntersectGroupBy(PrefixId& prefixId,
+                                         const ProjectionName& ridProjName,
+                                         const CEType intersectedCE,
+                                         const CEType leftCE,
+                                         const CEType rightCE,
+                                         const properties::PhysProps& physProps,
+                                         const properties::PhysProps& leftPhysProps,
+                                         const properties::PhysProps& rightPhysProps,
+                                         PhysPlanBuilder leftChild,
+                                         PhysPlanBuilder rightChild,
+                                         ChildPropsType& childProps) {
     using namespace properties;
 
     const auto& leftProjections =
@@ -1896,15 +1894,13 @@ ABT lowerRIDIntersectGroupBy(PrefixId& prefixId,
         make<FunctionCall>("$addToSet", makeSeq(make<Variable>(sideIdProjectionName))));
     aggProjectionNames.push_back(sideSetProjectionName);
 
-    leftChild =
-        make<EvaluationNode>(sideIdProjectionName, Constant::int64(0), std::move(leftChild));
-    childProps.emplace_back(&leftChild.cast<EvaluationNode>()->getChild(), leftPhysProps);
-    nodeCEMap.emplace(leftChild.cast<Node>(), leftCE);
+    leftChild.make<EvaluationNode>(
+        leftCE, sideIdProjectionName, Constant::int64(0), std::move(leftChild._node));
+    childProps.emplace_back(&leftChild._node.cast<EvaluationNode>()->getChild(), leftPhysProps);
 
-    rightChild =
-        make<EvaluationNode>(sideIdProjectionName, Constant::int64(1), std::move(rightChild));
-    childProps.emplace_back(&rightChild.cast<EvaluationNode>()->getChild(), rightPhysProps);
-    nodeCEMap.emplace(rightChild.cast<Node>(), rightCE);
+    rightChild.make<EvaluationNode>(
+        rightCE, sideIdProjectionName, Constant::int64(1), std::move(rightChild._node));
+    childProps.emplace_back(&rightChild._node.cast<EvaluationNode>()->getChild(), rightPhysProps);
 
     ProjectionNameVector sortedProjections =
         getPropertyConst<ProjectionRequirement>(physProps).getProjections().getVector();
@@ -1920,21 +1916,19 @@ ABT lowerRIDIntersectGroupBy(PrefixId& prefixId,
         unionProjections.push_back(tempProjectionName);
 
         if (leftProjections.find(projectionName)) {
-            leftChild = make<EvaluationNode>(
-                tempProjectionName, make<Variable>(projectionName), std::move(leftChild));
-            nodeCEMap.emplace(leftChild.cast<Node>(), leftCE);
-
-            rightChild = make<EvaluationNode>(
-                tempProjectionName, Constant::nothing(), std::move(rightChild));
-            nodeCEMap.emplace(rightChild.cast<Node>(), rightCE);
+            leftChild.make<EvaluationNode>(leftCE,
+                                           tempProjectionName,
+                                           make<Variable>(projectionName),
+                                           std::move(leftChild._node));
+            rightChild.make<EvaluationNode>(
+                rightCE, tempProjectionName, Constant::nothing(), std::move(rightChild._node));
         } else {
-            leftChild =
-                make<EvaluationNode>(tempProjectionName, Constant::nothing(), std::move(leftChild));
-            nodeCEMap.emplace(leftChild.cast<Node>(), leftCE);
-
-            rightChild = make<EvaluationNode>(
-                tempProjectionName, make<Variable>(projectionName), std::move(rightChild));
-            nodeCEMap.emplace(rightChild.cast<Node>(), rightCE);
+            leftChild.make<EvaluationNode>(
+                leftCE, tempProjectionName, Constant::nothing(), std::move(leftChild._node));
+            rightChild.make<EvaluationNode>(rightCE,
+                                            tempProjectionName,
+                                            make<Variable>(projectionName),
+                                            std::move(rightChild._node));
         }
 
         aggExpressions.emplace_back(
@@ -1942,44 +1936,45 @@ ABT lowerRIDIntersectGroupBy(PrefixId& prefixId,
         aggProjectionNames.push_back(projectionName);
     }
 
-    ABT result = make<UnionNode>(std::move(unionProjections),
-                                 makeSeq(std::move(leftChild), std::move(rightChild)));
-    nodeCEMap.emplace(result.cast<Node>(), leftCE + rightCE);
+    PhysPlanBuilder result;
+    result.make<UnionNode>(leftCE + rightCE,
+                           std::move(unionProjections),
+                           makeSeq(std::move(leftChild._node), std::move(rightChild._node)));
+    result.merge(leftChild);
+    result.merge(rightChild);
 
-    result = make<GroupByNode>(ProjectionNameVector{ridProjName},
-                               std::move(aggProjectionNames),
-                               std::move(aggExpressions),
-                               std::move(result));
-    nodeCEMap.emplace(result.cast<Node>(), intersectedCE);
+    result.make<GroupByNode>(intersectedCE,
+                             ProjectionNameVector{ridProjName},
+                             std::move(aggProjectionNames),
+                             std::move(aggExpressions),
+                             std::move(result._node));
 
-    result = make<FilterNode>(
+    result.make<FilterNode>(
+        intersectedCE,
         make<EvalFilter>(
             make<PathCompare>(Operations::Eq, Constant::int64(2)),
             make<FunctionCall>("getArraySize", makeSeq(make<Variable>(sideSetProjectionName)))),
-        std::move(result));
-    nodeCEMap.emplace(result.cast<Node>(), intersectedCE);
+        std::move(result._node));
 
     return result;
 }
 
-ABT lowerRIDIntersectHashJoin(PrefixId& prefixId,
-                              const ProjectionName& ridProjName,
-                              const CEType intersectedCE,
-                              const CEType leftCE,
-                              const CEType rightCE,
-                              const properties::PhysProps& leftPhysProps,
-                              const properties::PhysProps& rightPhysProps,
-                              ABT leftChild,
-                              ABT rightChild,
-                              NodeCEMap& nodeCEMap,
-                              ChildPropsType& childProps) {
+PhysPlanBuilder lowerRIDIntersectHashJoin(PrefixId& prefixId,
+                                          const ProjectionName& ridProjName,
+                                          const CEType intersectedCE,
+                                          const CEType leftCE,
+                                          const CEType rightCE,
+                                          const properties::PhysProps& leftPhysProps,
+                                          const properties::PhysProps& rightPhysProps,
+                                          PhysPlanBuilder leftChild,
+                                          PhysPlanBuilder rightChild,
+                                          ChildPropsType& childProps) {
     using namespace properties;
 
     ProjectionName rightRIDProjName = prefixId.getNextId("rid");
-    rightChild =
-        make<EvaluationNode>(rightRIDProjName, make<Variable>(ridProjName), std::move(rightChild));
-    ABT* rightChildPtr = &rightChild.cast<EvaluationNode>()->getChild();
-    nodeCEMap.emplace(rightChild.cast<Node>(), rightCE);
+    rightChild.make<EvaluationNode>(
+        rightCE, rightRIDProjName, make<Variable>(ridProjName), std::move(rightChild._node));
+    ABT* rightChildPtr = &rightChild._node.cast<EvaluationNode>()->getChild();
 
     auto rightProjections =
         getPropertyConst<ProjectionRequirement>(rightPhysProps).getProjections();
@@ -1991,40 +1986,40 @@ ABT lowerRIDIntersectHashJoin(PrefixId& prefixId,
     // Use a union node to restrict the rid projection name coming from the right child in order
     // to ensure we do not have the same rid from both children. This node is optimized away
     // during lowering.
-    restrictProjections(std::move(sortedProjections), rightChild);
-    nodeCEMap.emplace(rightChild.cast<Node>(), rightCE);
+    restrictProjections(std::move(sortedProjections), rightCE, rightChild);
 
-    ABT result = make<HashJoinNode>(JoinType::Inner,
-                                    ProjectionNameVector{ridProjName},
-                                    ProjectionNameVector{std::move(rightRIDProjName)},
-                                    std::move(leftChild),
-                                    std::move(rightChild));
-    nodeCEMap.emplace(result.cast<Node>(), intersectedCE);
+    PhysPlanBuilder result;
+    result.make<HashJoinNode>(intersectedCE,
+                              JoinType::Inner,
+                              ProjectionNameVector{ridProjName},
+                              ProjectionNameVector{std::move(rightRIDProjName)},
+                              std::move(leftChild._node),
+                              std::move(rightChild._node));
+    result.merge(leftChild);
+    result.merge(rightChild);
 
-    childProps.emplace_back(&result.cast<HashJoinNode>()->getLeftChild(), leftPhysProps);
+    childProps.emplace_back(&result._node.cast<HashJoinNode>()->getLeftChild(), leftPhysProps);
     childProps.emplace_back(rightChildPtr, rightPhysProps);
 
     return result;
 }
 
-ABT lowerRIDIntersectMergeJoin(PrefixId& prefixId,
-                               const ProjectionName& ridProjName,
-                               const CEType intersectedCE,
-                               const CEType leftCE,
-                               const CEType rightCE,
-                               const properties::PhysProps& leftPhysProps,
-                               const properties::PhysProps& rightPhysProps,
-                               ABT leftChild,
-                               ABT rightChild,
-                               NodeCEMap& nodeCEMap,
-                               ChildPropsType& childProps) {
+PhysPlanBuilder lowerRIDIntersectMergeJoin(PrefixId& prefixId,
+                                           const ProjectionName& ridProjName,
+                                           const CEType intersectedCE,
+                                           const CEType leftCE,
+                                           const CEType rightCE,
+                                           const properties::PhysProps& leftPhysProps,
+                                           const properties::PhysProps& rightPhysProps,
+                                           PhysPlanBuilder leftChild,
+                                           PhysPlanBuilder rightChild,
+                                           ChildPropsType& childProps) {
     using namespace properties;
 
     ProjectionName rightRIDProjName = prefixId.getNextId("rid");
-    rightChild =
-        make<EvaluationNode>(rightRIDProjName, make<Variable>(ridProjName), std::move(rightChild));
-    ABT* rightChildPtr = &rightChild.cast<EvaluationNode>()->getChild();
-    nodeCEMap.emplace(rightChild.cast<Node>(), rightCE);
+    rightChild.make<EvaluationNode>(
+        rightCE, rightRIDProjName, make<Variable>(ridProjName), std::move(rightChild._node));
+    ABT* rightChildPtr = &rightChild._node.cast<EvaluationNode>()->getChild();
 
     auto rightProjections =
         getPropertyConst<ProjectionRequirement>(rightPhysProps).getProjections();
@@ -2036,17 +2031,19 @@ ABT lowerRIDIntersectMergeJoin(PrefixId& prefixId,
     // Use a union node to restrict the rid projection name coming from the right child in order
     // to ensure we do not have the same rid from both children. This node is optimized away
     // during lowering.
-    restrictProjections(std::move(sortedProjections), rightChild);
-    nodeCEMap.emplace(rightChild.cast<Node>(), rightCE);
+    restrictProjections(std::move(sortedProjections), rightCE, rightChild);
 
-    ABT result = make<MergeJoinNode>(ProjectionNameVector{ridProjName},
-                                     ProjectionNameVector{std::move(rightRIDProjName)},
-                                     std::vector<CollationOp>{CollationOp::Ascending},
-                                     std::move(leftChild),
-                                     std::move(rightChild));
-    nodeCEMap.emplace(result.cast<Node>(), intersectedCE);
+    PhysPlanBuilder result;
+    result.make<MergeJoinNode>(intersectedCE,
+                               ProjectionNameVector{ridProjName},
+                               ProjectionNameVector{std::move(rightRIDProjName)},
+                               std::vector<CollationOp>{CollationOp::Ascending},
+                               std::move(leftChild._node),
+                               std::move(rightChild._node));
+    result.merge(leftChild);
+    result.merge(rightChild);
 
-    childProps.emplace_back(&result.cast<MergeJoinNode>()->getLeftChild(), leftPhysProps);
+    childProps.emplace_back(&result._node.cast<MergeJoinNode>()->getLeftChild(), leftPhysProps);
     childProps.emplace_back(rightChildPtr, rightPhysProps);
 
     return result;
@@ -2072,65 +2069,63 @@ ABT lowerRIDIntersectMergeJoin(PrefixId& prefixId,
  * index scan and associated parameters. Then we iterate in the recursive case where we re-open the
  * inner index scan on every new combination of values we receive from the spool.
  */
-static ABT generateDistinctScan(const std::string& scanDefName,
-                                const std::string& indexDefName,
-                                const bool reverse,
-                                const CEType ce,
-                                const int spoolId,
-                                ProjectionNameVector outerProjNames,
-                                FieldProjectionMap outerFPM,
-                                CompoundIntervalRequirement outerInterval,
-                                ProjectionNameVector innerProjNames,
-                                FieldProjectionMap innerFPM,
-                                CompoundIntervalRequirement innerInterval,
-                                NodeCEMap& nodeCEMap) {
+static PhysPlanBuilder generateDistinctScan(const std::string& scanDefName,
+                                            const std::string& indexDefName,
+                                            const bool reverse,
+                                            const CEType ce,
+                                            const int spoolId,
+                                            ProjectionNameVector outerProjNames,
+                                            FieldProjectionMap outerFPM,
+                                            CompoundIntervalRequirement outerInterval,
+                                            ProjectionNameVector innerProjNames,
+                                            FieldProjectionMap innerFPM,
+                                            CompoundIntervalRequirement innerInterval) {
     ProjectionNameSet innerProjNameSet;
     for (const auto& projName : innerProjNames) {
         innerProjNameSet.insert(projName);
     }
 
-    ABT innerIndexScan = make<IndexScanNode>(
-        std::move(innerFPM), scanDefName, indexDefName, std::move(innerInterval), reverse);
-    nodeCEMap.emplace(innerIndexScan.cast<Node>(), ce);
+    PhysPlanBuilder result;
+    result.make<IndexScanNode>(
+        ce, std::move(innerFPM), scanDefName, indexDefName, std::move(innerInterval), reverse);
 
     // Advance to the next unique key.
-    innerIndexScan =
-        make<LimitSkipNode>(properties::LimitSkipRequirement{1, 0}, std::move(innerIndexScan));
-    nodeCEMap.emplace(innerIndexScan.cast<Node>(), ce);
+    result.make<LimitSkipNode>(ce, properties::LimitSkipRequirement{1, 0}, std::move(result._node));
 
-    ABT spoolCons =
-        make<SpoolConsumerNode>(SpoolConsumerType::Stack, spoolId, std::move(innerProjNames));
-    nodeCEMap.emplace(spoolCons.cast<Node>(), ce);
+    PhysPlanBuilder spoolCons;
+    spoolCons.make<SpoolConsumerNode>(
+        ce, SpoolConsumerType::Stack, spoolId, std::move(innerProjNames));
 
-    ABT innerCorrelatedJoin = make<NestedLoopJoinNode>(JoinType::Inner,
-                                                       std::move(innerProjNameSet),
-                                                       Constant::boolean(true),
-                                                       std::move(spoolCons),
-                                                       std::move(innerIndexScan));
-    nodeCEMap.emplace(innerCorrelatedJoin.cast<Node>(), ce);
+    // Inner correlated join.
+    result.make<NestedLoopJoinNode>(ce,
+                                    JoinType::Inner,
+                                    std::move(innerProjNameSet),
+                                    Constant::boolean(true),
+                                    std::move(spoolCons._node),
+                                    std::move(result._node));
+    result.merge(spoolCons);
 
     // Outer index scan node.
-    ABT outerIndexScan = make<IndexScanNode>(
-        std::move(outerFPM), scanDefName, indexDefName, std::move(outerInterval), reverse);
-    nodeCEMap.emplace(outerIndexScan.cast<Node>(), ce);
+    PhysPlanBuilder outerIndexScan;
+    outerIndexScan.make<IndexScanNode>(
+        ce, std::move(outerFPM), scanDefName, indexDefName, std::move(outerInterval), reverse);
 
     // Limit to one result to seed the distinct scan.
-    outerIndexScan =
-        make<LimitSkipNode>(properties::LimitSkipRequirement{1, 0}, std::move(outerIndexScan));
-    nodeCEMap.emplace(outerIndexScan.cast<Node>(), ce);
+    outerIndexScan.make<LimitSkipNode>(
+        ce, properties::LimitSkipRequirement{1, 0}, std::move(outerIndexScan._node));
 
-    ABT unionNode = make<UnionNode>(
-        outerProjNames, makeSeq(std::move(outerIndexScan), std::move(innerCorrelatedJoin)));
-    nodeCEMap.emplace(unionNode.cast<Node>(), ce);
+    result.make<UnionNode>(
+        ce, outerProjNames, makeSeq(std::move(outerIndexScan._node), std::move(result._node)));
+    result.merge(outerIndexScan);
 
-    ABT spoolProd = make<SpoolProducerNode>(SpoolProducerType::Lazy,
-                                            spoolId,
-                                            std::move(outerProjNames),
-                                            Constant::boolean(true),
-                                            std::move(unionNode));
-    nodeCEMap.emplace(spoolProd.cast<Node>(), ce);
+    result.make<SpoolProducerNode>(ce,
+                                   SpoolProducerType::Lazy,
+                                   spoolId,
+                                   std::move(outerProjNames),
+                                   Constant::boolean(true),
+                                   std::move(result._node));
 
-    return spoolProd;
+    return result;
 }
 
 /**
@@ -2207,8 +2202,7 @@ public:
                            ProjectionNameVector correlatedProjNames,
                            const std::map<size_t, SelectivityType>& indexPredSelMap,
                            const CEType currentGroupCE,
-                           const CEType scanGroupCE,
-                           NodeCEMap& nodeCEMap)
+                           const CEType scanGroupCE)
         : _prefixId(prefixId),
           _ridProjName(ridProjName),
           _scanDefName(scanDefName),
@@ -2220,8 +2214,7 @@ public:
           _currentEqPrefix(_eqPrefixes.at(_currentEqPrefixIndex)),
           _reverseOrder(reverseOrder),
           _indexPredSelMap(indexPredSelMap),
-          _scanGroupCE(scanGroupCE),
-          _nodeCEMap(nodeCEMap) {
+          _scanGroupCE(scanGroupCE) {
         // Collect estimates for predicates satisfied with the current equality prefix.
         // TODO: rationalize cardinality estimates: estimate number of unique groups.
         CEType indexCE = currentGroupCE;
@@ -2244,7 +2237,7 @@ public:
             {indexSel, std::move(indexProjectionMap), std::move(correlatedProjNames)});
     };
 
-    ABT transport(const CompoundIntervalReqExpr::Atom& node) {
+    PhysPlanBuilder transport(const CompoundIntervalReqExpr::Atom& node) {
         const auto& params = _paramStack.back();
         const auto& currentFPM = params._fpm;
         const CEType currentCE = _scanGroupCE * params._estimate;
@@ -2262,10 +2255,10 @@ public:
 
         if (_currentEqPrefixIndex + 1 == _eqPrefixes.size()) {
             // If this is the last equality prefix, use the input field projection map.
-            ABT result = make<IndexScanNode>(
-                currentFPM, _scanDefName, _indexDefName, std::move(interval), reverse);
-            _nodeCEMap.emplace(result.cast<Node>(), currentCE);
-            return result;
+            PhysPlanBuilder builder;
+            builder.make<IndexScanNode>(
+                currentCE, currentFPM, _scanDefName, _indexDefName, std::move(interval), reverse);
+            return builder;
         }
 
         FieldProjectionMap nextFPM = currentFPM;
@@ -2330,7 +2323,7 @@ public:
         }
 
         // Recursively generate a plan to encode the intervals of the subsequent prefixes.
-        ABT nextPrefix = lowerEqPrefixes(_prefixId,
+        auto remaining = lowerEqPrefixes(_prefixId,
                                          _ridProjName,
                                          std::move(nextFPM),
                                          _scanDefName,
@@ -2343,30 +2336,29 @@ public:
                                          currentCorrelatedProjNames,
                                          _indexPredSelMap,
                                          currentCE,
-                                         _scanGroupCE,
-                                         _nodeCEMap);
+                                         _scanGroupCE);
 
-        ABT distinctScan = generateDistinctScan(_scanDefName,
-                                                _indexDefName,
-                                                reverse,
-                                                currentCE,
-                                                _spoolId.getNextId(),
-                                                std::move(outerProjNames),
-                                                std::move(outerFPM),
-                                                std::move(interval),
-                                                std::move(innerProjNames),
-                                                std::move(innerFPM),
-                                                std::move(innerInterval),
-                                                _nodeCEMap);
+        auto result = generateDistinctScan(_scanDefName,
+                                           _indexDefName,
+                                           reverse,
+                                           currentCE,
+                                           _spoolId.getNextId(),
+                                           std::move(outerProjNames),
+                                           std::move(outerFPM),
+                                           std::move(interval),
+                                           std::move(innerProjNames),
+                                           std::move(innerFPM),
+                                           std::move(innerInterval));
 
-        ABT outerCorrelatedJoin = make<NestedLoopJoinNode>(JoinType::Inner,
-                                                           std::move(correlationSet),
-                                                           Constant::boolean(true),
-                                                           std::move(distinctScan),
-                                                           std::move(nextPrefix));
-        _nodeCEMap.emplace(outerCorrelatedJoin.cast<Node>(), currentCE);
+        result.make<NestedLoopJoinNode>(currentCE,
+                                        JoinType::Inner,
+                                        std::move(correlationSet),
+                                        Constant::boolean(true),
+                                        std::move(result._node),
+                                        std::move(remaining._node));
+        result.merge(remaining);
 
-        return outerCorrelatedJoin;
+        return result;
     }
 
     template <bool isConjunction>
@@ -2420,7 +2412,7 @@ public:
     }
 
     template <bool isIntersect>
-    ABT implement(ABTVector inputs) {
+    PhysPlanBuilder implement(std::vector<PhysPlanBuilder> inputs) {
         auto params = std::move(_paramStack.back());
         _paramStack.pop_back();
         auto& prevParams = _paramStack.back();
@@ -2459,11 +2451,12 @@ public:
             sideSetProjectionName = _prefixId.getNextId("sides");
 
             for (size_t index = 0; index < inputSize; index++) {
-                ABT& input = inputs.at(index);
-                input = make<EvaluationNode>(
-                    sideIdProjectionName, Constant::int64(index), std::move(input));
+                PhysPlanBuilder& input = inputs.at(index);
                 // Not relevant for cost.
-                _nodeCEMap.emplace(input.cast<Node>(), CEType{0.0});
+                input.make<EvaluationNode>(CEType{0.0},
+                                           sideIdProjectionName,
+                                           Constant::int64(index),
+                                           std::move(input._node));
             }
 
             aggExpressions.emplace_back(
@@ -2471,34 +2464,41 @@ public:
             aggProjectionNames.push_back(*sideSetProjectionName);
         }
 
-        ABT result = make<UnionNode>(std::move(unionProjectionNames), std::move(inputs));
-        _nodeCEMap.emplace(result.cast<Node>(), ce);
+        PhysPlanBuilder result;
+        {
+            ABTVector inputABTs;
+            for (auto& input : inputs) {
+                inputABTs.push_back(std::move(input._node));
+                result.merge(input);
+            }
+            result.make<UnionNode>(ce, std::move(unionProjectionNames), std::move(inputABTs));
+        }
 
-        result = make<GroupByNode>(ProjectionNameVector{_ridProjName},
-                                   std::move(aggProjectionNames),
-                                   std::move(aggExpressions),
-                                   std::move(result));
-        _nodeCEMap.emplace(result.cast<Node>(), ce);
+        result.make<GroupByNode>(ce,
+                                 ProjectionNameVector{_ridProjName},
+                                 std::move(aggProjectionNames),
+                                 std::move(aggExpressions),
+                                 std::move(result._node));
 
         if constexpr (isIntersect) {
-            result = make<FilterNode>(
+            result.make<FilterNode>(
+                ce,
                 make<EvalFilter>(
                     make<PathCompare>(Operations::Eq, Constant::int64(inputSize)),
                     make<FunctionCall>("getArraySize",
                                        makeSeq(make<Variable>(*sideSetProjectionName)))),
-                std::move(result));
-            _nodeCEMap.emplace(result.cast<Node>(), ce);
+                std::move(result._node));
         } else if (!outerMap._ridProjection && !outerProjNames.empty()) {
             // Prevent rid projection from leaking out if we do not require it, and also auxiliary
             // left and right side projections.
-            restrictProjections(std::move(outerProjNames), result);
-            _nodeCEMap.emplace(result.cast<Node>(), ce);
+            restrictProjections(std::move(outerProjNames), ce, result);
         }
 
         return result;
     }
 
-    ABT transport(const CompoundIntervalReqExpr::Conjunction& node, ABTVector childResults) {
+    PhysPlanBuilder transport(const CompoundIntervalReqExpr::Conjunction& node,
+                              std::vector<PhysPlanBuilder> childResults) {
         return implement<true /*isIntersect*/>(std::move(childResults));
     }
 
@@ -2506,11 +2506,12 @@ public:
         prepare<false /*isConjunction*/>(node.nodes().size());
     }
 
-    ABT transport(const CompoundIntervalReqExpr::Disjunction& node, ABTVector childResults) {
+    PhysPlanBuilder transport(const CompoundIntervalReqExpr::Disjunction& node,
+                              std::vector<PhysPlanBuilder> childResults) {
         return implement<false /*isIntersect*/>(std::move(childResults));
     }
 
-    ABT lower(const CompoundIntervalReqExpr::Node& intervals) {
+    PhysPlanBuilder lower(const CompoundIntervalReqExpr::Node& intervals) {
         return algebra::transport<false>(intervals, *this);
     }
 
@@ -2530,7 +2531,6 @@ private:
     const std::map<size_t, SelectivityType>& _indexPredSelMap;
 
     const CEType _scanGroupCE;
-    NodeCEMap& _nodeCEMap;
 
     // Stack which is used to support carrying and updating parameters across Conjunction and
     // Disjunction nodes.
@@ -2542,21 +2542,20 @@ private:
     std::vector<StackEntry> _paramStack;
 };
 
-ABT lowerEqPrefixes(PrefixId& prefixId,
-                    const ProjectionName& ridProjName,
-                    FieldProjectionMap indexProjectionMap,
-                    const std::string& scanDefName,
-                    const std::string& indexDefName,
-                    SpoolId& spoolId,
-                    const size_t indexFieldCount,
-                    const std::vector<EqualityPrefixEntry>& eqPrefixes,
-                    const size_t eqPrefixIndex,
-                    const std::vector<bool>& reverseOrder,
-                    ProjectionNameVector correlatedProjNames,
-                    const std::map<size_t, SelectivityType>& indexPredSelMap,
-                    const CEType indexCE,
-                    const CEType scanGroupCE,
-                    NodeCEMap& nodeCEMap) {
+PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
+                                const ProjectionName& ridProjName,
+                                FieldProjectionMap indexProjectionMap,
+                                const std::string& scanDefName,
+                                const std::string& indexDefName,
+                                SpoolId& spoolId,
+                                const size_t indexFieldCount,
+                                const std::vector<EqualityPrefixEntry>& eqPrefixes,
+                                const size_t eqPrefixIndex,
+                                const std::vector<bool>& reverseOrder,
+                                ProjectionNameVector correlatedProjNames,
+                                const std::map<size_t, SelectivityType>& indexPredSelMap,
+                                const CEType indexCE,
+                                const CEType scanGroupCE) {
     IntervalLowerTransport lowerTransport(prefixId,
                                           ridProjName,
                                           std::move(indexProjectionMap),
@@ -2570,8 +2569,7 @@ ABT lowerEqPrefixes(PrefixId& prefixId,
                                           correlatedProjNames,
                                           indexPredSelMap,
                                           indexCE,
-                                          scanGroupCE,
-                                          nodeCEMap);
+                                          scanGroupCE);
     return lowerTransport.lower(eqPrefixes.at(eqPrefixIndex)._interval);
 }
 

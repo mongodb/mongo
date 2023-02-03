@@ -73,7 +73,11 @@ public:
     }
 
     void transport(ABT& n, const SargableNode& node, ABT& childResult, ABT& refs, ABT& binds) {
-        ABT result = childResult;
+        // We don't need to estimate cardinality of the sampling query itself, so the NodeCEMap part
+        // is ignored here. We use a builder only because lowerPartialSchemaRequirement requires
+        // one.
+        PhysPlanBuilder result{childResult};
+
         // Retain only output bindings without applying filters.
         for (const auto& [key, req] : node.getReqMap().conjuncts()) {
             if (const auto& boundProjName = req.getBoundProjectionName()) {
@@ -81,11 +85,12 @@ public:
                     key,
                     PartialSchemaRequirement{
                         boundProjName, IntervalReqExpr::makeSingularDNF(), req.getIsPerfOnly()},
-                    result,
-                    _phaseManager.getPathToInterval());
+                    _phaseManager.getPathToInterval(),
+                    boost::none /*residualCE*/,
+                    result);
             }
         }
-        std::swap(n, result);
+        std::swap(n, result._node);
     }
 
     void transport(ABT& n, const CollationNode& /*node*/, ABT& childResult, ABT& refs) {
@@ -168,18 +173,19 @@ public:
             }
 
             if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
-                ABT lowered = extracted;
+                PhysPlanBuilder lowered{extracted};
                 // Lower requirement without an output binding.
                 lowerPartialSchemaRequirement(
                     key,
                     PartialSchemaRequirement{boost::none /*boundProjectionName*/,
                                              req.getIntervals(),
                                              req.getIsPerfOnly()},
-                    lowered,
-                    _phaseManager.getPathToInterval());
-                uassert(6624243, "Expected a filter node", lowered.is<FilterNode>());
-                result =
-                    estimateFilterCE(metadata, memo, logicalProps, n, std::move(lowered), result);
+                    _phaseManager.getPathToInterval(),
+                    boost::none /*residualCE*/,
+                    lowered);
+                uassert(6624243, "Expected a filter node", lowered._node.is<FilterNode>());
+                result = estimateFilterCE(
+                    metadata, memo, logicalProps, n, std::move(lowered._node), result);
             }
         }
 

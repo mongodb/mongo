@@ -56,7 +56,7 @@ public:
     }
 
     template <typename T, typename... Args>
-    inline auto setNode(ProjectionName rootProjection, Args&&... args) {
+    void setNode(ProjectionName rootProjection, Args&&... args) {
         setNode(std::move(rootProjection), std::move(ABT::make<T>(std::forward<Args>(args)...)));
     }
 

@@ -33,6 +33,8 @@
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/utils/physical_plan_builder.h"
+
 
 namespace mongo::optimizer {
 
@@ -246,7 +248,7 @@ ProjectionNameSet extractReferencedColumns(const properties::PhysProps& properti
 
 // Use a union node to restrict the set of projections we expose up the tree. The union node is
 // optimized away during lowering.
-void restrictProjections(ProjectionNameVector projNames, ABT& input);
+void restrictProjections(ProjectionNameVector projNames, CEType ce, PhysPlanBuilder& input);
 
 struct CollationSplitResult {
     bool _validSplit = false;
@@ -440,17 +442,15 @@ bool checkMaybeHasNull(const IntervalReqExpr::Node& intervals, const ConstFoldFn
  */
 void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
                                    const PartialSchemaRequirement& req,
-                                   ABT& node,
                                    const PathToIntervalFn& pathToInterval,
-                                   const std::function<void(const ABT& node)>& visitor =
-                                       [](const ABT&) {});
+                                   boost::optional<CEType> residualCE,
+                                   PhysPlanBuilder& builder);
 
 void lowerPartialSchemaRequirements(CEType scanGroupCE,
                                     std::vector<SelectivityType> indexPredSels,
                                     ResidualRequirementsWithCE& requirements,
-                                    ABT& physNode,
                                     const PathToIntervalFn& pathToInterval,
-                                    NodeCEMap& nodeCEMap);
+                                    PhysPlanBuilder& builder);
 
 void sortResidualRequirements(ResidualRequirementsWithCE& residualReq);
 
@@ -466,45 +466,42 @@ void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& r
 /**
  * Implements an RID Intersect node using Union and GroupBy.
  */
-ABT lowerRIDIntersectGroupBy(PrefixId& prefixId,
-                             const ProjectionName& ridProjName,
-                             CEType intersectedCE,
-                             CEType leftCE,
-                             CEType rightCE,
-                             const properties::PhysProps& physProps,
-                             const properties::PhysProps& leftPhysProps,
-                             const properties::PhysProps& rightPhysProps,
-                             ABT leftChild,
-                             ABT rightChild,
-                             NodeCEMap& nodeCEMap,
-                             ChildPropsType& childProps);
+PhysPlanBuilder lowerRIDIntersectGroupBy(PrefixId& prefixId,
+                                         const ProjectionName& ridProjName,
+                                         CEType intersectedCE,
+                                         CEType leftCE,
+                                         CEType rightCE,
+                                         const properties::PhysProps& physProps,
+                                         const properties::PhysProps& leftPhysProps,
+                                         const properties::PhysProps& rightPhysProps,
+                                         PhysPlanBuilder leftChild,
+                                         PhysPlanBuilder rightChild,
+                                         ChildPropsType& childProps);
 
 /**
  * Implements an RID Intersect node using a HashJoin.
  */
-ABT lowerRIDIntersectHashJoin(PrefixId& prefixId,
-                              const ProjectionName& ridProjName,
-                              CEType intersectedCE,
-                              CEType leftCE,
-                              CEType rightCE,
-                              const properties::PhysProps& leftPhysProps,
-                              const properties::PhysProps& rightPhysProps,
-                              ABT leftChild,
-                              ABT rightChild,
-                              NodeCEMap& nodeCEMap,
-                              ChildPropsType& childProps);
+PhysPlanBuilder lowerRIDIntersectHashJoin(PrefixId& prefixId,
+                                          const ProjectionName& ridProjName,
+                                          CEType intersectedCE,
+                                          CEType leftCE,
+                                          CEType rightCE,
+                                          const properties::PhysProps& leftPhysProps,
+                                          const properties::PhysProps& rightPhysProps,
+                                          PhysPlanBuilder leftChild,
+                                          PhysPlanBuilder rightChild,
+                                          ChildPropsType& childProps);
 
-ABT lowerRIDIntersectMergeJoin(PrefixId& prefixId,
-                               const ProjectionName& ridProjName,
-                               CEType intersectedCE,
-                               CEType leftCE,
-                               CEType rightCE,
-                               const properties::PhysProps& leftPhysProps,
-                               const properties::PhysProps& rightPhysProps,
-                               ABT leftChild,
-                               ABT rightChild,
-                               NodeCEMap& nodeCEMap,
-                               ChildPropsType& childProps);
+PhysPlanBuilder lowerRIDIntersectMergeJoin(PrefixId& prefixId,
+                                           const ProjectionName& ridProjName,
+                                           CEType intersectedCE,
+                                           CEType leftCE,
+                                           CEType rightCE,
+                                           const properties::PhysProps& leftPhysProps,
+                                           const properties::PhysProps& rightPhysProps,
+                                           PhysPlanBuilder leftChild,
+                                           PhysPlanBuilder rightChild,
+                                           ChildPropsType& childProps);
 
 /**
  * Lowers a plan consisting of one or several equality prefixes. The sub-plans for each equality
@@ -512,21 +509,20 @@ ABT lowerRIDIntersectMergeJoin(PrefixId& prefixId,
  * implemented as one or more index scans which are unioned or intersected depending on the shape of
  * the interval expression (e.g. conjunction or disjunction).
  */
-ABT lowerEqPrefixes(PrefixId& prefixId,
-                    const ProjectionName& ridProjName,
-                    FieldProjectionMap indexProjectionMap,
-                    const std::string& scanDefName,
-                    const std::string& indexDefName,
-                    SpoolId& spoolId,
-                    size_t indexFieldCount,
-                    const std::vector<EqualityPrefixEntry>& eqPrefixes,
-                    size_t eqPrefixIndex,
-                    const std::vector<bool>& reverseOrder,
-                    ProjectionNameVector correlatedProjNames,
-                    const std::map<size_t, SelectivityType>& indexPredSelMap,
-                    CEType indexCE,
-                    CEType scanGroupCE,
-                    NodeCEMap& nodeCEMap);
+PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
+                                const ProjectionName& ridProjName,
+                                FieldProjectionMap indexProjectionMap,
+                                const std::string& scanDefName,
+                                const std::string& indexDefName,
+                                SpoolId& spoolId,
+                                size_t indexFieldCount,
+                                const std::vector<EqualityPrefixEntry>& eqPrefixes,
+                                size_t eqPrefixIndex,
+                                const std::vector<bool>& reverseOrder,
+                                ProjectionNameVector correlatedProjNames,
+                                const std::map<size_t, SelectivityType>& indexPredSelMap,
+                                CEType indexCE,
+                                CEType scanGroupCE);
 
 /**
  * This helper checks to see if we have a PathTraverse + PathId at the end of the path.

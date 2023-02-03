@@ -1168,12 +1168,13 @@ struct SubstituteConvert<EvaluationNode> {
 };
 
 static void lowerSargableNode(const SargableNode& node, RewriteContext& ctx) {
-    ABT n = node.getChild();
-    const auto reqMap = node.getReqMap();
+    PhysPlanBuilder builder{node.getChild()};
+    const auto& reqMap = node.getReqMap();
     for (const auto& [key, req] : reqMap.conjuncts()) {
-        lowerPartialSchemaRequirement(key, req, n, ctx.getPathToInterval());
+        lowerPartialSchemaRequirement(
+            key, req, ctx.getPathToInterval(), boost::none /*residualCE*/, builder);
     }
-    ctx.addNode(n, true /*clear*/);
+    ctx.addNode(builder._node, true /*clear*/);
 }
 
 template <class Type>
