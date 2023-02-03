@@ -2487,46 +2487,6 @@ functions:
 
         exit 0
 
-  "run kitchen":
-    command: shell.exec
-    type: test
-    params:
-      shell: bash
-      working_dir: src/buildscripts/package_test
-      script: |
-        set -o errexit
-
-        export KITCHEN_ARTIFACTS_URL="https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz"
-        export KITCHEN_SECURITY_GROUP="${kitchen_security_group}"
-        export KITCHEN_SSH_KEY_ID="${kitchen_ssh_key_id}"
-        export KITCHEN_SUBNET="${kitchen_subnet}"
-        export KITCHEN_VPC="${kitchen_vpc}"
-
-        if [[ "${packager_arch}" == "aarch64" || "${packager_arch}" == "arm64" ]]; then
-          kitchen_packager_distro="${packager_distro}-arm64"
-        else
-          kitchen_packager_distro="${packager_distro}-x86-64"
-        fi
-
-        ${activate_virtualenv}
-        # set expiration tag 2 hours in the future, since no test should take this long
-        export KITCHEN_EXPIRE="$($python -c 'import datetime; print((datetime.datetime.utcnow() + datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"))')"
-
-        for i in {1..3}
-        do
-          if ! kitchen verify $kitchen_packager_distro; then
-            verified="false"
-            kitchen destroy $kitchen_packager_distro || true
-            sleep 30
-          else
-            verified="true"
-            break
-          fi
-        done
-
-        kitchen destroy $kitchen_packager_distro || true
-        test "$verified" = "true"
-
   "copy ec2 monitor files": &copy_ec2_monitor_files
     command: shell.exec
     params:
@@ -7745,20 +7705,6 @@ tasks:
       resmoke_args: --suites=buildscripts_test
       resmoke_jobs_max: 1
 
-- name: test_packages
-  depends_on:
-  - name: package
-  commands:
-    - func: "git get project"
-    - func: "fetch packages"
-    - func: "set up remote credentials"
-      vars:
-        private_key_file: ~/.ssh/kitchen.pem
-        private_key_remote: ${kitchen_private_key}
-        aws_key_remote: ${kitchen_aws_key}
-        aws_secret_remote: ${kitchen_aws_secret}
-    - func: "run kitchen"
-
 - name: package
   commands:
     - func: "scons compile"
@@ -8945,9 +8891,6 @@ buildvariants:
   - name: watchdog_wiredtiger
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - ubuntu1804-small
@@ -9005,9 +8948,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .watchdog
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - ubuntu1804-small
@@ -9069,9 +9009,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .stitch
   - name: .ssl
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - ubuntu1604-small
@@ -9241,9 +9178,6 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - ubuntu2004-small
@@ -9296,9 +9230,6 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - ubuntu2004-small
@@ -9429,9 +9360,6 @@ buildvariants:
   - name: slow1_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - amazon1-2018-small
@@ -9481,9 +9409,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - amazon1-2018-small
@@ -9536,9 +9461,6 @@ buildvariants:
   - name: slow1_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - amazon2-small
@@ -9589,9 +9511,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - amazon2-small
@@ -9642,9 +9561,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - rhel80-small
@@ -9689,9 +9605,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - rhel80-small
@@ -10299,9 +10212,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: secondary_reads_passthrough_gen
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
         - rhel62-small
@@ -10827,9 +10737,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .updatefuzzer
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - rhel70-small
@@ -10884,9 +10791,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - rhel80-small
@@ -11135,9 +11039,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - rhel62-small
@@ -11185,9 +11086,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - rhel70-small
@@ -11235,9 +11133,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - rhel80-small
@@ -11450,9 +11345,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .watchdog
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - ubuntu1604-small
@@ -11572,9 +11464,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - suse12-sp5-small
@@ -11757,9 +11646,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - debian92-small
@@ -11807,9 +11693,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - debian92-small
@@ -11853,9 +11736,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - debian10-small
@@ -11903,9 +11783,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
   - name: .publish
     distros:
     - debian10-small
