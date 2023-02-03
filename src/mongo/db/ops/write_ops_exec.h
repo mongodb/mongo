@@ -135,5 +135,11 @@ void recordUpdateResultInOpDebug(const UpdateResult& updateResult, OpDebug* opDe
 bool shouldRetryDuplicateKeyException(const ParsedUpdate& parsedUpdate,
                                       const DuplicateKeyErrorInfo& errorInfo);
 
+/**
+ * Returns an InsertCommandReply if the timeseries writes succeeded.
+ */
+write_ops::InsertCommandReply performTimeseriesWrites(
+    OperationContext* opCtx, const write_ops::InsertCommandRequest& request);
+
 }  // namespace write_ops_exec
 }  // namespace mongo
