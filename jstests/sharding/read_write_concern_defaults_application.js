@@ -166,6 +166,8 @@ let testCases = {
     _shardsvrJoinMigrations: {skip: "internal command"},
     _shardsvrMergeAllChunksOnShard: {skip: "internal command"},
     _shardsvrMovePrimary: {skip: "internal command"},
+    _shardsvrMovePrimaryEnterCriticalSection: {skip: "internal command"},
+    _shardsvrMovePrimaryExitCriticalSection: {skip: "internal command"},
     _shardsvrMoveRange: {
         skip:
             "does not accept read or write concern (accepts writeConcern, but only explicitly and when _secondaryThrottle is true)"

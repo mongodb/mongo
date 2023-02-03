@@ -46,8 +46,8 @@ enums:
             kCatchup: "catchup"
             kEnterCriticalSection: "enterCriticalSection"
             kCommit: "commit"
-            kExitCriticalSection: "exitCriticalSection"
             kClean: "clean"
+            kExitCriticalSection: "exitCriticalSection"
 
 structs:
     MovePrimaryCoordinatorDocument:

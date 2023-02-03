@@ -94,8 +94,8 @@ private:
      * Commits the new primary shard for the given database to the config server. The database
      * version is passed to the config server's command as an idempotency key.
      */
-    StatusWith<Shard::CommandResponse> commitMetadataToConfig(
-        OperationContext* opCtx, const DatabaseVersion& preCommitDbVersion) const;
+    void commitMetadataToConfig(OperationContext* opCtx,
+                                const DatabaseVersion& preCommitDbVersion) const;
 
     /**
      * Ensures that the metadata changes have been actually commited on the config server, asserting
@@ -159,6 +159,18 @@ private:
      * Unblocks read and write operations on the database.
      */
     void unblockReadsAndWrites(OperationContext* opCtx) const;
+
+    /**
+     * Requests the recipient to enter the critical section on the database, causing the database
+     * metadata refreshes to block.
+     */
+    void enterCriticalSectionOnRecipient(OperationContext* opCtx) const;
+
+    /**
+     * Requests the recipient to exit the critical section on the database, causing the database
+     * metadata refreshes to unblock.
+     */
+    void exitCriticalSectionOnRecipient(OperationContext* opCtx) const;
 
     const DatabaseName _dbName;
     const BSONObj _csReason;

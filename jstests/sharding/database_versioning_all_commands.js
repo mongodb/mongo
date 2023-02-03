@@ -5,6 +5,7 @@
 (function() {
 'use strict';
 
+load("jstests/libs/feature_flag_util.js");
 load('jstests/sharding/libs/last_lts_mongos_commands.js');
 
 function getNewDbName(dbName) {
@@ -114,11 +115,16 @@ function testCommandAfterMovePrimary(testCase, st, dbName, collName) {
     const dbVersionAfter =
         st.s1.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
 
-    // The only change after the movePrimary should be that the old primary shard should have
-    // cleared its dbVersion.
+    // After the movePrimary, both old and new primary shards should have cleared the dbVersion.
     assertMongosDatabaseVersion(st.s0, dbName, dbVersionBefore);
     assertShardDatabaseVersion(primaryShardBefore, dbName, {});
-    assertShardDatabaseVersion(primaryShardAfter, dbName, dbVersionBefore);
+    // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
+    if (FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'),
+                                  "ResilientMovePrimary")) {
+        assertShardDatabaseVersion(primaryShardAfter, dbName, {});
+    } else {
+        assertShardDatabaseVersion(primaryShardAfter, dbName, dbVersionBefore);
+    }
 
     // Run the test case's command.
     const res = st.s0.getDB(testCase.runsAgainstAdminDb ? "admin" : dbName).runCommand(command);
@@ -140,13 +146,19 @@ function testCommandAfterMovePrimary(testCase, st, dbName, collName) {
         assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionAfter);
         assertShardDatabaseVersion(primaryShardAfter, dbName, dbVersionAfter);
     } else {
-        // If the command does not participate in database versioning, none of the nodes' view of
-        // the dbVersion should have changed:
+        // If the command does not participate in database versioning:
         // 1. The mongos should have targeted the old primary shard but not attached a dbVersion
         // 2. The old primary shard should have returned an ok response
+        // 3. Both old and new primary shards should have cleared the dbVersion
         assertMongosDatabaseVersion(st.s0, dbName, dbVersionBefore);
         assertShardDatabaseVersion(primaryShardBefore, dbName, {});
-        assertShardDatabaseVersion(primaryShardAfter, dbName, dbVersionBefore);
+        // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
+        if (FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'),
+                                      "ResilientMovePrimary")) {
+            assertShardDatabaseVersion(primaryShardAfter, dbName, {});
+        } else {
+            assertShardDatabaseVersion(primaryShardAfter, dbName, dbVersionBefore);
+        }
     }
 
     if (testCase.cleanUp) {

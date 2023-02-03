@@ -301,6 +301,8 @@ export const TenantMigrationConcurrentWriteUtil = {
         _shardsvrRegisterIndex: {skip: isOnlySupportedOnShardedCluster},
         _shardsvrDropIndexCatalogEntryParticipant: {skip: isOnlySupportedOnShardedCluster},
         _shardsvrMovePrimary: {skip: isNotRunOnUserDatabase},
+        _shardsvrMovePrimaryEnterCriticalSection: {skip: isNotRunOnUserDatabase},
+        _shardsvrMovePrimaryExitCriticalSection: {skip: isNotRunOnUserDatabase},
         _shardsvrSetAllowMigrations: {skip: isOnlySupportedOnShardedCluster},
         _shardsvrRenameCollection: {skip: isOnlySupportedOnShardedCluster},
         _shardsvrRenameIndexMetadata: {skip: isOnlySupportedOnShardedCluster},

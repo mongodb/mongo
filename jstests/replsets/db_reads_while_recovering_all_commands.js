@@ -106,6 +106,8 @@ const allCommands = {
     _shardsvrJoinMigrations: {skip: isAnInternalCommand},
     _shardsvrMergeAllChunksOnShard: {skip: isPrimaryOnly},
     _shardsvrMovePrimary: {skip: isPrimaryOnly},
+    _shardsvrMovePrimaryEnterCriticalSection: {skip: isPrimaryOnly},
+    _shardsvrMovePrimaryExitCriticalSection: {skip: isPrimaryOnly},
     _shardsvrMoveRange: {skip: isPrimaryOnly},
     _shardsvrRenameCollection: {skip: isPrimaryOnly},
     _shardsvrRenameCollectionParticipant: {skip: isAnInternalCommand},

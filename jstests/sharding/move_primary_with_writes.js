@@ -286,20 +286,18 @@ st.forEachConnection(shard => {
     }
 });
 
-let cloningCatalogDataFPName = "hangBeforeCloningCatalogData";
-let cleaningStaleDataFPName = "hangBeforeCleaningStaleData";
+let cloningDataFPName = "hangBeforeCloningData";
 
 // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
 if (!FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'), "ResilientMovePrimary")) {
-    cloningCatalogDataFPName = "hangInCloneStage";
-    cleaningStaleDataFPName = "hangInCleanStaleDataStage";
+    cloningDataFPName = "hangInCloneStage";
 }
 
 createCollections();
 let fromShard = st.getPrimaryShard(dbName);
 let toShard = st.getOther(fromShard);
 
-testMovePrimary(cloningCatalogDataFPName, fromShard, toShard, st.s.getDB(dbName), true, false);
+testMovePrimary(cloningDataFPName, fromShard, toShard, st.s.getDB(dbName), true, false);
 verifyDocuments(toShard.getDB(dbName), 3);
 verifyDocuments(fromShard.getDB(dbName), 0);
 
@@ -307,19 +305,24 @@ createCollections();
 fromShard = st.getPrimaryShard(dbName);
 toShard = st.getOther(fromShard);
 
-testMovePrimary(cloningCatalogDataFPName, fromShard, toShard, st.s.getDB(dbName), false, true);
+testMovePrimary(cloningDataFPName, fromShard, toShard, st.s.getDB(dbName), false, true);
 verifyDocuments(toShard.getDB(dbName), 3);
 verifyDocuments(fromShard.getDB(dbName), 0);
 
 createCollections();
 fromShard = st.getPrimaryShard(dbName);
 toShard = st.getOther(fromShard);
-testMovePrimaryDDL(cloningCatalogDataFPName, fromShard, toShard, st.s.getDB("admin"), false, true);
+testMovePrimaryDDL(cloningDataFPName, fromShard, toShard, st.s.getDB("admin"), false, true);
 
-createCollections();
-fromShard = st.getPrimaryShard(dbName);
-toShard = st.getOther(fromShard);
-testMovePrimary(cleaningStaleDataFPName, fromShard, toShard, st.s.getDB(dbName), false, false);
+// TODO (SERVER-71309): Remove once 7.0 becomes last LTS. With the new DDL coordinator, the
+// recipient blocks any CRUD operations until movePrimary is complete.
+if (!FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'), "ResilientMovePrimary")) {
+    createCollections();
+    fromShard = st.getPrimaryShard(dbName);
+    toShard = st.getOther(fromShard);
+    testMovePrimary(
+        "hangInCleanStaleDataStage", fromShard, toShard, st.s.getDB(dbName), false, false);
+}
 
 overrideDDLLockTimeoutFPs.forEach(fp => fp.off());
 

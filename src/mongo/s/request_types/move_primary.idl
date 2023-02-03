@@ -65,6 +65,34 @@ structs:
                 description: "The shard serving as the destination for un-sharded collections."
 
 commands:
+    _shardsvrMovePrimaryEnterCriticalSection:
+        command_name: _shardsvrMovePrimaryEnterCriticalSection
+        description: Block CRUD operations on the given database by entering the critical section.
+        cpp_name: ShardsvrMovePrimaryEnterCriticalSection
+        namespace: type
+        type: database_name
+        api_version:
+        strict: false
+        fields:
+            reason:
+                type: object
+                description: Descriptive reason for the critical section
+
+    _shardsvrMovePrimaryExitCriticalSection:
+        command_name: _shardsvrMovePrimaryExitCriticalSection
+        description: >-
+            Clear the local metadata of the given database, and unblocks CRUD operations by exiting
+            the critical section.
+        cpp_name: ShardsvrMovePrimaryExitCriticalSection
+        namespace: type
+        type: database_name
+        api_version:
+        strict: false
+        fields:
+            reason:
+                type: object
+                description: Descriptive reason for the critical section
+
     _configsvrCommitMovePrimary:
         command_name: _configsvrCommitMovePrimary
         description: Reassign a new primary shard for the given database on the config server

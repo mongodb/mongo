@@ -81,6 +81,8 @@ let testCases = {
     _shardsvrCompactStructuredEncryptionData: {skip: "primary only"},
     _shardsvrMergeAllChunksOnShard: {skip: "primary only"},
     _shardsvrMovePrimary: {skip: "primary only"},
+    _shardsvrMovePrimaryEnterCriticalSection: {skip: "primary only"},
+    _shardsvrMovePrimaryExitCriticalSection: {skip: "primary only"},
     _shardsvrMoveRange: {skip: "primary only"},
     _recvChunkAbort: {skip: "primary only"},
     _recvChunkCommit: {skip: "primary only"},

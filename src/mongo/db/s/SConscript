@@ -530,6 +530,8 @@ env.Library(
         'shardsvr_merge_all_chunks_on_shard_command.cpp',
         'shardsvr_merge_chunks_command.cpp',
         'shardsvr_move_primary_command.cpp',
+        'shardsvr_move_primary_enter_critical_section_command.cpp',
+        'shardsvr_move_primary_exit_critical_section_command.cpp',
         'shardsvr_move_range_command.cpp',
         'shardsvr_participant_block_command.cpp',
         'shardsvr_refine_collection_shard_key_command.cpp',
