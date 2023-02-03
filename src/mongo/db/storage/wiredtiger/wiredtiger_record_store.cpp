@@ -116,6 +116,7 @@ void checkOplogFormatVersion(OperationContext* opCtx, const std::string& uri) {
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(WTCompactRecordStoreEBUSY);
+MONGO_FAIL_POINT_DEFINE(WTRecordStoreUassertOutOfOrder);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictException);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
 MONGO_FAIL_POINT_DEFINE(slowOplogSamplingReads);
@@ -2068,9 +2069,13 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
         return {};
     }
 
-    if (_forward && _lastReturnedId >= id) {
-        // Crash when testing diagnostics are enabled.
-        invariant(!TestingProctor::instance().isEnabled());
+    if ((_forward && _lastReturnedId >= id) ||
+        MONGO_unlikely(WTRecordStoreUassertOutOfOrder.shouldFail())) {
+        if (!WTRecordStoreUassertOutOfOrder.shouldFail()) {
+            // Crash when testing diagnostics are enabled and not explicitly uasserting on
+            // out-of-order keys.
+            invariant(!TestingProctor::instance().isEnabled(), "cursor returned out-of-order keys");
+        }
 
         // uassert with 'DataCorruptionDetected' after logging.
         LOGV2_ERROR_OPTIONS(22406,
