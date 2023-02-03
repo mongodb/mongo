@@ -304,7 +304,6 @@ env.Library(
         'remote_command_targeter_factory_mock.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )

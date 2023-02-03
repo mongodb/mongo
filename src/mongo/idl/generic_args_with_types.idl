@@ -25,12 +25,12 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
+
 global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/basic_types.h"
         - "mongo/s/shard_version.h"
-
 
 imports:
     - "mongo/client/read_preference_setting.idl"

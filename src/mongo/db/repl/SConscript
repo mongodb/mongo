@@ -393,6 +393,7 @@ env.Library(
         'storage_interface',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
     ],

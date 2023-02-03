@@ -71,6 +71,7 @@ env.Library(
         'metadata',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/server_base',
         'rewrite_state_change_errors',
     ],

@@ -44,6 +44,7 @@
 #include "mongo/util/debug_util.h"
 
 namespace mongo {
+
 class CollatorInterface;
 class Collection;
 class CollectionPtr;

@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
@@ -71,5 +74,54 @@ StatusWith<BSONObj> extractShardKeyFromBasicQueryWithContext(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const ShardKeyPattern& shardKeyPattern,
     const BSONObj& basicQuery);
+
+BSONObj extractShardKeyFromQuery(const ShardKeyPattern& shardKeyPattern,
+                                 const CanonicalQuery& query);
+
+/**
+ * Return an ordered list of bounds generated using a ShardKeyPattern and the bounds from the
+ * IndexBounds. This function is used in sharding to determine where to route queries according to
+ * the shard key pattern.
+ *
+ * Examples:
+ *
+ * Key { a: 1 }, Bounds a: [0] => { a: 0 } -> { a: 0 }
+ * Key { a: 1 }, Bounds a: [2, 3) => { a: 2 } -> { a: 3 }  // bound inclusion ignored.
+ *
+ * The bounds returned by this function may be a superset of those defined by the constraints. For
+ * instance, if this KeyPattern is {a : 1, b: 1} Bounds: { a : {$in : [1,2]} , b : {$in : [3,4,5]} }
+ *         => {a : 1 , b : 3} -> {a : 1 , b : 5}, {a : 2 , b : 3} -> {a : 2 , b : 5}
+ *
+ * If the IndexBounds are not defined for all the fields in this keypattern, which means some fields
+ * are unsatisfied, an empty BoundList could return.
+ *
+ */
+BoundList flattenBounds(const ShardKeyPattern& shardKeyPattern, const IndexBounds& indexBounds);
+
+/**
+ * Transforms query into bounds for each field in the shard key.
+ * For example :
+ *   Key { a: 1, b: 1 },
+ *   Query { a : { $gte : 1, $lt : 2 },
+ *           b : { $gte : 3, $lt : 4 } }
+ *   => Bounds { a : [1, 2), b : [3, 4) }
+ */
+IndexBounds getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery& canonicalQuery);
+
+/**
+ * Finds the shard IDs for a given filter and collation. If collation is empty, we use the
+ * collection default collation for targeting.
+ *
+ * If 'chunkRanges' is not null, populates it with ChunkRanges that would be targeted by the query.
+ * If 'targetMinKeyToMaxKey' is not null, sets it to true if the query targets the entire shard key
+ * space.
+ */
+void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
+                         const BSONObj& query,
+                         const BSONObj& collation,
+                         const ChunkManager& cm,
+                         std::set<ShardId>* shardIds,
+                         std::set<ChunkRange>* chunkRanges = nullptr,
+                         bool* targetMinKeyToMaxKey = nullptr);
 
 }  // namespace mongo

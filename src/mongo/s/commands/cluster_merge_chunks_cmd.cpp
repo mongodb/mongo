@@ -27,25 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
-
-using std::string;
-using std::vector;
-
 namespace {
 
 /**
@@ -89,22 +81,22 @@ public:
     }
 
     // Required
-    static BSONField<string> nsField;
-    static BSONField<vector<BSONObj>> boundsField;
+    static BSONField<std::string> nsField;
+    static BSONField<std::vector<BSONObj>> boundsField;
 
     // Used to send sharding state
-    static BSONField<string> shardNameField;
-    static BSONField<string> configField;
+    static BSONField<std::string> shardNameField;
+    static BSONField<std::string> configField;
 
 
     bool errmsgRun(OperationContext* opCtx,
-                   const string& dbname,
+                   const std::string& dbname,
                    const BSONObj& cmdObj,
-                   string& errmsg,
+                   std::string& errmsg,
                    BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
 
-        vector<BSONObj> bounds;
+        std::vector<BSONObj> bounds;
         if (!FieldParser::extract(cmdObj, boundsField, &bounds, &errmsg)) {
             return false;
         }
@@ -187,11 +179,11 @@ public:
 
 } clusterMergeChunksCommand;
 
-BSONField<string> ClusterMergeChunksCommand::nsField("mergeChunks");
-BSONField<vector<BSONObj>> ClusterMergeChunksCommand::boundsField("bounds");
+BSONField<std::string> ClusterMergeChunksCommand::nsField("mergeChunks");
+BSONField<std::vector<BSONObj>> ClusterMergeChunksCommand::boundsField("bounds");
 
-BSONField<string> ClusterMergeChunksCommand::configField("config");
-BSONField<string> ClusterMergeChunksCommand::shardNameField("shardName");
+BSONField<std::string> ClusterMergeChunksCommand::configField("config");
+BSONField<std::string> ClusterMergeChunksCommand::shardNameField("shardName");
 
 }  // namespace
 }  // namespace mongo

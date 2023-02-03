@@ -32,12 +32,9 @@
 #include <vector>
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/exec/filter.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/index_bounds.h"
 
 namespace mongo {
 
@@ -109,11 +106,17 @@ public:
 
     bool hasHashedPrefix() const;
 
-    BSONElement getHashedField() const;
+    BSONElement getHashedField() const {
+        return _hashedField;
+    }
 
-    const KeyPattern& getKeyPattern() const;
+    const KeyPattern& getKeyPattern() const {
+        return _keyPattern;
+    }
 
-    const std::vector<std::unique_ptr<FieldRef>>& getKeyPatternFields() const;
+    const std::vector<std::unique_ptr<FieldRef>>& getKeyPatternFields() const {
+        return _keyPatternPaths;
+    }
 
     const BSONObj& toBSON() const;
 
@@ -213,8 +216,6 @@ public:
      */
     BSONObj emplaceMissingShardKeyValuesForDocument(BSONObj doc) const;
 
-    BSONObj extractShardKeyFromQuery(const CanonicalQuery& query) const;
-
     /**
      * Returns true if the shard key pattern can ensure that the index uniqueness is respected
      * across all shards.
@@ -249,27 +250,6 @@ public:
     bool isIndexUniquenessCompatible(const BSONObj& indexPattern) const;
 
     /**
-     * Return an ordered list of bounds generated using this KeyPattern and the
-     * bounds from the IndexBounds.  This function is used in sharding to
-     * determine where to route queries according to the shard key pattern.
-     *
-     * Examples:
-     *
-     * Key { a: 1 }, Bounds a: [0] => { a: 0 } -> { a: 0 }
-     * Key { a: 1 }, Bounds a: [2, 3) => { a: 2 } -> { a: 3 }  // bound inclusion ignored.
-     *
-     * The bounds returned by this function may be a superset of those defined
-     * by the constraints.  For instance, if this KeyPattern is {a : 1, b: 1}
-     * Bounds: { a : {$in : [1,2]} , b : {$in : [3,4,5]} }
-     *         => {a : 1 , b : 3} -> {a : 1 , b : 5}, {a : 2 , b : 3} -> {a : 2 , b : 5}
-     *
-     * If the IndexBounds are not defined for all the fields in this keypattern, which
-     * means some fields are unsatisfied, an empty BoundList could return.
-     *
-     */
-    BoundList flattenBounds(const IndexBounds& indexBounds) const;
-
-    /**
      * Returns true if the key pattern has an "_id" field of any flavor.
      */
     bool hasId() const {
@@ -277,6 +257,8 @@ public:
     };
 
     size_t getApproximateSize() const;
+
+    static bool isValidShardKeyElementForStorage(const BSONElement& element);
 
 private:
     KeyPattern _keyPattern;

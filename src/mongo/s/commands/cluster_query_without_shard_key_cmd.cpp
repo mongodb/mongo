@@ -37,6 +37,7 @@
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
+#include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -78,7 +79,13 @@ std::set<ShardId> getShardsToTarget(OperationContext* opCtx,
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
     }
     auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), nss);
-    cm.getShardIdsForQuery(expCtx, query, collation, &allShardsContainingChunksForNs);
+    getShardIdsForQuery(expCtx,
+                        query,
+                        collation,
+                        cm,
+                        &allShardsContainingChunksForNs,
+                        nullptr /* chunkRanges */,
+                        nullptr /* targetMinKeyToMaxKey */);
 
     // We must either get a subset of shards to target in the case of a partial shard key or we must
     // target all shards.

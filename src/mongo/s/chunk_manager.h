@@ -46,8 +46,6 @@
 
 namespace mongo {
 
-class CanonicalQuery;
-struct QuerySolutionNode;
 class ChunkManager;
 
 struct ShardVersionTargetingInfo {
@@ -115,6 +113,8 @@ public:
     ChunkMap createMerged(const std::vector<std::shared_ptr<ChunkInfo>>& changedChunks) const;
 
     BSONObj toBSON() const;
+
+    static bool allElementsAreOfType(BSONType type, const BSONObj& obj);
 
 private:
     ChunkVector::const_iterator _findIntersectingChunk(const BSONObj& shardKey,
@@ -268,7 +268,9 @@ public:
     /**
      * Returns the number of shards on which the collection has any chunks
      */
-    int getNShardsOwningChunks() const;
+    size_t getNShardsOwningChunks() const {
+        return _shardVersions.size();
+    }
 
     /**
      * Returns true if, for this shard, the chunks are identical in both chunk managers
@@ -504,6 +506,10 @@ public:
         return bool(_rt->optRt);
     }
 
+    bool isAtPointInTime() const {
+        return bool(_clusterTime);
+    }
+
     /**
      * Indicates that this collection must not honour any moveChunk requests, because it is required
      * to provide a stable view of its constituent shards.
@@ -555,14 +561,15 @@ public:
     }
 
     template <typename Callable>
-    void forEachChunk(Callable&& handler) const {
+    void forEachChunk(Callable&& handler, const BSONObj& shardKey = BSONObj()) const {
         _rt->optRt->forEachChunk(
             [this, handler = std::forward<Callable>(handler)](const auto& chunkInfo) mutable {
                 if (!handler(Chunk{*chunkInfo, _clusterTime}))
                     return false;
 
                 return true;
-            });
+            },
+            shardKey);
     }
 
     /**
@@ -614,20 +621,6 @@ public:
     ShardId getMinKeyShardIdWithSimpleCollation() const;
 
     /**
-     * Finds the shard IDs for a given filter and collation. If collation is empty, we use the
-     * collection default collation for targeting.
-     * If 'chunkRanges' is not null, populates it with ChunkRanges that would be targeted by the
-     * query. If 'targetMinKeyToMaxKey' is not null, sets it to true if the query targets the entire
-     * shard key space.
-     */
-    void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
-                             const BSONObj& query,
-                             const BSONObj& collation,
-                             std::set<ShardId>* shardIds,
-                             std::set<ChunkRange>* chunkRanges = nullptr,
-                             bool* targetMinKeyToMaxKey = nullptr) const;
-
-    /**
      * Returns all shard ids which contain chunks overlapping the range [min, max]. Please note the
      * inclusive bounds on both sides (SERVER-20768).
      * If 'chunkRanges' is not null, populates it with ChunkRanges that would be targeted by the
@@ -655,28 +648,9 @@ public:
     /**
      * Returns the number of shards on which the collection has any chunks
      */
-    int getNShardsOwningChunks() const {
+    size_t getNShardsOwningChunks() const {
         return _rt->optRt->getNShardsOwningChunks();
     }
-
-    // Transforms query into bounds for each field in the shard key
-    // for example :
-    //   Key { a: 1, b: 1 },
-    //   Query { a : { $gte : 1, $lt : 2 },
-    //            b : { $gte : 3, $lt : 4 } }
-    //   => Bounds { a : [1, 2), b : [3, 4) }
-    static IndexBounds getIndexBoundsForQuery(const BSONObj& key,
-                                              const CanonicalQuery& canonicalQuery);
-
-    // Collapse query solution tree.
-    //
-    // If it has OR node, the result could be a superset of the index bounds generated.
-    // Since to give a single IndexBounds, this gives the union of bounds on each field.
-    // for example:
-    //   OR: { a: (0, 1), b: (0, 1) },
-    //       { a: (2, 3), b: (2, 3) }
-    //   =>  { a: (0, 1), (2, 3), b: (0, 1), (2, 3) }
-    static IndexBounds collapseQuerySolution(const QuerySolutionNode* node);
 
     /**
      * Constructs a new ChunkManager, which is a view of the underlying routing table at a different

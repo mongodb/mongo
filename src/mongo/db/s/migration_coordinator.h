@@ -32,6 +32,7 @@
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 namespace migrationutil {

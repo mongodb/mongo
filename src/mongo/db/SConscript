@@ -829,6 +829,7 @@ env.Library(
         's/sharding_api_d_DO_NOT_ADD_MORE_USAGES',
     ],
     LIBDEPS_PRIVATE=[
+        'catalog/clustered_collection_options',
         'server_base',
     ],
 )
@@ -1312,6 +1313,7 @@ env.Library(
         'exec/shard_filterer_impl.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        'exec/working_set',
         'shard_role_api',
     ],
 )
@@ -1675,7 +1677,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/session/logical_session_id',
-        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/grid',
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
         '$BUILD_DIR/mongo/util/clock_sources',
         '$BUILD_DIR/mongo/util/periodic_runner',

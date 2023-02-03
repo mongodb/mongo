@@ -27,22 +27,16 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/hasher.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/chunk_manager.h"
-#include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -82,7 +76,7 @@ protected:
 
         BSONObj key = fromjson(keyStr);
 
-        IndexBounds indexBounds = ChunkManager::getIndexBoundsForQuery(key, *query.get());
+        IndexBounds indexBounds = getIndexBoundsForQuery(key, *query.get());
         ASSERT_EQUALS(indexBounds.size(), expectedBounds.size());
         for (size_t i = 0; i < indexBounds.size(); i++) {
             const OrderedIntervalList& oil = indexBounds.fields[i];
@@ -109,7 +103,7 @@ protected:
 
         BSONObj key = fromjson("{a: 1}");
 
-        IndexBounds indexBounds = ChunkManager::getIndexBoundsForQuery(key, *query.get());
+        IndexBounds indexBounds = getIndexBoundsForQuery(key, *query.get());
         ASSERT_EQUALS(indexBounds.size(), 1U);
         const OrderedIntervalList& oil = indexBounds.fields.front();
 
@@ -296,7 +290,7 @@ TEST_F(CMCollapseTreeTest, BasicAllElemMatch) {
 
     BSONObj key = fromjson("{'foo.a': 1}");
 
-    IndexBounds indexBounds = ChunkManager::getIndexBoundsForQuery(key, *query.get());
+    IndexBounds indexBounds = getIndexBoundsForQuery(key, *query.get());
     ASSERT_EQUALS(indexBounds.size(), 1U);
     const OrderedIntervalList& oil = indexBounds.fields.front();
     ASSERT_EQUALS(oil.intervals.size(), 1U);
@@ -475,7 +469,7 @@ TEST_F(CMKeyBoundsTest, Basic) {
     expectedList.emplace_back(fromjson("{a: 0}"), fromjson("{a: 0}"));
 
     ShardKeyPattern skeyPattern(fromjson("{a: 1}"));
-    BoundList list = skeyPattern.flattenBounds(indexBounds);
+    BoundList list = flattenBounds(skeyPattern, indexBounds);
     checkBoundList(list, expectedList);
 }
 
@@ -490,7 +484,7 @@ TEST_F(CMKeyBoundsTest, SingleInterval) {
     expectedList.emplace_back(fromjson("{a: 2}"), fromjson("{a: 3}"));
 
     ShardKeyPattern skeyPattern(fromjson("{a: 1}"));
-    BoundList list = skeyPattern.flattenBounds(indexBounds);
+    BoundList list = flattenBounds(skeyPattern, indexBounds);
     checkBoundList(list, expectedList);
 }
 
@@ -509,7 +503,7 @@ TEST_F(CMKeyBoundsTest, MultiIntervals) {
     expectedList.emplace_back(fromjson("{ a: 2, b: 2, c: 2 }"), fromjson("{ a: 3, b: 3, c: 3 }"));
 
     ShardKeyPattern skeyPattern(fromjson("{a: 1, b: 1, c: 1}"));
-    BoundList list = skeyPattern.flattenBounds(indexBounds);
+    BoundList list = flattenBounds(skeyPattern, indexBounds);
     checkBoundList(list, expectedList);
 }
 
@@ -537,7 +531,7 @@ TEST_F(CMKeyBoundsTest, IntervalExpansion) {
     expectedList.emplace_back(fromjson("{ a: 0, b: 6, c: 2 }"), fromjson("{ a: 0, b: 6, c: 3 }"));
 
     ShardKeyPattern skeyPattern(fromjson("{a: 1, b: 1, c: 1}"));
-    BoundList list = skeyPattern.flattenBounds(indexBounds);
+    BoundList list = flattenBounds(skeyPattern, indexBounds);
     checkBoundList(list, expectedList);
 }
 
@@ -562,7 +556,7 @@ TEST_F(CMKeyBoundsTest, NonPointIntervalExpasion) {
     expectedList.emplace_back(fromjson("{ a: 0, b: 4, c: 2 }"), fromjson("{ a: 1, b: 6, c: 3 }"));
 
     ShardKeyPattern skeyPattern(fromjson("{a: 1, b: 1, c: 1}"));
-    BoundList list = skeyPattern.flattenBounds(indexBounds);
+    BoundList list = flattenBounds(skeyPattern, indexBounds);
     checkBoundList(list, expectedList);
 }
 

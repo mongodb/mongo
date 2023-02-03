@@ -103,6 +103,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/processinfo.h"
@@ -390,7 +391,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
             // to include a shard filtering stage. By omitting the shard filter, it may be possible
             // to get a more efficient plan (for example, a COUNT_SCAN may be used if the query is
             // eligible).
-            const BSONObj extractedKey = shardKeyPattern.extractShardKeyFromQuery(*canonicalQuery);
+            const BSONObj extractedKey = extractShardKeyFromQuery(shardKeyPattern, *canonicalQuery);
 
             if (extractedKey.isEmpty()) {
                 plannerParams->shardKey = shardKeyPattern.toBSON();

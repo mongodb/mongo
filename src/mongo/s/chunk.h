@@ -141,6 +141,8 @@ public:
     Chunk(ChunkInfo& chunkInfo, const boost::optional<Timestamp>& atClusterTime)
         : _chunkInfo(chunkInfo), _atClusterTime(atClusterTime) {}
 
+    Chunk(const Chunk& other) = default;
+
     const BSONObj& getMin() const {
         return _chunkInfo.getMin();
     }

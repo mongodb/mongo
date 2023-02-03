@@ -35,6 +35,7 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -87,8 +88,13 @@ protected:
         }();
         auto expCtx =
             make_intrusive<ExpressionContextForTest>(operationContext(), kNss, std::move(cif));
-        chunkManager.getShardIdsForQuery(
-            expCtx, query, queryCollation, &shardIds, &chunkRanges, &targetMinKeyToMaxKey);
+        getShardIdsForQuery(expCtx,
+                            query,
+                            queryCollation,
+                            chunkManager,
+                            &shardIds,
+                            &chunkRanges,
+                            &targetMinKeyToMaxKey);
         _assertShardIdsMatch(expectedShardIds, shardIds);
         ASSERT_EQ(expectTargetMinKeyToMaxKey, targetMinKeyToMaxKey);
     }
@@ -606,7 +612,13 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
 
     const auto expCtx = make_intrusive<ExpressionContextForTest>();
     shardIds.clear();
-    chunkManager.getShardIdsForQuery(expCtx, BSON("x" << BSON("$gt" << -20)), {}, &shardIds);
+    getShardIdsForQuery(expCtx,
+                        BSON("x" << BSON("$gt" << -20)),
+                        {},
+                        chunkManager,
+                        &shardIds,
+                        nullptr /* chunkRanges */,
+                        nullptr /* targetMinKeyToMaxKey */);
     ASSERT_EQ(2, shardIds.size());
 }
 

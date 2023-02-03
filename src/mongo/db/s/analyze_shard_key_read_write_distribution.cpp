@@ -38,6 +38,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 
@@ -134,8 +135,13 @@ DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_increme
     std::set<ShardId> shardIds;  // This is not used.
     std::set<ChunkRange> chunkRanges;
     bool targetMinkeyToMaxKey = false;
-    _getChunkManager().getShardIdsForQuery(
-        expCtx, filter, collation, &shardIds, &chunkRanges, &targetMinkeyToMaxKey);
+    getShardIdsForQuery(expCtx,
+                        filter,
+                        collation,
+                        _getChunkManager(),
+                        &shardIds,
+                        &chunkRanges,
+                        &targetMinkeyToMaxKey);
     _incrementNumDispatchedByRanges(chunkRanges);
 
     // Increment metrics about sharding targeting.

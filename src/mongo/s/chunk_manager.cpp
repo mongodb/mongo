@@ -27,17 +27,10 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/chunk_manager.h"
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/chunk_writes_tracker.h"
@@ -46,23 +39,13 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
 namespace {
-
-bool allElementsAreOfType(BSONType type, const BSONObj& obj) {
-    for (auto&& elem : obj) {
-        if (elem.type() != type) {
-            return false;
-        }
-    }
-    return true;
-}
 
 void checkAllElementsAreOfType(BSONType type, const BSONObj& o) {
     uassert(ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "Not all elements of " << o << " are of type " << typeName(type),
-            allElementsAreOfType(type, o));
+            ChunkMap::allElementsAreOfType(type, o));
 }
 
 void appendChunkTo(std::vector<std::shared_ptr<ChunkInfo>>& chunks,
@@ -286,6 +269,15 @@ BSONObj ChunkMap::toBSON() const {
     return builder.obj();
 }
 
+bool ChunkMap::allElementsAreOfType(BSONType type, const BSONObj& obj) {
+    for (auto&& elem : obj) {
+        if (elem.type() != type) {
+            return false;
+        }
+    }
+    return true;
+}
+
 ChunkMap::ChunkVector::const_iterator ChunkMap::_findIntersectingChunk(const BSONObj& shardKey,
                                                                        bool isMaxInclusive) const {
     auto shardKeyString = ShardKeyPattern::toKeyString(shardKey);
@@ -410,107 +402,6 @@ bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& sha
     return chunkInfo->getShardIdAt(_clusterTime) == shardId;
 }
 
-void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                       const BSONObj& query,
-                                       const BSONObj& collation,
-                                       std::set<ShardId>* shardIds,
-                                       std::set<ChunkRange>* chunkRanges,
-                                       bool* targetMinKeyToMaxKey) const {
-    if (chunkRanges) {
-        invariant(chunkRanges->empty());
-    }
-
-    auto findCommand = std::make_unique<FindCommandRequest>(_rt->optRt->nss());
-    findCommand->setFilter(query.getOwned());
-
-    expCtx->uuid = getUUID();
-
-    if (!collation.isEmpty()) {
-        findCommand->setCollation(collation.getOwned());
-    } else if (_rt->optRt->getDefaultCollator()) {
-        auto defaultCollator = _rt->optRt->getDefaultCollator();
-        findCommand->setCollation(defaultCollator->getSpec().toBSON());
-        expCtx->setCollator(defaultCollator->clone());
-    }
-
-    auto cq = uassertStatusOK(
-        CanonicalQuery::canonicalize(expCtx->opCtx,
-                                     std::move(findCommand),
-                                     false, /* isExplain */
-                                     expCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures));
-
-    // Fast path for targeting equalities on the shard key.
-    auto shardKeyToFind = _rt->optRt->getShardKeyPattern().extractShardKeyFromQuery(*cq);
-    if (!shardKeyToFind.isEmpty()) {
-        try {
-            auto chunk = findIntersectingChunk(shardKeyToFind, collation);
-            shardIds->insert(chunk.getShardId());
-            if (chunkRanges) {
-                chunkRanges->insert(chunk.getRange());
-            }
-            if (targetMinKeyToMaxKey) {
-                *targetMinKeyToMaxKey = false;
-            }
-            return;
-        } catch (const DBException&) {
-            // The query uses multiple shards
-        }
-    }
-
-    // Transforms query into bounds for each field in the shard key
-    // for example :
-    //   Key { a: 1, b: 1 },
-    //   Query { a : { $gte : 1, $lt : 2 },
-    //            b : { $gte : 3, $lt : 4 } }
-    //   => Bounds { a : [1, 2), b : [3, 4) }
-    IndexBounds bounds = getIndexBoundsForQuery(_rt->optRt->getShardKeyPattern().toBSON(), *cq);
-
-    // Transforms bounds for each shard key field into full shard key ranges
-    // for example :
-    //   Key { a : 1, b : 1 }
-    //   Bounds { a : [1, 2), b : [3, 4) }
-    //   => Ranges { a : 1, b : 3 } => { a : 2, b : 4 }
-    BoundList ranges = _rt->optRt->getShardKeyPattern().flattenBounds(bounds);
-
-    for (BoundList::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
-        const auto& min = it->first;
-        const auto& max = it->second;
-
-        getShardIdsForRange(min, max, shardIds, chunkRanges);
-        if (targetMinKeyToMaxKey && allElementsAreOfType(MinKey, min) &&
-            allElementsAreOfType(MaxKey, max)) {
-            *targetMinKeyToMaxKey = true;
-        }
-
-        // Once we know we need to visit all shards no need to keep looping.
-        // However, this optimization does not apply when we are reading from a snapshot
-        // because _shardVersions contains shards with chunks and is built based on the last
-        // refresh. Therefore, it is possible for _shardVersions to have fewer entries if a shard
-        // no longer owns chunks when it used to at _clusterTime.
-        if (!_clusterTime && shardIds->size() == _rt->optRt->_shardVersions.size()) {
-            break;
-        }
-    }
-
-    // SERVER-4914 Some clients of getShardIdsForQuery() assume at least one shard will be returned.
-    // For now, we satisfy that assumption by adding a shard with no matches rather than returning
-    // an empty set of shards.
-    if (shardIds->empty()) {
-        _rt->optRt->forEachChunk([&](const std::shared_ptr<ChunkInfo>& chunkInfo) {
-            shardIds->insert(chunkInfo->getShardIdAt(_clusterTime));
-            if (chunkRanges) {
-                chunkRanges->insert(chunkInfo->getRange());
-            }
-            if (targetMinKeyToMaxKey) {
-                *targetMinKeyToMaxKey = false;
-            }
-            return false;
-        });
-    }
-}
-
 void ChunkManager::getShardIdsForRange(const BSONObj& min,
                                        const BSONObj& max,
                                        std::set<ShardId>* shardIds,
@@ -520,7 +411,8 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
     // contains shards with chunks and is built based on the last refresh. Therefore, it is
     // possible for _shardVersions to have fewer entries if a shard no longer owns chunks when it
     // used to at _clusterTime.
-    if (!_clusterTime && allElementsAreOfType(MinKey, min) && allElementsAreOfType(MaxKey, max)) {
+    if (!_clusterTime && ChunkMap::allElementsAreOfType(MinKey, min) &&
+        ChunkMap::allElementsAreOfType(MaxKey, max)) {
         getAllShardIds(shardIds);
         if (chunkRanges) {
             getAllChunkRanges(chunkRanges);
@@ -564,19 +456,18 @@ bool ChunkManager::rangeOverlapsShard(const ChunkRange& range, const ShardId& sh
 
 boost::optional<Chunk> ChunkManager::getNextChunkOnShard(const BSONObj& shardKey,
                                                          const ShardId& shardId) const {
-    boost::optional<Chunk> chunk;
-
-    _rt->optRt->forEachChunk(
-        [&](auto& chunkInfo) {
-            if (chunkInfo->getShardIdAt(_clusterTime) == shardId) {
-                chunk.emplace(*chunkInfo, _clusterTime);
+    boost::optional<Chunk> optChunk;
+    forEachChunk(
+        [&](const Chunk& chunk) {
+            if (chunk.getShardId() == shardId) {
+                optChunk.emplace(chunk);
                 return false;
             }
             return true;
         },
         shardKey);
 
-    return chunk;
+    return optChunk;
 }
 
 ShardId ChunkManager::getMinKeyShardIdWithSimpleCollation() const {
@@ -598,154 +489,6 @@ void RoutingTableHistory::getAllChunkRanges(std::set<ChunkRange>* all) const {
         all->insert(chunkInfo->getRange());
         return true;
     });
-}
-
-int RoutingTableHistory::getNShardsOwningChunks() const {
-    return _shardVersions.size();
-}
-
-IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
-                                                 const CanonicalQuery& canonicalQuery) {
-    // $text is not allowed in planning since we don't have text index on mongos.
-    // TODO: Treat $text query as a no-op in planning on mongos. So with shard key {a: 1},
-    //       the query { a: 2, $text: { ... } } will only target to {a: 2}.
-    if (QueryPlannerCommon::hasNode(canonicalQuery.root(), MatchExpression::TEXT)) {
-        IndexBounds bounds;
-        IndexBoundsBuilder::allValuesBounds(key, &bounds, false);  // [minKey, maxKey]
-        return bounds;
-    }
-
-    // Similarly, ignore GEO_NEAR queries in planning, since we do not have geo indexes on mongos.
-    if (QueryPlannerCommon::hasNode(canonicalQuery.root(), MatchExpression::GEO_NEAR)) {
-        // If the GEO_NEAR predicate is a child of AND, remove the GEO_NEAR and continue building
-        // bounds. Currently a CanonicalQuery can have at most one GEO_NEAR expression, and only at
-        // the top-level, so this check is sufficient.
-        auto geoIdx = [](auto root) -> boost::optional<size_t> {
-            if (root->matchType() == MatchExpression::AND) {
-                for (size_t i = 0; i < root->numChildren(); ++i) {
-                    if (MatchExpression::GEO_NEAR == root->getChild(i)->matchType()) {
-                        return boost::make_optional(i);
-                    }
-                }
-            }
-            return boost::none;
-        }(canonicalQuery.root());
-
-        if (!geoIdx) {
-            IndexBounds bounds;
-            IndexBoundsBuilder::allValuesBounds(key, &bounds, false);
-            return bounds;
-        }
-
-        canonicalQuery.root()->getChildVector()->erase(
-            canonicalQuery.root()->getChildVector()->begin() + geoIdx.value());
-    }
-
-    // Consider shard key as an index
-    std::string accessMethod = IndexNames::findPluginName(key);
-    dassert(accessMethod == IndexNames::BTREE || accessMethod == IndexNames::HASHED);
-    const auto indexType = IndexNames::nameToType(accessMethod);
-
-    // Use query framework to generate index bounds
-    QueryPlannerParams plannerParams;
-    // Must use "shard key" index
-    plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN;
-    IndexEntry indexEntry(key,
-                          indexType,
-                          IndexDescriptor::kLatestIndexVersion,
-                          // The shard key index cannot be multikey.
-                          false,
-                          // Empty multikey paths, since the shard key index cannot be multikey.
-                          MultikeyPaths{},
-                          // Empty multikey path set, since the shard key index cannot be multikey.
-                          {},
-                          false /* sparse */,
-                          false /* unique */,
-                          IndexEntry::Identifier{"shardkey"},
-                          nullptr /* filterExpr */,
-                          BSONObj(),
-                          nullptr, /* collator */
-                          nullptr /* projExec */);
-    plannerParams.indices.push_back(std::move(indexEntry));
-
-    auto statusWithMultiPlanSolns = QueryPlanner::plan(canonicalQuery, plannerParams);
-    if (statusWithMultiPlanSolns.getStatus().code() != ErrorCodes::NoQueryExecutionPlans) {
-        auto solutions = uassertStatusOK(std::move(statusWithMultiPlanSolns));
-
-        // Pick any solution that has non-trivial IndexBounds. bounds.size() == 0 represents a
-        // trivial IndexBounds where none of the fields' values are bounded.
-        for (auto&& soln : solutions) {
-            IndexBounds bounds = collapseQuerySolution(soln->root());
-            if (bounds.size() > 0) {
-                return bounds;
-            }
-        }
-    }
-
-    // We cannot plan the query without collection scan, so target to all shards.
-    IndexBounds bounds;
-    IndexBoundsBuilder::allValuesBounds(key, &bounds, false);  // [minKey, maxKey]
-    return bounds;
-}
-
-IndexBounds ChunkManager::collapseQuerySolution(const QuerySolutionNode* node) {
-    if (node->children.empty()) {
-        invariant(node->getType() == STAGE_IXSCAN);
-
-        const IndexScanNode* ixNode = static_cast<const IndexScanNode*>(node);
-        return ixNode->bounds;
-    }
-
-    if (node->children.size() == 1) {
-        // e.g. FETCH -> IXSCAN
-        return collapseQuerySolution(node->children.front().get());
-    }
-
-    // children.size() > 1, assert it's OR / SORT_MERGE.
-    if (node->getType() != STAGE_OR && node->getType() != STAGE_SORT_MERGE) {
-        // Unexpected node. We should never reach here.
-        LOGV2_ERROR(23833,
-                    "could not generate index bounds on query solution tree: {node}",
-                    "node"_attr = redact(node->toString()));
-        dassert(false);  // We'd like to know this error in testing.
-
-        // Bail out with all shards in production, since this isn't a fatal error.
-        return IndexBounds();
-    }
-
-    IndexBounds bounds;
-
-    for (auto it = node->children.begin(); it != node->children.end(); it++) {
-        // The first branch under OR
-        if (it == node->children.begin()) {
-            invariant(bounds.size() == 0);
-            bounds = collapseQuerySolution(it->get());
-            if (bounds.size() == 0) {  // Got unexpected node in query solution tree
-                return IndexBounds();
-            }
-            continue;
-        }
-
-        IndexBounds childBounds = collapseQuerySolution(it->get());
-        if (childBounds.size() == 0) {
-            // Got unexpected node in query solution tree
-            return IndexBounds();
-        }
-
-        invariant(childBounds.size() == bounds.size());
-
-        for (size_t i = 0; i < bounds.size(); i++) {
-            bounds.fields[i].intervals.insert(bounds.fields[i].intervals.end(),
-                                              childBounds.fields[i].intervals.begin(),
-                                              childBounds.fields[i].intervals.end());
-        }
-    }
-
-    for (size_t i = 0; i < bounds.size(); i++) {
-        IndexBoundsBuilder::unionize(&bounds.fields[i]);
-    }
-
-    return bounds;
 }
 
 ChunkManager ChunkManager::makeAtTime(const ChunkManager& cm, Timestamp clusterTime) {

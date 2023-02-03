@@ -75,7 +75,7 @@ bool isExactIdQuery(OperationContext* opCtx,
     if (cq.isOK()) {
         // Only returns a shard key iff a query has a full shard key with direct/equality matches on
         // all shard key fields.
-        auto shardKey = kVirtualIdShardKey.extractShardKeyFromQuery(*cq.getValue());
+        auto shardKey = extractShardKeyFromQuery(kVirtualIdShardKey, *cq.getValue());
         BSONElement idElt = shardKey["_id"];
 
         if (!idElt) {

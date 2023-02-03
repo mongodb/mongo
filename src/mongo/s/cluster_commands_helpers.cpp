@@ -27,12 +27,9 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
+#include "mongo/s/cluster_commands_helpers.h"
 
 #include <boost/optional.hpp>
-
-#include "mongo/s/cluster_commands_helpers.h"
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
@@ -45,24 +42,22 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/write_concern_error_detail.h"
-#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/database_version.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 
@@ -185,7 +180,13 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     }
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), nss);
-    cm.getShardIdsForQuery(expCtx, query, collation, &shardIds);
+    getShardIdsForQuery(expCtx,
+                        query,
+                        collation,
+                        cm,
+                        &shardIds,
+                        nullptr /* chunkRanges */,
+                        nullptr /* targetMinKeyToMaxKey */);
 
     const auto targetedSampleId = eligibleForSampling
         ? analyze_shard_key::tryGenerateTargetedSampleId(opCtx, nss, shardIds)
@@ -659,7 +660,13 @@ std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionConte
         // The collection is sharded. Use the routing table to decide which shards to target based
         // on the query and collation.
         std::set<ShardId> shardIds;
-        cm.getShardIdsForQuery(expCtx, query, collation, &shardIds);
+        getShardIdsForQuery(expCtx,
+                            query,
+                            collation,
+                            cm,
+                            &shardIds,
+                            nullptr /* chunkRanges */,
+                            nullptr /* targetMinKeyToMaxKey */);
         return shardIds;
     }
 

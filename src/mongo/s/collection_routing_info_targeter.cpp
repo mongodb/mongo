@@ -34,16 +34,16 @@
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
-#include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -55,7 +55,6 @@
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -166,7 +165,7 @@ BSONObj getUpdateExprForTargeting(const boost::intrusive_ptr<ExpressionContext> 
  *     { foo : <anything> } => false
  */
 bool isExactIdQuery(OperationContext* opCtx, const CanonicalQuery& query, const ChunkManager& cm) {
-    auto shardKey = kVirtualIdShardKey.extractShardKeyFromQuery(query);
+    auto shardKey = extractShardKeyFromQuery(kVirtualIdShardKey, query);
     BSONElement idElt = shardKey["_id"];
 
     if (!idElt) {
@@ -620,7 +619,7 @@ StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQue
 
     std::set<ShardId> shardIds;
     try {
-        _cri.cm.getShardIdsForQuery(expCtx, query, collation, &shardIds, chunkRanges);
+        getShardIdsForQuery(expCtx, query, collation, _cri.cm, &shardIds, chunkRanges);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }

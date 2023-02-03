@@ -37,7 +37,6 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/util/fail_point.h"
