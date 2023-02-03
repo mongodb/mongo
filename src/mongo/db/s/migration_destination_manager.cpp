@@ -1096,7 +1096,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
             // range deletion task with an immediately satsifiable write concern and then wait for
             // majority after yielding the session.
             migrationutil::persistRangeDeletionTaskLocally(
-                outerOpCtx, recipientDeletionTask, WriteConcernOptions());
+                outerOpCtx, recipientDeletionTask, ShardingCatalogClient::kLocalWriteConcern);
 
             runWithoutSession(
                 outerOpCtx,
