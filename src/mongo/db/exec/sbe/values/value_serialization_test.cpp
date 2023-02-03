@@ -268,6 +268,18 @@ TEST_F(ValueSerializeForKeyString, SbeArray) {
     runTest({{testDataTag, testDataVal}});
 }
 
+TEST_F(ValueSerializeForKeyString, ArraySet) {
+    auto [tag, val] = sbe::value::makeNewArraySet();
+    sbe::value::ValueGuard guard{tag, val};
+    auto* arraySet = sbe::value::getArraySetView(val);
+
+    arraySet->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    arraySet->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
+    arraySet->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(3.0));
+
+    runTest({{tag, val}});
+}
+
 TEST_F(ValueSerializeForKeyString, DateTime) {
     runTest({{value::TypeTags::Date, value::bitcastFrom<int64_t>(1234)},
              {value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(5678)}});
