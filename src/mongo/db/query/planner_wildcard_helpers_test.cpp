@@ -113,14 +113,14 @@ TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_WithProjection) {
     IndexEntryMock wildcardIndex{
         BSON("e.f" << 1 << "$**" << 1 << "m.n" << 1), BSON("a" << 1), {FieldRef{"a"_sd}}};
 
-    stdx::unordered_set<std::string> fields{"a", "b"};
+    stdx::unordered_set<std::string> fields{"a.c", "b"};
     std::vector<IndexEntry> expandedIndexes{};
     expandWildcardIndexEntry(*wildcardIndex.indexEntry, fields, &expandedIndexes);
 
     MultikeyPaths expectedMks{{}, {0}, {}};
     ASSERT_EQ(1, expandedIndexes.size());
     ASSERT_BSONOBJ_EQ(expandedIndexes.front().keyPattern,
-                      BSON("e.f" << 1 << "a" << 1 << "m.n" << 1));
+                      BSON("e.f" << 1 << "a.c" << 1 << "m.n" << 1));
     ASSERT_TRUE(expandedIndexes.front().multikey);
     ASSERT_EQ(1, expandedIndexes.front().wildcardFieldPos);
     ASSERT_EQ(expectedMks, expandedIndexes.front().multikeyPaths);
@@ -157,6 +157,28 @@ TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_WithoutProjection)
         }
         ASSERT_EQ(2, index.wildcardFieldPos);
     }
+}
+
+TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_NumericComponents) {
+    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
+
+    IndexEntryMock wildcardIndex{BSON("e.f" << 1 << "$**" << 1 << "m.n" << 1),
+                                 BSON("a.0" << 1 << "b" << 1),
+                                 {FieldRef{"a"_sd}}};
+
+    stdx::unordered_set<std::string> fields{"a.0.b", "b"};
+    std::vector<IndexEntry> expandedIndexes{};
+    expandWildcardIndexEntry(*wildcardIndex.indexEntry, fields, &expandedIndexes);
+
+    // Expanded IndexEntry {e.f: 1, a.0.b: 1, m.n: 1} is exclauded since this is the case when the
+    // query path lies along a $** projection through an array index. See comment to
+    // 'validateNumericPathComponents' in planner_wildcard_helper.cpp function for details.
+    MultikeyPaths expectedMks{{}, {}, {}};
+    ASSERT_EQ(1, expandedIndexes.size());
+    ASSERT_BSONOBJ_EQ(expandedIndexes.front().keyPattern,
+                      BSON("e.f" << 1 << "b" << 1 << "m.n" << 1));
+    ASSERT_FALSE(expandedIndexes.front().multikey);
+    ASSERT_EQ(expectedMks, expandedIndexes.front().multikeyPaths);
 }
 
 }  // namespace mongo::wildcard_planning

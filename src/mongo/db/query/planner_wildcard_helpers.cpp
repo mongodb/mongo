@@ -251,10 +251,20 @@ std::set<FieldRef> generateFieldNameOrArrayIndexPathSet(const MultikeyComponents
 bool validateNumericPathComponents(const MultikeyPaths& multikeyPaths,
                                    const std::set<FieldRef>& includedPaths,
                                    const FieldRef& queryPath) {
+    // Find the position of the Wildcard's MultikeyComponents in the paths, we assume that the
+    // wildcard field is the only one that can be multikey.
+    auto wildcardComponent = std::find_if(multikeyPaths.begin(),
+                                          multikeyPaths.end(),
+                                          [](const MultikeyComponents& c) { return !c.empty(); });
+    if (wildcardComponent == multikeyPaths.end()) {
+        // If no MultikeyComponents just return.
+        return true;
+    }
+
     // Find the positions of all multikey path components in 'queryPath' that have a numerical path
     // component immediately after. For a queryPath of 'a.2.b' this will return position 0; that is,
     // 'a'. If no such multikey path was found, we are clear to proceed with planning.
-    const auto arrayIndices = findArrayIndexPathComponents(multikeyPaths.front(), queryPath);
+    const auto arrayIndices = findArrayIndexPathComponents(*wildcardComponent, queryPath);
     if (arrayIndices.empty()) {
         return true;
     }
