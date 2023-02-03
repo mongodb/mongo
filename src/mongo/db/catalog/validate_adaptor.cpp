@@ -651,11 +651,6 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         Status status = validateRecord(
             opCtx, record->id, record->data, &nNonCompliantDocuments, &validatedSize, results);
 
-        // RecordStores are required to return records in RecordId order.
-        if (prevRecordId.isValid()) {
-            invariant(prevRecordId < record->id);
-        }
-
         // validatedSize = dataSize is not a general requirement as some storage engines may use
         // padding, but we still require that they return the unpadded record data.
         if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {

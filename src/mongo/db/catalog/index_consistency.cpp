@@ -59,6 +59,7 @@ const size_t IndexConsistency::kNumHashBuckets = 1U << 16;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(crashOnMultikeyValidateFailure);
+MONGO_FAIL_POINT_DEFINE(failIndexKeyOrdering);
 
 StringSet::hasher hash;
 
@@ -611,7 +612,7 @@ void _validateKeyOrder(OperationContext* opCtx,
 
     // KeyStrings will be in strictly increasing order because all keys are sorted and they are in
     // the format (Key, RID), and all RecordIDs are unique.
-    if (currKey.compare(prevKey) <= 0) {
+    if (currKey.compare(prevKey) <= 0 || MONGO_unlikely(failIndexKeyOrdering.shouldFail())) {
         if (results && results->valid) {
             results->errors.push_back(str::stream()
                                       << "index '" << descriptor->indexName()

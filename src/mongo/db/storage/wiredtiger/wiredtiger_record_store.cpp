@@ -141,6 +141,7 @@ std::size_t computeRecordIdSize(const RecordId& id) {
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(WTCompactRecordStoreEBUSY);
+MONGO_FAIL_POINT_DEFINE(WTRecordStoreUassertOutOfOrder);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictException);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
 MONGO_FAIL_POINT_DEFINE(slowOplogSamplingReads);
@@ -2221,7 +2222,8 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     }
 
     if ((_forward && _lastReturnedId >= id) ||
-        (!_forward && !_lastReturnedId.isNull() && id >= _lastReturnedId)) {
+        (!_forward && !_lastReturnedId.isNull() && id >= _lastReturnedId) ||
+        MONGO_unlikely(WTRecordStoreUassertOutOfOrder.shouldFail())) {
         HealthLogEntry entry;
         entry.setNss(_ns);
         entry.setTimestamp(Date_t::now());
@@ -2240,8 +2242,11 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
 
         HealthLogInterface::get(_opCtx)->log(entry);
 
-        // Crash when testing diagnostics are enabled.
-        invariant(!TestingProctor::instance().isEnabled(), "cursor returned out-of-order keys");
+        if (!WTRecordStoreUassertOutOfOrder.shouldFail()) {
+            // Crash when testing diagnostics are enabled and not explicitly uasserting on
+            // out-of-order keys.
+            invariant(!TestingProctor::instance().isEnabled(), "cursor returned out-of-order keys");
+        }
 
         // uassert with 'DataCorruptionDetected' after logging.
         LOGV2_ERROR_OPTIONS(22406,
