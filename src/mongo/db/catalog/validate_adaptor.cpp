@@ -57,6 +57,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(crashOnMultikeyValidateFailure);
+MONGO_FAIL_POINT_DEFINE(failIndexKeyOrdering);
 
 const long long kInterruptIntervalNumRecords = 4096;
 const long long kInterruptIntervalNumBytes = 50 * 1024 * 1024;  // 50MB.
@@ -210,7 +211,7 @@ void _validateKeyOrder(OperationContext* opCtx,
 
     // KeyStrings will be in strictly increasing order because all keys are sorted and they are in
     // the format (Key, RID), and all RecordIDs are unique.
-    if (currKey.compare(prevKey) <= 0) {
+    if (currKey.compare(prevKey) <= 0 || MONGO_unlikely(failIndexKeyOrdering.shouldFail())) {
         if (results && results->valid) {
             results->errors.push_back(str::stream()
                                       << "index '" << descriptor->indexName()
@@ -369,11 +370,6 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         dataSizeTotal += dataSize;
         size_t validatedSize = 0;
         Status status = validateRecord(opCtx, record->id, record->data, &validatedSize, results);
-
-        // Checks to ensure isInRecordIdOrder() is being used properly.
-        if (prevRecordId.isValid()) {
-            invariant(prevRecordId < record->id);
-        }
 
         // validatedSize = dataSize is not a general requirement as some storage engines may use
         // padding, but we still require that they return the unpadded record data.
