@@ -836,5 +836,14 @@ TEST_F(NodeSBE, SpoolFibonacci) {
     }
 }
 
+TEST_F(NodeSBE, TestConstantEquality) {
+    auto tree = make<If>(make<BinaryOp>(Operations::Eq, Constant::int32(9), Constant::nothing()),
+                         Constant::boolean(true),
+                         Constant::boolean(false));
+    auto env = VariableEnvironment::build(tree);
+    ConstEval{env}.optimize(tree);
+    ASSERT_TRUE(tree.is<Constant>());
+}
+
 }  // namespace
 }  // namespace mongo::optimizer
