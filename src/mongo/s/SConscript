@@ -203,6 +203,7 @@ env.Library(
         'catalog/type_config_version.cpp',
         'catalog/type_database.idl',
         'catalog/type_index_catalog.idl',
+        'catalog/type_index_catalog.cpp',
         'catalog/type_mongos.cpp',
         'catalog/type_namespace_placement.idl',
         'catalog/type_shard.cpp',

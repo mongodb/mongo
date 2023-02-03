@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/index_version.h"
 #include "mongo/util/read_through_cache.h"
 

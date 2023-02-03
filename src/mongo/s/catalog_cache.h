@@ -33,7 +33,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/type_database_gen.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/global_index_cache.h"

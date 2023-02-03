@@ -51,7 +51,7 @@
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"

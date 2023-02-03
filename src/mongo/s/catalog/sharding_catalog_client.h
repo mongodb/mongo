@@ -38,7 +38,7 @@
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/index_version.h"

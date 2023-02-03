@@ -30,12 +30,14 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_index_catalog.h"
 
 namespace mongo {
 
 /**
- * Renames the global indexes metadata.
+ * Renames the global indexes metadata. This function should only be called after stopping
+ * migrations and holding the critical section in all shards with data for userCollectionNss. This
+ * function is not currently compatible with transactions.
  */
 void renameGlobalIndexesMetadata(OperationContext* opCtx,
                                  const NamespaceString& fromNss,
@@ -60,36 +62,42 @@ void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
 /**
  * Removes the index identified by indexName from the catalog. This function updates the in-memory
  * state and the persisted state, so it should only be called after stopping migrations and holding
- * the critical section in all shards with data for userCollectionNss. This function is not
+ * the critical section in all shards with data for nss. This function is not
  * currently compatible with transactions.
  */
 void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
-                                                 const NamespaceString& userCollectionNss,
-                                                 const UUID& collectionUUID,
-                                                 const std::string& indexName,
+                                                 const NamespaceString& nss,
+                                                 const UUID& uuid,
+                                                 const StringData& indexName,
                                                  const Timestamp& lastmod);
 
 /**
  * Removes all the indexes and the current index version, and replace them for the specified indexes
- * and indexVersion.
+ * and indexVersion. This function should only be called after stopping migrations and holding the
+ * critical section in all shards with data for userCollectionNss. This function is not currently
+ * compatible with transactions.
  */
-void replaceGlobalIndexes(OperationContext* opCtx,
-                          const NamespaceString& nss,
-                          const UUID& uuid,
-                          const Timestamp& indexVersion,
-                          const std::vector<IndexCatalogType>& indexes);
+void replaceCollectionGlobalIndexes(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    const UUID& uuid,
+                                    const Timestamp& indexVersion,
+                                    const std::vector<IndexCatalogType>& indexes);
 
 /**
- * Drops all indexes and the collection entry.
+ * Drops all indexes and the collection entry. This function should only be called after stopping
+ * migrations and holding the critical section in all shards with data for userCollectionNss. This
+ * function is not currently compatible with transactions.
  */
 void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx,
                                          const NamespaceString& userCollectionNss);
 
 /**
- * Removes all the indexes and unset the current index version.
+ * Removes all the indexes and unset the current index version. This function should only be called
+ * after stopping migrations and holding the critical section in all shards with data for
+ * userCollectionNss. This function is not currently compatible with transactions.
  */
-void clearGlobalIndexes(OperationContext* opCtx,
-                        const NamespaceString& userCollectionNss,
-                        const UUID& collectionUUID);
+void clearCollectionGlobalIndexes(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const UUID& uuid);
 
 }  // namespace mongo

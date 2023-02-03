@@ -100,11 +100,11 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
                 indexes.push_back(index);
                 return true;
             });
-            replaceGlobalIndexes(opCtx,
-                                 metadata.getTempReshardingNss(),
-                                 metadata.getReshardingUUID(),
-                                 optGii->getCollectionIndexes().indexVersion(),
-                                 indexes);
+            replaceCollectionGlobalIndexes(opCtx,
+                                           metadata.getTempReshardingNss(),
+                                           metadata.getReshardingUUID(),
+                                           optGii->getCollectionIndexes().indexVersion(),
+                                           indexes);
         }
     }
 

@@ -40,7 +40,7 @@
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {

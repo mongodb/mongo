@@ -107,7 +107,7 @@ public:
             removeGlobalIndexCatalogEntryFromCollection(opCtx,
                                                         ns(),
                                                         request().getCollectionUUID(),
-                                                        request().getName().toString(),
+                                                        request().getName(),
                                                         request().getLastmod());
         }
 

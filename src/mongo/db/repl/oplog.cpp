@@ -102,7 +102,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/elapsed_tracker.h"
@@ -1175,67 +1175,60 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
      }}},
     {"modifyShardedCollectionGlobalIndexCatalog",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
-         auto entryObj = entry.getObject();
+         auto indexCatalogOplog = ShardingIndexCatalogOplogEntry::parse(
+             IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
          try {
-             switch (entry.getObject()["op"].String()[0]) {
-                 case 'i': {
-                     auto indexEntry =
-                         IndexCatalogType::parse(IDLParserContext("OplogModifyCatalogEntryContext"),
-                                                 entryObj["entry"].Obj());
-                     addGlobalIndexCatalogEntryToCollection(opCtx,
-                                                            entry.getNss(),
-                                                            indexEntry.getName().toString(),
-                                                            indexEntry.getKeyPattern(),
-                                                            indexEntry.getOptions(),
-                                                            indexEntry.getCollectionUUID(),
-                                                            indexEntry.getLastmod(),
-                                                            indexEntry.getIndexCollectionUUID());
+             switch (indexCatalogOplog.getOp()) {
+                 case ShardingIndexCatalogOpEnumEnum::insert: {
+                     auto indexEntry = ShardingIndexCatalogInsertEntry::parse(
+                         IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
+                     addGlobalIndexCatalogEntryToCollection(
+                         opCtx,
+                         entry.getNss(),
+                         indexEntry.getI().getName().toString(),
+                         indexEntry.getI().getKeyPattern(),
+                         indexEntry.getI().getOptions(),
+                         indexEntry.getI().getCollectionUUID(),
+                         indexEntry.getI().getLastmod(),
+                         indexEntry.getI().getIndexCollectionUUID());
                      break;
                  }
-                 case 'd':
-                     removeGlobalIndexCatalogEntryFromCollection(
-                         opCtx,
-                         entry.getNss(),
-                         uassertStatusOK(UUID::parse(
-                             entryObj["entry"][IndexCatalogType::kCollectionUUIDFieldName])),
-                         entryObj["entry"][IndexCatalogType::kNameFieldName].str(),
-                         entryObj["entry"][IndexCatalogType::kLastmodFieldName].timestamp());
-                     break;
-                 case 'r': {
-                     std::vector<IndexCatalogType> indexes;
-                     for (const auto& entryBSON : entryObj["entry"]["i"].Array()) {
-                         indexes.push_back(IndexCatalogType::parse(
-                             IDLParserContext("OplogModifyCatalogEntryContext"), entryBSON.Obj()));
-                     }
-                     auto indexVersion = entryObj["entry"]["v"].timestamp();
-                     replaceGlobalIndexes(
-                         opCtx,
-                         entry.getNss(),
-                         uassertStatusOK(UUID::parse(
-                             entryObj["entry"][IndexCatalogType::kCollectionUUIDFieldName])),
-                         indexVersion,
-                         indexes);
+                 case ShardingIndexCatalogOpEnumEnum::remove: {
+                     auto removeEntry = ShardingIndexCatalogRemoveEntry::parse(
+                         IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
+                     removeGlobalIndexCatalogEntryFromCollection(opCtx,
+                                                                 entry.getNss(),
+                                                                 removeEntry.getUuid(),
+                                                                 removeEntry.getName(),
+                                                                 removeEntry.getLastmod());
                      break;
                  }
-                 case 'c':
-                     clearGlobalIndexes(
-                         opCtx,
-                         entry.getNss(),
-                         uassertStatusOK(UUID::parse(
-                             entryObj["entry"][IndexCatalogType::kCollectionUUIDFieldName])));
+                 case ShardingIndexCatalogOpEnumEnum::replace: {
+                     auto replaceEntry = ShardingIndexCatalogReplaceEntry::parse(
+                         IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
+                     replaceCollectionGlobalIndexes(opCtx,
+                                                    entry.getNss(),
+                                                    replaceEntry.getUuid(),
+                                                    replaceEntry.getLastmod(),
+                                                    replaceEntry.getI());
                      break;
-                 case 'o': {
+                 }
+                 case ShardingIndexCatalogOpEnumEnum::clear: {
+                     auto clearEntry = ShardingIndexCatalogClearEntry::parse(
+                         IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
+                     clearCollectionGlobalIndexes(opCtx, entry.getNss(), clearEntry.getUuid());
+                     break;
+                 }
+                 case ShardingIndexCatalogOpEnumEnum::drop:
                      dropCollectionGlobalIndexesMetadata(opCtx, entry.getNss());
                      break;
-                 }
-                 case 'm': {
-                     auto fromNss = NamespaceString(entryObj["entry"]["fromNss"].String());
-                     auto toNss = NamespaceString(entryObj["entry"]["toNss"].String());
-                     renameGlobalIndexesMetadata(
-                         opCtx,
-                         fromNss,
-                         toNss,
-                         entryObj["entry"][IndexCatalogType::kLastmodFieldName].timestamp());
+                 case ShardingIndexCatalogOpEnumEnum::rename: {
+                     auto renameEntry = ShardingIndexCatalogRenameEntry::parse(
+                         IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
+                     renameGlobalIndexesMetadata(opCtx,
+                                                 renameEntry.getFromNss(),
+                                                 renameEntry.getToNss(),
+                                                 renameEntry.getLastmod());
                      break;
                  }
                  default:
@@ -1244,7 +1237,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          } catch (const DBException& ex) {
              LOGV2_ERROR(6712302,
                          "Failed to apply modifyShardedCollectionGlobalIndexCatalog with entry obj",
-                         "entryObj"_attr = redact(entryObj),
+                         "entry"_attr = redact(entry.getObject()),
                          "error"_attr = redact(ex));
              return ex.toStatus();
          }

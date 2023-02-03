@@ -145,7 +145,7 @@ public:
                                                 request().getIndexVersion().indexVersion());
                     break;
                 case RenameIndexCatalogOperationEnum::kClearTo:
-                    clearGlobalIndexes(opCtx, request().getToNss(), toUuid.value());
+                    clearCollectionGlobalIndexes(opCtx, request().getToNss(), toUuid.value());
                     break;
                 case RenameIndexCatalogOperationEnum::kNoop: {
                     // Since no write happened on this txnNumber, we need to make a dummy write

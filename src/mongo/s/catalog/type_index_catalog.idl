@@ -32,6 +32,18 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
 
+enums:
+    ShardingIndexCatalogOpEnum:
+        description: "Sharding index catalog operation"
+        type: string
+        values:
+            insert: "i"
+            remove: "d"
+            replace: "r"
+            drop: "o"
+            rename: "m"
+            clear: "c"
+
 structs:
     IndexCatalogType:
         description: "Represents the layout and contents of documents contained in the 
@@ -66,3 +78,95 @@ structs:
             global:
                 type: optionalBool
                 description: "If true then the index entry represent a global index"
+
+    ShardingIndexCatalogOplogEntry:
+        description: "Oplog entry format for sharding's index catalog modifications"
+        strict: false
+        fields:
+            op:
+                type: ShardingIndexCatalogOpEnum
+                description: "Index catalog operation type"
+
+    ShardingIndexCatalogInsertEntryBase:
+        description: "Oplog entry format for add operation"
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            ShardingIndexCatalogOplogEntry: ShardingIndexCatalogOplogEntry
+        fields:
+            i:
+                type: IndexCatalogType
+                description: "Index entry"
+
+    ShardingIndexCatalogRemoveEntryBase:
+        description: "Oplog entry format for delete operation"
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            ShardingIndexCatalogOplogEntry: ShardingIndexCatalogOplogEntry
+        fields:
+            name:
+                type: string
+                description: "Index name"
+            uuid:
+                type: uuid
+                description: "Collection uuid"
+            lastmod:
+                type: timestamp
+                description: "Final timestamp of the index version"
+    
+    ShardingIndexCatalogReplaceEntryBase:
+        description: "Oplog entry format for replace operation"
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            ShardingIndexCatalogOplogEntry: ShardingIndexCatalogOplogEntry
+        fields:
+            uuid:
+                type: uuid
+                description: "Collection uuid"
+            lastmod:
+                type: timestamp
+                description: "Final timestamp of the index version"
+            i:
+                type: array<IndexCatalogType>
+                description: "Index array"
+
+    ShardingIndexCatalogDropEntryBase:
+        description: "Oplog entry format for drop operation"
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            ShardingIndexCatalogOplogEntry: ShardingIndexCatalogOplogEntry
+        fields:
+            uuid:
+                type: uuid
+                description: "Collection uuid"
+
+    ShardingIndexCatalogRenameEntryBase:
+        description: "Oplog entry format for rename operation"
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            ShardingIndexCatalogOplogEntry: ShardingIndexCatalogOplogEntry
+        fields:
+            fromNss:
+                type: namespacestring
+                description: "Source collection name"
+            toNss:
+                type: namespacestring
+                description: "Destination collection name"
+            lastmod:
+                type: timestamp
+                description: "Final timestamp of the index version"
+
+    ShardingIndexCatalogClearEntryBase:
+        description: "Oplog entry for clear operation"
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            ShardingIndexCatalogOplogEntry: ShardingIndexCatalogOplogEntry
+        fields:
+            uuid:
+                type: uuid
+                description: "uuid of collection to be cleared"

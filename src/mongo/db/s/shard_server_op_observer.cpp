@@ -538,61 +538,50 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
         1,
         "Updating sharding in-memory state onModifyShardedCollectionGlobalIndexCatalogEntry",
         "indexDoc"_attr = indexDoc);
-    auto op = indexDoc["op"].String();
-    invariant(op.size() > 0);
-    switch (op[0]) {
-        case 'i': {
-            auto indexEntry = IndexCatalogType::parse(
-                IDLParserContext("onModifyShardedCollectionGlobalIndexCatalogEntry"),
-                indexDoc["entry"].Obj());
-            auto indexVersion = indexDoc["entry"][IndexCatalogType::kLastmodFieldName].timestamp();
-            auto collUuid = uassertStatusOK(
-                UUID::parse(indexDoc["entry"][IndexCatalogType::kCollectionUUIDFieldName]));
-            opCtx->recoveryUnit()->onCommit(
-                [opCtx, nss, collUuid, indexVersion, indexEntry](auto _) {
-                    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-                    auto scsr =
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
-                                                                                             nss);
-                    scsr->addIndex(opCtx, indexEntry, {collUuid, indexVersion});
-                });
-            break;
-        }
-        case 'd': {
-            auto indexName = indexDoc["entry"][IndexCatalogType::kNameFieldName].str();
-            auto indexVersion = indexDoc["entry"][IndexCatalogType::kLastmodFieldName].timestamp();
-            auto collUuid = uassertStatusOK(
-                UUID::parse(indexDoc["entry"][IndexCatalogType::kCollectionUUIDFieldName]));
-            opCtx->recoveryUnit()->onCommit(
-                [opCtx, nss, indexName, indexVersion, collUuid](auto _) {
-                    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-                    auto scsr =
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
-                                                                                             nss);
-                    scsr->removeIndex(opCtx, indexName, {collUuid, indexVersion});
-                });
-            break;
-        }
-        case 'r': {
-            std::vector<IndexCatalogType> indexes;
-            for (const auto& i : indexDoc["entry"]["i"].Array()) {
-                auto indexEntry = IndexCatalogType::parse(
-                    IDLParserContext("onModifyShardedCollectionGlobalIndexCatalogEntry"), i.Obj());
-                indexes.push_back(indexEntry);
-            }
-
-            auto indexVersion = indexDoc["entry"]["v"].timestamp();
-            auto collUuid = uassertStatusOK(
-                UUID::parse(indexDoc["entry"][IndexCatalogType::kCollectionUUIDFieldName]));
-            opCtx->recoveryUnit()->onCommit([opCtx, nss, collUuid, indexVersion, indexes](auto _) {
+    auto indexCatalogOplog = ShardingIndexCatalogOplogEntry::parse(
+        IDLParserContext("onModifyShardedCollectionGlobalIndexCatalogEntry"), indexDoc);
+    switch (indexCatalogOplog.getOp()) {
+        case ShardingIndexCatalogOpEnumEnum::insert: {
+            auto indexEntry = ShardingIndexCatalogInsertEntry::parse(
+                IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
+            opCtx->recoveryUnit()->onCommit([opCtx, nss, indexEntry](auto _) {
                 AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                     opCtx, nss);
-                scsr->replaceIndexes(opCtx, indexes, {collUuid, indexVersion});
+                scsr->addIndex(
+                    opCtx,
+                    indexEntry.getI(),
+                    {indexEntry.getI().getCollectionUUID(), indexEntry.getI().getLastmod()});
             });
             break;
         }
-        case 'c':
+        case ShardingIndexCatalogOpEnumEnum::remove: {
+            auto removeEntry = ShardingIndexCatalogRemoveEntry::parse(
+                IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
+            opCtx->recoveryUnit()->onCommit([opCtx, nss, removeEntry](auto _) {
+                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                    opCtx, nss);
+                scsr->removeIndex(opCtx,
+                                  removeEntry.getName().toString(),
+                                  {removeEntry.getUuid(), removeEntry.getLastmod()});
+            });
+            break;
+        }
+        case ShardingIndexCatalogOpEnumEnum::replace: {
+            auto replaceEntry = ShardingIndexCatalogReplaceEntry::parse(
+                IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
+            opCtx->recoveryUnit()->onCommit([opCtx, nss, replaceEntry](auto _) {
+                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                    opCtx, nss);
+                scsr->replaceIndexes(opCtx,
+                                     replaceEntry.getI(),
+                                     {replaceEntry.getUuid(), replaceEntry.getLastmod()});
+            });
+            break;
+        }
+        case ShardingIndexCatalogOpEnumEnum::clear:
             opCtx->recoveryUnit()->onCommit([opCtx, nss](auto _) {
                 AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
@@ -601,7 +590,7 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             });
 
             break;
-        case 'o': {
+        case ShardingIndexCatalogOpEnumEnum::drop: {
             opCtx->recoveryUnit()->onCommit([opCtx, nss](auto _) {
                 AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
@@ -610,22 +599,21 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             });
             break;
         }
-        case 'm': {
-            auto indexVersion = indexDoc["entry"][IndexCatalogType::kLastmodFieldName].timestamp();
-            auto fromNss = NamespaceString(indexDoc["entry"]["fromNss"].String());
-            auto toNss = NamespaceString(indexDoc["entry"]["toNss"].String());
-            opCtx->recoveryUnit()->onCommit([opCtx, fromNss, toNss, indexVersion](auto _) {
+        case ShardingIndexCatalogOpEnumEnum::rename: {
+            auto renameEntry = ShardingIndexCatalogRenameEntry::parse(
+                IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
+            opCtx->recoveryUnit()->onCommit([opCtx, renameEntry](auto _) {
                 AutoGetCollection autoCollFrom(
                     opCtx,
-                    fromNss,
+                    renameEntry.getFromNss(),
                     MODE_IX,
-                    AutoGetCollection::Options{}.secondaryNssOrUUIDs({toNss}));
+                    AutoGetCollection::Options{}.secondaryNssOrUUIDs({renameEntry.getToNss()}));
                 std::vector<IndexCatalogType> fromIndexes;
                 boost::optional<UUID> uuid;
                 {
                     auto fromCSR =
                         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                            opCtx, fromNss);
+                            opCtx, renameEntry.getFromNss());
                     auto indexCache = fromCSR->getIndexes(opCtx, true);
                     indexCache->forEachGlobalIndex([&](const auto& index) {
                         fromIndexes.push_back(index);
@@ -636,14 +624,14 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
                     fromCSR->clearIndexes(opCtx);
                 }
                 auto toCSR = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                    opCtx, toNss);
+                    opCtx, renameEntry.getToNss());
                 uassert(7079505,
                         format(FMT_STRING("The critical section for collection {} must be taken in "
                                           "order to execute this command"),
-                               toNss.toString()),
+                               renameEntry.getToNss().toString()),
                         toCSR->getCriticalSectionSignal(opCtx,
                                                         ShardingMigrationCriticalSection::kWrite));
-                toCSR->replaceIndexes(opCtx, fromIndexes, {*uuid, indexVersion});
+                toCSR->replaceIndexes(opCtx, fromIndexes, {*uuid, renameEntry.getLastmod()});
             });
             break;
         }

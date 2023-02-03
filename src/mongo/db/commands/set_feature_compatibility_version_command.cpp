@@ -87,7 +87,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_config_version.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/exit.h"
@@ -982,9 +982,9 @@ private:
         DropReply dropReply;
         if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-                // There cannot be any global indexes at this point, but calling clearGlobalIndexes
-                // removes the index version from config.shard.collections and the csr
-                // transactionally.
+                // There cannot be any global indexes at this point, but calling
+                // clearCollectionGlobalIndexes removes the index version from
+                // config.shard.collections and the csr transactionally.
                 LOGV2(7013200, "Clearing global indexes for all collections");
                 DBDirectClient client(opCtx);
                 FindCommandRequest findCmd{NamespaceString::kShardCollectionCatalogNamespace};
@@ -997,7 +997,7 @@ private:
                         uassertStatusOK(UUID::parse(collectionDoc[CollectionType::kUuidFieldName]));
                     auto collNss =
                         NamespaceString(collectionDoc[CollectionType::kNssFieldName].String());
-                    clearGlobalIndexes(opCtx, collNss, collUUID);
+                    clearCollectionGlobalIndexes(opCtx, collNss, collUUID);
                 }
 
                 LOGV2(6711905,

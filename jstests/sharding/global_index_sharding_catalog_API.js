@@ -355,26 +355,8 @@ jsTestLog(
 st.s.adminCommand({shardCollection: nss2, key: {_id: 1}});
 const collection2UUID = st.s.getCollection('config.collections').findOne({_id: nss2}).uuid;
 
-st.rs0.getPrimary().adminCommand({
-    _shardsvrRegisterIndex: nss2,
-    keyPattern: index1Pattern,
-    options: {global: true},
-    name: index1Name,
-    collectionUUID: collection2UUID,
-    indexCollectionUUID: UUID(),
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
-st.rs0.getPrimary().adminCommand({
-    _shardsvrRegisterIndex: nss2,
-    keyPattern: index2Pattern,
-    options: {global: true},
-    name: index2Name,
-    collectionUUID: collection2UUID,
-    indexCollectionUUID: UUID(),
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
+registerIndex(st.rs0, nss2, index1Pattern, index1Name, collection2UUID);
+registerIndex(st.rs0, nss2, index2Pattern, index2Name, collection2UUID);
 
 assert.eq(2, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collection2UUID
@@ -483,16 +465,7 @@ st.s.adminCommand({shardCollection: nss2, key: {_id: 1}});
 st.s.adminCommand({shardCollection: nss3, key: {_id: 1}});
 let collection3UUID = st.s.getCollection('config.collections').findOne({_id: nss3}).uuid;
 
-st.rs0.getPrimary().adminCommand({
-    _shardsvrRegisterIndex: nss3,
-    keyPattern: index1Pattern,
-    options: {global: true},
-    name: index1Name,
-    collectionUUID: collection3UUID,
-    indexCollectionUUID: UUID(),
-    lastmod: Timestamp(0, 0),
-    writeConcern: {w: 'majority'}
-});
+registerIndex(st.rs0, nss3, index1Pattern, index1Name, collection3UUID);
 
 assert.commandWorked(
     st.s.getDB(dbName).adminCommand({renameCollection: nss2, to: nss3, dropTarget: true}));

@@ -39,7 +39,7 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 

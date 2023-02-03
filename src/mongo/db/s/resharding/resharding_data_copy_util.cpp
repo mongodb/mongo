@@ -125,7 +125,7 @@ void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
                 !tempReshardingColl || tempReshardingColl->uuid() == metadata.getReshardingUUID());
         auto gii = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
                        opCtx, metadata.getTempReshardingNss())
-                       ->getIndexes(opCtx);
+                       ->getIndexes(opCtx, true);
         indexVersion = gii
             ? boost::make_optional<Timestamp>(gii->getCollectionIndexes().indexVersion())
             : boost::none;

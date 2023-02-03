@@ -76,7 +76,7 @@
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -319,10 +319,10 @@ void replaceGlobalIndexesInShardIfNeeded(OperationContext* opCtx,
             indexes.push_back(index);
             return true;
         });
-        replaceGlobalIndexes(
+        replaceCollectionGlobalIndexes(
             opCtx, nss, uuid, optGii->getCollectionIndexes().indexVersion(), indexes);
     } else {
-        clearGlobalIndexes(opCtx, nss, uuid);
+        clearCollectionGlobalIndexes(opCtx, nss, uuid);
     }
 }
 
