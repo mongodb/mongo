@@ -45,15 +45,7 @@ WildcardAccessMethod::WildcardAccessMethod(IndexCatalogEntry* wildcardState,
               _indexCatalogEntry->getCollator(),
               getSortedDataInterface()->getKeyStringVersion(),
               getSortedDataInterface()->getOrdering(),
-              getSortedDataInterface()->rsKeyFormat()) {
-    // Normalize the 'wildcardProjection' index option to facilitate its comparison as part of
-    // index signature.
-    if (!_descriptor->pathProjection().isEmpty()) {
-        auto* projExec = getWildcardProjection()->exec();
-        wildcardState->descriptor()->_setNormalizedPathProjection(
-            projExec->serializeTransformation(boost::none).toBson());
-    }
-}
+              getSortedDataInterface()->rsKeyFormat()) {}
 
 bool WildcardAccessMethod::shouldMarkIndexAsMultikey(size_t numberOfKeys,
                                                      const KeyStringSet& multikeyMetadataKeys,

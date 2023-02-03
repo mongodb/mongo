@@ -72,6 +72,9 @@ public:
     IndexAccessMethod() = default;
     virtual ~IndexAccessMethod() = default;
 
+    static std::unique_ptr<IndexAccessMethod> make(
+        IndexCatalogEntry* entry, std::unique_ptr<SortedDataInterface> sortedDataInterface);
+
     //
     // Lookup, traversal, and mutation support
     //
@@ -384,23 +387,6 @@ public:
      * documents into an index, except for testing purposes.
      */
     virtual SortedDataInterface* getSortedDataInterface() const = 0;
-};
-
-/**
- * Factory class that constructs an IndexAccessMethod depending on the type of index.
- */
-class IndexAccessMethodFactory {
-public:
-    IndexAccessMethodFactory() = default;
-    virtual ~IndexAccessMethodFactory() = default;
-
-    static IndexAccessMethodFactory* get(ServiceContext* service);
-    static IndexAccessMethodFactory* get(OperationContext* opCtx);
-    static void set(ServiceContext* service,
-                    std::unique_ptr<IndexAccessMethodFactory> collectionFactory);
-
-    virtual std::unique_ptr<IndexAccessMethod> make(
-        IndexCatalogEntry* entry, std::unique_ptr<SortedDataInterface> sortedDataInterface) = 0;
 };
 
 /**
