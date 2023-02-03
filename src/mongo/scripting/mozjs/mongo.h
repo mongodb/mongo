@@ -79,9 +79,10 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(getApiParameters);
         MONGO_DECLARE_JS_FUNCTION(_runCommandImpl);
         MONGO_DECLARE_JS_FUNCTION(_startSession);
+        MONGO_DECLARE_JS_FUNCTION(_setOIDCIdPAuthCallback);
     };
 
-    static const JSFunctionSpec methods[21];
+    static const JSFunctionSpec methods[22];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;

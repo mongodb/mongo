@@ -949,6 +949,7 @@ buildvariants:
   - name: .ssl
   - name: jsCore
   - name: external_auth
+  - name: external_auth_oidc
 
 - name: ubi8
   display_name: "UBI 8"
@@ -1254,6 +1255,7 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
+  - name: external_auth_oidc
   - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
@@ -1373,6 +1375,7 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
+  - name: external_auth_oidc
   - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
@@ -1498,6 +1501,7 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
+  - name: external_auth_oidc
   - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
@@ -1880,6 +1884,7 @@ buildvariants:
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
   - name: external_auth_aws
+  - name: external_auth_oidc
   - name: .jepsen
     distros:
     - ubuntu1804-build
@@ -2169,6 +2174,7 @@ buildvariants:
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
   - name: external_auth_aws
+  - name: external_auth_oidc
   - name: .jscore .common !.decimal !.sharding
   - name: jsCore_auth
   - name: .jstestfuzz .common
@@ -2235,6 +2241,7 @@ buildvariants:
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
   - name: external_auth_aws
+  - name: external_auth_oidc
   - name: .jscore .common !.decimal !.sharding
   - name: jsCore_auth
   - name: .jstestfuzz .common

@@ -23,3 +23,5 @@ packaging <= 21.3
 docker
 mongomock == 4.1.2
 pyjwt
+selenium
+geckodriver-autoinstaller

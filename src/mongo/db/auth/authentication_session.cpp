@@ -341,6 +341,11 @@ void AuthenticationSession::markSuccessful() {
     BSONObj metrics = _metricsRecorder.capture();
 
     if (gEnableDetailedConnectionHealthMetricLogLines) {
+        BSONObjBuilder extraInfoBob;
+        if (_mech) {
+            _mech->appendExtraInfo(&extraInfoBob);
+        }
+
         LOGV2(5286306,
               "Successfully authenticated",
               "client"_attr = _client->getRemote(),
@@ -350,7 +355,8 @@ void AuthenticationSession::markSuccessful() {
               "user"_attr = _userName.getUser(),
               "db"_attr = _userName.getDB(),
               "result"_attr = Status::OK().code(),
-              "metrics"_attr = metrics);
+              "metrics"_attr = metrics,
+              "extraInfo"_attr = extraInfoBob.obj());
     }
 }
 
@@ -369,6 +375,10 @@ void AuthenticationSession::markFailed(const Status& status) {
     BSONObj metrics = _metricsRecorder.capture();
 
     if (gEnableDetailedConnectionHealthMetricLogLines) {
+        BSONObjBuilder extraInfoBob;
+        if (_mech) {
+            _mech->appendExtraInfo(&extraInfoBob);
+        }
 
         LOGV2(5286307,
               "Failed to authenticate",
@@ -380,7 +390,8 @@ void AuthenticationSession::markFailed(const Status& status) {
               "db"_attr = _userName.getDB(),
               "error"_attr = redact(status),
               "result"_attr = status.code(),
-              "metrics"_attr = metrics);
+              "metrics"_attr = metrics,
+              "extraInfo"_attr = extraInfoBob.obj());
     }
 }
 }  // namespace mongo

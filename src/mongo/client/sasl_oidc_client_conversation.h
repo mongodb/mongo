@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/client/sasl_client_conversation.h"
+#include "mongo/client/sasl_oidc_client_params.h"
 
 namespace mongo {
 
@@ -44,6 +45,11 @@ public:
         : SaslClientConversation(clientSession),
           _principalName(principalName.rawData()),
           _accessToken(accessToken.rawData()) {}
+
+    static void setOIDCIdPAuthCallback(
+        const std::function<void(StringData, StringData)>& callback) {
+        oidcClientGlobalParams.oidcIdPAuthCallback = callback;
+    }
 
     StatusWith<bool> step(StringData inputData, std::string* outputData) override;
 

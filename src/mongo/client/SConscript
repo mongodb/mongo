@@ -131,6 +131,7 @@ saslClientEnv.Library(
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/shell/program_runner',
         '$BUILD_DIR/mongo/util/net/http_client',
+        'connection_string',
     ],
     SYSLIBDEPS=saslLibs,
 )

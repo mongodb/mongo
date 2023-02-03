@@ -5126,6 +5126,24 @@ tasks:
       - "src/evergreen/external_auth_aws_pip.sh"
   - func: "run tests"
 
+- <<: *task_template
+  name: external_auth_oidc
+  tags: []
+  commands:
+  - *f_expansions_write
+  - func: "do setup"
+  - func: "f_expansions_write"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/external_auth_pip.sh"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/external_auth_oidc_setup.sh"
+  - func: "run tests"
 
 - <<: *task_template
   name: external_auth_windows

@@ -7,3 +7,5 @@ selector:
     exclude_tasks:
     # Exclude list of jstests file names.
     exclude_tests:
+    # Requires external_auth_oidc.sh to run beforehand.
+    - src/mongo/db/modules/enterprise/jstests/external_auth_oidc/oidc_e2e_okta.js

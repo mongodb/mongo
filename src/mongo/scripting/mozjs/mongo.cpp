@@ -39,11 +39,13 @@
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/sasl_oidc_client_conversation.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/cursor.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
@@ -79,6 +81,7 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getApiParameters, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_runCommandImpl, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_startSession, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_setOIDCIdPAuthCallback, MongoExternalInfo),
     JS_FS_END,
 };
 
@@ -625,6 +628,35 @@ void MongoBase::Functions::_startSession::call(JSContext* cx, JS::CallArgs args)
     SessionInfo::make(cx, &obj, *client, id.toBSON());
 
     args.rval().setObjectOrNull(obj.get());
+}
+
+void MongoBase::Functions::_setOIDCIdPAuthCallback::call(JSContext* cx, JS::CallArgs args) {
+    if (args.length() != 1) {
+        uasserted(ErrorCodes::BadValue, "_setOIDCIdPAuthCallBack takes exactly 1 arg");
+    }
+
+    if (!args.get(0).isString()) {
+        uasserted(ErrorCodes::BadValue,
+                  "first argument to _setOIDCIdPAuthCallback must be a stringified function");
+    }
+
+    // ValueWriter currently does not have a native way to retrieve a std::function from a JS
+    // function. Existing places that require executing JS functions ($where, db.eval) parse the JS
+    // function as a raw string and then stash that into a wrapper type such as JsFunction.
+    // ScriptingFunction is loaded with the stringified function and then gets invoked by the parent
+    // scope. A potential alternative here would be to use JS_ValueToFunction, but that returns a
+    // pointer to a JSFunction that is still locally scoped to this function. Hence, we represent
+    // the function as a string, stash it into a lambda, and execute it directly when needed.
+    std::string stringifiedFn = ValueWriter(cx, args.get(0)).toString();
+    SaslOIDCClientConversation::setOIDCIdPAuthCallback(
+        [=](StringData userName, StringData idpEndpoint) {
+            auto* jsScope = getGlobalScriptEngine()->newScope();
+            BSONObj authInfo = BSON("userName" << userName << "activationEndpoint" << idpEndpoint);
+            ScriptingFunction function = jsScope->createFunction(stringifiedFn.c_str());
+            jsScope->invoke(function, nullptr, &authInfo);
+        });
+
+    args.rval().setUndefined();
 }
 
 void MongoExternalInfo::Functions::load::call(JSContext* cx, JS::CallArgs args) {

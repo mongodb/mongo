@@ -259,6 +259,7 @@ variables:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
+  - name: external_auth_oidc
   - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
@@ -1911,6 +1912,7 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
+  - name: external_auth_oidc
   - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
@@ -2307,6 +2309,7 @@ buildvariants:
   - name: free_monitoring
   - name: external_auth
   - name: external_auth_aws
+  - name: external_auth_oidc
   - name: initial_sync_fuzzer_gen
   - name: .integration !.standalone !.audit
   - name: .jscore .common
@@ -2392,6 +2395,7 @@ buildvariants:
   - name: free_monitoring
   - name: external_auth
   - name: external_auth_aws
+  - name: external_auth_oidc
   - name: initial_sync_fuzzer_gen
   - name: .integration !.standalone !.audit
   - name: .jscore .common !.sbe_only
@@ -3354,6 +3358,7 @@ buildvariants:
   - name: .encrypt .patch_build
   - name: external_auth
   - name: external_auth_aws
+  - name: external_auth_oidc
   - name: lint_fuzzer_sanity_patch
 
 - name: &enterprise-ubuntu1804-64-libvoidstar enterprise-ubuntu1804-64-libvoidstar

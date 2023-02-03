@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <string>
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 /**
@@ -40,6 +40,17 @@ struct OIDCClientGlobalParams {
      * Access Token.
      */
     std::string oidcAccessToken;
+
+    /**
+     * Refresh Token.
+     */
+    std::string oidcRefreshToken;
+
+    /*
+     * Callback function that accepts the username and IdP endpoint and then performs IdP
+     * authentication. This should be provided by tests, presumably as a JS function.
+     */
+    std::function<void(StringData, StringData)> oidcIdPAuthCallback;
 };
 
 extern OIDCClientGlobalParams oidcClientGlobalParams;

@@ -54,19 +54,18 @@ structs:
                     URL where the IDP may be contacted for end user
                     authentication and authorization code generation.
                 type: string
-                optional: true # Req if deviceAuthorizeEndpoint not present
+                optional: true # Req if deviceAuthorizationEndpoint not present
             tokenEndpoint:
                 description: >-
                     URL where the IDP may be contacted for authorization
-                    code <=> ID/access token exchange.
+                    code/device code <=> ID/access/refresh token exchange.
                 type: string
-                optional: true # Req if deviceAuthorizeEndpoint not present
             deviceAuthorizationEndpoint:
                 description: >-
                     URL where the IDP may be contacted for device
                     authentication and authorization code generation.
                 type: string
-                optional: true # Req if authorizeEndpoint not present
+                optional: true # Req if authorizationEndpoint not present
             clientId:
                 description: "Unique client ID for this OIDC client"
                 type: string

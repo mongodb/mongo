@@ -31,12 +31,144 @@
 
 #include "mongo/client/sasl_oidc_client_conversation.h"
 
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_type_validated.h"
+#include "mongo/bson/json.h"
+#include "mongo/client/mongo_uri.h"
 #include "mongo/client/sasl_client_session.h"
-#include "mongo/client/sasl_oidc_client_params.h"
 #include "mongo/db/auth/oidc_protocol_gen.h"
+#include "mongo/shell/program_runner.h"
+#include "mongo/util/net/http_client.h"
 
 namespace mongo {
+namespace {
+constexpr auto kClientIdParameterName = "client_id"_sd;
+constexpr auto kClientSecretParameterName = "client_secret"_sd;
+constexpr auto kRequestScopesParameterName = "scope"_sd;
+constexpr auto kGrantTypeParameterName = "grant_type"_sd;
+constexpr auto kGrantTypeParameterDeviceCodeValue =
+    "urn:ietf:params:oauth:grant-type:device_code"_sd;
+constexpr auto kDeviceCodeParameterName = "device_code"_sd;
 
+std::string buildPostBody(StringData clientId,
+                          const boost::optional<StringData>& clientSecret,
+                          const boost::optional<std::vector<StringData>>& requestScopes,
+                          const boost::optional<std::string>& deviceCode) {
+    StringBuilder sb;
+    sb << kClientIdParameterName << "=" << uriEncode(clientId);
+
+    if (clientSecret && !clientSecret->empty()) {
+        sb << "&" << kClientSecretParameterName << "=" << uriEncode(clientSecret.get());
+    }
+
+    if (requestScopes && requestScopes->size() > 0) {
+        sb << "&" << kRequestScopesParameterName << "=";
+        for (std::size_t i = 0; i < requestScopes->size(); i++) {
+            sb << uriEncode(requestScopes.get()[i]);
+            if (i < requestScopes->size() - 1) {
+                sb << uriEncode(" ");
+            }
+        }
+    }
+
+    if (deviceCode && !deviceCode->empty()) {
+        // If the device code is provided, the request must explicitly specify the grant type as
+        // device code.
+        sb << "&" << kGrantTypeParameterName << "=" << kGrantTypeParameterDeviceCodeValue;
+        sb << "&" << kDeviceCodeParameterName << "=" << uriEncode(deviceCode.get());
+    }
+
+    return sb.str();
+}
+
+BSONObj doPostRequest(HttpClient* httpClient, StringData endPoint, const std::string& requestBody) {
+    auto response = httpClient->post(endPoint, requestBody);
+    ConstDataRange responseCdr = response.getCursor();
+    StringData responseStr;
+    responseCdr.readInto<StringData>(&responseStr);
+    return fromjson(responseStr);
+}
+
+// @returns {accessToken, refreshToken}
+std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
+    const auth::OIDCMechanismServerStep1& serverReply, StringData principalName) {
+    auto deviceAuthorizationEndpoint = serverReply.getDeviceAuthorizationEndpoint().get();
+    uassert(ErrorCodes::BadValue,
+            "Device authorization endpoint in server reply must be an https endpoint or localhost",
+            deviceAuthorizationEndpoint.startsWith("https://"_sd) ||
+                deviceAuthorizationEndpoint.startsWith("http://localhost"_sd));
+
+    auto clientId = serverReply.getClientId();
+    uassert(ErrorCodes::BadValue, "Encountered empty client ID in server reply", !clientId.empty());
+
+    // Construct body of POST request to device authorization endpoint based on provided
+    // parameters.
+    auto deviceCodeRequest = buildPostBody(clientId,
+                                           serverReply.getClientSecret(),
+                                           serverReply.getRequestScopes(),
+                                           boost::none /* deviceCode */);
+
+    // Retrieve device code and user verification URI from IdP.
+    auto httpClient = HttpClient::createWithoutConnectionPool();
+    httpClient->setHeaders(
+        {"Accept: application/json", "Content-Type: application/x-www-form-urlencoded"});
+    BSONObj deviceAuthorizationResponseObj =
+        doPostRequest(httpClient.get(), deviceAuthorizationEndpoint, deviceCodeRequest);
+
+    // Simulate end user login via user verification URI.
+    auto deviceCode = deviceAuthorizationResponseObj["device_code"_sd].String();
+    auto activationEndpoint =
+        deviceAuthorizationResponseObj["verification_uri_complete"_sd].String();
+    oidcClientGlobalParams.oidcIdPAuthCallback(principalName, activationEndpoint);
+
+    // Poll token endpoint for access and refresh tokens. It should return immediately since
+    // the shell blocks on the authenticationSimulator until it completes, but poll anyway.
+    auto tokenRequest = buildPostBody(
+        clientId, serverReply.getClientSecret(), boost::none /* requestScopes */, deviceCode);
+
+    while (true) {
+        BSONObj tokenResponseObj =
+            doPostRequest(httpClient.get(), serverReply.getTokenEndpoint(), tokenRequest);
+
+        // The token endpoint will either respond with the tokens or {"error":
+        // "authorization pending"}.
+        bool hasAccessToken = tokenResponseObj.hasField("access_token"_sd);
+        bool hasError = tokenResponseObj.hasField("error"_sd);
+        uassert(ErrorCodes::UnknownError,
+                fmt::format("Received unrecognized reply from token endpoint: {}",
+                            tokenResponseObj.toString()),
+                hasAccessToken || hasError);
+
+        if (hasAccessToken) {
+            auto accessToken = tokenResponseObj["access_token"_sd].String();
+
+            // If a refresh token was also provided, cache that as well.
+            if (tokenResponseObj.hasField("refresh_token"_sd)) {
+                return {accessToken, tokenResponseObj["refresh_token"_sd].String()};
+            }
+
+            return {accessToken, ""};
+        }
+
+        // Assert that the error returned with "authorization pending", which indicates that
+        // the token endpoint has not perceived end-user authentication yet and we should
+        // poll again.
+        uassert(ErrorCodes::UnknownError,
+                fmt::format("Received unexpected error from token endpoint: {}",
+                            tokenResponseObj["error"_sd].String()),
+                tokenResponseObj["error"_sd].String() != "authorization pending");
+    }
+
+    MONGO_UNREACHABLE
+}
+
+std::pair<std::string, std::string> doAuthorizationCodeFlow(
+    const auth::OIDCMechanismServerStep1& serverReply) {
+    // TODO SERVER-73969 Add authorization code flow support.
+    uasserted(ErrorCodes::NotImplemented, "Authorization code flow is not yet supported");
+}
+
+}  // namespace
 OIDCClientGlobalParams oidcClientGlobalParams;
 
 StatusWith<bool> SaslOIDCClientConversation::step(StringData inputData, std::string* outputData) {
@@ -80,12 +212,40 @@ StatusWith<bool> SaslOIDCClientConversation::_firstStep(std::string* outputData)
 }
 
 StatusWith<bool> SaslOIDCClientConversation::_secondStep(StringData input,
-                                                         std::string* outputData) {
+                                                         std::string* outputData) try {
     // If the client already has a non-empty access token, then token acquisition can be skipped.
     if (_accessToken.empty()) {
-        // TODO SERVER-70958: Implement device authorization grant flow to acquire token.
-        uasserted(ErrorCodes::NotImplemented,
-                  "TODO: SERVER-70958 Implement device authorization grant flow to acquire token");
+        // Currently, only device authorization flow is supported for token acquisition.
+        // Parse device authorization endpoint from input.
+        ConstDataRange inputCdr(input.rawData(), input.size());
+        auto payload = inputCdr.read<Validated<BSONObj>>().val;
+        auto serverReply = auth::OIDCMechanismServerStep1::parse(
+            IDLParserContext{"oidcServerStep1Reply"}, payload);
+
+        // The token endpoint must be provided for both device auth and authz code flows.
+        auto tokenEndpoint = serverReply.getTokenEndpoint();
+        uassert(ErrorCodes::BadValue,
+                "Missing or invalid token endpoint in server reply",
+                !tokenEndpoint.empty() &&
+                    (tokenEndpoint.startsWith("https://"_sd) ||
+                     tokenEndpoint.startsWith("http://localhost"_sd)));
+
+        // Try device authorization grant flow first if provided, falling back to authorization code
+        // flow.
+        if (serverReply.getDeviceAuthorizationEndpoint()) {
+            auto tokens = doDeviceAuthorizationGrantFlow(serverReply, _principalName);
+            _accessToken = tokens.first;
+            oidcClientGlobalParams.oidcAccessToken = tokens.first;
+            oidcClientGlobalParams.oidcRefreshToken = tokens.second;
+        } else if (serverReply.getAuthorizationEndpoint()) {
+            auto tokens = doAuthorizationCodeFlow(serverReply);
+            _accessToken = tokens.first;
+            oidcClientGlobalParams.oidcAccessToken = tokens.first;
+            oidcClientGlobalParams.oidcRefreshToken = tokens.second;
+        } else {
+            uasserted(ErrorCodes::BadValue,
+                      "Missing device authorization and authorization endpoint in server reply");
+        }
     }
 
     auth::OIDCMechanismClientStep2 secondClientRequest;
@@ -94,6 +254,8 @@ StatusWith<bool> SaslOIDCClientConversation::_secondStep(StringData input,
     *outputData = std::string(bson.objdata(), bson.objsize());
 
     return true;
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 }  // namespace mongo
