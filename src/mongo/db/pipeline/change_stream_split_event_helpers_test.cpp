@@ -94,11 +94,11 @@ TEST_F(ChangeStreamSplitEventHelpersTest, ReplacesIdWithFragmentResumeToken) {
     doc.addField("a", Value(123));
     auto fieldSize = getFieldBsonSize(doc.peek(), "a");
     auto fragments = splitChangeEvent(doc.freeze(), minFragmentSize + fieldSize, 0);
-    ASSERT_EQ(1UL, fragments.size());
+    ASSERT_EQ(1ULL, fragments.size());
     auto& fragment = fragments.front();
     ASSERT_EQ(123, fragment.getField("a").getInt());
     auto tokenData = ResumeToken::parse(fragment.getField(kIdField).getDocument()).getData();
-    ASSERT_EQ(0UL, tokenData.fragmentNum);
+    ASSERT_EQ(0ULL, *tokenData.fragmentNum);
     ASSERT_EQ(tokenData,
               ResumeToken::parse(fragment.metadata().getSortKey().getDocument()).getData());
 }
@@ -117,7 +117,7 @@ TEST_F(ChangeStreamSplitEventHelpersTest, SplitEventAtMaxSizeBoundary) {
     doc.addField("a", Value(123));
     auto fieldSize = getFieldBsonSize(doc.peek(), "b");
     auto fragments = splitChangeEvent(doc.freeze(), minFragmentSize + fieldSize, 0);
-    ASSERT_EQ(2UL, fragments.size());
+    ASSERT_EQ(2ULL, fragments.size());
     auto &fragment1 = fragments.front(), fragment2 = fragments.back();
     ASSERT_EQ(123, fragment1.getField("a").getInt());
     ASSERT_EQ(321, fragment2.getField("b").getInt());
@@ -128,7 +128,7 @@ TEST_F(ChangeStreamSplitEventHelpersTest, SplitEventFieldsOrderedInAscendingSize
     doc.addField("b", Value("hello"_sd));
     auto fieldSize = getFieldBsonSize(doc.peek(), "a");
     auto fragments = splitChangeEvent(doc.freeze(), minFragmentSize + fieldSize, 0);
-    ASSERT_EQ(2UL, fragments.size());
+    ASSERT_EQ(2ULL, fragments.size());
     auto &fragment1 = fragments.front(), fragment2 = fragments.back();
     ASSERT_EQ(1, fragment1.getNestedField(fragmentNumberPath).getInt());
     ASSERT_EQ(2, fragment1.getNestedField(totalFragmentsPath).getInt());
@@ -143,11 +143,11 @@ TEST_F(ChangeStreamSplitEventHelpersTest, CanSkipFirstNFragments) {
     doc.addField("b", Value("hello"_sd));
     auto fieldSize = getFieldBsonSize(doc.peek(), "a");
     auto fragmentsSkip1 = splitChangeEvent(doc.peek(), minFragmentSize + fieldSize, 1);
-    ASSERT_EQ(1UL, fragmentsSkip1.size());
+    ASSERT_EQ(1ULL, fragmentsSkip1.size());
     ASSERT_EQ(2, fragmentsSkip1.front().getNestedField(fragmentNumberPath).getInt());
     ASSERT_EQ(2, fragmentsSkip1.front().getNestedField(totalFragmentsPath).getInt());
     auto fragmentsSkip2 = splitChangeEvent(doc.peek(), minFragmentSize + fieldSize, 2);
-    ASSERT_EQ(0UL, fragmentsSkip2.size());
+    ASSERT_EQ(0ULL, fragmentsSkip2.size());
 }
 
 }  // namespace

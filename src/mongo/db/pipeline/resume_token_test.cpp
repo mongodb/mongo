@@ -511,7 +511,7 @@ TEST(ResumeToken, FragmentNumRoundTripsThroughEncodingAndDecoding) {
     ASSERT_EQ(ResumeToken(resumeTokenDataIn).toBSON().objsize(),
               ResumeToken(resumeTokenDataFragmentNone).toBSON().objsize());
 
-    resumeTokenDataIn.fragmentNum = 0UL;
+    resumeTokenDataIn.fragmentNum = 0ULL;
     auto resumeTokenDataFragment0 =
         ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument()).getData();
 
@@ -519,7 +519,7 @@ TEST(ResumeToken, FragmentNumRoundTripsThroughEncodingAndDecoding) {
     ASSERT_EQ(ResumeToken(resumeTokenDataIn).toBSON().objsize(),
               ResumeToken(resumeTokenDataFragment0).toBSON().objsize());
 
-    resumeTokenDataIn.fragmentNum = 1UL;
+    resumeTokenDataIn.fragmentNum = 1ULL;
     auto resumeTokenDataFragment1 =
         ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument()).getData();
 
@@ -543,7 +543,7 @@ TEST(ResumeToken, FragmentNumInV1Throws) {
     ResumeTokenData resumeTokenDataV1{
         Timestamp(1000, 1), 1, 0, UUID::gen(), Value(Document{{"_id", 1}})};
 
-    resumeTokenDataV1.fragmentNum = 0UL;
+    resumeTokenDataV1.fragmentNum = 0ULL;
     ASSERT_THROWS_CODE(ResumeToken(resumeTokenDataV1), DBException, 7182504);
 }
 }  // namespace

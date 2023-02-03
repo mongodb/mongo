@@ -107,7 +107,7 @@ std::list<Document> splitChangeEvent(const Document& event,
         FieldPath::getFullyQualifiedPath(kSplitEventField, kTotalFragmentsField);
 
     std::list<Document> outputFragments;
-    for (auto [it, i] = std::make_pair(fragments.begin(), 0UL); it != fragments.end(); ++it, ++i) {
+    for (auto [it, i] = std::make_pair(fragments.begin(), 0ULL); it != fragments.end(); ++it, ++i) {
         // Do not insert first 'skipFirstFragments' into the output.
         if (i >= skipFirstFragments) {
             it->setNestedField(totalFragmentsFieldPath, totalFragments);
