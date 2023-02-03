@@ -736,14 +736,9 @@ TEST_F(EstablishCursorsTest, InterruptedWithDanglingRemoteRequest) {
         {kTestShardIds[0], cmdObj},
         {kTestShardIds[1], cmdObj},
     };
+    unittest::Barrier barrier(2);
 
-    // Hang in ARS before it sends the request to remotes[1].
-    auto fpSend = globalFailPointRegistry().find("hangBeforeSchedulingRemoteCommand");
-    invariant(fpSend);
-    auto timesHitSend = fpSend->setMode(
-        FailPoint::alwaysOn, 0, BSON("hostAndPort" << kTestShardHosts[1].toString()));
-
-    // Also hang in ARS::next when there is exactly 1 remote that hasn't replied yet.
+    // Hang in ARS::next when there is exactly 1 remote that hasn't replied yet.
     // This failpoint is important to ensure establishCursors' check for _interruptStatus.isOK()
     // happens after this unittest does opCtx->killOperation().
     auto fpNext = globalFailPointRegistry().find("hangBeforePollResponse");
@@ -751,6 +746,7 @@ TEST_F(EstablishCursorsTest, InterruptedWithDanglingRemoteRequest) {
     auto timesHitNext = fpNext->setMode(FailPoint::alwaysOn, 0, BSON("remotesLeft" << 1));
 
     auto future = launchAsync([&] {
+        ScopeGuard guard([&] { barrier.countDownAndWait(); });
         ASSERT_THROWS(establishCursors(operationContext(),
                                        executor(),
                                        _nss,
@@ -768,30 +764,26 @@ TEST_F(EstablishCursorsTest, InterruptedWithDanglingRemoteRequest) {
         return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
     });
 
-    // Wait for ars._remotes[1] to try to send its request. We want to test the case where the
-    // opCtx is killed after this happens.
-    fpSend->waitForTimesEntered(timesHitSend + 1);
+    // Wait until we hit the hangBeforePollResponse failpoint with remotesLeft 1.
+    // This ensures the first response has been processed.
+    fpNext->waitForTimesEntered(timesHitNext + 1);
+    // Now allow the thread calling ARS::next to continue.
+    fpNext->setMode(FailPoint::off);
 
-    // Mark the OperationContext as killed.
-    {
+    // Now we're processing the request for the second remote. Kill the opCtx
+    // instead of responding.
+    onCommand([&](auto&&) {
         stdx::lock_guard<Client> lk(*operationContext()->getClient());
         operationContext()->getServiceContext()->killOperation(
             lk, operationContext(), ErrorCodes::CursorKilled);
-    }
+        CursorResponse cursorResponse(_nss, CursorId(123), {});
+        // Wait until the kill takes.
+        barrier.countDownAndWait();
+        return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
 
-    // Allow ars._remotes[1] to send its request.
-    fpSend->setMode(FailPoint::off);
-
-    // Wait for establishCursors to call ars.next.
-    fpNext->waitForTimesEntered(timesHitNext + 1);
-
-    // Disable the ARS::next failpoint to allow establishCursors to handle that response.
     // Now ARS::next should check that the opCtx has been marked killed, and return a
     // failing response to establishCursors, which should clean up by sending kill commands.
-    fpNext->setMode(FailPoint::off);
-
-    // Because we paused the ARS using hangBeforePollResponse, we know the ARS will detect the
-    // killed opCtx before sending any more requests. So we know only _killOperations will be sent.
     expectKillOperations(2);
 
     future.default_timed_get();

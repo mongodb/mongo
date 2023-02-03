@@ -60,7 +60,6 @@ namespace {
 // Maximum number of retries for network and replication NotPrimary errors (per host).
 const int kMaxNumFailedHostRetryAttempts = 3;
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeSchedulingRemoteCommand);
 MONGO_FAIL_POINT_DEFINE(hangBeforePollResponse);
 
 }  // namespace
@@ -228,21 +227,6 @@ auto AsyncRequestsSender::RemoteData::scheduleRequest()
 
 auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(std::vector<HostAndPort>&& hostAndPorts)
     -> SemiFuture<RemoteCommandOnAnyCallbackArgs> {
-    hangBeforeSchedulingRemoteCommand.executeIf(
-        [&](const BSONObj& data) {
-            while (MONGO_unlikely(hangBeforeSchedulingRemoteCommand.shouldFail())) {
-                LOGV2(4625505,
-                      "Hanging in ARS due to "
-                      "'hangBeforeSchedulingRemoteCommand' failpoint");
-                sleepmillis(100);
-            }
-        },
-        [&](const BSONObj& data) {
-            return MONGO_unlikely(std::count(hostAndPorts.begin(),
-                                             hostAndPorts.end(),
-                                             HostAndPort(data.getStringField("hostAndPort"))));
-        });
-
     HedgeOptions options =
         getHedgeOptions(_cmdObj.firstElementFieldNameStringData(), _ars->_readPreference);
     executor::RemoteCommandRequestOnAny request(
