@@ -313,7 +313,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
             "Requested primary shard {} is draining"_format(toShardId.toString()),
             !toShardEntry.getDraining());
 
-    const auto transactionChain = [opCtx, dbName, expectedDbVersion, toShardId](
+    const auto transactionChain = [dbName, expectedDbVersion, toShardId](
                                       const txn_api::TransactionClient& txnClient,
                                       ExecutorPtr txnExec) {
         const auto updateDatabaseEntryOp = [&] {
@@ -351,7 +351,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
 
         return txnClient.runCRUDOp(updateDatabaseEntryOp, {})
             .thenRunOn(txnExec)
-            .then([&txnClient, &txnExec, opCtx, &dbName, toShardId](
+            .then([&txnClient, &txnExec, &dbName, toShardId](
                       const BatchedCommandResponse& updateCatalogDatabaseEntryResponse) {
                 uassertStatusOK(updateCatalogDatabaseEntryResponse.toStatus());
 
@@ -368,7 +368,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                     return SemiFuture<BatchedCommandResponse>(std::move(noOp));
                 }
 
-                const auto now = VectorClock::get(opCtx)->getTime();
+                const auto now = VectorClock::get(getGlobalServiceContext())->getTime();
                 const auto clusterTime = now.clusterTime().asTimestamp();
 
                 NamespacePlacementType placementInfo(
