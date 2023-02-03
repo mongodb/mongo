@@ -6068,25 +6068,6 @@ tasks:
     vars:
       resmoke_args: --suites=resmoke_end2end_tests
 
-- name: test_packages
-  depends_on:
-  - name: package
-  commands:
-    - command: manifest.load
-    - *git_get_project
-    - *f_expansions_write
-    - *kill_processes
-    - *cleanup_environment
-    - *set_up_venv
-    - func: "fetch packages"
-    - func: "set up remote credentials"
-      vars:
-        private_key_file: ~/.ssh/kitchen.pem
-        private_key_remote: ${kitchen_private_key}
-        aws_key_remote: ${kitchen_aws_key}
-        aws_secret_remote: ${kitchen_aws_secret}
-    - func: "run kitchen"
-
 - name: package
   depends_on:
     - name: compile_dist_test
@@ -7368,9 +7349,6 @@ buildvariants:
   - name: watchdog_wiredtiger
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu1804-small
@@ -7441,9 +7419,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .watchdog
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu1804-small
@@ -7506,9 +7481,6 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu1804-test
@@ -7542,9 +7514,6 @@ buildvariants:
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu1804-test
@@ -7594,9 +7563,6 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu2004-small
@@ -7647,9 +7613,6 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu2004-small
@@ -7700,9 +7663,6 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu2004-test
@@ -7735,9 +7695,6 @@ buildvariants:
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu2004-test
@@ -7793,9 +7750,6 @@ buildvariants:
   - name: slow1_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - amazon1-2018-small
@@ -7848,9 +7802,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - amazon1-2018-small
@@ -7905,9 +7856,6 @@ buildvariants:
   - name: slow1_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - amazon2-small
@@ -7960,9 +7908,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - amazon2-small
@@ -8016,9 +7961,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel80-small
@@ -8066,9 +8008,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel80-small
@@ -8810,9 +8749,6 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
       - rhel80-large
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -9424,9 +9360,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel70-small
@@ -9506,9 +9439,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-82-arm64
@@ -9558,9 +9488,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel80-small
@@ -9739,9 +9666,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel70-small
@@ -9791,9 +9715,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel80-small
@@ -9840,9 +9761,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel80-small
@@ -10202,9 +10120,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - suse12-small
@@ -10396,9 +10311,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - debian92-small
@@ -10449,9 +10361,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - debian92-small
@@ -10497,9 +10406,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - debian10-small
@@ -10549,9 +10455,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - debian10-small
@@ -10597,9 +10500,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - debian11-small
@@ -10648,9 +10548,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - debian11-small
