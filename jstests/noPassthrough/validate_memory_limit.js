@@ -22,31 +22,40 @@ function corruptIndex() {
     coll = conn.getDB("test").getCollection("corrupt");
 }
 
-function checkValidate(errorPrefix, numMissingIndexEntries) {
-    conn.getDB("test").adminCommand({setParameter: 1, maxValidateMemoryUsageMB: 1});
+function checkValidate(maxMemoryUsage, {minMissingKeys, maxMissingKeys}) {
+    conn.getDB("test").adminCommand({setParameter: 1, maxValidateMemoryUsageMB: maxMemoryUsage});
     const res = coll.validate();
     assert.commandWorked(res);
-    assert(!res.valid);
-    assert.containsPrefix(errorPrefix, res.errors);
-    assert.eq(res.missingIndexEntries.length, numMissingIndexEntries);
+    assert(!res.valid, tojson(res));
+    const notAllReportedPrefix =
+        "Not all index entry inconsistencies are reported due to memory limitations.";
+    assert.containsPrefix(notAllReportedPrefix, res.errors, tojson(res));
+    assert.gte(res.missingIndexEntries.length, minMissingKeys, tojson(res));
+    assert.lte(res.missingIndexEntries.length, maxMissingKeys, tojson(res));
 }
 
-const noneReportedPrefix =
-    "Unable to report index entry inconsistencies due to memory limitations.";
-const notAllReportedPrefix =
-    "Not all index entry inconsistencies are reported due to memory limitations.";
-
-// Insert a document with a key larger than maxValidateMemoryUsageMB so that validate does not
-// report any missing index entries.
+// Insert a document with a key larger than maxValidateMemoryUsageMB and test that we still report
+// at least one inconsistency.
 const indexKey = "a".repeat(kIndexKeyLength);
 assert.commandWorked(coll.insert({_id: indexKey}));
 corruptIndex();
-checkValidate(noneReportedPrefix, 0);
+checkValidate(1, {minMissingKeys: 1, maxMissingKeys: 1});
 
-// Insert a document with a small key so that validate reports one missing index entry.
-assert.commandWorked(coll.insert({_id: 1}));
+// Clear collection between tests.
+coll.drop();
+
+// Test that if we have keys distributed across many buckets, and would exceed
+// maxValidateMemoryUsageMB, we report as many inconsistencies as we can.
+for (let i = 0; i < 10; ++i) {
+    const indexKey = i.toString().repeat(kIndexKeyLength / 5);
+    assert.commandWorked(coll.insert({_id: indexKey}));
+}
+
 corruptIndex();
-checkValidate(notAllReportedPrefix, 1);
+// If each key is maxMem/5, then we can keep 4 of them (the 5th would put us at the limit). However,
+// each key is counted twice, so realistically we only expect to track 2 of them. However, there's
+// a small chance we could get hash collisions that would lead to us reporting only 1.
+checkValidate(1, {minMissingKeys: 1, maxMissingKeys: 2});
 
 MongoRunner.stopMongod(conn, null, {skipValidation: true});
 })();
