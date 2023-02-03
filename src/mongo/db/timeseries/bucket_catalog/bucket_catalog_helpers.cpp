@@ -256,6 +256,11 @@ StatusWith<Date_t> extractTime(const BSONObj& doc, StringData timeFieldName) {
     return timeElem.Date();
 }
 
+BSONObj buildControlMinTimestampDoc(StringData timeField, Date_t roundedTime) {
+    BSONObjBuilder builder;
+    builder.append(timeField, roundedTime);
+    return builder.obj();
+}
 
 StatusWith<std::pair<Date_t, BSONElement>> extractTimeAndMeta(const BSONObj& doc,
                                                               StringData timeFieldName,

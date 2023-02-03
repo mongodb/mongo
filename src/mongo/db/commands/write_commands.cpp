@@ -77,6 +77,7 @@
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_stats.h"
+#include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
@@ -238,50 +239,6 @@ write_ops::UpdateOpEntry makeTimeseriesTransformationOpEntry(
     invariant(!update.getMulti(), bucketId.toString());
     invariant(!update.getUpsert(), bucketId.toString());
     return update;
-}
-
-/**
- * Returns the document for inserting a new bucket.
- */
-BSONObj makeTimeseriesInsertDocument(std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
-                                     const BSONObj& metadata) {
-    using namespace timeseries;
-
-    auto metadataElem = metadata.firstElement();
-
-    StringDataMap<BSONObjBuilder> dataBuilders;
-    DecimalCounter<uint32_t> count;
-    for (const auto& doc : batch->measurements) {
-        for (const auto& elem : doc) {
-            auto key = elem.fieldNameStringData();
-            if (metadataElem && key == metadataElem.fieldNameStringData()) {
-                continue;
-            }
-            dataBuilders[key].appendAs(elem, count);
-        }
-        ++count;
-    }
-
-    BSONObjBuilder builder;
-    builder.append("_id", batch->bucketHandle.bucketId.oid);
-    {
-        BSONObjBuilder bucketControlBuilder(builder.subobjStart("control"));
-        bucketControlBuilder.append(kBucketControlVersionFieldName,
-                                    kTimeseriesControlDefaultVersion);
-        bucketControlBuilder.append(kBucketControlMinFieldName, batch->min);
-        bucketControlBuilder.append(kBucketControlMaxFieldName, batch->max);
-    }
-    if (metadataElem) {
-        builder.appendAs(metadataElem, kBucketMetaFieldName);
-    }
-    {
-        BSONObjBuilder bucketDataBuilder(builder.subobjStart(kBucketDataFieldName));
-        for (auto& dataBuilder : dataBuilders) {
-            bucketDataBuilder.append(dataBuilder.first, dataBuilder.second.obj());
-        }
-    }
-
-    return builder.obj();
 }
 
 /**
@@ -577,8 +534,9 @@ public:
             std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
             const BSONObj& metadata,
             std::vector<StmtId>&& stmtIds) const {
-            write_ops::InsertCommandRequest op{makeTimeseriesBucketsNamespace(ns()),
-                                               {makeTimeseriesInsertDocument(batch, metadata)}};
+            write_ops::InsertCommandRequest op{
+                makeTimeseriesBucketsNamespace(ns()),
+                {timeseries::makeNewDocumentForWrite(batch, metadata)}};
             op.setWriteCommandRequestBase(_makeTimeseriesWriteOpBase(std::move(stmtIds)));
             return op;
         }

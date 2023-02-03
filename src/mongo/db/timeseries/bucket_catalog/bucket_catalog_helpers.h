@@ -73,6 +73,10 @@ StatusWith<std::pair<Date_t, BSONElement>> extractTimeAndMeta(const BSONObj& doc
                                                               StringData timeFieldName,
                                                               StringData metaFieldName);
 
+/**
+ * Constructs a singleton BSONObj with the minimum timestamp.
+ */
+BSONObj buildControlMinTimestampDoc(StringData timeField, Date_t roundedTime);
 
 /**
  * Retrieves a document from the record store based off of the bucket ID.

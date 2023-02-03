@@ -31,8 +31,29 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/timeseries/bucket_catalog/write_batch.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 
 namespace mongo::timeseries {
+/**
+ * Returns the document for writing a new bucket with a write batch.
+ */
+BSONObj makeNewDocumentForWrite(std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
+                                const BSONObj& metadata);
+
+/**
+ * Returns the document for writing a new bucket with 'measurements'. Calculates the min and max
+ * fields while building the document.
+ *
+ * The measurements must already be known to fit in the same bucket. No checks will be done.
+ */
+BSONObj makeNewDocumentForWrite(
+    const OID& bucketId,
+    const std::vector<BSONObj>& measurements,
+    const BSONObj& metadata,
+    const boost::optional<TimeseriesOptions>& options,
+    const boost::optional<const StringData::ComparatorInterface*>& comparator);
+
 /**
  * Performs modifications atomically for a user command on a time-series collection.
  * Replaces the bucket document for a partial bucket modification and removes the bucket for a full

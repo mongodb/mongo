@@ -36,10 +36,112 @@
 #include "mongo/db/ops/write_ops_exec_util.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 
 namespace mongo::timeseries {
+namespace {
+
+// Builds the data field of a bucket document. Computes the min and max fields if necessary.
+boost::optional<bucket_catalog::MinMax> processTimeseriesMeasurements(
+    const std::vector<BSONObj>& measurements,
+    const BSONObj& metadata,
+    StringDataMap<BSONObjBuilder>& dataBuilders,
+    const boost::optional<TimeseriesOptions>& options = boost::none,
+    const boost::optional<const StringData::ComparatorInterface*>& comparator = boost::none) {
+    bucket_catalog::MinMax minmax;
+    bool computeMinmax = options && comparator;
+
+    auto metadataElem = metadata.firstElement();
+    boost::optional<StringData> metaFieldName;
+    if (metadataElem) {
+        metaFieldName = metadataElem.fieldNameStringData();
+    }
+
+    DecimalCounter<uint32_t> count;
+    for (const auto& doc : measurements) {
+        if (computeMinmax) {
+            minmax.update(doc, metaFieldName, *comparator);
+        }
+        for (const auto& elem : doc) {
+            auto key = elem.fieldNameStringData();
+            if (key == metaFieldName) {
+                continue;
+            }
+            dataBuilders[key].appendAs(elem, count);
+        }
+        ++count;
+    }
+
+    // Rounds the minimum timestamp and updates the min time field.
+    if (computeMinmax) {
+        auto minTime = roundTimestampToGranularity(
+            minmax.min().getField(options->getTimeField()).Date(), *options);
+        auto controlDoc =
+            bucket_catalog::buildControlMinTimestampDoc(options->getTimeField(), minTime);
+        minmax.update(controlDoc, /*metaField=*/boost::none, *comparator);
+        return minmax;
+    }
+
+    return boost::none;
+}
+
+// Builds a complete and new bucket document.
+BSONObj makeNewDocument(const OID& bucketId,
+                        const BSONObj& metadata,
+                        const BSONObj& min,
+                        const BSONObj& max,
+                        StringDataMap<BSONObjBuilder>& dataBuilders) {
+    auto metadataElem = metadata.firstElement();
+    BSONObjBuilder builder;
+    builder.append("_id", bucketId);
+    {
+        BSONObjBuilder bucketControlBuilder(builder.subobjStart("control"));
+        bucketControlBuilder.append(kBucketControlVersionFieldName,
+                                    kTimeseriesControlDefaultVersion);
+        bucketControlBuilder.append(kBucketControlMinFieldName, min);
+        bucketControlBuilder.append(kBucketControlMaxFieldName, max);
+    }
+    if (metadataElem) {
+        builder.appendAs(metadataElem, kBucketMetaFieldName);
+    }
+    {
+        BSONObjBuilder bucketDataBuilder(builder.subobjStart(kBucketDataFieldName));
+        for (auto& dataBuilder : dataBuilders) {
+            bucketDataBuilder.append(dataBuilder.first, dataBuilder.second.obj());
+        }
+    }
+
+    return builder.obj();
+}
+}  // namespace
+
+BSONObj makeNewDocumentForWrite(std::shared_ptr<bucket_catalog::WriteBatch> batch,
+                                const BSONObj& metadata) {
+    StringDataMap<BSONObjBuilder> dataBuilders;
+    processTimeseriesMeasurements(
+        {batch->measurements.begin(), batch->measurements.end()}, metadata, dataBuilders);
+
+    return makeNewDocument(
+        batch->bucketHandle.bucketId.oid, metadata, batch->min, batch->max, dataBuilders);
+}
+
+BSONObj makeNewDocumentForWrite(
+    const OID& bucketId,
+    const std::vector<BSONObj>& measurements,
+    const BSONObj& metadata,
+    const boost::optional<TimeseriesOptions>& options,
+    const boost::optional<const StringData::ComparatorInterface*>& comparator) {
+    StringDataMap<BSONObjBuilder> dataBuilders;
+    auto minmax =
+        processTimeseriesMeasurements(measurements, metadata, dataBuilders, options, comparator);
+
+    invariant(minmax);
+
+    return makeNewDocument(bucketId, metadata, minmax->min(), minmax->max(), dataBuilders);
+}
 
 Status performAtomicWrites(
     OperationContext* opCtx,

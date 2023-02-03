@@ -76,12 +76,6 @@ OperationId getOpId(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-BSONObj buildControlMinTimestampDoc(StringData timeField, Date_t roundedTime) {
-    BSONObjBuilder builder;
-    builder.append(timeField, roundedTime);
-    return builder.obj();
-}
-
 std::pair<OID, Date_t> generateBucketOID(const Date_t& time, const TimeseriesOptions& options) {
     OID oid = OID::gen();
 
@@ -1594,7 +1588,7 @@ Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
     // Make sure we set the control.min time field to match the rounded _id timestamp.
     auto controlDoc = buildControlMinTimestampDoc(info.options.getTimeField(), roundedTime);
     bucket->minmax.update(
-        controlDoc, bucket->key.metadata.getMetaField(), bucket->key.metadata.getComparator());
+        controlDoc, /*metaField=*/boost::none, bucket->key.metadata.getComparator());
     return bucket;
 }
 
