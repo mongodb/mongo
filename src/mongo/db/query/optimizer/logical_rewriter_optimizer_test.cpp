@@ -2070,13 +2070,14 @@ TEST(LogicalRewriter, SargableNodeRIN) {
     ASSERT_EQ(1, ci.at(0)._eqPrefixes.size());
 
     // The first index field ("a") is constrained to 1, the remaining fields are not constrained.
-    ASSERT_EQ(
+    ASSERT_INTERVAL_AUTO(  // NOLINT
         "{\n"
         "    {\n"
-        "        {=Const [1], <fully open>, <fully open>, <fully open>, <fully open>}\n"
+        "        {[Const [1 | minKey | minKey | minKey | minKey], Const [1 | maxKey | maxKey | "
+        "maxKey | maxKey]]}\n"
         "    }\n"
         "}\n",
-        ExplainGenerator::explainIntervalExpr(ci.at(0)._eqPrefixes.front()._interval));
+        ci.at(0)._eqPrefixes.front()._interval);
 
     // No correlated projections.
     ASSERT_EQ(0, ci.at(0)._correlatedProjNames.getVector().size());
@@ -2098,27 +2099,29 @@ TEST(LogicalRewriter, SargableNodeRIN) {
     ASSERT_EQ(2, ci.at(1)._eqPrefixes.size());
 
     // The first index field ("a") is again constrained to 1, and the remaining ones are not.
-    ASSERT_EQ(
+    ASSERT_INTERVAL_AUTO(  // NOLINT
         "{\n"
         "    {\n"
-        "        {=Const [1], <fully open>, <fully open>, <fully open>, <fully open>}\n"
+        "        {[Const [1 | minKey | minKey | minKey | minKey], Const [1 | maxKey | maxKey | ma"
+        "xKey | maxKey]]}\n"
         "    }\n"
         "}\n",
-        ExplainGenerator::explainIntervalExpr(ci.at(1)._eqPrefixes.at(0)._interval));
+        ci.at(1)._eqPrefixes.at(0)._interval);
 
     // Second eq prefix begins at index field 2.
     ASSERT_EQ(2, ci.at(1)._eqPrefixes.at(1)._startPos);
 
     // The first two index fields are constrained to variables obtained from the first scan, the
     // third one ("c") is bound to "2". The last two fields are unconstrained.
-    ASSERT_EQ(
+    ASSERT_INTERVAL_AUTO(  // NOLINT
         "{\n"
         "    {\n"
-        "        {=Variable [evalTemp_26], =Variable [evalTemp_27], =Const [2], <fully open>, "
-        "<fully open>}\n"
+        "        {[Variable [evalTemp_26] | Variable [evalTemp_27] | Const [2] | Const [minKey] |"
+        " Const [minKey], Variable [evalTemp_26] | Variable [evalTemp_27] | Const [2] | Const [ma"
+        "xKey] | Const [maxKey]]}\n"
         "    }\n"
         "}\n",
-        ExplainGenerator::explainIntervalExpr(ci.at(1)._eqPrefixes.at(1)._interval));
+        ci.at(1)._eqPrefixes.at(1)._interval);
 
     // Two correlated projections.
     ASSERT_EQ(2, ci.at(1)._correlatedProjNames.getVector().size());
@@ -2138,35 +2141,37 @@ TEST(LogicalRewriter, SargableNodeRIN) {
     ASSERT_EQ(4, ci.at(2)._correlatedProjNames.getVector().size());
 
     // The first index field ("a") is again constrained to 1.
-    ASSERT_EQ(
+    ASSERT_INTERVAL_AUTO(  // NOLINT
         "{\n"
         "    {\n"
-        "        {=Const [1], <fully open>, <fully open>, <fully open>, <fully open>}\n"
+        "        {[Const [1 | minKey | minKey | minKey | minKey], Const [1 | maxKey | maxKey | ma"
+        "xKey | maxKey]]}\n"
         "    }\n"
         "}\n",
-        ExplainGenerator::explainIntervalExpr(ci.at(2)._eqPrefixes.at(0)._interval));
+        ci.at(2)._eqPrefixes.at(0)._interval);
 
     // The first two index fields are constrained to variables obtained from the first scan, the
     // third one ("c") is bound to "2". The last two fields are unconstrained.
-    ASSERT_EQ(
+    ASSERT_INTERVAL_AUTO(  // NOLINT
         "{\n"
         "    {\n"
-        "        {=Variable [evalTemp_29], =Variable [evalTemp_30], =Const [2], <fully open>, "
-        "<fully open>}\n"
+        "        {[Variable [evalTemp_29] | Variable [evalTemp_30] | Const [2] | Const [minKey] |"
+        " Const [minKey], Variable [evalTemp_29] | Variable [evalTemp_30] | Const [2] | Const [ma"
+        "xKey] | Const [maxKey]]}\n"
         "    }\n"
         "}\n",
-        ExplainGenerator::explainIntervalExpr(ci.at(2)._eqPrefixes.at(1)._interval));
+        ci.at(2)._eqPrefixes.at(1)._interval);
 
     // The first 4 index fields are constrained to variables from the second scan, and the last one
     // to 4.
-    ASSERT_EQ(
+    ASSERT_INTERVAL_AUTO(  // NOLINT
         "{\n"
         "    {\n"
-        "        {=Variable [evalTemp_29], =Variable [evalTemp_30], =Variable [evalTemp_31], "
-        "=Variable [evalTemp_32], =Const [3]}\n"
+        "        {=Variable [evalTemp_29] | Variable [evalTemp_30] | Variable [evalTemp_31] | Var"
+        "iable [evalTemp_32] | Const [3]}\n"
         "    }\n"
         "}\n",
-        ExplainGenerator::explainIntervalExpr(ci.at(2)._eqPrefixes.at(2)._interval));
+        ci.at(2)._eqPrefixes.at(2)._interval);
 }
 
 TEST(LogicalRewriter, EmptyArrayIndexBounds) {

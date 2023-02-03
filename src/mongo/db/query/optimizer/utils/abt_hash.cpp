@@ -75,6 +75,13 @@ static void updateBoundHash(size_t& result, const BoundRequirement& bound) {
     updateHash(result, ABTHashGenerator::generate(bound.getBound()));
 };
 
+static void updateCompoundBoundHash(size_t& result, const CompoundBoundRequirement& bound) {
+    updateHash(result, std::hash<bool>()(bound.isInclusive()));
+    for (const auto& expr : bound.getBound()) {
+        updateHash(result, ABTHashGenerator::generate(expr));
+    }
+}
+
 template <class T>
 class IntervalHasher {
 public:
@@ -87,9 +94,8 @@ public:
 
     size_t computeHash(const CompoundIntervalRequirement& req) {
         size_t result = 19;
-        for (const auto& interval : req) {
-            updateHash(result, computeHash(interval));
-        }
+        updateCompoundBoundHash(result, req.getLowBound());
+        updateCompoundBoundHash(result, req.getHighBound());
         return result;
     }
 

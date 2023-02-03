@@ -275,11 +275,10 @@ private:
         const NodeProps& props,
         const sbe::value::SlotVector& toExclude = {});
 
-    std::unique_ptr<sbe::EExpression> convertBoundsToExpr(
-        SlotVarMap& slotMap,
-        bool isLower,
-        const IndexDefinition& indexDef,
-        const CompoundIntervalRequirement& interval);
+    std::unique_ptr<sbe::EExpression> convertBoundsToExpr(SlotVarMap& slotMap,
+                                                          bool isLower,
+                                                          const IndexDefinition& indexDef,
+                                                          const CompoundBoundRequirement& bound);
 
     std::unique_ptr<sbe::PlanStage> generateInternal(const ABT& n,
                                                      SlotVarMap& slotMap,

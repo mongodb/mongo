@@ -88,12 +88,12 @@ IntervalRequirement getMinMaxIntervalForType(sbe::value::TypeTags type) {
 bool isIntervalSubsetOfType(const IntervalRequirement& interval, sbe::value::TypeTags type) {
     // Create a conjunction of the interval and the min-max interval for the type as input for the
     // intersection function.
-    auto intervals =
-        IntervalReqExpr::make<IntervalReqExpr::Disjunction>(IntervalReqExpr::NodeVector{
-            IntervalReqExpr::make<IntervalReqExpr::Conjunction>(IntervalReqExpr::NodeVector{
-                IntervalReqExpr::make<IntervalReqExpr::Atom>(interval),
-                IntervalReqExpr::make<IntervalReqExpr::Atom>(getMinMaxIntervalForType(type))})});
-
+    auto intervals = std::move(*IntervalReqExpr::Builder{}
+                                    .pushDisj()
+                                    .pushConj()
+                                    .atom(interval)
+                                    .atom(getMinMaxIntervalForType(type))
+                                    .finish());
     return intersectDNFIntervals(intervals, ConstEval::constFold).has_value();
 }
 

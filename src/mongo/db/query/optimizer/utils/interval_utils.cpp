@@ -667,8 +667,7 @@ bool combineCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
                      targetConjunction.cast<CompoundIntervalReqExpr::Conjunction>()->nodes()) {
                     const auto& targetInterval =
                         targetConjunct.cast<CompoundIntervalReqExpr::Atom>()->getExpr();
-                    if (!targetInterval.empty() && !targetInterval.back().isEquality() &&
-                        !sourceInterval.isFullyOpen()) {
+                    if (!targetInterval.isEquality() && !sourceInterval.isFullyOpen()) {
                         // We do not have an equality prefix. Reject.
                         return false;
                     }
@@ -708,14 +707,11 @@ void padCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
                 targetConjunct.cast<CompoundIntervalReqExpr::Atom>()->getExpr();
 
             IntervalRequirement sourceInterval;
-            if (!targetInterval.empty()) {
-                const auto& lastInterval = targetInterval.back();
-                if (!lastInterval.getLowBound().isInclusive()) {
-                    sourceInterval.getLowBound() = {false /*inclusive*/, Constant::maxKey()};
-                }
-                if (!lastInterval.getHighBound().isInclusive()) {
-                    sourceInterval.getHighBound() = {false /*inclusive*/, Constant::minKey()};
-                }
+            if (!targetInterval.getLowBound().isInclusive()) {
+                sourceInterval.getLowBound() = {false /*inclusive*/, Constant::maxKey()};
+            }
+            if (!targetInterval.getHighBound().isInclusive()) {
+                sourceInterval.getHighBound() = {false /*inclusive*/, Constant::minKey()};
             }
 
             auto newInterval = targetInterval;
@@ -826,18 +822,9 @@ boost::optional<ABT> coerceIntervalToPathCompareEqMember(const IntervalReqExpr::
     return boost::none;
 }
 
-bool areCompoundIntervalsEqualities(const CompoundIntervalRequirement& intervals) {
-    for (const auto& interval : intervals) {
-        if (!interval.isEquality()) {
-            return false;
-        }
-    }
-    return true;
-}
-
 bool isSimpleRange(const CompoundIntervalReqExpr::Node& interval) {
     if (const auto singularInterval = CompoundIntervalReqExpr::getSingularDNF(interval);
-        singularInterval && !areCompoundIntervalsEqualities(*singularInterval)) {
+        singularInterval && !singularInterval->isEquality()) {
         return true;
     }
     return false;

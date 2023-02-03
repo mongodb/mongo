@@ -133,30 +133,57 @@ function findSubtrees(tree, predicate) {
     return result;
 }
 
+function printBound(bound) {
+    if (!Array.isArray(bound.bound)) {
+        return [false, ""];
+    }
+
+    let result = "";
+    let first = true;
+    for (const element of bound.bound) {
+        if (element.nodeType !== "Const") {
+            return [false, ""];
+        }
+
+        result += tojson(element.value);
+        if (first) {
+            first = false;
+        } else {
+            result += " | ";
+        }
+    }
+
+    return [true, result];
+}
+
 function prettyInterval(compoundInterval) {
     // Takes an array of intervals, each one applying to one component of a compound index key.
     // Try to format it as a string.
     // If either bound is not Constant, return the original JSON unchanged.
-    if (!Array.isArray(compoundInterval)) {
-        return compoundInterval;
-    }
+
+    const lowBound = compoundInterval.lowBound;
+    const highBound = compoundInterval.highBound;
+    const lowInclusive = lowBound.inclusive;
+    const highInclusive = highBound.inclusive;
+    assert.eq(typeof lowInclusive, 'boolean');
+    assert.eq(typeof highInclusive, 'boolean');
 
     let result = '';
-    for (const {lowBound, highBound} of compoundInterval) {
-        if (lowBound.bound.nodeType !== 'Const' || highBound.bound.nodeType !== 'Const') {
+    {
+        const res = printBound(lowBound);
+        if (!res[0]) {
             return compoundInterval;
         }
-
-        const lowInclusive = lowBound.inclusive;
-        const highInclusive = highBound.inclusive;
-        assert.eq(typeof lowInclusive, 'boolean');
-        assert.eq(typeof highInclusive, 'boolean');
-
-        result += ' ';
         result += lowInclusive ? '[ ' : '( ';
-        result += tojson(lowBound.bound.value);
-        result += ', ';
-        result += tojson(highBound.bound.value);
+        result += res[1];
+    }
+    result += ", ";
+    {
+        const res = printBound(highBound);
+        if (!res[0]) {
+            return compoundInterval;
+        }
+        result += res[1];
         result += highInclusive ? ' ]' : ' )';
     }
     return result.trim();

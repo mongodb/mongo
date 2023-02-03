@@ -530,17 +530,17 @@ TEST_F(ABTPlanGeneration, LowerIndexScanNode) {
         bool isReversed = i == 1;
         auto reversedString = isReversed ? "reverse" : "forward";
         // Basic index scan with RID
-        runNodeVariation(ctx,
-                         str::stream() << "Basic " << reversedString << " index scan with RID",
-                         _node(make<IndexScanNode>(
-                             FieldProjectionMap{{ProjectionName{"rid"}}, {}, {}},
-                             "collName",
-                             "index0",
-                             CompoundIntervalRequirement{IntervalRequirement(
-                                 BoundRequirement(i > 0, Constant::fromDouble(23 + i * 4)),
-                                 BoundRequirement(i == 0, Constant::fromDouble(35 + i * 100)))},
-                             isReversed)),
-                         indexDefs);
+        runNodeVariation(
+            ctx,
+            str::stream() << "Basic " << reversedString << " index scan with RID",
+            _node(make<IndexScanNode>(
+                FieldProjectionMap{{ProjectionName{"rid"}}, {}, {}},
+                "collName",
+                "index0",
+                CompoundIntervalRequirement{{i > 0, makeSeq(Constant::fromDouble(23 + i * 4))},
+                                            {i == 0, makeSeq(Constant::fromDouble(35 + i * 100))}},
+                isReversed)),
+            indexDefs);
 
 
         // Covering index scan with one field
@@ -551,9 +551,9 @@ TEST_F(ABTPlanGeneration, LowerIndexScanNode) {
                 FieldProjectionMap{{}, {}, {{"<indexKey> 0", ProjectionName{"proj0"}}}},
                 "collName",
                 "index0",
-                CompoundIntervalRequirement{IntervalRequirement(
-                    BoundRequirement(i >= 0, Constant::fromDouble(23 + (i + 1) * 3)),
-                    BoundRequirement(i > 0, Constant::fromDouble(35 + ((i * 3) * (i * 4)))))},
+                CompoundIntervalRequirement{
+                    {i >= 0, makeSeq(Constant::fromDouble(23 + (i + 1) * 3))},
+                    {i > 0, makeSeq(Constant::fromDouble(35 + ((i * 3) * (i * 4))))}},
                 isReversed)),
             indexDefs);
     }
@@ -742,14 +742,13 @@ TEST_F(ABTPlanGeneration, LowerSeekNode) {
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
 
-    auto indexScan =
-        _node(make<IndexScanNode>(FieldProjectionMap{{ProjectionName{"rid"}}, {}, {}},
-                                  "collName",
-                                  "index0",
-                                  CompoundIntervalRequirement{IntervalRequirement(
-                                      BoundRequirement(false, Constant::fromDouble(23)),
-                                      BoundRequirement(true, Constant::fromDouble(35)))},
-                                  false));
+    auto indexScan = _node(
+        make<IndexScanNode>(FieldProjectionMap{{ProjectionName{"rid"}}, {}, {}},
+                            "collName",
+                            "index0",
+                            CompoundIntervalRequirement{{false, makeSeq(Constant::fromDouble(23))},
+                                                        {true, makeSeq(Constant::fromDouble(35))}},
+                            false));
 
     auto seek = _node(make<LimitSkipNode>(
         properties::LimitSkipRequirement(1, 0),

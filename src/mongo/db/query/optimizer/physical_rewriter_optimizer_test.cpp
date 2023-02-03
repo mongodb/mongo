@@ -1084,8 +1084,8 @@ TEST(PhysRewriter, FilterIndexing3) {
         "|   |       pa\n"
         "|   RefBlock: \n"
         "|       Variable [pa]\n"
-        "IndexScan [{'<indexKey> 0': pa}, scanDefName: c1, indexDefName: index1, interval: {=Cons"
-        "t [1], <fully open>}]\n",
+        "IndexScan [{'<indexKey> 0': pa}, scanDefName: c1, indexDefName: index1, interval: {[Const "
+        "[1 | minKey], Const [1 | maxKey]]}]\n",
         optimized);
 }
 
@@ -1148,8 +1148,8 @@ TEST(PhysRewriter, FilterIndexing3MultiKey) {
         "Unique []\n"
         "|   projections: \n"
         "|       rid_0\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const [1"
-        "], <fully open>}]\n",
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const [1"
+        " | minKey], Const [1 | maxKey]]}]\n",
         optimized);
 }
 
@@ -1259,7 +1259,7 @@ TEST(PhysRewriter, FilterIndexing4) {
         "|   Const [1]\n"
         "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': evalTemp_12, '<indexKey> 2': evalTemp_13"
         ", '<indexKey> 3': evalTemp_14}, scanDefName: c1, indexDefName: index1, interval: {>Const"
-        " [1], >Const [maxKey], >Const [maxKey], >Const [maxKey]}]\n",
+        " [1 | maxKey | maxKey | maxKey]}]\n",
         optimized);
 }
 
@@ -1342,7 +1342,7 @@ TEST(PhysRewriter, FilterIndexing5) {
         "|   |   Variable [evalTemp_0]\n"
         "|   PathIdentity []\n"
         "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': evalTemp_0}, scanDefName: c1, indexDefNa"
-        "me: index1, interval: {>Const [0], >Const [maxKey]}]\n",
+        "me: index1, interval: {>Const [0 | maxKey]}]\n",
         optimized);
 }
 
@@ -1411,7 +1411,7 @@ TEST(PhysRewriter, FilterIndexing6) {
         "|       Variable [pa]\n"
         "|       Variable [pb]\n"
         "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': pb}, scanDefName: c1, indexDefName: inde"
-        "x1, interval: {=Const [0], >Const [0]}]\n",
+        "x1, interval: {(Const [0 | 0], Const [0 | maxKey]]}]\n",
         optimized);
 }
 
@@ -1727,8 +1727,8 @@ TEST(PhysRewriter, FilterIndexingRIN) {
         "evalTemp_60}]\n"
         "|   |   |   Const [true]\n"
         "|   |   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: "
-        "{=Variable [evalTemp_57], =Variable [evalTemp_58], =Variable [evalTemp_59], =Variable "
-        "[evalTemp_60], =Const [3]}]\n"
+        "{=Variable [evalTemp_57] | Variable [evalTemp_58] | Variable [evalTemp_59] | Variable "
+        "[evalTemp_60] | Const [3]}]\n"
         "|   SpoolProducer [Lazy, id: 0, {evalTemp_59, evalTemp_60}]\n"
         "|   |   |   Const [true]\n"
         "|   Union [{evalTemp_59, evalTemp_60}]\n"
@@ -1739,17 +1739,19 @@ TEST(PhysRewriter, FilterIndexingRIN) {
         "|   |   |   |       limit: 1\n"
         "|   |   |   |       skip: 0\n"
         "|   |   |   IndexScan [{'<indexKey> 2': evalTemp_59, '<indexKey> 3': evalTemp_60}, "
-        "scanDefName: c1, indexDefName: index1, interval: {(Variable [evalTemp_57], Variable "
-        "[evalTemp_57]], (Variable [evalTemp_58], Variable [evalTemp_58]], >Variable [rinInner_2], "
-        ">Variable [rinInner_3], =Const [maxKey]}]\n"
+        "scanDefName: c1, indexDefName: index1, interval: {(Variable [evalTemp_57] | Variable "
+        "[evalTemp_58] | Variable [rinInner_2] | Variable [rinInner_3] | Const [maxKey], Variable "
+        "[evalTemp_57] | Variable [evalTemp_58] | Const [maxKey] | Const [maxKey] | Const "
+        "[maxKey])}]\n"
         "|   |   SpoolConsumer [Stack, id: 0, {rinInner_2, rinInner_3}]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
         "|   |       limit: 1\n"
         "|   |       skip: 0\n"
         "|   IndexScan [{'<indexKey> 2': evalTemp_59, '<indexKey> 3': evalTemp_60}, scanDefName: "
-        "c1, indexDefName: index1, interval: {=Variable [evalTemp_57], =Variable [evalTemp_58], "
-        ">Const [2], >Const [maxKey], >Const [maxKey]}]\n"
+        "c1, indexDefName: index1, interval: {(Variable [evalTemp_57] | Variable [evalTemp_58] | "
+        "Const [2] | Const [maxKey] | Const [maxKey], Variable [evalTemp_57] | Variable "
+        "[evalTemp_58] | Const [maxKey] | Const [maxKey] | Const [maxKey]]}]\n"
         "SpoolProducer [Lazy, id: 1, {evalTemp_57, evalTemp_58}]\n"
         "|   |   Const [true]\n"
         "Union [{evalTemp_57, evalTemp_58}]\n"
@@ -1760,16 +1762,16 @@ TEST(PhysRewriter, FilterIndexingRIN) {
         "|   |   |       limit: 1\n"
         "|   |   |       skip: 0\n"
         "|   |   IndexScan [{'<indexKey> 0': evalTemp_57, '<indexKey> 1': evalTemp_58}, "
-        "scanDefName: c1, indexDefName: index1, interval: {>Variable [rinInner_0], >Variable "
-        "[rinInner_1], =Const [maxKey], =Const [maxKey], =Const [maxKey]}]\n"
+        "scanDefName: c1, indexDefName: index1, interval: {(Variable [rinInner_0] | Variable "
+        "[rinInner_1] | Const [maxKey] | Const [maxKey] | Const [maxKey], Const [maxKey | maxKey | "
+        "maxKey | maxKey | maxKey])}]\n"
         "|   SpoolConsumer [Stack, id: 1, {rinInner_0, rinInner_1}]\n"
         "LimitSkip []\n"
         "|   limitSkip:\n"
         "|       limit: 1\n"
         "|       skip: 0\n"
         "IndexScan [{'<indexKey> 0': evalTemp_57, '<indexKey> 1': evalTemp_58}, scanDefName: c1, "
-        "indexDefName: index1, interval: {>Const [1], >Const [maxKey], >Const [maxKey], >Const [m"
-        "axKey], >Const [maxKey]}]\n",
+        "indexDefName: index1, interval: {>Const [1 | maxKey | maxKey | maxKey | maxKey]}]\n",
         optimized);
 }
 
@@ -1840,7 +1842,7 @@ TEST(PhysRewriter, FilterIndexingRIN1) {
         "NestedLoopJoin [joinType: Inner, {pa}]\n"
         "|   |   Const [true]\n"
         "|   IndexScan [{'<indexKey> 1': pb, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
-        "index1, interval: {=Variable [pa], >Const [2]}]\n"
+        "index1, interval: {(Variable [pa] | Const [2], Variable [pa] | Const [maxKey]]}]\n"
         "SpoolProducer [Lazy, id: 1, {pa}]\n"
         "|   |   Const [true]\n"
         "Union [{pa}]\n"
@@ -1851,14 +1853,14 @@ TEST(PhysRewriter, FilterIndexingRIN1) {
         "|   |   |       limit: 1\n"
         "|   |   |       skip: 0\n"
         "|   |   IndexScan [{'<indexKey> 0': pa}, scanDefName: c1, indexDefName: index1, interval: "
-        "{(Const [1], Variable [rinInner_1]), (Const [maxKey], Const [minKey]]}, reversed]\n"
+        "{(Const [1 | maxKey], Variable [rinInner_1] | Const [minKey])}, reversed]\n"
         "|   SpoolConsumer [Stack, id: 1, {rinInner_1}]\n"
         "LimitSkip []\n"
         "|   limitSkip:\n"
         "|       limit: 1\n"
         "|       skip: 0\n"
         "IndexScan [{'<indexKey> 0': pa}, scanDefName: c1, indexDefName: index1, interval: {>Const "
-        "[1], >Const [maxKey]}, reversed]\n",
+        "[1 | maxKey]}, reversed]\n",
         optimized);
 }
 
@@ -1951,9 +1953,11 @@ TEST(PhysRewriter, FilterIndexingRIN2) {
         "|   |   |           Variable [disjunction_3]\n"
         "|   |   Union [{disjunction_3, rid_0}]\n"
         "|   |   |   IndexScan [{'<indexKey> 1': disjunction_3, '<rid>': rid_0}, scanDefName: c1, "
-        "indexDefName: index1, interval: {=Variable [disjunction_0], [Const [7], Const [8]]}]\n"
+        "indexDefName: index1, interval: {[Variable [disjunction_0] | Const [7], Variable "
+        "[disjunction_0] | Const [8]]}]\n"
         "|   |   IndexScan [{'<indexKey> 1': disjunction_3, '<rid>': rid_0}, scanDefName: c1, "
-        "indexDefName: index1, interval: {=Variable [disjunction_0], [Const [5], Const [6]]}]\n"
+        "indexDefName: index1, interval: {[Variable [disjunction_0] | Const [5], Variable "
+        "[disjunction_0] | Const [6]]}]\n"
         "|   SpoolProducer [Lazy, id: 1, {disjunction_0}]\n"
         "|   |   |   Const [true]\n"
         "|   Union [{disjunction_0}]\n"
@@ -1964,14 +1968,14 @@ TEST(PhysRewriter, FilterIndexingRIN2) {
         "|   |   |   |       limit: 1\n"
         "|   |   |   |       skip: 0\n"
         "|   |   |   IndexScan [{'<indexKey> 0': disjunction_0}, scanDefName: c1, indexDefName: "
-        "index1, interval: {(Variable [rinInner_1], Const [4]], =Const [maxKey]}]\n"
+        "index1, interval: {(Variable [rinInner_1] | Const [maxKey], Const [4 | maxKey])}]\n"
         "|   |   SpoolConsumer [Stack, id: 1, {rinInner_1}]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
         "|   |       limit: 1\n"
         "|   |       skip: 0\n"
         "|   IndexScan [{'<indexKey> 0': disjunction_0}, scanDefName: c1, indexDefName: index1, "
-        "interval: {[Const [3], Const [4]], <fully open>}]\n"
+        "interval: {[Const [3 | minKey], Const [4 | maxKey]]}]\n"
         "NestedLoopJoin [joinType: Inner, {disjunction_0}]\n"
         "|   |   Const [true]\n"
         "|   GroupBy []\n"
@@ -1984,9 +1988,11 @@ TEST(PhysRewriter, FilterIndexingRIN2) {
         "|   |           Variable [disjunction_2]\n"
         "|   Union [{disjunction_2, rid_0}]\n"
         "|   |   IndexScan [{'<indexKey> 1': disjunction_2, '<rid>': rid_0}, scanDefName: c1, "
-        "indexDefName: index1, interval: {=Variable [disjunction_0], [Const [7], Const [8]]}]\n"
+        "indexDefName: index1, interval: {[Variable [disjunction_0] | Const [7], Variable "
+        "[disjunction_0] | Const [8]]}]\n"
         "|   IndexScan [{'<indexKey> 1': disjunction_2, '<rid>': rid_0}, scanDefName: c1, "
-        "indexDefName: index1, interval: {=Variable [disjunction_0], [Const [5], Const [6]]}]\n"
+        "indexDefName: index1, interval: {[Variable [disjunction_0] | Const [5], Variable "
+        "[disjunction_0] | Const [6]]}]\n"
         "SpoolProducer [Lazy, id: 0, {disjunction_0}]\n"
         "|   |   Const [true]\n"
         "Union [{disjunction_0}]\n"
@@ -1997,14 +2003,14 @@ TEST(PhysRewriter, FilterIndexingRIN2) {
         "|   |   |       limit: 1\n"
         "|   |   |       skip: 0\n"
         "|   |   IndexScan [{'<indexKey> 0': disjunction_0}, scanDefName: c1, indexDefName: "
-        "index1, interval: {(Variable [rinInner_0], Const [2]], =Const [maxKey]}]\n"
+        "index1, interval: {(Variable [rinInner_0] | Const [maxKey], Const [2 | maxKey])}]\n"
         "|   SpoolConsumer [Stack, id: 0, {rinInner_0}]\n"
         "LimitSkip []\n"
         "|   limitSkip:\n"
         "|       limit: 1\n"
         "|       skip: 0\n"
         "IndexScan [{'<indexKey> 0': disjunction_0}, scanDefName: c1, indexDefName: index1, "
-        "interval: {[Const [1], Const [2]], <fully open>}]\n",
+        "interval: {[Const [1 | minKey], Const [2 | maxKey]]}]\n",
         optimized);
 }
 
@@ -2921,19 +2927,19 @@ TEST(PhysRewriter, CompoundIndex3) {
             explainRoot, "child.child.leftChild.rightChild.children.0.child")
             .Obj();
     ASSERT_BSON_PATH("\"IndexScan\"", explainIndex1, "nodeType");
-    ASSERT_BSON_PATH("2", explainIndex1, "interval.0.lowBound.bound.value");
-    ASSERT_BSON_PATH("2", explainIndex1, "interval.0.highBound.bound.value");
-    ASSERT_BSON_PATH("4", explainIndex1, "interval.1.lowBound.bound.value");
-    ASSERT_BSON_PATH("4", explainIndex1, "interval.1.highBound.bound.value");
+    ASSERT_BSON_PATH("2", explainIndex1, "interval.lowBound.bound.0.value");
+    ASSERT_BSON_PATH("2", explainIndex1, "interval.highBound.bound.0.value");
+    ASSERT_BSON_PATH("4", explainIndex1, "interval.lowBound.bound.1.value");
+    ASSERT_BSON_PATH("4", explainIndex1, "interval.highBound.bound.1.value");
 
     const BSONObj& explainIndex2 =
         dotted_path_support::extractElementAtPath(explainRoot, "child.child.leftChild.leftChild")
             .Obj();
     ASSERT_BSON_PATH("\"IndexScan\"", explainIndex2, "nodeType");
-    ASSERT_BSON_PATH("1", explainIndex2, "interval.0.lowBound.bound.value");
-    ASSERT_BSON_PATH("1", explainIndex2, "interval.0.highBound.bound.value");
-    ASSERT_BSON_PATH("3", explainIndex2, "interval.1.lowBound.bound.value");
-    ASSERT_BSON_PATH("3", explainIndex2, "interval.1.highBound.bound.value");
+    ASSERT_BSON_PATH("1", explainIndex2, "interval.lowBound.bound.0.value");
+    ASSERT_BSON_PATH("1", explainIndex2, "interval.highBound.bound.0.value");
+    ASSERT_BSON_PATH("3", explainIndex2, "interval.lowBound.bound.1.value");
+    ASSERT_BSON_PATH("3", explainIndex2, "interval.highBound.bound.1.value");
 }
 
 TEST(PhysRewriter, CompoundIndex4Negative) {
@@ -3012,8 +3018,8 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
     ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.child.nodeType");
 
     ASSERT_BSON_PATH("\"IndexScan\"", explainRoot, "child.leftChild.nodeType");
-    ASSERT_BSON_PATH("1", explainRoot, "child.leftChild.interval.0.lowBound.bound.value");
-    ASSERT_BSON_PATH("1", explainRoot, "child.leftChild.interval.0.highBound.bound.value");
+    ASSERT_BSON_PATH("1", explainRoot, "child.leftChild.interval.lowBound.bound.0.value");
+    ASSERT_BSON_PATH("1", explainRoot, "child.leftChild.interval.highBound.bound.0.value");
 }
 
 TEST(PhysRewriter, CompoundIndex5) {
@@ -3079,13 +3085,13 @@ TEST(PhysRewriter, CompoundIndex5) {
         "|   aggregations: \n"
         "Union [{rid_0}]\n"
         "|   |   |   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval"
-        ": {=Const [1], =Const [3]}]\n"
+        ": {=Const [1 | 3]}]\n"
         "|   |   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {="
-        "Const [0], =Const [3]}]\n"
+        "Const [0 | 3]}]\n"
         "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Cons"
-        "t [1], =Const [2]}]\n"
+        "t [1 | 2]}]\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const [0"
-        "], =Const [2]}]\n",
+        " | 2]}]\n",
         optimized);
 }
 
@@ -3156,14 +3162,14 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
     const BSONObj& explainIndexScan =
         dotted_path_support::extractElementAtPath(explainRoot, "child.leftChild.child").Obj();
     ASSERT_BSON_PATH("\"IndexScan\"", explainIndexScan, "nodeType");
-    ASSERT_BSON_PATH("1", explainIndexScan, "interval.0.lowBound.bound.value");
-    ASSERT_BSON_PATH("1", explainIndexScan, "interval.0.highBound.bound.value");
+    ASSERT_BSON_PATH("1", explainIndexScan, "interval.lowBound.bound.0.value");
+    ASSERT_BSON_PATH("1", explainIndexScan, "interval.highBound.bound.0.value");
 
     const std::string lowBound = dotted_path_support::extractElementAtPath(
-                                     explainIndexScan, "interval.1.lowBound.bound.value")
+                                     explainIndexScan, "interval.lowBound.bound.1.value")
                                      .toString(false /*includeFieldName*/);
     const std::string highBound = dotted_path_support::extractElementAtPath(
-                                      explainIndexScan, "interval.1.highBound.bound.value")
+                                      explainIndexScan, "interval.highBound.bound.1.value")
                                       .toString(false /*includeFieldName*/);
     ASSERT_TRUE((filterVal == "70" && lowBound == "MinKey" && highBound == "90") ||
                 (filterVal == "90" && lowBound == "70" && highBound == "MaxKey"));
@@ -3490,7 +3496,7 @@ TEST(PhysRewriter, IndexResidualReq) {
         "|   PathCompare [Gt]\n"
         "|   Const [0]\n"
         "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': evalTemp_2}, scanDefName: c1, indexDefNa"
-        "me: index1, interval: {>Const [0], >Const [maxKey]}]\n",
+        "me: index1, interval: {>Const [0 | maxKey]}]\n",
         phaseManager);
 }
 
@@ -3573,8 +3579,8 @@ TEST(PhysRewriter, IndexResidualReq1) {
         "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const [0"
-        "], =Const [0], =Const [0], <fully open>}]\n",
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const [0"
+        " | 0 | 0 | minKey], Const [0 | 0 | 0 | maxKey]]}]\n",
         optimized);
 }
 
@@ -3647,7 +3653,7 @@ TEST(PhysRewriter, IndexResidualReq2) {
         "|   PathCompare [Eq]\n"
         "|   Const [0]\n"
         "IndexScan [{'<indexKey> 2': evalTemp_10, '<rid>': rid_0}, scanDefName: c1, indexDefName:"
-        " index1, interval: {=Const [0], <fully open>, <fully open>}]\n",
+        " index1, interval: {[Const [0 | minKey | minKey], Const [0 | maxKey | maxKey]]}]\n",
         optimized);
 }
 
@@ -3788,8 +3794,8 @@ TEST(PhysRewriter, ElemMatchIndex1) {
         "Unique []\n"
         "|   projections: \n"
         "|       rid_0\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const [1"
-        "], (Const [70], Const [90])}]\n",
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {(Const [1"
+        " | 70], Const [1 | 90])}]\n",
         optimized);
 }
 
@@ -3946,7 +3952,7 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
         "|   |   Variable [evalTemp_8]\n"
         "|   PathGet [c] PathTraverse [1] PathCompare [Eq] Const [1]\n"
         "IndexScan [{'<indexKey> 1': evalTemp_8, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
-        "index1, interval: {<fully open>, <fully open>}]\n",
+        "index1, interval: {<fully open>}]\n",
         optimized);
 }
 
@@ -4190,7 +4196,7 @@ TEST(PhysRewriter, PathObj) {
         "|   projections: \n"
         "|       rid_0\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const [{"
-        "}], Const [[]]), <Const [minKey]}]\n",
+        "} | minKey], Const [[] | minKey])}]\n",
         optimized);
 }
 
@@ -4282,9 +4288,9 @@ TEST(PhysRewriter, ArrayConstantIndex) {
         "|   aggregations: \n"
         "Union [{rid_0}]\n"
         "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Cons"
-        "t [0], =Const [[1, 2, 3]]}]\n"
+        "t [0 | [1, 2, 3]]}]\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const [0"
-        "], =Const [1]}]\n",
+        " | 1]}]\n",
         optimized);
 }
 
@@ -6155,8 +6161,8 @@ TEST(PhysRewriter, PerfOnlyPreds1) {
         "|   Seek [ridProjection: rid_0, {'a': pa, 'b': evalTemp_3}, c1]\n"
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const [2"
-        "], <Const [1]}]\n",
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const [2"
+        " | minKey], Const [2 | 1])}]\n",
         optimized);
 }
 

@@ -48,9 +48,9 @@ assert.commandWorked(bulk.execute());
     const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child");
     assertValueOnPath("Union", indexUnionNode, "nodeType");
     assertValueOnPath("IndexScan", indexUnionNode, "children.0.nodeType");
-    assertValueOnPath([2], indexUnionNode, "children.0.interval.0.lowBound.bound.value");
+    assertValueOnPath([2], indexUnionNode, "children.0.interval.lowBound.bound.0.value");
     assertValueOnPath("IndexScan", indexUnionNode, "children.1.nodeType");
-    assertValueOnPath(2, indexUnionNode, "children.1.interval.0.lowBound.bound.value");
+    assertValueOnPath(2, indexUnionNode, "children.1.interval.lowBound.bound.0.value");
 }
 
 {
@@ -59,9 +59,9 @@ assert.commandWorked(bulk.execute());
     const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child");
     assertValueOnPath("Union", indexUnionNode, "nodeType");
     assertValueOnPath("IndexScan", indexUnionNode, "children.0.nodeType");
-    assertValueOnPath(undefined, indexUnionNode, "children.0.interval.0.lowBound.bound.value");
+    assertValueOnPath(undefined, indexUnionNode, "children.0.interval.lowBound.bound.0.value");
     assertValueOnPath("IndexScan", indexUnionNode, "children.1.nodeType");
-    assertValueOnPath([], indexUnionNode, "children.1.interval.0.lowBound.bound.value");
+    assertValueOnPath([], indexUnionNode, "children.1.interval.lowBound.bound.0.value");
 }
 
 assert.commandWorked(t.dropIndex({a: 1}));
@@ -75,8 +75,8 @@ assert.commandWorked(t.createIndex({b: 1, a: 1}));
     const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child");
     assertValueOnPath("Union", indexUnionNode, "nodeType");
     assertValueOnPath("IndexScan", indexUnionNode, "children.0.nodeType");
-    assertValueOnPath([2], indexUnionNode, "children.0.interval.1.lowBound.bound.value");
+    assertValueOnPath([2], indexUnionNode, "children.0.interval.lowBound.bound.1.value");
     assertValueOnPath("IndexScan", indexUnionNode, "children.1.nodeType");
-    assertValueOnPath(2, indexUnionNode, "children.1.interval.1.lowBound.bound.value");
+    assertValueOnPath(2, indexUnionNode, "children.1.interval.lowBound.bound.1.value");
 }
 }());

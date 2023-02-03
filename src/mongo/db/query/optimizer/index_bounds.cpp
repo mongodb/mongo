@@ -44,17 +44,8 @@ BoundRequirement BoundRequirement::makePlusInf() {
     return {true /*inclusive*/, Constant::maxKey()};
 }
 
-BoundRequirement::BoundRequirement(bool inclusive, ABT bound)
-    : _inclusive(inclusive), _bound(std::move(bound)) {
+BoundRequirement::BoundRequirement(bool inclusive, ABT bound) : Base(inclusive, std::move(bound)) {
     assertExprSort(_bound);
-}
-
-bool BoundRequirement::operator==(const BoundRequirement& other) const {
-    return _inclusive == other._inclusive && _bound == other._bound;
-}
-
-bool BoundRequirement::isInclusive() const {
-    return _inclusive;
 }
 
 bool BoundRequirement::isMinusInf() const {
@@ -65,50 +56,78 @@ bool BoundRequirement::isPlusInf() const {
     return _inclusive && _bound == Constant::maxKey();
 }
 
-const ABT& BoundRequirement::getBound() const {
-    return _bound;
-}
-
 IntervalRequirement::IntervalRequirement()
     : IntervalRequirement(BoundRequirement::makeMinusInf(), BoundRequirement::makePlusInf()) {}
 
 IntervalRequirement::IntervalRequirement(BoundRequirement lowBound, BoundRequirement highBound)
-    : _lowBound(std::move(lowBound)), _highBound(std::move(highBound)) {}
-
-bool IntervalRequirement::operator==(const IntervalRequirement& other) const {
-    return _lowBound == other._lowBound && _highBound == other._highBound;
-}
+    : Base(std::move(lowBound), std::move(highBound)) {}
 
 bool IntervalRequirement::isFullyOpen() const {
     return _lowBound.isMinusInf() && _highBound.isPlusInf();
 }
 
-bool IntervalRequirement::isEquality() const {
-    return _lowBound.isInclusive() && _highBound.isInclusive() && _lowBound == _highBound;
-}
-
-const BoundRequirement& IntervalRequirement::getLowBound() const {
-    return _lowBound;
-}
-
-BoundRequirement& IntervalRequirement::getLowBound() {
-    return _lowBound;
-}
-
-const BoundRequirement& IntervalRequirement::getHighBound() const {
-    return _highBound;
-}
-
-BoundRequirement& IntervalRequirement::getHighBound() {
-    return _highBound;
-}
-
-void IntervalRequirement::reverse() {
-    std::swap(_lowBound, _highBound);
-}
-
 bool IntervalRequirement::isConstant() const {
     return getLowBound().getBound().is<Constant>() && getHighBound().getBound().is<Constant>();
+}
+
+bool isIntervalReqFullyOpenDNF(const IntervalReqExpr::Node& n) {
+    if (auto singular = IntervalReqExpr::getSingularDNF(n); singular && singular->isFullyOpen()) {
+        return true;
+    }
+    return false;
+}
+
+CompoundBoundRequirement::CompoundBoundRequirement(bool inclusive, ABTVector bound)
+    : Base(inclusive, std::move(bound)) {
+    for (const auto& expr : _bound) {
+        assertExprSort(expr);
+    }
+}
+
+bool CompoundBoundRequirement::isMinusInf() const {
+    return _inclusive && std::all_of(_bound.cbegin(), _bound.cend(), [](const ABT& element) {
+               return element == Constant::minKey();
+           });
+}
+
+bool CompoundBoundRequirement::isPlusInf() const {
+    return _inclusive && std::all_of(_bound.cbegin(), _bound.cend(), [](const ABT& element) {
+               return element == Constant::maxKey();
+           });
+}
+
+bool CompoundBoundRequirement::isConstant() const {
+    return std::all_of(
+        _bound.cbegin(), _bound.cend(), [](const ABT& element) { return element.is<Constant>(); });
+}
+
+size_t CompoundBoundRequirement::size() const {
+    return _bound.size();
+}
+
+void CompoundBoundRequirement::push_back(BoundRequirement bound) {
+    _inclusive &= bound.isInclusive();
+    _bound.push_back(std::move(bound.getBound()));
+}
+
+CompoundIntervalRequirement::CompoundIntervalRequirement()
+    : CompoundIntervalRequirement({true /*inclusive*/, {}}, {true /*inclusive*/, {}}) {}
+
+CompoundIntervalRequirement::CompoundIntervalRequirement(CompoundBoundRequirement lowBound,
+                                                         CompoundBoundRequirement highBound)
+    : Base(std::move(lowBound), std::move(highBound)) {}
+
+bool CompoundIntervalRequirement::isFullyOpen() const {
+    return _lowBound.isMinusInf() && _highBound.isPlusInf();
+}
+
+size_t CompoundIntervalRequirement::size() const {
+    return _lowBound.size();
+}
+
+void CompoundIntervalRequirement::push_back(IntervalRequirement interval) {
+    _lowBound.push_back(std::move(interval.getLowBound()));
+    _highBound.push_back(std::move(interval.getHighBound()));
 }
 
 PartialSchemaKey::PartialSchemaKey(ABT path) : PartialSchemaKey(boost::none, std::move(path)) {}
@@ -124,13 +143,6 @@ PartialSchemaKey::PartialSchemaKey(boost::optional<ProjectionName> projectionNam
 
 bool PartialSchemaKey::operator==(const PartialSchemaKey& other) const {
     return _projectionName == other._projectionName && _path == other._path;
-}
-
-bool isIntervalReqFullyOpenDNF(const IntervalReqExpr::Node& n) {
-    if (auto singular = IntervalReqExpr::getSingularDNF(n); singular && singular->isFullyOpen()) {
-        return true;
-    }
-    return false;
 }
 
 PartialSchemaRequirement::PartialSchemaRequirement(

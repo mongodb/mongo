@@ -37,48 +37,154 @@
 
 namespace mongo::optimizer {
 
-class BoundRequirement {
+/**
+ * Generic bound.
+ */
+template <class T>
+class Bound {
+public:
+    Bound(bool inclusive, T bound) : _inclusive(inclusive), _bound(std::move(bound)) {}
+
+    bool operator==(const Bound& other) const {
+        return _inclusive == other._inclusive && _bound == other._bound;
+    }
+
+    bool isInclusive() const {
+        return _inclusive;
+    }
+
+    const T& getBound() const {
+        return _bound;
+    }
+    T& getBound() {
+        return _bound;
+    }
+
+protected:
+    bool _inclusive;
+    T _bound;
+};
+
+/**
+ * Generic interval.
+ */
+template <class T>
+class Interval {
+public:
+    Interval(T lowBound, T highBound)
+        : _lowBound(std::move(lowBound)), _highBound(std::move(highBound)) {}
+
+    bool operator==(const Interval& other) const {
+        return _lowBound == other._lowBound && _highBound == other._highBound;
+    }
+
+    bool isEquality() const {
+        return _lowBound.isInclusive() && _highBound.isInclusive() && _lowBound == _highBound;
+    }
+
+    void reverse() {
+        std::swap(_lowBound, _highBound);
+    }
+
+    const T& getLowBound() const {
+        return _lowBound;
+    }
+    T& getLowBound() {
+        return _lowBound;
+    }
+
+    const T& getHighBound() const {
+        return _highBound;
+    }
+    T& getHighBound() {
+        return _highBound;
+    }
+
+protected:
+    T _lowBound;
+    T _highBound;
+};
+
+/**
+ * Represents a bound in an simple interval (interval over one projection). The bound can be a
+ * constant or an expression (e.g. a formula). This is a logical abstraction.
+ */
+class BoundRequirement : public Bound<ABT> {
+    using Base = Bound<ABT>;
+
 public:
     static BoundRequirement makeMinusInf();
     static BoundRequirement makePlusInf();
 
     BoundRequirement(bool inclusive, ABT bound);
 
-    bool operator==(const BoundRequirement& other) const;
-
-    bool isInclusive() const;
-
     bool isMinusInf() const;
     bool isPlusInf() const;
-
-    const ABT& getBound() const;
-
-private:
-    bool _inclusive;
-    ABT _bound;
 };
 
-class IntervalRequirement {
+/**
+ * Represents a simple interval (interval over one projection). This is a logical abstraction. It
+ * counts low and high bounds which may be inclusive or exclusive.
+ */
+class IntervalRequirement : public Interval<BoundRequirement> {
+    using Base = Interval<BoundRequirement>;
+
 public:
     IntervalRequirement();
     IntervalRequirement(BoundRequirement lowBound, BoundRequirement highBound);
 
-    bool operator==(const IntervalRequirement& other) const;
-
     bool isFullyOpen() const;
-    bool isEquality() const;
-    void reverse();
+    bool isConstant() const;
+};
+
+/**
+ * Represents an expression (consisting of possibly nested unions and intersections) over an
+ * interval.
+ */
+using IntervalReqExpr = BoolExpr<IntervalRequirement>;
+bool isIntervalReqFullyOpenDNF(const IntervalReqExpr::Node& n);
+
+/**
+ * Represents a bound in a compound interval, which encodes an equality prefix. It consists of a
+ * vector of expressions, which represents an index bound. This is a physical abstraction.
+ */
+class CompoundBoundRequirement : public Bound<ABTVector> {
+    using Base = Bound<ABTVector>;
+
+public:
+    CompoundBoundRequirement(bool inclusive, ABTVector bound);
+
+    bool isMinusInf() const;
+    bool isPlusInf() const;
     bool isConstant() const;
 
-    const BoundRequirement& getLowBound() const;
-    BoundRequirement& getLowBound();
-    const BoundRequirement& getHighBound() const;
-    BoundRequirement& getHighBound();
+    size_t size() const;
 
-private:
-    BoundRequirement _lowBound;
-    BoundRequirement _highBound;
+    // Extend the current compound bound with a simple bound. It is the caller's responsibility to
+    // ensure we confirm to an equality prefix.
+    void push_back(BoundRequirement bound);
 };
+
+/**
+ * An interval of compound keys: each endpoint is a compound key, with one expression per index key.
+ * This is a physical primitive tied to a specific index.
+ */
+class CompoundIntervalRequirement : public Interval<CompoundBoundRequirement> {
+    using Base = Interval<CompoundBoundRequirement>;
+
+public:
+    CompoundIntervalRequirement();
+    CompoundIntervalRequirement(CompoundBoundRequirement lowBound,
+                                CompoundBoundRequirement highBound);
+
+    bool isFullyOpen() const;
+
+    size_t size() const;
+    void push_back(IntervalRequirement interval);
+};
+
+// Unions and conjunctions of individual compound intervals.
+using CompoundIntervalReqExpr = BoolExpr<CompoundIntervalRequirement>;
 
 struct PartialSchemaKey {
     PartialSchemaKey(ABT path);
@@ -96,9 +202,6 @@ struct PartialSchemaKey {
     // (Partially determined) path.
     ABT _path;
 };
-
-using IntervalReqExpr = BoolExpr<IntervalRequirement>;
-bool isIntervalReqFullyOpenDNF(const IntervalReqExpr::Node& n);
 
 class PartialSchemaRequirement {
 public:
@@ -289,21 +392,6 @@ struct ResidualRequirementWithCE {
     CEType _ce;
 };
 using ResidualRequirementsWithCE = std::vector<ResidualRequirementWithCE>;
-
-
-// A sequence of intervals corresponding to a compound bound, with one entry for each index key.
-// This is a physical primitive as it is tied to a specific index. It contains a sequence of simple
-// bounds which form a single equality prefix. As such the first 0+ entries are inclusive
-// (equalities), followed by 0/1 possibly exclusive ranges, followed by 0+ unconstrained entries
-// (MinKey to MaxKey). When the IndexNode is lowered we need to compute a global inclusion/exclusion
-// for the entire compound interval, and we do so by determining if there are ANY exclusive simple
-// low bounds or high bounds. In this case the compound bound is exclusive (on the low or the high
-// side respectively).
-// TODO: SERVER-72784: Update representation of compound index bounds.
-using CompoundIntervalRequirement = std::vector<IntervalRequirement>;
-
-// Unions and conjunctions of individual compound intervals.
-using CompoundIntervalReqExpr = BoolExpr<CompoundIntervalRequirement>;
 
 struct EqualityPrefixEntry {
     EqualityPrefixEntry(size_t startPos);

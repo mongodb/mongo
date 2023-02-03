@@ -1107,7 +1107,7 @@ std::unique_ptr<sbe::EExpression> SBENodeLowering::convertBoundsToExpr(
     SlotVarMap& slotMap,
     const bool isLower,
     const IndexDefinition& indexDef,
-    const CompoundIntervalRequirement& interval) {
+    const CompoundBoundRequirement& bound) {
     std::vector<std::unique_ptr<sbe::EExpression>> ksFnArgs;
     ksFnArgs.emplace_back(
         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
@@ -1119,29 +1119,21 @@ std::unique_ptr<sbe::EExpression> SBENodeLowering::convertBoundsToExpr(
                                    sbe::value::bitcastFrom<uint32_t>(indexDef.getOrdering())));
 
     auto exprLower = getExpressionLowering(slotMap);
-    bool inclusive = true;
-    bool fullyInfinite = true;
-    for (const auto& entry : interval) {
-        const BoundRequirement& entryBound = isLower ? entry.getLowBound() : entry.getHighBound();
-        if (!entryBound.isMinusInf() && !entryBound.isPlusInf()) {
-            fullyInfinite = false;
-            if (!entryBound.isInclusive()) {
-                inclusive = false;
-            }
-        }
-
-        auto boundExpr = exprLower.optimize(entryBound.getBound());
-        ksFnArgs.emplace_back(std::move(boundExpr));
+    for (const auto& expr : bound.getBound()) {
+        ksFnArgs.emplace_back(exprLower.optimize(expr));
     }
-    if (fullyInfinite && !isLower) {
+    if (!isLower && (bound.isMinusInf() || bound.isPlusInf())) {
         // We can skip if fully infinite only for upper bound. For lower bound we need to generate
         // minkeys.
         return nullptr;
     };
 
+    const auto discriminator = (isLower == bound.isInclusive())
+        ? KeyString::Discriminator::kExclusiveBefore
+        : KeyString::Discriminator::kExclusiveAfter;
     ksFnArgs.emplace_back(sbe::makeE<sbe::EConstant>(
         sbe::value::TypeTags::NumberInt64,
-        sbe::value::bitcastFrom<int64_t>((isLower == inclusive) ? 1 : 2)));
+        sbe::value::bitcastFrom<int64_t>(static_cast<int64_t>(discriminator))));
     return sbe::makeE<sbe::EFunction>("ks", toInlinedVector(std::move(ksFnArgs)));
 }
 
@@ -1182,15 +1174,16 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n,
     }
 
     const auto& interval = n.getIndexInterval();
-    auto lowerBoundExpr = convertBoundsToExpr(slotMap, true /*isLower*/, indexDef, interval);
-    auto upperBoundExpr = convertBoundsToExpr(slotMap, false /*isLower*/, indexDef, interval);
+    auto lowerBoundExpr =
+        convertBoundsToExpr(slotMap, true /*isLower*/, indexDef, interval.getLowBound());
+    auto upperBoundExpr =
+        convertBoundsToExpr(slotMap, false /*isLower*/, indexDef, interval.getHighBound());
     tassert(6624234,
             "Invalid bounds combination",
             lowerBoundExpr != nullptr || upperBoundExpr == nullptr);
 
     const bool reverse = n.isIndexReverseOrder();
     if (reverse) {
-        // TODO: SERVER-72784: implement bounds as vector of values, move reversal to impl. phase.
         std::swap(lowerBoundExpr, upperBoundExpr);
     }
 

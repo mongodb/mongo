@@ -37,5 +37,5 @@ assert.eq(numResults, res.executionStats.nReturned);
 
 const indexScanNode = navigateToPlanPath(res, "child.child.child.leftChild.child.child");
 assertValueOnPath("IndexScan", indexScanNode, "nodeType");
-assertValueOnPath(5, indexScanNode, "interval.0.highBound.bound.value");
+assertValueOnPath(5, indexScanNode, "interval.highBound.bound.0.value");
 }());

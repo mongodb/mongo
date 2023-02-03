@@ -2248,9 +2248,9 @@ public:
         const auto& currentCorrelatedProjNames = params._correlatedProjNames;
         // Update interval with current correlations.
         for (size_t i = 0; i < startPos; i++) {
-            BoundRequirement bound{true /*inclusive*/,
-                                   make<Variable>(currentCorrelatedProjNames.at(i))};
-            interval.at(i) = {bound, bound};
+            auto& lowBound = interval.getLowBound().getBound().at(i);
+            lowBound = make<Variable>(currentCorrelatedProjNames.at(i));
+            interval.getHighBound().getBound().at(i) = lowBound;
         }
 
         if (_currentEqPrefixIndex + 1 == _eqPrefixes.size()) {
@@ -2276,11 +2276,15 @@ public:
         FieldProjectionMap innerFPM;
 
         const auto addInnerBound = [&](BoundRequirement bound) {
-            const auto& req = interval.at(innerInterval.size());
+            const size_t size = innerInterval.size();
             if (reverse) {
-                innerInterval.emplace_back(req.getLowBound(), std::move(bound));
+                BoundRequirement lowBound{false /*inclusive*/,
+                                          interval.getLowBound().getBound().at(size)};
+                innerInterval.push_back({std::move(lowBound), std::move(bound)});
             } else {
-                innerInterval.emplace_back(std::move(bound), req.getHighBound());
+                BoundRequirement highBound{false /*inclusive*/,
+                                           interval.getHighBound().getBound().at(size)};
+                innerInterval.push_back({std::move(bound), std::move(highBound)});
             }
         };
 

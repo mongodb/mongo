@@ -893,91 +893,115 @@ public:
         return printer;
     }
 
-    void printInterval(ExplainPrinter& printer, const IntervalRequirement& interval) {
-        const BoundRequirement& lowBound = interval.getLowBound();
-        const BoundRequirement& highBound = interval.getHighBound();
-
+    void printBound(ExplainPrinter& printer, const BoundRequirement& bound) {
         if constexpr (version < ExplainVersion::V3) {
-            const auto printBoundFn = [](ExplainPrinter& printer, const ABT& bound) {
-                // Since we are printing on a single level, use V1 printer in order to avoid
-                // children being reversed.
-                ExplainGeneratorTransporter<ExplainVersion::V1> gen;
-                auto boundPrinter = gen.generate(bound);
-                printer.printSingleLevel(boundPrinter);
-            };
+            // Since we are printing on a single level, use V1 printer in order to avoid children
+            // being reversed. Also note that we are specifically not printing inclusive flag here.
+            // The inclusion is explained by the caller.
 
-            // Shortened output for half-open, fully open and point intervals.
-            if (interval.isFullyOpen()) {
-                printer.print("<fully open>");
-            } else if (interval.isEquality()) {
-                printer.print("=");
-                printBoundFn(printer, lowBound.getBound());
-            } else if (lowBound.isMinusInf()) {
-                printer.print("<");
-                if (highBound.isInclusive()) {
-                    printer.print("=");
-                }
-                printBoundFn(printer, highBound.getBound());
-            } else if (highBound.isPlusInf()) {
-                printer.print(">");
-                if (lowBound.isInclusive()) {
-                    printer.print("=");
-                }
-                printBoundFn(printer, lowBound.getBound());
-            } else {
-                // Output for a generic interval.
-
-                printer.print(lowBound.isInclusive() ? "[" : "(");
-                printBoundFn(printer, lowBound.getBound());
-
-                printer.print(", ");
-                printBoundFn(printer, highBound.getBound());
-
-                printer.print(highBound.isInclusive() ? "]" : ")");
-            }
+            ExplainGeneratorTransporter<ExplainVersion::V1> gen;
+            auto boundPrinter = gen.generate(bound.getBound());
+            printer.printSingleLevel(boundPrinter);
         } else if constexpr (version == ExplainVersion::V3) {
-            ExplainPrinter lowBoundPrinter;
-            lowBoundPrinter.fieldName("inclusive").print(lowBound.isInclusive());
+            printer.fieldName("inclusive").print(bound.isInclusive());
             {
-                ExplainPrinter boundPrinter = generate(lowBound.getBound());
-                lowBoundPrinter.fieldName("bound").print(boundPrinter);
+                ExplainPrinter boundPrinter = generate(bound.getBound());
+                printer.fieldName("bound").print(boundPrinter);
             }
-
-            ExplainPrinter highBoundPrinter;
-            highBoundPrinter.fieldName("inclusive").print(highBound.isInclusive());
-            {
-                ExplainPrinter boundPrinter = generate(highBound.getBound());
-                highBoundPrinter.fieldName("bound").print(boundPrinter);
-            }
-
-            printer.fieldName("lowBound")
-                .print(lowBoundPrinter)
-                .fieldName("highBound")
-                .print(highBoundPrinter);
         } else {
             MONGO_UNREACHABLE;
         }
     }
 
-    void printInterval(ExplainPrinter& printer, const CompoundIntervalRequirement& interval) {
+    void printBound(ExplainPrinter& printer, const CompoundBoundRequirement& bound) {
         if constexpr (version < ExplainVersion::V3) {
+            const bool manyConstants = bound.size() > 1 && bound.isConstant();
+            if (manyConstants) {
+                printer.print("Const [");
+            }
+
             bool first = true;
-            for (const auto& entry : interval) {
+            for (const auto& entry : bound.getBound()) {
                 if (first) {
                     first = false;
                 } else {
-                    printer.print(", ");
+                    printer.print(" | ");
                 }
-                printInterval(printer, entry);
+
+                if (manyConstants) {
+                    std::ostringstream os;
+                    os << entry.cast<Constant>()->get();
+                    printer.print(os.str());
+                } else {
+                    ExplainGeneratorTransporter<ExplainVersion::V1> gen;
+                    auto boundPrinter = gen.generate(entry);
+                    printer.printSingleLevel(boundPrinter);
+                }
+            }
+
+            if (manyConstants) {
+                printer.print("]");
             }
         } else if constexpr (version == ExplainVersion::V3) {
+            printer.fieldName("inclusive").print(bound.isInclusive());
+
             std::vector<ExplainPrinter> printers;
-            for (const auto& entry : interval) {
-                ExplainPrinter local;
-                printInterval(local, entry);
-                printers.push_back(std::move(local));
+            for (const auto& entry : bound.getBound()) {
+                printers.push_back(generate(entry));
             }
-            printer.print(printers);
+            printer.fieldName("bound").print(printers);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+    }
+
+    template <class T>
+    void printInterval(ExplainPrinter& printer, const T& interval) {
+        const auto& lowBound = interval.getLowBound();
+        const auto& highBound = interval.getHighBound();
+
+        if constexpr (version < ExplainVersion::V3) {
+            // Shortened output for half-open, fully open and point intervals.
+            if (interval.isFullyOpen()) {
+                printer.print("<fully open>");
+            } else if (interval.isEquality()) {
+                printer.print("=");
+                printBound(printer, lowBound);
+            } else if (lowBound.isMinusInf()) {
+                printer.print("<");
+                if (highBound.isInclusive()) {
+                    printer.print("=");
+                }
+                printBound(printer, highBound);
+            } else if (highBound.isPlusInf()) {
+                printer.print(">");
+                if (lowBound.isInclusive()) {
+                    printer.print("=");
+                }
+                printBound(printer, lowBound);
+            } else {
+                // Output for a generic interval.
+
+                printer.print(lowBound.isInclusive() ? "[" : "(");
+                printBound(printer, lowBound);
+
+                printer.print(", ");
+                printBound(printer, highBound);
+
+                printer.print(highBound.isInclusive() ? "]" : ")");
+            }
+        } else if constexpr (version == ExplainVersion::V3) {
+            ExplainPrinter lowBoundPrinter;
+            printBound(lowBoundPrinter, lowBound);
+            ExplainPrinter highBoundPrinter;
+            printBound(highBoundPrinter, highBound);
+
+            ExplainPrinter local;
+            local.fieldName("lowBound")
+                .print(lowBoundPrinter)
+                .fieldName("highBound")
+                .print(highBoundPrinter);
+            printer.print(local);
         } else {
             MONGO_UNREACHABLE;
         }
@@ -2862,7 +2886,7 @@ std::string ExplainGenerator::explainInterval(const IntervalRequirement& interva
     return gen.printInterval(interval);
 }
 
-std::string explainInterval(const CompoundIntervalRequirement& interval) {
+std::string ExplainGenerator::explainInterval(const CompoundIntervalRequirement& interval) {
     ExplainGeneratorV2 gen;
     return gen.printInterval(interval);
 }

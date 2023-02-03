@@ -147,14 +147,13 @@ BENCHMARK_F(ABTNodeLoweringFixture, BM_LowerPhysicalScan)(benchmark::State& stat
 }
 
 BENCHMARK_F(ABTNodeLoweringFixture, BM_LowerIndexScanAndSeek)(benchmark::State& state) {
-    auto indexScan =
-        _node(make<IndexScanNode>(FieldProjectionMap{{ProjectionName{"rid"}}, {}, {}},
-                                  "collName",
-                                  "idx",
-                                  CompoundIntervalRequirement{IntervalRequirement(
-                                      BoundRequirement(false, Constant::fromDouble(23)),
-                                      BoundRequirement(true, Constant::fromDouble(35)))},
-                                  false));
+    auto indexScan = _node(
+        make<IndexScanNode>(FieldProjectionMap{{ProjectionName{"rid"}}, {}, {}},
+                            "collName",
+                            "idx",
+                            CompoundIntervalRequirement{{false, makeSeq(Constant::fromDouble(23))},
+                                                        {true, makeSeq(Constant::fromDouble(35))}},
+                            false));
 
     auto seek = _node(make<LimitSkipNode>(
         properties::LimitSkipRequirement(1, 0),
