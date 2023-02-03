@@ -245,22 +245,22 @@ function testMonotonicity(conn, dbName, collName, currentShardKey, testCases, nu
         const isClusteredColl =
             listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
 
-        const expectedMonotonicity = isClusteredColl ? "unknown" : testCase.expected;
-        assert.eq(res.monotonicity, expectedMonotonicity, res);
+        const expectedType = isClusteredColl ? "unknown" : testCase.expected;
+        assert.eq(res.monotonicity.type, expectedType, res);
 
-        if (expectedMonotonicity == "unknown") {
-            assert(!res.hasOwnProperty("recordIdCorrelationCoefficient"));
+        if (expectedType == "unknown") {
+            assert(!res.monotonicity.hasOwnProperty("recordIdCorrelationCoefficient"));
         } else {
-            assert(res.hasOwnProperty("recordIdCorrelationCoefficient"));
+            assert(res.monotonicity.hasOwnProperty("recordIdCorrelationCoefficient"));
 
-            if (expectedMonotonicity == "monotonic") {
-                assert.gte(Math.abs(res.recordIdCorrelationCoefficient),
+            if (expectedType == "monotonic") {
+                assert.gte(Math.abs(res.monotonicity.recordIdCorrelationCoefficient),
                            correlationCoefficientThreshold);
-            } else if (expectedMonotonicity == "not monotonic") {
-                assert.lt(Math.abs(res.recordIdCorrelationCoefficient),
+            } else if (expectedType == "not monotonic") {
+                assert.lt(Math.abs(res.monotonicity.recordIdCorrelationCoefficient),
                           correlationCoefficientThreshold);
             } else {
-                throw new Error("Unknown expected monotonicity '" + expectedMonotonicity + "'");
+                throw new Error("Unknown expected monotonicity '" + expectedType + "'");
             }
         }
 

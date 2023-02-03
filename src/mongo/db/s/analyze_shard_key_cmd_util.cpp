@@ -275,11 +275,6 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequency(OperationContext* o
     return metrics;
 }
 
-struct MonotonicityMetrics {
-    MonotonicityTypeEnum type;
-    boost::optional<double> correlationCoefficient = boost::none;
-};
-
 /**
  * Returns the monotonicity metrics for the given shard key, i.e. whether the value of the given
  * shard key is monotonically changing in insertion order and the RecordId correlation coefficient
@@ -292,13 +287,13 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
     MonotonicityMetrics metrics;
 
     if (collection->isClustered()) {
-        metrics.type = MonotonicityTypeEnum::kUnknown;
+        metrics.setType(MonotonicityTypeEnum::kUnknown);
         return metrics;
     }
 
     if (KeyPattern::isHashedKeyPattern(shardKey) && shardKey.nFields() == 1) {
-        metrics.type = MonotonicityTypeEnum::kNotMonotonic;
-        metrics.correlationCoefficient = 0;
+        metrics.setType(MonotonicityTypeEnum::kNotMonotonic);
+        metrics.setRecordIdCorrelationCoefficient(0);
         return metrics;
     }
 
@@ -309,7 +304,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
                                            /*requireSingleKey=*/true);
 
     if (!index) {
-        metrics.type = MonotonicityTypeEnum::kUnknown;
+        metrics.setType(MonotonicityTypeEnum::kUnknown);
         return metrics;
     }
     // Non-clustered indexes always have an associated IndexDescriptor.
@@ -347,27 +342,27 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
     invariant(recordIds.size() > 0);
 
     if (recordIds.size() == 1) {
-        metrics.type = MonotonicityTypeEnum::kNotMonotonic;
-        metrics.correlationCoefficient = 0;
+        metrics.setType(MonotonicityTypeEnum::kNotMonotonic);
+        metrics.setRecordIdCorrelationCoefficient(0);
         return metrics;
     }
 
-    metrics.correlationCoefficient = [&] {
+    metrics.setRecordIdCorrelationCoefficient([&] {
         auto& y = recordIds;
         std::vector<int64_t> x(y.size());
         std::iota(x.begin(), x.end(), 1);
         return round(boost::math::statistics::correlation_coefficient<std::vector<int64_t>>(x, y),
                      kMaxNumDecimalPlaces);
-    }();
+    }());
     auto coefficientThreshold = gMonotonicityCorrelationCoefficientThreshold.load();
     LOGV2(6875302,
           "Calculating monotonicity",
-          "coefficient"_attr = metrics.correlationCoefficient,
+          "coefficient"_attr = metrics.getRecordIdCorrelationCoefficient(),
           "coefficientThreshold"_attr = coefficientThreshold);
 
-    metrics.type = abs(*metrics.correlationCoefficient) >= coefficientThreshold
-        ? MonotonicityTypeEnum::kMonotonic
-        : MonotonicityTypeEnum::kNotMonotonic;
+    metrics.setType(abs(*metrics.getRecordIdCorrelationCoefficient()) >= coefficientThreshold
+                        ? MonotonicityTypeEnum::kMonotonic
+                        : MonotonicityTypeEnum::kNotMonotonic);
 
     return metrics;
 }
@@ -524,8 +519,7 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
         metrics.setIsUnique(shardKeyBson.nFields() == indexKeyBson.nFields() ? indexSpec->isUnique
                                                                              : false);
         auto monotonicityMetrics = calculateMonotonicity(opCtx, *collection, shardKeyBson);
-        metrics.setMonotonicity(monotonicityMetrics.type);
-        metrics.setRecordIdCorrelationCoefficient(monotonicityMetrics.correlationCoefficient);
+        metrics.setMonotonicity(monotonicityMetrics);
     }
 
     auto cardinalityFrequencyMetrics = calculateCardinalityAndFrequency(

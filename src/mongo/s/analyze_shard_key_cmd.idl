@@ -63,6 +63,24 @@ structs:
         type: long
         validator: { gte: 0 }
 
+  MonotonicityMetrics:
+    description: "The metrics about the monotonicity of a shard key, i.e. whether its value is
+                  monotonically changing in insertion order."
+    strict: false
+    fields:
+      recordIdCorrelationCoefficient:
+        type: double
+        description: "The RecordId correlation coefficient calculated by the monotonicity check.
+                      This is only set if the monotonicity check occurred, i.e. if the shard key
+                      has a supporting index and the collection is not clustered."
+        validator:
+          gte: -1
+          lte: 1
+        optional: true
+      type:
+        type: MonotonicityType
+        description: "The monotonicity type."
+
   KeyCharacteristicsMetrics:
     description: "The metrics about the characteristics of a shard key."
     strict: false
@@ -87,17 +105,8 @@ structs:
                       value."
         optional: true
       monotonicity:
-        type: MonotonicityType
-        description: "The monotonicity of the shard key values in insertion order."
-        optional: true
-      recordIdCorrelationCoefficient:
-        type: double
-        description: "The RecordId correlation coefficient calculated by the monotonicity check.
-                      This is only set if the monotonicity check occurred, i.e. if the shard key
-                      has a supporting index and the collection is not clustered."
-        validator:
-          gte: -1
-          lte: 1
+        type: MonotonicityMetrics
+        description: "The monotonicity metrics for the shard key."
         optional: true
       numOrphanDocs:
         type: long
