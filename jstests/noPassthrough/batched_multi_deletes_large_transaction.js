@@ -96,18 +96,5 @@ assert(ops[1].hasOwnProperty('prevOpTime'));
 assert.eq(ops[0].prevOpTime.ts, ops[1].ts);
 assert.eq(ops[1].prevOpTime.ts, Timestamp());
 
-// Secondary oplog application will reject the first applyOps entry in the oplog chain because it
-// is expecting a multi-document transaction with the 'lsid' and 'txnNumber' fields.
-// TODO(SERVER-70572): Remove this check when oplog application supports chained applyOps entries
-// for batch writes.
-assert.soon(function() {
-    return rawMongoProgramOutput().search(/Invariant failure.*op\.getSessionId\(\)/) >= 0;
-});
-const secondary = rst.getSecondary();
-rst.stop(secondary, /*signal=*/undefined, {allowedExitCode: MongoRunner.EXIT_ABORT});
-
-// TODO(SERVER-70572): Secondary oplog application cannot apply chain of applyOps oplog entries
-// for batched writes, so the collections in a replica set will be inconsistent.
-// Therefore, we skip checking collection/db hashes across a replica set until this is resolved.
-rst.stopSet(/*signal=*/undefined, /*forRestart=*/false, {skipCheckDBHashes: true});
+rst.stopSet();
 })();
