@@ -817,6 +817,7 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
                 auto* partialTxnList = getPartialTxnList(op);
                 _addOplogChainOpsToWriterVectors(
                     opCtx, partialTxnList, derivedOps, &op, &collPropertiesCache, writerVectors);
+                invariant(partialTxnList->empty(), op.toStringForLogging());
                 continue;
             }
             if (op.isPreparedCommit() &&
