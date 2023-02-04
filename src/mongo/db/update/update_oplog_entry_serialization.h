@@ -33,8 +33,7 @@
 #include "mongo/db/update/update_oplog_entry_version.h"
 
 /**
- * This provides helpers for creating oplog entries. To create a $v: 1 modifier-style oplog
- * entry, a LogBuilder must be used instead.
+ * This provides helpers for creating oplog entries.
  */
 namespace mongo::update_oplog_entry {
 static inline constexpr StringData kDiffObjectFieldName = "diff"_sd;
@@ -51,7 +50,6 @@ constexpr size_t kSizeOfDeltaOplogEntryMetadata = 15;
  */
 enum class UpdateType {
     kReplacement,
-    kV1Modifier,
     kV2Delta,
 };
 

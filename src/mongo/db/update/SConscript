@@ -169,6 +169,7 @@ env.CppUnitTest(
         'update_array_node_test.cpp',
         'update_driver_test.cpp',
         'update_object_node_test.cpp',
+        'update_oplog_entry_serialization_test.cpp',
         'update_serialization_test.cpp',
         'v2_log_builder_test.cpp',
     ],

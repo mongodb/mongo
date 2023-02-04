@@ -202,12 +202,20 @@ public:
                              const BSONObj& spec = kDefaultSpec,
                              const boost::optional<Document> expectedInvalidate = {},
                              const std::vector<repl::OplogEntry> transactionEntries = {},
-                             std::vector<Document> documentsForLookup = {}) {
+                             std::vector<Document> documentsForLookup = {},
+                             const boost::optional<std::int32_t> expectedErrorCode = {}) {
         vector<intrusive_ptr<DocumentSource>> stages = makeStages(entry.getEntry().toBSON(), spec);
         auto lastStage = stages.back();
 
         getExpCtx()->mongoProcessInterface =
             std::make_unique<MockMongoInterface>(transactionEntries, std::move(documentsForLookup));
+
+        if (expectedErrorCode) {
+            ASSERT_THROWS_CODE(lastStage->getNext(),
+                               AssertionException,
+                               ErrorCodes::Error(expectedErrorCode.get()));
+            return;
+        }
 
         auto next = lastStage->getNext();
         // Match stage should pass the doc down if expectedDoc is given.
@@ -743,7 +751,8 @@ TEST_F(ChangeStreamStageTest, TransformInsertFromMigrateShowMigrations) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformUpdateFields) {
-    BSONObj o = BSON("$set" << BSON("y" << 1));
+    BSONObj diff = BSON("u" << BSON("y" << 1));
+    BSONObj o = BSON("diff" << diff << "$v" << 2);
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto updateField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                       nss,                  // namespace
@@ -752,13 +761,19 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFields) {
                                       boost::none,          // fromMigrate
                                       o2);                  // o2
 
-    const auto expectedUpdateField = makeExpectedUpdateEvent(
-        kDefaultTs, nss, o2, D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}});
+    const auto expectedUpdateField = makeExpectedUpdateEvent(kDefaultTs,
+                                                             nss,
+                                                             o2,
+                                                             D{{"updatedFields", D{{"y", 1}}},
+                                                               {"removedFields", vector<V>()},
+                                                               {"truncatedArrays", vector<V>()}});
+
     checkTransformation(updateField, expectedUpdateField);
 }
 
 TEST_F(ChangeStreamStageTest, TransformUpdateFieldsShowExpandedEvents) {
-    BSONObj o = BSON("$set" << BSON("y" << 1));
+    BSONObj diff = BSON("u" << BSON("y" << 1));
+    BSONObj o = BSON("diff" << diff << "$v" << 2);
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto updateField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                       nss,                  // namespace
@@ -767,12 +782,14 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFieldsShowExpandedEvents) {
                                       boost::none,          // fromMigrate
                                       o2);                  // o2
 
-    const auto expectedUpdateField =
-        makeExpectedUpdateEvent(kDefaultTs,
-                                nss,
-                                o2,
-                                D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}},
-                                true /* expanded events */);
+    const auto expectedUpdateField = makeExpectedUpdateEvent(kDefaultTs,
+                                                             nss,
+                                                             o2,
+                                                             D{{"updatedFields", D{{"y", 1}}},
+                                                               {"removedFields", vector<V>()},
+                                                               {"truncatedArrays", vector<V>()},
+                                                               {"disambiguatedPaths", D{}}},
+                                                             true /* expanded events */);
     checkTransformation(updateField, expectedUpdateField, kShowExpandedEventsSpec);
 }
 
@@ -905,7 +922,8 @@ TEST_F(ChangeStreamStageTest, TransformDeltaOplogNestedComplexSubDiffs) {
 // Legacy documents might not have an _id field; then the document key is the full (post-update)
 // document.
 TEST_F(ChangeStreamStageTest, TransformUpdateFieldsLegacyNoId) {
-    BSONObj o = BSON("$set" << BSON("y" << 1));
+    BSONObj diff = BSON("u" << BSON("y" << 1));
+    BSONObj o = BSON("diff" << diff << "$v" << 2);
     BSONObj o2 = BSON("x" << 1 << "y" << 1);
     auto updateField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                       nss,                  // namespace
@@ -914,13 +932,18 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFieldsLegacyNoId) {
                                       boost::none,          // fromMigrate
                                       o2);                  // o2
 
-    const auto expectedUpdateField = makeExpectedUpdateEvent(
-        kDefaultTs, nss, o2, D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}});
+    const auto expectedUpdateField = makeExpectedUpdateEvent(kDefaultTs,
+                                                             nss,
+                                                             o2,
+                                                             D{{"updatedFields", D{{"y", 1}}},
+                                                               {"removedFields", vector<V>()},
+                                                               {"truncatedArrays", vector<V>()}});
     checkTransformation(updateField, expectedUpdateField);
 }
 
 TEST_F(ChangeStreamStageTest, TransformRemoveFields) {
-    BSONObj o = BSON("$unset" << BSON("y" << 1));
+    BSONObj diff = BSON("d" << BSON("y" << false));
+    BSONObj o = BSON("diff" << diff << "$v" << 2);
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto removeField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                       nss,                  // namespace
@@ -930,7 +953,10 @@ TEST_F(ChangeStreamStageTest, TransformRemoveFields) {
                                       o2);                  // o2
 
     const auto expectedUpdateField = makeExpectedUpdateEvent(
-        kDefaultTs, nss, o2, D{{"updatedFields", D{}}, {"removedFields", {"y"_sd}}});
+        kDefaultTs,
+        nss,
+        o2,
+        D{{"updatedFields", D{}}, {"removedFields", {"y"_sd}}, {"truncatedArrays", vector<V>()}});
     checkTransformation(removeField, expectedUpdateField);
 }  // namespace
 
@@ -2306,7 +2332,6 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
 TEST_F(ChangeStreamStageTest, TransformApplyOps) {
     // Doesn't use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
-
     Document applyOpsDoc{
         {"applyOps",
          Value{std::vector<Document>{
@@ -2317,7 +2342,10 @@ TEST_F(ChangeStreamStageTest, TransformApplyOps) {
              Document{{"op", "u"_sd},
                       {"ns", nss.ns()},
                       {"ui", testUuid()},
-                      {"o", Value{Document{{"$set", Value{Document{{"x", "hallo 2"_sd}}}}}}},
+                      {"o",
+                       Value{Document{
+                           {"diff", Value{Document{{"u", Value{Document{{"x", "hallo 2"_sd}}}}}}},
+                           {"$v", 2}}}},
                       {"o2", Value{Document{{"_id", 123}}}}},
              // Operation on another namespace which should be skipped.
              Document{{"op", "i"_sd},
@@ -2412,7 +2440,8 @@ TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
     const auto opTime = repl::OpTime(ts, term);
 
     // Test the 'clusterTime' field is copied from the oplog entry for an update.
-    BSONObj o = BSON("$set" << BSON("y" << 1));
+    BSONObj diff = BSON("u" << BSON("y" << 1));
+    BSONObj o = BSON("diff" << diff << "$v" << 2);
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto updateField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                       nss,                  // namespace
@@ -2422,8 +2451,12 @@ TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
                                       o2,                   // o2
                                       opTime);              // opTime
 
-    const auto expectedUpdateField = makeExpectedUpdateEvent(
-        ts, nss, o2, D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}});
+    const auto expectedUpdateField = makeExpectedUpdateEvent(ts,
+                                                             nss,
+                                                             o2,
+                                                             D{{"updatedFields", D{{"y", 1}}},
+                                                               {"removedFields", vector<V>()},
+                                                               {"truncatedArrays", vector<V>()}});
     checkTransformation(updateField, expectedUpdateField);
 
     // Test the 'clusterTime' field is copied from the oplog entry for a collection drop.
@@ -3070,18 +3103,40 @@ TEST_F(ChangeStreamStageDBTest, TransformsEntriesForLegalClientCollectionsWithSy
     }
 }
 
-TEST_F(ChangeStreamStageDBTest, TransformUpdateFields) {
+TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsVMissingNotSupported) {
+    // A missing $v field in the update oplog entry implies $v:1, which is no longer supported.
     BSONObj o = BSON("$set" << BSON("y" << 1));
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto updateField = makeOplogEntry(OpTypeEnum::kUpdate, nss, o, testUuid(), boost::none, o2);
+    checkTransformation(updateField, boost::none, kDefaultSpec, {}, {}, {}, 6741200);
+}
 
-    const auto expectedUpdateField = makeExpectedUpdateEvent(
-        kDefaultTs, nss, o2, D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}});
+TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsNonV2NotSupported) {
+    BSONObj diff = BSON("u" << BSON("y" << 1));
+    BSONObj o = BSON("diff" << diff << "$v" << 3);
+    BSONObj o2 = BSON("_id" << 1 << "x" << 2);
+    auto updateField = makeOplogEntry(OpTypeEnum::kUpdate, nss, o, testUuid(), boost::none, o2);
+    checkTransformation(updateField, boost::none, kDefaultSpec, {}, {}, {}, 6741200);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformUpdateFields) {
+    BSONObj diff = BSON("u" << BSON("y" << 1));
+    BSONObj o = BSON("diff" << diff << "$v" << 2);
+    BSONObj o2 = BSON("_id" << 1 << "x" << 2);
+    auto updateField = makeOplogEntry(OpTypeEnum::kUpdate, nss, o, testUuid(), boost::none, o2);
+
+    const auto expectedUpdateField = makeExpectedUpdateEvent(kDefaultTs,
+                                                             nss,
+                                                             o2,
+                                                             D{{"updatedFields", D{{"y", 1}}},
+                                                               {"removedFields", vector<V>()},
+                                                               {"truncatedArrays", vector<V>()}});
     checkTransformation(updateField, expectedUpdateField);
 }
 
 TEST_F(ChangeStreamStageDBTest, TransformRemoveFields) {
-    BSONObj o = BSON("$unset" << BSON("y" << 1));
+    BSONObj diff = BSON("d" << BSON("y" << false));
+    BSONObj o = BSON("diff" << diff << "$v" << 2);
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto removeField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                       nss,                  // namespace
@@ -3091,7 +3146,10 @@ TEST_F(ChangeStreamStageDBTest, TransformRemoveFields) {
                                       o2);                  // o2
 
     const auto expectedRemoveField = makeExpectedUpdateEvent(
-        kDefaultTs, nss, o2, D{{"updatedFields", D{}}, {"removedFields", {"y"_sd}}});
+        kDefaultTs,
+        nss,
+        o2,
+        D{{"updatedFields", D{}}, {"removedFields", {"y"_sd}}, {"truncatedArrays", vector<V>()}});
     checkTransformation(removeField, expectedRemoveField);
 }
 

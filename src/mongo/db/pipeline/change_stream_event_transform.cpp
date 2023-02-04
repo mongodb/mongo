@@ -218,33 +218,11 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                         {"disambiguatedPaths",
                          showDisambiguatedPaths ? Value(deltaDesc.disambiguatedPaths) : Value()}});
                 }
-            } else if (id.missing()) {
-                operationType = DocumentSourceChangeStream::kUpdateOpType;
-                checkValueType(input[repl::OplogEntry::kObjectFieldName],
-                               repl::OplogEntry::kObjectFieldName,
-                               BSONType::Object);
-
-                if (_changeStreamSpec.getShowRawUpdateDescription()) {
-                    updateDescription = input[repl::OplogEntry::kObjectFieldName];
-                } else {
-                    Document opObject = input[repl::OplogEntry::kObjectFieldName].getDocument();
-                    Value updatedFields = opObject["$set"];
-                    Value removedFields = opObject["$unset"];
-
-                    // Extract the field names of $unset document.
-                    std::vector<Value> removedFieldsVector;
-                    if (removedFields.getType() == BSONType::Object) {
-                        auto iter = removedFields.getDocument().fieldIterator();
-                        while (iter.more()) {
-                            removedFieldsVector.push_back(Value(iter.next().first));
-                        }
-                    }
-
-                    updateDescription = Value(
-                        Document{{"updatedFields",
-                                  updatedFields.missing() ? Value(Document()) : updatedFields},
-                                 {"removedFields", removedFieldsVector}});
-                }
+            } else if (!oplogVersion.missing() || id.missing()) {
+                // This is not a replacement op, and we did not see a valid update version number.
+                uasserted(6741200,
+                          str::stream() << "Unsupported or missing oplog version, $v: "
+                                        << oplogVersion.toString());
             } else {
                 operationType = DocumentSourceChangeStream::kReplaceOpType;
                 fullDocument = input[repl::OplogEntry::kObjectFieldName];

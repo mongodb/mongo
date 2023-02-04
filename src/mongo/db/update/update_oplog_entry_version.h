@@ -50,7 +50,7 @@ enum class UpdateOplogEntryVersion {
     // user facing modifier-style update system remains. When a single update adds
     // multiple fields, those fields are added in lexicographic order by field name. This system
     // introduces support for arrayFilters and $[] syntax.
-    kUpdateNodeV1 = 1,
+    kUpdateNodeV1_NotSupprted = 1,
 
     // Delta style update, introduced in 4.7. When a pipeline based update is executed, the pre and
     // post images are diffed, producing a delta. The delta is recorded in the oplog. On
