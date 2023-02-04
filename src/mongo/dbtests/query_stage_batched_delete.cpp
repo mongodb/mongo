@@ -111,7 +111,7 @@ public:
     }
 
     virtual ~QueryStageBatchedDeleteTest() {
-        _client.dropCollection(nss.ns());
+        _client.dropCollection(nss);
     }
 
     TickSourceMock<Milliseconds>* tickSource() {

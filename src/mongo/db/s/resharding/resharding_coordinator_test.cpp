@@ -71,11 +71,11 @@ protected:
         // Create config.transactions collection
         auto opCtx = operationContext();
         DBDirectClient client(opCtx);
-        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
+        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace);
         client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
-        client.createCollection(NamespaceString::kConfigReshardingOperationsNamespace.ns());
-        client.createCollection(CollectionType::ConfigNS.ns());
+        client.createCollection(NamespaceString::kConfigReshardingOperationsNamespace);
+        client.createCollection(CollectionType::ConfigNS);
         client.createIndex(TagsType::ConfigNS, BSON("ns" << 1 << "min" << 1));
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())
@@ -569,8 +569,8 @@ protected:
                 opCtx->getServiceContext()->getPreciseClockSource()->now());
             client.insert(CollectionType::ConfigNS.ns(), originalNssCatalogEntry.toBSON());
 
-            client.createCollection(ChunkType::ConfigNS.ns());
-            client.createCollection(TagsType::ConfigNS.ns());
+            client.createCollection(ChunkType::ConfigNS);
+            client.createCollection(TagsType::ConfigNS);
 
             ASSERT_OK(createIndexOnConfigCollection(
                 opCtx,

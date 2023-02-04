@@ -44,7 +44,7 @@ TEST(WriteOpsDocSeq, InsertDocStreamWorks) {
     auto conn = std::move(swConn.getValue());
 
     NamespaceString ns("test", "doc_seq");
-    conn->dropCollection(ns.ns());
+    conn->dropCollection(ns);
     ASSERT_EQ(conn->count(ns), 0u);
 
     OpMsgRequest request;

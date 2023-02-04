@@ -55,7 +55,7 @@ public:
 
     virtual ~CountBase() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns().ns());
-        _client.dropCollection(ns().ns());
+        _client.dropCollection(ns());
     }
 
     void addIndex(const BSONObj& obj) {

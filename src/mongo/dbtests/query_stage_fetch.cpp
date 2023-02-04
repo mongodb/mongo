@@ -59,7 +59,7 @@ public:
     QueryStageFetchBase() : _client(&_opCtx) {}
 
     virtual ~QueryStageFetchBase() {
-        _client.dropCollection(ns());
+        _client.dropCollection(nss());
     }
 
     void getRecordIds(set<RecordId>* out, const CollectionPtr& coll) {

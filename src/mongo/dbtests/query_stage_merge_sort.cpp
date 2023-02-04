@@ -66,7 +66,7 @@ public:
 
     virtual ~QueryStageMergeSortTestBase() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        _client.dropCollection(ns());
+        _client.dropCollection(nss());
     }
 
     void addIndex(const BSONObj& obj) {

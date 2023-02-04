@@ -74,7 +74,7 @@ public:
 
     virtual ~IndexScanBase() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        _client.dropCollection(ns());
+        _client.dropCollection(nss());
     }
 
     void addIndex(const BSONObj& obj) {
@@ -138,6 +138,9 @@ public:
     }
     static const char* ns() {
         return "unittests.IndexScan";
+    }
+    static NamespaceString nss() {
+        return NamespaceString(ns());
     }
 
 protected:

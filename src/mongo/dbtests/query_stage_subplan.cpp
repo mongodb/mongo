@@ -60,7 +60,7 @@ public:
 
     virtual ~QueryStageSubplanTest() {
         dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
-        _client.dropCollection(nss.ns());
+        _client.dropCollection(nss);
     }
 
     void addIndex(const BSONObj& obj) {

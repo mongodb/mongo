@@ -300,7 +300,7 @@ StatusWith<BSONObj> RollbackSourceMock::getCollectionInfo(const NamespaceString&
     return BSON("name" << nss.ns() << "options" << BSONObj());
 }
 
-StatusWith<BSONObj> RollbackSourceMock::getCollectionInfoByUUID(const std::string& db,
+StatusWith<BSONObj> RollbackSourceMock::getCollectionInfoByUUID(const DatabaseName& dbName,
                                                                 const UUID& uuid) const {
     return BSON("options" << BSONObj() << "info" << BSON("uuid" << uuid));
 }

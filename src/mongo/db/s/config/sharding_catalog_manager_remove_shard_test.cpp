@@ -92,7 +92,7 @@ protected:
         ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
 
         DBDirectClient client(operationContext());
-        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
+        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace);
         client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
 

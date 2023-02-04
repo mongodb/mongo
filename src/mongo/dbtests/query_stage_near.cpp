@@ -48,19 +48,18 @@
 namespace mongo {
 namespace {
 
-const std::string kTestNamespace = "test.coll";
+const NamespaceString kTestNamespace("test.coll");
 const BSONObj kTestKeyPattern = BSON("testIndex" << 1);
 
 class QueryStageNearTest : public unittest::Test {
 public:
     void setUp() override {
-        _expCtx =
-            make_intrusive<ExpressionContext>(_opCtx, nullptr, NamespaceString(kTestNamespace));
+        _expCtx = make_intrusive<ExpressionContext>(_opCtx, nullptr, kTestNamespace);
 
         directClient.createCollection(kTestNamespace);
-        ASSERT_OK(dbtests::createIndex(_opCtx, kTestNamespace, kTestKeyPattern));
+        ASSERT_OK(dbtests::createIndex(_opCtx, kTestNamespace.ns(), kTestKeyPattern));
 
-        _autoColl.emplace(_opCtx, NamespaceString{kTestNamespace});
+        _autoColl.emplace(_opCtx, kTestNamespace);
         const auto& coll = _autoColl->getCollection();
         ASSERT(coll);
         _mockGeoIndex = coll->getIndexCatalog()->findIndexByKeyPatternAndOptions(
@@ -227,7 +226,7 @@ TEST_F(QueryStageNearTest, EmptyResults) {
     std::vector<BSONObj> mockData;
     WorkingSet workingSet;
 
-    AutoGetCollectionForReadMaybeLockFree autoColl(_opCtx, NamespaceString{kTestNamespace});
+    AutoGetCollectionForReadMaybeLockFree autoColl(_opCtx, kTestNamespace);
     const auto& coll = autoColl.getCollection();
     ASSERT(coll);
 

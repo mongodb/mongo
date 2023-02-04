@@ -86,12 +86,12 @@ class QueryStageMultiPlanTest : public unittest::Test {
 public:
     QueryStageMultiPlanTest() : _client(_opCtx.get()) {
         dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns());
-        _client.dropCollection(nss.ns());
+        _client.dropCollection(nss);
     }
 
     virtual ~QueryStageMultiPlanTest() {
         dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns());
-        _client.dropCollection(nss.ns());
+        _client.dropCollection(nss);
     }
 
     void addIndex(const BSONObj& obj) {

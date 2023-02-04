@@ -482,7 +482,7 @@ bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
     return ok;
 }
 
-bool DBClientBase::createCollection(const string& ns,
+bool DBClientBase::createCollection(const NamespaceString& nss,
                                     long long size,
                                     bool capped,
                                     int max,
@@ -493,8 +493,7 @@ bool DBClientBase::createCollection(const string& ns,
     if (info == nullptr)
         info = &o;
     BSONObjBuilder b;
-    string db = nsToDatabase(ns);
-    b.append("create", ns.c_str() + db.length() + 1);
+    b.append("create", nss.coll());
     if (size)
         b.append("size", size);
     if (capped)
@@ -504,12 +503,7 @@ bool DBClientBase::createCollection(const string& ns,
     if (writeConcernObj) {
         b.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
-    // TODO SERVER-72942: Use ns.dbName() which is DatabaseName object already.
-    return runCommand(DatabaseName(boost::none, db), b.done(), *info);
-}
-
-list<BSONObj> DBClientBase::getCollectionInfos(const std::string& db, const BSONObj& filter) {
-    return getCollectionInfos(DatabaseName(boost::none, db), filter, boost::none);
+    return runCommand(nss.dbName(), b.done(), *info);
 }
 
 list<BSONObj> DBClientBase::getCollectionInfos(const DatabaseName& dbName,

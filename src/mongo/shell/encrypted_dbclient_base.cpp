@@ -536,7 +536,7 @@ void EncryptedDBClientBase::decrypt(mozjs::MozJSImplScope* scope,
 
 boost::optional<EncryptedFieldConfig> EncryptedDBClientBase::getEncryptedFieldConfig(
     const NamespaceString& nss) {
-    auto collsList = _conn->getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
+    auto collsList = _conn->getCollectionInfos(nss.dbName(), BSON("name" << nss.coll()));
     uassert(ErrorCodes::BadValue,
             str::stream() << "Namespace not found: " << nss.toString(),
             !collsList.empty());

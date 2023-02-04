@@ -392,7 +392,7 @@ public:
 
     void tearDown() override {
         DBDirectClient client(operationContext());
-        client.dropCollection(kTestNss.ns());
+        client.dropCollection(kTestNss);
 
         RangeDeleterService::get(operationContext())->onStepDown();
         RangeDeleterService::get(operationContext())->onShutdown();
@@ -559,8 +559,8 @@ public:
     void setUp() override {
         CollectionShardingRuntimeWithRangeDeleterTest::setUp();
         DBDirectClient client(operationContext());
-        client.createCollection(NamespaceString::kShardIndexCatalogNamespace.ns());
-        client.createCollection(NamespaceString::kShardCollectionCatalogNamespace.ns());
+        client.createCollection(NamespaceString::kShardIndexCatalogNamespace);
+        client.createCollection(NamespaceString::kShardCollectionCatalogNamespace);
     }
 
     void tearDown() override {

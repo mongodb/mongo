@@ -83,7 +83,7 @@ public:
     }
 
     virtual ~DocumentSourceCursorTest() {
-        client.dropCollection(nss.ns());
+        client.dropCollection(nss);
     }
 
 protected:
@@ -300,7 +300,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
     // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
     const bool capped = true;
     const long long cappedSize = 1024;
-    ASSERT_TRUE(client.createCollection(nss.ns(), cappedSize, capped));
+    ASSERT_TRUE(client.createCollection(nss, cappedSize, capped));
     client.insert(nss.ns(), BSON("a" << 1));
 
     // Make a tailable collection scan wrapped up in a PlanExecutor.
@@ -345,7 +345,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
 
 TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
     // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
-    ASSERT_TRUE(client.createCollection(nss.ns()));
+    ASSERT_TRUE(client.createCollection(nss));
     client.insert(nss.ns(), BSON("a" << 1));
 
     // Make a tailable collection scan wrapped up in a PlanExecutor.
@@ -396,7 +396,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
     // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
     const bool capped = true;
     const long long cappedSize = 1024;
-    ASSERT_TRUE(client.createCollection(nss.ns(), cappedSize, capped));
+    ASSERT_TRUE(client.createCollection(nss, cappedSize, capped));
     client.insert(nss.ns(), BSON("a" << 1));
 
     // Make a tailable collection scan wrapped up in a PlanExecutor.
@@ -440,7 +440,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
 
 TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
     // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
-    ASSERT_TRUE(client.createCollection(nss.ns()));
+    ASSERT_TRUE(client.createCollection(nss));
     client.insert(nss.ns(), BSON("a" << 1));
 
     // Make a tailable collection scan wrapped up in a PlanExecutor.

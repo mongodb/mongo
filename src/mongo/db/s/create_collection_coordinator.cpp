@@ -85,7 +85,7 @@ OptionsAndIndexes getCollectionOptionsAndIndexes(OperationContext* opCtx,
     BSONObjBuilder optionsBob;
 
     auto all =
-        localClient.getCollectionInfos(nssOrUUID.dbname(), BSON("info.uuid" << *nssOrUUID.uuid()));
+        localClient.getCollectionInfos(*nssOrUUID.dbName(), BSON("info.uuid" << *nssOrUUID.uuid()));
 
     // There must be a collection at this time.
     invariant(!all.empty());
@@ -1186,7 +1186,7 @@ void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(
     std::set<ShardId> initializedShards;
     auto dbPrimaryShardId = ShardingState::get(opCtx)->shardId();
 
-    NamespaceStringOrUUID nssOrUUID{nss().db().toString(), *_collectionUUID};
+    NamespaceStringOrUUID nssOrUUID{nss().dbName(), *_collectionUUID};
     auto [collOptions, indexes, idIndex] = getCollectionOptionsAndIndexes(opCtx, nssOrUUID);
 
     for (const auto& chunk : _initialChunks->chunks) {

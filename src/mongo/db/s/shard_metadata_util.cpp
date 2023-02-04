@@ -430,7 +430,10 @@ void dropChunks(OperationContext* opCtx, const NamespaceString& nss) {
 
     // Drop the 'config.cache.chunks.<ns>' collection.
     BSONObj result;
-    if (!client.dropCollection(ChunkType::ShardNSPrefix + nss.ns(), kLocalWriteConcern, &result)) {
+    if (!client.dropCollection(
+            NamespaceStringUtil::deserialize(boost::none, ChunkType::ShardNSPrefix + nss.ns()),
+            kLocalWriteConcern,
+            &result)) {
         auto status = getStatusFromCommandResult(result);
         if (status != ErrorCodes::NamespaceNotFound) {
             uassertStatusOK(status);

@@ -85,7 +85,7 @@ public:
 
     void tearDown() override {
         DBDirectClient client(_opCtx);
-        client.dropCollection(kNss.ns());
+        client.dropCollection(kNss);
 
         while (migrationutil::getMigrationUtilExecutor(getServiceContext())->hasTasks()) {
             continue;
@@ -153,7 +153,7 @@ public:
 
     void tearDown() override {
         DBDirectClient client(_opCtx);
-        client.dropCollection(kToNss.ns());
+        client.dropCollection(kToNss);
         // Re-enabling range deletions to drain tasks on the executor
         globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::off);
         RangeDeleterTest::tearDown();
@@ -741,7 +741,7 @@ TEST_F(RangeDeleterTest,
     // Insert range deletion task for this collection and range.
     auto t = insertRangeDeletionTask(_opCtx, uuid(), range);
 
-    dbclient.dropCollection(kNss.toString());
+    dbclient.dropCollection(kNss);
 
     auto cleanupComplete =
         removeDocumentsInRange(executor(),

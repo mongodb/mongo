@@ -2701,7 +2701,7 @@ TEST_F(SessionCatalogMigrationSourceTest, UntransferredDataSizeWithCommittedWrit
     const auto txnNumber = TxnNumber{1};
 
     DBDirectClient client(opCtx());
-    client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
+    client.createCollection(NamespaceString::kSessionTransactionsTableNamespace);
     client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                          {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
     // Enter an oplog entry before creating SessionCatalogMigrationSource to set config.transactions

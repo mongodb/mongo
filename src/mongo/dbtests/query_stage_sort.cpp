@@ -71,7 +71,7 @@ public:
     }
 
     virtual ~QueryStageSortTestBase() {
-        _client.dropCollection(ns());
+        _client.dropCollection(nss());
     }
 
     void insert(const BSONObj& obj) {

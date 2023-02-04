@@ -107,7 +107,7 @@ size_t createTestData(std::string ns, size_t numDocs) {
     for (size_t i = 0; i < numDocs; ++i) {
         docs.emplace_back(BSON("x" << int(i)));
     }
-    dbclient->dropCollection(ns);
+    dbclient->dropCollection(NamespaceString(ns));
     dbclient->insert(ns, docs);
     return dbclient->count(NamespaceString(ns));
 }

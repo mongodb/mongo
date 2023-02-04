@@ -63,7 +63,7 @@ public:
     PlanExecutorInvalidationTest()
         : _client(&_opCtx), _expCtx(make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss)) {
         _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns()));
-        _client.dropCollection(nss.ns());
+        _client.dropCollection(nss);
 
         for (int i = 0; i < N(); ++i) {
             _client.insert(nss.ns(), BSON("foo" << i));
@@ -128,7 +128,7 @@ public:
     }
 
     bool dropCollection(const std::string& ns) {
-        bool res = _client.dropCollection(ns);
+        bool res = _client.dropCollection(NamespaceString(ns));
         _refreshCollection();
         return res;
     }

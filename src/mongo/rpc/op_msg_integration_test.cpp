@@ -112,7 +112,7 @@ TEST(OpMsg, UnknownOptionalFlagIsIgnored) {
 TEST(OpMsg, FireAndForgetInsertWorks) {
     auto conn = getIntegrationTestConnection();
 
-    conn->dropCollection("test.collection");
+    conn->dropCollection(NamespaceString("test.collection"));
 
     conn->runFireAndForgetCommand(OpMsgRequest::fromDBAndBody("test", fromjson(R"({
         insert: "collection",
@@ -128,7 +128,7 @@ TEST(OpMsg, FireAndForgetInsertWorks) {
 TEST(OpMsg, DocumentSequenceLargeDocumentMultiInsertWorks) {
     auto conn = getIntegrationTestConnection();
 
-    conn->dropCollection("test.collection");
+    conn->dropCollection(NamespaceString("test.collection"));
 
     OpMsgBuilder msgBuilder;
 
@@ -153,13 +153,13 @@ TEST(OpMsg, DocumentSequenceLargeDocumentMultiInsertWorks) {
     conn->call(request, reply);
 
     ASSERT_EQ(conn->count(NamespaceString("test.collection")), 3u);
-    conn->dropCollection("test.collection");
+    conn->dropCollection(NamespaceString("test.collection"));
 }
 
 TEST(OpMsg, DocumentSequenceMaxWriteBatchWorks) {
     auto conn = getIntegrationTestConnection();
 
-    conn->dropCollection("test.collection");
+    conn->dropCollection(NamespaceString("test.collection"));
 
     OpMsgBuilder msgBuilder;
 
@@ -186,7 +186,7 @@ TEST(OpMsg, DocumentSequenceMaxWriteBatchWorks) {
     conn->call(request, reply);
 
     ASSERT_EQ(conn->count(NamespaceString("test.collection")), write_ops::kMaxWriteBatchSize);
-    conn->dropCollection("test.collection");
+    conn->dropCollection(NamespaceString("test.collection"));
 }
 
 TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
@@ -333,7 +333,7 @@ void exhaustGetMoreTest(bool enableChecksum) {
 
     NamespaceString nss("test", "coll");
 
-    conn->dropCollection(nss.toString());
+    conn->dropCollection(nss);
 
     // Insert a few documents.
     for (int i = 0; i < 5; i++) {
@@ -420,7 +420,7 @@ TEST(OpMsg, FindIgnoresExhaust) {
 
     NamespaceString nss("test", "coll");
 
-    conn->dropCollection(nss.toString());
+    conn->dropCollection(nss);
 
     // Insert a few documents.
     for (int i = 0; i < 5; i++) {
@@ -452,7 +452,7 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
 
     NamespaceString nss("test", "coll");
 
-    conn->dropCollection(nss.toString());
+    conn->dropCollection(nss);
 
     // Insert a few documents.
     for (int i = 0; i < 5; i++) {
@@ -472,7 +472,7 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
     ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
 
     // Drop the collection, so that the next getMore will error.
-    conn->dropCollection(nss.toString());
+    conn->dropCollection(nss);
 
     // Construct getMore request with exhaust flag.
     int batchSize = 2;
@@ -499,7 +499,7 @@ TEST(OpMsg, MongosIgnoresExhaustForGetMore) {
 
     NamespaceString nss("test", "coll");
 
-    conn->dropCollection(nss.toString());
+    conn->dropCollection(nss);
 
     // Insert a few documents.
     for (int i = 0; i < 5; i++) {
@@ -550,7 +550,7 @@ TEST(OpMsg, ExhaustWorksForAggCursor) {
 
     NamespaceString nss("test", "coll");
 
-    conn->dropCollection(nss.toString());
+    conn->dropCollection(nss);
 
     // Insert 5 documents so that a cursor using a batchSize of 2 requires three batches to get all
     // the results.
@@ -1227,7 +1227,7 @@ TEST(OpMsg, ExhaustWithDBClientCursorBehavesCorrectly) {
     }
 
     NamespaceString nss("test", "coll");
-    conn->dropCollection(nss.toString());
+    conn->dropCollection(nss);
 
     const int nDocs = 5;
     LOGV2(22634, "Inserting {nDocs} documents.", "nDocs"_attr = nDocs);

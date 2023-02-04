@@ -156,7 +156,7 @@ public:
     }
 
     void createCollection(const NamespaceString& nss) {
-        _client.createCollection(nss.toString());
+        _client.createCollection(nss);
     }
 
 private:

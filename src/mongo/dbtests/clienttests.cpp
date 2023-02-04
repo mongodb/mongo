@@ -46,7 +46,7 @@ using std::vector;
 
 class Base {
 public:
-    Base(string coll) : _ns("test." + coll) {
+    Base(string coll) : _nss("test." + coll) {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
@@ -59,18 +59,18 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.dropCollection(_ns);
+        db.dropCollection(nss());
     }
 
-    NamespaceString nss() {
-        return NamespaceString(_ns);
+    const NamespaceString& nss() {
+        return _nss;
     }
 
-    const char* ns() {
-        return _ns.c_str();
+    const std::string& ns() {
+        return _nss.toString();
     }
 
-    const string _ns;
+    const NamespaceString _nss;
 };
 
 
@@ -223,10 +223,10 @@ public:
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
-
-        db.createCollection("unittests.clienttests.create");
+        const NamespaceString nss("unittests.clienttests.create");
+        db.createCollection(nss);
         BSONObj info;
-        ASSERT(db.runCommand({boost::none, "unittests"},
+        ASSERT(db.runCommand(nss.dbName(),
                              BSON("collstats"
                                   << "clienttests.create"),
                              info));

@@ -1473,7 +1473,7 @@ void syncFixUp(OperationContext* opCtx,
             CollectionWriter collection(opCtx, uuid);
             invariant(collection);
 
-            auto infoResult = rollbackSource.getCollectionInfoByUUID(nss->db().toString(), uuid);
+            auto infoResult = rollbackSource.getCollectionInfoByUUID(nss->dbName(), uuid);
 
             if (!infoResult.isOK()) {
                 // The collection was dropped by the sync source so we can't correctly change it

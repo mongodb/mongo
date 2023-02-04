@@ -79,7 +79,7 @@ public:
         ASSERT_GTE(N, internalQueryPlanEvaluationWorks.load() + 1000);
 
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        _client.dropCollection(nss.ns());
+        _client.dropCollection(nss);
     }
 
     virtual ~PlanRankingTestBase() {

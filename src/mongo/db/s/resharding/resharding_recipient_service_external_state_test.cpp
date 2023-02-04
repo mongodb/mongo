@@ -237,7 +237,7 @@ public:
                                     const std::vector<BSONObj>& indexes) {
         DBDirectClient client(operationContext());
 
-        auto collInfos = client.getCollectionInfos(nss.db().toString());
+        auto collInfos = client.getCollectionInfos(nss.dbName());
         ASSERT_EQ(collInfos.size(), 1);
         ASSERT_EQ(collInfos.front()["name"].str(), nss.coll());
         ASSERT_EQ(unittest::assertGet(UUID::parse(collInfos.front()["info"]["uuid"])), uuid);

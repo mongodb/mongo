@@ -497,7 +497,7 @@ protected:
 
         auto opCtx = operationContext();
         DBDirectClient client(opCtx);
-        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
+        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace);
         client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
 

@@ -328,7 +328,7 @@ public:
      *
      *  If the collection already exists, no action occurs.
      *
-     *  'ns': Fully qualified collection name.
+     *  'nss': Fully qualified collection name.
      *  'size': Desired initial extent size for the collection.
      *          Must be <= 1000000000 for normal collections.
      *          For fixed size (capped) collections, this size is the total/max size of the
@@ -338,7 +338,7 @@ public:
      *
      * Returns true if successful.
      */
-    bool createCollection(const std::string& ns,
+    bool createCollection(const NamespaceString& nss,
                           long long size = 0,
                           bool capped = false,
                           int max = 0,
@@ -351,11 +351,10 @@ public:
      *  'info': An optional output parameter that receives the result object the database returns
      *          from the drop command. May be null if the caller doesn't need that info.
      */
-    virtual bool dropCollection(const std::string& ns,
+    virtual bool dropCollection(const NamespaceString& nss,
                                 const WriteConcernOptions& writeConcern = WriteConcernOptions(),
                                 BSONObj* info = nullptr) {
-        std::string db = nsGetDB(ns);
-        std::string coll = nsGetCollection(ns);
+        auto coll = nss.coll();
         uassert(10011, "no collection name", coll.size());
 
         BSONObj temp;
@@ -363,10 +362,8 @@ public:
             info = &temp;
         }
 
-        // TODO SERVER-72942: Use ns.dbName() which is DatabaseName object already.
-        bool res = runCommand(DatabaseName(boost::none, db),
-                              BSON("drop" << coll << "writeConcern" << writeConcern.toBSON()),
-                              *info);
+        bool res = runCommand(
+            nss.dbName(), BSON("drop" << coll << "writeConcern" << writeConcern.toBSON()), *info);
         return res;
     }
 
@@ -380,15 +377,6 @@ public:
         // TODO SERVER-72943: Use ns.dbName() which is DatabaseName object already.
         return runCommand(DatabaseName(boost::none, nsGetDB(ns)), cmd, info);
     }
-
-    /**
-     * { name : "<short collection name>",
-     *   options : { }
-     * }
-     * // TODO SERVER-70433 Remove this function in favor of the one below which takes in a
-     * DatabaseName object.
-     */
-    std::list<BSONObj> getCollectionInfos(const std::string& db, const BSONObj& filter = BSONObj());
 
     /**
      * { name : "<short collection name>",

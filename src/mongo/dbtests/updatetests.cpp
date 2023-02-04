@@ -78,6 +78,7 @@ protected:
     const char* ns() {
         return "unittests.UpdateTests_Fail";
     }
+
     virtual void prep() {
         auto response = _client.insertAcknowledged(ns(), {fromjson("{a:1}")});
         ASSERT_EQ(1, response["n"].Int());
@@ -145,7 +146,7 @@ class IncTargetNonNumber : public Fail {
 class SetBase : public ClientBase {
 public:
     ~SetBase() {
-        _client.dropCollection(ns());
+        _client.dropCollection(nss());
     }
 
 protected:
@@ -934,7 +935,7 @@ public:
 class PushSortBase : public ClientBase {
 public:
     ~PushSortBase() {
-        _client.dropCollection(ns());
+        _client.dropCollection(nss());
     }
 
 protected:
@@ -1044,7 +1045,7 @@ public:
         // BOTTOMK_DESC: $push: { x: { $each: [ {a:2,b:2} ], $slice:3, $sort: { b:-1 } } }
 
         for (int i = 0; i < 2; i++) {  // i < 4 when we have positive $slice
-            _client.dropCollection(ns());
+            _client.dropCollection(nss());
             _client.insert(ns(), fromjson("{'_id':0,x:[{a:1,b:1}]}"));
 
             BSONObj result;
@@ -1089,7 +1090,7 @@ public:
         // BOTTOMK_DESC: $push: { x: { $each: [ {a:2,b:2} ], $slice:2, $sort: { b:-1 } } }
 
         for (int i = 0; i < 2; i++) {  // i < 4 when we have positive $slice
-            _client.dropCollection(ns());
+            _client.dropCollection(nss());
             _client.insert(ns(), fromjson("{'_id':0,x:[{a:1,b:1}]}"));
 
             BSONObj result;
@@ -1134,7 +1135,7 @@ public:
         // BOTTOMK_DESC: $push: { x: { $each: [ {a:2,b:2} ], $slice:2, $sort: { b:-1 } } }
 
         for (int i = 0; i < 2; i++) {  // i < 4 when we have positive $slice
-            _client.dropCollection(ns());
+            _client.dropCollection(nss());
             _client.insert(ns(), fromjson("{'_id':0,x:[{a:1,b:1},{a:3,b:3}]}"));
 
             BSONObj result;
@@ -1182,7 +1183,7 @@ public:
         // BOTTOMK_DESC: $push: { x: { $each: [ {a:2,b:2} ], $slice:0, $sort: { b:-1 } } }
 
         for (int i = 0; i < 2; i++) {  // i < 4 when we have positive $slice
-            _client.dropCollection(ns());
+            _client.dropCollection(nss());
             _client.insert(ns(), fromjson("{'_id':0,x:[{a:1,b:1},{a:3,b:3}]}"));
 
             BSONObj result;
@@ -1215,7 +1216,7 @@ public:
         // BOTTOMK_DESC: $push: { x: { $each: [ {a:2,b:2} ], $slice:0, $sort: { b:-1 } } }
 
         for (int i = 0; i < 2; i++) {  // i < 4 when we have positive $slice
-            _client.dropCollection(ns());
+            _client.dropCollection(nss());
             _client.insert(ns(), fromjson("{'_id':0}"));
 
             BSONObj result;
@@ -1250,7 +1251,7 @@ public:
         // BOTTOMK_DESC: $push: { x: { $each: [ <genarray> ], $slice:2, $sort: { b:-1 } } }
 
         for (int i = 0; i < 2; i++) {  // i < 4 when we have positive $slice
-            _client.dropCollection(ns());
+            _client.dropCollection(nss());
             _client.insert(ns(), fromjson("{'_id':0}"));
 
             BSONObj result;
@@ -1296,7 +1297,7 @@ public:
         // BOTTOMK_DESC: $push: { x: { $each: [ <genarray> ], $slice:2, $sort: { b:-1 } } }
 
         for (int i = 0; i < 2; i++) {  // i < 4 when we have positive $slice
-            _client.dropCollection(ns());
+            _client.dropCollection(nss());
             _client.insert(ns(), fromjson("{'_id':0}"));
 
             BSONObj result;
@@ -1345,7 +1346,7 @@ public:
         // BOTTOMK_DESC: $push: { x: { $each: [ <genarray> ], $slice:2, $sort: { b:-1 } } }
 
         for (int i = 0; i < 2; i++) {  // i < 4 when we have positive $slice
-            _client.dropCollection(ns());
+            _client.dropCollection(nss());
             _client.insert(ns(), fromjson("{'_id':0,x:[]}"));
 
             BSONObj result;
@@ -1391,7 +1392,7 @@ public:
         // BOTTOMK_DESC: $push: { x: { $each: [ <genarray> ], $slice:2, $sort: { b:-1 } } }
 
         for (int i = 0; i < 2; i++) {  // i < 4 when we have positive $slice
-            _client.dropCollection(ns());
+            _client.dropCollection(nss());
             _client.insert(ns(), fromjson("{'_id':0,x:[]}"));
 
             BSONObj result;
@@ -1843,6 +1844,11 @@ namespace basic {
 class Base : public ClientBase {
 protected:
     virtual const char* ns() = 0;
+
+    NamespaceString nss() {
+        return NamespaceString(ns());
+    };
+
     virtual void dotest() = 0;
 
     void insert(const BSONObj& o) {
@@ -1863,11 +1869,11 @@ protected:
 
 
     void test(const BSONObj& initial, const BSONObj& mod, const BSONObj& after) {
-        _client.dropCollection(ns());
+        _client.dropCollection(nss());
         insert(initial);
         update(mod);
         ASSERT_BSONOBJ_EQ(after, findOne());
-        _client.dropCollection(ns());
+        _client.dropCollection(nss());
     }
 
 public:
@@ -1875,11 +1881,11 @@ public:
     virtual ~Base() {}
 
     void run() {
-        _client.dropCollection(ns());
+        _client.dropCollection(nss());
 
         dotest();
 
-        _client.dropCollection(ns());
+        _client.dropCollection(nss());
     }
 };
 

@@ -103,14 +103,15 @@ std::pair<BSONObj, NamespaceString> RollbackSourceImpl::findOneByUUID(const std:
     return {std::move(result), std::move(nss)};
 }
 
-StatusWith<BSONObj> RollbackSourceImpl::getCollectionInfoByUUID(const std::string& db,
+StatusWith<BSONObj> RollbackSourceImpl::getCollectionInfoByUUID(const DatabaseName& dbName,
                                                                 const UUID& uuid) const {
-    std::list<BSONObj> info = _getConnection()->getCollectionInfos(db, BSON("info.uuid" << uuid));
+    std::list<BSONObj> info =
+        _getConnection()->getCollectionInfos(dbName, BSON("info.uuid" << uuid));
     if (info.empty()) {
         return StatusWith<BSONObj>(ErrorCodes::NoSuchKey,
                                    str::stream()
                                        << "No collection info found for collection with uuid: "
-                                       << uuid.toString() << " in db: " << db);
+                                       << uuid.toString() << " in db: " << dbName.db());
     }
     invariant(info.size() == 1U);
     return info.front();
@@ -118,7 +119,7 @@ StatusWith<BSONObj> RollbackSourceImpl::getCollectionInfoByUUID(const std::strin
 
 StatusWith<BSONObj> RollbackSourceImpl::getCollectionInfo(const NamespaceString& nss) const {
     std::list<BSONObj> info =
-        _getConnection()->getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
+        _getConnection()->getCollectionInfos(nss.dbName(), BSON("name" << nss.coll()));
     if (info.empty()) {
         return StatusWith<BSONObj>(ErrorCodes::NoSuchKey,
                                    str::stream() << "no collection info found: " << nss.ns());

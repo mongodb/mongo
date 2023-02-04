@@ -58,7 +58,7 @@ protected:
 
         ConfigServerTestFixture::setUp();
         DBDirectClient client(operationContext());
-        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
+        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace);
         client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
 

@@ -51,19 +51,20 @@ public:
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
+        const NamespaceString nss(ns);
 
         vector<BSONObj> objs;
         objs.push_back(BSON("_id" << 1));
         objs.push_back(BSON("_id" << 1));
         objs.push_back(BSON("_id" << 2));
 
-        client.dropCollection(ns);
+        client.dropCollection(nss);
 
         auto response = client.insertAcknowledged(ns, objs);
         ASSERT_EQUALS(ErrorCodes::DuplicateKey, getStatusFromWriteCommandReply(response));
         ASSERT_EQUALS((int)client.count(NamespaceString(ns)), 1);
 
-        client.dropCollection(ns);
+        client.dropCollection(nss);
 
         response = client.insertAcknowledged(ns, objs, false /*ordered*/);
         ASSERT_EQUALS(ErrorCodes::DuplicateKey, getStatusFromWriteCommandReply(response));

@@ -480,8 +480,9 @@ Status Cloner::copyDb(OperationContext* opCtx,
     }
 
     // Gather the list of collections to clone
-    std::list<BSONObj> initialCollections =
-        conn->getCollectionInfos(dBName, ListCollectionsFilter::makeTypeCollectionFilter());
+    // TODO SERVER-63111 Once the cloner takes in a DatabaseName obj, use dBName directly
+    std::list<BSONObj> initialCollections = conn->getCollectionInfos(
+        DatabaseName(boost::none, dBName), ListCollectionsFilter::makeTypeCollectionFilter());
 
     auto statusWithCollections = _filterCollectionsForClone(dBName, initialCollections);
     if (!statusWithCollections.isOK()) {

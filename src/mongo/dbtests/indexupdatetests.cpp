@@ -568,7 +568,7 @@ public:
     void run() {
         auto opCtx = cc().makeOperationContext();
         DBDirectClient client(opCtx.get());
-        client.dropCollection(_ns);
+        client.dropCollection(_nss);
         IndexSpec indexSpec;
         indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale"
                                                                   << "fr")));
@@ -585,7 +585,7 @@ public:
     void run() {
         auto opCtx = cc().makeOperationContext();
         DBDirectClient client(opCtx.get());
-        client.dropCollection(_ns);
+        client.dropCollection(_nss);
         IndexSpec indexSpec;
         indexSpec.addKey("a");
         client.createIndex(_nss, indexSpec);
@@ -602,7 +602,7 @@ public:
     void run() {
         auto opCtx = cc().makeOperationContext();
         DBDirectClient client(opCtx.get());
-        client.dropCollection(_ns);
+        client.dropCollection(_nss);
         IndexSpec indexSpec;
         indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale"
                                                                   << "fr")));
@@ -620,7 +620,7 @@ public:
     void run() {
         auto opCtx = cc().makeOperationContext();
         DBDirectClient client(opCtx.get());
-        client.dropCollection(_ns);
+        client.dropCollection(_nss);
         IndexSpec indexSpec;
         indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale"
                                                                   << "fr")));
@@ -638,7 +638,7 @@ public:
     void run() {
         auto opCtx = cc().makeOperationContext();
         DBDirectClient client(opCtx.get());
-        client.dropCollection(_ns);
+        client.dropCollection(_nss);
         client.insert(_ns, BSON("a" << BSON_ARRAY(99 << BSONSymbol("mySymbol"))));
         ASSERT_EQUALS(client.count(_nss), 1U);
         IndexSpec indexSpec;
@@ -655,7 +655,7 @@ public:
     void run() {
         auto opCtx = cc().makeOperationContext();
         DBDirectClient client(opCtx.get());
-        client.dropCollection(_ns);
+        client.dropCollection(_nss);
         BSONObj cmdResult;
         ASSERT_TRUE(client.runCommand({boost::none, "unittests"},
                                       BSON("create"

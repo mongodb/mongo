@@ -135,11 +135,11 @@ public:
 
         auto opCtx = operationContext();
         DBDirectClient client(opCtx);
-        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
+        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace);
         client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
-        client.createCollection(NamespaceString::kConfigReshardingOperationsNamespace.ns());
-        client.createCollection(CollectionType::ConfigNS.ns());
+        client.createCollection(NamespaceString::kConfigReshardingOperationsNamespace);
+        client.createCollection(CollectionType::ConfigNS);
 
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())

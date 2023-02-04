@@ -80,8 +80,7 @@ void MockReplCoordServerFixture::setUp() {
 
     // Note: internal code does not allow implicit creation of non-capped oplog collection.
     DBDirectClient client(opCtx());
-    ASSERT_TRUE(
-        client.createCollection(NamespaceString::kRsOplogNamespace.ns(), 1024 * 1024, true));
+    ASSERT_TRUE(client.createCollection(NamespaceString::kRsOplogNamespace, 1024 * 1024, true));
 
     repl::acquireOplogCollectionForLogging(opCtx());
 

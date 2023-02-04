@@ -279,7 +279,7 @@ public:
                                                       UUID uuid,
                                                       const BSONObj& filter) const override;
 
-    StatusWith<BSONObj> getCollectionInfoByUUID(const std::string& db,
+    StatusWith<BSONObj> getCollectionInfoByUUID(const DatabaseName& dbName,
                                                 const UUID& uuid) const override;
     StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const override;
 

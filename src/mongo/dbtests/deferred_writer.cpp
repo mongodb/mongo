@@ -95,12 +95,12 @@ public:
     virtual ~DeferredWriterTestBase() {}
 
     void createCollection(void) {
-        _client.createCollection(kTestNamespace.toString());
+        _client.createCollection(kTestNamespace);
     }
 
     void dropCollection(void) {
         if (AutoGetCollection(_opCtx.get(), kTestNamespace, MODE_IS).getCollection()) {
-            _client.dropCollection(kTestNamespace.toString());
+            _client.dropCollection(kTestNamespace);
         }
     }
 

@@ -71,7 +71,7 @@ public:
     PlanExecutorTest() : _client(&_opCtx) {}
 
     virtual ~PlanExecutorTest() {
-        _client.dropCollection(nss.ns());
+        _client.dropCollection(nss);
     }
 
     void addIndex(const BSONObj& obj) {
@@ -87,7 +87,7 @@ public:
     }
 
     void dropCollection() {
-        _client.dropCollection(nss.ns());
+        _client.dropCollection(nss);
     }
 
     void update(BSONObj& query, BSONObj& updateSpec) {

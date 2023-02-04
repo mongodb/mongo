@@ -54,7 +54,7 @@ TEST(CommandTests, InputDocumentSequeceWorksEndToEnd) {
 
     NamespaceString nss("test", "doc_seq");
     DBDirectClient db(opCtx);
-    db.dropCollection(nss.ns());
+    db.dropCollection(nss);
     ASSERT_EQ(db.count(nss), 0u);
 
     OpMsgRequest request;
@@ -82,7 +82,7 @@ using std::string;
 class Base {
 public:
     Base() : db(&_opCtx) {
-        db.dropCollection(nss().ns());
+        db.dropCollection(nss());
     }
 
     NamespaceString nss() {
@@ -104,7 +104,7 @@ public:
 namespace FileMD5 {
 struct Base {
     Base() : db(&_opCtx) {
-        db.dropCollection(nss().ns());
+        db.dropCollection(nss());
         ASSERT_OK(dbtests::createIndex(&_opCtx, nss().ns(), BSON("files_id" << 1 << "n" << 1)));
     }
 
@@ -175,7 +175,7 @@ namespace SymbolArgument {
 class Drop : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(nss().ns()));
+        ASSERT(db.createCollection(nss()));
         {
             BSONObjBuilder cmd;
             cmd.appendSymbol("drop", nsColl());  // Use Symbol for SERVER-16260
@@ -191,7 +191,7 @@ public:
 class DropIndexes : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(nss().ns()));
+        ASSERT(db.createCollection(nss()));
 
         BSONObjBuilder cmd;
         cmd.appendSymbol("dropIndexes", nsColl());  // Use Symbol for SERVER-16260
@@ -207,7 +207,7 @@ public:
 class CreateIndexWithNoKey : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(nss().ns()));
+        ASSERT(db.createCollection(nss()));
 
         BSONObjBuilder indexSpec;
 
@@ -228,7 +228,7 @@ public:
 class CreateIndexWithDuplicateKey : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(nss().ns()));
+        ASSERT(db.createCollection(nss()));
 
         BSONObjBuilder indexSpec;
         indexSpec.append("key", BSON("a" << 1 << "a" << 1 << "b" << 1));
@@ -251,7 +251,7 @@ public:
 class CreateIndexWithEmptyStringAsValue : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(nss().ns()));
+        ASSERT(db.createCollection(nss()));
 
         BSONObjBuilder indexSpec;
         indexSpec.append("key",
@@ -275,7 +275,7 @@ public:
 class FindAndModify : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(nss().ns()));
+        ASSERT(db.createCollection(nss()));
         {
             BSONObjBuilder b;
             b.genOID();

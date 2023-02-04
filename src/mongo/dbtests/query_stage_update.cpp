@@ -67,13 +67,13 @@ class QueryStageUpdateBase {
 public:
     QueryStageUpdateBase() : _client(&_opCtx) {
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        _client.dropCollection(nss.ns());
-        _client.createCollection(nss.ns());
+        _client.dropCollection(nss);
+        _client.createCollection(nss);
     }
 
     virtual ~QueryStageUpdateBase() {
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        _client.dropCollection(nss.ns());
+        _client.dropCollection(nss);
     }
 
     void insert(const BSONObj& doc) {

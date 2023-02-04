@@ -63,7 +63,7 @@ const StringData testBackgroundAppName = "curop_exhaust_cursor_test_bg";
 
 void initTestCollection(DBClientBase* conn) {
     // Drop and recreate the test namespace.
-    conn->dropCollection(testNSS.ns());
+    conn->dropCollection(testNSS);
     for (int i = 0; i < 10; i++) {
         auto insertCmd =
             BSON("insert" << testNSS.coll() << "documents" << BSON_ARRAY(BSON("a" << i)));
@@ -374,12 +374,10 @@ TEST(CurrentOpExhaustCursorTest, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
     DBClientBase* conn = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->primaryConn();
     ASSERT(conn);
 
-    conn->dropCollection(testNSS.ns());
+    conn->dropCollection(testNSS);
     // Create a capped collection to run tailable awaitData queries on.
-    conn->createCollection(testNSS.ns(),
-                           1024 /* size of collection */,
-                           true /* capped */,
-                           10 /* max number of objects */);
+    conn->createCollection(
+        testNSS, 1024 /* size of collection */, true /* capped */, 10 /* max number of objects */);
     // Insert initial records into the capped collection.
     for (int i = 0; i < 5; i++) {
         auto insertCmd =

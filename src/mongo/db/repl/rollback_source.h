@@ -92,7 +92,7 @@ public:
     /**
      * Finds and returns collection info using the UUID.
      */
-    virtual StatusWith<BSONObj> getCollectionInfoByUUID(const std::string& db,
+    virtual StatusWith<BSONObj> getCollectionInfoByUUID(const DatabaseName& dbName,
                                                         const UUID& uuid) const = 0;
 
     /**

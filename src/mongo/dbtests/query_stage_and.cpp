@@ -66,7 +66,7 @@ public:
     QueryStageAndBase() : _client(&_opCtx) {}
 
     virtual ~QueryStageAndBase() {
-        _client.dropCollection(ns());
+        _client.dropCollection(nss());
     }
 
     void addIndex(const BSONObj& obj) {

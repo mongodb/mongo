@@ -87,8 +87,9 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
     // This will be set after a successful listCollections command.
     _operationTime = Timestamp();
 
-    auto collectionInfos =
-        getClient()->getCollectionInfos(_dbName, ListCollectionsFilter::makeTypeCollectionFilter());
+    // TODO SERVER-72945: Use the _dbName which is DatabaseName object already.
+    auto collectionInfos = getClient()->getCollectionInfos(
+        DatabaseName(boost::none, _dbName), ListCollectionsFilter::makeTypeCollectionFilter());
 
     // Do a majority read on the sync source to make sure the collections listed exist on a majority
     // of nodes in the set. We do not check the rollbackId - rollback would lead to the sync source
@@ -198,8 +199,9 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStag
     long long approxTotalDBSizeOnDisk = 0;
 
     std::vector<UUID> clonedCollectionUUIDs;
-    auto collectionInfos =
-        client.getCollectionInfos(_dbName, ListCollectionsFilter::makeTypeCollectionFilter());
+    // TODO SERVER-72945: Use the _dbName which is DatabaseName object already.
+    auto collectionInfos = client.getCollectionInfos(
+        DatabaseName(boost::none, _dbName), ListCollectionsFilter::makeTypeCollectionFilter());
     for (auto&& info : collectionInfos) {
         ListCollectionResult result;
         try {

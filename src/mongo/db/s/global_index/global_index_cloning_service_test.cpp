@@ -289,7 +289,7 @@ public:
         // Create config.transactions collection
         auto opCtx = serviceContext->makeOperationContext(Client::getCurrent());
         DBDirectClient client(opCtx.get());
-        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
+        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace);
         client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
 
@@ -347,7 +347,7 @@ public:
     bool doesCollectionExist(OperationContext* opCtx, const NamespaceString& nss) {
         DBDirectClient client(opCtx);
         auto collectionInfos = client.getCollectionInfos(
-            nss.db().toString(), ListCollectionsFilter::makeTypeCollectionFilter());
+            nss.dbName(), ListCollectionsFilter::makeTypeCollectionFilter());
 
         for (auto&& info : collectionInfos) {
             auto coll =

@@ -79,7 +79,7 @@ public:
 
     virtual ~QueryStageCollectionScanTest() {
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        _client.dropCollection(nss.ns());
+        _client.dropCollection(nss);
     }
 
     void remove(const BSONObj& obj) {

@@ -170,8 +170,8 @@ public:
         QueryAnalysisWriter::get(operationContext())->onStartup(operationContext());
 
         DBDirectClient client(operationContext());
-        client.createCollection(nss0.toString());
-        client.createCollection(nss1.toString());
+        client.createCollection(nss0);
+        client.createCollection(nss1);
     }
 
     void tearDown() {

@@ -508,8 +508,7 @@ BSONObj getUnshardedCollInfo(OperationContext* opCtx,
                              const NamespaceString& nss) {
     auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
     ScopedDbConnection conn(shard->getConnString());
-    std::list<BSONObj> all =
-        conn->getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
+    std::list<BSONObj> all = conn->getCollectionInfos(nss.dbName(), BSON("name" << nss.coll()));
     if (all.empty()) {
         // Collection does not exist, return an empty object.
         return BSONObj();

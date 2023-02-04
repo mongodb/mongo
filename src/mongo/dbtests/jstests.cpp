@@ -970,11 +970,15 @@ private:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
 
-        client.dropCollection(ns());
+        client.dropCollection(nss());
     }
 
     static const char* ns() {
         return "unittest.jstests.utf8check";
+    }
+
+    static NamespaceString nss() {
+        return NamespaceString(ns());
     }
 };
 
