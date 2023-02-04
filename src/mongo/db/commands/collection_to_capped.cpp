@@ -111,7 +111,7 @@ public:
                 str::stream() << "Invalid target collection name: " << to,
                 NamespaceString::validCollectionName(to));
 
-        double size = cmdObj.getField("size").number();
+        auto size = cmdObj.getField("size").safeNumberLong();
         bool temp = cmdObj.getField("temp").trueValue();
 
         uassert(ErrorCodes::InvalidOptions, "invalid command spec", size != 0);
@@ -179,7 +179,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
-        long long size = cmdObj.getField("size").safeNumberLong();
+        auto size = cmdObj.getField("size").safeNumberLong();
 
         uassert(ErrorCodes::InvalidOptions, "invalid command spec", size != 0);
 
