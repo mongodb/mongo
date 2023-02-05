@@ -41,6 +41,7 @@ selector:
   - tenant_migration_incompatible
   - requires_timeseries # Tenant migration not supported
   - requires_fastcount
+  - multiple_tenants_incompatible
 
 executor:
   archive:

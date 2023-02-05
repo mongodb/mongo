@@ -253,6 +253,7 @@ selector:
   - requires_multi_updates
   - requires_timeseries # Tenant migration, transactions not supported
   - requires_fastcount
+  - multiple_tenants_incompatible
 
 executor:
   archive:

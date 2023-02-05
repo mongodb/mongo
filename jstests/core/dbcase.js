@@ -1,8 +1,8 @@
 // Check db name duplication constraint SERVER-2111
 // @tags: [
-//   # The inject_tenant_prefix override in shard split mode might choose different
+//   # The inject_tenant_prefix override in multi-tenant mode might choose different
 //   # prefixes for each sibling DB in this test.
-//   shard_split_incompatible,
+//   multiple_tenants_incompatible,
 // ]
 
 a = db.getSiblingDB("dbcasetest_dbnamea");

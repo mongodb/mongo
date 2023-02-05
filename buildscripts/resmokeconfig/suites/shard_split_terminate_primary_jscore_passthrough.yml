@@ -114,7 +114,7 @@ selector:
   - assumes_write_concern_unchanged
   # Full validation can cause ongoing queries to fail. This can affect the shard split process.
   - uses_full_validation
-  - shard_split_incompatible
+  - multiple_tenants_incompatible
   - requires_timeseries # Tenant migration not supported
 
 executor:
