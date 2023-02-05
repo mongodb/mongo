@@ -432,8 +432,16 @@ private:
         invariant(!_work);
         if (_nextWork)
             return Future{std::move(_nextWork)};  // Already have one ready.
-        if (useDedicatedThread())
+        if (useDedicatedThread()) {
+            // Yield here to avoid pinning the CPU. Give other threads some CPU
+            // time to avoid a spiky latency distribution (BF-27452). Even if
+            // this client can run continuously and receive another command
+            // without blocking, we yield anyway. We WANT context switching, and
+            // we're trying deliberately to make it happen, to reduce long tail
+            // latency.
+            _yieldPointReached();
             return _receiveRequest();
+        }
         auto&& [p, f] = makePromiseFuture<void>();
         taskRunner()->runOnDataAvailable(
             session(), _captureContext([p = std::move(p)](Status s) mutable { p.setFrom(s); }));
