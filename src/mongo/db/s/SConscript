@@ -27,6 +27,65 @@ env.Library(
 )
 
 env.Library(
+    target='move_primary_shared_data',
+    source=[
+        'move_primary/move_primary_shared_data.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/repl/repl_sync_shared_data',
+    ],
+)
+
+env.Library(
+    target='move_primary_cloners',
+    source=[
+        'move_primary/move_primary_base_cloner.cpp',
+        'move_primary/move_primary_collection_cloner.cpp',
+        'move_primary/move_primary_database_cloner.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/base_cloner',
+        '$BUILD_DIR/mongo/db/repl/cloner_utils',
+        '$BUILD_DIR/mongo/db/repl/task_runner',
+        'move_primary_shared_data',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
+        '$BUILD_DIR/mongo/db/commands/list_collections_filter',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
+        '$BUILD_DIR/mongo/db/repl/oplog',
+        '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
+        '$BUILD_DIR/mongo/db/shard_role_api',
+        '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/util/progress_meter',
+    ],
+)
+
+env.Library(
+    target='move_primary_test_fixtures',
+    source=[
+        'move_primary/move_primary_cloner_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        # Required for service context test fixture
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/repl/cloner_test_fixtures',
+        '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/dbtests/mocklib',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        'move_primary_shared_data',
+    ],
+)
+
+env.Library(
     target='balancer_stats_registry',
     source=[
         'balancer_stats_registry.cpp',
@@ -255,6 +314,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/util/future_util',
         'balancer_stats_registry',
+        'move_primary_cloners',
         'query_analysis_writer',
         'sharding_catalog',
         'sharding_logging',
@@ -694,6 +754,8 @@ env.CppUnitTest(
         'global_index/global_index_metrics_test.cpp',
         'implicit_collection_creation_test.cpp',
         'metadata_manager_test.cpp',
+        'move_primary/move_primary_collection_cloner_test.cpp',
+        'move_primary/move_primary_database_cloner_test.cpp',
         'migration_batch_fetcher_test.cpp',
         'migration_chunk_cloner_source_legacy_test.cpp',
         'migration_destination_manager_test.cpp',
@@ -790,6 +852,8 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/analyze_shard_key_util',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
+        'move_primary_cloners',
+        'move_primary_test_fixtures',
         'query_analysis_writer',
         'shard_server_test_fixture',
         'sharding_catalog',
