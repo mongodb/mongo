@@ -257,6 +257,7 @@ if (typeof _threadInject != "undefined") {
             // default.
             "timeseries/timeseries_update_multi.js",
             "timeseries/timeseries_delete_multi.js",
+            "timeseries/timeseries_delete_one.js",
         ]);
 
         // Get files, including files in subdirectories.
