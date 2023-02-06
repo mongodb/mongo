@@ -33,6 +33,7 @@
 
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/testing_options_gen.h"
 #include "mongo/util/tick_source_mock.h"
@@ -109,7 +110,9 @@ TEST_F(FLEStatsTest, BinaryEmuStatsAreEmptyWithoutTesting) {
 }
 
 TEST_F(FLEStatsTest, BinaryEmuStatsArePopulatedWithTesting) {
-    gTestingDiagnosticsEnabledAtStartup = true;
+    RAIIServerParameterControllerForTest controller1(
+        "unsupportedDangerousTestingFLEDiagnosticsEnabled", true);
+    RAIIServerParameterControllerForTest controller2("testingDiagnosticsEnabled", true);
 
     {
         auto tracker = instance->makeEmuBinaryTracker();
