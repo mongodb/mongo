@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/resource_catalog.h"
@@ -59,6 +60,8 @@ static RecordId kUnknownRangeMarkerId = RecordId::minLong();
 // Used to avoid quadratic behavior when inserting entries at the beginning. When threshold is
 // reached we will fall back to more durable catalog scans.
 static constexpr int kMaxCatalogIdMappingLengthForMissingInsert = 1000;
+
+constexpr auto kNumDurableCatalogScansDueToMissingMapping = "numScansDueToMissingMapping"_sd;
 
 struct LatestCollectionCatalog {
     std::shared_ptr<CollectionCatalog> catalog = std::make_shared<CollectionCatalog>();
@@ -99,6 +102,27 @@ const auto maxUuid = UUID::parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF").getValu
 const auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
 
 }  // namespace
+
+/**
+ * Defines a new serverStatus section "collectionCatalog".
+ */
+class CollectionCatalogSection final : public ServerStatusSection {
+public:
+    CollectionCatalogSection() : ServerStatusSection("collectionCatalog") {}
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement&) const override {
+        BSONObjBuilder section;
+        section.append(kNumDurableCatalogScansDueToMissingMapping,
+                       numScansDueToMissingMapping.loadRelaxed());
+        return section.obj();
+    }
+
+    AtomicWord<long long> numScansDueToMissingMapping;
+} gCollectionCatalogSection;
 
 class IgnoreExternalViewChangesForDatabase {
 public:
@@ -1036,6 +1060,7 @@ boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
         invariant(readTimestamp);
 
         // Scan durable catalog when we don't have accurate catalogId mapping for this timestamp.
+        gCollectionCatalogSection.numScansDueToMissingMapping.fetchAndAdd(1);
         auto catalogEntry = DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nss);
         writeCatalogIdAfterScan(catalogEntry);
         return catalogEntry;
