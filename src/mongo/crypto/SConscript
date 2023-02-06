@@ -106,14 +106,13 @@ fleCryptoEnv.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/secure_allocator',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/query/query_knobs',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/shell/kms_idl',
         '$BUILD_DIR/mongo/util/testing_options',
         '$BUILD_DIR/third_party/shim_libmongocrypt',

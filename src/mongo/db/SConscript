@@ -61,20 +61,21 @@ env.Library(
     target='server_base',
     source=[
         'basic_types.idl',
-        'database_name.cpp',
         'catalog_shard_feature_flag.idl',
         'cluster_role.cpp',
-        'feature_compatibility_version_parser.cpp',
+        'database_name.cpp',
         'feature_compatibility_version_document.idl',
+        'feature_compatibility_version_parser.cpp',
         'feature_flag.cpp',
         'index_names.cpp',
         'keypattern.cpp',
         'logical_time.cpp',
         'multitenancy.idl',
         'namespace_string.cpp',
-        'server_parameter_with_storage.cpp',
+        'server_options.cpp',
         'server_parameter.cpp',
         'server_parameter.idl',
+        'server_parameter_with_storage.cpp',
         'shard_id.cpp',
         'shutdown_in_progress_quiesce_info.cpp',
         'tenant_id.cpp',
@@ -82,7 +83,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        'server_options_core',
     ],
 )
 
@@ -266,16 +266,6 @@ env.Library(
 )
 
 env.Library(
-    target='server_options_core',
-    source=[
-        'server_options.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
     target='server_options',
     source=[
         'server_options_helpers.cpp',
@@ -450,10 +440,10 @@ env.Library(
         'change_stream_options_parameter.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         'change_stream_options',
         'change_stream_serverless_helpers',
-        'server_options_core',
+        'repl/repl_coordinator_interface',
+        'server_base',
         'service_context',
     ],
 )
@@ -1911,7 +1901,7 @@ env.Library(
         'dbdirectclient',
         'repl/replica_set_aware_service',
         'rw_concern_d',
-        'server_options_core',
+        'server_base',
     ],
 )
 

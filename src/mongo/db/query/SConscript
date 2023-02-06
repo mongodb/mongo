@@ -360,19 +360,34 @@ env.Library(
 
 env.Library(
     target='op_metrics',
-    source=['telemetry.cpp', '$BUILD_DIR/mongo/db/curop.cpp'],
+    source=[
+        'telemetry.cpp',
+        '$BUILD_DIR/mongo/db/curop.cpp',
+    ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base', '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/db/commands', '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/generic_cursor', '$BUILD_DIR/mongo/db/profile_filter',
-        '$BUILD_DIR/mongo/db/server_options', '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/generic_cursor',
+        '$BUILD_DIR/mongo/db/profile_filter',
+        '$BUILD_DIR/mongo/db/server_options',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/stats/timer_stats',
         '$BUILD_DIR/mongo/db/storage/storage_engine_parameters',
-        '$BUILD_DIR/mongo/rpc/client_metadata', '$BUILD_DIR/mongo/transport/service_executor',
-        '$BUILD_DIR/mongo/util/diagnostic_info' if get_option('use-diagnostic-latches') == 'on' else
-        [], '$BUILD_DIR/mongo/util/fail_point', '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/processinfo', '$BUILD_DIR/mongo/util/progress_meter',
-        'command_request_response', 'memory_util', 'query_knobs', 'rate_limiting'
+        '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/transport/service_executor',
+        '$BUILD_DIR/mongo/util/diagnostic_info'
+        if get_option('use-diagnostic-latches') == 'on' else [],
+        '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/util/processinfo',
+        '$BUILD_DIR/mongo/util/progress_meter',
+        'command_request_response',
+        'memory_util',
+        'query_knobs',
+        'rate_limiting',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',

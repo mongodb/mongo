@@ -63,8 +63,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/dbmessage',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/util/net/network',
         'message',
@@ -73,6 +71,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/stats/counters',
         'rewrite_state_change_errors',
     ],
 )

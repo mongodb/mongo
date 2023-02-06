@@ -32,11 +32,10 @@ utEnv.Library(
         'unittest.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         'golden_test_base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/mongo/util/pcre_util',
         '$BUILD_DIR/mongo/util/pcre_wrapper',

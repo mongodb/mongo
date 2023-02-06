@@ -20,11 +20,10 @@ fmEnv.Library(
         'free_mon_storage.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/ftdc/ftdc',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/third_party/shim_snappy',
     ],
 )

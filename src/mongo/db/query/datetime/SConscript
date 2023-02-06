@@ -17,9 +17,11 @@ timeZoneEnv.Library(
 
 timeZoneEnv.Library(
     target='init_timezone_data',
-    source=['init_timezone_data.cpp'],
+    source=[
+        'init_timezone_data.cpp',
+    ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/third_party/shim_timelib',
         'date_time_support',
     ],

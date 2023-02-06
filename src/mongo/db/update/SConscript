@@ -92,12 +92,11 @@ env.Library(
         'update_driver.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/query/canonical_query',
         '$BUILD_DIR/mongo/db/query_expressions',
-        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/db/server_base',
         'update',
     ],
 )

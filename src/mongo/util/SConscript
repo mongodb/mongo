@@ -240,7 +240,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
-        '$BUILD_DIR/mongo/db/server_options_core',
     ],
 )
 
@@ -506,9 +505,8 @@ env.Library(
         "signal_win32.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/log_process_details",
-        "$BUILD_DIR/mongo/db/server_options_core",
+        "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/db/service_context",
     ],
 )

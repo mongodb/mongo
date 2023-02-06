@@ -82,8 +82,7 @@ if get_option('link-model') != 'dynamic-sdk':
             'mongoc_embedded_test.idl',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/server_options_core',
+            '$BUILD_DIR/mongo/db/server_base',
             '$BUILD_DIR/mongo/unittest/unittest',
             '$BUILD_DIR/mongo/util/options_parser/options_parser',
             'mongoc_embedded',
