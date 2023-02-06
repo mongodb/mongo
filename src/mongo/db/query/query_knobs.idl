@@ -26,6 +26,9 @@
 # it in the license file.
 #
 
+imports:
+  - "mongo/idl/cluster_server_parameter.idl"
+
 global:
   cpp_namespace: "mongo"
   cpp_includes:
@@ -60,6 +63,21 @@ enums:
             kConstantRedactionStrategy: "constant"
             # Use a prefix of sha256 redaction strategy
             kSha256RedactionStrategy: "sha256"
+
+structs:
+  InternalQueryCutoffForSampleFromRandomCursorStorage:
+    description: "A specification for the 'internalQueryCutoffForSampleFromRandomCursor' cluster-wide configuration parameter type."
+    inline_chained_structs: true
+    chained_structs:
+      ClusterServerParameter: clusterServerParameter
+    fields:
+      sampleCutoff:
+        description: "The configuration for random-cursor sample cutoffs."
+        type: double
+        default: 0.05
+        validator:
+          gt: 0.0
+          lte: 1.0
 
 server_parameters:
 
@@ -1075,6 +1093,12 @@ server_parameters:
     validator:
       gte: 0
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
+  internalQueryCutoffForSampleFromRandomCursor:
+    description: "The maximum sample ratio for random cursor."
+    set_at: cluster
+    cpp_varname: "internalQueryCutoffForSampleFromRandomCursor"
+    cpp_vartype: InternalQueryCutoffForSampleFromRandomCursorStorage
 
   internalQueryGlobalProfilingFilter:
     description: "Enables the setProfilingFilterGlobally command."

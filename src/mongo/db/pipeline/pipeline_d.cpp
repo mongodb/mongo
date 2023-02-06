@@ -516,7 +516,17 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     // function because double-locking forces any PlanExecutor we create to adopt a NO_YIELD policy.
     invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_IS));
 
-    static const double kMaxSampleRatioForRandCursor = 0.05;
+    auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+    auto* randomCursorSampleRatioParam =
+        clusterParameters
+            ->get<ClusterParameterWithStorage<InternalQueryCutoffForSampleFromRandomCursorStorage>>(
+                "internalQueryCutoffForSampleFromRandomCursor");
+
+    auto maxSampleRatioClusterParameter =
+        randomCursorSampleRatioParam->getValue(expCtx->ns.tenantId());
+
+    const double kMaxSampleRatioForRandCursor = maxSampleRatioClusterParameter.getSampleCutoff();
+
     if (!expCtx->ns.isTimeseriesBucketsCollection()) {
         if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100) {
             return nullptr;
