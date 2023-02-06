@@ -170,9 +170,10 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                     options->baton = baton;
                     requests.push_back(
                         sendCommand(options, opCtx, std::move(t)).thenRunOn(proxyExec));
-                    if (i > 0) {
-                        hm->incrementNumTotalHedgedOperations();
-                    }
+                }
+
+                if (opts.hedgeCount > 0) {
+                    hm->incrementNumTotalHedgedOperations();
                 }
 
                 /**

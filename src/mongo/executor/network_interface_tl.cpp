@@ -687,6 +687,12 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         });
     }
 
+    if (_svcCtx && cmdState->hedgeCount > 1) {
+        auto hm = HedgingMetrics::get(_svcCtx);
+        invariant(hm);
+        hm->incrementNumTotalHedgedOperations();
+    }
+
     return Status::OK();
 } catch (const DBException& ex) {
     return ex.toStatus();
@@ -901,12 +907,6 @@ void NetworkInterfaceTL::RequestManager::trySend(
                 hedgingMaxTimeMS < request->timeout) {
                 logSetMaxTimeMSHedge = true;
                 request->timeout = hedgingMaxTimeMS;
-            }
-
-            if (cmdState->interface->_svcCtx) {
-                auto hm = HedgingMetrics::get(cmdState->interface->_svcCtx);
-                invariant(hm);
-                hm->incrementNumTotalHedgedOperations();
             }
         }
 
