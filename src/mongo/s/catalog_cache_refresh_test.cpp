@@ -143,7 +143,7 @@ TEST_F(CatalogCacheRefreshTest, FullLoad) {
         epoch, timestamp, shardKeyPattern, reshardingUUID, {chunk1, chunk2, chunk3, chunk4});
 
     expectCollectionAndIndexesAggregation(
-        kNss, epoch, timestamp, reshardingUUID, shardKeyPattern, {});
+        kNss, epoch, timestamp, reshardingUUID, shardKeyPattern, boost::none, {});
 
     auto cm = *future.default_timed_get();
     ASSERT(cm.isSharded());

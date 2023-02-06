@@ -196,7 +196,7 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
         kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {chunk1, chunk2});
 
     expectCollectionAndIndexesAggregation(
-        kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {});
+        kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, boost::none, {});
 
     // That error should be retried, but only the one on that shard.
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -290,7 +290,7 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
         kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {chunk1, chunk2, chunk3});
 
     expectCollectionAndIndexesAggregation(
-        kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {});
+        kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, boost::none, {});
 
     // That error should be retried, this time two shards.
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -381,7 +381,7 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
         kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {chunk1});
 
     expectCollectionAndIndexesAggregation(
-        kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {});
+        kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, boost::none, {});
 
     // That error should be retried, this time targetting only one shard.
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -451,7 +451,7 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
         kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {chunk1, chunk2});
 
     expectCollectionAndIndexesAggregation(
-        kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {});
+        kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, boost::none, {});
 
     // Mock out the sharded view error responses from both shards.
     std::vector<BSONObj> viewPipeline = {fromjson("{$group: {_id: '$groupKey'}}"),

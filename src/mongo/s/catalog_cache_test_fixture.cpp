@@ -252,6 +252,7 @@ void CatalogCacheTestFixture::expectCollectionAndIndexesAggregation(
     Timestamp timestamp,
     UUID uuid,
     const ShardKeyPattern& shardKeyPattern,
+    boost::optional<Timestamp> indexVersion,
     const std::vector<BSONObj>& globalIndexes) {
     if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -259,7 +260,8 @@ void CatalogCacheTestFixture::expectCollectionAndIndexesAggregation(
             ASSERT_EQ(request.dbname, "config");
             CollectionType collType(
                 nss, epoch, timestamp, Date_t::now(), uuid, shardKeyPattern.toBSON());
-            return makeCollectionAndIndexesAggregationResponse(collType, {});
+            collType.setIndexVersion(indexVersion);
+            return makeCollectionAndIndexesAggregationResponse(collType, globalIndexes);
         });
     }
 }
