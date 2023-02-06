@@ -48,15 +48,12 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics);
 
-StringData makeOrphanDocsWarningMsg() {
-    return str::stream() << "If \"" << KeyCharacteristicsMetrics::kNumOrphanDocsFieldName
-                         << "\" is large relative to \""
-                         << KeyCharacteristicsMetrics::kNumDocsFieldName
-                         << "\", you may want to rerun the command at some other time to get more "
-                            "accurate \""
-                         << KeyCharacteristicsMetrics::kNumDistinctValuesFieldName << "\" and \""
-                         << KeyCharacteristicsMetrics::kFrequencyFieldName << "\" metrics.";
-}
+const std::string kOrphanDocsWarningMessage = "If \"" +
+    KeyCharacteristicsMetrics::kNumOrphanDocsFieldName + "\" is large relative to \"" +
+    KeyCharacteristicsMetrics::kNumDocsFieldName +
+    "\", you may want to rerun the command at some other time to get more accurate \"" +
+    KeyCharacteristicsMetrics::kNumDistinctValuesFieldName + "\" and \"" +
+    KeyCharacteristicsMetrics::kFrequencyFieldName + "\" metrics.";
 
 void validateCommandOptions(OperationContext* opCtx,
                             const NamespaceString& nss,
@@ -99,7 +96,7 @@ public:
                 analyze_shard_key::calculateKeyCharacteristicsMetrics(opCtx, nss, key);
             response.setKeyCharacteristics(keyCharacteristics);
             if (response.getNumOrphanDocs()) {
-                response.setNote(makeOrphanDocsWarningMsg());
+                response.setNote(StringData(kOrphanDocsWarningMessage));
             }
 
             if (!serverGlobalParams.clusterRole.isShardRole() ||
