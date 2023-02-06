@@ -9,8 +9,9 @@
 load("jstests/libs/sbe_explain_helpers.js");  // For getSbePlanStages.
 load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
+const kNumNodes = 3;
 const replTest = new ReplSetTest({
-    nodes: 3,
+    nodes: kNumNodes,
 });
 
 replTest.startSet();
@@ -20,15 +21,18 @@ replTest.initiate();
  * Setup the primary and secondary collections.
  */
 let primary = replTest.getPrimary();
-const insertColl = primary.getDB("test").foo;
+let bulk = primary.getDB("test").foo.initializeUnorderedBulkOp();
 const cRecords = 50;
 for (let i = 0; i < cRecords; ++i) {
     // We'll be using a unique 'key' field for group & lookup, but we cannot use '_id' for this,
     // because '_id' is indexed and would trigger Indexed Loop Join instead of Hash Join.
-    assert.commandWorked(insertColl.insert({key: i, string: "test test test"}));
+    bulk.insert({key: i, string: "test test test"});
 }
+assert.commandWorked(bulk.execute({w: kNumNodes, wtimeout: 5000}));
 
 let secondary = replTest.getSecondary();
+// Wait for the insertion to be visible on 'secondary'.
+replTest.awaitLastOpCommitted(null, [secondary]);
 const readColl = secondary.getDB("test").foo;
 
 /**
