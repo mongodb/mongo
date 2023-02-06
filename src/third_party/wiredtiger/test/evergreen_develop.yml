@@ -18,7 +18,7 @@ buildvariants:
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_BUILDDIR/test/utility/
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O3
     HAVE_DIAGNOSTIC: -DHAVE_DIAGNOSTIC=0
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake
     CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
     python_binary: '/opt/mongodbtoolchain/v4/bin/python3'
     pip3_binary: '/opt/mongodbtoolchain/v4/bin/pip3'
@@ -93,7 +93,7 @@ buildvariants:
       LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
     make_command: ninja
     cmake_generator: Ninja
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake
     CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
   tasks:
     - name: coverage-report
