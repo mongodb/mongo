@@ -42,7 +42,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/async_rpc_shard_targeter.h"
-#include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
@@ -347,53 +346,6 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
         options->genericArgs.stable.toBSON().addFields(options->genericArgs.unstable.toBSON());
     auto cmdBSON = options->cmd.toBSON(genericArgs);
     return detail::sendCommandWithRunner(cmdBSON, options, runner, nullptr, std::move(targeter));
-}
-
-/**
- * This function operates the same to `sendCommand` above, but will attach transaction metadata
- * from the opCtx to the command BSONObject metadata before sending to the targeted shardId.
- */
-template <typename CommandType>
-ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendTxnCommand(
-    std::shared_ptr<AsyncRPCOptions<CommandType>> options,
-    OperationContext* opCtx,
-    std::unique_ptr<ShardIdTargeter> targeter) {
-    using ReplyType = AsyncRPCResponse<typename CommandType::Reply>;
-    // Execute the command after extracting the db name and bson from the CommandType.
-    // Wrapping this function allows us to separate the CommandType parsing logic from the
-    // implementation details of executing the remote command asynchronously.
-    auto runner = detail::AsyncRPCRunner::get(opCtx->getServiceContext());
-    auto cmdBSON = options->cmd.toBSON({});
-    const auto shardId = targeter->getShardId();
-    if (auto txnRouter = TransactionRouter::get(opCtx); txnRouter) {
-        cmdBSON = txnRouter.attachTxnFieldsIfNeeded(opCtx, targeter->getShardId(), cmdBSON);
-    }
-    auto genericArgs =
-        options->genericArgs.stable.toBSON().addFields(options->genericArgs.unstable.toBSON());
-    auto cmdBsonWithArgs = cmdBSON.addFields(genericArgs);
-    return detail::sendCommandWithRunner(
-               cmdBsonWithArgs, options, runner, opCtx, std::move(targeter))
-        .onCompletion([opCtx, shardId](StatusWith<ReplyType> swResponse) -> StatusWith<ReplyType> {
-            auto txnRouter = TransactionRouter::get(opCtx);
-            if (!txnRouter) {
-                return swResponse;
-            }
-            if (swResponse.isOK()) {
-                // TODO (SERVER-72082): Make sure TxnResponseMetadata is appended to the BSON
-                // that we are passing into 'processParticipantResponse'.
-                txnRouter.processParticipantResponse(
-                    opCtx, shardId, swResponse.getValue().response.toBSON());
-            } else {
-                auto extraInfo = swResponse.getStatus().template extraInfo<AsyncRPCErrorInfo>();
-                if (extraInfo->isRemote()) {
-                    auto remoteError = extraInfo->asRemote();
-                    txnRouter.processParticipantResponse(
-                        opCtx, shardId, remoteError.getResponseObj());
-                }
-            }
-            return swResponse;
-        })
-        .thenRunOn(options->exec);
 }
 }  // namespace mongo::async_rpc
 #undef MONGO_LOGV2_DEFAULT_COMPONENT

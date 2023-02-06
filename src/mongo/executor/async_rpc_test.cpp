@@ -36,6 +36,7 @@
 #include "mongo/executor/async_rpc_retry_policy.h"
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/async_rpc_test_fixture.h"
+#include "mongo/executor/async_transaction_rpc.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
