@@ -246,9 +246,11 @@ struct OperationInternal {
 };
 
 struct CheckpointOperationInternal : OperationInternal {
-    CheckpointOperationInternal() : OperationInternal() {}
+    std::string ckpt_config;
+    CheckpointOperationInternal() : OperationInternal(), ckpt_config() {}
     CheckpointOperationInternal(const CheckpointOperationInternal &other) :
-	OperationInternal(other) {}
+	OperationInternal(other), ckpt_config(other.ckpt_config)  {}
+    virtual void parse_config(const std::string &config);
     virtual int run(ThreadRunner *runner, WT_SESSION *session);
 };
 
