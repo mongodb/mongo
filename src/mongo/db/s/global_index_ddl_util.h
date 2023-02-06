@@ -88,8 +88,7 @@ void replaceCollectionGlobalIndexes(OperationContext* opCtx,
  * migrations and holding the critical section in all shards with data for userCollectionNss. This
  * function is not currently compatible with transactions.
  */
-void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx,
-                                         const NamespaceString& userCollectionNss);
+void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
  * Removes all the indexes and unset the current index version. This function should only be called

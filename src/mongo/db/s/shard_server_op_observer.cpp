@@ -545,7 +545,6 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             auto indexEntry = ShardingIndexCatalogInsertEntry::parse(
                 IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
             opCtx->recoveryUnit()->onCommit([opCtx, nss, indexEntry](auto _) {
-                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                     opCtx, nss);
                 scsr->addIndex(
@@ -559,7 +558,6 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             auto removeEntry = ShardingIndexCatalogRemoveEntry::parse(
                 IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
             opCtx->recoveryUnit()->onCommit([opCtx, nss, removeEntry](auto _) {
-                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                     opCtx, nss);
                 scsr->removeIndex(opCtx,
@@ -572,7 +570,6 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             auto replaceEntry = ShardingIndexCatalogReplaceEntry::parse(
                 IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
             opCtx->recoveryUnit()->onCommit([opCtx, nss, replaceEntry](auto _) {
-                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                     opCtx, nss);
                 scsr->replaceIndexes(opCtx,
@@ -583,7 +580,6 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
         }
         case ShardingIndexCatalogOpEnumEnum::clear:
             opCtx->recoveryUnit()->onCommit([opCtx, nss](auto _) {
-                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                     opCtx, nss);
                 scsr->clearIndexes(opCtx);
@@ -592,22 +588,17 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             break;
         case ShardingIndexCatalogOpEnumEnum::drop: {
             opCtx->recoveryUnit()->onCommit([opCtx, nss](auto _) {
-                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                     opCtx, nss);
                 scsr->clearIndexes(opCtx);
             });
+
             break;
         }
         case ShardingIndexCatalogOpEnumEnum::rename: {
             auto renameEntry = ShardingIndexCatalogRenameEntry::parse(
                 IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
             opCtx->recoveryUnit()->onCommit([opCtx, renameEntry](auto _) {
-                AutoGetCollection autoCollFrom(
-                    opCtx,
-                    renameEntry.getFromNss(),
-                    MODE_IX,
-                    AutoGetCollection::Options{}.secondaryNssOrUUIDs({renameEntry.getToNss()}));
                 std::vector<IndexCatalogType> fromIndexes;
                 boost::optional<UUID> uuid;
                 {

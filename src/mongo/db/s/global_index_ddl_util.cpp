@@ -69,8 +69,13 @@ void renameGlobalIndexesMetadata(OperationContext* opCtx,
         [&]() {
             boost::optional<UUID> toUuid;
             WriteUnitOfWork wunit(opCtx);
-            AutoGetCollection collsColl(
-                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
+            AutoGetCollection fromToColl(
+                opCtx, fromNss, MODE_IX, AutoGetCollection::Options{}.secondaryNssOrUUIDs({toNss}));
+            AutoGetCollection collsColl(opCtx,
+                                        NamespaceString::kShardCollectionCatalogNamespace,
+                                        MODE_IX,
+                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                                            {NamespaceString::kShardIndexCatalogNamespace}));
             {
                 // First get the document to check the index version if the document already exists
                 const auto queryTo = BSON(CollectionType::kNssFieldName << toNss.ns());
@@ -158,8 +163,12 @@ void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
     writeConflictRetry(
         opCtx, "AddIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
             WriteUnitOfWork wunit(opCtx);
-            AutoGetCollection collsColl(
-                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
+            AutoGetCollection userColl(opCtx, userCollectionNss, MODE_IX);
+            AutoGetCollection collsColl(opCtx,
+                                        NamespaceString::kShardCollectionCatalogNamespace,
+                                        MODE_IX,
+                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                                            {NamespaceString::kShardIndexCatalogNamespace}));
 
             {
                 // First get the document to check the index version if the document already exists
@@ -229,9 +238,12 @@ void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
     writeConflictRetry(
         opCtx, "RemoveIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
             WriteUnitOfWork wunit(opCtx);
-            AutoGetCollection collsColl(
-                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
-
+            AutoGetCollection userColl(opCtx, nss, MODE_IX);
+            AutoGetCollection collsColl(opCtx,
+                                        NamespaceString::kShardCollectionCatalogNamespace,
+                                        MODE_IX,
+                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                                            {NamespaceString::kShardIndexCatalogNamespace}));
             {
                 // First get the document to check the index version if the document already exists
                 const auto query = BSON(CollectionType::kNssFieldName
@@ -297,8 +309,12 @@ void replaceCollectionGlobalIndexes(OperationContext* opCtx,
     writeConflictRetry(
         opCtx, "ReplaceIndexCatalog", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
             WriteUnitOfWork wunit(opCtx);
-            AutoGetCollection collsColl(
-                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
+            AutoGetCollection userColl(opCtx, nss, MODE_IX);
+            AutoGetCollection collsColl(opCtx,
+                                        NamespaceString::kShardCollectionCatalogNamespace,
+                                        MODE_IX,
+                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                                            {NamespaceString::kShardIndexCatalogNamespace}));
             {
                 // Set final indexVersion
                 const auto query = BSON(CollectionType::kNssFieldName
@@ -357,8 +373,13 @@ void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx, const Namespac
         opCtx, "DropIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
             boost::optional<UUID> collectionUUID;
             WriteUnitOfWork wunit(opCtx);
-            AutoGetCollection collsColl(
-                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
+            Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
+            Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+            AutoGetCollection collsColl(opCtx,
+                                        NamespaceString::kShardCollectionCatalogNamespace,
+                                        MODE_IX,
+                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                                            {NamespaceString::kShardIndexCatalogNamespace}));
             {
                 const auto query = BSON(CollectionType::kNssFieldName << nss.ns());
                 BSONObj collectionDoc;
@@ -400,8 +421,12 @@ void clearCollectionGlobalIndexes(OperationContext* opCtx,
     writeConflictRetry(
         opCtx, "ClearIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
             WriteUnitOfWork wunit(opCtx);
-            AutoGetCollection collsColl(
-                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
+            AutoGetCollection userColl(opCtx, nss, MODE_IX);
+            AutoGetCollection collsColl(opCtx,
+                                        NamespaceString::kShardCollectionCatalogNamespace,
+                                        MODE_IX,
+                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                                            {NamespaceString::kShardIndexCatalogNamespace}));
             {
                 // First unset the index version.
                 const auto query = BSON(CollectionType::kNssFieldName
