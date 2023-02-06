@@ -1253,18 +1253,10 @@ vm::CodeFragment ELocalLambda::compileBodyDirect(CompileCtx& ctx) const {
     // Lambda parameter is no longer accessible after this point so remove the frame.
     body.removeFrame(_frameId);
 
-    // TODO SERVER-72843 Remove the adjustment below when the issue if fixed.
-    // Adjust the stack offsets by 1 to account to maintain the bug compatibility that
-    // allows traverse lambdas to access clousre variables under special conditions.
-    // Lambda captures are not supported, and adjustment below is only meant to keep
-    // existing stage builder code from falling apart.
-    body.fixupStackOffsets(1);
-
-    // TODO SERVER-72843: Add assert that verifies that lambda uses no closure variables.
-    // Possibly by ensuring that there are no outstanding frames in the lambda code fragment, like:
-    // tassert(7284301,
-    //         !body.hasFrames(),
-    //         "Accessing closure variables from lambda body in not supported.");
+    // Verify that 'body' does not refer to local variables defined outside of 'body'.
+    tassert(7284301,
+            "Lambda referring to local variable defined outside of the lambda is not supported.",
+            !body.hasFrames());
 
     return body;
 }

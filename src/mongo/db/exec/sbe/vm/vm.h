@@ -912,13 +912,10 @@ public:
     // Returns whether the are any frames currently in scope.
     bool hasFrames() const;
 
+private:
     // Adjusts all the stack offsets in the outstanding fixups by the provided delta.
-    // TODO SERVER-72843: Make fixupStackOffsets private after fixing the issue.
-    // ELocalLambda needs access to fixupStackOffsets as the bug workaround, and should be
-    // treated as private otherwise.
     void fixupStackOffsets(int stackOffsetDelta);
 
-private:
     // Stores the fixup information for stack frames.
     // stackPosition - stack depth of where the frame was declared, or kPositionNotSet if not known
     // yet.
@@ -931,7 +928,6 @@ private:
         int64_t stackPosition{kPositionNotSet};
     };
 
-private:
     template <typename... Ts>
     void appendSimpleInstruction(Instruction::Tags tag, Ts&&... params);
     auto allocateSpace(size_t size) {
@@ -956,7 +952,6 @@ private:
     FrameInfo& getOrDefineFrame(FrameId frameId);
     void fixupFrame(FrameInfo& frame);
 
-private:
     absl::InlinedVector<uint8_t, 16> _instrs;
 
     // A collection of frame information for local variables.

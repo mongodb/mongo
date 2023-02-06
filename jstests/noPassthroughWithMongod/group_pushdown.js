@@ -332,21 +332,6 @@ assertResultsMatchWithAndWithoutPushdown(coll,
                                          [{"_id": null, "lowp": 2, "highp": 1}],
                                          2);
 
-// The second $group stage refers to top-fields below a $filter
-assertResultsMatchWithAndWithoutPushdown(
-    coll,
-    [
-        {$group: {_id: "$item", prices: {$push: "$price"}}},
-        {
-            $group: {
-                _id: "$_id",
-                o: {$push: {$filter: {input: "$prices", as: "p", cond: {$gte: ["$$p", 5]}}}}
-            }
-        }
-    ],
-    [{"_id": "a", "o": [[10, 5]]}, {"_id": "b", "o": [[20, 10]]}, {"_id": "c", "o": [[5]]}],
-    2);
-
 // The second $group stage refers to top-fields below a $let
 assertResultsMatchWithAndWithoutPushdown(
     coll,

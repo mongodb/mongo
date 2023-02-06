@@ -2664,9 +2664,7 @@ ExpressionFilter::ExpressionFilter(ExpressionContext* const expCtx,
       _varName(std::move(varName)),
       _varId(varId),
       _limit(_children.size() == 3 ? 2 : boost::optional<size_t>(boost::none)) {
-    if (_limit) {
-        expCtx->sbeCompatible = false;
-    }
+    expCtx->sbeCompatible = false;
 }
 
 intrusive_ptr<Expression> ExpressionFilter::optimize() {

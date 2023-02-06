@@ -129,12 +129,6 @@ struct ExpressionVisitorContext {
     std::stack<VarsFrame> varsFrameStack;
 
     const PlanStageSlots* slots = nullptr;
-
-    // This stack contains the FrameIds used by the $filter expressions that are currently
-    // being processed.
-    std::stack<sbe::FrameId> filterExprFrameStack;
-    // We use this counter to track which children of $filter we've already processed.
-    std::stack<int> filterExprChildrenCounter;
 };
 
 /**
@@ -304,12 +298,7 @@ public:
     void visit(const ExpressionDivide* expr) final {}
     void visit(const ExpressionExp* expr) final {}
     void visit(const ExpressionFieldPath* expr) final {}
-    void visit(const ExpressionFilter* expr) final {
-        tassert(
-            6987502, "SBE does not support $filter expression with 'limit' arg", !expr->hasLimit());
-
-        _context->filterExprChildrenCounter.push(1);
-    }
+    void visit(const ExpressionFilter* expr) final {}
     void visit(const ExpressionFloor* expr) final {}
     void visit(const ExpressionIfNull* expr) final {}
     void visit(const ExpressionIn* expr) final {}
@@ -467,32 +456,7 @@ public:
     void visit(const ExpressionDivide* expr) final {}
     void visit(const ExpressionExp* expr) final {}
     void visit(const ExpressionFieldPath* expr) final {}
-    void visit(const ExpressionFilter* expr) final {
-        // $filter has up to three children: cond, as, and limit (optional). SBE currently does not
-        // support $filter when the 'limit' arg is specified.
-        //
-        // Only the filter predicate (cond) needs access to the value of the "as" arg, here referred
-        // to as current element var. The filter predicate will be the second element in the
-        // _children vector the expression_walker walks.
-        const auto filterPredIndex = 2;
-        auto variableId = expr->getVariableId();
-
-        // We use this counter in the visit methods of ExpressionFilter to track which child we are
-        // processing and which children we've already processed.
-        auto& currentIndex = _context->filterExprChildrenCounter.top();
-        if (++currentIndex == filterPredIndex) {
-            tassert(3273901,
-                    "Current element variable already exists in _context",
-                    _context->environment.find(variableId) == _context->environment.end());
-            auto frameId = _context->state.frameId();
-            _context->environment.emplace(variableId, frameId);
-            // This stack maintains the current element variable for $filter so that we can erase it
-            // from our context in inVisitor when processing the optional limit arg, but then still
-            // have access to this var again in postVisitor when constructing the filter
-            // predicate/'cond' subtree.
-            _context->filterExprFrameStack.push(frameId);
-        }
-    }
+    void visit(const ExpressionFilter* expr) final {}
     void visit(const ExpressionFloor* expr) final {}
     void visit(const ExpressionIfNull* expr) final {}
     void visit(const ExpressionIn* expr) final {}
@@ -1943,51 +1907,7 @@ public:
         pushABT(std::move(resultExpr));
     }
     void visit(const ExpressionFilter* expr) final {
-        // Remove index tracking current child of $filter expression, since it is not used anymore.
-        _context->filterExprChildrenCounter.pop();
-
-        _context->ensureArity(2);
-        // Extract filter predicate expression and sub-tree.
-        auto filterExpr = _context->popABTExpr();
-        auto inputExpr = _context->popABTExpr();
-
-        // We no longer need this mapping because filter predicate which expects it was already
-        // compiled.
-        _context->environment.erase(expr->getVariableId());
-
-        tassert(7158304,
-                "Expected frame id for the current element variable of $filter expression",
-                !_context->filterExprFrameStack.empty());
-        auto lambdaFrameId = _context->filterExprFrameStack.top();
-        _context->filterExprFrameStack.pop();
-
-        auto lambdaParamName = makeLocalVariableName(lambdaFrameId, 0);
-
-        // If coerceToBool() returns true we return the lambda input, otherwise we return Nothing.
-        // This will effectively cause all elements in the array that coerce to False to get
-        // filtered out, and only the elements that coerce to True will remain.
-        auto lambdaBodyExpr = optimizer::make<optimizer::If>(
-            makeFillEmptyFalse(makeABTFunction("coerceToBool", std::move(filterExpr))),
-            makeVariable(lambdaParamName),
-            optimizer::Constant::nothing());
-
-        auto lambdaExpr = optimizer::make<optimizer::LambdaAbstraction>(std::move(lambdaParamName),
-                                                                        std::move(lambdaBodyExpr));
-
-        auto inputName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto traversePExpr = makeABTFunction("traverseP",
-                                             makeVariable(inputName),
-                                             std::move(lambdaExpr),
-                                             optimizer::Constant::int32(1));
-
-        // If input is null or missing, we do not evaluate filter predicate and return Null.
-        auto resultExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(inputName), optimizer::Constant::null()},
-            ABTCaseValuePair{makeABTFunction("isArray", makeVariable(inputName)),
-                             std::move(traversePExpr)},
-            makeABTFail(ErrorCodes::Error{7158305}, "input to $filter must be an array"));
-        pushABT(optimizer::make<optimizer::Let>(
-            std::move(inputName), std::move(inputExpr), std::move(resultExpr)));
+        unsupportedExpression("$filter");
     }
 
     void visit(const ExpressionFloor* expr) final {
