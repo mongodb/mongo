@@ -416,6 +416,17 @@ public:
         OperationContext* opCtx, const NamespaceString& nss) const;
 
     /**
+     * Fetches a collection pointer that corresponds to the NamespaceString or UUID.
+     *
+     * Requires a MODE_IS collection lock to be obtained prior to calling this function, or else the
+     * found Collection pointer might no longer be valid when the call returns.
+     *
+     * Returns nullptr is the namespace or uuid is unknown.
+     */
+    CollectionPtr lookupCollectionByNamespaceOrUUID(OperationContext* opCtx,
+                                                    const NamespaceStringOrUUID& nssOrUUID) const;
+
+    /**
      * This function gets the NamespaceString from the collection catalog entry that
      * corresponds to UUID uuid. If no collection exists with the uuid, return
      * boost::none. See onCloseCatalog/onOpenCatalog for more info.

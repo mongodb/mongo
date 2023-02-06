@@ -243,13 +243,8 @@ boost::optional<std::vector<NamespaceString>> resolveSecondaryNamespacesOrUUIDs(
  */
 void establishCappedSnapshotIfNeeded(OperationContext* opCtx,
                                      const std::shared_ptr<const CollectionCatalog>& catalog,
-                                     const NamespaceStringOrUUID& nsOrUUID,
-                                     const NamespaceString& resolvedNss) {
-    // Lookup the collection by UUID if one was provided - otherwise look it up by namespace.
-    // TODO(SERVER-73353): Use lookupCollection function that takes NamespaceStringOrUUID
-    // directly once it exists.
-    auto coll = (nsOrUUID.uuid() ? catalog->lookupCollectionByUUID(opCtx, *nsOrUUID.uuid())
-                                 : catalog->lookupCollectionByNamespace(opCtx, resolvedNss));
+                                     const NamespaceStringOrUUID& nsOrUUID) {
+    auto coll = catalog->lookupCollectionByNamespaceOrUUID(opCtx, nsOrUUID);
     if (coll && coll->usesCappedSnapshots()) {
         CappedSnapshots::get(opCtx).establish(opCtx, coll);
     }
@@ -1141,7 +1136,7 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
         // snapshot here, on the Collection object in the latest version of the catalog, even if
         // openCollection is eventually called to construct a Collection object from the durable
         // catalog.
-        establishCappedSnapshotIfNeeded(opCtx, catalogBeforeSnapshot, nsOrUUID, nss);
+        establishCappedSnapshotIfNeeded(opCtx, catalogBeforeSnapshot, nsOrUUID);
 
         openSnapshot(opCtx, nss.isOplog());
 
@@ -1227,16 +1222,10 @@ const Collection* getCollectionFromCatalog(OperationContext* opCtx,
         }
         return coll;
     } else {
-        // It's safe to extract the raw pointer from the shared_ptr returned by
-        // lookupCollectionByNamespaceForRead, because the shared_ptr is owned by the catalog, which
-        // will remain valid for as long as we're using the collection returned here.
-        //
-        // TODO(SERVER-65011): It would be good to clean this up once the lookup APIs are unified.
-        if (nsOrUUID.nss()) {
-            return catalog->lookupCollectionByNamespaceForRead(opCtx, *nsOrUUID.nss()).get();
-        } else {
-            return catalog->lookupCollectionByUUIDForRead(opCtx, *nsOrUUID.uuid()).get();
-        }
+        // It's safe to extract the raw pointer from the CollectionPtr returned by lookupCollection
+        // because it is owned by the catalog, which will remain valid for as long as we're using
+        // the collection returned here.
+        return catalog->lookupCollectionByNamespaceOrUUID(opCtx, nsOrUUID).get();
     }
 }
 

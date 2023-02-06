@@ -770,8 +770,7 @@ bool CollectionCatalog::needsOpenCollection(OperationContext* opCtx,
                                             const NamespaceStringOrUUID& nsOrUUID,
                                             boost::optional<Timestamp> readTimestamp) const {
     if (readTimestamp) {
-        auto coll = (nsOrUUID.nss() ? lookupCollectionByNamespace(opCtx, *nsOrUUID.nss())
-                                    : lookupCollectionByUUID(opCtx, *nsOrUUID.uuid()));
+        auto coll = lookupCollectionByNamespaceOrUUID(opCtx, nsOrUUID);
         return !coll || *readTimestamp < coll->getMinimumValidSnapshot();
     } else {
         if (nsOrUUID.nss()) {
@@ -1344,6 +1343,13 @@ CollectionPtr CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
     return (coll && coll->isCommitted())
         ? CollectionPtr(opCtx, coll.get(), LookupCollectionForYieldRestore(coll->ns()))
         : CollectionPtr();
+}
+
+CollectionPtr CollectionCatalog::lookupCollectionByNamespaceOrUUID(
+    OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) const {
+    if (boost::optional<UUID> uuid = nssOrUUID.uuid())
+        return lookupCollectionByUUID(opCtx, *uuid);
+    return lookupCollectionByNamespace(opCtx, *nssOrUUID.nss());
 }
 
 bool CollectionCatalog::isCollectionAwaitingVisibility(UUID uuid) const {
