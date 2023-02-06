@@ -468,12 +468,21 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     const auto& currentMetadata = optCurrentMetadata->get();
 
+    const auto indexFeatureFlag = feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
+        serverGlobalParams.featureCompatibility);
     const auto wantedPlacementVersion = currentMetadata.getShardVersion();
-    const auto wantedShardVersion =
-        ShardVersion(wantedPlacementVersion, boost::optional<CollectionIndexes>(boost::none));
-    const ChunkVersion receivedPlacementVersion = receivedShardVersion.placementVersion();
+    const auto wantedCollectionIndexes =
+        indexFeatureFlag ? getCollectionIndexes(opCtx) : boost::none;
+    const auto wantedIndexVersion = wantedCollectionIndexes
+        ? boost::make_optional(wantedCollectionIndexes->indexVersion())
+        : boost::none;
+    const auto wantedShardVersion = ShardVersion(wantedPlacementVersion, wantedCollectionIndexes);
 
-    if (wantedPlacementVersion.isWriteCompatibleWith(receivedPlacementVersion) ||
+    const ChunkVersion receivedPlacementVersion = receivedShardVersion.placementVersion();
+    const boost::optional<Timestamp> receivedIndexVersion = receivedShardVersion.indexVersion();
+
+    if ((wantedPlacementVersion.isWriteCompatibleWith(receivedPlacementVersion) &&
+         (!indexFeatureFlag || receivedIndexVersion == wantedIndexVersion)) ||
         receivedShardVersion == ShardVersion::IGNORED())
         return optCurrentMetadata;
 
@@ -499,7 +508,13 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     if (wantedPlacementVersion.majorVersion() != receivedPlacementVersion.majorVersion()) {
         // Could be > or < - wanted is > if this is the source of a migration, wanted < if this is
         // the target of a migration
-        uasserted(std::move(sci), str::stream() << "version mismatch detected for " << _nss.ns());
+        uasserted(std::move(sci),
+                  str::stream() << "placement version mismatch detected for " << _nss.ns());
+    }
+
+    if (indexFeatureFlag && wantedIndexVersion != receivedIndexVersion) {
+        uasserted(std::move(sci),
+                  str::stream() << "index version mismatch detected for " << _nss.ns());
     }
 
     // Those are all the reasons the versions can mismatch
