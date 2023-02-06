@@ -37,6 +37,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/distinct_command_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/remove_tags_gen.h"
@@ -562,14 +563,15 @@ void shardedRenameMetadata(OperationContext* opCtx,
     // Update "FROM" tags to "TO".
     updateTags(opCtx, configShard, fromNss, toNss, writeConcern);
 
-    // Retrieve the most recent placement information about "FROM", excluding the entry that
-    // matches its deletion (an empty 'shards' field).
     auto renamedCollPlacementInfo = [&]() -> boost::optional<NamespacePlacementType> {
+        // TODO SERVER-72870 replace feature flag check
         if (!feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
                 serverGlobalParams.featureCompatibility)) {
             return boost::none;
         }
 
+        // Retrieve the latest placement document about "FROM" prior to its deletion (which will
+        // have left an entry with an empty set of shards).
         auto query = BSON(NamespacePlacementType::kNssFieldName
                           << fromNss.ns() << NamespacePlacementType::kShardsFieldName
                           << BSON("$ne" << BSONArray()));
@@ -585,17 +587,36 @@ void shardedRenameMetadata(OperationContext* opCtx,
                                 1 /*limit*/))
                 .docs;
 
-        /*
-         * TODO SERVER-72870 Replace the if block below with
-         * uassert(RetriableErrorCode,queryResponse.size() == 1)
-         */
         if (queryResponse.empty()) {
-            // If the "FROM" collection was created under a legacy FCV, no previous placement
-            // info will be available. Skip also the insertion of the updated one.
+            // Persisted placement information may be unavailable as a consequence of FCV
+            // transitions. Use the content of config.chunks as a fallback.
             LOGV2_WARNING(7068200,
                           "Unable to retrieve placement entry for the namespace being renamed",
                           "fromNss"_attr = fromNss);
-            return boost::none;
+
+            DistinctCommandRequest distinctRequest(ChunkType::ConfigNS);
+            distinctRequest.setKey(ChunkType::shard.name());
+            distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << fromUUID));
+
+            auto reply = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
+                NamespaceString::kConfigDb.toString(),
+                distinctRequest.toBSON({}),
+                Shard::RetryPolicy::kIdempotent));
+
+            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(reply));
+            std::vector<ShardId> shardIds;
+            for (const auto& valueElement : reply.response.getField("values").Array()) {
+                shardIds.emplace_back(valueElement.String());
+            }
+
+            // Compose a placement info object based on the retrieved information; the timestamp
+            // field may be disregarded, since it will be overwritten by the caller before being
+            // consumed.
+            NamespacePlacementType placementInfo(fromNss, Timestamp(), std::move(shardIds));
+            placementInfo.setUuid(fromUUID);
+            return placementInfo;
         }
 
         return NamespacePlacementType::parse(IDLParserContext("shardedRenameMetadata"),
