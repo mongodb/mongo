@@ -71,6 +71,7 @@ void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
     oplogEntry.setNss(nss);
     oplogEntry.setUuid(uuid);
+    oplogEntry.setTid(nss.tenantId());
     oplogEntry.setObject(BSON("msg" << BSON("shardCollection" << nss.ns())));
     oplogEntry.setObject2(fullCmd);
     oplogEntry.setOpTime(repl::OpTime());
