@@ -34,8 +34,7 @@ namespace gcs = google::cloud::storage;
 using namespace gcs;
 
 gcp_connection::gcp_connection(const std::string &bucket_name, const std::string &prefix)
-    : _gcp_client(google::cloud::storage::Client()), _bucket_name(bucket_name),
-      _object_prefix(prefix)
+    : _gcp_client(gcs::Client()), _bucket_name(bucket_name), _object_prefix(prefix)
 {
     // StatusOr either contains a usable BucketMetadata value or a Status object explaining why the
     // value is not present. The value's validity is checked by StatusOr::ok().

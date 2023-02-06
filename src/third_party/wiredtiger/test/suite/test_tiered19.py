@@ -30,10 +30,11 @@ import random, string, wiredtiger, wttest
 from helper_tiered import get_auth_token, TieredConfigMixin
 from wtscenario import make_scenarios
 
+file_system = wiredtiger.FileSystem
+
 # test_tiered19.py
 # Testing storage source functionality for the Azure Storage Store
 # and Google Cloud extensions.
-
 class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
 
     tiered_storage_sources = [
@@ -46,23 +47,78 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
         ('gcp_store', dict(is_tiered = True,
             is_local_storage = False,
             auth_token = get_auth_token('gcp_store'), 
-            bucket = 'pythontest',
+            bucket = 'test_tiered19',
             bucket_prefix = "pfx_",
             ss_name = 'gcp_store')),
     ]
 
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(tiered_storage_sources)
+
+    def get_storage_source(self):
+        return self.conn.get_storage_source(self.ss_name)
+
+    def get_fs_config(self, prefix = '', cache_dir = ''):
+        conf = ''
+        if prefix:
+            conf += ',prefix=' + prefix
+        if cache_dir:
+            conf += ',cache_directory=' + cache_dir
+        return conf
     
     # Load the storage source extensions.
     def conn_extensions(self, extlist):
         TieredConfigMixin.conn_extensions(self, extlist)
 
-    def get_storage_source(self):
-        return self.conn.get_storage_source(self.ss_name)
-    
-    def get_fs_config(self, prefix = ''):
-        return ",prefix=" + prefix
+    def test_gcp_filesystem(self): 
+        # Test basic functionality of the storage source API, calling
+        # each supported method in the API at least once.
+
+        session = self.session
+        ss = self.get_storage_source()
+
+        if (self.ss_name != 'gcp_store'):
+            return
+
+        # Since this class has multiple tests, append test name to the prefix to
+        # avoid namespace collision. 0th element on the stack is the current function.
+        prefix = self.bucket_prefix.join(random.choices(string.ascii_letters + string.digits, k=10))
+
+        # Success case: an existing accessible bucket has been provided with the correct credentials file.
+        fs = ss.ss_customize_file_system(session, self.bucket, self.auth_token, self.get_fs_config(prefix))
+
+        # Error cases.
+        err_msg = 'Exception: Invalid argument'
+
+        # Do not provide bucket name and credentials.
+        self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
+            lambda: ss.ss_customize_file_system(
+                session, None, None, self.get_fs_config(prefix)), err_msg)
+        # Provide empty bucket string.
+        self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
+            lambda: ss.ss_customize_file_system(
+                session, "", None, self.get_fs_config(prefix)), err_msg)
+        # Provide credentials in incorrect form.
+        self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
+            lambda: ss.ss_customize_file_system(
+                session, self.bucket, "gcp_cred", self.get_fs_config(prefix)), err_msg)
+        # Provide empty credentials string.
+        self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
+            lambda: ss.ss_customize_file_system(
+                session, self.bucket, "", self.get_fs_config(prefix)), err_msg)
+        # Provide a bucket name that does not exist.
+        non_exist_bucket = "non_exist" 
+        self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
+            lambda: ss.ss_customize_file_system(
+                session, non_exist_bucket, None, self.get_fs_config(prefix)), err_msg)
+        # Provide a bucket name that exists but we do not have access to. 
+        no_access_bucket = "test_cred"
+        self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
+            lambda: ss.ss_customize_file_system(
+                session, no_access_bucket, None, self.get_fs_config(prefix)), err_msg)
+
+        fs.terminate(session)
+        ss.terminate(session)
 
     def test_ss_file_systems_gcp_and_azure(self):
         if self.ss_name != "azure_store":
