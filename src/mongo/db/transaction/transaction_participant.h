@@ -840,6 +840,20 @@ public:
         // This should be called *without* the Client being locked.
         void _commitStorageTransaction(OperationContext* opCtx);
 
+        // Commits a "split prepared" transaction. Prepared transactions processed on secondaries
+        // may split the storage writes into multiple RecoveryUnits. This method will be invoked by
+        // a primary such that it looks for all recovery units and commits them such that they
+        // become visible to snapshot/timestamped readers atomically.
+        //
+        // This must be called while an OplogSlot is being held open at or earlier than the input
+        // `durableTimestamp`.
+        void _commitSplitPreparedTxnOnPrimary(OperationContext* opCtx,
+                                              repl::SplitPrepareSessionManager* splitPrepareManager,
+                                              const LogicalSessionId& sessionId,
+                                              const TxnNumber& txnNumber,
+                                              const Timestamp& commitTimestamp,
+                                              const Timestamp& durableTimestamp);
+
         // Stash transaction resources.
         void _stashActiveTransaction(OperationContext* opCtx);
 

@@ -244,11 +244,13 @@ void ReplicationCoordinatorMock::_setMyLastAppliedOpTimeAndWallTime(
     _myLastAppliedOpTime = opTimeAndWallTime.opTime;
     _myLastAppliedWallTime = opTimeAndWallTime.wallTime;
 
-    _setCurrentCommittedSnapshotOpTime(lk, opTimeAndWallTime.opTime);
+    if (_updateCommittedSnapshot) {
+        _setCurrentCommittedSnapshotOpTime(lk, opTimeAndWallTime.opTime);
 
-    if (auto storageEngine = _service->getStorageEngine()) {
-        if (auto snapshotManager = storageEngine->getSnapshotManager()) {
-            snapshotManager->setCommittedSnapshot(opTimeAndWallTime.opTime.getTimestamp());
+        if (auto storageEngine = _service->getStorageEngine()) {
+            if (auto snapshotManager = storageEngine->getSnapshotManager()) {
+                snapshotManager->setCommittedSnapshot(opTimeAndWallTime.opTime.getTimestamp());
+            }
         }
     }
 }

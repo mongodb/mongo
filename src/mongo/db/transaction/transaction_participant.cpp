@@ -1913,7 +1913,6 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         // Once entering "committing with prepare" we cannot throw an exception.
         // TODO (SERVER-71610): Fix to be interruptible or document exception.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-        opCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);
 
         // On secondary, we generate a fake empty oplog slot, since it's not used by opObserver.
         OplogSlot commitOplogSlot;
@@ -1946,13 +1945,28 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         // entry.
         invariant(!o().lastWriteOpTime.isNull());
 
-        // If commitOplogEntryOpTime is a nullopt, then we grab the OpTime from the commitOplogSlot
-        // which will only be set if we are primary. Otherwise, the commitOplogEntryOpTime must have
-        // been passed in during secondary oplog application.
         auto commitOplogSlotOpTime = commitOplogEntryOpTime.value_or(commitOplogSlot);
-        opCtx->recoveryUnit()->setDurableTimestamp(commitOplogSlotOpTime.getTimestamp());
-
-        _commitStorageTransaction(opCtx);
+        auto* splitPrepareManager =
+            repl::ReplicationCoordinator::get(opCtx)->getSplitPrepareSessionManager();
+        if (opCtx->writesAreReplicated() &&
+            splitPrepareManager->isSessionSplit(
+                _sessionId(), o().activeTxnNumberAndRetryCounter.getTxnNumber())) {
+            // If we are a primary committing a transaction that was split into smaller prepared
+            // transactions, use a special commit code path.
+            _commitSplitPreparedTxnOnPrimary(opCtx,
+                                             splitPrepareManager,
+                                             _sessionId(),
+                                             o().activeTxnNumberAndRetryCounter.getTxnNumber(),
+                                             commitTimestamp,
+                                             commitOplogSlot.getTimestamp());
+        } else {
+            // If commitOplogEntryOpTime is a nullopt, then we grab the OpTime from the
+            // commitOplogSlot which will only be set if we are primary. Otherwise, the
+            // commitOplogEntryOpTime must have been passed in during secondary oplog application.
+            opCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);
+            opCtx->recoveryUnit()->setDurableTimestamp(commitOplogSlotOpTime.getTimestamp());
+            _commitStorageTransaction(opCtx);
+        }
 
         auto opObserver = opCtx->getServiceContext()->getOpObserver();
         invariant(opObserver);
@@ -1998,13 +2012,68 @@ void TransactionParticipant::Participant::_commitStorageTransaction(OperationCon
     opCtx->lockState()->unsetMaxLockTimeout();
 }
 
+void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
+    OperationContext* parentOpCtx,
+    repl::SplitPrepareSessionManager* splitPrepareManager,
+    const LogicalSessionId& userSessionId,
+    const TxnNumber& userTxnNumber,
+    const Timestamp& commitTimestamp,
+    const Timestamp& durableTimestamp) {
+
+    for (const repl::PooledSession& session :
+         splitPrepareManager->getSplitSessions(userSessionId, userTxnNumber).get()) {
+
+        auto splitClientOwned = parentOpCtx->getServiceContext()->makeClient("tempSplitClient");
+        auto splitOpCtx = splitClientOwned->makeOperationContext();
+        AlternativeClientRegion acr(splitClientOwned);
+
+        std::unique_ptr<MongoDSessionCatalog::Session> checkedOutSession;
+
+        repl::UnreplicatedWritesBlock notReplicated(splitOpCtx.get());
+        splitOpCtx->setLogicalSessionId(session.getSessionId());
+        splitOpCtx->setTxnNumber(session.getTxnNumber());
+        splitOpCtx->setInMultiDocumentTransaction();
+
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(splitOpCtx.get());
+        checkedOutSession = mongoDSessionCatalog->checkOutSession(splitOpCtx.get());
+        TransactionParticipant::Participant newTxnParticipant =
+            TransactionParticipant::get(splitOpCtx.get());
+        newTxnParticipant.beginOrContinueTransactionUnconditionally(
+            splitOpCtx.get(), {*(splitOpCtx->getTxnNumber())});
+        newTxnParticipant.unstashTransactionResources(splitOpCtx.get(), "commitTransaction");
+
+        splitOpCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);
+        splitOpCtx->recoveryUnit()->setDurableTimestamp(durableTimestamp);
+
+        {
+            Lock::GlobalLock rstl(splitOpCtx.get(), LockMode::MODE_IX);
+            newTxnParticipant._commitStorageTransaction(splitOpCtx.get());
+            auto operationCount = newTxnParticipant.p().transactionOperations.numOperations();
+            auto oplogOperationBytes =
+                newTxnParticipant.p().transactionOperations.getTotalOperationBytes();
+            newTxnParticipant.clearOperationsInMemory(splitOpCtx.get());
+
+            newTxnParticipant._finishCommitTransaction(
+                splitOpCtx.get(), operationCount, oplogOperationBytes);
+        }
+
+        newTxnParticipant.stashTransactionResources(splitOpCtx.get());
+        checkedOutSession->checkIn(splitOpCtx.get(), OperationContextSession::CheckInReason::kDone);
+    }
+
+    parentOpCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);
+    parentOpCtx->recoveryUnit()->setDurableTimestamp(durableTimestamp);
+    this->_commitStorageTransaction(parentOpCtx);
+}
+
 void TransactionParticipant::Participant::_finishCommitTransaction(
     OperationContext* opCtx, size_t operationCount, size_t oplogOperationBytes) noexcept {
     {
         auto tickSource = opCtx->getServiceContext()->getTickSource();
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).txnState.transitionTo(TransactionState::kCommitted);
-
+        // Features such as the "split prepared transaction" optimization will not attribute
+        // transaction metrics to the internal sessions.
         o(lk).transactionMetricsObserver.onCommit(opCtx,
                                                   ServerTransactionsMetrics::get(opCtx),
                                                   tickSource,

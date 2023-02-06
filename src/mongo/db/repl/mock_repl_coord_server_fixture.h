@@ -42,7 +42,7 @@ class StorageInterfaceMock;
 }  // namespace repl
 
 /**
- * This is a basic fixture that is backed by an ephemeral storage engine and a mock replication
+ * This is a basic fixture that is backed by a real storage engine and a mock replication
  * coordinator that is running as primary.
  */
 class MockReplCoordServerFixture : public ServiceContextMongoDTest {

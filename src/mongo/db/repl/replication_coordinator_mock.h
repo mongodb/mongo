@@ -423,6 +423,15 @@ public:
 
     virtual SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
 
+    /**
+     * If this is true, the mock will update the "committed snapshot" everytime the "last applied"
+     * is updated. That behavior can be disabled for tests that need more control over what's
+     * majority committed.
+     */
+    void setUpdateCommittedSnapshot(bool val) {
+        _updateCommittedSnapshot = val;
+    }
+
 private:
     void _setMyLastAppliedOpTimeAndWallTime(WithLock lk,
                                             const OpTimeAndWallTime& opTimeAndWallTime);
@@ -454,6 +463,7 @@ private:
     bool _canAcceptNonLocalWrites = false;
 
     SplitPrepareSessionManager _splitSessionManager;
+    bool _updateCommittedSnapshot = true;
 };
 
 }  // namespace repl
