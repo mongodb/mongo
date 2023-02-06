@@ -581,6 +581,10 @@ class _MongoSFixture(interface.Fixture):
 
     def get_node_info(self):
         """Return a list of NodeInfo objects."""
+        if self.mongos is None:
+            self.logger.warning("The mongos fixture has not been set up yet.")
+            return []
+
         info = interface.NodeInfo(full_name=self.logger.full_name, name=self.logger.name,
                                   port=self.port, pid=self.mongos.pid)
         return [info]

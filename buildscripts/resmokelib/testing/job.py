@@ -378,23 +378,35 @@ class FixtureTestCaseManager:
 
         Return True if the teardown was successful, False otherwise.
         """
+        try:
+            test_case = None
 
-        # Refresh the fixture table before teardown to capture changes due to
-        # CleanEveryN and stepdown hooks.
-        self.report.logging_prefix = create_fixture_table(self.fixture)
+            if abort:
+                test_case = _fixture.FixtureAbortTestCase(self.test_queue_logger, self.fixture,
+                                                          "job{}".format(self.job_num),
+                                                          self.times_set_up)
+                self.times_set_up += 1
+            else:
+                test_case = _fixture.FixtureTeardownTestCase(self.test_queue_logger, self.fixture,
+                                                             "job{}".format(self.job_num))
 
-        if abort:
-            test_case = _fixture.FixtureAbortTestCase(self.test_queue_logger, self.fixture,
-                                                      "job{}".format(self.job_num),
-                                                      self.times_set_up)
-            self.times_set_up += 1
-        else:
-            test_case = _fixture.FixtureTeardownTestCase(self.test_queue_logger, self.fixture,
-                                                         "job{}".format(self.job_num))
+            # Refresh the fixture table before teardown to capture changes due to
+            # CleanEveryN and stepdown hooks.
+            self.report.logging_prefix = create_fixture_table(self.fixture)
+            test_case(self.report)
 
-        test_case(self.report)
-        if self.report.find_test_info(test_case).status != "pass":
-            logger.error("The teardown of %s failed.", self.fixture)
-            return False
+            if self.report.find_test_info(test_case).status != "pass":
+                logger.error("The teardown of %s failed.", self.fixture)
+                return False
 
-        return True
+            return True
+        finally:
+            # This is a failsafe. In the event that 'teardown_fixture' fails,
+            # any rogue logger handlers will be removed from this fixture.
+            # If not cleaned up, these will trigger 'setup failures' --
+            # indicated by exiting with LoggerRuntimeConfigError.EXIT_CODE.
+            if not isinstance(test_case, _fixture.FixtureAbortTestCase):
+                for handler in self.fixture.logger.handlers:
+                    # We ignore the cancellation token returned by close_later() since we always
+                    # want the logs to eventually get flushed.
+                    self.fixture.fixturelib.close_loggers(handler)
