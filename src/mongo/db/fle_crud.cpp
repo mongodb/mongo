@@ -300,6 +300,15 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     uint32_t numDocs = 0;
     write_ops::WriteCommandReplyBase writeBase;
 
+    // TODO: Remove with SERVER-73714
+    if (documents.size() == 1) {
+        auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(documents[0]);
+        if (serverPayload.size() == 0) {
+            return std::pair<FLEBatchResult, write_ops::InsertCommandReply>{
+                FLEBatchResult::kNotProcessed, write_ops::InsertCommandReply()};
+        }
+    }
+
     for (auto& document : documents) {
         const auto& [swResult, reply] =
             insertSingleDocument(opCtx, insertRequest, document, &stmtId, getTxns);
