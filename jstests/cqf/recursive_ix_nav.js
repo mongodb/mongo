@@ -115,11 +115,11 @@ assert.commandWorked(t.createIndex({a: 1, b: 1, c: 1, d: 1, e: 1}));
     // We have two spool producer nodes, one for each interval for "a" ([1, 3] and [6, 6]).
     assertValueOnPlanPath(
         "SpoolProducer", res, "child.leftChild.child.children.0.leftChild.nodeType");
-    assertValueOnPlanPath(0, res, "child.leftChild.child.children.0.leftChild.id");
+    assertValueOnPlanPath(1, res, "child.leftChild.child.children.0.leftChild.id");
 
     assertValueOnPlanPath(
         "SpoolProducer", res, "child.leftChild.child.children.1.leftChild.nodeType");
-    assertValueOnPlanPath(1, res, "child.leftChild.child.children.1.leftChild.id");
+    assertValueOnPlanPath(2, res, "child.leftChild.child.children.1.leftChild.id");
 }
 
 {
@@ -139,10 +139,10 @@ assert.commandWorked(t.createIndex({a: 1, b: 1, c: 1, d: 1, e: 1}));
 
     // We have two spool producers, for the first two equality prefixes.
     assertValueOnPlanPath("SpoolProducer", res, "child.child.leftChild.nodeType");
-    assertValueOnPlanPath(1, res, "child.child.leftChild.id");
+    assertValueOnPlanPath(2, res, "child.child.leftChild.id");
 
     assertValueOnPlanPath("SpoolProducer", res, "child.child.rightChild.leftChild.nodeType");
-    assertValueOnPlanPath(0, res, "child.child.rightChild.leftChild.id");
+    assertValueOnPlanPath(1, res, "child.child.rightChild.leftChild.id");
 }
 
 {
@@ -171,11 +171,11 @@ assert.commandWorked(t.createIndex({a: 1, b: 1, c: 1, d: 1, e: 1}));
     // Assert we have two spool producers, one for each interval for "a" ([1, 3] and [6, 6]).
     assertValueOnPlanPath(
         "SpoolProducer", res, "child.child.leftChild.child.children.0.leftChild.nodeType");
-    assertValueOnPlanPath(6, res, "child.child.leftChild.child.children.0.leftChild.id");
+    assertValueOnPlanPath(7, res, "child.child.leftChild.child.children.0.leftChild.id");
 
     assertValueOnPlanPath(
         "SpoolProducer", res, "child.child.leftChild.child.children.1.leftChild.nodeType");
-    assertValueOnPlanPath(7, res, "child.child.leftChild.child.children.1.leftChild.id");
+    assertValueOnPlanPath(8, res, "child.child.leftChild.child.children.1.leftChild.id");
 }
 
 {

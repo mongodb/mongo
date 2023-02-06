@@ -1254,7 +1254,7 @@ public:
                           const QueryHints& hints,
                           const RIDProjectionsMap& ridProjections,
                           PrefixId& prefixId,
-                          SpoolId& spoolId,
+                          SpoolIdGenerator& spoolId,
                           PhysRewriteQueue& queue,
                           const PhysProps& physProps,
                           const LogicalProps& logicalProps,
@@ -1678,7 +1678,7 @@ private:
     const QueryHints& _hints;
     const RIDProjectionsMap& _ridProjections;
     PrefixId& _prefixId;
-    SpoolId& _spoolId;
+    SpoolIdGenerator& _spoolId;
     PhysRewriteQueue& _queue;
     const PhysProps& _physProps;
     const LogicalProps& _logicalProps;
@@ -1690,7 +1690,7 @@ void addImplementers(const Metadata& metadata,
                      const QueryHints& hints,
                      const RIDProjectionsMap& ridProjections,
                      PrefixId& prefixId,
-                     SpoolId& spoolId,
+                     SpoolIdGenerator& spoolId,
                      const PhysProps& physProps,
                      PhysQueueAndImplPos& queue,
                      const LogicalProps& logicalProps,

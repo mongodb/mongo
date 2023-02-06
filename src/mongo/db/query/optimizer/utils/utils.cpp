@@ -2194,7 +2194,7 @@ public:
                            FieldProjectionMap indexProjectionMap,
                            const std::string& scanDefName,
                            const std::string& indexDefName,
-                           SpoolId& spoolId,
+                           SpoolIdGenerator& spoolId,
                            const size_t indexFieldCount,
                            const std::vector<EqualityPrefixEntry>& eqPrefixes,
                            const size_t currentEqPrefixIndex,
@@ -2346,7 +2346,7 @@ public:
                                            _indexDefName,
                                            reverse,
                                            currentCE,
-                                           _spoolId.getNextId(),
+                                           _spoolId.generate(),
                                            std::move(outerProjNames),
                                            std::move(outerFPM),
                                            std::move(interval),
@@ -2526,7 +2526,7 @@ private:
     const std::string& _indexDefName;
 
     // Equality-prefix and related.
-    SpoolId& _spoolId;
+    SpoolIdGenerator& _spoolId;
     const size_t _indexFieldCount;
     const std::vector<EqualityPrefixEntry>& _eqPrefixes;
     const size_t _currentEqPrefixIndex;
@@ -2551,7 +2551,7 @@ PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
                                 FieldProjectionMap indexProjectionMap,
                                 const std::string& scanDefName,
                                 const std::string& indexDefName,
-                                SpoolId& spoolId,
+                                SpoolIdGenerator& spoolId,
                                 const size_t indexFieldCount,
                                 const std::vector<EqualityPrefixEntry>& eqPrefixes,
                                 const size_t eqPrefixIndex,

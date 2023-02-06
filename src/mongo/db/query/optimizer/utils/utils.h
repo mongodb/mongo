@@ -34,6 +34,7 @@
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/utils/physical_plan_builder.h"
+#include "mongo/util/id_generator.h"
 
 
 namespace mongo::optimizer {
@@ -216,20 +217,7 @@ private:
     std::variant<IdType, PrefixMapType> _ids;
 };
 
-/**
- * Used to vend out fresh spool ids.
- */
-class SpoolId {
-public:
-    SpoolId() : _nextId(0) {}
-
-    int64_t getNextId() {
-        return _nextId++;
-    }
-
-private:
-    int64_t _nextId;
-};
+using SpoolIdGenerator = IdGenerator<int64_t>;
 
 ProjectionNameOrderedSet convertToOrderedSet(ProjectionNameSet unordered);
 
@@ -514,7 +502,7 @@ PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
                                 FieldProjectionMap indexProjectionMap,
                                 const std::string& scanDefName,
                                 const std::string& indexDefName,
-                                SpoolId& spoolId,
+                                SpoolIdGenerator& spoolId,
                                 size_t indexFieldCount,
                                 const std::vector<EqualityPrefixEntry>& eqPrefixes,
                                 size_t eqPrefixIndex,
