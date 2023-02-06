@@ -102,3 +102,8 @@ feature_flags:
       description: "Feature flag to enable user specified sort for sharded $search queries."
       cpp_varname: gFeatureFlagShardedSearchCustomSort
       default: false
+
+    featureFlagUserRoles:
+      description: "Feature flag to enable usage of $$USER_ROLES."
+      cpp_varname: gFeatureFlagUserRoles
+      default: false
