@@ -1209,6 +1209,7 @@ const allCommands = {
     validateDBMetadata: {
         command: {validateDBMetadata: 1, apiParameters: {version: "1", strict: true}},
     },
+    voteAbortIndexBuild: {skip: isAnInternalCommand},
     voteCommitImportCollection: {skip: isAnInternalCommand},
     voteCommitIndexBuild: {skip: isAnInternalCommand},
     waitForFailPoint: {

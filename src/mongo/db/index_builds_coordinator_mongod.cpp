@@ -445,6 +445,33 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     return replState->sharedPromise.getFuture();
 }
 
+Status IndexBuildsCoordinatorMongod::voteAbortIndexBuild(OperationContext* opCtx,
+                                                         const UUID& buildUUID,
+                                                         const HostAndPort& votingNode,
+                                                         const StringData& reason) {
+
+    auto memberConfig =
+        repl::ReplicationCoordinator::get(opCtx)->findConfigMemberByHostAndPort(votingNode);
+    if (!memberConfig || memberConfig->isArbiter()) {
+        return Status{ErrorCodes::Error{7329201},
+                      "Non-member and arbiter nodes cannot vote to abort an index build"};
+    }
+
+    bool aborted = abortIndexBuildByBuildUUID(
+        opCtx,
+        buildUUID,
+        IndexBuildAction::kPrimaryAbort,
+        fmt::format("'voteAbortIndexBuild' received from '{}': {}", votingNode.toString(), reason));
+
+    if (aborted) {
+        return Status::OK();
+    }
+
+    // Index build does not exist or cannot be aborted because it is committing.
+    // No need to wait for write concern.
+    return Status{ErrorCodes::Error{7329202}, "Index build cannot be aborted"};
+}
+
 Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCtx,
                                                           const UUID& buildUUID,
                                                           const HostAndPort& votingNode) {

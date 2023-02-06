@@ -560,9 +560,10 @@ env.Library(
         "top_command.cpp",
         "txn_cmds.cpp",
         "user_management_commands.cpp",
+        "vote_abort_index_build_command.cpp",
         "vote_commit_index_build_command.cpp",
         'internal_rename_if_options_and_indexes_match.idl',
-        'vote_commit_index_build.idl',
+        'vote_index_build.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/clientdriver_minimal',

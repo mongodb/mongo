@@ -39,7 +39,9 @@ commands:
     voteCommitIndexBuild:
         command_name: voteCommitIndexBuild
         cpp_name: VoteCommitIndexBuild
-        description: "An internal mongod command pertaining to cross replica set index builds"
+        description: "An internal mongod command pertaining to cross replica set index builds.
+            Can only be run on a primary node to signal that the node identified with 'hostAndPort'
+            is ready to commit the index build identified by the UUID in the command."
         strict: false
         namespace: type
         api_version: ""
@@ -48,3 +50,21 @@ commands:
             hostAndPort:
                 type: HostAndPort
                 description: "Replica set member identification"
+
+    voteAbortIndexBuild:
+        command_name: voteAbortIndexBuild
+        cpp_name: VoteAbortIndexBuild
+        description: "An internal mongod command pertaining to cross replica set index builds.
+            Can only be run on primary node to request that an index build, indentified by UUID, be
+            aborted."
+        strict: false
+        namespace: type
+        api_version: ""
+        type: uuid
+        fields:
+            hostAndPort:
+                type: HostAndPort
+                description: "Replica set member identification"
+            reason:
+                type: string
+                description: "Index build abort reason on the issuing replica set member"

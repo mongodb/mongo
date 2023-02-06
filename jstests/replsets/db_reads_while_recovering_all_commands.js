@@ -416,6 +416,7 @@ const allCommands = {
         expectFailure: true,
         expectedErrorCode: ErrorCodes.NotPrimaryOrSecondary,
     },
+    voteAbortIndexBuild: {skip: isNotAUserDataRead},
     voteCommitImportCollection: {skip: isNotAUserDataRead},
     voteCommitIndexBuild: {skip: isNotAUserDataRead},
     waitForFailPoint: {skip: isNotAUserDataRead},

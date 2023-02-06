@@ -346,6 +346,14 @@ public:
     IndexBuilds stopIndexBuildsForRollback(OperationContext* opCtx);
 
     /**
+     * Handles the 'voteAbortIndexBuild' command request.
+     */
+    virtual Status voteAbortIndexBuild(OperationContext* opCtx,
+                                       const UUID& buildUUID,
+                                       const HostAndPort& hostAndPort,
+                                       const StringData& reason) = 0;
+
+    /**
      * Handles the 'VoteCommitIndexBuild' command request.
      * Writes the host and port information of the replica set member that has voted to commit an
      * index build into config.system.indexBuilds collection.

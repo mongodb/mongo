@@ -770,6 +770,7 @@ let testCases = {
     usersInfo: {skip: "does not accept read or write concern"},
     validate: {skip: "does not accept read or write concern"},
     validateDBMetadata: {skip: "does not accept read or write concern"},
+    voteAbortIndexBuild: {skip: "internal command"},
     voteCommitImportCollection: {skip: "internal command"},
     voteCommitIndexBuild: {skip: "internal command"},
     waitForFailPoint: {skip: "does not accept read or write concern"},

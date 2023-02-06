@@ -95,6 +95,13 @@ void IndexBuildsCoordinatorEmbedded::_waitForNextIndexBuildActionAndCommit(
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions) {}
 
+Status IndexBuildsCoordinatorEmbedded::voteAbortIndexBuild(OperationContext* opCtx,
+                                                           const UUID& buildUUID,
+                                                           const HostAndPort& hostAndPort,
+                                                           const StringData& reason) {
+    MONGO_UNREACHABLE;
+}
+
 Status IndexBuildsCoordinatorEmbedded::voteCommitIndexBuild(OperationContext* opCtx,
                                                             const UUID& buildUUID,
                                                             const HostAndPort& hostAndPort) {

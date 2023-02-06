@@ -76,6 +76,10 @@ public:
     /**
      * None of the following functions should ever be called on an embedded server node.
      */
+    Status voteAbortIndexBuild(OperationContext* opCtx,
+                               const UUID& buildUUID,
+                               const HostAndPort& hostAndPort,
+                               const StringData& reason) override;
     Status voteCommitIndexBuild(OperationContext* opCtx,
                                 const UUID& buildUUID,
                                 const HostAndPort& hostAndPort) override;

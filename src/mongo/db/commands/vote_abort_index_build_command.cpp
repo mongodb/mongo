@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/db/repl/replication_coordinator_fwd.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
@@ -35,6 +36,7 @@
 #include "mongo/db/commands/vote_index_build_gen.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -44,21 +46,20 @@ namespace mongo {
 namespace {
 
 /**
- * Confirms that a specified replica set member is ready for commit of the index build identified by
- * the provided index build UUID.
+ * Requests abortion of the index build identified by the provided index build UUID.
  *
  * {
- *     voteCommitIndexBuild: <index_build_uuid>,
+ *     voteAbortIndexBuild: <index_build_uuid>,
  *     hostAndPort: "host:port",
  * }
  */
-class VoteCommitIndexBuildCommand final : public TypedCommand<VoteCommitIndexBuildCommand> {
+class VoteAbortIndexBuildCommand final : public TypedCommand<VoteAbortIndexBuildCommand> {
 public:
-    using Request = VoteCommitIndexBuild;
+    using Request = VoteAbortIndexBuild;
 
     std::string help() const override {
-        return "Internal intra replica set command to signal to the primary that a member is ready "
-               "to commit an index build.";
+        return "Internal intra replica set command to request that the primary abort an index "
+               "build with the specified UUID.";
     }
 
     bool adminOnly() const override {
@@ -77,24 +78,24 @@ public:
             auto lastOpBeforeRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
             const auto& cmd = request();
-            LOGV2_DEBUG(3856208,
+            LOGV2_DEBUG(7329200,
                         1,
-                        "Received voteCommitIndexBuild request for index build: {buildUUID}, "
+                        "Received voteAbortIndexBuild request for index build: {buildUUID}, "
                         "from host: {host}",
-                        "Received voteCommitIndexBuild request",
+                        "Received voteAbortIndexBuild request",
                         "buildUUID"_attr = cmd.getCommandParameter(),
-                        "host"_attr = cmd.getHostAndPort().toString());
-            auto voteStatus = IndexBuildsCoordinator::get(opCtx)->voteCommitIndexBuild(
-                opCtx, cmd.getCommandParameter(), cmd.getHostAndPort());
+                        "host"_attr = cmd.getHostAndPort().toString(),
+                        "reason"_attr = cmd.getReason());
 
-            // No need to wait for majority write concern if we fail to persist the voter's info.
-            uassertStatusOK(voteStatus);
+            uassertStatusOK(IndexBuildsCoordinator::get(opCtx)->voteAbortIndexBuild(
+                opCtx, cmd.getCommandParameter(), cmd.getHostAndPort(), cmd.getReason()));
 
             auto lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-            // Update the client's last optime to last oplog entry's opTime.
-            // This case can hit only if the member has already voted for that index build. So, to
-            // make sure the voter's info won't be rolled back, we wait for the oplog's last entry's
-            // opTime to be majority replicated.
+            // If the client's lastOp before and after abort are equal, this means the index build
+            // was already aborted, and no "abortIndexBuild" oplog entry is generated under this
+            // client. We must still ensure a correct writeConcern wait on the pre-existing
+            // "abortIndexBuild" oplog entry before replying. We guarantee this by waiting for the
+            // system's last op time.
             if (lastOpBeforeRun == lastOpAfterRun) {
                 repl::ReplClientInfo::forClient(opCtx->getClient())
                     .setLastOpToSystemLastOpTime(opCtx);
@@ -118,8 +119,10 @@ public:
                                                            ActionType::internal));
         }
     };
+};
 
-} voteCommitIndexBuildCmd;
+MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(VoteAbortIndexBuildCommand,
+                                       feature_flags::gIndexBuildGracefulErrorHandling);
 
 }  // namespace
 }  // namespace mongo
