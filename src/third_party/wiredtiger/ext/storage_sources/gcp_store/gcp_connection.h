@@ -33,6 +33,14 @@
 #include <string>
 #include <vector>
 
+// Mapping between Google Status codes and corresponding system error numbers to be used by the GCP
+// connection methods to return system error numbers expected by the filesystem interface.
+static const std::map<google::cloud::StatusCode, int32_t> toErrno = {
+  {google::cloud::StatusCode::kUnknown, EAGAIN},
+  {google::cloud::StatusCode::kInvalidArgument, EINVAL},
+  {google::cloud::StatusCode::kNotFound, ENOENT},
+  {google::cloud::StatusCode::kAlreadyExists, EBUSY},
+  {google::cloud::StatusCode::kPermissionDenied, EACCES}};
 class gcp_connection {
     public:
     gcp_connection(const std::string &bucket_name, const std::string &prefix);
@@ -41,6 +49,7 @@ class gcp_connection {
     int delete_object(const std::string &object_key);
     int object_exists(const std::string &object_key, bool &exists, size_t &object_size);
     int read_object(const std::string &object_key, int64_t offset, size_t len, void *buf);
+    int handle_error(const google::cloud::Status status, const std::string &error_message) const;
 
     ~gcp_connection() = default;
 
