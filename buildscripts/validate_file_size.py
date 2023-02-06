@@ -14,9 +14,9 @@ def main():
         file_size_in_bytes = os.path.getsize(file_path)
         if file_size_in_bytes > FILE_SIZE_THRESHOLD_IN_BYTES:
             print(
-                f"{file_name} is {file_size_in_bytes} bytes, exceeding threshold {FILE_SIZE_THRESHOLD_IN_BYTES} bytes, "
-                f"file upload may fail due to network issues, or Evergreen may reject very large yaml sizes"
-            )
+                f"WARNING! {file_name} is {file_size_in_bytes} bytes, exceeding threshold"
+                f" {FILE_SIZE_THRESHOLD_IN_BYTES} bytes, file upload may fail due to network issues, or Evergreen"
+                f" may reject very large yaml sizes")
         else:
             print(
                 f"{file_name} is {file_size_in_bytes} bytes, below threshold {FILE_SIZE_THRESHOLD_IN_BYTES} bytes"

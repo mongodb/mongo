@@ -1099,6 +1099,14 @@ functions:
       source_dir: src/generated_resmoke_config
       include:
       - "*"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/validate_file_size.py"
+      - "generate_tasks_config.tgz"
   - command: s3.put
     params:
       aws_key: ${aws_key}
