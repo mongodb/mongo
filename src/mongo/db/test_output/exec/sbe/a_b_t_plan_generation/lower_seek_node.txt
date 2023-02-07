@@ -4,10 +4,7 @@
 -- INPUT:
 NestedLoopJoin [joinType: Inner, {rid}]
 |   |   Const [true]
-|   LimitSkip []
-|   |   limitSkip:
-|   |       limit: 1
-|   |       skip: 0
+|   LimitSkip [limit: 1, skip: 0]
 |   Seek [ridProjection: rid, {'<root>': scan0}, collName]
 |   RefBlock: 
 |       Variable [rid]

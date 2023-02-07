@@ -787,10 +787,7 @@ TEST_F(NodeSBE, SpoolFibonacci) {
         "|   Const [0]\n"
         "Evaluation [{it}]\n"
         "|   Const [1]\n"
-        "LimitSkip []\n"
-        "|   limitSkip:\n"
-        "|       limit: 1\n"
-        "|       skip: 0\n"
+        "LimitSkip [limit: 1, skip: 0]\n"
         "CoScan []\n",
         tree);
 

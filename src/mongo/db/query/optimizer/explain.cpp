@@ -165,12 +165,12 @@ public:
         return print(other);
     }
 
-    ExplainPrinterImpl& setChildCount(const size_t childCount) {
+    ExplainPrinterImpl& setChildCount(const size_t childCount, const bool noInline = false) {
         if (version == ExplainVersion::V1) {
             return *this;
         }
 
-        if (version == ExplainVersion::V2Compact && childCount == 1) {
+        if (!noInline && version == ExplainVersion::V2Compact && childCount == 1) {
             _inlineNextChild = true;
             _childrenRemaining = childCount;
             return *this;
@@ -1906,11 +1906,30 @@ public:
     ExplainPrinter transport(const ABT& n, const LimitSkipNode& node, ExplainPrinter childResult) {
         ExplainPrinter printer("LimitSkip");
         maybePrintProps(printer, node);
-        printer.separator(" []");
-        nodeCEPropsPrint(printer, n, node);
+        printer.separator(" [");
 
-        printer.setChildCount(2);
-        printLimitSkipProperty(printer, node.getProperty(), false /*directToParent*/);
+        // If we have version < V3, inline the limit skip.
+        if constexpr (version < ExplainVersion::V3) {
+            const auto& prop = node.getProperty();
+            printer.fieldName("limit");
+            if (prop.hasLimit()) {
+                printer.print(prop.getLimit());
+            } else {
+                printer.print("(none)");
+            }
+            printer.separator(", ").fieldName("skip").print(prop.getSkip()).separator("]");
+            nodeCEPropsPrint(printer, n, node);
+            // Do not inline LimitSkip, since it's not a path.
+            printer.setChildCount(1, true /*noInline*/);
+        } else if (version == ExplainVersion::V3) {
+            printer.separator("]");
+            nodeCEPropsPrint(printer, n, node);
+            printer.setChildCount(2);
+            printLimitSkipProperty(printer, node.getProperty(), false /*directToParent*/);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+
         printer.fieldName("child", ExplainVersion::V3).print(childResult);
 
         return printer;

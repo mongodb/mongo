@@ -85,10 +85,7 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         "|       Variable [scan_0]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
-        "|   LimitSkip []\n"
-        "|   |   limitSkip:\n"
-        "|   |       limit: 1\n"
-        "|   |       skip: 0\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
@@ -105,10 +102,7 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         "|       Variable [scan_0]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
-        "|   LimitSkip []\n"
-        "|   |   limitSkip:\n"
-        "|   |       limit: 1\n"
-        "|   |       skip: 0\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
@@ -127,10 +121,7 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         "|       Variable [scan_0]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
-        "|   LimitSkip []\n"
-        "|   |   limitSkip:\n"
-        "|   |       limit: 1\n"
-        "|   |       skip: 0\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
@@ -156,10 +147,7 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         "|       Variable [scan_0]\n"
         "Evaluation [{scan_0}]\n"
         "|   Const [Nothing]\n"
-        "LimitSkip []\n"
-        "|   limitSkip:\n"
-        "|       limit: 0\n"
-        "|       skip: 0\n"
+        "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimizedQueryPlan(q4Text, testIndex));
 
@@ -175,10 +163,7 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         "|       Variable [scan_0]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
-        "|   LimitSkip []\n"
-        "|   |   limitSkip:\n"
-        "|   |       limit: 1\n"
-        "|   |       skip: 0\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
@@ -198,10 +183,7 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         "|       Variable [scan_0]\n"
         "Evaluation [{scan_0}]\n"
         "|   Const [Nothing]\n"
-        "LimitSkip []\n"
-        "|   limitSkip:\n"
-        "|       limit: 0\n"
-        "|       skip: 0\n"
+        "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimizedQueryPlan(q6Text, testIndex));
 
@@ -217,10 +199,7 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         "|       Variable [scan_0]\n"
         "Evaluation [{scan_0}]\n"
         "|   Const [Nothing]\n"
-        "LimitSkip []\n"
-        "|   limitSkip:\n"
-        "|       limit: 0\n"
-        "|       skip: 0\n"
+        "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimizedQueryPlan(q7Text, testIndex));
 }
@@ -244,10 +223,7 @@ TEST_F(IntervalIntersection, MultiFieldIntersection) {
         "|       Variable [scan_0]\n"
         "Evaluation [{scan_0}]\n"
         "|   Const [Nothing]\n"
-        "LimitSkip []\n"
-        "|   limitSkip:\n"
-        "|       limit: 0\n"
-        "|       skip: 0\n"
+        "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimizedQueryPlan(q1Text, testIndex));
 
@@ -261,10 +237,7 @@ TEST_F(IntervalIntersection, MultiFieldIntersection) {
         "|       Variable [scan_0]\n"
         "Evaluation [{scan_0}]\n"
         "|   Const [Nothing]\n"
-        "LimitSkip []\n"
-        "|   limitSkip:\n"
-        "|       limit: 0\n"
-        "|       skip: 0\n"
+        "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimizedQueryPlan(q2Text, testIndex));
 
@@ -278,10 +251,7 @@ TEST_F(IntervalIntersection, MultiFieldIntersection) {
         "|       Variable [scan_0]\n"
         "Evaluation [{scan_0}]\n"
         "|   Const [Nothing]\n"
-        "LimitSkip []\n"
-        "|   limitSkip:\n"
-        "|       limit: 0\n"
-        "|       skip: 0\n"
+        "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimizedQueryPlan(q3Text, testIndex));
 
@@ -294,10 +264,7 @@ TEST_F(IntervalIntersection, MultiFieldIntersection) {
         "|       Variable [scan_0]\n"
         "Evaluation [{scan_0}]\n"
         "|   Const [Nothing]\n"
-        "LimitSkip []\n"
-        "|   limitSkip:\n"
-        "|       limit: 0\n"
-        "|       skip: 0\n"
+        "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimizedQueryPlan(q4Text, testIndex));
 }

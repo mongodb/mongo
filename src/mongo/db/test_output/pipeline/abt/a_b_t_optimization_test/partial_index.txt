@@ -56,10 +56,7 @@ NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   |   |   Const [2]
 |   |   |   Variable [valCmp_0]
 |   |   Variable [evalTemp_4]
-|   LimitSkip []
-|   |   limitSkip:
-|   |       limit: 1
-|   |       skip: 0
+|   LimitSkip [limit: 1, skip: 0]
 |   Seek [ridProjection: rid_0, {'<root>': scan_0, 'b': evalTemp_4}, collection]
 |   RefBlock: 
 |       Variable [rid_0]

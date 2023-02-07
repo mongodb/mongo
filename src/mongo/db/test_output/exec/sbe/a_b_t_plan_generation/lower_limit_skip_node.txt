@@ -2,10 +2,7 @@
 
 ==== VARIATION: Lower single limit without skip ====
 -- INPUT:
-LimitSkip []
-|   limitSkip:
-|       limit: 5
-|       skip: 0
+LimitSkip [limit: 5, skip: 0]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
@@ -14,10 +11,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 ==== VARIATION: Lower single skip without limit ====
 -- INPUT:
-LimitSkip []
-|   limitSkip:
-|       limit: 0
-|       skip: 4
+LimitSkip [limit: 0, skip: 4]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
@@ -26,10 +20,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 ==== VARIATION: Lower LimitSkip node with values for both limit and skip ====
 -- INPUT:
-LimitSkip []
-|   limitSkip:
-|       limit: 4
-|       skip: 2
+LimitSkip [limit: 4, skip: 2]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:

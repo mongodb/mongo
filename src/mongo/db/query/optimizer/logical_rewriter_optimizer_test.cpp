@@ -60,14 +60,8 @@ TEST(LogicalRewriter, RootNodeMerge) {
         "    a\n"
         "  RefBlock: \n"
         "    Variable [a]\n"
-        "  LimitSkip []\n"
-        "    limitSkip:\n"
-        "      limit: 5\n"
-        "      skip: 0\n"
-        "    LimitSkip []\n"
-        "      limitSkip:\n"
-        "        limit: (none)\n"
-        "        skip: 10\n"
+        "  LimitSkip [limit: 5, skip: 0]\n"
+        "    LimitSkip [limit: (none), skip: 10]\n"
         "      Scan [test, {a}]\n",
         rootNode);
 
@@ -85,10 +79,7 @@ TEST(LogicalRewriter, RootNodeMerge) {
         "    a\n"
         "  RefBlock: \n"
         "    Variable [a]\n"
-        "  LimitSkip []\n"
-        "    limitSkip:\n"
-        "      limit: 5\n"
-        "      skip: 10\n"
+        "  LimitSkip [limit: 5, skip: 10]\n"
         "    Scan [test, {a}]\n",
         rewritten);
 }

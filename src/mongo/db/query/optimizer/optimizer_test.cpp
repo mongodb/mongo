@@ -252,11 +252,8 @@ TEST(Optimizer, CoScan) {
     VariableEnvironment venv = VariableEnvironment::build(limitNode);
     ASSERT_TRUE(!venv.hasFreeVariables());
 
-    ASSERT_EXPLAIN(
-        "LimitSkip []\n"
-        "  limitSkip:\n"
-        "    limit: 1\n"
-        "    skip: 0\n"
+    ASSERT_EXPLAIN_AUTO(
+        "LimitSkip [limit: 1, skip: 0]\n"
         "  CoScan []\n",
         limitNode);
 }
@@ -563,10 +560,7 @@ TEST(Optimizer, LimitSkip) {
     }
 
     ASSERT_EXPLAIN_AUTO(
-        "LimitSkip []\n"
-        "  limitSkip:\n"
-        "    limit: 10\n"
-        "    skip: 20\n"
+        "LimitSkip [limit: 10, skip: 20]\n"
         "  Evaluation [{b}]\n"
         "    EvalPath []\n"
         "      PathConstant []\n"

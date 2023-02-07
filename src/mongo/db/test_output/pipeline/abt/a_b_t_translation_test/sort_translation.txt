@@ -36,14 +36,8 @@ Evaluation [{sort_0}]
 |   |   Variable [scan_0]
 |   PathGet [a]
 |   PathIdentity []
-LimitSkip []
-|   limitSkip:
-|       limit: (none)
-|       skip: 3
-LimitSkip []
-|   limitSkip:
-|       limit: 5
-|       skip: 0
+LimitSkip [limit: (none), skip: 3]
+LimitSkip [limit: 5, skip: 0]
 Scan [collection, {scan_0}]
 
 

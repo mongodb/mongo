@@ -401,10 +401,7 @@ Root []
 |       Variable [scan_0]
 NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
-|   LimitSkip []
-|   |   limitSkip:
-|   |       limit: 1
-|   |       skip: 0
+|   LimitSkip [limit: 1, skip: 0]
 |   Seek [ridProjection: rid_0, {'<root>': scan_0}, collection]
 |   RefBlock: 
 |       Variable [rid_0]
@@ -755,10 +752,7 @@ Collation []
 |       Variable [sort_0]
 NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
-|   LimitSkip []
-|   |   limitSkip:
-|   |       limit: 1
-|   |       skip: 0
+|   LimitSkip [limit: 1, skip: 0]
 |   Seek [ridProjection: rid_0, {'<root>': scan_0, 'a': sort_0}, collection]
 |   RefBlock: 
 |       Variable [rid_0]
@@ -808,10 +802,7 @@ Root []
 |       Variable [scan_0]
 NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
-|   LimitSkip []
-|   |   limitSkip:
-|   |       limit: 1
-|   |       skip: 0
+|   LimitSkip [limit: 1, skip: 0]
 |   Seek [ridProjection: rid_0, {'<root>': scan_0}, collection]
 |   RefBlock: 
 |       Variable [rid_0]
@@ -887,10 +878,7 @@ Root []
 |       Variable [scan_0]
 NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
-|   LimitSkip []
-|   |   limitSkip:
-|   |       limit: 1
-|   |       skip: 0
+|   LimitSkip [limit: 1, skip: 0]
 |   Seek [ridProjection: rid_0, {'<root>': scan_0}, collection]
 |   RefBlock: 
 |       Variable [rid_0]
@@ -947,10 +935,7 @@ NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   PathTraverse [1]
 |   |   PathCompare [Eq]
 |   |   Const [2]
-|   LimitSkip []
-|   |   limitSkip:
-|   |       limit: 1
-|   |       skip: 0
+|   LimitSkip [limit: 1, skip: 0]
 |   Seek [ridProjection: rid_0, {'<root>': scan_0, 'b': evalTemp_4}, collection]
 |   RefBlock: 
 |       Variable [rid_0]
