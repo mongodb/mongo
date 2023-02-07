@@ -1456,7 +1456,7 @@ env.Library(
         'stats/serveronly_stats',
         'storage/remove_saver',
         'storage/storage_options',
-        'update/produce_document_for_upsert',
+        'update/update_driver',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_crud',

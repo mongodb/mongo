@@ -30,7 +30,6 @@
 #include "mongo/db/update/produce_document_for_upsert.h"
 
 #include "mongo/bson/mutable/algorithm.h"
-#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/update/storage_validation.h"
 
@@ -87,60 +86,12 @@ void generateNewDocumentFromSuppliedDoc(OperationContext* opCtx,
         opCtx, {}, &document, validateForStorage, immutablePaths, isInsert));
 }
 
-void assertDocumentToBeInsertedIsValid(const mutablebson::Document& document,
-                                       const FieldRefSet& shardKeyPaths,
-                                       bool isUserInitiatedWrite,
-                                       UpdateDriver* driver) {
-    // For a non-internal operation, we assert that the document contains all required paths, that
-    // no shard key fields have arrays at any point along their paths, and that the document is
-    // valid for storage. Skip all such checks for an internal operation.
-    if (isUserInitiatedWrite) {
-        // Shard key values are permitted to be missing, and so the only required field is _id. We
-        // should always have an _id here, since we generated one earlier if not already present.
-        invariant(document.root().ok() && document.root()[idFieldName].ok());
-        bool containsDotsAndDollarsField = false;
-
-        storage_validation::scanDocument(document,
-                                         true, /* allowTopLevelDollarPrefixes */
-                                         true, /* Should validate for storage */
-                                         &containsDotsAndDollarsField);
-        if (containsDotsAndDollarsField)
-            driver->setContainsDotsAndDollarsField(true);
-
-        //  Neither _id nor the shard key fields may have arrays at any point along their paths.
-        assertPathsNotArray(document, {{&idFieldRef}});
-        assertPathsNotArray(document, shardKeyPaths);
-    }
-}
-
-BSONObj produceDocumentForUpsert(OperationContext* opCtx,
-                                 const UpdateRequest* request,
-                                 UpdateDriver* driver,
-                                 const CanonicalQuery* canonicalQuery,
-                                 bool isUserInitiatedWrite,
-                                 mutablebson::Document& doc,
-                                 const ScopedCollectionDescription& collDesc) {
-    // Obtain the collection description. This will be needed to compute the shardKey paths.
-    FieldRefSet shardKeyPaths, immutablePaths;
-
-    if (isUserInitiatedWrite) {
-        // If the collection is sharded, add all fields from the shard key to the 'shardKeyPaths'
-        // set.
-        if (collDesc.isSharded()) {
-            shardKeyPaths.fillFrom(collDesc.getKeyPatternFields());
-        }
-
-        // An unversioned request cannot update the shard key, so all shardKey paths are immutable.
-        if (!OperationShardingState::isComingFromRouter(opCtx)) {
-            for (auto&& shardKeyPath : shardKeyPaths) {
-                immutablePaths.insert(shardKeyPath);
-            }
-        }
-
-        // The _id field is always immutable to user requests, even if the shard key is mutable.
-        immutablePaths.keepShortest(&idFieldRef);
-    }
-
+void produceDocumentForUpsert(OperationContext* opCtx,
+                              const UpdateRequest* request,
+                              UpdateDriver* driver,
+                              const CanonicalQuery* canonicalQuery,
+                              const FieldRefSet& immutablePaths,
+                              mutablebson::Document& doc) {
     // Reset the document into which we will be writing.
     doc.reset();
 
@@ -163,19 +114,6 @@ BSONObj produceDocumentForUpsert(OperationContext* opCtx,
 
     // Third: ensure _id is first if it exists, and generate a new OID otherwise.
     ensureIdFieldIsFirst(&doc, true);
-
-    // Fourth: assert that the finished document has all required fields and is valid for storage.
-    assertDocumentToBeInsertedIsValid(doc, shardKeyPaths, isUserInitiatedWrite, driver);
-
-    // Fifth: validate that the newly-produced document does not exceed the maximum BSON user size.
-    auto newDocument = doc.getObject();
-    if (!DocumentValidationSettings::get(opCtx).isInternalValidationDisabled()) {
-        uassert(17420,
-                str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize,
-                newDocument.objsize() <= BSONObjMaxUserSize);
-    }
-
-    return newDocument;
 }
 
 void assertPathsNotArray(const mutablebson::Document& document, const FieldRefSet& paths) {

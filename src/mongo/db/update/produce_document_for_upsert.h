@@ -29,7 +29,6 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_request.h"
-#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/util/safe_num.h"
 
@@ -39,13 +38,12 @@ namespace update {
 /**
  * Use an UpdateDriver and UpdateRequest to produce the document to insert.
  **/
-BSONObj produceDocumentForUpsert(OperationContext* opCtx,
-                                 const UpdateRequest* request,
-                                 UpdateDriver* driver,
-                                 const CanonicalQuery* cq,
-                                 bool isUserInitiatedWrite,
-                                 mutablebson::Document& doc,
-                                 const ScopedCollectionDescription& collDesc);
+void produceDocumentForUpsert(OperationContext* opCtx,
+                              const UpdateRequest* request,
+                              UpdateDriver* driver,
+                              const CanonicalQuery* cq,
+                              const FieldRefSet& immutablePaths,
+                              mutablebson::Document& doc);
 
 void ensureIdFieldIsFirst(mutablebson::Document* doc, bool generateOIDIfMissing);
 void assertPathsNotArray(const mutablebson::Document& document, const FieldRefSet& paths);

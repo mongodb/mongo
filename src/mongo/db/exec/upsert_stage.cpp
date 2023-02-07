@@ -101,14 +101,7 @@ PlanStage::StageState UpsertStage::doWork(WorkingSetID* out) {
     _specificStats.nUpserted = 1;
 
     // Generate the new document to be inserted.
-    const auto& collDesc = _cachedShardingCollectionDescription.getCollectionDescription(opCtx());
-    _specificStats.objInserted = update::produceDocumentForUpsert(opCtx(),
-                                                                  _params.request,
-                                                                  _params.driver,
-                                                                  _params.canonicalQuery,
-                                                                  _isUserInitiatedWrite,
-                                                                  _doc,
-                                                                  collDesc);
+    _specificStats.objInserted = _produceNewDocumentForInsert();
 
     // If this is an explain, skip performing the actual insert.
     if (!_params.request->explain()) {
@@ -204,6 +197,71 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
         // immediately after, it would just be wasted work.
         wunit.commit();
     });
+}
+
+BSONObj UpsertStage::_produceNewDocumentForInsert() {
+    FieldRefSet shardKeyPaths, immutablePaths;
+    if (_isUserInitiatedWrite) {
+        // Obtain the collection description. This will be needed to compute the shardKey paths.
+        const auto& collDesc =
+            _cachedShardingCollectionDescription.getCollectionDescription(opCtx());
+
+        // If the collection is sharded, add all fields from the shard key to the 'shardKeyPaths'
+        // set.
+        if (collDesc.isSharded()) {
+            shardKeyPaths.fillFrom(collDesc.getKeyPatternFields());
+        }
+
+        // An unversioned request cannot update the shard key, so all shardKey paths are immutable.
+        if (!OperationShardingState::isComingFromRouter(opCtx())) {
+            for (auto&& shardKeyPath : shardKeyPaths) {
+                immutablePaths.insert(shardKeyPath);
+            }
+        }
+
+        // The _id field is always immutable to user requests, even if the shard key is mutable.
+        immutablePaths.keepShortest(&idFieldRef);
+    }
+
+    // Generate the new document to be inserted.
+    update::produceDocumentForUpsert(
+        opCtx(), _params.request, _params.driver, _params.canonicalQuery, immutablePaths, _doc);
+
+    // Assert that the finished document has all required fields and is valid for storage.
+    _assertDocumentToBeInsertedIsValid(_doc, shardKeyPaths);
+
+    auto newDocument = _doc.getObject();
+    if (!DocumentValidationSettings::get(opCtx()).isInternalValidationDisabled()) {
+        uassert(17420,
+                str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize,
+                newDocument.objsize() <= BSONObjMaxUserSize);
+    }
+
+    return newDocument;
+}
+
+void UpsertStage::_assertDocumentToBeInsertedIsValid(const mutablebson::Document& document,
+                                                     const FieldRefSet& shardKeyPaths) {
+    // For a non-internal operation, we assert that the document contains all required paths, that
+    // no shard key fields have arrays at any point along their paths, and that the document is
+    // valid for storage. Skip all such checks for an internal operation.
+    if (_isUserInitiatedWrite) {
+        // Shard key values are permitted to be missing, and so the only required field is _id. We
+        // should always have an _id here, since we generated one earlier if not already present.
+        invariant(document.root().ok() && document.root()[idFieldName].ok());
+        bool containsDotsAndDollarsField = false;
+
+        storage_validation::scanDocument(document,
+                                         true, /* allowTopLevelDollarPrefixes */
+                                         true, /* Should validate for storage */
+                                         &containsDotsAndDollarsField);
+        if (containsDotsAndDollarsField)
+            _params.driver->setContainsDotsAndDollarsField(true);
+
+        //  Neither _id nor the shard key fields may have arrays at any point along their paths.
+        update::assertPathsNotArray(document, {{&idFieldRef}});
+        update::assertPathsNotArray(document, shardKeyPaths);
+    }
 }
 
 }  // namespace mongo

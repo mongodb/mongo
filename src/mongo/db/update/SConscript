@@ -90,6 +90,7 @@ env.Library(
     target='update_driver',
     source=[
         'update_driver.cpp',
+        'produce_document_for_upsert.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/common',
@@ -98,18 +99,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query_expressions',
         '$BUILD_DIR/mongo/db/server_base',
         'update',
-    ],
-)
-
-env.Library(
-    target='produce_document_for_upsert',
-    source=[
-        'produce_document_for_upsert.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/document_validation',
-        '$BUILD_DIR/mongo/db/shard_role_api',
-        '$BUILD_DIR/mongo/db/update/update_driver',
     ],
 )
 

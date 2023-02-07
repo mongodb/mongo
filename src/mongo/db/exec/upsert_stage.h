@@ -61,7 +61,10 @@ public:
     StageState doWork(WorkingSetID* out) final;
 
 private:
+    BSONObj _produceNewDocumentForInsert();
     void _performInsert(BSONObj newDocument);
+    void _assertDocumentToBeInsertedIsValid(const mutablebson::Document& document,
+                                            const FieldRefSet& shardKeyPaths);
 };
 
 }  // namespace mongo
