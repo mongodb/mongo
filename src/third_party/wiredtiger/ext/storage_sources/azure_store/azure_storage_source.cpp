@@ -28,6 +28,8 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 #include <algorithm>
+#include <filesystem>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -67,10 +69,10 @@ static int azure_customize_file_system(
   WT_STORAGE_SOURCE *, WT_SESSION *, const char *, const char *, const char *, WT_FILE_SYSTEM **);
 static int azure_add_reference(WT_STORAGE_SOURCE *);
 static int azure_terminate(WT_STORAGE_SOURCE *, WT_SESSION *);
-static int azure_flush(WT_STORAGE_SOURCE *, WT_SESSION *, WT_FILE_SYSTEM *, const char *,
-  const char *, const char *) __attribute__((__unused__));
-static int azure_flush_finish(WT_STORAGE_SOURCE *, WT_SESSION *, WT_FILE_SYSTEM *, const char *,
-  const char *, const char *) __attribute__((__unused__));
+static int azure_flush(
+  WT_STORAGE_SOURCE *, WT_SESSION *, WT_FILE_SYSTEM *, const char *, const char *, const char *);
+static int azure_flush_finish(
+  WT_STORAGE_SOURCE *, WT_SESSION *, WT_FILE_SYSTEM *, const char *, const char *, const char *);
 
 // WT_FILE_SYSTEM Interface
 static int azure_object_list(WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, char ***,
@@ -181,31 +183,71 @@ azure_add_reference(WT_STORAGE_SOURCE *storage_source)
     return 0;
 }
 
+// Flush given file to the Azure Blob storage.
 static int
 azure_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, WT_FILE_SYSTEM *file_system,
   const char *source, const char *object, const char *config)
 {
     WT_UNUSED(storage_source);
-    WT_UNUSED(session);
-    WT_UNUSED(file_system);
     WT_UNUSED(source);
-    WT_UNUSED(object);
     WT_UNUSED(config);
+    azure_file_system *azure_fs = reinterpret_cast<azure_file_system *>(file_system);
+    WT_FILE_SYSTEM *wtFileSystem = azure_fs->wt_fs;
 
-    return 0;
+    // std::filesystem::canonical will throw an exception if object does not exist so
+    // check if the object exists.
+    if (!std::filesystem::exists(source)) {
+        std::cerr << "azure_flush: Object: " << object << " does not exist." << std::endl;
+        return ENOENT;
+    }
+
+    bool exists_native = false;
+    int ret = wtFileSystem->fs_exist(
+      wtFileSystem, session, std::filesystem::canonical(source).string().c_str(), &exists_native);
+    if (ret != 0) {
+        std::cerr << "azure_flush: Failed to check for the existence of " << source
+                  << " on the native filesystem." << std::endl;
+        return ret;
+    }
+
+    if (!exists_native) {
+        std::cerr << "azure_flush: " << object << " No such file." << std::endl;
+        return ENOENT;
+    }
+    std::cout << "azure_flush: Uploading object: " << object << " into bucket using put_object."
+              << std::endl;
+
+    // Upload the object into the bucket.
+    if (azure_fs->azure_conn->put_object(object, std::filesystem::canonical(source)) != 0)
+        std::cerr << "azure_flush: Put object request to Azure failed." << std::endl;
+    else
+        std::cout << "azure_flush: Uploaded object to Azure." << std::endl;
+    return ret;
 }
 
+// Check that flush has been completed by checking the object exists in Azure.
 static int
 azure_flush_finish(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
   WT_FILE_SYSTEM *file_system, const char *source, const char *object, const char *config)
 {
     WT_UNUSED(storage_source);
     WT_UNUSED(session);
-    WT_UNUSED(file_system);
-    WT_UNUSED(source);
-    WT_UNUSED(object);
     WT_UNUSED(config);
+    WT_UNUSED(source);
+    azure_file_system *azure_fs = reinterpret_cast<azure_file_system *>(file_system);
 
+    std::cout << "azure_flush_finish: Checking object: " << object << " exists in Azure."
+              << std::endl;
+
+    // Check whether the object exists in the cloud.
+    bool exists_cloud = false;
+    azure_fs->azure_conn->object_exists(object, exists_cloud);
+    if (!exists_cloud) {
+        std::cerr << "azure_flush_finish: Object: " << object << " does not exist in Azure."
+                  << std::endl;
+        return ENOENT;
+    }
+    std::cout << "azure_flush_finish: Object: " << object << " exists in Azure." << std::endl;
     return 0;
 }
 
