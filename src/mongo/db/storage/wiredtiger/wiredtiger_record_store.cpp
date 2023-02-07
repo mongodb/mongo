@@ -2221,9 +2221,10 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
         return {};
     }
 
+    const bool failWithOutOfOrderForTest = WTRecordStoreUassertOutOfOrder.shouldFail();
     if ((_forward && _lastReturnedId >= id) ||
         (!_forward && !_lastReturnedId.isNull() && id >= _lastReturnedId) ||
-        MONGO_unlikely(WTRecordStoreUassertOutOfOrder.shouldFail())) {
+        MONGO_unlikely(failWithOutOfOrderForTest)) {
         HealthLogEntry entry;
         entry.setNss(_ns);
         entry.setTimestamp(Date_t::now());
@@ -2242,7 +2243,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
 
         HealthLogInterface::get(_opCtx)->log(entry);
 
-        if (!WTRecordStoreUassertOutOfOrder.shouldFail()) {
+        if (!failWithOutOfOrderForTest) {
             // Crash when testing diagnostics are enabled and not explicitly uasserting on
             // out-of-order keys.
             invariant(!TestingProctor::instance().isEnabled(), "cursor returned out-of-order keys");
