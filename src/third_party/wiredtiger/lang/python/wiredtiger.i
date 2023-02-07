@@ -90,9 +90,6 @@ from packing import pack, unpack
 %typemap(in, numinputs=0) wt_off_t * (wt_off_t temp = false) {
 	$1 = &temp;
 }
-%typemap(in, numinputs=0) int64_t * (int64_t temp = 0) {
-	$1 = &temp;
-}
 
 %typemap(in, numinputs=0) WT_EVENT_HANDLER * %{
 	$1 = &pyApiEventHandler;
@@ -325,6 +322,11 @@ from packing import pack, unpack
 %typemap(out) uint64_t {
 	$result = PyLong_FromUnsignedLongLong($1);
 }
+%typemap(out) int64_t {
+	$result = PyLong_FromLongLong($1);
+}
+
+%pointer_class(int64_t, int64_t_ptr);
 
 /* Internal _set_key, _set_value methods take a 'bytes' object as parameter. */
 %pybuffer_binary(unsigned char *data, int);
@@ -685,10 +687,6 @@ OVERRIDE_METHOD(__wt_cursor, WT_CURSOR, search_near, (self))
 	} else {
 		SWIG_exception_fail(SWIG_AttributeError, "invalid pointer argument");
 	}
-}
-
-%typemap(argout) int64_t * {
-	$result = PyLong_FromLongLong(*$1);
 }
 
 /* Handle binary data input from FILE_HANDLE->fh_write. */
