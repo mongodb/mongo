@@ -62,5 +62,5 @@ feature_flags:
     featureFlagBucketUnpackWithSort50:
       description: "Enables a time-series optimization that allows for partially-blocking sort on time"
       cpp_varname: gFeatureFlagBucketUnpackWithSort50
-      default: false
-      #version: 5.0
+      default: true
+      version: 5.0
