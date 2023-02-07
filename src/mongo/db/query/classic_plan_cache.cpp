@@ -130,8 +130,7 @@ bool shouldCacheQuery(const CanonicalQuery& query) {
     const MatchExpression* expr = query.root();
 
     if (!query.getSortPattern() && expr->matchType() == MatchExpression::AND &&
-        expr->numChildren() == 0 &&
-        !(feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV() && query.isSbeCompatible())) {
+        expr->numChildren() == 0 && !query.isSbeCompatible()) {
         return false;
     }
 

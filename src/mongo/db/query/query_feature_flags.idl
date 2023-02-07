@@ -77,8 +77,7 @@ feature_flags:
       default: false
 
     featureFlagSbeFull:
-      description: "Feature flag for enabling full SBE support. Enables SBE for a much larger class
-      of queries, including NLJ $lookup plans. Also enables the SBE plan cache."
+      description: "Feature flag for enabling SBE for a much larger class of queries than what is exposed by default"
       cpp_varname: gFeatureFlagSbeFull
       default: false
 

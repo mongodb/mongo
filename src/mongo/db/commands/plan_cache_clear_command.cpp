@@ -90,11 +90,8 @@ Status clear(OperationContext* opCtx,
             canonical_query_encoder::encodeForPlanCacheCommand(*cq))};
         plan_cache_commands::removePlanCacheEntriesByPlanCacheCommandKeys(planCacheCommandKeys,
                                                                           planCache);
-
-        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-            plan_cache_commands::removePlanCacheEntriesByPlanCacheCommandKeys(
-                planCacheCommandKeys, collection->uuid(), &sbe::getPlanCache(opCtx));
-        }
+        plan_cache_commands::removePlanCacheEntriesByPlanCacheCommandKeys(
+            planCacheCommandKeys, collection->uuid(), &sbe::getPlanCache(opCtx));
 
         return Status::OK();
     }
@@ -109,13 +106,11 @@ Status clear(OperationContext* opCtx,
 
     planCache->clear();
 
-    if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-        auto version = CollectionQueryInfo::get(collection).getPlanCacheInvalidatorVersion();
-        sbe::clearPlanCacheEntriesWith(opCtx->getServiceContext(),
-                                       collection->uuid(),
-                                       version,
-                                       false /*matchSecondaryCollections*/);
-    }
+    auto version = CollectionQueryInfo::get(collection).getPlanCacheInvalidatorVersion();
+    sbe::clearPlanCacheEntriesWith(opCtx->getServiceContext(),
+                                   collection->uuid(),
+                                   version,
+                                   false /*matchSecondaryCollections*/);
 
     LOGV2_DEBUG(
         23908, 1, "{namespace}: Cleared plan cache", "Cleared plan cache", "namespace"_attr = ns);

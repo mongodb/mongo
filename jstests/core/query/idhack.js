@@ -61,8 +61,7 @@ winningPlan = getWinningPlan(explain.queryPlanner);
 assert(!isIdhack(db, winningPlan), winningPlan);
 
 // Covered query returning _id field only can be handled by ID hack.
-const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
-const parentStage = isSbeEnabled ? "PROJECTION_COVERED" : "FETCH";
+const parentStage = checkSBEEnabled(db) ? "PROJECTION_COVERED" : "FETCH";
 explain = t.find(query, {_id: 1}).explain();
 winningPlan = getWinningPlan(explain.queryPlanner);
 assert(isIdhack(db, winningPlan), winningPlan);

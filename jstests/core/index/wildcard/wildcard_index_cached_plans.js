@@ -34,7 +34,7 @@ coll.drop();
 assert.commandWorked(coll.createIndex({"b.$**": 1}));
 assert.commandWorked(coll.createIndex({"a": 1}));
 
-const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
+const isSbeEnabled = checkSBEEnabled(db);
 
 // In order for the plan cache to be used, there must be more than one plan available. Insert
 // data into the collection such that the b.$** index will be far more selective than the index

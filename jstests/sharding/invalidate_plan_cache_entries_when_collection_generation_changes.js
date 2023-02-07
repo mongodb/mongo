@@ -1,6 +1,11 @@
 /**
  * Tests that plan cache entries are deleted after shard key refining, resharding and renaming
  * operations.
+ *
+ *  @tags: [
+ *   # The SBE plan cache was enabled by default in 6.3.
+ *   requires_fcv_63,
+ * ]
  */
 
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
@@ -28,7 +33,7 @@ const db = st.getDB(dbName);
 const collA = db["collA"];
 const collB = db["collB"];
 
-if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+if (!checkSBEEnabled(db)) {
     jsTestLog("********** Skip the test because SBE is disabled **********");
     st.stop();
     return;

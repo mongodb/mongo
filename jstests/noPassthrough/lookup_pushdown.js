@@ -18,7 +18,7 @@ const JoinAlgorithm = {
 };
 
 // Standalone cases.
-const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: true}});
+const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const name = "lookup_pushdown";
 const foreignCollName = "foreign_lookup_pushdown";
@@ -112,14 +112,12 @@ function runTest(coll,
 }
 
 let db = conn.getDB(name);
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because either the sbe lookup pushdown feature flag is disabled or" +
-              " sbe itself is disabled");
+const sbeEnabled = checkSBEEnabled(db);
+if (!sbeEnabled) {
+    jsTestLog("Skipping test because SBE is disabled");
     MongoRunner.stopMongod(conn);
     return;
 }
-
-const sbeFullEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 let coll = db[name];
 const localDocs = [{_id: 1, a: 2}];
@@ -299,48 +297,6 @@ function setLookupPushdownDisabled(value) {
             null /* indexKeyPattern */,
             {allowDiskUse: false});
 }());
-
-// Verify that SBE is only used when a $lookup or a $group is present.
-(function testLookupGroupIsRequiredForPushdown() {
-    // Don't execute this test case if SBE is fully enabled.
-    if (sbeFullEnabled) {
-        jsTestLog("Skipping test case because we are supporting SBE beyond $group and $lookup" +
-                  " pushdown");
-        return;
-    }
-
-    const assertEngineUsed = function(pipeline, isSBE) {
-        const explain = coll.explain().aggregate(pipeline);
-        assert(explain.hasOwnProperty("explainVersion"), explain);
-        if (isSBE) {
-            assert.eq(explain.explainVersion, "2", explain);
-        } else {
-            assert.eq(explain.explainVersion, "1", explain);
-        }
-    };
-
-    const lookup = {$lookup: {from: "coll", localField: "a", foreignField: "b", as: "out"}};
-    const group = {
-        $group: {
-            _id: "$a",
-            out: {$min: "$b"},
-        }
-    };
-    const match = {$match: {a: 1}};
-
-    // $lookup and $group should each run in SBE.
-    assertEngineUsed([lookup], true /* isSBE */);
-    assertEngineUsed([group], true /* isSBE */);
-    assertEngineUsed([lookup, group], true /* isSBE */);
-
-    // $match on its own won't use SBE, nor will an empty pipeline.
-    assertEngineUsed([match], false /* isSBE */);
-    assertEngineUsed([], false /* isSBE */);
-
-    // $match will use SBE if followed by either a $group or a $lookup.
-    assertEngineUsed([match, lookup], true /* isSBE */);
-    assertEngineUsed([match, group], true /* isSBE */);
-})();
 
 // Build an index on the foreign collection that matches the foreignField. This should cause us
 // to choose an indexed nested loop join.
@@ -707,61 +663,56 @@ function setLookupPushdownDisabled(value) {
 // Test which verifies that the right side of a classic $lookup is never lowered into SBE, even if
 // the queries for the right side are eligible on their own to run in SBE.
 (function verifyThatClassicLookupRightSideIsNeverLoweredIntoSBE() {
-    // If running with SBE fully enabled, verify that our $match is SBE compatible. Otherwise,
-    // verify that the same $match, when used as a $lookup sub-pipeline, will not be lowered
-    // into SBE.
+    // Confirm that our candidate subpipeline is SBE compatible on its own.
     const subPipeline = [{$match: {b: 2}}];
-    if (sbeFullEnabled) {
-        const subPipelineExplain = foreignColl.explain().aggregate(subPipeline);
-        assert(subPipelineExplain.hasOwnProperty("explainVersion"), subPipelineExplain);
-        assert.eq(subPipelineExplain["explainVersion"], "2", subPipelineExplain);
-    } else {
-        const pipeline = [{$lookup: {from: foreignCollName, pipeline: subPipeline, as: "result"}}];
-        runTest(coll, pipeline, JoinAlgorithm.Classic /* expectedJoinAlgorithm */);
+    const subPipelineExplain = foreignColl.explain().aggregate(subPipeline);
+    assert(subPipelineExplain.hasOwnProperty("explainVersion"), subPipelineExplain);
+    assert.eq(subPipelineExplain["explainVersion"], "2", subPipelineExplain);
 
-        // Create multiple indexes that can be used to answer the subPipeline query. This will allow
-        // the winning plan to be cached.
-        assert.commandWorked(foreignColl.dropIndexes());
-        assert.commandWorked(foreignColl.createIndexes([{b: 1, a: 1}, {b: 1, c: 1}]));
+    // Now, run a lookup and force it to run in the classic engine by prefixing it with
+    // '$_internalInhibitOptimization'.
+    const pipeline = [
+        {$_internalInhibitOptimization: {}},
+        {$lookup: {from: foreignCollName, pipeline: subPipeline, as: "result"}}
+    ];
+    runTest(coll, pipeline, JoinAlgorithm.Classic /* expectedJoinAlgorithm */);
 
-        // Run the pipeline enough times to generate a cache entry for the right side in the foreign
-        // collection.
-        coll.aggregate(pipeline).itcount();
-        coll.aggregate(pipeline).itcount();
+    // Create multiple indexes that can be used to answer the subPipeline query. This will allow
+    // the winning plan to be cached.
+    assert.commandWorked(foreignColl.dropIndexes());
+    assert.commandWorked(foreignColl.createIndexes([{b: 1, a: 1}, {b: 1, c: 1}]));
 
-        const cacheEntries = foreignColl.getPlanCache().list();
-        assert.eq(cacheEntries.length, 1);
-        const cacheEntry = cacheEntries[0];
+    // Run the pipeline enough times to generate a cache entry for the right side in the foreign
+    // collection.
+    coll.aggregate(pipeline).itcount();
+    coll.aggregate(pipeline).itcount();
 
-        // The cached plan should be a classic plan.
-        assert(cacheEntry.hasOwnProperty("version"), cacheEntry);
-        assert.eq(cacheEntry.version, "1", cacheEntry);
-        assert(cacheEntry.hasOwnProperty("cachedPlan"), cacheEntry);
-        const cachedPlan = cacheEntry.cachedPlan;
+    const cacheEntries = foreignColl.getPlanCache().list();
+    assert.eq(cacheEntries.length, 1);
+    const cacheEntry = cacheEntries[0];
 
-        // The cached plan should not have slot based plan. Instead, it should be a FETCH + IXSCAN
-        // executed in the classic engine.
-        assert(!cachedPlan.hasOwnProperty("slots"), cacheEntry);
-        assert(cachedPlan.hasOwnProperty("stage"), cacheEntry);
+    // The cached plan should be a classic plan.
+    assert(cacheEntry.hasOwnProperty("version"), cacheEntry);
+    assert.eq(cacheEntry.version, "1", cacheEntry);
+    assert(cacheEntry.hasOwnProperty("cachedPlan"), cacheEntry);
+    const cachedPlan = cacheEntry.cachedPlan;
 
-        assert(planHasStage(db, cachedPlan, "FETCH"), cacheEntry);
-        assert(planHasStage(db, cachedPlan, "IXSCAN"), cacheEntry);
-        assert.commandWorked(coll.dropIndexes());
-    }
+    // The cached plan should not have slot based plan. Instead, it should be a FETCH + IXSCAN
+    // executed in the classic engine.
+    assert(!cachedPlan.hasOwnProperty("slots"), cacheEntry);
+    assert(cachedPlan.hasOwnProperty("stage"), cacheEntry);
+
+    assert(planHasStage(db, cachedPlan, "FETCH"), cacheEntry);
+    assert(planHasStage(db, cachedPlan, "IXSCAN"), cacheEntry);
+    assert.commandWorked(coll.dropIndexes());
 }());
 
 MongoRunner.stopMongod(conn);
 
-// Verify that pipeline stages get pushed down according to the subset of SBE that is enabled.
-(function verifyPushdownLogicSbePartiallyEnabled() {
-    const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: true}});
+// Verify that $lookup and $group stages get pushed down as expected.
+(function verifyLookupGroupStagesArePushedDown() {
+    const conn = MongoRunner.runMongod();
     const db = conn.getDB(name);
-    if (sbeFullEnabled) {
-        jsTestLog("Skipping test case because SBE is fully enabled, but this test case assumes" +
-                  " that it is not fully enabled");
-        MongoRunner.stopMongod(conn);
-        return;
-    }
     const coll = db[name];
     const foreignColl = db[foreignCollName];
 
@@ -838,7 +789,7 @@ MongoRunner.stopMongod(conn);
 (function testHashJoinQueryKnobs() {
     // Create a new scope and start a new mongod so that the mongod-wide global state changes do not
     // affect subsequent tests if any.
-    const conn = MongoRunner.runMongod({setParameter: {featureFlagSbeFull: true}});
+    const conn = MongoRunner.runMongod();
     const db = conn.getDB(name);
     const lcoll = db.query_knobs_local;
     const fcoll = db.query_knobs_foreign;
@@ -851,8 +802,7 @@ MongoRunner.stopMongod(conn);
     runTest(lcoll,
             [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
             JoinAlgorithm.HJ,
-            null /* indexKeyPattern */,
-            {allowDiskUse: true});
+            null /* indexKeyPattern */);
 
     // The fcollStats.count means the number of documents in a collection, the fcollStats.size means
     // the collection's data size, and the fcollStats.storageSize means the allocated storage size.
@@ -868,8 +818,7 @@ MongoRunner.stopMongod(conn);
     runTest(lcoll,
             [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
             JoinAlgorithm.HJ,
-            null /* indexKeyPattern */,
-            {allowDiskUse: true});
+            null /* indexKeyPattern */);
 
     // Setting the 'internalQueryDisableLookupExecutionUsingHashJoin' knob to true will disable
     // HJ plans from being chosen and since the pipeline is SBE compatible it will fallback to
@@ -882,8 +831,7 @@ MongoRunner.stopMongod(conn);
     runTest(lcoll,
             [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
             JoinAlgorithm.NLJ,
-            null /* indexKeyPattern */,
-            {allowDiskUse: true});
+            null /* indexKeyPattern */);
 
     // Test that we can go back to generating HJ plans.
     assert.commandWorked(db.adminCommand({
@@ -894,8 +842,7 @@ MongoRunner.stopMongod(conn);
     runTest(lcoll,
             [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
             JoinAlgorithm.HJ,
-            null /* indexKeyPattern */,
-            {allowDiskUse: true});
+            null /* indexKeyPattern */);
 
     // Setting the 'internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin' to count - 1 results in
     // choosing the NLJ algorithm.
@@ -907,8 +854,7 @@ MongoRunner.stopMongod(conn);
     runTest(lcoll,
             [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
             JoinAlgorithm.NLJ,
-            null /* indexKeyPattern */,
-            {allowDiskUse: true});
+            null /* indexKeyPattern */);
 
     // Reverting back 'internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin' to the previous
     // value. Setting the 'internalQueryCollectionMaxDataSizeBytesToChooseHashJoin' to size - 1
@@ -922,8 +868,7 @@ MongoRunner.stopMongod(conn);
     runTest(lcoll,
             [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
             JoinAlgorithm.NLJ,
-            null /* indexKeyPattern */,
-            {allowDiskUse: true});
+            null /* indexKeyPattern */);
 
     // Reverting back 'internalQueryCollectionMaxDataSizeBytesToChooseHashJoin' to the previous
     // value. Setting the 'internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin' to
@@ -937,8 +882,7 @@ MongoRunner.stopMongod(conn);
     runTest(lcoll,
             [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
             JoinAlgorithm.NLJ,
-            null /* indexKeyPattern */,
-            {allowDiskUse: true});
+            null /* indexKeyPattern */);
 
     MongoRunner.stopMongod(conn);
 }());
@@ -1010,11 +954,7 @@ MongoRunner.stopMongod(conn);
 }());
 
 // Sharded cases.
-const st = new ShardingTest({
-    shards: 2,
-    mongos: 1,
-    other: {shardOptions: {setParameter: {featureFlagSbeFull: true, allowDiskUseByDefault: true}}}
-});
+const st = new ShardingTest({shards: 2, mongos: 1});
 db = st.s.getDB(name);
 
 // Setup. Here, 'coll' is sharded, 'foreignColl' is unsharded, 'viewName' is an unsharded view,

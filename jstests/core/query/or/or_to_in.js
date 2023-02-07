@@ -4,6 +4,7 @@
 // This test is not prepared to handle explain output for sharded collections.
 // @tags: [
 //   assumes_unsharded_collection,
+//   requires_fcv_63,
 // ]
 
 (function() {
@@ -11,7 +12,6 @@
 
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");  // For checkBothEnginesAreRunOnCluster.
 
 var coll = db.orToIn;
 coll.drop();
@@ -48,9 +48,7 @@ function assertEquivPlanAndResult(expectedQuery, actualQuery, supportWithCollati
     // Make sure both queries have the same access plan.
     const expectedPlan = getWinningPlan(expectedExplain.queryPlanner);
     const actualPlan = getWinningPlan(actualExplain.queryPlanner);
-    if (!checkBothEnginesAreRunOnCluster(db)) {
-        assert.docEq(expectedPlan, actualPlan);
-    }
+    assert.docEq(expectedPlan, actualPlan);
 
     // The queries must produce the same result.
     const expectedRes = coll.find(expectedQuery).toArray();

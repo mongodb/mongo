@@ -112,7 +112,7 @@ assertPlanCacheField({
 
 // SBE's planCacheKey encoding encodes "collection version" which will be increased after dropping
 // an index.
-if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+if (!checkSBEEnabled(db)) {
     // The 'planCacheKey' should be the same as what it was before we dropped the index.
     assertPlanCacheField({
         firstExplain: initialExplain,

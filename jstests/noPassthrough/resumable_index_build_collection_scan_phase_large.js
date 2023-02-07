@@ -33,8 +33,7 @@ const primary = rst.getPrimary();
 const coll = primary.getDB(dbName).getCollection(jsTestName());
 
 const columnstoreEnabled =
-    checkSBEEnabled(
-        primary.getDB(dbName), ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true) &&
+    checkSBEEnabled(primary.getDB(dbName), ["featureFlagColumnstoreIndexes"], true) &&
     setUpServerForColumnStoreIndexTest(primary.getDB(dbName));
 
 const bulk = coll.initializeUnorderedBulkOp();

@@ -33,7 +33,8 @@
  *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
- *   requires_fcv_60
+ *   # The SBE plan cache was first enabled in 6.3.
+ *   requires_fcv_63,
  * ]
  */
 
@@ -344,7 +345,7 @@ assert.commandFailed(
 filters = getFilters();
 assert.eq(0, filters.length, tojson(filters));
 
-if (checkSBEEnabled(db, ["featureFlagSbeFull"], true /* checkAllNodes */)) {
+if (checkSBEEnabled(db)) {
     //
     // Test that planCacheSetFilter doesn't apply to the inner side of a $lookup.
     //

@@ -569,22 +569,21 @@ std::vector<BSONObj> CommonMongodProcessInterface::getMatchingPlanCacheEntryStat
     auto planCacheEntries =
         planCache->getMatchingStats({} /* cacheKeyFilterFunc */, serializer, predicate);
 
-    if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-        // Retrieve plan cache entries from the SBE plan cache.
-        const auto cacheKeyFilter = [uuid = collection->uuid(),
-                                     collVersion = collQueryInfo.getPlanCacheInvalidatorVersion()](
-                                        const sbe::PlanCacheKey& key) {
-            // Only fetch plan cache entries with keys matching given UUID and collectionVersion.
-            return uuid == key.getMainCollectionState().uuid &&
-                collVersion == key.getMainCollectionState().version;
-        };
+    // Retrieve plan cache entries from the SBE plan cache.
+    const auto cacheKeyFilter = [uuid = collection->uuid(),
+                                 collVersion = collQueryInfo.getPlanCacheInvalidatorVersion()](
+                                    const sbe::PlanCacheKey& key) {
+        // Only fetch plan cache entries with keys matching given UUID and collectionVersion.
+        return uuid == key.getMainCollectionState().uuid &&
+            collVersion == key.getMainCollectionState().version;
+    };
 
-        auto planCacheEntriesSBE =
-            sbe::getPlanCache(opCtx).getMatchingStats(cacheKeyFilter, serializer, predicate);
+    auto planCacheEntriesSBE =
+        sbe::getPlanCache(opCtx).getMatchingStats(cacheKeyFilter, serializer, predicate);
 
-        planCacheEntries.insert(
-            planCacheEntries.end(), planCacheEntriesSBE.begin(), planCacheEntriesSBE.end());
-    }
+    planCacheEntries.insert(
+        planCacheEntries.end(), planCacheEntriesSBE.begin(), planCacheEntriesSBE.end());
+
 
     return planCacheEntries;
 }

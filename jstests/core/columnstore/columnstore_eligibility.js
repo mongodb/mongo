@@ -25,8 +25,6 @@ if (!setUpServerForColumnStoreIndexTest(db)) {
     return;
 }
 
-const sbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
-
 const coll = db.columnstore_eligibility;
 coll.drop();
 
@@ -66,12 +64,35 @@ assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
 // will be applied after assembling an intermediate result containing both "a" and "b".
 explain = coll.find({$or: [{a: 2}, {b: 2}]}, {_id: 0, a: 1}).explain();
 
-// For top-level $or queries, COLUMN_SCAN is only used when sbeFull is also enabled due to a
-// quirk in the engine selection logic. TODO: SERVER-XYZ.
+// COLUMN_SCAN is used for top-level $or queries.
+assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
+
+// COLUMN_SCAN is only used for for certain top-level $or queries when sbeFull is also enabled due
+// to a quirk in the engine selection logic.
+const sbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
+explain = coll.explain().aggregate([
+    {$match: {$or: [{a: {$gt: 0}}, {b: {$gt: 0}}]}},
+    {$project: {_id: 0, computedField: {$add: ["$a", "$b"]}}},
+]);
+let planHasColumnScan = planHasStage(db, explain, "COLUMN_SCAN");
+
 if (sbeFull) {
-    assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
+    assert(planHasColumnScan, explain);
 } else {
-    assert(planHasStage(db, explain, "COLLSCAN"), explain);
+    assert(!planHasColumnScan, explain);
+}
+
+explain = coll.explain().aggregate([
+    {$match: {$or: [{a: {$gt: 0}}, {b: {$gt: 0}}]}},
+    {$project: {_id: 0, computedField: {$add: ["$a", "$b"]}}},
+    {$group: {_id: "$computedField"}}
+]);
+planHasColumnScan = planHasStage(db, explain, "COLUMN_SCAN");
+
+if (sbeFull) {
+    assert(planHasColumnScan, explain);
+} else {
+    assert(!planHasColumnScan, explain);
 }
 
 // Simplest case: just scan "a" column.

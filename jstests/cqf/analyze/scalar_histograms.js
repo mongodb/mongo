@@ -2,15 +2,9 @@
 "use strict";
 
 load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
-load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
 
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
-}
-
-if (checkSBEEnabled(db, ["featureFlagSbeFull"], true)) {
-    jsTestLog("Skipping the test because it doesn't work in Full SBE");
     return;
 }
 
@@ -18,6 +12,7 @@ assert.commandWorked(
     db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
 
 const coll = db.cqf_analyze_scalar_hist;
+coll.drop();
 const stats_coll = db.system.statistics.cqf_analyze_scalar_hist;
 
 const testAnalyzeStats = (key, docs, count) => {

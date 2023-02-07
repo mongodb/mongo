@@ -9,8 +9,8 @@
 load("jstests/libs/analyze_plan.js");  // For explain helpers.
 load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
-if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
-    jsTest.log("Skipping test because SBE is not fully enabled");
+if (!checkSBEEnabled(db)) {
+    jsTest.log("Skipping test because SBE is not enabled");
     return;
 }
 

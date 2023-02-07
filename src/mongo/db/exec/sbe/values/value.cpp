@@ -348,9 +348,6 @@ void releaseValueDeep(TypeTags tag, Value val) noexcept {
         case TypeTags::indexBounds:
             delete getIndexBoundsView(val);
             break;
-        case TypeTags::classicMatchExpresion:
-            delete getClassicMatchExpressionView(val);
-            break;
         default:
             break;
     }
