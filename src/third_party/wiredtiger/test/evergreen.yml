@@ -2231,7 +2231,7 @@ tasks:
             cd cmake_build
             i=0
             limit=100
-            while ((i < limit)) 
+            while ((i < limit))
             do
               ((i=i+1))
               echo "Test count: $i"
@@ -3245,7 +3245,7 @@ tasks:
       - func: "run data validation stress test checkpoint"
         vars:
           run_test_checkpoint_args: -x -s 6
-  
+
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s7
     tags: ["data-validation-stress-test"]
     depends_on:
@@ -5086,7 +5086,7 @@ buildvariants:
   - macos-1100
   batchtime: 120 # 2 hours
   expansions:
-    # The cmake toolchain file is set to the mongodb toolchain gcc by defualt. 
+    # The cmake toolchain file is set to the mongodb toolchain gcc by defualt.
     # Remove that configuration here and let MacOS use the default Xcode toolchain instead.
     CMAKE_TOOLCHAIN_FILE:
     python_binary: 'python3'

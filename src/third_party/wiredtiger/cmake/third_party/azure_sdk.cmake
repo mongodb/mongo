@@ -10,7 +10,7 @@ config_choice(
         "package;IMPORT_AZURE_SDK_PACKAGE;ENABLE_AZURE"
         "external;IMPORT_AZURE_SDK_EXTERNAL;ENABLE_AZURE"
 )
- 
+
 if(IMPORT_AZURE_SDK_NONE)
     message(FATAL_ERROR "Cannot enable the Azure extension without specifying an IMPORT_AZURE_SDK method (package, external).")
 endif()
@@ -39,7 +39,7 @@ if (IMPORT_AZURE_SDK_EXTERNAL)
         BUILD_BYPRODUCTS
             ${CMAKE_CURRENT_BINARY_DIR}/azure-sdk-cpp/install/${CMAKE_INSTALL_LIBDIR}/libazure-storage-blobs${CMAKE_SHARED_LIBRARY_SUFFIX}
             ${CMAKE_CURRENT_BINARY_DIR}/azure-sdk-cpp/install/${CMAKE_INSTALL_LIBDIR}/libazure-core${CMAKE_SHARED_LIBRARY_SUFFIX}
-	    ${CMAKE_CURRENT_BINARY_DIR}/azure-sdk-cpp/install/${CMAKE_INSTALL_LIBDIR}/libazure-storage-common${CMAKE_SHARED_LIBRARY_SUFFIX}
+            ${CMAKE_CURRENT_BINARY_DIR}/azure-sdk-cpp/install/${CMAKE_INSTALL_LIBDIR}/libazure-storage-common${CMAKE_SHARED_LIBRARY_SUFFIX}
         INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/azure-sdk-cpp/install
         TEST_COMMAND ""
         UPDATE_COMMAND ""
@@ -59,7 +59,7 @@ add_library(azure_core_lib SHARED IMPORTED)
 add_library(azure_storage_common_lib SHARED IMPORTED)
 
 # Declare the include directories under INTERFACE_INCLUDE_DIRECTORIES during the configuration phase
-# to set the IMPORTED_LOCATION for shared imported targets so that the linker knows where the shared 
+# to set the IMPORTED_LOCATION for shared imported targets so that the linker knows where the shared
 # libraries are located to build the intermediate library.
 set_target_properties(azure_storage_lib PROPERTIES
     IMPORTED_LOCATION ${azure_storage_lib_location}

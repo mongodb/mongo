@@ -40,13 +40,13 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
     tiered_storage_sources = [
         ('azure_store', dict(is_tiered = True,
             is_local_storage = False,
-            auth_token = get_auth_token('azure_store'), 
+            auth_token = get_auth_token('azure_store'),
             bucket = 'pythontest',
             bucket_prefix = "pfx_",
             ss_name = 'azure_store')),
         ('gcp_store', dict(is_tiered = True,
             is_local_storage = False,
-            auth_token = get_auth_token('gcp_store'), 
+            auth_token = get_auth_token('gcp_store'),
             bucket = 'test_tiered19',
             bucket_prefix = "pfx_",
             ss_name = 'gcp_store')),
@@ -65,12 +65,12 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
         if cache_dir:
             conf += ',cache_directory=' + cache_dir
         return conf
-    
+
     # Load the storage source extensions.
     def conn_extensions(self, extlist):
         TieredConfigMixin.conn_extensions(self, extlist)
 
-    def test_gcp_filesystem(self): 
+    def test_gcp_filesystem(self):
         # Test basic functionality of the storage source API, calling
         # each supported method in the API at least once.
 
@@ -107,11 +107,11 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
             lambda: ss.ss_customize_file_system(
                 session, self.bucket, "", self.get_fs_config(prefix)), err_msg)
         # Provide a bucket name that does not exist.
-        non_exist_bucket = "non_exist" 
+        non_exist_bucket = "non_exist"
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda: ss.ss_customize_file_system(
                 session, non_exist_bucket, None, self.get_fs_config(prefix)), err_msg)
-        # Provide a bucket name that exists but we do not have access to. 
+        # Provide a bucket name that exists but we do not have access to.
         no_access_bucket = "test_cred"
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda: ss.ss_customize_file_system(
@@ -137,7 +137,7 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
             lambda: ss.ss_customize_file_system(
                 session, "", None, self.get_fs_config(prefix_1)), err_msg)
 
-        bad_bucket = "./bucket_BAD" 
+        bad_bucket = "./bucket_BAD"
         err_msg = '/Exception: No such file or directory/'
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda: ss.ss_customize_file_system(
@@ -150,7 +150,7 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
         # Create another file systems to make sure that terminate works.
         ss.ss_customize_file_system(
             session, self.bucket, None, self.get_fs_config(prefix_2))
-        
+
         # Test that azure file system terminate succeeds.
         self.assertEqual(azure_fs_1.terminate(session), 0)
 
