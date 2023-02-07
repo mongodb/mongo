@@ -964,11 +964,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTag
         return {false, tag, val};
     } else if (objTag == value::TypeTags::bsonObject) {
         auto be = value::bitcastTo<const char*>(objValue);
-        auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
+        const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
         // Skip document length.
         be += 4;
         while (be != end - 1) {
-            auto sv = bson::fieldNameView(be);
+            auto sv = bson::fieldNameAndLength(be);
 
             if (sv == fieldStr) {
                 auto [tag, val] = bson::convertFrom<true>(be, end, fieldStr.size());
@@ -1383,12 +1383,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::setField() {
 
             if (objTag == value::TypeTags::bsonObject) {
                 auto be = value::bitcastTo<const char*>(objVal);
-                auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
+                const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
 
                 // Skip document length.
                 be += 4;
-                while (*be != 0) {
-                    auto sv = bson::fieldNameView(be);
+                while (be != end - 1) {
+                    auto sv = bson::fieldNameAndLength(be);
 
                     if (sv != fieldName) {
                         auto [tag, val] = bson::convertFrom<false>(be, end, sv.size());
@@ -1424,12 +1424,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::setField() {
 
         if (objTag == value::TypeTags::bsonObject) {
             auto be = value::bitcastTo<const char*>(objVal);
-            auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
+            const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
 
             // Skip document length.
             be += 4;
-            while (*be != 0) {
-                auto sv = bson::fieldNameView(be);
+            while (be != end - 1) {
+                auto sv = bson::fieldNameAndLength(be);
 
                 if (sv != fieldName) {
                     auto [tag, val] = bson::convertFrom<false>(be, end, sv.size());
@@ -1908,11 +1908,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDropFields(Arity
 
     if (tagInObj == value::TypeTags::bsonObject) {
         auto be = value::bitcastTo<const char*>(valInObj);
-        auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
+        const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
         // Skip document length.
         be += 4;
-        while (*be != 0) {
-            auto sv = bson::fieldNameView(be);
+        while (be != end - 1) {
+            auto sv = bson::fieldNameAndLength(be);
 
             if (restrictFieldsSet.count(sv) == 0) {
                 auto [tag, val] = bson::convertFrom<false>(be, end, sv.size());
@@ -1984,11 +1984,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinKeepFields(Arity
 
     if (tagInObj == value::TypeTags::bsonObject) {
         auto be = value::bitcastTo<const char*>(valInObj);
-        auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
+        const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
         // Skip document length.
         be += 4;
-        while (*be != 0) {
-            auto sv = bson::fieldNameView(be);
+        while (be != end - 1) {
+            auto sv = bson::fieldNameAndLength(be);
 
             if (keepFieldsSet.count(sv) == 1) {
                 auto [tag, val] = bson::convertFrom<false>(be, end, sv.size());

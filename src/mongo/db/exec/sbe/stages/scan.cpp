@@ -474,7 +474,7 @@ PlanState ScanStage::getNext() {
             auto name = StringData{_fields[0]};
             auto [tag, val] = [start, last, end, name] {
                 for (auto bsonElement = start; bsonElement != last;) {
-                    auto field = bson::fieldNameView(bsonElement);
+                    auto field = bson::fieldNameAndLength(bsonElement);
                     if (field == name) {
                         return bson::convertFrom<true>(bsonElement, end, field.size());
                     }
@@ -499,7 +499,7 @@ PlanState ScanStage::getNext() {
                 // machine instructions) in front of the hashtable. When we "miss" in the bloom
                 // filter, we can quickly skip over a field without having to generate the hash for
                 // the field.
-                auto field = bson::fieldNameView(bsonElement);
+                auto field = bson::fieldNameAndLength(bsonElement);
                 const size_t offset = computeFieldMaskOffset(field.rawData(), field.size());
                 if (!(_fieldsBloomFilter & computeFieldMask(offset))) {
                     bsonElement = bson::advance(bsonElement, field.size());
@@ -1032,7 +1032,7 @@ PlanState ParallelScanStage::getNext() {
             accessor->reset();
         }
         while (*be != 0) {
-            auto sv = bson::fieldNameView(be);
+            auto sv = bson::fieldNameAndLength(be);
             if (auto it = _fieldAccessors.find(sv); it != _fieldAccessors.end()) {
                 // Found the field so convert it to Value.
                 auto [tag, val] = bson::convertFrom<true>(be, end, sv.size());

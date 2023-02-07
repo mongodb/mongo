@@ -1892,7 +1892,7 @@ public:
         const char* bsonElt = valuesToAgg.objdata() + 4;
         const char* bsonEnd = bsonElt + valuesToAgg.objsize();
         while (*bsonElt != 0) {
-            auto fieldName = sbe::bson::fieldNameView(bsonElt);
+            auto fieldName = sbe::bson::fieldNameAndLength(bsonElt);
 
             // Convert the BSON value to an SBE value and put it inside the input slot.
             auto [tag, val] = sbe::bson::convertFrom<false>(bsonElt, bsonEnd, fieldName.size());

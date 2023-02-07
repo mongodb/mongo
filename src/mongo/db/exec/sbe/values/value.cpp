@@ -859,8 +859,7 @@ std::pair<TypeTags, Value> ArrayEnumerator::getViewOfValue() const {
     } else if (_arraySet) {
         return {_iter->first, _iter->second};
     } else {
-        auto sv = bson::fieldNameView(_arrayCurrent);
-        return bson::convertFrom<true>(_arrayCurrent, _arrayEnd, sv.size());
+        return bson::convertFrom<true>(_arrayCurrent, _arrayEnd, _fieldNameSize);
     }
 }
 
@@ -878,12 +877,24 @@ bool ArrayEnumerator::advance() {
 
         return _iter != _arraySet->values().end();
     } else {
-        if (*_arrayCurrent != 0) {
-            auto sv = bson::fieldNameView(_arrayCurrent);
-            _arrayCurrent = bson::advance(_arrayCurrent, sv.size());
+        if (_arrayCurrent != _arrayEnd - 1) {
+            _arrayCurrent = bson::advance(_arrayCurrent, _fieldNameSize);
+
+            // Hand rolled strlen() code is faster than calling into shared library
+            // strlen() for small strings. Since this is a BSON array we are guaranteed
+            // the key names are small.
+            if (_arrayCurrent != _arrayEnd - 1) {
+                size_t keySize = 0;
+                auto* fieldName = bson::fieldNameRaw(_arrayCurrent);
+                while (*fieldName) {
+                    keySize++;
+                    fieldName++;
+                }
+                _fieldNameSize = keySize;
+            }
         }
 
-        return *_arrayCurrent != 0;
+        return _arrayCurrent != _arrayEnd - 1;
     }
 }
 
@@ -891,7 +902,7 @@ std::pair<TypeTags, Value> ObjectEnumerator::getViewOfValue() const {
     if (_object) {
         return _object->getAt(_index);
     } else {
-        auto sv = bson::fieldNameView(_objectCurrent);
+        auto sv = bson::fieldNameAndLength(_objectCurrent);
         return bson::convertFrom<true>(_objectCurrent, _objectEnd, sv.size());
     }
 }
@@ -905,7 +916,7 @@ bool ObjectEnumerator::advance() {
         return _index < _object->size();
     } else {
         if (*_objectCurrent != 0) {
-            auto sv = bson::fieldNameView(_objectCurrent);
+            auto sv = bson::fieldNameAndLength(_objectCurrent);
             _objectCurrent = bson::advance(_objectCurrent, sv.size());
         }
 
@@ -923,7 +934,7 @@ StringData ObjectEnumerator::getFieldName() const {
         }
     } else {
         if (*_objectCurrent != 0) {
-            return bson::fieldNameView(_objectCurrent);
+            return bson::fieldNameAndLength(_objectCurrent);
         } else {
             return ""_sd;
         }

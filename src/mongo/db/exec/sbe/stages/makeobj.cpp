@@ -191,7 +191,7 @@ void MakeObjStageBase<MakeObjOutputType::object>::produceObject() {
                 // Skip document length.
                 be += 4;
                 while (*be != 0) {
-                    auto sv = bson::fieldNameView(be);
+                    auto sv = bson::fieldNameAndLength(be);
                     auto key = StringMapHasher{}.hashed_key(StringData(sv));
 
                     if (!isFieldProjectedOrRestricted(key)) {

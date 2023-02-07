@@ -1643,6 +1643,9 @@ public:
                 auto bson = getRawPointerView(val);
                 _arrayCurrent = bson + 4;
                 _arrayEnd = bson + ConstDataView(bson).read<LittleEndian<uint32_t>>();
+                if (_arrayCurrent != _arrayEnd - 1) {
+                    _fieldNameSize = strlen(_arrayCurrent + 1);
+                }
             } else {
                 MONGO_UNREACHABLE;
             }
@@ -1661,7 +1664,7 @@ public:
         } else if (_arraySet) {
             return _iter == _arraySet->values().end();
         } else {
-            return *_arrayCurrent == 0;
+            return _arrayCurrent == _arrayEnd - 1;
         }
     }
 
@@ -1682,6 +1685,7 @@ private:
     // bsonArray
     const char* _arrayCurrent{nullptr};
     const char* _arrayEnd{nullptr};
+    size_t _fieldNameSize = 0;
 };
 
 /**

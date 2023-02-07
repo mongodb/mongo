@@ -111,10 +111,11 @@ public:
         if (rootTag == value::TypeTags::bsonObject) {
             if (!(nFieldsNeededIfInclusion == 0 && fieldBehavior == FieldBehavior::keep)) {
                 auto be = value::bitcastTo<const char*>(rootVal);
+                const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
                 // Skip document length.
                 be += 4;
-                while (*be != 0) {
-                    auto sv = bson::fieldNameView(be);
+                while (be != end - 1) {
+                    auto sv = bson::fieldNameAndLength(be);
                     auto key = StringMapHasher{}.hashed_key(StringData(sv));
                     auto nextBe = bson::advance(be, sv.size());
 
