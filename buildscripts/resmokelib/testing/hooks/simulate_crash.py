@@ -113,7 +113,7 @@ class SimulateCrash(bghook.BGHook):
             mdb.start()
 
             client = pymongo.MongoClient(host="localhost", port=self.validate_port, connect=True,
-                                         connectTimeoutMS=240000, serverSelectionTimeoutMS=240000,
+                                         connectTimeoutMS=300000, serverSelectionTimeoutMS=300000,
                                          directConnection=True)
             is_valid = validate(client, self.logger, self.acceptable_err_codes)
 
