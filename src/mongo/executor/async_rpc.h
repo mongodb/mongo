@@ -32,7 +32,11 @@
 #include <memory>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/async_remote_command_targeter_adapter.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/executor/async_rpc_retry_policy.h"
 #include "mongo/executor/async_rpc_targeter.h"
@@ -347,5 +351,53 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
     auto cmdBSON = options->cmd.toBSON(genericArgs);
     return detail::sendCommandWithRunner(cmdBSON, options, runner, nullptr, std::move(targeter));
 }
+
+/**
+ * This overloaded version of 'sendCommand' uses ShardId instead of Targeter.
+ */
+template <typename CommandType>
+ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
+    std::shared_ptr<AsyncRPCOptions<CommandType>> options,
+    OperationContext* opCtx,
+    ShardId shardId) {
+    ReadPreferenceSetting readPref;
+    std::unique_ptr<Targeter> targeter =
+        std::make_unique<ShardIdTargeter>(shardId, opCtx, readPref, options->exec);
+    auto runner = detail::AsyncRPCRunner::get(opCtx->getServiceContext());
+    auto cmdBSON = options->cmd.toBSON({});
+    return detail::sendCommandWithRunner(cmdBSON, options, runner, opCtx, std::move(targeter));
+}
+
+/**
+ * This overloaded version of 'sendCommand' uses ConnectionString instead of Targeter.
+ */
+template <typename CommandType>
+ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
+    std::shared_ptr<AsyncRPCOptions<CommandType>> options,
+    OperationContext* opCtx,
+    ConnectionString& cstr) {
+    ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly);
+    readPref.hedgingMode = HedgingMode();
+
+    std::shared_ptr<RemoteCommandTargeter> remoteCommandTargeter =
+        RemoteCommandTargeterFactoryImpl().create(cstr);
+    std::unique_ptr<Targeter> targeter =
+        std::make_unique<AsyncRemoteCommandTargeterAdapter>(readPref, remoteCommandTargeter);
+
+    auto runner = detail::AsyncRPCRunner::get(opCtx->getServiceContext());
+    auto cmdBSON = options->cmd.toBSON({});
+    return detail::sendCommandWithRunner(cmdBSON, options, runner, opCtx, std::move(targeter));
+}
+
+/**
+ * This overloaded version of 'sendCommand' uses MongoURI instead of Targeter.
+ */
+template <typename CommandType>
+ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
+    std::shared_ptr<AsyncRPCOptions<CommandType>> options, OperationContext* opCtx, MongoURI& uri) {
+    auto cstr = uri.connectionString();
+    return sendCommand(options, opCtx, cstr);
+}
+
 }  // namespace mongo::async_rpc
 #undef MONGO_LOGV2_DEFAULT_COMPONENT

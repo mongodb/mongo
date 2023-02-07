@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/oid.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/repl/hello_gen.h"
@@ -62,6 +63,8 @@ const std::vector<ShardId> kTestShardIds = {
 const std::vector<HostAndPort> kTestShardHosts = {HostAndPort("FakeShard1Host", 12345),
                                                   HostAndPort("FakeShard2Host", 12345),
                                                   HostAndPort("FakeShard3Host", 12345)};
+const HostAndPort kTestStandaloneHost = {HostAndPort("FakeStandalone1Host", 12345)};
+
 namespace async_rpc {
 namespace {
 /*
@@ -89,6 +92,64 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHello) {
 
     ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
     ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), res.targetUsed);
+}
+
+/*
+ * Test URI overload version of 'sendCommand'.
+ */
+TEST_F(AsyncRPCTestFixture, URIOverload) {
+    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+
+    MongoURI uri = MongoURI::parse("mongodb://" + kTestStandaloneHost.toString()).getValue();
+
+    auto opCtxHolder = makeOperationContext();
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
+        sendCommand(options, opCtxHolder.get(), uri);
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(kTestStandaloneHost, request.target);
+        return helloReply.toBSON();
+    });
+
+    AsyncRPCResponse res = resultFuture.get();
+
+    ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
+    ASSERT_EQ(kTestStandaloneHost, res.targetUsed);
+}
+
+/*
+ * Test ConnectionString overload version of 'sendCommand'.
+ */
+TEST_F(AsyncRPCTestFixture, ConnectionStringOverload) {
+    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+
+    std::vector<HostAndPort> hosts;
+    hosts.push_back(kTestStandaloneHost);
+    ConnectionString cstr = ConnectionString::forStandalones(hosts);
+
+    auto opCtxHolder = makeOperationContext();
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
+        sendCommand(options, opCtxHolder.get(), cstr);
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(kTestStandaloneHost, request.target);
+        return helloReply.toBSON();
+    });
+
+    AsyncRPCResponse res = resultFuture.get();
+
+    ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
+    ASSERT_EQ(kTestStandaloneHost, res.targetUsed);
 }
 
 /*

@@ -698,6 +698,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/dbtests/mocklib',
+        '$BUILD_DIR/mongo/executor/async_rpc',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
         'catalog/sharding_catalog_client_mock',

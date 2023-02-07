@@ -29,7 +29,9 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/executor/async_rpc.h"
 #include "mongo/s/async_rpc_shard_targeter.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/sharding_initialization.h"
@@ -290,6 +292,39 @@ DEATH_TEST_F(AsyncRPCShardingTestFixture, CannotCallOnRemoteErrorBeforeResolve, 
 
     Status e = Status(ErrorCodes::NetworkTimeout, "mock");
     auto commandErrorResult = targeter.onRemoteCommandError(kTestShardHosts[0], e);
+}
+
+/**
+ * Test ShardId overload version of 'sendCommand'.
+ */
+TEST_F(AsyncRPCShardingTestFixture, ShardIdOverload) {
+    const NamespaceString testNS = NamespaceString("testdb", "testcoll");
+    const BSONObj testFirstBatch = BSON("x" << 1);
+    const FindCommandRequest findCmd = FindCommandRequest(testNS);
+    const BSONObj findReply = CursorResponse(testNS, 0LL, {testFirstBatch})
+                                  .toBSON(CursorResponse::ResponseType::InitialResponse);
+
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, executor(), CancellationToken::uncancelable());
+    auto fut = sendCommand(options, operationContext(), ShardId(kTestShardIds[0]));
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        return findReply;
+    });
+
+    auto net = network();
+    net->enterNetwork();
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
+
+    auto res = fut.get();
+
+    // CursorResponse toBSON method adds an 'ok' field, which is omitted in async_rpc
+    BSONObjBuilder bob;
+    bob.appendElements(res.response.toBSON());
+    bob.append("ok", 1.0);
+    ASSERT_BSONOBJ_EQ(bob.obj(), findReply);
 }
 
 }  // namespace
