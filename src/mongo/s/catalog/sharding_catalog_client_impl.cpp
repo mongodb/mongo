@@ -42,6 +42,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_facet.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -61,6 +62,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
@@ -495,7 +497,7 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchData
     }
 }
 
-std::vector<ShardId> ShardingCatalogClientImpl::_fetchPlacementMetadata(
+HistoricalPlacement ShardingCatalogClientImpl::_fetchPlacementMetadata(
     OperationContext* opCtx, ConfigsvrGetHistoricalPlacement&& request) {
     auto remoteResponse = uassertStatusOK(_getConfigShard(opCtx)->runCommandWithFixedRetryAttempts(
         opCtx,
@@ -510,7 +512,7 @@ std::vector<ShardId> ShardingCatalogClientImpl::_fetchPlacementMetadata(
     auto placementDetails = ConfigsvrGetHistoricalPlacementResponse::parse(
         IDLParserContext("ShardingCatalogClient"), remoteResponse.response);
 
-    return placementDetails.getShards();
+    return placementDetails.getHistoricalPlacement();
 }
 
 CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
@@ -1273,7 +1275,7 @@ StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNe
 }
 
 
-std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataForCollAtClusterTime(
+HistoricalPlacement ShardingCatalogClientImpl::getShardsThatOwnDataForCollAtClusterTime(
     OperationContext* opCtx, const NamespaceString& collName, const Timestamp& clusterTime) {
 
     uassert(ErrorCodes::InvalidOptions,
@@ -1288,7 +1290,7 @@ std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataForCollAtClu
 }
 
 
-std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataForDbAtClusterTime(
+HistoricalPlacement ShardingCatalogClientImpl::getShardsThatOwnDataForDbAtClusterTime(
     OperationContext* opCtx, const NamespaceString& dbName, const Timestamp& clusterTime) {
 
     uassert(ErrorCodes::InvalidOptions,
@@ -1302,7 +1304,7 @@ std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataForDbAtClust
     return _fetchPlacementMetadata(opCtx, ConfigsvrGetHistoricalPlacement(dbName, clusterTime));
 }
 
-std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataAtClusterTime(
+HistoricalPlacement ShardingCatalogClientImpl::getShardsThatOwnDataAtClusterTime(
     OperationContext* opCtx, const Timestamp& clusterTime) {
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
@@ -1314,7 +1316,7 @@ std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataAtClusterTim
     return _fetchPlacementMetadata(opCtx, std::move(request));
 }
 
-std::vector<ShardId> ShardingCatalogClientImpl::getHistoricalPlacement(
+HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
     OperationContext* opCtx,
     const Timestamp& atClusterTime,
     const boost::optional<NamespaceString>& nss) {
@@ -1323,66 +1325,141 @@ std::vector<ShardId> ShardingCatalogClientImpl::getHistoricalPlacement(
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
     auto configShard = _getConfigShard(opCtx);
     /*
-        Stage 1. Select only the entry with timestamp <= clusterTime and filter out all nss that are
-        not the collection or the database
+    The aggregation pipeline is split in 2 sub pipelines:
+    - one pipeline "exactPlacementData" describing the list of shards currently active in the
+    cluster in which the data belonging to the input nss were placed at the given clusterTime. The
+    primary shard is always included in the list. In case the input nss is empty, the list of shards
+    includes all the shards in the cluster containing data at the given clusterTime. Stages can be
+    described as follow:
+        Stage 1. Select only the entry with timestamp <= clusterTime and filter out
+    all nss that are not the collection or the database using a regex. We also esclude all the
+    entries related to the fcv marker. In case the whole cluster info is searched, we filter any nss
+    with at least 1 caracter
         Stage 2. sort by timestamp
         Stage 3. Extract the first document for each database and collection matching the received
-        namespace
+    namespace
         Stage 4. Discard the entries with empty shards (i.e. the collection was dropped or
-        renamed)
+    renamed)
         Stage 5. Group all documents and concat shards (this will generate an array of arrays)
-        Stage 6. Flatten the array of arrays into a set (this will also remove duplicates)
-
+        Stage 6. Flatten the array of arrays into a set
+    (this will also remove duplicates)
         Stage 7. Access to the list of shards currently active in the cluster
         Stage 8. Count the number of shards obtained on stage 6 that also appear in the list of
-        active shards
+            active shards
         Stage 9. Do not return the list of active shards (used only for the count)
 
-        regex=^db(\.collection)?$ // matches db or db.collection ( this is skipped in case the whole
-       cluster info is searched)
-        [
-            {
-                "$match": { "timestamp": { "$lte": clusterTime } , "nss" : { $regex: regex} }
-            },
-            {
-                "$sort": { "timestamp": -1 }
-            },
-            {
-                "$group": {
-                    _id: "$nss",
-                    shards: { $first: "$shards" }
-                }
-            },
-            { "$match": { shards: { $not: { $size: 0 } } } },
-            {
-                "$group": {
-                    _id: "",
-                    shards: { $push: "$shards" }
-                }
-            },
-            {
-                $project: {
-                    "shards": {
-                            $reduce: {
-                            input: "$shards",
-                            initialValue: [],
-                            in: { "$setUnion": [ "$$this", "$$value"] }
-                            }
+    - one pipeline "approximatePlacementData" retreiving the last "marker" which is a special entry
+    where the nss is empty and the list of shard can be either empty or not.
+        - In case the list is not empty: it means the clusterTime requested was during an fcv
+    upgrade/downgrade. Thus we cannot guarantee the result of 'exactPlacementData' to
+    be correct. We therefore report the list of shards present in the "marker" entry, which
+    correspond to the list of shards in the cluster at the time the fcv upgrade/downgrade started.
+        - The pipeline selects only the fcv markers, sorts by decreasing timestamp and gets the
+    first element.
+
+        regex=^db(\.collection)?$ // matches db or db.collection
+        {
+        "$facet": {
+            "exactPlacementData": [
+                {
+                "$match": {
+                    "timestamp": {
+                    "$lte": <clusterTime>
+                    },
+                    "nss": {
+                    $regex: regex
                     }
                 }
-            },
-            {
-                $lookup:
+                },
                 {
+                "$sort": {
+                    "timestamp": -1
+                }
+                },
+                {
+                "$group": {
+                    _id: "$nss",
+                    shards: {
+                    $first: "$shards"
+                    }
+                }
+                },
+                {
+                "$match": {
+                    shards: {
+                    $not: {
+                        $size: 0
+                    }
+                    }
+                }
+                },
+                {
+                "$group": {
+                    _id: "",
+                    shards: {
+                    $push: "$shards"
+                    }
+                }
+                },
+                {
+                $project: {
+                    "shards": {
+                    $reduce: {
+                        input: "$shards",
+                        initialValue: [],
+                        in: {
+                        "$setUnion": [
+                            "$$this",
+                            "$$value"
+                        ]
+                        }
+                    }
+                    }
+                }
+                },
+                {
+                $lookup: {
                     from: "shards",
                     localField: "shards",
                     foreignField: "_id",
                     as: "activeShards"
                 }
-            },
-            { "$set" : { "numActiveShards" : { "$size" : "$activeShards" } } },
-            { "$project": { "activeShards" : 0 } }
-        ]
+                },
+                {
+                "$set": {
+                    "numActiveShards": {
+                    "$size": "$activeShards"
+                    }
+                }
+                },
+                {
+                "$project": {
+                    "activeShards": 0,
+                    "_id": 0
+                }
+                }
+            ],
+            "approximatePlacementData": [
+                {
+                    "$match": {
+                        "timestamp": {
+                        "$lte": Timestamp(3, 0)
+                        },
+                        "nss":
+                    }
+                    },
+                    {
+                    "$sort": {
+                        "timestamp": -1
+                    }
+                    },
+                    {
+                    "$limit": 1
+                    }
+                }
+            ]
+        }
+
         */
 
     auto expCtx = make_intrusive<ExpressionContext>(
@@ -1395,23 +1472,25 @@ std::vector<ShardId> ShardingCatalogClientImpl::getHistoricalPlacement(
         std::vector<BSONObj>() /* pipeline */};
     expCtx->setResolvedNamespaces(resolvedNamespaces);
 
+    // Build the pipeline for the exact placement data.
     // 1. Get all the history entries prior to the requested time concerning either the collection
     // or the parent database.
-
-
+    const auto& kMarkerNss = NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace.ns();
     auto matchStage = [&]() {
         bool isClusterSearch = !nss.has_value();
         if (isClusterSearch)
-            return DocumentSourceMatch::create(BSON("timestamp" << BSON("$lte" << atClusterTime)),
+            return DocumentSourceMatch::create(BSON("nss" << BSON("$ne" << kMarkerNss)
+                                                          << "timestamp"
+                                                          << BSON("$lte" << atClusterTime)),
                                                expCtx);
 
         bool isCollectionSearch = !nss->db().empty() && !nss->coll().empty();
         auto collMatchExpression = isCollectionSearch ? pcre_util::quoteMeta(nss->coll()) : ".*";
         auto regexString =
             "^" + pcre_util::quoteMeta(nss->db()) + "(\\." + collMatchExpression + ")?$";
-        return DocumentSourceMatch::create(BSON("timestamp" << BSON("$lte" << atClusterTime)
-                                                            << "nss"
-                                                            << BSON("$regex" << regexString)),
+        return DocumentSourceMatch::create(BSON("nss" << BSON("$regex" << regexString)
+                                                      << "timestamp"
+                                                      << BSON("$lte" << atClusterTime)),
                                            expCtx);
     }();
 
@@ -1467,10 +1546,9 @@ std::vector<ShardId> ShardingCatalogClientImpl::getHistoricalPlacement(
 
     // Stage 9. Disable activeShards field to avoid sending it to the client
     auto projectStageDoc = Document{{"activeShards", 0}};
-    auto projectStage = DocumentSourceProject::create(
-        projectStageDoc.toBson(), expCtx, "getShardsThatOwnDataForNamespaceAtClusterTime");
+    auto projectStageHideActiveShards = DocumentSourceProject::createFromBson(
+        Document{{"$project", projectStageDoc.toBson()}}.toBson().firstElement(), expCtx);
 
-    // Create pipeline
     Pipeline::SourceContainer stages;
     stages.emplace_back(std::move(matchStage));
     stages.emplace_back(std::move(sortStage));
@@ -1480,9 +1558,29 @@ std::vector<ShardId> ShardingCatalogClientImpl::getHistoricalPlacement(
     stages.emplace_back(std::move(projectStageFlatten));
     stages.emplace_back(std::move(lookupStage));
     stages.emplace_back(std::move(setStage));
-    stages.emplace_back(std::move(projectStage));
+    stages.emplace_back(std::move(projectStageHideActiveShards));
+    auto exactDataPipeline = Pipeline::create(stages, expCtx);
 
-    const auto pipeline = Pipeline::create(stages, expCtx);
+    // Build the pipeline for the approximate data.
+    auto MatchFcvMarkerStage = DocumentSourceMatch::create(
+        BSON("timestamp" << BSON("$lte" << atClusterTime) << "nss" << kMarkerNss), expCtx);
+    auto SortFcvMarkerStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
+    auto LimitFcvMarkerStage = DocumentSourceLimit::create(expCtx, 1);
+    Pipeline::SourceContainer stages2;
+    stages2.emplace_back(std::move(MatchFcvMarkerStage));
+    stages2.emplace_back(std::move(SortFcvMarkerStage));
+    stages2.emplace_back(std::move(LimitFcvMarkerStage));
+    auto approximateDataPipeline = Pipeline::create(stages2, expCtx);
+
+
+    // Build the facet pipeline
+    auto facetStageBson = BSON("approximatePlacementData"
+                               << approximateDataPipeline->serializeToBson() << "exactPlacementData"
+                               << exactDataPipeline->serializeToBson());
+    auto facetStage = DocumentSourceFacet::createFromBson(
+        Document{{"$facet", std::move(facetStageBson)}}.toBson().firstElement(), expCtx);
+
+    const auto pipeline = Pipeline::create({facetStage}, expCtx);
     auto aggRequest = AggregateCommandRequest(NamespaceString::kConfigsvrPlacementHistoryNamespace,
                                               pipeline->serializeToBson());
 
@@ -1503,27 +1601,46 @@ std::vector<ShardId> ShardingCatalogClientImpl::getHistoricalPlacement(
     auto aggrResult = runCatalogAggregation(
         opCtx, configShard, aggRequest, readConcern, Shard::kDefaultConfigCommandTimeout);
 
-    // Parse the result
-    std::vector<ShardId> activeShards;
-    if (!aggrResult.empty()) {
-        invariant(aggrResult.size() == 1);
-
-        // Extract the result
-        const auto& doc = aggrResult.front();
-        auto numActiveShards = doc.getField("numActiveShards").Int();
-        // Use Obj() instead of Array() to avoid instantiating a temporary std::vector.
-        const auto& shards = doc.getField("shards").Obj();
-
-        uassert(ErrorCodes::SnapshotTooOld,
-                "Part of the history may no longer be retrieved because of one or more removed "
-                "shards.",
-                numActiveShards == static_cast<int>(shards.nFields()));
-
-        for (const auto& shard : shards) {
-            activeShards.push_back(shard.String());
+    auto extractShardIds = [](const BSONObj& obj, const std::string& pipelineName) {
+        // each sub-pipeline of $facet produces an array with a single element containing a 'shards'
+        // field. for this aggregation, every pipeline result is an array of one element
+        auto pipelineResult = obj[pipelineName].Array();
+        if (pipelineResult.empty()) {
+            return std::vector<ShardId>{};
+        } else {
+            auto shards = pipelineResult[0]["shards"].Obj();
+            std::vector<ShardId> activeShards;
+            for (const auto& shard : shards) {
+                activeShards.push_back(shard.String());
+            }
+            return activeShards;
         }
+    };
+
+    invariant(aggrResult.size() == 1);
+    // if there is an fcv marker and the shards array is not empty, return the shards
+    // array, declaring the retrieved data as "not exact".
+    auto fcvMarkerShards = extractShardIds(aggrResult.front(), "approximatePlacementData");
+    if (!fcvMarkerShards.empty()) {
+        return HistoricalPlacement{fcvMarkerShards, false};
     }
-    return activeShards;
+
+    // if the fcv marker shards array is empty, return the shards array from the exact data
+    auto exactShards = extractShardIds(aggrResult.front(), "exactPlacementData");
+    if (exactShards.empty()) {
+        return HistoricalPlacement{{}, true};
+    }
+
+    // check that the shards in the exact data are all active shards
+    const int numActiveShards =
+        aggrResult.front()["exactPlacementData"].Array()[0]["numActiveShards"].Int();
+
+    uassert(ErrorCodes::SnapshotTooOld,
+            "Part of the history may no longer be retrieved because of one or more removed "
+            "shards.",
+            numActiveShards == static_cast<int>(exactShards.size()));
+
+    return HistoricalPlacement{exactShards, true};
 }
 
 std::shared_ptr<Shard> ShardingCatalogClientImpl::_getConfigShard(OperationContext* opCtx) {

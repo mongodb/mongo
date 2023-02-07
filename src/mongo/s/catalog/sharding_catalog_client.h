@@ -42,6 +42,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/index_version.h"
+#include "mongo/s/request_types/get_historical_placement_info_gen.h"
 
 namespace mongo {
 
@@ -342,7 +343,7 @@ public:
      * that used to contain data for the specified collection at clusterTime >= input clusterTime
      * based on placementHistory
      */
-    virtual std::vector<ShardId> getShardsThatOwnDataForCollAtClusterTime(
+    virtual HistoricalPlacement getShardsThatOwnDataForCollAtClusterTime(
         OperationContext* opCtx, const NamespaceString& collName, const Timestamp& clusterTime) = 0;
 
     /**
@@ -350,15 +351,15 @@ public:
      * that used to contain data for the specified database at clusterTime >= input clusterTime
      * based on placementHistory
      */
-    virtual std::vector<ShardId> getShardsThatOwnDataForDbAtClusterTime(
+    virtual HistoricalPlacement getShardsThatOwnDataForDbAtClusterTime(
         OperationContext* opCtx, const NamespaceString& dbName, const Timestamp& clusterTime) = 0;
 
     /**
      * Returns the list of active shards that still contains data or that used to contain data
      * at clusterTime >= input clusterTime based on placementHistory
      */
-    virtual std::vector<ShardId> getShardsThatOwnDataAtClusterTime(
-        OperationContext* opCtx, const Timestamp& clusterTime) = 0;
+    virtual HistoricalPlacement getShardsThatOwnDataAtClusterTime(OperationContext* opCtx,
+                                                                  const Timestamp& clusterTime) = 0;
 
     /**
      * Queries config.placementHistory to retrieve placement metadata on the requested namespace at
@@ -368,7 +369,7 @@ public:
      *
      * TODO (SERVER-73029): convert to private method of ShardingCatalogClientImpl
      */
-    virtual std::vector<ShardId> getHistoricalPlacement(
+    virtual HistoricalPlacement getHistoricalPlacement(
         OperationContext* opCtx,
         const Timestamp& atClusterTime,
         const boost::optional<NamespaceString>& nss) = 0;

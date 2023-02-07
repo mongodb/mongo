@@ -34,7 +34,6 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/request_types/get_historical_placement_info_gen.h"
 
 namespace mongo {
 
@@ -181,7 +180,7 @@ public:
             3. An empty array if the collection and the database are not found
         * In case at least one of the shard is no longer active, a SnapshotTooOld error is thrown.
     */
-    std::vector<ShardId> getShardsThatOwnDataForCollAtClusterTime(
+    HistoricalPlacement getShardsThatOwnDataForCollAtClusterTime(
         OperationContext* opCtx,
         const NamespaceString& collName,
         const Timestamp& clusterTime) override;
@@ -193,7 +192,7 @@ public:
             2. An empty array if the collection and the database are not found
         * In case at least one of the shard is no longer active, a SnapshotTooOld error is thrown.
     */
-    std::vector<ShardId> getShardsThatOwnDataForDbAtClusterTime(
+    HistoricalPlacement getShardsThatOwnDataForDbAtClusterTime(
         OperationContext* opCtx,
         const NamespaceString& dbName,
         const Timestamp& clusterTime) override;
@@ -202,10 +201,10 @@ public:
      * Returns the list of active shards that still contains data or that used to contain data
      * at clusterTime >= input clusterTime based on placementHistory
      */
-    std::vector<ShardId> getShardsThatOwnDataAtClusterTime(OperationContext* opCtx,
-                                                           const Timestamp& clusterTime) override;
+    HistoricalPlacement getShardsThatOwnDataAtClusterTime(OperationContext* opCtx,
+                                                          const Timestamp& clusterTime) override;
 
-    std::vector<ShardId> getHistoricalPlacement(
+    HistoricalPlacement getHistoricalPlacement(
         OperationContext* opCtx,
         const Timestamp& atClusterTime,
         const boost::optional<NamespaceString>& nss) override;
@@ -257,8 +256,8 @@ private:
      * TODO (SERVER-73029): Remove the method - and replace its invocations with
      * runPlacementHistoryAggregation()
      */
-    std::vector<ShardId> _fetchPlacementMetadata(OperationContext* opCtx,
-                                                 ConfigsvrGetHistoricalPlacement&& request);
+    HistoricalPlacement _fetchPlacementMetadata(OperationContext* opCtx,
+                                                ConfigsvrGetHistoricalPlacement&& request);
 
 
     /**

@@ -263,6 +263,11 @@ public:
     // Namespace used for storing NamespacePlacementType docs on the CSRS.
     static const NamespaceString kConfigsvrPlacementHistoryNamespace;
 
+    // Namespace value used to identify the "fcv marker entry" of
+    // kConfigsvrPlacementHistoryNamespace collection which marks the start or the end of a FCV
+    // upgrade/downgrade.
+    static const NamespaceString kConfigsvrPlacementHistoryFcvMarkerNamespace;
+
     // TODO SERVER-68551: remove once 7.0 becomes last-lts
     static const NamespaceString kLockpingsNamespace;
 

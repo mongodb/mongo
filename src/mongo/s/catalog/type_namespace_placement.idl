@@ -61,3 +61,20 @@ structs:
                 description: "The list of shard IDs containing one of more chunks of 'nss' 
                               at time 'timestamp' (may be empty)."
 
+    HistoricalPlacement:
+        description: "Result of the placement search query at a point in time over the 
+                    config.placementHistory"
+        strict: false
+        fields:
+            shards:
+                type: array<shard_id>
+                description: "The set of shard IDs containing data on the requested nss/cluster at 
+                            the point in time"
+            isExact:
+                type: bool
+                description: "When true, the returned list of shards is an accurate recording of 
+                            the placement info at the requested point in time. 
+                            When false, the result value represents an approximation based on 
+                            a present/past reading of config.shards"
+
+

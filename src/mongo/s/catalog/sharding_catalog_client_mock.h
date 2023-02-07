@@ -149,20 +149,20 @@ public:
         const LogicalTime& newerThanThis,
         repl::ReadConcernLevel readConcernLevel) override;
 
-    std::vector<ShardId> getShardsThatOwnDataForCollAtClusterTime(
+    HistoricalPlacement getShardsThatOwnDataForCollAtClusterTime(
         OperationContext* opCtx,
         const NamespaceString& collName,
         const Timestamp& clusterTime) override;
 
-    std::vector<ShardId> getShardsThatOwnDataForDbAtClusterTime(
+    HistoricalPlacement getShardsThatOwnDataForDbAtClusterTime(
         OperationContext* opCtx,
         const NamespaceString& dbName,
         const Timestamp& clusterTime) override;
 
-    std::vector<ShardId> getShardsThatOwnDataAtClusterTime(OperationContext* opCtx,
-                                                           const Timestamp& clusterTime) override;
+    HistoricalPlacement getShardsThatOwnDataAtClusterTime(OperationContext* opCtx,
+                                                          const Timestamp& clusterTime) override;
 
-    std::vector<ShardId> getHistoricalPlacement(
+    HistoricalPlacement getHistoricalPlacement(
         OperationContext* opCtx,
         const Timestamp& atClusterTime,
         const boost::optional<NamespaceString>& nss) override;

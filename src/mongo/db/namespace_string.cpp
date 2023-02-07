@@ -184,6 +184,10 @@ const NamespaceString NamespaceString::kShardCollectionCatalogNamespace(Namespac
 const NamespaceString NamespaceString::kConfigsvrPlacementHistoryNamespace(
     NamespaceString::kConfigDb, "placementHistory");
 
+const NamespaceString NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace("",
+                                                                                    "",
+                                                                                    boost::none);
+
 const NamespaceString NamespaceString::kLockpingsNamespace(NamespaceString::kConfigDb, "lockpings");
 const NamespaceString NamespaceString::kDistLocksNamepsace(NamespaceString::kConfigDb, "locks");
 

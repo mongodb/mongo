@@ -33,27 +33,15 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/s/sharding_types.idl"
-
+    - "mongo/s/catalog/type_namespace_placement.idl"
+  
 structs:
-
   ConfigsvrGetHistoricalPlacementResponse:
       description: "Response for the _configsvrGetHistoricalPlacement command"
       strict: false
       is_command_reply: true
       fields:
-        shards:
-          type: array<shard_id>
-          description: "The set of shard IDs containing data on the requested nss/cluster at 
-                        the point in time"
-        isExact:
-          type: bool
-          description: "When true, the returned list of shards is an accurate recording of 
-                        the placement info at the requested point in time. 
-                        When false, the result value represents an approximation based on 
-                        a present/past reading of config.shards"
-          default: true
-
-
+        historicalPlacement: HistoricalPlacement
 commands:
 
     _configsvrGetHistoricalPlacement:
