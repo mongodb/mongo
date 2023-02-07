@@ -158,6 +158,7 @@ executor:
           runInsideTransaction: true
           runningWithSessions: true
           traceExceptions: false
+          runningWithBalancer: true
   hooks:
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash

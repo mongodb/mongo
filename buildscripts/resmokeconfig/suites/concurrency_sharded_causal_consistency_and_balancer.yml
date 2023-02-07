@@ -116,6 +116,7 @@ executor:
       global_vars:
         TestData:
           runningWithCausalConsistency: true
+          runningWithBalancer: true
   hooks:
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash

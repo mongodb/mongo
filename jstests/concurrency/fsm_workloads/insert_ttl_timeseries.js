@@ -13,6 +13,8 @@
  * ]
  */
 
+load('jstests/concurrency/fsm_workload_helpers/balancer.js');
+
 var $config = (function() {
     const initData = {
         getCollectionName: function(collName) {
@@ -156,6 +158,14 @@ var $config = (function() {
     }
 
     function teardown(db, collName, cluster) {
+        if (TestData.runningWithBalancer) {
+            // Disallow balancing 'ns' so that it does not cause the TTLMonitor to fail rounds due
+            // to ongoing migration critical sections. TTLMonitor will retry on the next round, but
+            // it might not converge in time for the following assertion to pass.
+            BalancerHelper.disableBalancerForCollection(db, db[collName].getFullName());
+            BalancerHelper.joinBalancerRound(db);
+        }
+
         // Default TTL monitor period
         const ttlMonitorSleepSecs = 60;
 

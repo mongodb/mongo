@@ -9,6 +9,9 @@
  * doc inserted by each thread is no longer in the collection.
  * @tags: [uses_ttl]
  */
+
+load('jstests/concurrency/fsm_workload_helpers/balancer.js');
+
 var $config = (function() {
     var states = {
         init: function init(db, collName) {
@@ -33,6 +36,14 @@ var $config = (function() {
     }
 
     function teardown(db, collName, cluster) {
+        if (TestData.runningWithBalancer) {
+            // Disallow balancing 'ns' so that it does not cause the TTLMonitor to fail rounds due
+            // to ongoing migration critical sections. TTLMonitor will retry on the next round, but
+            // it might not converge in time for the following assertion to pass.
+            BalancerHelper.disableBalancerForCollection(db, db[collName].getFullName());
+            BalancerHelper.joinBalancerRound(db);
+        }
+
         // By default, the TTL monitor thread runs every 60 seconds.
         var defaultTTLSecs = 60;
 

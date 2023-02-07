@@ -8,6 +8,7 @@
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');
 load('jstests/concurrency/fsm_workloads/sharded_base_partitioned.js');
+load('jstests/concurrency/fsm_workload_helpers/balancer.js');
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.threadCount = 5;
@@ -33,11 +34,17 @@ var $config = extendWorkload($config, function($config, $super) {
         const shard = connCache.shards[shardNames[randomIndex]];
         const shardPrimary = ChunkHelper.getPrimary(shard);
 
+        // Disable balancing so that waiting for orphan cleanup can converge quickly.
+        BalancerHelper.disableBalancerForCollection(db, ns);
+
         // Ensure the cleanup of all chunk orphans of the primary shard
         assert.soonNoExcept(() => {
             assert.commandWorked(shardPrimary.adminCommand({cleanupOrphaned: ns}));
             return true;
         }, undefined, 10 * 1000, 100);
+
+        // Reenable balancing.
+        BalancerHelper.enableBalancerForCollection(db, ns);
     };
 
     // Verify that counts are stable.
@@ -62,6 +69,10 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         const ns = db[collName].getFullName();
 
+        // Disallow balancing 'ns' during $setup so it does not interfere with the splits.
+        BalancerHelper.disableBalancerForCollection(db, ns);
+        BalancerHelper.joinBalancerRound(db);
+
         for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
             let bulk = db[collName].initializeUnorderedBulkOp();
 
@@ -75,14 +86,12 @@ var $config = extendWorkload($config, function($config, $super) {
             assertAlways.commandWorked(bulk.execute());
 
             if (chunkIndex > 0) {
-                // Need to retry split command to avoid conflicting with moveChunks issued by the
-                // balancer.
-                assert.soonNoExcept(() => {
-                    assert.commandWorked(db.adminCommand({split: ns, middle: {skey: splitKey}}));
-                    return true;
-                }, undefined, 10 * 1000, 100);
+                assert.commandWorked(db.adminCommand({split: ns, middle: {skey: splitKey}}));
             }
         }
+
+        // Allow balancing 'ns' again.
+        BalancerHelper.enableBalancerForCollection(db, ns);
     };
 
     $config.transitions = {

@@ -163,6 +163,7 @@ executor:
           runningWithCausalConsistency: false
           runningWithSessions: true
           traceExceptions: false
+          runningWithBalancer: true
   hooks:
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash

@@ -183,6 +183,7 @@ executor:
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
           useActionPermittedFile: true
+          runningWithBalancer: true
   hooks:
   - class: ContinuousStepdown
     config_stepdown: true

@@ -17,8 +17,13 @@
  *   # This test just performs rename operations that can't be executed in transactions
  *   does_not_support_transactions,
  *   # Can be removed once PM-1965-Milestone-1 is completed.
+ *
+ *   # TODO SERVER-73385 reenable when fixed.
+ *   assumes_balancer_off,
  *  ]
  */
+
+load('jstests/concurrency/fsm_workload_helpers/balancer.js');
 
 const numChunks = 20;
 const documentsPerChunk = 5;
@@ -34,17 +39,17 @@ function initAndFillShardedCollection(db, collName, shardNames) {
     const ns = coll.getFullName();
     db.adminCommand({shardCollection: ns, key: {x: 1}});
 
+    // Disallow balancing 'ns' during $setup so it does not interfere with the splits.
+    BalancerHelper.disableBalancerForCollection(db, ns);
+    BalancerHelper.joinBalancerRound(db);
+
     var nextShardKeyValue = 0;
     for (var i = 0; i < numChunks; i++) {
         for (var j = 0; j < documentsPerChunk; j++) {
             coll.insert({x: nextShardKeyValue++});
         }
 
-        // Need to retry split command to avoid conflicting with moveChunks issued by the balancer.
-        assert.soonNoExcept(() => {
-            assert.commandWorked(db.adminCommand({split: ns, middle: {x: nextShardKeyValue}}));
-            return true;
-        });
+        assert.commandWorked(db.adminCommand({split: ns, middle: {x: nextShardKeyValue}}));
 
         const lastInsertedShardKeyValue = nextShardKeyValue - 1;
 
@@ -57,6 +62,9 @@ function initAndFillShardedCollection(db, collName, shardNames) {
         });
         assert.commandWorkedOrFailedWithCode(res, ErrorCodes.ConflictingOperationInProgress);
     }
+
+    // Allow balancing 'ns' again.
+    BalancerHelper.enableBalancerForCollection(db, ns);
 }
 
 /*

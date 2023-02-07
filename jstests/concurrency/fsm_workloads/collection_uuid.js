@@ -184,7 +184,8 @@ var $config = (function() {
             const namespace = db.getName() + "." + collName;
 
             // Find
-            const findCmd = {find: namespace, collectionUUID: this.collUUID};
+            // Use 'singleBatch: true' to avoid leaving open cursors.
+            const findCmd = {find: namespace, collectionUUID: this.collUUID, singleBatch: true};
             testCommand(db, namespace, "find", findCmd, this);
 
             // Update
