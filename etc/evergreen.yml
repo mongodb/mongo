@@ -346,40 +346,6 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_opportunistic_secondary_targeting_gen
 
-- <<: *linux-64-debug-required-template
-  name: &linux-64-debug-wtdevelop linux-64-debug-wtdevelop
-  display_name: "~ Linux DEBUG WiredTiger develop"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - wtdevelop
-  depends_on:
-  - name: archive_dist_test_debug
-    variant: &linux_x86_dynamic_debug_wtdevelop_compile_variant_name linux-x86-dynamic-debug-wtdevelop-compile
-  - name: version_gen
-    variant: generate-tasks-for-version
-    # This is added because of EVG-18211.
-    # Without this we are adding extra dependencies on evergreen and it is causing strain
-    omit_generated_tasks: true
-  expansions:
-    use_wt_develop: true
-    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    large_distro_name: rhel80-medium
-    max_sub_suites: "5"
-    target_resmoke_time: "15"
-    compile_flags: >-
-      --dbg=on
-      --opt=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --enable-free-mon=on
-      --enable-http-client=on
-      --link-model=dynamic
-    scons_cache_mode: all
-    scons_cache_scope: shared
-    num_scons_link_jobs_available: 0.99
-    test_flags: --excludeWithAnyTags=requires_http_client
-    compile_variant: *linux_x86_dynamic_debug_wtdevelop_compile_variant_name
-
 - name: &tla-plus tla-plus
   display_name: "TLA+"
   run_on:
@@ -3438,18 +3404,6 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: .benchmarks !benchmarks_orphaned
-
-- <<: *enterprise-windows-nopush-template
-  name: &enterprise-windows-wtdevelop enterprise-windows-wtdevelop
-  display_name: "~ Enterprise Windows WiredTiger develop"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
-  - wtdevelop
-  expansions:
-    <<: *enterprise-windows-nopush-expansions-template
-    use_wt_develop: true
-    compile_variant: *enterprise-windows-wtdevelop
 
 ### QO & QE Patch-Specific Build Variants ###
 - <<: *enterprise-windows-nopush-template
