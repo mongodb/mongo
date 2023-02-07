@@ -8,7 +8,7 @@ and proceed with @ref windows_building
 First, clone the repository:
 
 @code
-git clone git://github.com/wiredtiger/wiredtiger.git
+git clone https://github.com/wiredtiger/wiredtiger.git
 @endcode
 
 Now proceed with @ref windows_building
@@ -17,7 +17,7 @@ Now proceed with @ref windows_building
 
 Building WiredTiger on Windows requires
 <a href="https://cmake.org/">CMake</a> as well as the Microsoft Visual
-C++ compiler in Microsoft Visual Studio 2017.
+C++ compiler in Microsoft Visual Studio 2017 (or newer).
 
 You can build WiredTiger from source using command-line tools.
 When compiling via command-line tools, we recommend a prompt/shell that has been appropriately
@@ -35,10 +35,10 @@ cd build
 @endcode
 
 Change into your newly created build directory and using CMake run the build configuration
-step to generate your build.
+step to generate your build. "-A x64" is needed if it's a 64-bit architecture build system.
 
 @code
-cmake ..\.
+cmake ..\. -A x64
 @endcode
 
 In the absence of an explicit generator, CMake will generate Visual Studio project files
