@@ -19,6 +19,7 @@ featureCompatibilityVersions:
   - "6.1"
   - "6.2"
   - "6.3"
+  - "7.0"
   - "100.0" # This version is not an actual version and used for testing only
 # All LTS releases starting with 4.0.
 longTermSupportReleases:
@@ -27,6 +28,7 @@ longTermSupportReleases:
   - "4.4"
   - "5.0"
   - "6.0"
+  - "7.0"
 
 # List of stable MongoDB versions since 2.0 that have been EOL'd. This does not
 # include developer builds (ex: 4.1), but does include rapid releases.
@@ -46,6 +48,7 @@ eolVersions:
   - "5.1" # 2022-01
   - "5.2" # 2022-04
   - "5.3" # 2022-07
+  - "6.1" # 2023-01
 
 # Optional.
 # Using this special override extends FCV constant generation down to the previous value of
