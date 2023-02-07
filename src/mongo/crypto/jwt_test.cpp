@@ -57,11 +57,11 @@ TEST(JWKManager, parseJWKSetBasicFromSource) {
     manager.serialize(&bob);
     ASSERT_BSONOBJ_EQ(bob.obj(), data);
 
-    const auto& initialKeys = manager.getInitialKeys();
+    const auto& currentKeys = manager.getKeys();
     for (const auto& key : data["keys"_sd].Obj()) {
-        auto initialKey = initialKeys.find(key["kid"_sd].str());
-        ASSERT(initialKey != initialKeys.end());
-        ASSERT_BSONOBJ_EQ(key.Obj(), initialKey->second);
+        auto currentKey = currentKeys.find(key["kid"_sd].str());
+        ASSERT(currentKey != currentKeys.end());
+        ASSERT_BSONOBJ_EQ(key.Obj(), currentKey->second);
     }
 
     for (const auto& key : data["keys"_sd].Obj()) {

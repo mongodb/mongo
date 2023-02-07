@@ -56,11 +56,11 @@ StringData reduceInt(StringData value) {
 
 }  // namespace
 
-JWKManager::JWKManager(StringData source) : _keyURI(source) {
+JWKManager::JWKManager(StringData source) : _keyURI(source), _isKeyModified(false) {
     _loadKeysFromUri(true /* isInitialLoad */);
 }
 
-JWKManager::JWKManager(BSONObj keys) {
+JWKManager::JWKManager(BSONObj keys) : _isKeyModified(false) {
     _setAndValidateKeys(keys, true /* isInitialLoad */);
 }
 
@@ -117,12 +117,6 @@ void JWKManager::_setAndValidateKeys(const BSONObj& keys, bool isInitialLoad) {
                 str::stream() << "Key IDs must be unique, duplicate '" << keyId << "'",
                 newKeyMaterial->find(keyId) == newKeyMaterial->end());
 
-        // Does not need to be loaded atomically because isInitialLoad is only true when invoked
-        // from the constructor, so there will not be any concurrent reads.
-        if (isInitialLoad) {
-            _initialKeyMaterial.insert({keyId, key.copy()});
-        }
-
         newKeyMaterial->insert({keyId, key.copy()});
 
         auto swValidator = JWSValidator::create(JWK.getType(), key);
@@ -132,6 +126,9 @@ void JWKManager::_setAndValidateKeys(const BSONObj& keys, bool isInitialLoad) {
         newValidators->insert({keyId, shValidator});
         LOGV2_DEBUG(7070202, 3, "Loaded JWK key", "kid"_attr = keyId, "typ"_attr = JWK.getType());
     }
+    // We compare the old keys from the new ones and return if any old key is not present in the new
+    // set of keys.
+    _isKeyModified |= _haveKeysBeenModified(*newKeyMaterial);
 
     // A mutex is not used here because no single thread consumes both _validators and _keyMaterial.
     // _keyMaterial is used purely for reflection of current key state while _validators is used
@@ -175,6 +172,25 @@ void JWKManager::serialize(BSONObjBuilder* bob) const {
 
     JWKSet jwks(keyVector);
     jwks.serialize(bob);
+}
+
+bool JWKManager::_haveKeysBeenModified(const KeyMap& newKeyMaterial) const {
+    if (!_keyMaterial) {
+        return false;
+    }
+    const bool hasBeenModified =
+        std::any_of((*_keyMaterial).cbegin(), (*_keyMaterial).cend(), [&](const auto& entry) {
+            auto newKey = newKeyMaterial.find(entry.first);
+            if (newKey == newKeyMaterial.end()) {
+                // Key no longer exists in this JWKS.
+                return true;
+            }
+
+            // Key still exists.
+            return entry.second.woCompare(newKey->second) != 0;
+        });
+
+    return hasBeenModified;
 }
 
 }  // namespace mongo::crypto

@@ -68,13 +68,14 @@ public:
     }
 
     /**
-     * Get a snapshot of the keys the key manager was initialized with. It is not
-     * modified after initialization and can be used to determine whether
-     * invalidation is necessary.
-     * TODO SERVER-73165 Generalize this to better handle invalidation.
+     * Get current keys.
      */
-    const KeyMap& getInitialKeys() const {
-        return _initialKeyMaterial;
+    const KeyMap& getKeys() const {
+        return *_keyMaterial;
+    }
+
+    bool getIsKeyModified() const {
+        return _isKeyModified;
     }
 
     /**
@@ -87,15 +88,18 @@ private:
 
     void _loadKeysFromUri(bool isInitialLoad);
 
-private:
-    // Stores the key material that the manager was initialized with.
-    KeyMap _initialKeyMaterial;
+    bool _haveKeysBeenModified(const KeyMap& newKeyMaterial) const;
 
+private:
     // Stores the current key material of the manager, which may have been refreshed.
     std::shared_ptr<KeyMap> _keyMaterial;
 
     boost::optional<std::string> _keyURI;
     std::shared_ptr<std::map<std::string, SharedValidator>> _validators;
+
+    // If an existing key got deleted or modified while doing a just in time refresh, we activate
+    // this flag to indicate that a refresh occurred during this JWKManager's lifetime.
+    bool _isKeyModified;
 };
 
 }  // namespace mongo::crypto
