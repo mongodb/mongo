@@ -151,6 +151,26 @@ void updateMinMaxUniqArrayVals(std::vector<SBEValue>& arrayElements,
         }
     }
 }
+
+// Helper which calculates the the area between two neighboring values, given the frequency of the
+// former value. This function truncates areas which are infinite to the largest possible double as
+// we use infinity as a sentinel value to denote the transition between type brackets. This is
+// because we want to prioritize splitting type brackets into separate buckets over splitting values
+// in the same type bracket that are infinitely far apart, so we avoid returning infinity here.
+double boundedCalculateArea(SBEValue v1, SBEValue v2, size_t freq) {
+    const double spread = valueSpread(v1.getTag(), v1.getValue(), v2.getTag(), v2.getValue());
+    uassert(7299702,
+            str::stream() << "the value spread between "
+                          << std::make_pair(v1.getTag(), v1.getValue()) << " and "
+                          << std::make_pair(v2.getTag(), v2.getValue()) << " is NaN",
+            !std::isnan(spread));
+    const double area = spread * freq;
+    if (std::isinf(area)) {
+        return std::numeric_limits<double>::max();
+    }
+    return area;
+}
+
 }  // namespace
 
 DataDistribution getDataDistribution(const std::vector<SBEValue>& sortedInput) {
@@ -191,43 +211,55 @@ DataDistribution getDataDistribution(const std::vector<SBEValue>& sortedInput) {
     for (size_t i = 0; i + 1 < result._freq.size(); ++i) {
         const auto v1 = result._bounds[i];
         const auto v2 = result._bounds[i + 1];
-        const bool newTypeClass = !sameTypeClass(v1.getTag(), v2.getTag());
+        const bool newTypeBracket = !sameTypeBracket(v1.getTag(), v2.getTag());
 
-        if (newTypeClass) {
-            const auto res = result.typeClassBounds.emplace(i, maxArea);
+        if (newTypeBracket) {
+            // If maxArea is 0.0, this is because this value is the only value of its type bracket.
+            // Because we want to force it to be a bucket, set maxArea to inifinte.
+            const auto res = result.typeClassBounds.emplace(
+                i, maxArea == 0.0 ? std::numeric_limits<double>::infinity() : maxArea);
             uassert(6660551, "There can't be duplicate type class bounds.", res.second);
             maxArea = 0.0;
         } else if (i == 0) {
-            const double spread =
-                valueSpread(v1.getTag(), v1.getValue(), v2.getTag(), v2.getValue());
-            maxArea = result._freq[i]._freq * spread;
+            maxArea = boundedCalculateArea(v1, v2, result._freq[i]._freq);
         }
 
-        if (i == 0 || newTypeClass) {
+        if (i == 0 || newTypeBracket) {
             // Make sure we insert bucket boundaries between different types, and also make sure
             // first value is picked for a boundary.
             result._freq[i]._area = std::numeric_limits<double>::infinity();
         } else {
-            const double spread =
-                valueSpread(v1.getTag(), v1.getValue(), v2.getTag(), v2.getValue());
-            result._freq[i]._area = result._freq[i]._freq * spread;
+            result._freq[i]._area = boundedCalculateArea(v1, v2, result._freq[i]._freq);
             maxArea = std::max(maxArea, result._freq[i]._area);
         }
     }
 
     // Make sure last value is picked as a histogram bucket boundary.
     result._freq.back()._area = std::numeric_limits<double>::infinity();
-    const auto res = result.typeClassBounds.emplace(result._freq.size(), maxArea);
+    // If maxArea is 0.0, it is because the last value is the only value in a type class. We need to
+    // give it an infinite area so we allocate a bucket for it.
+    const auto res = result.typeClassBounds.emplace(
+        result._freq.size() - 1,
+        maxArea == 0.0 ? std::numeric_limits<double>::infinity() : maxArea);
     uassert(6660503, "There can't be duplicate type class bounds.", res.second);
 
-    // Compute normalized areas. If the spread is 0, the area may also be 0. This could happen,
-    // for instance, if there is only a single value of a given type,
-    size_t beginIdx = 0;
+    // Compute normalized areas.
+    size_t i = 0;
     for (const auto [endIdx, area] : result.typeClassBounds) {
-        for (size_t i = beginIdx; i < endIdx; ++i) {
-            result._freq[i]._normArea = area > 0.0 ? (result._freq[i]._area / area) : 0.0;
+        // We ensure above that the area for the current type bracket is never 0.
+        tassert(7299703, str::stream() << "maximum area for type bracket is zero", area != 0.0);
+        // Iterate over all values in the current type bracket.
+        // Note: 'endIdx' is an inclusive index into result._freq.
+        for (; i <= endIdx; ++i) {
+            if (std::isinf(result._freq[i]._area)) {
+                // We want to set type boundaries to have infinite normalized area to force them to
+                // be picked as buckets. We want them to be picked before the entry with the highest
+                // area for a type which has normalized area 1.0.
+                result._freq[i]._normArea = std::numeric_limits<double>::infinity();
+            } else {
+                result._freq[i]._normArea = result._freq[i]._area / area;
+            }
         }
-        beginIdx = endIdx;
     }
 
     // std::cout << "Distribution sorted by value:\n"
@@ -241,6 +273,16 @@ ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib, size_t 
     if (dataDistrib._freq.empty()) {
         return ScalarHistogram::make();
     }
+
+    const auto numTypes = dataDistrib.typeClassBounds.size();
+    // At the very least, we must have one bucket for the first value in the distribution and one
+    // bucket for every type class (except when the first type bracket has a single value, in which
+    // case we the number of buckets can equal the number of types).
+    // For example, {0, 1, 2, "foo", "bar"} needs buckets with values: 0, 2, and "bar".
+    uassert(7299701,
+            "number of buckets: {}, must be larger than number of types: {} in the data"_format(
+                numBuckets, numTypes),
+            numBuckets >= numTypes);
 
     std::vector<ValFreq> topKBuckets = generateTopKBuckets(dataDistrib, numBuckets);
     uassert(6660504,

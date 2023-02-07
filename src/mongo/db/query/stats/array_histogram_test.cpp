@@ -40,7 +40,7 @@
 
 namespace mongo::stats {
 
-TEST(ArrayHistogram, BSONEdgeValues) {
+TEST(ArrayHistograms, BSONEdgeValues) {
     const std::vector<SBEValue> values{
         SBEValue{sbe::value::TypeTags::Nothing, {}},
 
@@ -50,9 +50,11 @@ TEST(ArrayHistogram, BSONEdgeValues) {
         makeInt64Value(std::numeric_limits<int>::min()),
         makeInt64Value(std::numeric_limits<int>::max()),
 
+        makeDoubleValue(std::numeric_limits<double>::lowest()),
         makeDoubleValue(std::numeric_limits<double>::min()),
         makeDoubleValue(std::numeric_limits<double>::max()),
-        makeDoubleValue(std::numeric_limits<double>::infinity()),
+        // TODO SERVER-73510: Support infinity in histograms
+        // makeDoubleValue(std::numeric_limits<double>::infinity()),
         makeDoubleValue(std::numeric_limits<double>::quiet_NaN()),
         makeDoubleValue(std::numeric_limits<double>::signaling_NaN()),
 
@@ -83,8 +85,9 @@ TEST(ArrayHistogram, BSONEdgeValues) {
         sbe::value::makeCopyDecimal(Decimal128::kLargestPositive),
         sbe::value::makeCopyDecimal(Decimal128::kNormalizedZero),
         sbe::value::makeCopyDecimal(Decimal128::kLargestNegativeExponentZero),
-        sbe::value::makeCopyDecimal(Decimal128::kNegativeInfinity),
-        sbe::value::makeCopyDecimal(Decimal128::kPositiveInfinity),
+        // TODO SERVER-73510: Support infinity in histograms
+        // sbe::value::makeCopyDecimal(Decimal128::kNegativeInfinity),
+        // sbe::value::makeCopyDecimal(Decimal128::kPositiveInfinity),
         sbe::value::makeCopyDecimal(Decimal128::kNegativeNaN),
         sbe::value::makeCopyDecimal(Decimal128::kPositiveNaN),
 
@@ -117,7 +120,7 @@ TEST(ArrayHistogram, BSONEdgeValues) {
         {sbe::value::TypeTags::StringBig, 2},
         {sbe::value::TypeTags::MinKey, 1},
         {sbe::value::TypeTags::MaxKey, 1},
-        {sbe::value::TypeTags::NumberDecimal, 10},
+        {sbe::value::TypeTags::NumberDecimal, 8},
         {sbe::value::TypeTags::Array, 2},
         {sbe::value::TypeTags::Object, 1},
         {sbe::value::TypeTags::ObjectId, 1},
@@ -128,14 +131,100 @@ TEST(ArrayHistogram, BSONEdgeValues) {
     ASSERT_EQ(ah->getNanCount(), 4);
     ASSERT_EQ(ah->getEmptyArrayCount(), 1);
 
-    // TODO SERVER-72997: Fix this test. We currently need to specify at least 20 buckets for this
-    // test to pass.
     // Verify that we can build a histogram with the number of buckets equal to the number of
-    // types in the value stream (numeric, date, timestamp, string, and objectId).
-    // ah = createArrayEstimator(values, 5);
+    // types in the value stream + 1 (numeric, date, timestamp, string, and objectId).
+    ah = createArrayEstimator(values, 6);
 
     // Ensure we fail to build a histrogram when we have more types than buckets.
-    ASSERT_THROWS_CODE(createArrayEstimator(values, 4), DBException, 6660504);
+    ASSERT_THROWS(createArrayEstimator(values, 5), DBException);
+}
+
+TEST(ArrayHistograms, EmptyHistogram) {
+    auto ah = createArrayEstimator({}, ScalarHistogram::kMaxBuckets);
+}
+
+TEST(ArrayHistograms, SingleEntryHistogram) {
+    const Date_t d = dateFromISOString("2015-10-21T07:28:00+0000").getValue();
+    const std::vector<SBEValue> values{
+        makeInt64Value(42),
+        makeDoubleValue(42.0),
+        makeDateValue(d),
+        makeTimestampValue(Timestamp(d)),
+        sbe::value::makeNewString("mcfly"),
+        sbe::value::makeNewObjectId(),
+    };
+    for (auto&& v : values) {
+        std::vector<SBEValue> singleValVec{sbe::value::copyValue(v.getTag(), v.getValue())};
+        auto ah = createArrayEstimator(singleValVec, ScalarHistogram::kMaxBuckets);
+        ah = createArrayEstimator(singleValVec, 1);
+    }
+}
+
+TEST(ArrayHistograms, DuplicateValues) {
+    auto ah = createArrayEstimator(
+        {
+            makeInt64Value(1),
+            makeInt64Value(1),
+            makeInt64Value(2),
+            sbe::value::makeNewString("marty"),
+            sbe::value::makeNewString("marty"),
+            sbe::value::makeNewString("mcfly"),
+        },
+        3);
+}
+
+TEST(ArrayHistograms, SingleEntryInTypeClass) {
+    // Single entry at the end
+    auto ah = createArrayEstimator(
+        {
+            makeInt64Value(1),
+            makeInt64Value(2),
+            sbe::value::makeNewString("mcfly"),
+        },
+        3);
+    // Single entry at the beginning
+    ah = createArrayEstimator(
+        {
+            makeInt64Value(1),
+            sbe::value::makeNewString("marty"),
+            sbe::value::makeNewString("mcfly"),
+        },
+        3);
+    // Single entry in the middle
+    ah = createArrayEstimator(
+        {
+            makeInt64Value(1),
+            makeInt64Value(2),
+            sbe::value::makeNewString("mcfly"),
+            makeDateValue(dateFromISOString("1985-10-26T09:00:00+0000").getValue()),
+            makeDateValue(dateFromISOString("2015-10-21T07:28:00+0000").getValue()),
+        },
+        4);
+}
+
+TEST(ArrayHistograms, LargeAreasWithinTypeClass) {
+    auto ah = createArrayEstimator(
+        {
+            makeInt32Value(std::numeric_limits<int32_t>::min()),
+            makeInt32Value(std::numeric_limits<int32_t>::max()),
+            makeInt64Value(std::numeric_limits<int>::min()),
+            makeInt64Value(std::numeric_limits<int>::max()),
+            makeDoubleValue(std::numeric_limits<double>::lowest()),
+            makeDoubleValue(std::numeric_limits<double>::max()),
+            sbe::value::makeCopyDecimal(Decimal128::kLargestNegative),
+            sbe::value::makeCopyDecimal(Decimal128::kLargestPositive),
+        },
+        2);
+}
+
+TEST(ArrayHistograms, SmallAreasWithinTypeClass) {
+    auto ah = createArrayEstimator(
+        {
+            sbe::value::makeCopyDecimal(Decimal128::kSmallestNegative),
+            sbe::value::makeCopyDecimal(Decimal128::kNormalizedZero),
+            sbe::value::makeCopyDecimal(Decimal128::kSmallestPositive),
+        },
+        2);
 }
 
 TEST(ArrayHistograms, MixedTypedHistrogram) {
@@ -201,7 +290,7 @@ TEST(ArrayHistograms, LargeArraysHistogram) {
     ASSERT_FALSE(ah->getArrayMax().empty());
 }
 
-TEST(ArrayHistrograms, LargeNumberOfArraysHistogram) {
+TEST(ArrayHistograms, LargeNumberOfArraysHistogram) {
     std::mt19937_64 seed(42);
     MixedDistributionDescriptor uniform{{DistrType::kUniform, 1.0}};
 

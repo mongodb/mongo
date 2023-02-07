@@ -162,13 +162,10 @@ assert.commandWorked(coll.insert([
         res = db.runCommand({analyze: coll.getName(), key: "a", numberBuckets: i});
         assert.commandFailed(res);
     }
-    // TODO SERVER-72997: Fix and enable tests
     // Verify that we can bucket into numberic, string, and date buckets
-    // res = db.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 3});
-    // assert.commandWorked(res);
-    res = db.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 5});
+    res = db.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 4});
     assert.commandWorked(res);
-    assert.eq(5, syscoll.find({_id: "a"})[0].statistics.scalarHistogram.buckets.length);
+    assert.eq(4, syscoll.find({_id: "a"})[0].statistics.scalarHistogram.buckets.length);
 })();
 
 cleanup();

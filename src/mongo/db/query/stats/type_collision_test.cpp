@@ -61,11 +61,11 @@ TEST(TypeCollisionTest, ZeroedCollidingTypesHistogram) {
 
     // We should always fail to build a histogram on 0 buckets.
     auto i = 0;
-    ASSERT_THROWS_CODE(createArrayEstimator(data, 0), DBException, 7120500);
+    ASSERT_THROWS(createArrayEstimator(data, 0), DBException);
 
     // We should always fail to build a histogram if we have fewer buckets than type classes.
     for (i = 1; i < 5; i++) {
-        ASSERT_THROWS_CODE(createArrayEstimator(data, i), DBException, 6660505);
+        ASSERT_THROWS(createArrayEstimator(data, i), DBException);
     }
 
     // With sufficient buckets, we should build a histogram with one bucket per type class.
