@@ -294,7 +294,7 @@ private:
  */
 template <class KeyType,
           class CachedPlanType,
-          class BudgetEstimator,
+          class KeyBudgetEstimator,
           class DebugInfoType,
           class Partitioner,
           class KeyHasher = std::hash<KeyType>>
@@ -305,7 +305,7 @@ class PlanCacheBase
           // cache entries out of the lock, therefore it is illegal to mutate the pieces of a cache
           // entry that can be cloned whether you are holding a lock or not.
           std::shared_ptr<const PlanCacheEntryBase<CachedPlanType, DebugInfoType>>,
-          BudgetEstimator,
+          KeyBudgetEstimator,
           Partitioner,
           KeyHasher> {
 private:
@@ -316,7 +316,7 @@ public:
     using Base =
         PartitionedCache<KeyType,
                          std::shared_ptr<const PlanCacheEntryBase<CachedPlanType, DebugInfoType>>,
-                         BudgetEstimator,
+                         KeyBudgetEstimator,
                          Partitioner,
                          KeyHasher>;
     using Entry = PlanCacheEntryBase<CachedPlanType, DebugInfoType>;

@@ -40,13 +40,6 @@ namespace mongo::telemetry {
 class TelemetryStoreTest : public ServiceContextTest {};
 
 TEST_F(TelemetryStoreTest, BasicUsage) {
-    // Turning on the flag at runtime will crash as telemetry store registerer (which creates the
-    // telemetry store) is called at start up and if flag is off, the telemetry store will have
-    // never been created. Thus, instead of turning on the flag at runtime and crashing, we skip the
-    // test if telemetry feature flag is off.
-    if (!feature_flags::gFeatureFlagTelemetry.isEnabledAndIgnoreFCV()) {
-        return;
-    }
     TelemetryStore telStore{5000000, 1000};
 
     auto getMetrics = [&](BSONObj& key) {
@@ -99,6 +92,22 @@ TEST_F(TelemetryStoreTest, BasicUsage) {
     telStore.forEach([&](const BSONObj& key, const TelemetryMetrics& entry) { numKeys++; });
 
     ASSERT_EQ(numKeys, 2);
+}
+
+
+TEST_F(TelemetryStoreTest, EvictEntries) {
+    // This creates a telemetry store with 2 partitions, each with a size of 1200 bytes.
+    TelemetryStore telStore{2400, 2};
+
+    for (int i = 0; i < 10; i++) {
+        auto query = BSON("query" + std::to_string(i) << 1 << "xEquals" << 42);
+        telStore.put(query, TelemetryMetrics{});
+    }
+    int numKeys = 0;
+    telStore.forEach([&](const BSONObj& key, const TelemetryMetrics& entry) { numKeys++; });
+    // Given the size of the bson keys (~46 bytes) and values (~208 bytes), each partition (1200
+    // bytes) can hold at most 4 entries.
+    ASSERT_EQ(numKeys, 8);
 }
 
 }  // namespace mongo::telemetry

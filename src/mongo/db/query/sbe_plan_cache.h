@@ -216,7 +216,10 @@ struct CachedSbePlan {
 using PlanCacheEntry = PlanCacheEntryBase<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;
 
 struct BudgetEstimator {
-    size_t operator()(const std::shared_ptr<const PlanCacheEntry>& entry) {
+    size_t operator()(const sbe::PlanCacheKey& key,
+                      const std::shared_ptr<const PlanCacheEntry>& entry) {
+        // TODO: SERVER-73649 include size of underlying query shape and size of int_32 key hash in
+        // total size estimation.
         return entry->estimatedEntrySizeBytes;
     }
 };

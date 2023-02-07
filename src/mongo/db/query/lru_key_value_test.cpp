@@ -64,15 +64,15 @@ struct ValueType {
 struct TrivialBudgetEstimator {
     static constexpr size_t kSize = 1;
 
-    size_t operator()(const ValueType&) {
+    size_t operator()(const int&, const ValueType&) {
         return kSize;
     }
 
-    size_t operator()(const std::shared_ptr<int>&) {
+    size_t operator()(const int&, const std::unique_ptr<int>&) {
         return kSize;
     }
 
-    size_t operator()(const std::unique_ptr<int>&) {
+    size_t operator()(const int&, const std::shared_ptr<int>) {
         return kSize;
     }
 };
@@ -87,7 +87,7 @@ struct NonTrivialEntry {
 };
 
 struct NonTrivialBudgetEstimator {
-    size_t operator()(const std::shared_ptr<NonTrivialEntry>& value) {
+    size_t operator()(const int& key, const std::shared_ptr<NonTrivialEntry> value) {
         return value->budgetSize;
     }
 };

@@ -57,8 +57,9 @@ bool isTelemetryEnabled() {
     return feature_flags::gFeatureFlagTelemetry.isEnabledAndIgnoreFCV();
 }
 
-
 namespace {
+
+CounterMetric telemetryEvictedMetric("telemetry.numEvicted");
 
 /**
  * Cap the telemetry store size.
@@ -129,7 +130,8 @@ public:
 
         auto& telemetryStoreManager = telemetryStoreDecoration(serviceCtx);
         auto&& telemetryStore = telemetryStoreManager->getTelemetryStore();
-        telemetryStore.reset(cappedSize);
+        size_t numEvicted = telemetryStore.reset(cappedSize);
+        telemetryEvictedMetric.increment(numEvicted);
     }
 };
 
@@ -234,7 +236,8 @@ public:
         if (statusWithMetrics.isOK()) {
             metrics = statusWithMetrics.getValue();
         } else {
-            telemetryStore.put(telemetryKey, {}, partitionLock);
+            size_t numEvicted = telemetryStore.put(telemetryKey, {}, partitionLock);
+            telemetryEvictedMetric.increment(numEvicted);
             auto newMetrics = partitionLock->get(telemetryKey);
             // This can happen if the budget is immediately exceeded. Specifically if the there is
             // not enough room for a single new entry if the number of partitions is too high

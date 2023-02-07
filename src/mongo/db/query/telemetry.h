@@ -36,6 +36,7 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
+#include <cstdint>
 
 namespace mongo {
 
@@ -150,21 +151,16 @@ struct TelemetryPartitioner {
     }
 };
 
-/**
- * Average key size used to pad the metrics size. We store a cached redaction of the key in the
- * TelemetryMetrics object.
- */
-const size_t kAverageKeySize = 100;
 
-struct ComputeEntrySize {
-    size_t operator()(const TelemetryMetrics& entry) {
-        return sizeof(TelemetryMetrics) + kAverageKeySize;
+struct TelemetryStoreEntryBudgetor {
+    size_t operator()(const BSONObj& key, const TelemetryMetrics& value) {
+        return sizeof(TelemetryMetrics) + sizeof(BSONObj) + key.objsize();
     }
 };
 
 using TelemetryStore = PartitionedCache<BSONObj,
                                         TelemetryMetrics,
-                                        ComputeEntrySize,
+                                        TelemetryStoreEntryBudgetor,
                                         TelemetryPartitioner,
                                         SimpleBSONObjComparator::Hasher,
                                         SimpleBSONObjComparator::EqualTo>;

@@ -43,7 +43,7 @@ namespace mongo {
  */
 template <class KeyType,
           class ValueType,
-          class BudgetEstimator,
+          class KeyBudgetEstimator,
           class Partitioner,
           class KeyHasher = std::hash<KeyType>,
           class Eq = std::equal_to<KeyType>>
@@ -53,7 +53,7 @@ private:
     PartitionedCache& operator=(const PartitionedCache&) = delete;
 
 public:
-    using Lru = LRUKeyValue<KeyType, ValueType, BudgetEstimator, KeyHasher, Eq>;
+    using Lru = LRUKeyValue<KeyType, ValueType, KeyBudgetEstimator, KeyHasher, Eq>;
     using Partition = typename Partitioned<Lru, Partitioner>::OnePartition;
     using PartitionId = typename Partitioned<Lru, Partitioner>::PartitionId;
 
@@ -69,14 +69,20 @@ public:
     }
 
     ~PartitionedCache() = default;
-
-    void put(const KeyType& key, ValueType value) {
+    /**
+     * Inserts the provided <key, value> into the partition associated with that key. Returns the
+     * number of older entries evicted to fit this new one.
+     */
+    size_t put(const KeyType& key, ValueType value) {
         auto partition = _partitionedCache->lockOnePartition(key);
-        partition->add(key, std::move(value));
+        return partition->add(key, std::move(value));
     }
-
-    void put(const KeyType& key, ValueType value, Partition& partition) {
-        partition->add(key, std::move(value));
+    /**
+     * Inserts the provided <key, value> into the specified partition. Returns the number of older
+     * entries evicted to fit this new one.
+     */
+    size_t put(const KeyType& key, ValueType value, Partition& partition) {
+        return partition->add(key, std::move(value));
     }
 
     StatusWith<ValueType*> lookup(const KeyType& key) const {
@@ -134,13 +140,17 @@ public:
 
     /**
      * Reset total cache size. If the size is set to a smaller value than before, enough entries are
-     * evicted in order to ensure that the cache fits within the new budget.
+     * evicted in order to ensure that the cache fits within the new budget. Returns the number of
+     * entries evicted.
      */
-    void reset(size_t cacheSize) {
+    size_t reset(size_t cacheSize) {
+        size_t numEvicted = 0;
         for (size_t partitionId = 0; partitionId < _numPartitions; ++partitionId) {
             auto lockedPartition = _partitionedCache->lockOnePartitionById(partitionId);
-            lockedPartition->reset(cacheSize / _numPartitions);
+            numEvicted += lockedPartition->reset(cacheSize / _numPartitions);
         }
+
+        return numEvicted;
     }
 
     /**
