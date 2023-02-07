@@ -1980,10 +1980,10 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
         return {};
     }
 
-    if ((_forward && _lastReturnedId >= id) ||
-        MONGO_unlikely(WTRecordStoreUassertOutOfOrder.shouldFail())) {
+    const bool failWithOutOfOrderForTest = WTRecordStoreUassertOutOfOrder.shouldFail();
+    if ((_forward && _lastReturnedId >= id) || MONGO_unlikely(failWithOutOfOrderForTest)) {
         // Crash when test commands are enabled and not explicitly uasserting on out-of-order keys.
-        if (!WTRecordStoreUassertOutOfOrder.shouldFail()) {
+        if (!failWithOutOfOrderForTest) {
             invariant(!getTestCommandsEnabled());
         }
 
