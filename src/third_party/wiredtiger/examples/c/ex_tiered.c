@@ -87,6 +87,20 @@ show_data(WT_SESSION *session, const char *uri, int nentries, const char *commen
 }
 
 /*
+ * FIXME-WT-10567 At the moment, this example will not run on Windows, because it requires an
+ * extension module to be loaded that is not yet built or tested on that platform.
+ */
+static bool
+platform_supported(void)
+{
+#ifdef _WIN32
+    return (false);
+#else
+    return (true);
+#endif
+}
+
+/*
  * A storage source is a driver that controls access to an underlying object storage (e.g. a
  * specific cloud provider). The dir_store storage source stores objects in a directory named by the
  * bucket name, relative to the WiredTiger home directory.
@@ -105,6 +119,11 @@ main(int argc, char *argv[])
     WT_SESSION *session;
     const char *home;
     char buf[1024], config[1024];
+
+    if (!platform_supported()) {
+        fprintf(stderr, "**** Warning: %s is not supported on this platform\n", argv[0]);
+        return (EXIT_SUCCESS);
+    }
 
     home = example_setup(argc, argv);
 
