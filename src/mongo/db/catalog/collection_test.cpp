@@ -567,38 +567,18 @@ TEST_F(CollectionTest, CheckTimeseriesBucketDocsForMixedSchemaData) {
     }
 }
 
-TEST_F(CatalogTestFixture, CollectionPtrNoYieldTag) {
-    CollectionMock mock(NamespaceString("test.t"));
-
-    CollectionPtr coll(&mock, CollectionPtr::NoYieldTag{});
-    ASSERT_TRUE(coll);
-    ASSERT_EQ(coll.get(), &mock);
-
-    // Yield should be a no-op
-    coll.yield();
-    ASSERT_TRUE(coll);
-    ASSERT_EQ(coll.get(), &mock);
-
-    // Restore should also be a no-op
-    coll.restore();
-    ASSERT_TRUE(coll);
-    ASSERT_EQ(coll.get(), &mock);
-
-    coll.reset();
-    ASSERT_FALSE(coll);
-}
-
 TEST_F(CatalogTestFixture, CollectionPtrYieldable) {
     CollectionMock beforeYield(NamespaceString("test.t"));
     CollectionMock afterYield(NamespaceString("test.t"));
 
     int numRestoreCalls = 0;
 
-    CollectionPtr coll(
-        operationContext(), &beforeYield, [&afterYield, &numRestoreCalls](OperationContext*, UUID) {
-            ++numRestoreCalls;
-            return &afterYield;
-        });
+    CollectionPtr coll(&beforeYield);
+    coll.makeYieldable(operationContext(),
+                       [&afterYield, &numRestoreCalls](OperationContext*, UUID) {
+                           ++numRestoreCalls;
+                           return &afterYield;
+                       });
 
     ASSERT_TRUE(coll);
     ASSERT_EQ(coll.get(), &beforeYield);

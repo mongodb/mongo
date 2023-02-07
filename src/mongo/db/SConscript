@@ -830,6 +830,7 @@ env.Library(
         'catalog_raii.cpp',
         'catalog/catalog_helper.cpp',
         'catalog/collection_uuid_mismatch.cpp',
+        'catalog/collection_yield_restore.cpp',
         'db_raii.cpp',
         'shard_role.cpp',
         'transaction_resources.cpp',

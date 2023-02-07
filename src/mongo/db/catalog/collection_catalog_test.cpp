@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -75,7 +76,7 @@ public:
         globalLock.emplace(opCtx.get());
 
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(colUUID, nss);
-        col = CollectionPtr(collection.get(), CollectionPtr::NoYieldTag{});
+        col = CollectionPtr(collection.get());
         // Register dummy collection in catalog.
         catalog.registerCollection(opCtx.get(), colUUID, collection, boost::none);
 
@@ -354,6 +355,10 @@ TEST_F(CollectionCatalogTest, OnDropCollection) {
     ASSERT(yieldableColl);
     ASSERT_EQUALS(yieldableColl, col);
 
+    // Make the CollectionPtr yieldable by setting yield impl
+    yieldableColl.makeYieldable(opCtx.get(),
+                                LockedCollectionYieldRestore(opCtx.get(), yieldableColl));
+
     // Yielding resets a CollectionPtr's internal state to be restored later, provided
     // the collection has not been dropped or renamed.
     ASSERT_EQ(yieldableColl->uuid(), colUUID);  // Correct collection UUID is required for restore.
@@ -391,6 +396,10 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
     auto yieldableColl = catalog.lookupCollectionByUUID(opCtx.get(), uuid);
     ASSERT(yieldableColl);
     ASSERT_EQUALS(yieldableColl, collection);
+
+    // Make the CollectionPtr yieldable by setting yield impl
+    yieldableColl.makeYieldable(opCtx.get(),
+                                LockedCollectionYieldRestore(opCtx.get(), yieldableColl));
 
     // Yielding resets a CollectionPtr's internal state to be restored later, provided
     // the collection has not been dropped or renamed.

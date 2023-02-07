@@ -309,8 +309,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
-        '$BUILD_DIR/mongo/db/storage/capped_snapshots',
-        '$BUILD_DIR/mongo/db/storage/snapshot_helper',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/views/util',
         '$BUILD_DIR/mongo/db/views/views',

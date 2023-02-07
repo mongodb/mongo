@@ -1258,7 +1258,7 @@ TEST_F(MigrationChunkClonerSourceTest, CloneShouldNotCrashWhenNextCloneBatchThro
         {
             auto collWithFault =
                 std::make_unique<CollectionWithFault>(autoColl.getCollection().get());
-            CollectionPtr collPtrWithFault(collWithFault.get(), CollectionPtr::NoYieldTag());
+            CollectionPtr collPtrWithFault(collWithFault.get());
 
             // Note: findDoc currently doesn't have any interruption points, this test simulates
             // an exception being thrown while it is being called.

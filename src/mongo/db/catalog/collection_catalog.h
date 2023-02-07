@@ -928,18 +928,6 @@ private:
 };
 
 /**
- * Functor for looking up Collection by UUID from the Collection Catalog. This is the default yield
- * restore implementation for CollectionPtr when acquired from the catalog.
- */
-struct LookupCollectionForYieldRestore {
-    explicit LookupCollectionForYieldRestore(const NamespaceString& nss) : _nss(nss) {}
-    const Collection* operator()(OperationContext* opCtx, const UUID& uuid) const;
-
-private:
-    const NamespaceString _nss;
-};
-
-/**
  * RAII class to perform multiple writes to the CollectionCatalog on a single copy of the
  * CollectionCatalog instance. Requires the global lock to be held in exclusive write mode (MODE_X)
  * for the lifetime of this object.

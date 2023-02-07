@@ -306,12 +306,11 @@ public:
             int32_t nDocs = 1000;
             OpDebug* const nullOpDebug = nullptr;
             for (int32_t i = 0; i < nDocs; ++i) {
-                ASSERT_OK(collection_internal::insertDocument(
-                    _opCtx,
-                    CollectionPtr(coll, CollectionPtr::NoYieldTag{}),
-                    InsertStatement(BSON("_id" << i)),
-                    nullOpDebug,
-                    true));
+                ASSERT_OK(collection_internal::insertDocument(_opCtx,
+                                                              CollectionPtr(coll),
+                                                              InsertStatement(BSON("_id" << i)),
+                                                              nullOpDebug,
+                                                              true));
             }
             wunit.commit();
             // Request an interrupt.
@@ -553,6 +552,8 @@ protected:
 class IndexCatatalogFixIndexKey : public IndexBuildBase {
 public:
     void run() {
+        AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_X);
+
         auto indexCatalog = collection().get()->getIndexCatalog();
 
         ASSERT_BSONOBJ_EQ(BSON("x" << 1), indexCatalog->fixIndexKey(BSON("x" << 1)));

@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
+#include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/repl/collection_utils.h"
@@ -303,6 +304,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     // Check that the collections are all safe to use.
     _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
     _coll = catalog->lookupCollectionByNamespace(opCtx, _resolvedNss);
+    _coll.makeYieldable(opCtx, LockedCollectionYieldRestore{opCtx, _coll});
 
     if (_coll) {
         // It is possible for an operation to have created the database and collection after this
@@ -414,15 +416,14 @@ Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx) {
         // the write unit of work finishes so we re-fetches and re-clones the Collection if a
         // new write unit of work is opened.
         opCtx->recoveryUnit()->registerChange(
-            [this, opCtx](boost::optional<Timestamp> commitTime) {
-                _coll =
-                    CollectionPtr(opCtx, _coll.get(), LookupCollectionForYieldRestore(_coll->ns()));
+            [this](OperationContext* opCtx, boost::optional<Timestamp> commitTime) {
+                _coll = CollectionPtr(_coll.get());
+                _coll.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _coll));
                 _writableColl = nullptr;
             },
-            [this, originalCollection = _coll.get(), opCtx]() {
-                _coll = CollectionPtr(opCtx,
-                                      originalCollection,
-                                      LookupCollectionForYieldRestore(originalCollection->ns()));
+            [this, originalCollection = _coll.get()](OperationContext* opCtx) {
+                _coll = CollectionPtr(originalCollection);
+                _coll.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _coll));
                 _writableColl = nullptr;
             });
 
@@ -455,9 +456,9 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
 
     // When we restore from yield on this CollectionPtr we will update _collection above and use its
     // new pointer in the CollectionPtr
-    _collectionPtr = CollectionPtr(
+    _collectionPtr = CollectionPtr(_collection.get());
+    _collectionPtr.makeYieldable(
         opCtx,
-        _collection.get(),
         [this, restoreFromYield = std::move(restoreFromYield)](OperationContext* opCtx, UUID uuid) {
             restoreFromYield(_collection, opCtx, uuid);
             return _collection.get();
@@ -546,6 +547,7 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const UUID& uuid)
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
     _storedCollection = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid);
+    _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
     _sharedImpl->_writableCollectionInitializer = [opCtx, uuid]() {
         return CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForMetadataWrite(opCtx, uuid);
     };
@@ -556,6 +558,7 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceStrin
       _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
     _storedCollection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+    _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
     _sharedImpl->_writableCollectionInitializer = [opCtx, nss]() {
         return CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx,
                                                                                           nss);
@@ -601,13 +604,21 @@ Collection* CollectionWriter::getWritableCollection(OperationContext* opCtx) {
             // pointer to the CollectionWriter explicitly so we can detect if the instance is
             // already destroyed.
             opCtx->recoveryUnit()->registerChange(
-                [shared = _sharedImpl](boost::optional<Timestamp>) {
-                    if (shared->_parent)
-                        shared->_parent->_writableCollection = nullptr;
-                },
-                [shared = _sharedImpl,
-                 rollbackCollection = std::move(rollbackCollection)]() mutable {
+                [shared = _sharedImpl](OperationContext* opCtx, boost::optional<Timestamp>) {
                     if (shared->_parent) {
+                        shared->_parent->_writableCollection = nullptr;
+
+                        // Make the stored collection yieldable again as we now operate with the
+                        // same instance as is in the catalog.
+                        CollectionPtr& coll = shared->_parent->_storedCollection;
+                        coll.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, coll));
+                    }
+                },
+                [shared = _sharedImpl, rollbackCollection = std::move(rollbackCollection)](
+                    OperationContext* opCtx) mutable {
+                    if (shared->_parent) {
+                        // Restore stored collection to its previous state. The rollback instance is
+                        // already yieldable.
                         shared->_parent->_storedCollection = std::move(rollbackCollection);
                         shared->_parent->_writableCollection = nullptr;
                     }

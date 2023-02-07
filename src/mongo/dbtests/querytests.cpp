@@ -140,7 +140,7 @@ protected:
             wunit.commit();
         }
         abortOnExit.dismiss();
-        _collection = CollectionPtr(collection.get().get(), CollectionPtr::NoYieldTag{});
+        _collection = CollectionPtr(collection.get().get());
     }
 
     void insert(const char* s) {

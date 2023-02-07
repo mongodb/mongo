@@ -627,10 +627,10 @@ public:
             CallbackChange(CommitCallback&& commit, RollbackCallback&& rollback)
                 : _rollback(std::move(rollback)), _commit(std::move(commit)) {}
             void rollback(OperationContext* opCtx) final {
-                _rollback();
+                _rollback(opCtx);
             }
             void commit(OperationContext* opCtx, boost::optional<Timestamp> ts) final {
-                _commit(ts);
+                _commit(opCtx, ts);
             }
 
         private:

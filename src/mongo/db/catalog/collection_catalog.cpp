@@ -40,10 +40,8 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -406,8 +404,7 @@ CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*()
         return CollectionPtr();
     }
 
-    return {
-        _opCtx, _mapIter->second.get(), LookupCollectionForYieldRestore(_mapIter->second->ns())};
+    return {_mapIter->second.get()};
 }
 
 Collection* CollectionCatalog::iterator::getWritableCollection(OperationContext* opCtx) {
@@ -909,12 +906,12 @@ CollectionPtr CollectionCatalog::_openCollectionAtLatestByNamespace(
         invariant(pendingCollection && pendingCollection->isMetadataEqual(metadata));
         // TODO(SERVER-72193): Test this code path.
         openedCollections.store(pendingCollection, nss, uuid);
-        return CollectionPtr(pendingCollection.get(), CollectionPtr::NoYieldTag{});
+        return CollectionPtr(pendingCollection.get());
     }
 
     invariant(latestCollection->isMetadataEqual(metadata));
     openedCollections.store(latestCollection, nss, uuid);
-    return CollectionPtr(latestCollection.get(), CollectionPtr::NoYieldTag{});
+    return CollectionPtr(latestCollection.get());
 }
 
 CollectionPtr CollectionCatalog::_openCollectionAtLatestByUUID(OperationContext* opCtx,
@@ -965,12 +962,12 @@ CollectionPtr CollectionCatalog::_openCollectionAtLatestByUUID(OperationContext*
         if (latestCollection->ns() == nss) {
             openedCollections.store(nullptr, pendingCollection->ns(), boost::none);
             openedCollections.store(latestCollection, nss, uuid);
-            return CollectionPtr(latestCollection.get(), CollectionPtr::NoYieldTag{});
+            return CollectionPtr(latestCollection.get());
         } else {
             invariant(pendingCollection->ns() == nss);
             openedCollections.store(nullptr, latestCollection->ns(), boost::none);
             openedCollections.store(pendingCollection, nss, uuid);
-            return CollectionPtr(pendingCollection.get(), CollectionPtr::NoYieldTag{});
+            return CollectionPtr(pendingCollection.get());
         }
     }
 
@@ -989,12 +986,12 @@ CollectionPtr CollectionCatalog::_openCollectionAtLatestByUUID(OperationContext*
         // operating on this snapshot.
         invariant(pendingCollection && pendingCollection->isMetadataEqual(metadata));
         openedCollections.store(pendingCollection, nss, uuid);
-        return CollectionPtr(pendingCollection.get(), CollectionPtr::NoYieldTag{});
+        return CollectionPtr(pendingCollection.get());
     }
 
     invariant(latestCollection->isMetadataEqual(metadata));
     openedCollections.store(latestCollection, nss, uuid);
-    return CollectionPtr(latestCollection.get(), CollectionPtr::NoYieldTag{});
+    return CollectionPtr(latestCollection.get());
 }
 CollectionPtr CollectionCatalog::_openCollectionAtPointInTimeByNamespace(
     OperationContext* opCtx, const NamespaceString& nss, Timestamp readTimestamp) const {
@@ -1012,7 +1009,7 @@ CollectionPtr CollectionCatalog::_openCollectionAtPointInTimeByNamespace(
     // Return the in-memory Collection instance if it is compatible with the read timestamp.
     if (isExistingCollectionCompatible(latestCollection, readTimestamp)) {
         openedCollections.store(latestCollection, nss, latestCollection->uuid());
-        return CollectionPtr(latestCollection.get(), CollectionPtr::NoYieldTag{});
+        return CollectionPtr(latestCollection.get());
     }
 
     // Use the shared collection state from the latest Collection in the in-memory collection
@@ -1021,7 +1018,7 @@ CollectionPtr CollectionCatalog::_openCollectionAtPointInTimeByNamespace(
         _createCompatibleCollection(opCtx, latestCollection, readTimestamp, catalogEntry.get());
     if (compatibleCollection) {
         openedCollections.store(compatibleCollection, nss, compatibleCollection->uuid());
-        return CollectionPtr(compatibleCollection.get(), CollectionPtr::NoYieldTag{});
+        return CollectionPtr(compatibleCollection.get());
     }
 
     // There is no state in-memory that matches the catalog entry. Try to instantiate a new
@@ -1029,7 +1026,7 @@ CollectionPtr CollectionCatalog::_openCollectionAtPointInTimeByNamespace(
     auto newCollection = _createNewPITCollection(opCtx, readTimestamp, catalogEntry.get());
     if (newCollection) {
         openedCollections.store(newCollection, nss, newCollection->uuid());
-        return CollectionPtr(newCollection.get(), CollectionPtr::NoYieldTag{});
+        return CollectionPtr(newCollection.get());
     }
 
     openedCollections.store(nullptr, nss, boost::none);
@@ -1357,17 +1354,11 @@ CollectionPtr CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
     // Return any previously instantiated collection on this namespace for this snapshot
     if (auto openedColl = OpenedCollections::get(opCtx).lookupByUUID(uuid)) {
 
-        return openedColl.value()
-            ? CollectionPtr(opCtx,
-                            openedColl->get(),
-                            LookupCollectionForYieldRestore(openedColl.value()->ns()))
-            : CollectionPtr();
+        return openedColl.value() ? CollectionPtr(openedColl->get()) : CollectionPtr();
     }
 
     auto coll = _lookupCollectionByUUID(uuid);
-    return (coll && coll->isCommitted())
-        ? CollectionPtr(opCtx, coll.get(), LookupCollectionForYieldRestore(coll->ns()))
-        : CollectionPtr();
+    return (coll && coll->isCommitted()) ? CollectionPtr(coll.get()) : CollectionPtr();
 }
 
 CollectionPtr CollectionCatalog::lookupCollectionByNamespaceOrUUID(
@@ -1489,14 +1480,12 @@ CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* o
 
     // Return any previously instantiated collection on this namespace for this snapshot
     if (auto openedColl = OpenedCollections::get(opCtx).lookupByNamespace(nss)) {
-        return CollectionPtr(opCtx, openedColl->get(), LookupCollectionForYieldRestore(nss));
+        return CollectionPtr(openedColl->get());
     }
 
     auto it = _collections.find(nss);
     auto coll = (it == _collections.end() ? nullptr : it->second);
-    return (coll && coll->isCommitted())
-        ? CollectionPtr(opCtx, coll.get(), LookupCollectionForYieldRestore(coll->ns()))
-        : nullptr;
+    return (coll && coll->isCommitted()) ? CollectionPtr(coll.get()) : nullptr;
 }
 
 boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationContext* opCtx,
@@ -2538,37 +2527,6 @@ void CollectionCatalogStasher::reset() {
         CollectionCatalog::stash(_opCtx, nullptr);
         _stashed = false;
     }
-}
-
-const Collection* LookupCollectionForYieldRestore::operator()(OperationContext* opCtx,
-                                                              const UUID& uuid) const {
-    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForRead(opCtx, uuid);
-
-    // Collection dropped during yielding.
-    if (!collection) {
-        return nullptr;
-    }
-
-    // Collection renamed during yielding.
-    // This check ensures that we are locked on the same namespace and that it is safe to return
-    // the C-style pointer to the Collection.
-    if (collection->ns() != _nss) {
-        return nullptr;
-    }
-
-    // Non-lock-free readers use this path and need to re-establish their capped snapshot.
-    if (collection->usesCappedSnapshots()) {
-        CappedSnapshots::get(opCtx).establish(opCtx, collection.get());
-    }
-
-    // After yielding and reacquiring locks, the preconditions that were used to select our
-    // ReadSource initially need to be checked again. We select a ReadSource based on replication
-    // state. After a query yields its locks, the replication state may have changed, invalidating
-    // our current choice of ReadSource. Using the same preconditions, change our ReadSource if
-    // necessary.
-    SnapshotHelper::changeReadSourceIfNeeded(opCtx, collection->ns());
-
-    return collection.get();
 }
 
 BatchedCollectionCatalogWriter::BatchedCollectionCatalogWriter(OperationContext* opCtx)

@@ -116,9 +116,9 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         wunit.commit();
     }
     MultiIndexBlock indexer;
-    CollectionWriter collection(opCtx, nss);
     ScopeGuard abortOnExit([&] {
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+        CollectionWriter collection(opCtx, nss);
         WriteUnitOfWork wunit(opCtx);
         indexer.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
         wunit.commit();
@@ -126,6 +126,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     auto status = Status::OK();
     {
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+        CollectionWriter collection(opCtx, nss);
         status = indexer
                      .init(opCtx,
                            collection,
@@ -146,6 +147,8 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     }
     {
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+        // Using CollectionWriter for convenience here.
+        CollectionWriter collection(opCtx, nss);
         status = indexer.insertAllDocumentsInCollection(opCtx, collection.get());
         if (!status.isOK()) {
             return status;
@@ -153,6 +156,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     }
     {
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+        CollectionWriter collection(opCtx, nss);
         status = indexer.retrySkippedRecords(opCtx, collection.get());
         if (!status.isOK()) {
             return status;

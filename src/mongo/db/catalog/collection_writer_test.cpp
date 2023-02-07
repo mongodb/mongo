@@ -92,6 +92,7 @@ protected:
 };
 
 TEST_F(CollectionWriterTest, Commit) {
+    AutoGetCollection lock(operationContext(), kNss, MODE_X);
     CollectionWriter writer(operationContext(), kNss);
 
     const Collection* before = lookupCollectionFromCatalog().get();
@@ -102,7 +103,6 @@ TEST_F(CollectionWriterTest, Commit) {
     ASSERT_EQ(lookupCollectionFromCatalog().get(), lookupCollectionFromCatalogForRead());
 
     {
-        AutoGetCollection lock(operationContext(), kNss, MODE_X);
         WriteUnitOfWork wuow(operationContext());
         auto writable = writer.getWritableCollection(operationContext());
 
@@ -129,7 +129,6 @@ TEST_F(CollectionWriterTest, Commit) {
     before = lookupCollectionFromCatalog().get();
 
     {
-        AutoGetCollection lock(operationContext(), kNss, MODE_X);
         WriteUnitOfWork wuow(operationContext());
         auto writable = writer.getWritableCollection(operationContext());
 
@@ -146,6 +145,7 @@ TEST_F(CollectionWriterTest, Commit) {
 }
 
 TEST_F(CollectionWriterTest, Rollback) {
+    AutoGetCollection lock(operationContext(), kNss, MODE_X);
     CollectionWriter writer(operationContext(), kNss);
 
     const Collection* before = lookupCollectionFromCatalog().get();
@@ -154,7 +154,6 @@ TEST_F(CollectionWriterTest, Rollback) {
     ASSERT_EQ(lookupCollectionFromCatalog().get(), lookupCollectionFromCatalogForRead());
 
     {
-        AutoGetCollection lock(operationContext(), kNss, MODE_X);
         WriteUnitOfWork wuow(operationContext());
         auto writable = writer.getWritableCollection(operationContext());
 

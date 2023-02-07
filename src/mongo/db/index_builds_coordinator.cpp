@@ -35,6 +35,7 @@
 
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_build_entry_gen.h"
@@ -2213,7 +2214,7 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
         auto status = ex.toStatus();
         auto collectionSharedPtr = CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForRead(
             opCtx, replState->collectionUUID);
-        CollectionPtr collection(collectionSharedPtr.get(), CollectionPtr::NoYieldTag{});
+        CollectionPtr collection(collectionSharedPtr.get());
         invariant(collection,
                   str::stream() << "Collection with UUID " << replState->collectionUUID
                                 << " should exist because an index build is in progress: "
@@ -2455,7 +2456,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
     // logging purposes.
     auto collectionSharedPtr = CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForRead(
         opCtx, replState->collectionUUID);
-    CollectionPtr collection(collectionSharedPtr.get(), CollectionPtr::NoYieldTag{});
+    CollectionPtr collection(collectionSharedPtr.get());
     invariant(collection,
               str::stream() << "Collection with UUID " << replState->collectionUUID
                             << " should exist because an index build is in progress: "
@@ -2738,6 +2739,7 @@ CollectionPtr IndexBuildsCoordinator::_setUpForScanCollectionAndInsertSortedKeys
     auto collection =
         CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, replState->collectionUUID);
     invariant(collection);
+    collection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, collection));
 
     // Set up the thread's currentOp information to display createIndexes cmd information.
     updateCurOpOpDescription(opCtx, collection->ns(), replState->indexSpecs);

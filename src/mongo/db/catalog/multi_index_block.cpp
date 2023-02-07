@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/multi_index_block_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -834,8 +835,9 @@ Status MultiIndexBlock::drainBackgroundWrites(
 
     ReadSourceScope readSourceScope(opCtx, readSource);
 
-    const CollectionPtr& coll =
+    CollectionPtr coll =
         CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, _collectionUUID.value());
+    coll.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, coll));
 
     // Drain side-writes table for each index. This only drains what is visible. Assuming intent
     // locks are held on the user collection, more writes can come in after this drain completes.

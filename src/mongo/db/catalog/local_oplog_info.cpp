@@ -68,7 +68,7 @@ const CollectionPtr& LocalOplogInfo::getCollection() const {
 }
 
 void LocalOplogInfo::setCollection(const CollectionPtr& oplog) {
-    _oplog = CollectionPtr(oplog.get(), CollectionPtr::NoYieldTag{});
+    _oplog = CollectionPtr(oplog.get());
 }
 
 void LocalOplogInfo::resetCollection() {

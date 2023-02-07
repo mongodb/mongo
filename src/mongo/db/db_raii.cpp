@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
+#include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
@@ -494,7 +495,9 @@ CollectionPtr fetchOrCreatePITCollection(OperationContext* opCtx,
     // TODO SERVER-70846: openCollection does not set a yield handler on the CollectionPtr
     // returned. Therefore, it is necessary to lookup the collection again via a different
     // lookup fn to fetch a yielding-aware CollectionPtr from the catalog.
-    return catalog->lookupCollectionByNamespace(opCtx, nss);
+    CollectionPtr coll = catalog->lookupCollectionByNamespace(opCtx, nss);
+    coll.makeYieldable(opCtx, LockedCollectionYieldRestore{opCtx, coll});
+    return coll;
 }
 
 }  // namespace
@@ -1268,11 +1271,7 @@ static const Lock::GlobalLockSkipOptions kLockFreeReadsGlobalLockOptions{[] {
 
 CollectionPtr makeCollectionPtrForLockFreeReadSubOperation(OperationContext* opCtx,
                                                            const Collection* coll) {
-    return {opCtx, coll, [](OperationContext*, UUID) -> const Collection* {
-                // A sub-operation should never yield because it would break the consistent
-                // in-memory and on-disk view of the higher level operation.
-                MONGO_UNREACHABLE;
-            }};
+    return {coll};
 }
 
 struct CatalogStateForNamespace {
@@ -1417,8 +1416,10 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
         _secondaryNssIsAViewOrSharded = catalogStateForNamespace.isAnySecondaryNssShardedOrAView;
 
         _collectionPtr = CollectionPtr(
+
+            catalogStateForNamespace.collection);
+        _collectionPtr.makeYieldable(
             opCtx,
-            catalogStateForNamespace.collection,
             _makeRestoreFromYieldFn(options,
                                     _callerExpectedToConflictWithSecondaryBatchApplication,
                                     _resolvedNss.dbName()));
