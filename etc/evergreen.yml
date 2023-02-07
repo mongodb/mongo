@@ -3272,6 +3272,7 @@ buildvariants:
       -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
     clang_tidy_toolchain: v4
+    num_scons_unit_cc_jobs_available: 0.2
     compile_variant: *commit-queue
   depends_on: []
   tasks:

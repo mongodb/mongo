@@ -251,10 +251,8 @@ EOF
     chmod +x ./create_build_id_links.sh
     cpus=$(getconf _NPROCESSORS_ONLN)
 
-    # notice we don't search lib directory as we assume dynamic builds build the index during
-    # the build.
-    find bin -type f -perm -o=x | xargs --max-args=1 --max-procs=$cpus ./add_index.sh
-    find bin -type f -perm -o=x | xargs --max-args=1 --max-procs=$cpus ./recalc_debuglink.sh
+    find bin lib -type f -perm -o=x | xargs --max-args=1 --max-procs=$cpus ./add_index.sh
+    find bin lib -type f -perm -o=x | xargs --max-args=1 --max-procs=$cpus ./recalc_debuglink.sh
 
     # This script constructs symblinks based off the build-id so GDB can skip the crc check
     # normally performed during .gnu_debuglink loading.

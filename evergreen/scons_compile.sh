@@ -17,6 +17,9 @@ rm -rf ${install_directory}
 echo "Changing SCons to run with --jlink=${num_scons_link_jobs_available}"
 extra_args="$extra_args --jlink=${num_scons_link_jobs_available} --separate-debug=${separate_debug}"
 
+echo "Changing SCons to run with UNITTESTS_COMPILE_CONCURRENCY=${num_scons_unit_cc_jobs_available}"
+extra_args="$extra_args UNITTESTS_COMPILE_CONCURRENCY=${num_scons_unit_cc_jobs_available}"
+
 if [ "${scons_cache_scope}" = "shared" ]; then
   extra_args="$extra_args --cache-debug=scons_cache.log"
 fi
@@ -49,7 +52,7 @@ else
   extra_args="$extra_args --release"
 fi
 
-extra_args="$extra_args SPLIT_DWARF=0"
+extra_args="$extra_args SPLIT_DWARF=0 GDB_INDEX=0"
 
 if [ "${generating_for_ninja}" = "true" ] && [ "Windows_NT" = "$OS" ]; then
   vcvars="$(vswhere -latest -property installationPath | tr '\\' '/' | dos2unix.exe)/VC/Auxiliary/Build/"

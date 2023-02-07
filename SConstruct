@@ -1025,6 +1025,14 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    'UNITTESTS_COMPILE_CONCURRENCY',
+    help=
+    'Sets the ratio of total jobs for max concurrency when compiling unittests source files. Should be float between 0 and 1.',
+    default="1",
+    converter=lambda val: float(val) if val != '' else '',
+)
+
+env_vars.Add(
     'DESTDIR',
     help='Where builds will install files',
     default='$BUILD_ROOT/install',
@@ -6287,45 +6295,28 @@ env.Alias("distsrc", "distsrc-tgz")
 # Do this as close to last as possible before reading SConscripts, so
 # that any tools that may have injected other things via emitters are included
 # among the side effect adornments.
-#
-# TODO: Move this to a tool.
+env.Tool('task_limiter')
 if has_option('jlink'):
-    jlink = get_option('jlink')
-    if jlink <= 0:
-        env.FatalError("The argument to jlink must be a positive integer or float")
-    elif jlink < 1 and jlink > 0:
-        jlink = env.GetOption('num_jobs') * jlink
-        jlink = round(jlink)
-        if jlink < 1.0:
-            print("Computed jlink value was less than 1; Defaulting to 1")
-            jlink = 1.0
 
-    jlink = int(jlink)
-    target_builders = ['Program', 'SharedLibrary', 'LoadableModule']
+    env.SetupTaskLimiter(
+        name='jlink',
+        concurrency_ratio=get_option('jlink'),
+        builders=['Program', 'SharedLibrary', 'LoadableModule'],
+    )
 
-    # A bound map of stream (as in stream of work) name to side-effect
-    # file. Since SCons will not allow tasks with a shared side-effect
-    # to execute concurrently, this gives us a way to limit link jobs
-    # independently of overall SCons concurrency.
-    jlink_stream_map = dict()
+if env.get('UNITTESTS_COMPILE_CONCURRENCY'):
 
-    def jlink_emitter(target, source, env):
-        name = str(target[0])
-        se_name = "#jlink-stream" + str(hash(name) % jlink)
-        se_node = jlink_stream_map.get(se_name, None)
-        if not se_node:
-            se_node = env.Entry(se_name)
-            # This may not be necessary, but why chance it
-            env.NoCache(se_node)
-            jlink_stream_map[se_name] = se_node
-        env.SideEffect(se_node, target)
-        return (target, source)
+    if hasattr(SCons.Tool, 'cxx'):
+        c_suffixes = SCons.Tool.cxx.CXXSuffixes
+    else:
+        c_suffixes = SCons.Tool.msvc.CXXSuffixes
 
-    for target_builder in target_builders:
-        builder = env['BUILDERS'][target_builder]
-        base_emitter = builder.emitter
-        new_emitter = SCons.Builder.ListEmitter([base_emitter, jlink_emitter])
-        builder.emitter = new_emitter
+    env.SetupTaskLimiter(
+        name='unit_cc',
+        concurrency_ratio=float(env.get('UNITTESTS_COMPILE_CONCURRENCY')),
+        builders={'Object': c_suffixes, 'SharedObject': c_suffixes},
+        source_file_regex=r"^.*_test\.cpp$",
+    )
 
 # Keep this late in the game so that we can investigate attributes set by all the tools that have run.
 if has_option("cache"):
