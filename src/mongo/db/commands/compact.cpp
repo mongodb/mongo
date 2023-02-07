@@ -95,11 +95,6 @@ public:
                 "other running operations. use force:true to force",
                 !replCoord->getMemberState().primary() || cmdObj["force"].trueValue());
 
-        // Items in system.* cannot be moved as there might be pointers to them.
-        uassert(ErrorCodes::InvalidNamespace,
-                "can't compact a system namespace",
-                !nss.isSystem() || nss.isTimeseriesBucketsCollection());
-
         // This command is internal to the storage engine and should not block oplog application.
         ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
 
