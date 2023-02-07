@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/base/status.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/data_view.h"
@@ -770,56 +771,123 @@ TEST(BSONValidateExtended, BSONColumn) {
 }
 
 TEST(BSONValidateExtended, BSONEncryptedValue) {
+    BSONObj obj;
+    Status status = Status::OK();
     FleBlobHeader blob;
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue);
-    auto fle = BSONBinData(
-        reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
-    BSONObj obj = BSON("a" << fle);
-    Status status = validateBSON(obj, BSONValidateMode::kExtended);
-    ASSERT_OK(status);
+    BSONBinData fle;
 
-    // Empty Encrypted BSON Value.
-    auto emptyBinData = "";
-    obj = BSON("a" << BSONBinData(emptyBinData, 0, Encrypt));
-    status = validateBSON(obj, mongo::BSONValidateMode::kExtended);
-    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
-    status = validateBSON(obj, mongo::BSONValidateMode::kFull);
-    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    {
+        // Successful FLE2 Unindexed Encrypted Value
+        memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
+        blob.originalBsonType = BSONType::String;
+        blob.fleBlobSubtype =
+            static_cast<int8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue);
+        fle = BSONBinData(
+            reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
+        obj = BSON("a" << fle);
+        status = validateBSON(obj, BSONValidateMode::kExtended);
+        ASSERT_OK(status);
+    }
 
-    // Encrypted BSON value subtype not supposed to persist.
-    blob.originalBsonType = BSONType::String;
-    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kFLE2Placeholder);
-    fle = BSONBinData(
-        reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
-    obj = BSON("a" << fle);
-    status = validateBSON(obj, mongo::BSONValidateMode::kExtended);
-    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
-    status = validateBSON(obj, mongo::BSONValidateMode::kFull);
-    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    {
+        // Successful FLE2 Equality Indexed Value
+        memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
+        blob.originalBsonType = BSONType::String;
+        blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue);
+        fle = BSONBinData(
+            reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
+        obj = BSON("a" << fle);
+        status = validateBSON(obj, BSONValidateMode::kExtended);
+        ASSERT_OK(status);
+    }
 
-    // Short Encrypted BSON Value.
-    blob.originalBsonType = BSONType::String;
-    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue);
-    fle = BSONBinData(
-        reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader) - 1, BinDataType::Encrypt);
-    obj = BSON("a" << fle);
-    status = validateBSON(obj, mongo::BSONValidateMode::kExtended);
-    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
-    status = validateBSON(obj, mongo::BSONValidateMode::kFull);
-    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    {
+        // Successful FLE2 Range Indexed Value
+        memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
+        blob.originalBsonType = BSONType::NumberInt;
+        blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kFLE2RangeIndexedValue);
+        fle = BSONBinData(
+            reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
+        obj = BSON("a" << fle);
+        status = validateBSON(obj, BSONValidateMode::kExtended);
+        ASSERT_OK(status);
+    }
 
-    // Unsupported original BSON subtype.
-    blob.originalBsonType = BSONType::MaxKey;
-    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue);
-    fle = BSONBinData(
-        reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
-    obj = BSON("a" << fle);
-    status = validateBSON(obj, mongo::BSONValidateMode::kExtended);
-    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
-    status = validateBSON(obj, mongo::BSONValidateMode::kFull);
-    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    {
+        // Successful FLE2 Equality Indexed Value V2
+        memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
+        blob.originalBsonType = BSONType::String;
+        blob.fleBlobSubtype =
+            static_cast<int8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValueV2);
+        fle = BSONBinData(
+            reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
+        obj = BSON("a" << fle);
+        status = validateBSON(obj, BSONValidateMode::kExtended);
+        ASSERT_OK(status);
+    }
+
+    {
+        // Successful FLE2 Range Indexed Value V2
+        memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
+        blob.originalBsonType = BSONType::NumberInt;
+        blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kFLE2RangeIndexedValueV2);
+        fle = BSONBinData(
+            reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
+        obj = BSON("a" << fle);
+        status = validateBSON(obj, BSONValidateMode::kExtended);
+        ASSERT_OK(status);
+    }
+
+    {
+        // Empty Encrypted BSON Value.
+        auto emptyBinData = "";
+        obj = BSON("a" << BSONBinData(emptyBinData, 0, Encrypt));
+        status = validateBSON(obj, mongo::BSONValidateMode::kExtended);
+        ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+        status = validateBSON(obj, mongo::BSONValidateMode::kFull);
+        ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    }
+
+    {
+        // Encrypted BSON value subtype not supposed to persist.
+        blob.originalBsonType = BSONType::String;
+        blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kFLE2Placeholder);
+        fle = BSONBinData(
+            reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
+        obj = BSON("a" << fle);
+        status = validateBSON(obj, mongo::BSONValidateMode::kExtended);
+        ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+        status = validateBSON(obj, mongo::BSONValidateMode::kFull);
+        ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    }
+
+    {
+        // Short Encrypted BSON Value.
+        blob.originalBsonType = BSONType::String;
+        blob.fleBlobSubtype =
+            static_cast<int8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue);
+        fle = BSONBinData(
+            reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader) - 1, BinDataType::Encrypt);
+        obj = BSON("a" << fle);
+        status = validateBSON(obj, mongo::BSONValidateMode::kExtended);
+        ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+        status = validateBSON(obj, mongo::BSONValidateMode::kFull);
+        ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    }
+
+    {
+        // Unsupported original BSON subtype.
+        blob.originalBsonType = BSONType::MaxKey;
+        blob.fleBlobSubtype =
+            static_cast<int8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue);
+        fle = BSONBinData(
+            reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
+        obj = BSON("a" << fle);
+        status = validateBSON(obj, mongo::BSONValidateMode::kExtended);
+        ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+        status = validateBSON(obj, mongo::BSONValidateMode::kFull);
+        ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    }
 }
 
 }  // namespace
