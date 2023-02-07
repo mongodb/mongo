@@ -1455,8 +1455,6 @@ extern int __wt_session_compact_readonly(WT_SESSION *wt_session, const char *uri
   const char *config) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_session_copy_values(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_session_count(WT_SESSION *wt_session, const char *uri, int64_t *count)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_session_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_session_cursor_cache_sweep(WT_SESSION_IMPL *session, bool big_sweep)
