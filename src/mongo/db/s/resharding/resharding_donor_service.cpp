@@ -46,6 +46,7 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
@@ -60,6 +61,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/future_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
@@ -824,6 +826,11 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
         // Allow bypassing user write blocking. The check has already been performed on the
         // db-primary shard's ReshardCollectionCoordinator.
         WriteBlockBypass::get(opCtx.get()).set(true);
+
+        if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            dropCollectionGlobalIndexesMetadata(opCtx.get(), _metadata.getSourceNss());
+        }
         mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent(
             opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
     }

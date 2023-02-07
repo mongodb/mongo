@@ -69,8 +69,7 @@ const shardIndexCatalog = 'config.shard.indexes';
 const shardCollectionCatalog = 'config.shard.collections';
 
 st.s.adminCommand({enableSharding: dbName, primaryShard: shard0});
-st.s.adminCommand({shardCollection: nss, key: {_id: 1}});
-
+assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {_id: 1}}));
 const collectionUUID = st.s.getCollection('config.collections').findOne({_id: nss}).uuid;
 
 registerIndex(st.rs0, nss, index1Pattern, index1Name, collectionUUID);
@@ -352,7 +351,7 @@ assert.eq(1, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
 
 jsTestLog(
     "Rename test. Have one sharded collection with indexVersion 1. Have a second collection with indexVersion 2. Rename A to B, indexVersion should be bumped.");
-st.s.adminCommand({shardCollection: nss2, key: {_id: 1}});
+assert.commandWorked(st.s.adminCommand({shardCollection: nss2, key: {_id: 1}}));
 const collection2UUID = st.s.getCollection('config.collections').findOne({_id: nss2}).uuid;
 
 registerIndex(st.rs0, nss2, index1Pattern, index1Name, collection2UUID);
@@ -461,8 +460,9 @@ assert.commandWorked(st.s.getDB(dbName).runCommand({drop: collection2Name}));
 jsTestLog(
     "Case 3: Rename from sharded collection without indexes to sharded collection with indexes clears the indexVersion");
 
-st.s.adminCommand({shardCollection: nss2, key: {_id: 1}});
-st.s.adminCommand({shardCollection: nss3, key: {_id: 1}});
+assert.commandWorked(st.s.adminCommand({shardCollection: nss2, key: {_id: 1}}));
+assert.commandWorked(st.s.adminCommand({shardCollection: nss3, key: {_id: 1}}));
+
 let collection3UUID = st.s.getCollection('config.collections').findOne({_id: nss3}).uuid;
 
 registerIndex(st.rs0, nss3, index1Pattern, index1Name, collection3UUID);
@@ -475,8 +475,7 @@ let nss3Metadata =
 assert(!nss3Metadata.indexVersion);
 
 jsTestLog("Drop collection test. Create a sharded collection and some indexes");
-st.s.adminCommand({shardCollection: nss4, key: {_id: 1}});
-
+assert.commandWorked(st.s.adminCommand({shardCollection: nss4, key: {_id: 1}}));
 const collection4UUID = st.s.getCollection('config.collections').findOne({_id: nss4}).uuid;
 
 registerIndex(st.rs0, nss4, index1Pattern, index1Name, collection4UUID);
@@ -498,7 +497,7 @@ assert.eq(0, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).count
 }));
 
 jsTestLog("Drop database test. Create a sharded collection and some indexes");
-st.s.adminCommand({shardCollection: nss5, key: {_id: 1}});
+assert.commandWorked(st.s.adminCommand({shardCollection: nss5, key: {_id: 1}}));
 
 const collection5UUID = st.s.getCollection('config.collections').findOne({_id: nss5}).uuid;
 
@@ -520,12 +519,11 @@ assert.eq(0, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).count
     collectionUUID: collection5UUID,
 }));
 
-jsTestLog(
-    "Resharding, should create the indexes at least in the config server for the new collection.");
+jsTestLog("Resharding Case 1: happy path.");
+st.s.adminCommand({enableSharding: dbName, primaryShard: shard0});
 assert.eq(0, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({}));
 assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({}));
-assert.commandWorked(
-    st.s.adminCommand({shardCollection: nss6, key: {_id: 1}, primaryShard: shard0}));
+assert.commandWorked(st.s.adminCommand({shardCollection: nss6, key: {_id: 1}}));
 
 assert.commandWorked(st.s.adminCommand({split: nss6, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: nss6, find: {_id: 0}, to: shard1}));
@@ -540,7 +538,7 @@ const beforeReshardingIndexVersion =
 assert.commandWorked(st.s.getDB(dbName).runCommand(
     {createIndexes: collection6Name, indexes: [{key: {x: 1}, name: 'x_1'}]}));
 
-// Give enough cardinality for two chunks to resharding.
+jsTestLog("Give enough cardinality for two chunks to resharding.");
 assert.commandWorked(st.s.getCollection(nss6).insert({x: 0}));
 assert.commandWorked(st.s.getCollection(nss6).insert({x: 1}));
 
@@ -577,6 +575,41 @@ assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
 
 assert.eq(2, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collection6AfterResharding.uuid
+}));
+
+jsTestLog("Case 2: donor shard different to destination shard. First move chunks to " + shard1 +
+          ".");
+
+let coll6Chunks =
+    st.s.getCollection('config.chunks').find({uuid: collection6AfterResharding.uuid}).toArray();
+let newChunks = [];
+
+coll6Chunks.forEach((chunk) => {
+    assert.commandWorked(st.s.adminCommand({moveChunk: nss6, find: chunk.min, to: shard1}));
+    newChunks.push({min: {y: chunk.min.x}, max: {y: chunk.max.x}, recipientShardId: shard0});
+});
+
+assert.eq(2, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection6AfterResharding.uuid
+}));
+
+assert.commandWorked(st.s.getDB(dbName).runCommand(
+    {createIndexes: collection6Name, indexes: [{key: {y: 1}, name: 'y_1'}]}));
+assert.commandWorked(st.s.getCollection(nss6).insert({y: 0}));
+assert.commandWorked(st.s.getCollection(nss6).insert({y: 1}));
+
+assert.commandWorked(
+    st.s.adminCommand({reshardCollection: nss6, key: {y: 1}, _presetReshardedChunks: newChunks}));
+
+const collection6AfterSecondResharding =
+    st.s.getCollection(configsvrCollectionCatalog).findOne({_id: nss6});
+
+assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection6AfterSecondResharding.uuid
+}));
+
+assert.eq(2, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection6AfterSecondResharding.uuid
 }));
 
 st.stop();
