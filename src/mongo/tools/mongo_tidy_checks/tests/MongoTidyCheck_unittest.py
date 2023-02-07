@@ -90,6 +90,22 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
+    def test_MongoUninterruptibleLockGuardCheck(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-uninterruptible-lock-guard-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = (
+            "Potentially incorrect use of UninterruptibleLockGuard, "
+            "the programming model inside MongoDB requires that all operations be interruptible. "
+            "Review with care and if the use is warranted, add NOLINT and a comment explaining why."
+        )
+
+        self.run_clang_tidy()
+
 
 if __name__ == '__main__':
 

@@ -26,35 +26,28 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#include "MongoTestCheck.h"
-#include "MongoUninterruptibleLockGuardCheck.h"
+#pragma once
 
 #include <clang-tidy/ClangTidy.h>
 #include <clang-tidy/ClangTidyCheck.h>
-#include <clang-tidy/ClangTidyModule.h>
-#include <clang-tidy/ClangTidyModuleRegistry.h>
 
 namespace mongo {
 namespace tidy {
-
-class MongoTidyModule : public ClangTidyModule {
+/**
+ * check for new instances of UninteruptibleLockGuard
+ * Overrides the default registerMatchers function to add matcher to match the
+ * new instance of UninteruptibleLockGuard. overrides the default check function to
+ * flag the uses of UninteruptibleLockGuard since it does not comply with the design
+ * requirements of MongoDB, they should be flagged so new instances receive extra
+ * scrutiny from authors and code reviewers.
+ */
+class MongoUninterruptibleLockGuardCheck : public clang::tidy::ClangTidyCheck {
 public:
-    void addCheckFactories(ClangTidyCheckFactories& CheckFactories) override {
-        CheckFactories.registerCheck<MongoUninterruptibleLockGuardCheck>(
-            "mongo-uninterruptible-lock-guard-check");
-        CheckFactories.registerCheck<MongoTestCheck>("mongo-test-check");
-    }
+    MongoUninterruptibleLockGuardCheck(clang::StringRef Name,
+                                       clang::tidy::ClangTidyContext* Context);
+    void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
+    void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
 };
 
-// Register the MongoTidyModule using this statically initialized variable.
-static ClangTidyModuleRegistry::Add<MongoTidyModule> X("mongo-tidy-module",
-                                                       "MongoDB custom checks.");
-
 }  // namespace tidy
-
-// This anchor is used to force the linker to link in the generated object file
-// and thus register the MongoTidyModule.
-volatile int MongoTidyModuleAnchorSource = 0;
-
 }  // namespace mongo

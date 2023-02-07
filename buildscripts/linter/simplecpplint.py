@@ -399,16 +399,15 @@ class Linter:
         if linenum in self.nolint_suppression:
             return
 
+        norm_file_name = self.file_name.replace('\\', '/')
+        # Custom clang-tidy check tests purposefully produce errors for
+        # tests to find, they should be ignored.
+        if "mongo_tidy_checks/tests/" in norm_file_name:
+            return
+
         if category == "legal/license":
             # Enterprise module does not have the SSPL license
             if "enterprise" in self.file_name:
-                return
-
-            norm_file_name = self.file_name.replace('\\', '/')
-
-            # Custom clang-tidy check tests purposefully produce errors for
-            # tests to find, they should be ignored.
-            if "mongo_tidy_checks/tests/" in norm_file_name:
                 return
 
             # The following files are in the src/mongo/ directory but technically belong

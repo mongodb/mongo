@@ -27,34 +27,37 @@
  *    it in the license file.
  */
 
-#include "MongoTestCheck.h"
 #include "MongoUninterruptibleLockGuardCheck.h"
 
-#include <clang-tidy/ClangTidy.h>
-#include <clang-tidy/ClangTidyCheck.h>
-#include <clang-tidy/ClangTidyModule.h>
-#include <clang-tidy/ClangTidyModuleRegistry.h>
 
 namespace mongo {
 namespace tidy {
 
-class MongoTidyModule : public ClangTidyModule {
-public:
-    void addCheckFactories(ClangTidyCheckFactories& CheckFactories) override {
-        CheckFactories.registerCheck<MongoUninterruptibleLockGuardCheck>(
-            "mongo-uninterruptible-lock-guard-check");
-        CheckFactories.registerCheck<MongoTestCheck>("mongo-test-check");
-    }
-};
+using namespace clang;
+using namespace clang::ast_matchers;
 
-// Register the MongoTidyModule using this statically initialized variable.
-static ClangTidyModuleRegistry::Add<MongoTidyModule> X("mongo-tidy-module",
-                                                       "MongoDB custom checks.");
+MongoUninterruptibleLockGuardCheck::MongoUninterruptibleLockGuardCheck(
+    StringRef Name, clang::tidy::ClangTidyContext* Context)
+    : ClangTidyCheck(Name, Context) {}
+
+void MongoUninterruptibleLockGuardCheck::registerMatchers(MatchFinder* Finder) {
+    Finder->addMatcher(varDecl(hasType(cxxRecordDecl(hasName("UninterruptibleLockGuard"))))
+                           .bind("UninterruptibleLockGuardDec"),
+                       this);
+}
+
+void MongoUninterruptibleLockGuardCheck::check(const MatchFinder::MatchResult& Result) {
+    const auto* matchUninterruptibleLockGuardDecl =
+        Result.Nodes.getNodeAs<VarDecl>("UninterruptibleLockGuardDec");
+
+    if (matchUninterruptibleLockGuardDecl) {
+        diag(matchUninterruptibleLockGuardDecl->getBeginLoc(),
+             "Potentially incorrect use of UninterruptibleLockGuard, "
+             "the programming model inside MongoDB requires that all operations be interruptible. "
+             "Review with care and if the use is warranted, add NOLINT and a comment explaining "
+             "why.");
+    }
+}
 
 }  // namespace tidy
-
-// This anchor is used to force the linker to link in the generated object file
-// and thus register the MongoTidyModule.
-volatile int MongoTidyModuleAnchorSource = 0;
-
 }  // namespace mongo

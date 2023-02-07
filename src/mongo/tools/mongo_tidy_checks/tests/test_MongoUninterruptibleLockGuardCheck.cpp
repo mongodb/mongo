@@ -26,35 +26,17 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#include "MongoTestCheck.h"
-#include "MongoUninterruptibleLockGuardCheck.h"
-
-#include <clang-tidy/ClangTidy.h>
-#include <clang-tidy/ClangTidyCheck.h>
-#include <clang-tidy/ClangTidyModule.h>
-#include <clang-tidy/ClangTidyModuleRegistry.h>
-
 namespace mongo {
-namespace tidy {
-
-class MongoTidyModule : public ClangTidyModule {
+class UninterruptibleLockGuard {
 public:
-    void addCheckFactories(ClangTidyCheckFactories& CheckFactories) override {
-        CheckFactories.registerCheck<MongoUninterruptibleLockGuardCheck>(
-            "mongo-uninterruptible-lock-guard-check");
-        CheckFactories.registerCheck<MongoTestCheck>("mongo-test-check");
+    UninterruptibleLockGuard(int test) {
+        m_test = test;
     }
+
+private:
+    int m_test;
 };
 
-// Register the MongoTidyModule using this statically initialized variable.
-static ClangTidyModuleRegistry::Add<MongoTidyModule> X("mongo-tidy-module",
-                                                       "MongoDB custom checks.");
-
-}  // namespace tidy
-
-// This anchor is used to force the linker to link in the generated object file
-// and thus register the MongoTidyModule.
-volatile int MongoTidyModuleAnchorSource = 0;
+UninterruptibleLockGuard noInterrupt(2);
 
 }  // namespace mongo

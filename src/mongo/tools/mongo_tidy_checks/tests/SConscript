@@ -13,6 +13,7 @@ if env.GetOption('ninja') == 'disabled':
     # by a clang tidy check. The issue should be isolated in as minimal way as possible.
     tests = [
         'test_MongoTestCheck.cpp',
+        'test_MongoUninterruptibleLockGuardCheck.cpp',
     ]
 
     # So that we can do fast runs, we will generate a separate compilation database file for each
