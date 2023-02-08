@@ -497,8 +497,10 @@ void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx,
     const auto& nss = coll.getNss();
     const auto& uuid = coll.getUuid();
 
-    ON_BLOCK_EXIT(
-        [&] { Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss); });
+    ON_BLOCK_EXIT([&] {
+        Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss);
+        Grid::get(opCtx)->catalogCache()->invalidateIndexEntry_LINEARIZABLE(nss);
+    });
 
     deleteCollection(opCtx, nss, uuid, writeConcern);
 

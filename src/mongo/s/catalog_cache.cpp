@@ -761,7 +761,9 @@ void CatalogCache::invalidateCollectionEntry_LINEARIZABLE(const NamespaceString&
 }
 
 void CatalogCache::invalidateIndexEntry_LINEARIZABLE(const NamespaceString& nss) {
-    _indexCache.invalidateKey(nss);
+    if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
+        _indexCache.invalidateKey(nss);
+    }
 }
 
 void CatalogCache::Stats::report(BSONObjBuilder* builder) const {

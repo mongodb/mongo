@@ -92,6 +92,7 @@ public:
                 // fails due to e.g. a NetworkError.
                 ON_BLOCK_EXIT([opCtx, nss] {
                     Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss);
+                    Grid::get(opCtx)->catalogCache()->invalidateIndexEntry_LINEARIZABLE(nss);
                 });
 
                 const auto dbInfo =

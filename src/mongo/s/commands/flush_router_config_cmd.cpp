@@ -110,6 +110,8 @@ public:
                       "Routing metadata flushed for collection",
                       "namespace"_attr = nss);
                 catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
+                LOGV2(7343300, "Index information flushed for collection", "namespace"_attr = nss);
+                catalogCache->invalidateIndexEntry_LINEARIZABLE(nss);
             }
         }
 

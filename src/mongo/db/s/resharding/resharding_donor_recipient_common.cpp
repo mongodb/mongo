@@ -350,6 +350,7 @@ void clearFilteringMetadata(OperationContext* opCtx,
             // new donor shard primaries will refresh from the config server and see the chunk
             // distribution for the ongoing resharding operation.
             catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
+            catalogCache->invalidateIndexEntry_LINEARIZABLE(nss);
         }
 
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);

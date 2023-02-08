@@ -130,6 +130,7 @@ public:
                 toNss, renameCollResp.getCollectionVersion(), dbInfo->getPrimary());
 
             catalogCache->invalidateCollectionEntry_LINEARIZABLE(fromNss);
+            catalogCache->invalidateIndexEntry_LINEARIZABLE(fromNss);
         }
 
         NamespaceString ns() const override {
