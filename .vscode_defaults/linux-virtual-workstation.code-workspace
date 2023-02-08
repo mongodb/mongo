@@ -52,6 +52,10 @@
 			"editor.defaultFormatter": "xaver.clang-format",
 			"editor.formatOnSave": true,
 		},
+		"[python]": {
+			"editor.defaultFormatter": "ms-python.python",
+			"editor.formatOnSave": true,
+		},
 	},
 	"extensions": {
 		"recommendations": [
