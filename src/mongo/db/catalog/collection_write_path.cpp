@@ -426,14 +426,14 @@ Status checkFailCollectionInsertsFailPoint(const NamespaceString& ns, const BSON
     return s;
 }
 
-RecordId updateDocument(OperationContext* opCtx,
-                        const CollectionPtr& collection,
-                        const RecordId& oldLocation,
-                        const Snapshotted<BSONObj>& oldDoc,
-                        const BSONObj& newDoc,
-                        const BSONObj* opDiff,
-                        OpDebug* opDebug,
-                        CollectionUpdateArgs* args) {
+void updateDocument(OperationContext* opCtx,
+                    const CollectionPtr& collection,
+                    const RecordId& oldLocation,
+                    const Snapshotted<BSONObj>& oldDoc,
+                    const BSONObj& newDoc,
+                    const BSONObj* opDiff,
+                    OpDebug* opDebug,
+                    CollectionUpdateArgs* args) {
     {
         auto status = collection->checkValidationAndParseResult(opCtx, newDoc);
         if (!status.isOK()) {
@@ -535,8 +535,6 @@ RecordId updateDocument(OperationContext* opCtx,
     args->updatedDoc = newDoc;
 
     opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
-
-    return oldLocation;
 }
 
 StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,

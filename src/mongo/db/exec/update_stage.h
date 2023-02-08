@@ -200,18 +200,10 @@ private:
     // If not WorkingSet::INVALID_ID, we return this member to our caller.
     WorkingSetID _idReturning;
 
-    // If the update was in-place, we may see it again.  This only matters if we're doing
-    // a multi-update; if we're not doing a multi-update we stop after one update and we
-    // won't see any more docs.
-    //
-    // For example: If we're scanning an index {x:1} and performing {$inc:{x:5}}, we'll keep
-    // moving the document forward and it will continue to reappear in our index scan.
-    // Unless the index is multikey, the underlying query machinery won't de-dup.
-    //
-    // If the update wasn't in-place we may see it again.  Our query may return the new
-    // document and we wouldn't want to update that.
-    //
-    // So, no matter what, we keep track of where the doc wound up.
+    // Guard against the "Halloween Problem": If we're scanning an index {x:1} and performing
+    // {$inc:{x:5}}, we'll keep moving the document forward and it will continue to reappear in our
+    // index scan. Unless the index is multikey, the underlying query machinery won't de-dup so we
+    // keep track of already updated docs in '_updatedRecordIds'.
     typedef stdx::unordered_set<RecordId, RecordId::Hasher> RecordIdSet;
     const std::unique_ptr<RecordIdSet> _updatedRecordIds;
 
