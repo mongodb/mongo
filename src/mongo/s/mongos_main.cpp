@@ -325,7 +325,10 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
 
         ReplicaSetMonitor::shutdown();
 
-        opCtx->setIsExecutingShutdown();
+        {
+            stdx::lock_guard lg(client);
+            opCtx->setIsExecutingShutdown();
+        }
 
         if (serviceContext) {
             serviceContext->setKillAllOperations();

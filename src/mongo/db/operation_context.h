@@ -344,7 +344,8 @@ public:
      * global shutdown.
      *
      * This should only be called from the registered task of global shutdown and is not
-     * recoverable.
+     * recoverable. May only be called by the thread executing on behalf of this OperationContext,
+     * and only while it has the Client that owns this OperationContext locked.
      */
     void setIsExecutingShutdown();
 
@@ -645,28 +646,49 @@ public:
         _explicitlyOptIntoQuerySampling = true;
     }
 
+    /**
+     * Invokes the passed callback while ignoring interrupts. Note that this causes the deadline to
+     * be reset to Date_t::max(), but that it can also subsequently be reduced in size after the
+     * fact. Additionally handles the dance of try/catching the invocation and checking
+     * checkForInterrupt with the guard inactive (to allow a higher level timeout to override a
+     * lower level one, or for top level interruption to propagate).
+     *
+     * This should only be called from the thread executing on behalf of this OperationContext.
+     * The Client for this OperationContext should not be locked by the thread calling this
+     * function, as this function will acquire the lock internally to modify the OperationContext's
+     * interrupt state.
+     */
+    template <typename Callback>
+    decltype(auto) runWithoutInterruptionExceptAtGlobalShutdown(Callback&& cb) {
+        try {
+            bool prevIgnoringInterrupts = _ignoreInterrupts;
+            DeadlineState prevDeadlineState{_deadline, _timeoutError, _hasArtificialDeadline};
+            ScopeGuard guard([&] {
+                // Restore the original interruption and deadline state.
+                stdx::lock_guard lg(*_client);
+                _ignoreInterrupts = prevIgnoringInterrupts;
+                setDeadlineByDate(prevDeadlineState.deadline, prevDeadlineState.error);
+                _hasArtificialDeadline = prevDeadlineState.hasArtificialDeadline;
+                _markKilledIfDeadlineRequires();
+            });
+            // Ignore interrupts until the callback completes.
+            {
+                stdx::lock_guard lg(*_client);
+                _hasArtificialDeadline = true;
+                setDeadlineByDate(Date_t::max(), ErrorCodes::ExceededTimeLimit);
+                _ignoreInterrupts = true;
+            }
+            return std::forward<Callback>(cb)();
+        } catch (const ExceptionForCat<ErrorCategory::ExceededTimeLimitError>&) {
+            // May throw replacement exception
+            checkForInterrupt();
+            throw;
+        }
+    }
+
 private:
     StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
         stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override;
-
-    IgnoreInterruptsState pushIgnoreInterrupts() override {
-        IgnoreInterruptsState iis{_ignoreInterrupts,
-                                  {_deadline, _timeoutError, _hasArtificialDeadline}};
-        _hasArtificialDeadline = true;
-        setDeadlineByDate(Date_t::max(), ErrorCodes::ExceededTimeLimit);
-        _ignoreInterrupts = true;
-
-        return iis;
-    }
-
-    void popIgnoreInterrupts(IgnoreInterruptsState iis) override {
-        _ignoreInterrupts = iis.ignoreInterrupts;
-
-        setDeadlineByDate(iis.deadline.deadline, iis.deadline.error);
-        _hasArtificialDeadline = iis.deadline.hasArtificialDeadline;
-
-        _markKilledIfDeadlineRequires();
-    }
 
     DeadlineState pushArtificialDeadline(Date_t deadline, ErrorCodes::Error error) override {
         DeadlineState ds{_deadline, _timeoutError, _hasArtificialDeadline};
