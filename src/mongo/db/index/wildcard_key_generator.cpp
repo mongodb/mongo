@@ -94,7 +94,7 @@ Ordering makeOrdering(const BSONObj& pattern) {
     BSONObjBuilder newPattern;
     for (auto elem : pattern) {
         const auto fieldName = elem.fieldNameStringData();
-        if ((fieldName == "$**") || fieldName.endsWith(".$**")) {
+        if (WildcardNames::isWildcardFieldName(fieldName)) {
             newPattern.append("$_path", 1);  // "$_path" should always be in ascending order.
         }
         newPattern.append(elem);
@@ -289,11 +289,11 @@ WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPat
     size_t suffixPos = std::string::npos;
     for (auto elem : keyPattern) {
         StringData fieldName(elem.fieldNameStringData());
-        if (fieldName == "$**" || fieldName.endsWith(".$**")) {
+        if (WildcardNames::isWildcardFieldName(fieldName)) {
             // The _keyPattern is either {..., "$**": 1, ..} for all paths or
             // {.., "path.$**": 1, ...} for a single subtree. If we are indexing a single subtree
             // then we will project just that path.
-            indexRoot = elem.fieldNameStringData();
+            indexRoot = fieldName;
             suffixPos = indexRoot.find(kSubtreeSuffix);
             break;
         }

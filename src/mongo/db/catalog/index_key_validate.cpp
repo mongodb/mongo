@@ -222,7 +222,7 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
                 // Columnstore indexes do not support compound indexes.
                 return Status(code,
                               str::stream() << pluginName << " indexes do not allow compounding");
-            } else if ((fieldName != "$**") && !fieldName.endsWith(".$**")) {
+            } else if (!WildcardNames::isWildcardFieldName(fieldName)) {
                 // Invalid key names for columnstore are not supported.
                 return Status(code,
                               str::stream() << "Invalid key name for " << pluginName << " indexes");

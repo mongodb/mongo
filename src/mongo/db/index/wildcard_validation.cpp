@@ -30,6 +30,7 @@
 #include "mongo/db/index/wildcard_validation.h"
 
 #include "mongo/db/field_ref.h"
+#include "mongo/db/index_names.h"
 
 namespace mongo {
 namespace {
@@ -62,7 +63,7 @@ Status getWildcardIndexKeyFeilds(const BSONObj& keyPattern,
                                  std::vector<FieldRef>& indexFields) {
     for (const auto& keyElement : keyPattern) {
         auto keyElemFieldName = keyElement.fieldNameStringData();
-        if (keyElemFieldName.compare("$**"_sd) == 0 || keyElemFieldName.endsWith(".$**"_sd)) {
+        if (WildcardNames::isWildcardFieldName(keyElemFieldName)) {
             if (!wildcardField.empty()) {
                 return {ErrorCodes::Error{7246201},
                         "Index Key can contain only one wildcard index field"};

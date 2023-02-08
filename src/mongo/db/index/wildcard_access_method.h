@@ -66,6 +66,13 @@ public:
         return _keyGen.getWildcardProjection();
     }
 
+    /**
+     * Returns the Wildcard Index's key pattern.
+     */
+    const BSONObj& getKeyPattern() const {
+        return _descriptor->keyPattern();
+    }
+
 private:
     void doGetKeys(OperationContext* opCtx,
                    const CollectionPtr& collection,

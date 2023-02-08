@@ -32,6 +32,7 @@
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -50,7 +51,7 @@ namespace mongo {
  */
 class WildcardKeyGenerator {
 public:
-    static constexpr StringData kSubtreeSuffix = ".$**"_sd;
+    static constexpr StringData kSubtreeSuffix = WildcardNames::WILDCARD_FIELD_NAME_SUFFIX;
 
     /**
      * Returns an owned ProjectionExecutor identical to the one that WildcardKeyGenerator will use
