@@ -31,7 +31,7 @@ if [[ "$(ls -A $indir)" ]]; then
   ./src/scripts/npm_run.sh jstestfuzz -- --jsTestsDir $indir --out $outdir --numSourceFiles $num_files --numGeneratedFiles 50
 
   # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
-  ls -1 -d $outdir/* | xargs -P 32 -L 50 ./src/scripts/npm_run.sh parse-jsfiles -- | tee lint_fuzzer_sanity.log
+  ls -1 -d $outdir/* | xargs -P 32 -L 50 ./src/scripts/npm_run.sh parse-jsfiles -- 2>&1 | tee lint_fuzzer_sanity.log
   exit_code=$?
 
   # Exit out of the jstestfuzz directory
