@@ -44,7 +44,7 @@ function testUpdate({
             : {timeField: timeFieldName},
     }));
 
-    assert.commandWorked(coll.insert(coll, initialDocList));
+    assert.commandWorked(coll.insert(initialDocList));
 
     const updateCommand = {update: coll.getName(), updates: updateList};
     const res = failCode ? assert.commandFailedWithCode(testDB.runCommand(updateCommand), failCode)
