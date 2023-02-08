@@ -369,17 +369,17 @@ functions:
             load('jstests/hooks/run_validate_collections.actual.js');
           EOF
           fi
-          tar czf mongodb${compile-variant|}.tar.gz mongodb
+          tar czf mongodb${compile_variant|}.tar.gz mongodb
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongodb${compile-variant|}.tar.gz
-        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile-variant|}-${version_id}.tar.gz
+        local_file: src/mongodb${compile_variant|}.tar.gz
+        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile_variant|}-${version_id}.tar.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        display_name: mongodb${compile-variant|}.tar.gz
+        display_name: mongodb${compile_variant|}.tar.gz
   ###
 
   ## Schedule Tasks ##
@@ -1095,7 +1095,7 @@ buildvariants:
     cron: "0 0 * * *" # Everyday at 00:00
     expansions:
       <<: *compile-expansions
-      compile-variant: -arm64
+      compile_variant: -arm64
     run_on:
       - "amazon2-arm64"
     tasks:
@@ -1243,7 +1243,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
         --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      compile-variant: -rhel70
+      compile_variant: -rhel70
     run_on:
       - rhel70-large
     tasks:
@@ -1965,7 +1965,7 @@ buildvariants:
       project_dir: *project_dir
       authentication: enabled
       storageEngine: wiredTiger
-      compile-variant: -rhel70
+      compile_variant: -rhel70
     run_on:
       - "rhel70-perf-M60-like"
     depends_on: *_compile_rhel70
@@ -2012,7 +2012,7 @@ buildvariants:
       project_dir: *project_dir
       authentication: enabled
       storageEngine: wiredTiger
-      compile-variant: -arm64
+      compile_variant: -arm64
     run_on:
       - "rhel70-perf-M60-like"
     depends_on: *_compile_amazon_linux2_arm64
@@ -2070,7 +2070,7 @@ buildvariants:
       canaries: none
       atlas_setup: M60-repl-azure
       use_custom_build_azure: true
-      compile-variant: -rhel70
+      compile_variant: -rhel70
       run_on_azure: true
       infrastructure_provisioning: workload_client
       platform: linux
