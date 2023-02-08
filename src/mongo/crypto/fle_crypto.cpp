@@ -3203,21 +3203,24 @@ FLE2IndexedEqualityEncryptedValueV2::FLE2IndexedEqualityEncryptedValueV2(
 
 StatusWith<UUID> FLE2IndexedEqualityEncryptedValueV2::readKeyId(
     ConstDataRange serializedServerValue) {
-    ConstDataRangeCursor baseCdrc(serializedServerValue);
-
-    auto swKeyId = baseCdrc.readAndAdvanceNoThrow<UUIDBuf>();
-    if (!swKeyId.isOK()) {
-        return {swKeyId.getStatus()};
+    auto swFields = parseAndValidateFields(serializedServerValue);
+    if (!swFields.isOK()) {
+        return swFields.getStatus();
     }
-
-    return UUID::fromCDR(swKeyId.getValue());
+    return swFields.getValue().keyId;
 }
 
-StatusWith<FLE2IndexedEqualityEncryptedValueV2>
-FLE2IndexedEqualityEncryptedValueV2::decryptAndParse(
-    ServerDataEncryptionLevel1Token serverEncryptionToken,
-    ServerDerivedFromDataToken serverDataDerivedToken,
+StatusWith<BSONType> FLE2IndexedEqualityEncryptedValueV2::readBsonType(
     ConstDataRange serializedServerValue) {
+    auto swFields = parseAndValidateFields(serializedServerValue);
+    if (!swFields.isOK()) {
+        return swFields.getStatus();
+    }
+    return swFields.getValue().bsonType;
+}
+
+StatusWith<FLE2IndexedEqualityEncryptedValueV2::ParsedFields>
+FLE2IndexedEqualityEncryptedValueV2::parseAndValidateFields(ConstDataRange serializedServerValue) {
     ConstDataRangeCursor serializedServerCdrc(serializedServerValue);
 
     auto swIndexKeyId = serializedServerCdrc.readAndAdvanceNoThrow<UUIDBuf>();
@@ -3244,22 +3247,32 @@ FLE2IndexedEqualityEncryptedValueV2::decryptAndParse(
     auto encryptedDataSize =
         serializedServerCdrc.length() - sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob);
 
-    auto swClientEncryptedData =
-        decryptData(serverEncryptionToken.toCDR(),
-                    ConstDataRange(serializedServerCdrc.data(), encryptedDataSize));
-    if (!swClientEncryptedData.isOK()) {
-        return swClientEncryptedData.getStatus();
-    }
+    ConstDataRange encryptedDataCdrc(serializedServerCdrc.data(), encryptedDataSize);
     serializedServerCdrc.advance(encryptedDataSize);
-    auto swMetadataBlock = FLE2TagAndEncryptedMetadataBlock::decryptAndParse(serverDataDerivedToken,
-                                                                             serializedServerCdrc);
-    if (!swMetadataBlock.isOK()) {
-        return swMetadataBlock.getStatus();
+    ConstDataRange metadataBlockCdrc(serializedServerCdrc.data(),
+                                     sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
+
+    return {{UUID::fromCDR(swIndexKeyId.getValue()), type, encryptedDataCdrc, metadataBlockCdrc}};
+}
+
+StatusWith<std::vector<uint8_t>> FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptCiphertext(
+    ServerDataEncryptionLevel1Token serverEncryptionToken, ConstDataRange serializedServerValue) {
+    auto swFields = parseAndValidateFields(serializedServerValue);
+    if (!swFields.isOK()) {
+        return swFields.getStatus();
     }
-    return FLE2IndexedEqualityEncryptedValueV2(type,
-                                               UUID::fromCDR(swIndexKeyId.getValue()),
-                                               std::move(swClientEncryptedData.getValue()),
-                                               std::move(swMetadataBlock.getValue()));
+    return decryptData(serverEncryptionToken.toCDR(), swFields.getValue().ciphertext);
+}
+
+StatusWith<FLE2TagAndEncryptedMetadataBlock>
+FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptMetadataBlock(
+    ServerDerivedFromDataToken serverDataDerivedToken, ConstDataRange serializedServerValue) {
+    auto swFields = parseAndValidateFields(serializedServerValue);
+    if (!swFields.isOK()) {
+        return swFields.getStatus();
+    }
+    return FLE2TagAndEncryptedMetadataBlock::decryptAndParse(serverDataDerivedToken,
+                                                             swFields.getValue().metadataBlock);
 }
 
 StatusWith<std::vector<uint8_t>> FLE2IndexedEqualityEncryptedValueV2::serialize(
@@ -3611,20 +3624,24 @@ FLE2IndexedRangeEncryptedValueV2::FLE2IndexedRangeEncryptedValueV2(
 }
 
 StatusWith<UUID> FLE2IndexedRangeEncryptedValueV2::readKeyId(ConstDataRange serializedServerValue) {
-    ConstDataRangeCursor baseCdrc(serializedServerValue);
-
-    auto swKeyId = baseCdrc.readAndAdvanceNoThrow<UUIDBuf>();
-    if (!swKeyId.isOK()) {
-        return {swKeyId.getStatus()};
+    auto swFields = parseAndValidateFields(serializedServerValue);
+    if (!swFields.isOK()) {
+        return swFields.getStatus();
     }
-
-    return UUID::fromCDR(swKeyId.getValue());
+    return swFields.getValue().keyId;
 }
 
-StatusWith<FLE2IndexedRangeEncryptedValueV2> FLE2IndexedRangeEncryptedValueV2::decryptAndParse(
-    ServerDataEncryptionLevel1Token serverEncryptionToken,
-    const std::vector<ServerDerivedFromDataToken>& serverDataDerivedTokens,
+StatusWith<BSONType> FLE2IndexedRangeEncryptedValueV2::readBsonType(
     ConstDataRange serializedServerValue) {
+    auto swFields = parseAndValidateFields(serializedServerValue);
+    if (!swFields.isOK()) {
+        return swFields.getStatus();
+    }
+    return swFields.getValue().bsonType;
+}
+
+StatusWith<FLE2IndexedRangeEncryptedValueV2::ParsedFields>
+FLE2IndexedRangeEncryptedValueV2::parseAndValidateFields(ConstDataRange serializedServerValue) {
     ConstDataRangeCursor serializedServerCdrc(serializedServerValue);
 
     auto swIndexKeyId = serializedServerCdrc.readAndAdvanceNoThrow<UUIDBuf>();
@@ -3650,10 +3667,6 @@ StatusWith<FLE2IndexedRangeEncryptedValueV2> FLE2IndexedRangeEncryptedValueV2::d
 
     auto edgeCount = swEdgeCount.getValue();
 
-    uassert(7290907,
-            "Invalid length of serverDataDerivedTokens parameter",
-            serverDataDerivedTokens.size() == edgeCount);
-
     uassert(7290908,
             "Invalid length of Queryable Encryption IndexedRangeEncryptedValueV2",
             serializedServerCdrc.length() >=
@@ -3662,22 +3675,49 @@ StatusWith<FLE2IndexedRangeEncryptedValueV2> FLE2IndexedRangeEncryptedValueV2::d
     auto encryptedDataSize = serializedServerCdrc.length() -
         edgeCount * sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob);
 
-    auto swClientEncryptedData =
-        decryptData(serverEncryptionToken.toCDR(),
-                    ConstDataRange(serializedServerCdrc.data(), encryptedDataSize));
-
-    if (!swClientEncryptedData.isOK()) {
-        return swClientEncryptedData.getStatus();
-    }
-
+    ConstDataRange encryptedDataCdrc(serializedServerCdrc.data(), encryptedDataSize);
     serializedServerCdrc.advance(encryptedDataSize);
 
-    std::vector<FLE2TagAndEncryptedMetadataBlock> metadataBlocks;
+    std::vector<ConstDataRange> metadataBlocks;
     metadataBlocks.reserve(edgeCount);
 
     for (uint8_t i = 0; i < edgeCount; i++) {
-        auto encryptedMetadataBlockCDR = serializedServerCdrc.sliceAndAdvance(
-            sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
+        metadataBlocks.push_back(serializedServerCdrc.sliceAndAdvance(
+            sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob)));
+    }
+
+    return {{UUID::fromCDR(swIndexKeyId.getValue()),
+             type,
+             edgeCount,
+             encryptedDataCdrc,
+             metadataBlocks}};
+}
+
+StatusWith<std::vector<uint8_t>> FLE2IndexedRangeEncryptedValueV2::parseAndDecryptCiphertext(
+    ServerDataEncryptionLevel1Token serverEncryptionToken, ConstDataRange serializedServerValue) {
+    auto swFields = parseAndValidateFields(serializedServerValue);
+    if (!swFields.isOK()) {
+        return swFields.getStatus();
+    }
+    return decryptData(serverEncryptionToken.toCDR(), swFields.getValue().ciphertext);
+}
+
+StatusWith<std::vector<FLE2TagAndEncryptedMetadataBlock>>
+FLE2IndexedRangeEncryptedValueV2::parseAndDecryptMetadataBlocks(
+    const std::vector<ServerDerivedFromDataToken>& serverDataDerivedTokens,
+    ConstDataRange serializedServerValue) {
+    auto swFields = parseAndValidateFields(serializedServerValue);
+    if (!swFields.isOK()) {
+        return swFields.getStatus();
+    }
+    auto edgeCount = swFields.getValue().edgeCount;
+    uassert(7290907,
+            "Invalid length of serverDataDerivedTokens parameter",
+            serverDataDerivedTokens.size() == edgeCount);
+
+    std::vector<FLE2TagAndEncryptedMetadataBlock> metadataBlocks;
+    for (uint8_t i = 0; i < edgeCount; i++) {
+        auto encryptedMetadataBlockCDR = swFields.getValue().metadataBlocks[i];
 
         auto swMetadataBlock = FLE2TagAndEncryptedMetadataBlock::decryptAndParse(
             serverDataDerivedTokens[i], encryptedMetadataBlockCDR);
@@ -3688,11 +3728,7 @@ StatusWith<FLE2IndexedRangeEncryptedValueV2> FLE2IndexedRangeEncryptedValueV2::d
 
         metadataBlocks.push_back(swMetadataBlock.getValue());
     }
-
-    return FLE2IndexedRangeEncryptedValueV2(type,
-                                            UUID::fromCDR(swIndexKeyId.getValue()),
-                                            std::move(swClientEncryptedData.getValue()),
-                                            std::move(metadataBlocks));
+    return metadataBlocks;
 }
 
 StatusWith<std::vector<uint8_t>> FLE2IndexedRangeEncryptedValueV2::serialize(

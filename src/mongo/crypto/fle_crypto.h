@@ -1008,12 +1008,24 @@ struct FLE2IndexedEqualityEncryptedValueV2 {
                                         std::vector<uint8_t> clientEncryptedValueParam,
                                         FLE2TagAndEncryptedMetadataBlock metadataBlockParam);
 
-    static StatusWith<FLE2IndexedEqualityEncryptedValueV2> decryptAndParse(
+    struct ParsedFields {
+        UUID keyId;
+        BSONType bsonType;
+        ConstDataRange ciphertext;
+        ConstDataRange metadataBlock;
+    };
+    static StatusWith<ParsedFields> parseAndValidateFields(ConstDataRange serializedServerValue);
+
+    static StatusWith<std::vector<uint8_t>> parseAndDecryptCiphertext(
         ServerDataEncryptionLevel1Token serverEncryptionToken,
-        ServerDerivedFromDataToken serverDataDerivedToken,
         ConstDataRange serializedServerValue);
 
+    static StatusWith<FLE2TagAndEncryptedMetadataBlock> parseAndDecryptMetadataBlock(
+        ServerDerivedFromDataToken serverDataDerivedToken, ConstDataRange serializedServerValue);
+
     static StatusWith<UUID> readKeyId(ConstDataRange serializedServerValue);
+
+    static StatusWith<BSONType> readBsonType(ConstDataRange serializedServerValue);
 
     StatusWith<std::vector<uint8_t>> serialize(
         ServerDataEncryptionLevel1Token serverEncryptionToken,
@@ -1140,12 +1152,26 @@ struct FLE2IndexedRangeEncryptedValueV2 {
         std::vector<uint8_t> clientEncryptedValueParam,
         std::vector<FLE2TagAndEncryptedMetadataBlock> metadataBlockParam);
 
-    static StatusWith<FLE2IndexedRangeEncryptedValueV2> decryptAndParse(
+    struct ParsedFields {
+        UUID keyId;
+        BSONType bsonType;
+        uint8_t edgeCount;
+        ConstDataRange ciphertext;
+        std::vector<ConstDataRange> metadataBlocks;
+    };
+    static StatusWith<ParsedFields> parseAndValidateFields(ConstDataRange serializedServerValue);
+
+    static StatusWith<std::vector<uint8_t>> parseAndDecryptCiphertext(
         ServerDataEncryptionLevel1Token serverEncryptionToken,
+        ConstDataRange serializedServerValue);
+
+    static StatusWith<std::vector<FLE2TagAndEncryptedMetadataBlock>> parseAndDecryptMetadataBlocks(
         const std::vector<ServerDerivedFromDataToken>& serverDataDerivedTokens,
         ConstDataRange serializedServerValue);
 
     static StatusWith<UUID> readKeyId(ConstDataRange serializedServerValue);
+
+    static StatusWith<BSONType> readBsonType(ConstDataRange serializedServerValue);
 
     StatusWith<std::vector<uint8_t>> serialize(
         ServerDataEncryptionLevel1Token serverEncryptionToken,

@@ -310,6 +310,7 @@ structs:
             description: "Randomly sampled contention factor value"
             type: long
             cpp_name: contentionFactor
+            validator: { gte: 0 }
           g:
             description: "Array of Edges"
             type: array<EdgeTokenSetV2>

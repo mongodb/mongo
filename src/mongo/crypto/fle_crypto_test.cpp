@@ -1723,23 +1723,32 @@ TEST(FLE_EDC, ServerSide_Equality_Payloads_V2) {
     auto swBuf = serverPayload.serialize(serverEncryptToken, serverDerivedFromDataToken);
     ASSERT_OK(swBuf.getStatus());
 
-    auto swServerPayload = FLE2IndexedEqualityEncryptedValueV2::decryptAndParse(
-        serverEncryptToken, serverDerivedFromDataToken, swBuf.getValue());
+    auto swParsedType = FLE2IndexedEqualityEncryptedValueV2::readBsonType(swBuf.getValue());
+    ASSERT_OK(swParsedType.getStatus());
+    ASSERT_EQ(swParsedType.getValue(), iupayload.getType());
 
-    ASSERT_OK(swServerPayload.getStatus());
-    auto& sp = swServerPayload.getValue();
-    ASSERT_EQ(sp.bsonType, iupayload.getType());
-    ASSERT(sp.indexKeyId == iupayload.getIndexKeyId());
-    ASSERT(sp.clientEncryptedValue == serverPayload.clientEncryptedValue);
+    auto swParsedUuid = FLE2IndexedEqualityEncryptedValueV2::readKeyId(swBuf.getValue());
+    ASSERT_OK(swParsedUuid.getStatus());
+    ASSERT_EQ(swParsedUuid.getValue(), iupayload.getIndexKeyId());
+
+    auto swDecryptedValue = FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptCiphertext(
+        serverEncryptToken, swBuf.getValue());
+    ASSERT_OK(swDecryptedValue.getStatus());
+    auto& clientEncryptedValue = swDecryptedValue.getValue();
+    ASSERT(clientEncryptedValue == serverPayload.clientEncryptedValue);
     ASSERT_EQ(serverPayload.clientEncryptedValue.size(), value.length());
     ASSERT(std::equal(serverPayload.clientEncryptedValue.begin(),
                       serverPayload.clientEncryptedValue.end(),
                       value.data<uint8_t>()));
 
-    ASSERT_EQ(sp.metadataBlock.contentionFactor, counter);
-    ASSERT_EQ(sp.metadataBlock.count, 123456);
-    ASSERT(sp.metadataBlock.tag == tag);
-    ASSERT_TRUE(sp.metadataBlock.isValidZerosBlob(sp.metadataBlock.zeros));
+    auto swMetadata = FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptMetadataBlock(
+        serverDerivedFromDataToken, swBuf.getValue());
+    ASSERT_OK(swMetadata.getStatus());
+    auto& metadataBlock = swMetadata.getValue();
+    ASSERT_EQ(metadataBlock.contentionFactor, counter);
+    ASSERT_EQ(metadataBlock.count, 123456);
+    ASSERT(metadataBlock.tag == tag);
+    ASSERT_TRUE(metadataBlock.isValidZerosBlob(metadataBlock.zeros));
 }
 
 TEST(FLE_EDC, ServerSide_Payloads_V2_InvalidArgs) {
@@ -1803,6 +1812,110 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_InvalidArgs) {
     ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2(iupayload, {bogusTag, bogusTag}, {0}),
                        DBException,
                        7290900);
+}
+
+TEST(FLE_EDC, ServerSide_Payloads_V2_ParseInvalidInput) {
+    ConstDataRange empty(0, 0);
+    PrfBlock token;
+    ServerDataEncryptionLevel1Token serverToken(token);
+    ServerDerivedFromDataToken serverDataDerivedToken(token);
+
+    constexpr size_t cipherTextSize = 32;
+    constexpr size_t typeOffset = UUID::kNumBytes;
+    constexpr size_t edgeCountOffset = typeOffset + 1;
+
+    std::vector<uint8_t> shortInput(edgeCountOffset + 1);
+    shortInput.at(typeOffset) = static_cast<uint8_t>(BSONType::Bool);
+    shortInput.at(edgeCountOffset) = 1;
+
+    // test short input for equality payload
+    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::parseAndValidateFields(shortInput),
+                       DBException,
+                       7290802);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedEqualityEncryptedValueV2::readKeyId(shortInput), DBException, 7290802);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedEqualityEncryptedValueV2::readBsonType(shortInput), DBException, 7290802);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptCiphertext(serverToken, shortInput),
+        DBException,
+        7290802);
+    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptMetadataBlock(
+                           serverDataDerivedToken, shortInput),
+                       DBException,
+                       7290802);
+
+    // test short input for range payload
+    ASSERT_THROWS_CODE(
+        FLE2IndexedRangeEncryptedValueV2::parseAndValidateFields(shortInput), DBException, 7290908);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedRangeEncryptedValueV2::readKeyId(shortInput), DBException, 7290908);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedRangeEncryptedValueV2::readBsonType(shortInput), DBException, 7290908);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedRangeEncryptedValueV2::parseAndDecryptCiphertext(serverToken, shortInput),
+        DBException,
+        7290908);
+    ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2::parseAndDecryptMetadataBlocks(
+                           {serverDataDerivedToken}, shortInput),
+                       DBException,
+                       7290908);
+
+    // test bad bson type for equality payload
+    std::vector<uint8_t> badTypeInput(edgeCountOffset + 1 + cipherTextSize +
+                                      sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
+    badTypeInput.at(typeOffset) = 124;  // bad bsonType
+    badTypeInput.at(edgeCountOffset) = 1;
+
+    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::parseAndValidateFields(badTypeInput),
+                       DBException,
+                       7290801);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedEqualityEncryptedValueV2::readKeyId(badTypeInput), DBException, 7290801);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedEqualityEncryptedValueV2::readBsonType(badTypeInput), DBException, 7290801);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptCiphertext(serverToken, badTypeInput),
+        DBException,
+        7290801);
+    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptMetadataBlock(
+                           serverDataDerivedToken, badTypeInput),
+                       DBException,
+                       7290801);
+
+    // test bad bson type for range payload
+    ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2::parseAndValidateFields(badTypeInput),
+                       DBException,
+                       7290906);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedRangeEncryptedValueV2::readKeyId(badTypeInput), DBException, 7290906);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedRangeEncryptedValueV2::readBsonType(badTypeInput), DBException, 7290906);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedRangeEncryptedValueV2::parseAndDecryptCiphertext(serverToken, badTypeInput),
+        DBException,
+        7290906);
+    ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2::parseAndDecryptMetadataBlocks(
+                           {serverDataDerivedToken}, badTypeInput),
+                       DBException,
+                       7290906);
+
+    // test invalid ciphertext length for equality payload fails to decrypt
+    std::vector<uint8_t> emptyEqualityCipherText(
+        typeOffset + 1 + sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
+    emptyEqualityCipherText.at(typeOffset) = static_cast<uint8_t>(BSONType::Bool);
+    auto swDecryptedData = FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptCiphertext(
+        serverToken, emptyEqualityCipherText);
+    ASSERT_NOT_OK(swDecryptedData.getStatus());
+
+    // test invalid ciphertext length for range payload fails to decrypt
+    std::vector<uint8_t> emptyRangeCipherText(
+        edgeCountOffset + 1 + sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
+    emptyRangeCipherText.at(typeOffset) = static_cast<uint8_t>(BSONType::Bool);
+    emptyRangeCipherText.at(edgeCountOffset) = 1;
+    swDecryptedData = FLE2IndexedRangeEncryptedValueV2::parseAndDecryptCiphertext(
+        serverToken, emptyRangeCipherText);
+    ASSERT_NOT_OK(swDecryptedData.getStatus());
 }
 
 TEST(FLE_EDC, ServerSide_Payloads_V2_IsValidZerosBlob) {
@@ -2056,7 +2169,7 @@ TEST(FLE_EDC, ServerSide_Range_Payloads_V2) {
     ASSERT_OK(swBuf.getStatus());
 
     {
-        // Test that serialize and decrypt and parse don't work with derivedDataTokens
+        // Test that serialize and parseAndDecryptMetadataBlocks don't work with derivedDataTokens
         // of incorrect length.
         std::vector<ServerDerivedFromDataToken> derivedDataTokensBad = derivedDataTokens;
         derivedDataTokensBad.push_back(serverDerivedFromDataToken);
@@ -2064,29 +2177,39 @@ TEST(FLE_EDC, ServerSide_Range_Payloads_V2) {
                            DBException,
                            7290909);
 
-        ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2::decryptAndParse(
-                               serverEncryptToken, derivedDataTokensBad, swBuf.getValue()),
+        ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2::parseAndDecryptMetadataBlocks(
+                               derivedDataTokensBad, swBuf.getValue()),
                            DBException,
                            7290907);
     }
 
-    auto swServerPayload = FLE2IndexedRangeEncryptedValueV2::decryptAndParse(
-        serverEncryptToken, derivedDataTokens, swBuf.getValue());
+    auto swIndexKeyId = FLE2IndexedRangeEncryptedValueV2::readKeyId(swBuf.getValue());
+    ASSERT_OK(swIndexKeyId.getStatus());
 
-    ASSERT_OK(swServerPayload.getStatus());
-    auto sp = swServerPayload.getValue();
+    auto swBsonType = FLE2IndexedRangeEncryptedValueV2::readBsonType(swBuf.getValue());
+    ASSERT_OK(swBsonType.getStatus());
 
-    ASSERT_EQ(sp.bsonType, iupayload.getType());
-    ASSERT(sp.indexKeyId == iupayload.getIndexKeyId());
+    auto swDecryptedValue = FLE2IndexedRangeEncryptedValueV2::parseAndDecryptCiphertext(
+        serverEncryptToken, swBuf.getValue());
+    ASSERT_OK(swDecryptedValue.getStatus());
+    auto& clientEncryptedValue = swDecryptedValue.getValue();
 
-    ASSERT_EQ(sp.metadataBlocks.size(), 2);
-    for (size_t i = 0; i < sp.metadataBlocks.size(); i++) {
-        ASSERT_EQ(sp.metadataBlocks[i].contentionFactor, counter);
-        ASSERT_EQ(sp.metadataBlocks[i].count, 123456);
-        ASSERT(sp.metadataBlocks[i].tag == tag);
+    auto swBlocks = FLE2IndexedRangeEncryptedValueV2::parseAndDecryptMetadataBlocks(
+        derivedDataTokens, swBuf.getValue());
+    ASSERT_OK(swBlocks.getStatus());
+    auto& metadataBlocks = swBlocks.getValue();
+
+    ASSERT_EQ(swBsonType.getValue(), iupayload.getType());
+    ASSERT(swIndexKeyId.getValue() == iupayload.getIndexKeyId());
+
+    ASSERT_EQ(metadataBlocks.size(), 2);
+    for (size_t i = 0; i < metadataBlocks.size(); i++) {
+        ASSERT_EQ(metadataBlocks[i].contentionFactor, counter);
+        ASSERT_EQ(metadataBlocks[i].count, 123456);
+        ASSERT(metadataBlocks[i].tag == tag);
     }
 
-    ASSERT(sp.clientEncryptedValue == serverPayload.clientEncryptedValue);
+    ASSERT(clientEncryptedValue == serverPayload.clientEncryptedValue);
     ASSERT_EQ(serverPayload.clientEncryptedValue.size(), value.length());
     ASSERT(std::equal(serverPayload.clientEncryptedValue.begin(),
                       serverPayload.clientEncryptedValue.end(),
