@@ -111,13 +111,17 @@ structs:
                 description: "This flag will be set to true by the balancer when all the chunks of 
                               this collection have been already split and ready for downgrade"
                 default: false
-            defragmentCollection: 
+            defragmentCollection:
                 type: bool
                 description: "Balancer will merge chunks up to the configured maxChunkSizeBytes."
                 optional: true
-            noAutoSplit: 
+            noAutoSplit:
                 type: bool
                 description: "Specifies whether the auto-splitter should be running or not for this collection."
+                optional: true
+            enableAutoMerge:
+                type: bool
+                description: "Specifies whether the auto-merger should be running or not for this collection."
                 optional: true
             defragmentationPhase:
                 type: DefragmentationPhase

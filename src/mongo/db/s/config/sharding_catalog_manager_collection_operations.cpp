@@ -381,7 +381,8 @@ void ShardingCatalogManager::configureCollectionBalancing(
     const NamespaceString& nss,
     boost::optional<int32_t> chunkSizeMB,
     boost::optional<bool> defragmentCollection,
-    boost::optional<bool> enableAutoSplitter) {
+    boost::optional<bool> enableAutoSplitter,
+    boost::optional<bool> enableAutoMerger) {
 
     uassert(ErrorCodes::InvalidOptions,
             "invalid configure collection balancing update",
@@ -434,6 +435,11 @@ void ShardingCatalogManager::configureCollectionBalancing(
         if (enableAutoSplitter) {
             bool doSplit = enableAutoSplitter.value();
             setClauseBuilder.append(CollectionType::kNoAutoSplitFieldName, !doSplit);
+            updatedFields++;
+        }
+        if (enableAutoMerger) {
+            setClauseBuilder.append(CollectionType::kEnableAutoMergeFieldName,
+                                    enableAutoMerger.value());
             updatedFields++;
         }
     }

@@ -444,7 +444,8 @@ public:
                                       const NamespaceString& nss,
                                       boost::optional<int32_t> chunkSizeMB,
                                       boost::optional<bool> defragmentCollection,
-                                      boost::optional<bool> enableAutoSplitter);
+                                      boost::optional<bool> enableAutoSplitter,
+                                      boost::optional<bool> enableAutoMerger);
 
     /**
      * Removes the maxChunkSize constraint from config.system.collection to ensure compatibility

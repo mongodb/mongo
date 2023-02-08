@@ -43,9 +43,13 @@ structs:
                 cpp_name: chunkSizeMB
                 description: "New default chunk size in MiB, 0 will unset the collection specific chunk size."
                 optional: true
-            enableAutoSplitter: 
+            enableAutoSplitter:
                 type: bool
                 description: "Specifies whether the auto-splitter should be running or not for this collection."
+                optional: true
+            enableAutoMerger:
+                type: bool
+                description: "Specifies whether the auto-merger should be running or not for this collection."
                 optional: true
             defragmentCollection:
                 type: bool
@@ -70,7 +74,7 @@ commands:
         command_name: _configsvrConfigureCollectionBalancing
         cpp_name: ConfigsvrConfigureCollectionBalancing
         description: "Internal configureCollectionBalancing command on the config server"
-        strict: true
+        strict: false
         namespace: type
         api_version: ""
         type: namespacestring
