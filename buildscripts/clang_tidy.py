@@ -15,11 +15,12 @@ from typing import Any, Dict, List, Optional, Tuple
 import multiprocessing
 from pathlib import Path
 from concurrent import futures
-from simple_report import Result, Report, put_report, try_combine_reports, make_report
+from simple_report import put_report, try_combine_reports, make_report
 import yaml
+from clang_tidy_vscode import CHECKS_SO
 
 
-def _clang_tidy_executor(clang_tidy_filename: str, clang_tidy_binary: str,
+def _clang_tidy_executor(clang_tidy_filename: Path, clang_tidy_binary: str,
                          clang_tidy_cfg: Dict[str, Any], output_dir: str, show_stdout: bool,
                          mongo_check_module: str = '') -> Tuple[str, Optional[str]]:
 
@@ -139,8 +140,7 @@ def main():
                         help="clang tidy log from evergreen")
     parser.add_argument("--disable-reporting", action='store_true', default=False,
                         help="Disable generating the report file for evergreen perf.send")
-    parser.add_argument("-m", "--check-module", type=str,
-                        default="build/install/lib/libmongo_tidy_checks.so",
+    parser.add_argument("-m", "--check-module", type=str, default=CHECKS_SO,
                         help="Path to load the custom mongo checks module.")
     # TODO: Is there someway to get this without hardcoding this much
     parser.add_argument("-y", "--clang-tidy-toolchain", type=str, default="v4")
@@ -178,7 +178,7 @@ def main():
             print(f"Could not find config file: {args.clang_tidy_cfg}")
         sys.exit(1)
 
-    files_to_tidy = list()
+    files_to_tidy: List[Path] = list()
     files_to_parse = list()
     for file_doc in compile_commands:
         # A few special cases of files to ignore

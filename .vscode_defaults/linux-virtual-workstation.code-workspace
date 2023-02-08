@@ -12,7 +12,7 @@
 		],
 		"clangd.checkUpdates": true,
 		"clang-format.executable": "/opt/mongodbtoolchain/v3/bin/clang-format",
-		"clang-tidy.executable": "/opt/mongodbtoolchain/v4/bin/clang-tidy",
+		"clang-tidy.executable": "buildscripts/clang_tidy_vscode.py",
 		"editor.codeActionsOnSave": {
 			"source.fixAll.eslint": true
 		},
