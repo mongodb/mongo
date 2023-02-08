@@ -38,6 +38,7 @@
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -84,7 +85,6 @@ ScanStage::ScanStage(UUID collectionUuid,
                  _fields.end()));
     // We cannot use a random cursor if we are seeking or requesting a reverse scan.
     invariant(!_useRandomCursor || (!_seekKeySlot && _forward));
-
     // Initialize _fieldsBloomFilter.
     _fieldsBloomFilter = 0;
     for (size_t idx = 0; idx < _fields.size(); ++idx) {
@@ -123,16 +123,35 @@ void ScanStage::prepare(CompileCtx& ctx) {
         _recordIdAccessor = std::make_unique<value::OwnedValueAccessor>();
     }
 
+    _fieldAccessors.resize(_fields.size());
     for (size_t idx = 0; idx < _fields.size(); ++idx) {
-        auto [it, inserted] =
-            _fieldAccessors.emplace(_fields[idx], std::make_unique<value::OwnedValueAccessor>());
-        uassert(4822814, str::stream() << "duplicate field: " << _fields[idx], inserted);
-        auto [itRename, insertedRename] = _varAccessors.emplace(_vars[idx], it->second.get());
+        auto accessorPtr = &_fieldAccessors[idx];
+
+        auto [itRename, insertedRename] = _varAccessors.emplace(_vars[idx], accessorPtr);
         uassert(4822815, str::stream() << "duplicate field: " << _vars[idx], insertedRename);
 
         if (_oplogTsSlot && _fields[idx] == repl::OpTime::kTimestampFieldName) {
-            _tsFieldAccessor = it->second.get();
+            _tsFieldAccessor = accessorPtr;
         }
+
+        const size_t offset = computeFieldMaskOffset(_fields[idx].c_str(), _fields[idx].size());
+        _maskOffsetToFieldAccessors[offset] = stdx::visit(
+            OverloadedVisitor{
+                [&](stdx::monostate _) -> FieldAccessorVariant {
+                    return std::make_pair(StringData{_fields[idx]}, accessorPtr);
+                },
+                [&](std::pair<StringData, value::OwnedValueAccessor*> pair)
+                    -> FieldAccessorVariant {
+                    StringMap<value::OwnedValueAccessor*> map;
+                    map.emplace(pair.first, pair.second);
+                    map.emplace(_fields[idx], accessorPtr);
+                    return map;
+                },
+                [&](StringMap<value::OwnedValueAccessor*> map) -> FieldAccessorVariant {
+                    map.emplace(_fields[idx], accessorPtr);
+                    return std::move(map);
+                }},
+            std::move(_maskOffsetToFieldAccessors[offset]));
     }
 
     if (_seekKeySlot) {
@@ -210,8 +229,8 @@ void ScanStage::doSaveState(bool relinquishCursor) {
             // disabled. We should use slotsAccessible() instead of true, once the bug is fixed.
             prepareForYielding(*_recordIdAccessor, true);
         }
-        for (auto& [fieldName, accessor] : _fieldAccessors) {
-            prepareForYielding(*accessor, slotsAccessible());
+        for (auto& accessor : _fieldAccessors) {
+            prepareForYielding(accessor, slotsAccessible());
         }
     }
 
@@ -363,6 +382,20 @@ void ScanStage::open(bool reOpen) {
     _firstGetNext = true;
 }
 
+value::OwnedValueAccessor* ScanStage::getFieldAccessor(StringData name, size_t offset) const {
+    return stdx::visit(
+        OverloadedVisitor{
+            [](const stdx::monostate& _) -> value::OwnedValueAccessor* { return nullptr; },
+            [&](const std::pair<StringData, value::OwnedValueAccessor*> pair) {
+                return (pair.first == name) ? pair.second : nullptr;
+            },
+            [&](const StringMap<value::OwnedValueAccessor*>& map) {
+                auto it = map.find(name);
+                return it == map.end() ? nullptr : it->second;
+            }},
+        _maskOffsetToFieldAccessors[offset]);
+}
+
 PlanState ScanStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
@@ -450,11 +483,11 @@ PlanState ScanStage::getNext() {
                 return std::make_pair(value::TypeTags::Nothing, value::Value{0});
             }();
 
-            _fieldAccessors.begin()->second->reset(false, tag, val);
+            _fieldAccessors.front().reset(false, tag, val);
         } else {
             // If we're looking for 2 or more fields, it's more efficient to use the hashtable.
-            for (auto& [name, accessor] : _fieldAccessors) {
-                accessor->reset();
+            for (auto& accessor : _fieldAccessors) {
+                accessor.reset();
             }
 
             auto fieldsToMatch = _fieldAccessors.size();
@@ -467,20 +500,21 @@ PlanState ScanStage::getNext() {
                 // filter, we can quickly skip over a field without having to generate the hash for
                 // the field.
                 auto field = bson::fieldNameView(bsonElement);
-                if (!(_fieldsBloomFilter & computeFieldMask(field.rawData(), field.size()))) {
+                const size_t offset = computeFieldMaskOffset(field.rawData(), field.size());
+                if (!(_fieldsBloomFilter & computeFieldMask(offset))) {
                     bsonElement = bson::advance(bsonElement, field.size());
                     continue;
                 }
-                // Search for the field in the hashtable.
-                if (auto it = _fieldAccessors.find(field); it != _fieldAccessors.end()) {
+
+                auto accessor = getFieldAccessor(field, offset);
+                if (accessor != nullptr) {
                     auto [tag, val] = bson::convertFrom<true>(bsonElement, end, field.size());
-                    it->second->reset(false, tag, val);
+                    accessor->reset(false, tag, val);
                     if ((--fieldsToMatch) == 0) {
                         // No need to scan any further so bail out early.
                         break;
                     }
                 }
-
                 bsonElement = bson::advance(bsonElement, field.size());
             }
         }

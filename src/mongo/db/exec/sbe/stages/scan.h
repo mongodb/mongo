@@ -138,11 +138,19 @@ private:
     // Returns the primary cursor or the random cursor depending on whether _useRandomCursor is set.
     RecordCursor* getActiveCursor() const;
 
-    static uint64_t computeFieldMask(const char* name, size_t length) {
-        // Discard the upper bits so that 'shiftAmt' is always between 0 and 63 inclusive.
-        auto shiftAmt = static_cast<unsigned char>(name[length / 2]) & 63u;
-        return uint64_t{1} << shiftAmt;
+    static size_t computeFieldMaskOffset(const char* name, size_t length) {
+        return static_cast<unsigned char>(name[length / 2]) & 63u;
     }
+
+    static uint64_t computeFieldMask(size_t offset) {
+        return uint64_t{1} << offset;
+    }
+
+    static uint64_t computeFieldMask(const char* name, size_t length) {
+        return uint64_t{1} << computeFieldMaskOffset(name, length);
+    }
+
+    value::OwnedValueAccessor* getFieldAccessor(StringData name, size_t offset) const;
 
     const UUID _collUuid;
     const boost::optional<value::SlotId> _recordSlot;
@@ -188,9 +196,20 @@ private:
     // Used to return a random sample of the collection.
     const bool _useRandomCursor;
 
-    value::FieldAccessorMap _fieldAccessors;
+    std::vector<value::OwnedValueAccessor> _fieldAccessors;
     value::SlotAccessorMap _varAccessors;
     value::SlotAccessor* _seekKeyAccessor{nullptr};
+
+    // Variant stores pointers to field accessors for all fields with a given bloom filter mask
+    // offset. If there is only one field with a given offset, it is stored as a StringData and
+    // pointer pair, which allows us to just compare strings instead of hash map lookup.
+    using FieldAccessorVariant = stdx::variant<stdx::monostate,
+                                               std::pair<StringData, value::OwnedValueAccessor*>,
+                                               StringMap<value::OwnedValueAccessor*>>;
+
+    // Array contains FieldAccessorVariants, indexed by bloom filter mask offset, determined by
+    // computeFieldMaskOffset function.
+    std::array<FieldAccessorVariant, 64> _maskOffsetToFieldAccessors;
 
     // _tsFieldAccessor points to the accessor for field "ts". We use _tsFieldAccessor to get at
     // the accessor quickly rather than having to look it up in the _fieldAccessors hashtable.
