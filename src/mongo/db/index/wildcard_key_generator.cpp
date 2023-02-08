@@ -79,6 +79,14 @@ void appendToKeyString(const std::vector<BSONElement>& elems,
     }
 }
 
+// Append 'MinKey' to 'keyString'. Multikey path keys use 'MinKey' for non-wildcard fields.
+void appendToMultiKeyString(const std::vector<BSONElement>& elems,
+                            KeyString::PooledBuilder* keyString) {
+    for (size_t i = 0; i < elems.size(); i++) {
+        keyString->appendBSONElement(kMinBSONKey.firstElement());
+    }
+}
+
 // We should make a new Ordering for wildcard key generator because the index keys generated for
 // wildcard indexes include a "$_path" field prior to the wildcard field and the Ordering passed in
 // does not account for the "$_path" field.
@@ -226,13 +234,13 @@ void SingleDocumentKeyEncoder::_addMultiKey(const FieldRef& fullPath) {
         KeyString::PooledBuilder keyString(_pooledBufferBuilder, _keyStringVersion, _ordering);
 
         if (!_preElems.empty()) {
-            appendToKeyString(_preElems, _collator, &keyString);
+            appendToMultiKeyString(_preElems, &keyString);
         }
         for (auto elem : BSON("" << 1 << "" << fullPath.dottedField())) {
             keyString.appendBSONElement(elem);
         }
         if (!_postElems.empty()) {
-            appendToKeyString(_postElems, _collator, &keyString);
+            appendToMultiKeyString(_postElems, &keyString);
         }
 
         keyString.appendRecordId(record_id_helpers::reservedIdFor(

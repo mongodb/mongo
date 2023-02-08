@@ -1387,21 +1387,23 @@ TEST_F(WildcardKeyGeneratorCompoundTest, CompoundWildcardIndexShouldBeSparse) {
 }
 
 TEST_F(WildcardKeyGeneratorCompoundTest, CanGenerateKeysForMultikeyFieldCompound) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1, c: 1}"),
-                                fromjson("{c: 0}"),
+    WildcardKeyGenerator keyGen{fromjson("{a: 1, '$**': 1, c: 1}"),
+                                fromjson("{a: 0, c: 0}"),
                                 nullptr,
                                 KeyString::Version::kLatestVersion,
                                 Ordering::make(BSONObj()),
                                 rsKeyFormat};
-    auto inputDoc = fromjson("{a: [], b: [1, {c: [3]}]}");
+    auto inputDoc = fromjson("{a: 1, b: [1, {c: [3]}]}");
 
-    auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': undefined, '': null}"),
-                                    fromjson("{'': 'b', '': 1, '': null}"),
-                                    fromjson("{'': 'b.c', '': 3, '': null}")});
+    auto expectedKeys = makeKeySet({fromjson("{'': 1, '': 'b', '': 1, '': null}"),
+                                    fromjson("{'': 1, '': 'b.c', '': 3, '': null}")});
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a', '': null}"),
-                    fromjson("{'': 1, '': 'b', '': null}"),
-                    fromjson("{'': 1, '': 'b.c', '': null}")},
+        makeKeySet({BSON("" << MINKEY << "" << 1 << ""
+                            << "b"
+                            << "" << MINKEY),
+                    BSON("" << MINKEY << "" << 1 << ""
+                            << "b.c"
+                            << "" << MINKEY)},
                    record_id_helpers::reservedIdFor(
                        record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, rsKeyFormat));
 
