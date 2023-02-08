@@ -126,6 +126,7 @@ let viewsCommandTests = {
     _configsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _configsvrSetClusterParameter: {skip: isAnInternalCommand},
     _configsvrSetUserWriteBlockMode: {skip: isAnInternalCommand},
+    _configsvrTransitionToCatalogShard: {skip: isAnInternalCommand},
     _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
     _flushDatabaseCacheUpdates: {skip: isUnrelated},
     _flushDatabaseCacheUpdatesWithWriteConcern: {skip: isUnrelated},
@@ -708,6 +709,7 @@ let viewsCommandTests = {
     testVersion2: {skip: isAnInternalCommand},
     testVersions1And2: {skip: isAnInternalCommand},
     top: {skip: "tested in views/views_stats.js"},
+    transitionToCatalogShard: {skip: isUnrelated},
     update: {command: {update: "view", updates: [{q: {x: 1}, u: {x: 2}}]}, expectFailure: true},
     updateRole: {
         command: {

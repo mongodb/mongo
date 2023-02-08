@@ -342,7 +342,8 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     OperationContext* opCtx,
     std::shared_ptr<RemoteCommandTargeter> targeter,
     const std::string* shardProposedName,
-    const ConnectionString& connectionString) {
+    const ConnectionString& connectionString,
+    bool isCatalogShard) {
     auto swCommandResponse = _runCommandForAddShard(
         opCtx, targeter.get(), NamespaceString::kAdminDb, BSON("isMaster" << 1));
     if (swCommandResponse.getStatus() == ErrorCodes::IncompatibleServerVersion) {
@@ -427,7 +428,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
 
     // Is it a config server?
     if (resIsMaster.hasField("configsvr")) {
-        if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+        if (!isCatalogShard) {
             return {ErrorCodes::OperationFailed,
                     str::stream() << "Cannot add " << connectionString.toString()
                                   << " as a shard since it is a config server"};
@@ -532,7 +533,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     }
 
     // Disallow adding shard replica set with name 'config'
-    if (actualShardName == NamespaceString::kConfigDb) {
+    if (!isCatalogShard && actualShardName == NamespaceString::kConfigDb) {
         return {ErrorCodes::BadValue, "use of shard replica set with name 'config' is not allowed"};
     }
 
@@ -628,7 +629,8 @@ void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext
 StatusWith<std::string> ShardingCatalogManager::addShard(
     OperationContext* opCtx,
     const std::string* shardProposedName,
-    const ConnectionString& shardConnectionString) {
+    const ConnectionString& shardConnectionString,
+    bool isCatalogShard) {
     if (!shardConnectionString) {
         return {ErrorCodes::BadValue, "Invalid connection string"};
     }
@@ -661,10 +663,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     auto targeter = shard->getTargeter();
 
     ScopeGuard stopMonitoringGuard([&] {
-        bool isCatalogShard =
-            shardProposedName && *shardProposedName == ShardId::kCatalogShardId.toString();
-        // The config server will still be a part of the replica set even if it could not be added
-        // as a catalog shard so we do not want to remove the replica set monitor for it.
         if (shardConnectionString.type() == ConnectionString::ConnectionType::kReplicaSet &&
             !isCatalogShard) {
             // This is a workaround for the case were we could have some bad shard being
@@ -676,8 +674,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     });
 
     // Validate the specified connection string may serve as shard at all
-    auto shardStatus =
-        _validateHostAsShard(opCtx, targeter, shardProposedName, shardConnectionString);
+    auto shardStatus = _validateHostAsShard(
+        opCtx, targeter, shardProposedName, shardConnectionString, isCatalogShard);
     if (!shardStatus.isOK()) {
         return shardStatus.getStatus();
     }
@@ -734,10 +732,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         return Shard::CommandResponse::processBatchWriteResponse(commandResponse, &batchResponse);
     };
 
-    // The catalog shard will already have a ShardIdentity document on the config server, so skip
-    // adding it here.
-    if (!gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility) ||
-        shardType.getName() != ShardId::kCatalogShardId) {
+    if (!isCatalogShard) {
         AddShard addShardCmd = add_shard_util::createAddShardCmd(opCtx, shardType.getName());
 
         // Use the _addShard command to add the shard, which in turn inserts a shardIdentity
@@ -746,13 +741,13 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         if (!addShardStatus.isOK()) {
             return addShardStatus;
         }
+
+        // Set the user-writes blocking state on the new shard.
+        _setUserWriteBlockingStateOnNewShard(opCtx, targeter.get());
+
+        // Determine the set of cluster parameters to be used.
+        _standardizeClusterParameters(opCtx, shard.get());
     }
-
-    // Set the user-writes blocking state on the new shard.
-    _setUserWriteBlockingStateOnNewShard(opCtx, targeter.get());
-
-    // Determine the set of cluster parameters to be used.
-    _standardizeClusterParameters(opCtx, shard.get());
 
     {
         // Keep the FCV stable across checking the FCV, sending setFCV to the new shard and writing
@@ -781,22 +776,24 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
                   fcvRegion == multiversion::GenericFCV::kLastContinuous ||
                   fcvRegion == multiversion::GenericFCV::kLastLTS);
 
-        SetFeatureCompatibilityVersion setFcvCmd(fcvRegion->getVersion());
-        setFcvCmd.setDbName(NamespaceString::kAdminDb);
-        setFcvCmd.setFromConfigServer(true);
+        if (!isCatalogShard) {
+            SetFeatureCompatibilityVersion setFcvCmd(fcvRegion->getVersion());
+            setFcvCmd.setDbName(NamespaceString::kAdminDb);
+            setFcvCmd.setFromConfigServer(true);
 
-        auto versionResponse =
-            _runCommandForAddShard(opCtx,
-                                   targeter.get(),
-                                   NamespaceString::kAdminDb,
-                                   setFcvCmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField
-                                                         << opCtx->getWriteConcern().toBSON())));
-        if (!versionResponse.isOK()) {
-            return versionResponse.getStatus();
-        }
+            auto versionResponse = _runCommandForAddShard(
+                opCtx,
+                targeter.get(),
+                NamespaceString::kAdminDb,
+                setFcvCmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField
+                                      << opCtx->getWriteConcern().toBSON())));
+            if (!versionResponse.isOK()) {
+                return versionResponse.getStatus();
+            }
 
-        if (!versionResponse.getValue().commandStatus.isOK()) {
-            return versionResponse.getValue().commandStatus;
+            if (!versionResponse.getValue().commandStatus.isOK()) {
+                return versionResponse.getValue().commandStatus;
+            }
         }
 
         // Tick clusterTime to get a new topologyTime for this mutation of the topology.

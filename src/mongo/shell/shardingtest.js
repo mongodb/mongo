@@ -1817,14 +1817,20 @@ var ShardingTest = function(params) {
                 var name;
                 if (isCatalogShardMode && idx == 0) {
                     name = "catalogShard";
+
+                    print("ShardingTest " + testName + " transitioning to catalog shard");
+
+                    var result =
+                        assert.commandWorked(admin.runCommand({transitionToCatalogShard: 1}));
+
+                    z.shardName = name;
+                } else {
+                    print("ShardingTest " + testName + " going to add shard : " + n);
+
+                    var result = assert.commandWorked(admin.runCommand({addshard: n}),
+                                                      "Failed to add shard " + n);
+                    z.shardName = result.shardAdded;
                 }
-
-                print("ShardingTest " + testName + " going to add shard : " + n);
-
-                var result = assert.commandWorked(
-                    admin.runCommand(name ? {addshard: n, name: name} : {addshard: n}),
-                    "Failed to add shard " + n);
-                z.shardName = result.shardAdded;
             });
         }
     } catch (e) {

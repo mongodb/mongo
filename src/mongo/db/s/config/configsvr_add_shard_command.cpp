@@ -120,7 +120,8 @@ public:
         StatusWith<std::string> addShardResult = ShardingCatalogManager::get(opCtx)->addShard(
             opCtx,
             parsedRequest.hasName() ? &parsedRequest.getName() : nullptr,
-            parsedRequest.getConnString());
+            parsedRequest.getConnString(),
+            false);
 
         if (!addShardResult.isOK()) {
             LOGV2(21920,

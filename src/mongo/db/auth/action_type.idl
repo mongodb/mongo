@@ -185,6 +185,7 @@ enums:
            top :  "top"
            touch :  "touch"
            trafficRecord :  "trafficRecord"
+           transitionToCatalogShard : "transitionToCatalogShard"
            unlock :  "unlock"
            useTenant : "useTenant"
            useUUID :  "useUUID"

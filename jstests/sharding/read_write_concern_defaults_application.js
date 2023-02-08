@@ -118,6 +118,7 @@ let testCases = {
     _configsvrSetAllowMigrations: {skip: "internal command"},
     _configsvrSetClusterParameter: {skip: "internal command"},
     _configsvrSetUserWriteBlockMode: {skip: "internal command"},
+    _configsvrTransitionToCatalogShard: {skip: "internal command"},
     _configsvrUpdateZoneKeyRange: {skip: "internal command"},
     _flushDatabaseCacheUpdates: {skip: "internal command"},
     _flushDatabaseCacheUpdatesWithWriteConcern: {skip: "internal command"},
@@ -734,6 +735,7 @@ let testCases = {
     testVersions1And2: {skip: "does not accept read or write concern"},
     testVersion2: {skip: "does not accept read or write concern"},
     top: {skip: "does not accept read or write concern"},
+    transitionToCatalogShard: {skip: "does not accept read or write concern"},
     update: {
         setUp: function(conn) {
             assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));

@@ -487,7 +487,8 @@ public:
      */
     StatusWith<std::string> addShard(OperationContext* opCtx,
                                      const std::string* shardProposedName,
-                                     const ConnectionString& shardConnectionString);
+                                     const ConnectionString& shardConnectionString,
+                                     bool isCatalogShard);
 
     /**
      * Inserts the config server shard identity document using a sentinel shard id. Requires the
@@ -641,7 +642,8 @@ private:
     StatusWith<ShardType> _validateHostAsShard(OperationContext* opCtx,
                                                std::shared_ptr<RemoteCommandTargeter> targeter,
                                                const std::string* shardProposedName,
-                                               const ConnectionString& connectionString);
+                                               const ConnectionString& connectionString,
+                                               bool isCatalogShard);
 
     /**
      * Drops the sessions collection on the specified host.

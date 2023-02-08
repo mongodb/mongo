@@ -52,11 +52,11 @@ const configCS = st.configRS.getURL();
     //
     // Adding the config server as a shard works.
     //
-    assert.commandWorked(st.s.adminCommand({addShard: configCS}));
+    assert.commandWorked(st.s.adminCommand({transitionToCatalogShard: 1}));
 
     // More than once works.
-    assert.commandWorked(st.s.adminCommand({addShard: configCS}));
-    assert.commandWorked(st.s.adminCommand({addShard: configCS}));
+    assert.commandWorked(st.s.adminCommand({transitionToCatalogShard: 1}));
+    assert.commandWorked(st.s.adminCommand({transitionToCatalogShard: 1}));
 
     // Flushing routing / db cache updates works.
     flushRoutingAndDBCacheUpdates(st.configRS.getPrimary());
@@ -65,6 +65,9 @@ const configCS = st.configRS.getURL();
 // Refresh the logical session cache now that we have a shard to create the sessions collection to
 // verify it works as expected.
 st.configRS.getPrimary().adminCommand({refreshLogicalSessionCacheNow: 1});
+
+let shardList = st.getDB('config').shards.find().toArray();
+assert.eq(1, shardList.length, tojson(shardList));
 
 st.stop();
 }());

@@ -78,6 +78,7 @@ const allCommands = {
     _configsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _configsvrSetClusterParameter: {skip: isAnInternalCommand},
     _configsvrSetUserWriteBlockMode: {skip: isAnInternalCommand},
+    _configsvrTransitionToCatalogShard: {skip: isAnInternalCommand},
     _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
     _flushDatabaseCacheUpdates: {skip: isAnInternalCommand},
     _flushDatabaseCacheUpdatesWithWriteConcern: {skip: isAnInternalCommand},

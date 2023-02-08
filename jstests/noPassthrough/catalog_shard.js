@@ -183,8 +183,7 @@ const newShardName =
     // movePrimary won't delete from the source, so drop the moved db directly to avoid a conflict
     // in addShard.
     assert.commandWorked(st.configRS.getPrimary().getDB(dbName).dropDatabase());
-    assert.commandWorked(
-        st.s.adminCommand({addShard: st.configRS.getURL(), name: kCatalogShardId}));
+    assert.commandWorked(st.s.adminCommand({transitionToCatalogShard: 1}));
 
     // Basic CRUD and sharded DDL work.
     basicCRUD(st.s);
