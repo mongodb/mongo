@@ -31,7 +31,7 @@
 
 #include <map>
 
-#include "mongo/db/query/optimizer/index_bounds.h"
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
 
 
 namespace mongo::optimizer {

@@ -999,13 +999,8 @@ def register_abt_printers(pp):
     pp.add("Memo", "mongo::optimizer::cascades::Memo", False, MemoPrinter)
 
     # PartialSchemaRequirements printer.
-    schema_req_type = """std::multimap<mongo::optimizer::PartialSchemaKey,
-                        mongo::optimizer::PartialSchemaRequirement,
-                        mongo::optimizer::PartialSchemaKeyLessComparator,
-                        std::allocator<std::pair<mongo::optimizer::PartialSchemaKey const,
-                            mongo::optimizer::PartialSchemaRequirement>
-                        > >"""
-    pp.add("PartialSchemaRequirements", schema_req_type, False, PartialSchemaReqMapPrinter)
+    pp.add("PartialSchemaRequirements", "mongo::optimizer::PartialSchemaRequirements", False,
+           PartialSchemaReqMapPrinter)
 
     # Attempt to dynamically load the ABT type since it has a templated type set that is bound to
     # change. This may fail on certain builds, such as those with dynamically linked libraries, so

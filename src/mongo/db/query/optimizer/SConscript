@@ -22,6 +22,7 @@ env.Library(
         "index_bounds.cpp",
         "metadata.cpp",
         "node.cpp",
+        "partial_schema_requirements.cpp",
         "props.cpp",
         "reference_tracker.cpp",
         "syntax/expr.cpp",
