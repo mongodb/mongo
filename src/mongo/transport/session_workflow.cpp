@@ -80,10 +80,10 @@ namespace metrics_detail {
 /** Applies X(id) for each SplitId */
 #define EXPAND_TIME_SPLIT_IDS(X) \
     X(started)                   \
+    X(yielded)                   \
     X(receivedWork)              \
     X(processedWork)             \
     X(sentResponse)              \
-    X(yielded)                   \
     X(done)                      \
     /**/
 
@@ -95,27 +95,27 @@ namespace metrics_detail {
  * `intervals` are durations between notable pairs of them.
  *
  *  [started]
- *  |   [receivedWork]
- *  |   |   [processedWork]
- *  |   |   |   [sentResponse]
- *  |   |   |   |   [yielded]
+ *  |   [yielded]
+ *  |   |   [receivedWork]
+ *  |   |   |   [processedWork]
+ *  |   |   |   |   [sentResponse]
  *  |   |   |   |   |   [done]
  *  |<----------------->| total
- *  |   |<------------->| active
- *  |<->|   |   |   |   | receivedWork
- *  |   |<->|   |   |   | processWork
- *  |   |   |<->|   |   | sendResponse
- *  |   |   |   |<->|   | yield
+ *  |<->|   |   |   |   | yield
+ *  |   |<->|   |   |   | receiveWork
+ *  |   |   |<--------->| active
+ *  |   |   |<->|   |   | processWork
+ *  |   |   |   |<->|   | sendResponse
  *  |   |   |   |   |<->| finalize
  */
 #define EXPAND_INTERVAL_IDS(X)                   \
     X(total, started, done)                      \
+    X(yield, started, yielded)                   \
+    X(receiveWork, yielded, receivedWork)        \
     X(active, receivedWork, done)                \
-    X(receiveWork, started, receivedWork)        \
     X(processWork, receivedWork, processedWork)  \
     X(sendResponse, processedWork, sentResponse) \
-    X(yield, sentResponse, yielded)              \
-    X(finalize, yielded, done)                   \
+    X(finalize, sentResponse, done)              \
     /**/
 
 #define X_ID(id, ...) id,
@@ -407,6 +407,17 @@ private:
         ServiceExecutor* source = nullptr;
     };
 
+    struct IterationFrame {
+        explicit IterationFrame(const Impl& impl) : metrics{impl._sep} {
+            metrics.start();
+        }
+        ~IterationFrame() {
+            metrics.finish();
+        }
+
+        metrics_detail::SessionWorkflowMetrics metrics;
+    };
+
     /** Alias: refers to this Impl, but holds a ref to the enclosing workflow. */
     std::shared_ptr<Impl> shared_from_this() {
         return {_workflow->shared_from_this(), this};
@@ -440,6 +451,7 @@ private:
             // we're trying deliberately to make it happen, to reduce long tail
             // latency.
             _yieldPointReached();
+            _iterationFrame->metrics.yielded();
             return _receiveRequest();
         }
         auto&& [p, f] = makePromiseFuture<void>();
@@ -494,6 +506,7 @@ private:
 
     std::unique_ptr<WorkItem> _work;
     std::unique_ptr<WorkItem> _nextWork; /**< created by exhaust responses */
+    boost::optional<IterationFrame> _iterationFrame;
 };
 
 class SessionWorkflow::Impl::WorkItem {
@@ -708,33 +721,20 @@ void SessionWorkflow::Impl::_onLoopError(Status error) {
 
 /** Returns a Future representing the completion of one loop iteration. */
 Future<void> SessionWorkflow::Impl::_doOneIteration() {
-    struct Frame {
-        explicit Frame(std::shared_ptr<Impl> a) : anchor{std::move(a)} {
-            metrics.start();
-        }
-        ~Frame() {
-            metrics.finish();
-        }
-
-        std::shared_ptr<Impl> anchor;
-        metrics_detail::SessionWorkflowMetrics metrics{anchor->_sep};
-    };
-
-    auto fr = std::make_shared<Frame>(shared_from_this());
+    _iterationFrame.emplace(*this);
     return _getNextWork()
-        .then([&, fr](auto work) {
-            fr->metrics.received();
+        .then([&](auto work) {
+            _iterationFrame->metrics.received();
             invariant(!_work);
             _work = std::move(work);
             return _dispatchWork();
         })
-        .then([&, fr](auto rsp) {
+        .then([&](auto rsp) {
             _acceptResponse(std::move(rsp));
-            fr->metrics.processed();
+            _iterationFrame->metrics.processed();
             _sendResponse();
-            fr->metrics.sent(*session());
-            _yieldPointReached();
-            fr->metrics.yielded();
+            _iterationFrame->metrics.sent(*session());
+            _iterationFrame.reset();
         });
 }
 
