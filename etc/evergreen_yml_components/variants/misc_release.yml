@@ -448,8 +448,6 @@ buildvariants:
     distros:
     - amazon2022-large
   - name: .publish_crypt
-    distros:
-    - amazon2022-large
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless
@@ -1434,8 +1432,6 @@ buildvariants:
     distros:
     - ubuntu2204-arm64-small
   - name: .publish
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel90-arm64
@@ -1505,8 +1501,6 @@ buildvariants:
     distros:
     - ubuntu2204-arm64-small
   - name: .publish
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: suse12
