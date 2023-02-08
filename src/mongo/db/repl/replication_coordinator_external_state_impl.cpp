@@ -137,8 +137,6 @@ const char kLocalDbName[] = "local";
 // TODO SERVER-62491 Use SystemTenantId
 const DatabaseName kConfigDatabaseName{boost::none, kLocalDbName};
 
-const NamespaceString kConfigCollectionNS{kLocalDbName, "system.replset"};
-
 MONGO_FAIL_POINT_DEFINE(dropPendingCollectionReaperHang);
 
 // The count of items in the buffer
@@ -429,7 +427,8 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                {
                                    // Writes to 'local.system.replset' must be untimestamped.
                                    WriteUnitOfWork wuow(opCtx);
-                                   Helpers::putSingleton(opCtx, kConfigCollectionNS, config);
+                                   Helpers::putSingleton(
+                                       opCtx, NamespaceString::kSystemReplSetNamespace, config);
                                    wuow.commit();
                                }
                                {
@@ -564,13 +563,17 @@ StatusWith<BSONObj> ReplicationCoordinatorExternalStateImpl::loadLocalConfigDocu
     OperationContext* opCtx) {
     try {
         return writeConflictRetry(
-            opCtx, "load replica set config", kConfigCollectionNS.ns(), [opCtx] {
+            opCtx,
+            "load replica set config",
+            NamespaceString::kSystemReplSetNamespace.ns(),
+            [opCtx] {
                 BSONObj config;
-                if (!Helpers::getSingleton(opCtx, kConfigCollectionNS, config)) {
+                if (!Helpers::getSingleton(
+                        opCtx, NamespaceString::kSystemReplSetNamespace, config)) {
                     return StatusWith<BSONObj>(
                         ErrorCodes::NoMatchingDocument,
                         "Did not find replica set configuration document in {}"_format(
-                            kConfigCollectionNS.toString()));
+                            NamespaceString::kSystemReplSetNamespace.toString()));
                 }
                 return StatusWith<BSONObj>(config);
             });
@@ -583,29 +586,30 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
                                                                          const BSONObj& config,
                                                                          bool writeOplog) {
     try {
-        writeConflictRetry(opCtx, "save replica set config", kConfigCollectionNS.ns(), [&] {
-            {
-                // Writes to 'local.system.replset' must be untimestamped.
-                WriteUnitOfWork wuow(opCtx);
-                Lock::DBLock dbWriteLock(opCtx, kConfigDatabaseName, MODE_X);
-                Helpers::putSingleton(opCtx, kConfigCollectionNS, config);
-                wuow.commit();
-            }
+        writeConflictRetry(
+            opCtx, "save replica set config", NamespaceString::kSystemReplSetNamespace.ns(), [&] {
+                {
+                    // Writes to 'local.system.replset' must be untimestamped.
+                    WriteUnitOfWork wuow(opCtx);
+                    Lock::DBLock dbWriteLock(opCtx, kConfigDatabaseName, MODE_X);
+                    Helpers::putSingleton(opCtx, NamespaceString::kSystemReplSetNamespace, config);
+                    wuow.commit();
+                }
 
-            if (writeOplog) {
-                // The no-op write doesn't affect the correctness of the safe reconfig protocol and
-                // so it doesn't have to be written in the same WUOW as the config write. In fact,
-                // the no-op write is only needed for some corner cases where the committed snapshot
-                // is dropped after a force reconfig that changes the config content or a safe
-                // reconfig that changes writeConcernMajorityJournalDefault.
-                WriteUnitOfWork wuow(opCtx);
-                auto msgObj = BSON("msg"
-                                   << "Reconfig set"
-                                   << "version" << config["version"]);
-                _service->getOpObserver()->onOpMessage(opCtx, msgObj);
-                wuow.commit();
-            }
-        });
+                if (writeOplog) {
+                    // The no-op write doesn't affect the correctness of the safe reconfig protocol
+                    // and so it doesn't have to be written in the same WUOW as the config write. In
+                    // fact, the no-op write is only needed for some corner cases where the
+                    // committed snapshot is dropped after a force reconfig that changes the config
+                    // content or a safe reconfig that changes writeConcernMajorityJournalDefault.
+                    WriteUnitOfWork wuow(opCtx);
+                    auto msgObj = BSON("msg"
+                                       << "Reconfig set"
+                                       << "version" << config["version"]);
+                    _service->getOpObserver()->onOpMessage(opCtx, msgObj);
+                    wuow.commit();
+                }
+            });
         return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -614,13 +618,14 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
 
 Status ReplicationCoordinatorExternalStateImpl::replaceLocalConfigDocument(
     OperationContext* opCtx, const BSONObj& config) try {
-    writeConflictRetry(opCtx, "replace replica set config", kConfigCollectionNS.ns(), [&] {
-        WriteUnitOfWork wuow(opCtx);
-        Lock::DBLock dbWriteLock(opCtx, kConfigDatabaseName, MODE_X);
-        Helpers::emptyCollection(opCtx, kConfigCollectionNS);
-        Helpers::putSingleton(opCtx, kConfigCollectionNS, config);
-        wuow.commit();
-    });
+    writeConflictRetry(
+        opCtx, "replace replica set config", NamespaceString::kSystemReplSetNamespace.ns(), [&] {
+            WriteUnitOfWork wuow(opCtx);
+            Lock::DBLock dbWriteLock(opCtx, kConfigDatabaseName, MODE_X);
+            Helpers::emptyCollection(opCtx, NamespaceString::kSystemReplSetNamespace);
+            Helpers::putSingleton(opCtx, NamespaceString::kSystemReplSetNamespace, config);
+            wuow.commit();
+        });
     return Status::OK();
 } catch (const DBException& ex) {
     return ex.toStatus();
