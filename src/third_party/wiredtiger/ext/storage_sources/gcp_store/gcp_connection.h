@@ -44,7 +44,8 @@ static const std::map<google::cloud::StatusCode, int32_t> toErrno = {
 class gcp_connection {
     public:
     gcp_connection(const std::string &bucket_name, const std::string &prefix);
-    int list_objects(std::vector<std::string> &objects, bool list_single);
+    int list_objects(
+      std::string search_prefix, std::vector<std::string> &objects, bool list_single);
     int put_object(const std::string &object_key, const std::string &file_path);
     int delete_object(const std::string &object_key);
     int object_exists(const std::string &object_key, bool &exists, size_t &object_size);
@@ -56,5 +57,5 @@ class gcp_connection {
     private:
     google::cloud::storage::Client _gcp_client;
     const std::string _bucket_name;
-    const std::string _object_prefix;
+    const std::string _bucket_prefix;
 };
