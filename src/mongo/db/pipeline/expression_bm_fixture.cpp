@@ -442,6 +442,18 @@ void ExpressionBenchmarkFixture::benchmarkDateAddEvaluate12HoursWithTimezone(
     testDateAddExpression(1604131115000LL, "hour", 12LL, std::string{"America/New_York"}, state);
 }
 
+void ExpressionBenchmarkFixture::benchmarkDateFromString(benchmark::State& state) {
+    testDateFromStringExpression(
+        "08/14/2023, 12:24:36", std::string{"UTC"}, std::string{"%m/%d/%Y, %H:%M:%S"}, state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkDateFromStringNewYork(benchmark::State& state) {
+    testDateFromStringExpression("08/14/2023, 12:24:36",
+                                 std::string{"America/New_York"},
+                                 std::string{"%m/%d/%Y, %H:%M:%S"},
+                                 state);
+}
+
 void ExpressionBenchmarkFixture::benchmarkDateTruncEvaluateMinute15NewYork(
     benchmark::State& state) {
     testDateTruncExpression(1615460825000LL /* year 2021*/,
@@ -1030,6 +1042,21 @@ void ExpressionBenchmarkFixture::testDateAddExpression(long long startDate,
         BSON("$dateAdd" << objBuilder.obj()),
         state,
         std::vector<Document>(1, {{"startDate"_sd, Date_t::fromMillisSinceEpoch(startDate)}}));
+}
+
+void ExpressionBenchmarkFixture::testDateFromStringExpression(std::string dateString,
+                                                              boost::optional<std::string> timezone,
+                                                              boost::optional<std::string> format,
+                                                              benchmark::State& state) {
+    BSONObjBuilder objBuilder;
+    objBuilder << "dateString" << dateString;
+    if (timezone) {
+        objBuilder << "timezone" << *timezone;
+    }
+    if (format) {
+        objBuilder << "format" << *format;
+    }
+    benchmarkExpression(BSON("$dateFromString" << objBuilder.obj()), state);
 }
 
 void ExpressionBenchmarkFixture::testSetFieldExpression(std::string fieldname,

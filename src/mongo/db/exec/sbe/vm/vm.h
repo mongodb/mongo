@@ -605,6 +605,8 @@ enum class Builtin : uint8_t {
     dayOfWeek,
     datePartsWeekYear,
     dateToString,
+    dateFromString,
+    dateFromStringNoThrow,
     dropFields,
     newArray,
     keepFields,
@@ -701,6 +703,7 @@ enum class Builtin : uint8_t {
     isTimeUnit,
     isTimezone,
     isValidToStringFormat,
+    validateFromStringFormat,
     setUnion,
     setIntersection,
     setDifference,
@@ -1357,6 +1360,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinIsTimeUnit(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIsTimezone(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIsValidToStringFormat(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValidateFromStringFormat(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSetUnion(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSetIntersection(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSetDifference(ArityType arity);
@@ -1391,6 +1395,8 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinTsIncrement(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinTypeMatch(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDateToString(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDateFromString(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDateFromStringNoThrow(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDateTrunc(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinMinMaxFromArray(ArityType arity,
                                                                           Builtin f);

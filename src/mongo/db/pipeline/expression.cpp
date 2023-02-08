@@ -1642,9 +1642,7 @@ ExpressionDateFromString::ExpressionDateFromString(ExpressionContext* const expC
                   std::move(timeZone),
                   std::move(format),
                   std::move(onNull),
-                  std::move(onError)}) {
-    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
-}
+                  std::move(onError)}) {}
 
 intrusive_ptr<Expression> ExpressionDateFromString::optimize() {
     _children[_kDateString] = _children[_kDateString]->optimize();

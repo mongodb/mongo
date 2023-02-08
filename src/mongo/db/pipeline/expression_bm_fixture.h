@@ -92,6 +92,9 @@ public:
     void benchmarkDateAddEvaluate100Years(benchmark::State& state);
     void benchmarkDateAddEvaluate12HoursWithTimezone(benchmark::State& state);
 
+    void benchmarkDateFromString(benchmark::State& state);
+    void benchmarkDateFromStringNewYork(benchmark::State& state);
+
     void benchmarkDateTruncEvaluateMinute15NewYork(benchmark::State& state);
     void benchmarkDateTruncEvaluateMinute15UTC(benchmark::State& state);
     void benchmarkDateTruncEvaluateHour1UTCMinus0700(benchmark::State& state);
@@ -158,6 +161,10 @@ private:
                                long long amount,
                                boost::optional<std::string> timezone,
                                benchmark::State& state);
+    void testDateFromStringExpression(std::string dateString,
+                                      boost::optional<std::string> timezone,
+                                      boost::optional<std::string> format,
+                                      benchmark::State& state);
     void testSetFieldExpression(std::string fieldname,
                                 std::string oldFieldValue,
                                 std::string newFieldValue,

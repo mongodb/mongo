@@ -1200,7 +1200,174 @@ public:
         pushABT(std::move(dateDiffExpression));
     }
     void visit(const ExpressionDateFromString* expr) final {
-        unsupportedExpression("$dateFromString");
+        auto children = expr->getChildren();
+        invariant(children.size() == 5);
+        _context->ensureArity(
+            1 + (expr->isFormatSpecified() ? 1 : 0) + (expr->isTimezoneSpecified() ? 1 : 0) +
+            (expr->isOnErrorSpecified() ? 1 : 0) + (expr->isOnNullSpecified() ? 1 : 0));
+
+        // Get child expressions.
+        auto onErrorExpression =
+            expr->isOnErrorSpecified() ? _context->popABTExpr() : optimizer::Constant::null();
+
+        auto onNullExpression =
+            expr->isOnNullSpecified() ? _context->popABTExpr() : optimizer::Constant::null();
+
+        auto formatExpression =
+            expr->isFormatSpecified() ? _context->popABTExpr() : optimizer::Constant::null();
+        auto formatName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto timezoneExpression = expr->isTimezoneSpecified() ? _context->popABTExpr()
+                                                              : optimizer::Constant::str("UTC"_sd);
+        auto timezoneName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto dateStringExpression = _context->popABTExpr();
+        auto dateStringName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
+
+        // Set parameters for an invocation of built-in "dateFromString" function.
+        optimizer::ABTVector arguments;
+        arguments.push_back(makeVariable(timeZoneDBName));
+        // Set bindings for the frame.
+        optimizer::ABTVector bindings;
+        optimizer::ProjectionNameVector bindingNames;
+        bindingNames.push_back(dateStringName);
+        bindings.push_back(dateStringExpression);
+        arguments.push_back(makeVariable(dateStringName));
+        if (timezoneExpression.is<optimizer::Constant>()) {
+            arguments.push_back(timezoneExpression);
+        } else {
+            bindingNames.push_back(timezoneName);
+            bindings.push_back(timezoneExpression);
+            arguments.push_back(makeVariable(timezoneName));
+        }
+        if (expr->isFormatSpecified()) {
+            if (formatExpression.is<optimizer::Constant>()) {
+                arguments.push_back(formatExpression);
+            } else {
+                bindingNames.push_back(formatName);
+                bindings.push_back(formatExpression);
+                arguments.push_back(makeVariable(formatName));
+            }
+        }
+
+        // Create an expression to invoke built-in "dateFromString" function.
+        std::string functionName =
+            expr->isOnErrorSpecified() ? "dateFromStringNoThrow" : "dateFromString";
+        auto dateFromStringFunctionCall =
+            optimizer::make<optimizer::FunctionCall>(functionName, std::move(arguments));
+
+        // Create expressions to check that each argument to "dateFromString" function exists, is
+        // not null, and is of the correct type.
+        std::vector<ABTCaseValuePair> inputValidationCases;
+
+        // Return onNull if dateString is null or missing.
+        inputValidationCases.push_back(
+            {generateABTNullOrMissing(makeVariable(dateStringName)), onNullExpression});
+
+        // Create an expression to return Nothing if specified, or raise a conversion failure.
+        // As long as onError is specified, a Nothing return will always be filled with onError.
+        auto nonStringReturn = expr->isOnErrorSpecified()
+            ? optimizer::Constant::nothing()
+            : makeABTFail(ErrorCodes::ConversionFailure,
+                          "$dateFromString requires that 'dateString' be a string");
+
+        inputValidationCases.push_back(
+            {generateABTNonStringCheck(makeVariable(dateStringName)), nonStringReturn});
+
+        if (expr->isTimezoneSpecified()) {
+            if (timezoneExpression.is<optimizer::Constant>()) {
+                // Return null if timezone is specified as either null or missing.
+                inputValidationCases.push_back(
+                    generateABTReturnNullIfNullOrMissing(timezoneExpression));
+            } else {
+                inputValidationCases.push_back(
+                    generateABTReturnNullIfNullOrMissing(makeVariable(timezoneName)));
+            }
+        }
+
+        if (expr->isFormatSpecified()) {
+            // validate "format" parameter only if it has been specified.
+            if (auto* formatExpressionConst = formatExpression.cast<optimizer::Constant>();
+                formatExpressionConst) {
+                inputValidationCases.push_back(
+                    generateABTReturnNullIfNullOrMissing(formatExpression));
+                auto [formatTag, formatVal] = formatExpressionConst->get();
+                if (!sbe::value::isNullish(formatTag)) {
+                    // We don't want to error on null.
+                    uassert(4997802,
+                            "$dateFromString requires that 'format' be a string",
+                            sbe::value::isString(formatTag));
+                    TimeZone::validateFromStringFormat(getStringView(formatTag, formatVal));
+                }
+            } else {
+                inputValidationCases.push_back(
+                    generateABTReturnNullIfNullOrMissing(makeVariable(formatName)));
+                inputValidationCases.emplace_back(
+                    generateABTNonStringCheck(makeVariable(formatName)),
+                    makeABTFail(ErrorCodes::Error{4997803},
+                                "$dateFromString requires that 'format' be a string"));
+                inputValidationCases.emplace_back(
+                    makeNot(makeABTFunction("validateFromStringFormat", makeVariable(formatName))),
+                    // This should be unreachable. The validation function above will uassert on an
+                    // invalid format string and then return true. It returns false on non-string
+                    // input, but we already check for non-string format above.
+                    optimizer::Constant::null());
+            }
+        }
+
+        // "timezone" parameter validation.
+        if (auto* timezoneExpressionConst = timezoneExpression.cast<optimizer::Constant>();
+            timezoneExpressionConst) {
+            auto [timezoneTag, timezoneVal] = timezoneExpressionConst->get();
+            if (!sbe::value::isNullish(timezoneTag)) {
+                // We don't want to error on null.
+                uassert(4997805,
+                        "$dateFromString parameter 'timezone' must be a string",
+                        sbe::value::isString(timezoneTag));
+                auto [timezoneDBTag, timezoneDBVal] =
+                    _context->state.data->env->getAccessor(timeZoneDBSlot)->getViewOfValue();
+                uassert(4997801,
+                        "$dateFromString first argument must be a timezoneDB object",
+                        timezoneDBTag == sbe::value::TypeTags::timeZoneDB);
+                uassert(4997806,
+                        "$dateFromString parameter 'timezone' must be a valid timezone",
+                        sbe::vm::isValidTimezone(timezoneTag,
+                                                 timezoneVal,
+                                                 sbe::value::getTimeZoneDBView(timezoneDBVal)));
+            }
+        } else {
+            inputValidationCases.emplace_back(
+                generateABTNonStringCheck(makeVariable(timezoneName)),
+                makeABTFail(ErrorCodes::Error{4997807},
+                            "$dateFromString parameter 'timezone' must be a string"));
+            inputValidationCases.emplace_back(
+                makeNot(makeABTFunction(
+                    "isTimezone", makeVariable(timeZoneDBName), makeVariable(timezoneName))),
+                makeABTFail(ErrorCodes::Error{4997808},
+                            "$dateFromString parameter 'timezone' must be a valid timezone"));
+        }
+
+        auto dateFromStringExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
+            std::move(inputValidationCases), std::move(dateFromStringFunctionCall));
+
+        // If onError is specified, a Nothing return means that either dateString is not a string,
+        // or the builtin dateFromStringNoThrow caught an error. We return onError in either case.
+        if (expr->isOnErrorSpecified()) {
+            dateFromStringExpr =
+                optimizer::make<optimizer::BinaryOp>(optimizer::Operations::FillEmpty,
+                                                     std::move(dateFromStringExpr),
+                                                     std::move(onErrorExpression));
+        }
+
+        for (int i = bindings.size() - 1; i >= 0; --i) {
+            dateFromStringExpr = optimizer::make<optimizer::Let>(
+                std::move(bindingNames[i]), std::move(bindings[i]), std::move(dateFromStringExpr));
+        }
+
+        pushABT(std::move(dateFromStringExpr));
     }
     void visit(const ExpressionDateFromParts* expr) final {
         // This expression can carry null children depending on the set of fields provided,

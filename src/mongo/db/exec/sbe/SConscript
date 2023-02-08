@@ -176,6 +176,7 @@ env.CppUnitTest(
         'expressions/sbe_constant_test.cpp',
         'expressions/sbe_date_add_test.cpp',
         'expressions/sbe_date_diff_test.cpp',
+        'expressions/sbe_date_from_string_test.cpp',
         'expressions/sbe_date_to_parts_test.cpp',
         'expressions/sbe_date_to_string_test.cpp',
         'expressions/sbe_date_trunc_test.cpp',

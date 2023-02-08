@@ -1412,6 +1412,34 @@ public:
         return visitor->visit(this);
     }
 
+    /**
+     * Returns true if this expression has parameter 'format' specified, otherwise false.
+     */
+    bool isFormatSpecified() const {
+        return static_cast<bool>(_children[_kFormat]);
+    }
+
+    /**
+     * Returns true if this expression has parameter 'timezone' specified, otherwise false.
+     */
+    bool isTimezoneSpecified() const {
+        return static_cast<bool>(_children[_kTimeZone]);
+    }
+
+    /**
+     * Returns true if this expression has parameter 'onError' specified, otherwise false.
+     */
+    bool isOnErrorSpecified() const {
+        return static_cast<bool>(_children[_kOnError]);
+    }
+
+    /**
+     * Returns true if this expression has parameter 'onNull' specified, otherwise false.
+     */
+    bool isOnNullSpecified() const {
+        return static_cast<bool>(_children[_kOnNull]);
+    }
+
 private:
     static constexpr size_t _kDateString = 0;
     static constexpr size_t _kTimeZone = 1;

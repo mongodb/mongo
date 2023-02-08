@@ -3141,6 +3141,51 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateToString(Ari
     return {true, strTag, strValue};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateFromString(ArityType arity) {
+    auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
+    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBValue);
+
+    // Get parameter tuples from stack.
+    auto [dateStringOwn, dateStringTag, dateStringValue] = getFromStack(1);
+    auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+
+    auto timezone = getTimezone(timezoneTag, timezoneValue, timezoneDB);
+
+    // Attempt to get the date from the string. This may throw a ConversionFailure error.
+    Date_t date;
+    auto dateString = value::getStringView(dateStringTag, dateStringValue);
+    if (arity == 3) {
+        // Format wasn't specified, so we call fromString without it.
+        date = timezoneDB->fromString(dateString, timezone);
+    } else {
+        // Fetch format from the stack, validate it, and call fromString with it.
+        auto [formatOwn, formatTag, formatValue] = getFromStack(3);
+        if (!value::isString(formatTag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        auto formatString = value::getStringView(formatTag, formatValue);
+        if (!TimeZone::isValidFromStringFormat(formatString)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        date = timezoneDB->fromString(dateString, timezone, formatString);
+    }
+
+    return {true, value::TypeTags::Date, value::bitcastFrom<int64_t>(date.toMillisSinceEpoch())};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateFromStringNoThrow(
+    ArityType arity) {
+    try {
+        return builtinDateFromString(arity);
+    } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
+        // Upon error, we return Nothing and let the caller decide whether to raise an error.
+        return {false, value::TypeTags::Nothing, 0};
+    }
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateTrunc(ArityType arity) {
     invariant(arity == 6);
 
@@ -4096,6 +4141,17 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsValidToStringF
         return {false, value::TypeTags::Boolean, true};
     }
     return {false, value::TypeTags::Boolean, false};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValidateFromStringFormat(
+    ArityType arity) {
+    auto [formatOwn, formatTag, formatVal] = getFromStack(0);
+    if (!value::isString(formatTag)) {
+        return {false, value::TypeTags::Boolean, false};
+    }
+    auto formatStr = value::getStringView(formatTag, formatVal);
+    TimeZone::validateFromStringFormat(formatStr);
+    return {false, value::TypeTags::Boolean, true};
 }
 
 namespace {
@@ -5434,6 +5490,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinDayOfWeek(arity);
         case Builtin::dateToString:
             return builtinDateToString(arity);
+        case Builtin::dateFromString:
+            return builtinDateFromString(arity);
+        case Builtin::dateFromStringNoThrow:
+            return builtinDateFromStringNoThrow(arity);
         case Builtin::split:
             return builtinSplit(arity);
         case Builtin::regexMatch:
@@ -5580,6 +5640,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinIsTimezone(arity);
         case Builtin::isValidToStringFormat:
             return builtinIsValidToStringFormat(arity);
+        case Builtin::validateFromStringFormat:
+            return builtinValidateFromStringFormat(arity);
         case Builtin::setUnion:
             return builtinSetUnion(arity);
         case Builtin::setIntersection:
@@ -5679,6 +5741,10 @@ std::string builtinToString(Builtin b) {
             return "datePartsWeekYear";
         case Builtin::dateToString:
             return "dateToString";
+        case Builtin::dateFromString:
+            return "dateFromString";
+        case Builtin::dateFromStringNoThrow:
+            return "dateFromStringNoThrow";
         case Builtin::dropFields:
             return "dropFields";
         case Builtin::newArray:
@@ -5819,6 +5885,8 @@ std::string builtinToString(Builtin b) {
             return "isTimezone";
         case Builtin::isValidToStringFormat:
             return "isValidToStringFormat";
+        case Builtin::validateFromStringFormat:
+            return "validateFromStringFormat";
         case Builtin::setUnion:
             return "setUnion";
         case Builtin::setIntersection:
