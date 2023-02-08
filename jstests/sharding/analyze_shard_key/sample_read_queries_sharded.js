@@ -17,13 +17,7 @@ const st = new ShardingTest({
         setParameter:
             {queryAnalysisWriterIntervalSecs: 1, logComponentVerbosity: tojson({verbosity: 2})}
     },
-    mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs: 1}},
-    other: {
-        // Disable periodic index checker so its aggregate isn't incorrectly sampled. This is only a
-        // problem when the catalog shard feature flag is enabled because otherwise the config
-        // server fails the "supportsSamplingQueries()" check.
-        configOptions: {setParameter: {enableShardedIndexConsistencyCheck: false}},
-    }
+    mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs: 1}}
 });
 
 const dbName = "testDb";

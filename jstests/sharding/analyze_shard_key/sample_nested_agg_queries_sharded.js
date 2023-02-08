@@ -23,13 +23,7 @@ const st = new ShardingTest({
     // Disable query sampling on mongos to verify that the nested aggregate queries are sampled by
     // the shard that routes them.
     mongosOptions:
-        {setParameter: {"failpoint.disableQueryAnalysisSampler": tojson({mode: "alwaysOn"})}},
-    other: {
-        // Disable periodic index checker so its aggregate isn't incorrectly sampled. This is only a
-        // problem when the catalog shard feature flag is enabled because otherwise the config
-        // server fails the "supportsSamplingQueries()" check.
-        configOptions: {setParameter: {enableShardedIndexConsistencyCheck: false}},
-    }
+        {setParameter: {"failpoint.disableQueryAnalysisSampler": tojson({mode: "alwaysOn"})}}
 });
 
 const dbName = "testDb";

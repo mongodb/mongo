@@ -28,7 +28,6 @@ var QuerySamplingUtil = (function() {
 
     /**
      * Waits for the given node to have one active collection for query sampling.
-     * Throws if the featureFlagAnalyzeShardKey is not set.
      */
     function waitForActiveSampling(node) {
         assert.soon(() => {
@@ -36,6 +35,8 @@ var QuerySamplingUtil = (function() {
             assert(res.hasOwnProperty("queryAnalyzers"));
             return res.queryAnalyzers.activeCollections == 1;
         });
+        // Wait for the bucket to contain at least one second of tokens.
+        sleep(1000);
     }
 
     /**
@@ -56,10 +57,13 @@ var QuerySamplingUtil = (function() {
             rs.nodes.forEach(node => {
                 assert.soon(() => {
                     const res = assert.commandWorked(node.adminCommand({serverStatus: 1}));
+                    assert(res.hasOwnProperty("queryAnalyzers"));
                     return res.queryAnalyzers.activeCollections == 1;
                 });
             });
         });
+        // Wait for the bucket to contain at least one second of tokens.
+        sleep(1000);
     }
 
     /**
