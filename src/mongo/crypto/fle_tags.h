@@ -33,6 +33,10 @@
 
 #include "mongo/crypto/fle_crypto.h"
 
+namespace mongo {
+class FLETagQueryInterface;
+}
+
 namespace mongo::fle {
 
 /**
@@ -52,8 +56,9 @@ std::vector<PrfBlock> readTagsWithContention(const FLEStateCollectionReader& esc
  * Read a list of binary tags given ESC, ECC, and EDC derived tokens and a maximum contention
  * factor.
  */
-std::vector<PrfBlock> readTags(const FLEStateCollectionReader& esc,
-                               const FLEStateCollectionReader& ecc,
+std::vector<PrfBlock> readTags(FLETagQueryInterface* queryImpl,
+                               const NamespaceString& nssEsc,
+                               const NamespaceString& nssEcc,
                                ESCDerivedFromDataToken s,
                                ECCDerivedFromDataToken c,
                                EDCDerivedFromDataToken d,

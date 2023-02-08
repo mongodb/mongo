@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
@@ -54,14 +55,16 @@ public:
      * computation.
      */
     QueryRewriter(boost::intrusive_ptr<ExpressionContext> expCtx,
-                  const FLEStateCollectionReader& escReader,
-                  const FLEStateCollectionReader& eccReader,
+                  FLETagQueryInterface* tagQueryInterface,
+                  const NamespaceString& nssEsc,
+                  const NamespaceString& nssEcc,
                   EncryptedCollScanModeAllowed mode = EncryptedCollScanModeAllowed::kAllow)
         : _expCtx(expCtx),
-          _escReader(&escReader),
-          _eccReader(&eccReader),
           _exprRewrites(aggPredicateRewriteMap),
-          _matchRewrites(matchPredicateRewriteMap) {
+          _matchRewrites(matchPredicateRewriteMap),
+          _nssEsc(nssEsc),
+          _nssEcc(nssEcc),
+          _tagQueryInterface(tagQueryInterface) {
 
         if (internalQueryFLEAlwaysUseEncryptedCollScanMode.load()) {
             _mode = EncryptedCollScanMode::kForceAlways;
@@ -108,28 +111,34 @@ public:
         return _mode;
     }
 
-    const FLEStateCollectionReader* getEscReader() const override {
-        return _escReader;
-    }
-
-    const FLEStateCollectionReader* getEccReader() const override {
-        return _eccReader;
-    }
-
     ExpressionContext* getExpressionContext() const override {
         return _expCtx.get();
+    }
+
+    FLETagQueryInterface* getTagQueryInterface() const override {
+        return _tagQueryInterface;
+    }
+
+    const NamespaceString& getESCNss() const override {
+        return _nssEsc;
+    }
+    const NamespaceString& getECCNss() const override {
+        return _nssEcc;
     }
 
 protected:
     // This constructor should only be used for mocks in testing.
     QueryRewriter(boost::intrusive_ptr<ExpressionContext> expCtx,
+                  const NamespaceString& nssEsc,
+                  const NamespaceString& nssEcc,
                   const ExpressionToRewriteMap& exprRewrites,
                   const MatchTypeToRewriteMap& matchRewrites)
         : _expCtx(expCtx),
-          _escReader(nullptr),
-          _eccReader(nullptr),
           _exprRewrites(exprRewrites),
-          _matchRewrites(matchRewrites) {}
+          _matchRewrites(matchRewrites),
+          _nssEsc(nssEsc),
+          _nssEcc(nssEcc),
+          _tagQueryInterface(nullptr) {}
 
 private:
     /**
@@ -139,11 +148,6 @@ private:
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
-    // Holds a pointer so that these can be null for tests, even though the public constructor
-    // takes a const reference.
-    const FLEStateCollectionReader* _escReader;
-    const FLEStateCollectionReader* _eccReader;
-
     // True if the last Expression or MatchExpression processed by this rewriter was rewritten.
     bool _rewroteLastExpression = false;
 
@@ -152,5 +156,8 @@ private:
 
     const ExpressionToRewriteMap& _exprRewrites;
     const MatchTypeToRewriteMap& _matchRewrites;
+    const NamespaceString& _nssEsc;
+    const NamespaceString& _nssEcc;
+    FLETagQueryInterface* _tagQueryInterface;
 };
 }  // namespace mongo::fle

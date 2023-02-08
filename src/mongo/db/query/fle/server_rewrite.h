@@ -47,7 +47,7 @@
  * This file contains the interface for rewriting filters within CRUD commands for FLE2.
  */
 namespace mongo {
-class FLEQueryInterface;
+class FLETagQueryInterface;
 namespace fle {
 
 
@@ -103,11 +103,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> processPipeline(
 
 /**
  * Rewrite a filter MatchExpression with FLE Find Payloads into a disjunction over the tag array
- * from inside an existing transaction using a FLEQueryInterface constructed from a
+ * from inside an existing transaction using a FLETagQueryInterface constructed from a
  * transaction client.
  */
 BSONObj rewriteEncryptedFilterInsideTxn(
-    FLEQueryInterface* queryImpl,
+    FLETagQueryInterface* queryImpl,
     const DatabaseName& dbName,
     const EncryptedFieldConfig& efc,
     boost::intrusive_ptr<ExpressionContext> expCtx,

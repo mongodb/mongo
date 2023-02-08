@@ -31,6 +31,8 @@
 
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_tags.h"
+#include "mongo/db/fle_crud.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo::fle {
@@ -199,12 +201,23 @@ std::vector<PrfBlock> readTagsWithContention(const FLEStateCollectionReader& esc
 }
 
 // A positive contention factor (cm) means we must run the above algorithm (cm) times.
-std::vector<PrfBlock> readTags(const FLEStateCollectionReader& esc,
-                               const FLEStateCollectionReader& ecc,
+std::vector<PrfBlock> readTags(FLETagQueryInterface* queryImpl,
+                               const NamespaceString& nssEsc,
+                               const NamespaceString& nssEcc,
                                ESCDerivedFromDataToken s,
                                ECCDerivedFromDataToken c,
                                EDCDerivedFromDataToken d,
                                boost::optional<int64_t> cm) {
+
+    auto makeCollectionReader = [](FLETagQueryInterface* queryImpl, const NamespaceString& nss) {
+        auto docCount = queryImpl->countDocuments(nss);
+        return TxnCollectionReader(docCount, queryImpl, nss);
+    };
+
+    // Construct FLE rewriter from the transaction client and encryptionInformation.
+    auto esc = makeCollectionReader(queryImpl, nssEsc);
+    auto ecc = makeCollectionReader(queryImpl, nssEcc);
+
     // The output of readTags will be used as the argument to a $in expression, so make sure we
     // don't exceed the configured memory limit.
     auto limit = static_cast<size_t>(internalQueryFLERewriteMemoryLimit.load());

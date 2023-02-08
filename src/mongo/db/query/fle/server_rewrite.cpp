@@ -121,14 +121,15 @@ REGISTER_DOCUMENT_SOURCE_FLE_REWRITER(DocumentSourceMatch, rewriteMatch);
 REGISTER_DOCUMENT_SOURCE_FLE_REWRITER(DocumentSourceGeoNear, rewriteGeoNear);
 REGISTER_DOCUMENT_SOURCE_FLE_REWRITER(DocumentSourceGraphLookUp, rewriteGraphLookUp);
 
-BSONObj rewriteEncryptedFilter(const FLEStateCollectionReader& escReader,
-                               const FLEStateCollectionReader& eccReader,
+BSONObj rewriteEncryptedFilter(FLETagQueryInterface* queryImpl,
+                               const NamespaceString& nssEsc,
+                               const NamespaceString& nssEcc,
                                boost::intrusive_ptr<ExpressionContext> expCtx,
                                BSONObj filter,
                                EncryptedCollScanModeAllowed mode) {
 
     if (auto rewritten =
-            QueryRewriter(expCtx, escReader, eccReader, mode).rewriteMatchExpression(filter)) {
+            QueryRewriter(expCtx, queryImpl, nssEsc, nssEcc, mode).rewriteMatchExpression(filter)) {
         return rewritten.value();
     }
 
@@ -146,8 +147,9 @@ public:
         ecc = efc.getEccCollection()->toString();
     }
     virtual ~RewriteBase(){};
-    virtual void doRewrite(FLEStateCollectionReader& escReader,
-                           FLEStateCollectionReader& eccReader){};
+    virtual void doRewrite(FLEQueryInterface* queryImpl,
+                           const NamespaceString& nssEsc,
+                           const NamespaceString& nssEcc){};
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
     std::string esc;
@@ -164,8 +166,10 @@ public:
         : RewriteBase(toRewrite->getContext(), nss, encryptInfo), pipeline(std::move(toRewrite)) {}
 
     ~PipelineRewrite(){};
-    void doRewrite(FLEStateCollectionReader& escReader, FLEStateCollectionReader& eccReader) final {
-        auto rewriter = QueryRewriter(expCtx, escReader, eccReader);
+    void doRewrite(FLEQueryInterface* queryImpl,
+                   const NamespaceString& nssEsc,
+                   const NamespaceString& nssEcc) final {
+        auto rewriter = QueryRewriter(expCtx, queryImpl, nssEsc, nssEcc);
         for (auto&& source : pipeline->getSources()) {
             if (stageRewriterMap.find(typeid(*source)) != stageRewriterMap.end()) {
                 stageRewriterMap[typeid(*source)](&rewriter, source.get());
@@ -192,8 +196,11 @@ public:
         : RewriteBase(expCtx, nss, encryptInfo), userFilter(toRewrite), _mode(mode) {}
 
     ~FilterRewrite(){};
-    void doRewrite(FLEStateCollectionReader& escReader, FLEStateCollectionReader& eccReader) final {
-        rewrittenFilter = rewriteEncryptedFilter(escReader, eccReader, expCtx, userFilter, _mode);
+    void doRewrite(FLEQueryInterface* queryImpl,
+                   const NamespaceString& nssEsc,
+                   const NamespaceString& nssEcc) final {
+        rewrittenFilter =
+            rewriteEncryptedFilter(queryImpl, nssEsc, nssEcc, expCtx, userFilter, _mode);
     }
 
     const BSONObj userFilter;
@@ -211,20 +218,14 @@ void doFLERewriteInTxn(OperationContext* opCtx,
     auto txn = getTxn(opCtx);
     auto swCommitResult = txn->runNoThrow(
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {
-            auto makeCollectionReader = [sharedBlock](FLEQueryInterface* queryImpl,
-                                                      const StringData& coll) {
-                NamespaceString nss(sharedBlock->db, coll);
-                auto docCount = queryImpl->countDocuments(nss);
-                return TxnCollectionReader(docCount, queryImpl, nss);
-            };
+            NamespaceString nssEsc(sharedBlock->db, sharedBlock->esc);
+            NamespaceString nssEcc(sharedBlock->db, sharedBlock->ecc);
 
             // Construct FLE rewriter from the transaction client and encryptionInformation.
             auto queryInterface = FLEQueryInterfaceImpl(txnClient, getGlobalServiceContext());
-            auto escReader = makeCollectionReader(&queryInterface, sharedBlock->esc);
-            auto eccReader = makeCollectionReader(&queryInterface, sharedBlock->ecc);
 
             // Rewrite the MatchExpression.
-            sharedBlock->doRewrite(escReader, eccReader);
+            sharedBlock->doRewrite(&queryInterface, nssEsc, nssEcc);
 
             return SemiFuture<void>::makeReady();
         });
@@ -235,21 +236,16 @@ void doFLERewriteInTxn(OperationContext* opCtx,
 }
 }  // namespace
 
-BSONObj rewriteEncryptedFilterInsideTxn(FLEQueryInterface* queryImpl,
+BSONObj rewriteEncryptedFilterInsideTxn(FLETagQueryInterface* queryImpl,
                                         const DatabaseName& dbName,
                                         const EncryptedFieldConfig& efc,
                                         boost::intrusive_ptr<ExpressionContext> expCtx,
                                         BSONObj filter,
                                         EncryptedCollScanModeAllowed mode) {
-    auto makeCollectionReader = [&](FLEQueryInterface* queryImpl, const StringData& coll) {
-        NamespaceString nss(dbName, coll);
-        auto docCount = queryImpl->countDocuments(nss);
-        return TxnCollectionReader(docCount, queryImpl, nss);
-    };
-    auto escReader = makeCollectionReader(queryImpl, efc.getEscCollection().value());
-    auto eccReader = makeCollectionReader(queryImpl, efc.getEccCollection().value());
+    NamespaceString nssEsc(dbName, efc.getEscCollection().value());
+    NamespaceString nssEcc(dbName, efc.getEccCollection().value());
 
-    return rewriteEncryptedFilter(escReader, eccReader, expCtx, filter, mode);
+    return rewriteEncryptedFilter(queryImpl, nssEsc, nssEcc, expCtx, filter, mode);
 }
 
 BSONObj rewriteQuery(OperationContext* opCtx,

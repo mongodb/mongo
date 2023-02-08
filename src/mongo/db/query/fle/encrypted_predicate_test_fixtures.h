@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/db/query/fle/equality_predicate.h"
@@ -48,12 +49,6 @@ using TagMap = std::map<std::pair<StringData, int>, std::vector<PrfBlock>>;
 class MockServerRewrite : public QueryRewriterInterface {
 public:
     MockServerRewrite() : _expCtx((new ExpressionContextForTest())) {}
-    const FLEStateCollectionReader* getEscReader() const override {
-        return nullptr;
-    }
-    const FLEStateCollectionReader* getEccReader() const override {
-        return nullptr;
-    }
     EncryptedCollScanMode getEncryptedCollScanMode() const override {
         return _mode;
     };
@@ -65,9 +60,21 @@ public:
         _mode = EncryptedCollScanMode::kForceAlways;
     }
 
+    FLETagQueryInterface* getTagQueryInterface() const override {
+        return nullptr;
+    };
+    const NamespaceString& getESCNss() const override {
+        return _mockNss;
+    }
+    const NamespaceString& getECCNss() const override {
+        return _mockNss;
+    }
+
+
 private:
     boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
     EncryptedCollScanMode _mode{EncryptedCollScanMode::kUseIfNeeded};
+    NamespaceString _mockNss{"mock"_sd};
 };
 
 class EncryptedPredicateRewriteTest : public unittest::Test {

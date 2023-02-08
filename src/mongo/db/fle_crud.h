@@ -226,11 +226,11 @@ bool shouldDoFLERewrite(const T& cmd) {
 }
 
 /**
- * Abstraction layer for FLE
+ * Basic set of functions to read/query data from state collections to perform EmuBinary.
  */
-class FLEQueryInterface {
+class FLETagQueryInterface {
 public:
-    virtual ~FLEQueryInterface();
+    virtual ~FLETagQueryInterface();
 
     /**
      * Retrieve a single document by _id == BSONElement from nss.
@@ -246,7 +246,13 @@ public:
      * Throws if the collection is not found.
      */
     virtual uint64_t countDocuments(const NamespaceString& nss) = 0;
+};
 
+/**
+ * Abstraction layer for FLE
+ */
+class FLEQueryInterface : public FLETagQueryInterface {
+public:
     /**
      * Insert a document into the given collection.
      *
@@ -362,7 +368,7 @@ private:
  */
 class TxnCollectionReader : public FLEStateCollectionReader {
 public:
-    TxnCollectionReader(uint64_t count, FLEQueryInterface* queryImpl, const NamespaceString& nss)
+    TxnCollectionReader(uint64_t count, FLETagQueryInterface* queryImpl, const NamespaceString& nss)
         : _count(count), _queryImpl(queryImpl), _nss(nss) {}
 
     uint64_t getDocumentCount() const override {
@@ -377,7 +383,7 @@ public:
 
 private:
     uint64_t _count;
-    FLEQueryInterface* _queryImpl;
+    FLETagQueryInterface* _queryImpl;
     NamespaceString _nss;
 };
 

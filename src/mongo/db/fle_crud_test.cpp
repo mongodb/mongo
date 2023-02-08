@@ -758,9 +758,9 @@ protected:
         auto s = getTestESCDataToken(obj);
         auto c = getTestECCDataToken(obj);
         auto d = getTestEDCDataToken(obj);
-        auto esc = CollectionReader("test.esc", *_queryImpl);
-        auto ecc = CollectionReader("test.ecc", *_queryImpl);
-        return mongo::fle::readTags(esc, ecc, s, c, d, cm);
+        auto nssEsc = NamespaceString("test.esc");
+        auto nssEcc = NamespaceString("test.ecc");
+        return mongo::fle::readTags(_queryImpl.get(), nssEsc, nssEcc, s, c, d, cm);
     }
 };
 

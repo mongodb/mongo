@@ -47,8 +47,9 @@ REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE(ExpressionIn, EqualityPredicate);
 
 std::vector<PrfBlock> EqualityPredicate::generateTags(BSONValue payload) const {
     ParsedFindEqualityPayload tokens = parseFindPayload<ParsedFindEqualityPayload>(payload);
-    return readTags(*_rewriter->getEscReader(),
-                    *_rewriter->getEccReader(),
+    return readTags(_rewriter->getTagQueryInterface(),
+                    _rewriter->getESCNss(),
+                    _rewriter->getECCNss(),
                     tokens.escToken,
                     tokens.eccToken,
                     tokens.edcToken,

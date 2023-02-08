@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
@@ -237,8 +238,10 @@ void setMockRewriteMaps(fle::MatchTypeToRewriteMap& match,
 class MockQueryRewriter : public fle::QueryRewriter {
 public:
     MockQueryRewriter(fle::ExpressionToRewriteMap* exprRewrites,
-                      fle::MatchTypeToRewriteMap* matchRewrites)
-        : fle::QueryRewriter(new ExpressionContextForTest(), *exprRewrites, *matchRewrites) {
+                      fle::MatchTypeToRewriteMap* matchRewrites,
+                      const NamespaceString& mockNss)
+        : fle::QueryRewriter(
+              new ExpressionContextForTest(), mockNss, mockNss, *exprRewrites, *matchRewrites) {
         setMockRewriteMaps(*matchRewrites, *exprRewrites, _tags, _encryptedFields);
     }
 
@@ -265,7 +268,7 @@ public:
     FLEServerRewriteTest() : _mock(nullptr) {}
 
     void setUp() override {
-        _mock = std::make_unique<MockQueryRewriter>(&_agg, &_match);
+        _mock = std::make_unique<MockQueryRewriter>(&_agg, &_match, _mockNss);
     }
 
     void tearDown() override {}
@@ -274,6 +277,7 @@ protected:
     std::unique_ptr<MockQueryRewriter> _mock;
     fle::ExpressionToRewriteMap _agg;
     fle::MatchTypeToRewriteMap _match;
+    NamespaceString _mockNss{"mock"_sd};
 };
 
 #define ASSERT_MATCH_EXPRESSION_REWRITE(input, expected)                 \

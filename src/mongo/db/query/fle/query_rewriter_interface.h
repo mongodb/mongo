@@ -33,6 +33,9 @@
 #include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {
+
+class FLETagQueryInterface;
+
 namespace fle {
 enum class EncryptedCollScanMode {
     // Always use high cardinality filters, used by tests
@@ -62,8 +65,10 @@ enum class EncryptedCollScanModeAllowed {
 class QueryRewriterInterface {
 public:
     virtual ~QueryRewriterInterface() {}
-    virtual const FLEStateCollectionReader* getEscReader() const = 0;
-    virtual const FLEStateCollectionReader* getEccReader() const = 0;
+    virtual FLETagQueryInterface* getTagQueryInterface() const = 0;
+    virtual const NamespaceString& getESCNss() const = 0;
+    virtual const NamespaceString& getECCNss() const = 0;
+
     virtual EncryptedCollScanMode getEncryptedCollScanMode() const = 0;
     virtual ExpressionContext* getExpressionContext() const = 0;
 };
