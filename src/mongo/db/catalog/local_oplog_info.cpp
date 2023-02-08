@@ -63,16 +63,16 @@ LocalOplogInfo* LocalOplogInfo::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-const CollectionPtr& LocalOplogInfo::getCollection() const {
+const Collection* LocalOplogInfo::getCollection() const {
     return _oplog;
 }
 
-void LocalOplogInfo::setCollection(const CollectionPtr& oplog) {
-    _oplog = CollectionPtr(oplog.get());
+void LocalOplogInfo::setCollection(const Collection* oplog) {
+    _oplog = oplog;
 }
 
 void LocalOplogInfo::resetCollection() {
-    _oplog.reset();
+    _oplog = nullptr;
 }
 
 void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {

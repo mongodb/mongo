@@ -550,7 +550,7 @@ public:
      * Returns a pointer to the oplog collection or nullptr if the oplog collection didn't exist.
      */
     const CollectionPtr& getCollection() const {
-        return *_oplog;
+        return _oplog;
     }
 
 private:
@@ -558,7 +558,7 @@ private:
         _shouldNotConflictWithSecondaryBatchApplicationBlock;
     boost::optional<Lock::GlobalLock> _globalLock;
     LocalOplogInfo* _oplogInfo;
-    const CollectionPtr* _oplog;
+    CollectionPtr _oplog;
 };
 
 /**

@@ -2265,10 +2265,10 @@ void clearLocalOplogPtr(ServiceContext* service) {
 
 void acquireOplogCollectionForLogging(OperationContext* opCtx) {
     AutoGetCollection autoColl(opCtx, NamespaceString::kRsOplogNamespace, MODE_IX);
-    LocalOplogInfo::get(opCtx)->setCollection(autoColl.getCollection());
+    LocalOplogInfo::get(opCtx)->setCollection(autoColl.getCollection().get());
 }
 
-void establishOplogCollectionForLogging(OperationContext* opCtx, const CollectionPtr& oplog) {
+void establishOplogCollectionForLogging(OperationContext* opCtx, const Collection* oplog) {
     invariant(opCtx->lockState()->isW());
     invariant(oplog);
     LocalOplogInfo::get(opCtx)->setCollection(oplog);

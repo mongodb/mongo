@@ -673,7 +673,8 @@ AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t
     }
 
     _oplogInfo = LocalOplogInfo::get(opCtx);
-    _oplog = &_oplogInfo->getCollection();
+    _oplog = _oplogInfo->getCollection();
+    _oplog.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _oplog));
 }
 
 
