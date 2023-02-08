@@ -14,11 +14,7 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       combinedProjection_0
-|   RefBlock: 
-|       Variable [combinedProjection_0]
+Root [{combinedProjection_0}]
 Filter []
 |   EvalFilter []
 |   |   Variable [combinedProjection_0]
@@ -74,11 +70,7 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       agg_project_0
-|   RefBlock: 
-|       Variable [agg_project_0]
+Root [{agg_project_0}]
 Evaluation [{agg_project_0}]
 |   EvalPath []
 |   |   Const [{}]
@@ -89,10 +81,7 @@ Evaluation [{agg_project_0}]
 |   PathField [_id]
 |   PathConstant []
 |   Variable [groupByProj_0]
-GroupBy []
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [groupByProj_0]
+GroupBy [{groupByProj_0}]
 |   aggregations: 
 |       [field_agg_0]
 |           FunctionCall [$sum]
@@ -133,11 +122,7 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       agg_project_0
-|   RefBlock: 
-|       Variable [agg_project_0]
+Root [{agg_project_0}]
 Evaluation [{agg_project_0}]
 |   EvalPath []
 |   |   Const [{}]
@@ -148,10 +133,7 @@ Evaluation [{agg_project_0}]
 |   PathField [_id]
 |   PathConstant []
 |   Variable [groupByProj_0]
-GroupBy []
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [groupByProj_0]
+GroupBy [{groupByProj_0}]
 |   aggregations: 
 |       [field_agg_0]
 |           FunctionCall [$sum]
@@ -185,11 +167,7 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       agg_project_0
-|   RefBlock: 
-|       Variable [agg_project_0]
+Root [{agg_project_0}]
 Evaluation [{agg_project_0}]
 |   EvalPath []
 |   |   Const [{}]
@@ -209,11 +187,7 @@ Evaluation [{agg_project_0}]
 |   PathField [isin]
 |   PathConstant []
 |   Variable [groupByProj_0]
-GroupBy []
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [groupByProj_0]
-|   |           Variable [groupByProj_1]
+GroupBy [{groupByProj_0, groupByProj_1}]
 |   aggregations: 
 |       [field_agg_0]
 |           FunctionCall [$sum]

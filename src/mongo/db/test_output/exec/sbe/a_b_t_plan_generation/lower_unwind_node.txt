@@ -2,7 +2,7 @@
 
 ==== VARIATION: Lower UnwindNode discard non-arrays ====
 -- INPUT:
-Unwind []
+Unwind [{proj0, proj0_pid}]
 Evaluation [{proj0}]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -16,7 +16,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 ==== VARIATION: Lower UnwindNode keep non-arrays ====
 -- INPUT:
-Unwind [retainNonArrays]
+Unwind [{proj0, proj0_pid}, retainNonArrays]
 Evaluation [{proj0}]
 |   FunctionCall [getField]
 |   |   Const ["a"]

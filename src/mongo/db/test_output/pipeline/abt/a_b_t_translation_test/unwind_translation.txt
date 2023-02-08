@@ -14,11 +14,7 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       embedProj_0
-|   RefBlock: 
-|       Variable [embedProj_0]
+Root [{embedProj_0}]
 Evaluation [{embedProj_0}]
 |   EvalPath []
 |   |   Variable [scan_0]
@@ -29,7 +25,7 @@ Evaluation [{embedProj_0}]
 |   PathField [c]
 |   PathConstant []
 |   Variable [unwoundProj_0]
-Unwind []
+Unwind [{unwoundProj_0, unwoundPid_0}]
 Evaluation [{unwoundProj_0}]
 |   EvalPath []
 |   |   Variable [scan_0]
@@ -56,11 +52,7 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       embedPidProj_0
-|   RefBlock: 
-|       Variable [embedPidProj_0]
+Root [{embedPidProj_0}]
 Evaluation [{embedPidProj_0}]
 |   EvalPath []
 |   |   Variable [embedProj_0]
@@ -89,7 +81,7 @@ Evaluation [{embedProj_0}]
 |   BinaryOp [Gte]
 |   |   Const [0]
 |   Variable [unwoundPid_0]
-Unwind [retainNonArrays]
+Unwind [{unwoundProj_0, unwoundPid_0}, retainNonArrays]
 Evaluation [{unwoundProj_0}]
 |   EvalPath []
 |   |   Variable [scan_0]
@@ -116,21 +108,14 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       agg_project_0
-|   RefBlock: 
-|       Variable [agg_project_0]
+Root [{agg_project_0}]
 Evaluation [{agg_project_0}]
 |   EvalPath []
 |   |   Const [{}]
 |   PathField [_id]
 |   PathConstant []
 |   Variable [groupByProj_0]
-GroupBy []
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [groupByProj_0]
+GroupBy [{groupByProj_0}]
 |   aggregations: 
 Evaluation [{groupByProj_0}]
 |   EvalPath []
@@ -153,7 +138,7 @@ Evaluation [{embedProj_0}]
 |   BinaryOp [Gte]
 |   |   Const [0]
 |   Variable [unwoundPid_0]
-Unwind [retainNonArrays]
+Unwind [{unwoundProj_0, unwoundPid_0}, retainNonArrays]
 Evaluation [{unwoundProj_0}]
 |   EvalPath []
 |   |   Variable [scan_0]

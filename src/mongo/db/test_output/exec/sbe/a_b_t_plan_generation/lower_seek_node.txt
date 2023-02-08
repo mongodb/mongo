@@ -6,8 +6,6 @@ NestedLoopJoin [joinType: Inner, {rid}]
 |   |   Const [true]
 |   LimitSkip [limit: 1, skip: 0]
 |   Seek [ridProjection: rid, {'<root>': scan0}, collName]
-|   RefBlock: 
-|       Variable [rid]
 IndexScan [{'<rid>': rid}, scanDefName: collName, indexDefName: index0, interval: {(Const [23], Const [35]]}]
 
 -- OUTPUT:

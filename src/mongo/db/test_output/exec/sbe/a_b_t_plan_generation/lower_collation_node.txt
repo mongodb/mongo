@@ -13,8 +13,6 @@ Filter []
 Collation []
 |   |   collation: 
 |   |       sortA: Ascending
-|   RefBlock: 
-|       Variable [sortA]
 Evaluation [{proj1}]
 |   FunctionCall [getField]
 |   |   Const ["c"]
@@ -51,9 +49,6 @@ Collation []
 |   |   collation: 
 |   |       sortA: Ascending
 |   |       sortB: Descending
-|   RefBlock: 
-|       Variable [sortA]
-|       Variable [sortB]
 Evaluation [{proj0}]
 |   FunctionCall [getField]
 |   |   Const ["c"]

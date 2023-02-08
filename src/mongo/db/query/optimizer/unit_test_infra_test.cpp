@@ -160,15 +160,8 @@ TEST(TestInfra, ABTLiterals) {
     auto rootNode = _root("pc")(std::move(groupByNode));
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       pc\n"
-        "|   RefBlock: \n"
-        "|       Variable [pc]\n"
-        "GroupBy []\n"
-        "|   |   groupings: \n"
-        "|   |       RefBlock: \n"
-        "|   |           Variable [pa]\n"
+        "Root [{pc}]\n"
+        "GroupBy [{pa}]\n"
         "|   aggregations: \n"
         "|       [pc]\n"
         "|           Variable [pb]\n"
@@ -206,15 +199,8 @@ TEST(TestInfra, ABTLiterals) {
                          .finish(_scan("root", "c1"));
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       pc\n"
-        "|   RefBlock: \n"
-        "|       Variable [pc]\n"
-        "GroupBy []\n"
-        "|   |   groupings: \n"
-        "|   |       RefBlock: \n"
-        "|   |           Variable [pa]\n"
+        "Root [{pc}]\n"
+        "GroupBy [{pa}]\n"
         "|   aggregations: \n"
         "|       [pc]\n"
         "|           Variable [pb]\n"

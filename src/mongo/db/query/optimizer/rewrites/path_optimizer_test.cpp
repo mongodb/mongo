@@ -192,11 +192,7 @@ TEST(Path, Fuse3) {
     auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"y"}},
                                std::move(project2));
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    y\n"
-        "  RefBlock: \n"
-        "    Variable [y]\n"
+        "Root [{y}]\n"
         "  Evaluation [{y}]\n"
         "    EvalPath []\n"
         "      PathGet [a]\n"
@@ -231,11 +227,7 @@ TEST(Path, Fuse3) {
     } while (changed);
 
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    y\n"
-        "  RefBlock: \n"
-        "    Variable [y]\n"
+        "Root [{y}]\n"
         "  Evaluation [{y}]\n"
         "    EvalPath []\n"
         "      PathGet [z]\n"
@@ -286,13 +278,7 @@ TEST(Path, Fuse4) {
                                std::move(project2));
 
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    x\n"
-        "    y\n"
-        "  RefBlock: \n"
-        "    Variable [x]\n"
-        "    Variable [y]\n"
+        "Root [{x, y}]\n"
         "  Evaluation [{y}]\n"
         "    EvalPath []\n"
         "      PathGet [a]\n"
@@ -345,13 +331,7 @@ TEST(Path, Fuse4) {
     } while (changed);
 
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    x\n"
-        "    y\n"
-        "  RefBlock: \n"
-        "    Variable [x]\n"
-        "    Variable [y]\n"
+        "Root [{x, y}]\n"
         "  Evaluation [{y}]\n"
         "    EvalPath []\n"
         "      PathTraverse [inf]\n"
@@ -408,11 +388,7 @@ TEST(Path, Fuse5) {
                                std::move(filter));
 
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    x\n"
-        "  RefBlock: \n"
-        "    Variable [x]\n"
+        "Root [{x}]\n"
         "  Filter []\n"
         "    EvalFilter []\n"
         "      PathGet [a]\n"
@@ -441,11 +417,7 @@ TEST(Path, Fuse5) {
 
     // The filter now refers directly to the root projection.
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    x\n"
-        "  RefBlock: \n"
-        "    Variable [x]\n"
+        "Root [{x}]\n"
         "  Filter []\n"
         "    EvalFilter []\n"
         "      PathGet [a]\n"
@@ -477,11 +449,7 @@ TEST(Path, Fuse6) {
                                std::move(project));
 
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    x\n"
-        "  RefBlock: \n"
-        "    Variable [x]\n"
+        "Root [{x}]\n"
         "  Evaluation [{x}]\n"
         "    EvalPath []\n"
         "      PathComposeM []\n"
@@ -509,11 +477,7 @@ TEST(Path, Fuse6) {
 
     // PathObj is removed.
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    x\n"
-        "  RefBlock: \n"
-        "    Variable [x]\n"
+        "Root [{x}]\n"
         "  Evaluation [{x}]\n"
         "    EvalPath []\n"
         "      PathComposeM []\n"
@@ -548,11 +512,7 @@ TEST(Path, Fuse7) {
                                std::move(project2));
 
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    py\n"
-        "  RefBlock: \n"
-        "    Variable [py]\n"
+        "Root [{py}]\n"
         "  Evaluation [{py}]\n"
         "    EvalPath []\n"
         "      PathComposeM []\n"
@@ -586,11 +546,7 @@ TEST(Path, Fuse7) {
 
     // Obtain "x" and directly assign at "a".
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    py\n"
-        "  RefBlock: \n"
-        "    Variable [py]\n"
+        "Root [{py}]\n"
         "  Evaluation [{py}]\n"
         "    EvalPath []\n"
         "      PathField [a]\n"
@@ -719,11 +675,7 @@ TEST(Path, ProjElim1) {
     runPathLowering(env, prefixId, tree);
 
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    y\n"
-        "  RefBlock: \n"
-        "    Variable [y]\n"
+        "Root [{y}]\n"
         "  Evaluation [{y}]\n"
         "    FunctionCall [anyFunctionWillDo]\n"
         "      Variable [root]\n"
@@ -750,8 +702,6 @@ TEST(Path, ProjElim2) {
 
     ASSERT_EXPLAIN_AUTO(
         "Root []\n"
-        "  projections: \n"
-        "  RefBlock: \n"
         "  Scan [test, {root}]\n",
         tree);
 }
@@ -784,11 +734,7 @@ TEST(Path, ProjElim3) {
     } while (changed);
 
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    p99\n"
-        "  RefBlock: \n"
-        "    Variable [p99]\n"
+        "Root [{p99}]\n"
         "  Evaluation [{p99}]\n"
         "    Variable [root]\n"
         "    Scan [test, {root}]\n",

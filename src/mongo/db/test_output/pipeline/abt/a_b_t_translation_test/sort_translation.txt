@@ -14,18 +14,11 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 Collation []
 |   |   collation: 
 |   |       sort_0: Ascending
 |   |       sort_1: Descending
-|   RefBlock: 
-|       Variable [sort_0]
-|       Variable [sort_1]
 Evaluation [{sort_1}]
 |   EvalPath []
 |   |   Variable [scan_0]
@@ -57,16 +50,10 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 Collation []
 |   |   collation: 
 |   |       sort_0: Ascending
-|   RefBlock: 
-|       Variable [sort_0]
 Evaluation [{sort_0}]
 |   EvalPath []
 |   |   Variable [scan_0]

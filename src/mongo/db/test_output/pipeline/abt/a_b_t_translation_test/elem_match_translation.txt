@@ -14,11 +14,7 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 Filter []
 |   EvalFilter []
 |   |   Variable [scan_0]
@@ -54,11 +50,7 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 Filter []
 |   EvalFilter []
 |   |   Variable [scan_0]
@@ -89,11 +81,7 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       combinedProjection_0
-|   RefBlock: 
-|       Variable [combinedProjection_0]
+Root [{combinedProjection_0}]
 Filter []
 |   EvalFilter []
 |   |   Variable [combinedProjection_0]
@@ -147,11 +135,7 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 Filter []
 |   EvalFilter []
 |   |   Variable [scan_0]

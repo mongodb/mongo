@@ -55,11 +55,7 @@ TEST(LogicalRewriter, RootNodeMerge) {
                                   std::move(limitSkipNode2));
 
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    a\n"
-        "  RefBlock: \n"
-        "    Variable [a]\n"
+        "Root [{a}]\n"
         "  LimitSkip [limit: 5, skip: 0]\n"
         "    LimitSkip [limit: (none), skip: 10]\n"
         "      Scan [test, {a}]\n",
@@ -74,11 +70,7 @@ TEST(LogicalRewriter, RootNodeMerge) {
     phaseManager.optimize(rewritten);
 
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    a\n"
-        "  RefBlock: \n"
-        "    Variable [a]\n"
+        "Root [{a}]\n"
         "  LimitSkip [limit: 5, skip: 10]\n"
         "    Scan [test, {a}]\n",
         rewritten);
@@ -244,8 +236,6 @@ TEST(LogicalRewriter, FilterProjectRewrite) {
 
     ASSERT_EXPLAIN_AUTO(
         "Root []\n"
-        "  projections: \n"
-        "  RefBlock: \n"
         "  Filter []\n"
         "    EvalFilter []\n"
         "      PathIdentity []\n"
@@ -257,8 +247,6 @@ TEST(LogicalRewriter, FilterProjectRewrite) {
         "      Collation []\n"
         "        collation: \n"
         "          ptest: Ascending\n"
-        "        RefBlock: \n"
-        "          Variable [ptest]\n"
         "        Scan [test, {ptest}]\n",
         rootNode);
 
@@ -272,13 +260,9 @@ TEST(LogicalRewriter, FilterProjectRewrite) {
 
     ASSERT_EXPLAIN_AUTO(
         "Root []\n"
-        "  projections: \n"
-        "  RefBlock: \n"
         "  Collation []\n"
         "    collation: \n"
         "      ptest: Ascending\n"
-        "    RefBlock: \n"
-        "      Variable [ptest]\n"
         "    Filter []\n"
         "      EvalFilter []\n"
         "        PathIdentity []\n"
@@ -326,8 +310,6 @@ TEST(LogicalRewriter, FilterProjectComplexRewrite) {
 
     ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
-        "|   |   projections: \n"
-        "|   RefBlock: \n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [p2]\n"
@@ -347,8 +329,6 @@ TEST(LogicalRewriter, FilterProjectComplexRewrite) {
         "Collation []\n"
         "|   |   collation: \n"
         "|   |       ptest: Ascending\n"
-        "|   RefBlock: \n"
-        "|       Variable [ptest]\n"
         "Evaluation [{p3}]\n"
         "|   EvalPath []\n"
         "|   |   Variable [ptest]\n"
@@ -371,13 +351,9 @@ TEST(LogicalRewriter, FilterProjectComplexRewrite) {
     // Note: this assert depends on the order on which we consider rewrites.
     ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
-        "|   |   projections: \n"
-        "|   RefBlock: \n"
         "Collation []\n"
         "|   |   collation: \n"
         "|   |       ptest: Ascending\n"
-        "|   RefBlock: \n"
-        "|       Variable [ptest]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [p2]\n"
@@ -439,15 +415,8 @@ TEST(LogicalRewriter, FilterProjectGroupRewrite) {
     phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       c\n"
-        "|   RefBlock: \n"
-        "|       Variable [c]\n"
-        "GroupBy []\n"
-        "|   |   groupings: \n"
-        "|   |       RefBlock: \n"
-        "|   |           Variable [a]\n"
+        "Root [{c}]\n"
+        "GroupBy [{a}]\n"
         "|   aggregations: \n"
         "|       [c]\n"
         "|           Variable [b]\n"
@@ -503,13 +472,7 @@ TEST(LogicalRewriter, FilterProjectUnwindRewrite) {
     phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       a\n"
-        "|   |       b\n"
-        "|   RefBlock: \n"
-        "|       Variable [a]\n"
-        "|       Variable [b]\n"
+        "Root [{a, b}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [b]\n"
@@ -518,7 +481,7 @@ TEST(LogicalRewriter, FilterProjectUnwindRewrite) {
         "|   EvalFilter []\n"
         "|   |   Variable [a]\n"
         "|   PathIdentity []\n"
-        "Unwind []\n"
+        "Unwind [{a, a_pid}]\n"
         "Evaluation [{b}]\n"
         "|   EvalPath []\n"
         "|   |   Variable [ptest]\n"
@@ -563,13 +526,7 @@ TEST(LogicalRewriter, FilterProjectExchangeRewrite) {
     phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       a\n"
-        "|   |       b\n"
-        "|   RefBlock: \n"
-        "|       Variable [a]\n"
-        "|       Variable [b]\n"
+        "Root [{a, b}]\n"
         "Evaluation [{b}]\n"
         "|   EvalPath []\n"
         "|   |   Variable [ptest]\n"
@@ -579,8 +536,6 @@ TEST(LogicalRewriter, FilterProjectExchangeRewrite) {
         "|   |       type: HashPartitioning\n"
         "|   |           projections: \n"
         "|   |               a\n"
-        "|   RefBlock: \n"
-        "|       Variable [a]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [a]\n"
@@ -629,19 +584,11 @@ TEST(LogicalRewriter, UnwindCollationRewrite) {
     phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       a\n"
-        "|   |       b\n"
-        "|   RefBlock: \n"
-        "|       Variable [a]\n"
-        "|       Variable [b]\n"
+        "Root [{a, b}]\n"
         "Collation []\n"
         "|   |   collation: \n"
         "|   |       b: Ascending\n"
-        "|   RefBlock: \n"
-        "|       Variable [b]\n"
-        "Unwind []\n"
+        "Unwind [{a, a_pid}]\n"
         "Evaluation [{b}]\n"
         "|   EvalPath []\n"
         "|   |   Variable [ptest]\n"
@@ -683,11 +630,7 @@ TEST(LogicalRewriter, FilterUnionReorderSingleProjection) {
     ABT latest = std::move(rootNode);
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       pUnion\n"
-        "|   RefBlock: \n"
-        "|       Variable [pUnion]\n"
+        "Root [{pUnion}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [pUnion]\n"
@@ -717,11 +660,7 @@ TEST(LogicalRewriter, FilterUnionReorderSingleProjection) {
     phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       pUnion\n"
-        "|   RefBlock: \n"
-        "|       Variable [pUnion]\n"
+        "Root [{pUnion}]\n"
         "Union [{pUnion}]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
@@ -799,13 +738,7 @@ TEST(LogicalRewriter, MultipleFilterUnionReorder) {
     ABT latest = std::move(rootNode);
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       pUnion1\n"
-        "|   |       pUnion2\n"
-        "|   RefBlock: \n"
-        "|       Variable [pUnion1]\n"
-        "|       Variable [pUnion2]\n"
+        "Root [{pUnion1, pUnion2}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [pUnion2]\n"
@@ -850,13 +783,7 @@ TEST(LogicalRewriter, MultipleFilterUnionReorder) {
     phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       pUnion1\n"
-        "|   |       pUnion2\n"
-        "|   RefBlock: \n"
-        "|       Variable [pUnion1]\n"
-        "|       Variable [pUnion2]\n"
+        "Root [{pUnion1, pUnion2}]\n"
         "Union [{pUnion1, pUnion2}]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
@@ -937,11 +864,7 @@ TEST(LogicalRewriter, FilterUnionUnionPushdown) {
     ABT latest = std::move(rootNode);
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       ptest\n"
-        "|   RefBlock: \n"
-        "|       Variable [ptest]\n"
+        "Root [{ptest}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [ptest]\n"
@@ -959,11 +882,7 @@ TEST(LogicalRewriter, FilterUnionUnionPushdown) {
     phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       ptest\n"
-        "|   RefBlock: \n"
-        "|       Variable [ptest]\n"
+        "Root [{ptest}]\n"
         "Union [{ptest}]\n"
         "|   Sargable [Complete]\n"
         "|   |   |   |   |   requirementsMap: \n"
@@ -1203,11 +1122,7 @@ TEST(LogicalRewriter, UnionPreservesCommonLogicalProps) {
         "    |   |               type: UnknownPartitioning\n"
         "    |   logicalNodes: \n"
         "    |       logicalNodeId: 0, rule: Root\n"
-        "    |           Root []\n"
-        "    |           |   |   projections: \n"
-        "    |           |   |       a\n"
-        "    |           |   RefBlock: \n"
-        "    |           |       Variable [a]\n"
+        "    |           Root [{a}]\n"
         "    |           MemoLogicalDelegator [groupId: 4]\n"
         "    physicalNodes: \n",
         phaseManager.getMemo());
@@ -1316,11 +1231,7 @@ TEST(LogicalRewriter, SargableCE) {
         "    |   |               type: Centralized\n"
         "    |   logicalNodes: \n"
         "    |       logicalNodeId: 0, rule: Root\n"
-        "    |           Root []\n"
-        "    |           |   |   projections: \n"
-        "    |           |   |       ptest\n"
-        "    |           |   RefBlock: \n"
-        "    |           |       Variable [ptest]\n"
+        "    |           Root [{ptest}]\n"
         "    |           MemoLogicalDelegator [groupId: 1]\n"
         "    physicalNodes: \n",
         phaseManager.getMemo());
@@ -1349,11 +1260,7 @@ TEST(LogicalRewriter, RemoveNoopFilter) {
     phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       ptest\n"
-        "|   RefBlock: \n"
-        "|       Variable [ptest]\n"
+        "Root [{ptest}]\n"
         "Scan [test, {ptest}]\n",
         latest);
 }
@@ -1401,11 +1308,7 @@ TEST(LogicalRewriter, NotPushdownToplevelSuccess) {
 
     // We remove the Traverse nodes, and combine the Not ... Eq into Neq.
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       scan_0\n"
-        "|   RefBlock: \n"
-        "|       Variable [scan_0]\n"
+        "Root [{scan_0}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [scan_0]\n"
@@ -1461,11 +1364,7 @@ TEST(LogicalRewriter, NotPushdownToplevelFailureMultikey) {
     // Because the index is multikey, we don't remove the Traverse nodes,
     // which prevents us from pushing down the Not.
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       scan_0\n"
-        "|   RefBlock: \n"
-        "|       Variable [scan_0]\n"
+        "Root [{scan_0}]\n"
         "Filter []\n"
         "|   UnaryOp [Not]\n"
         "|   EvalFilter []\n"
@@ -1510,11 +1409,7 @@ TEST(LogicalRewriter, NotPushdownComposeM) {
     // We should push the Not down as far as possible, so that some leaves become Neq.
     // Leaves with a Traverse in the way residualize a Not instead.
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       scan_0\n"
-        "|   RefBlock: \n"
-        "|       Variable [scan_0]\n"
+        "Root [{scan_0}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [scan_0]\n"
@@ -1593,11 +1488,7 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaSuccess) {
 
     // All the Traverses should be eliminated, and the Not ... Eq combined as Neq.
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       scan_0\n"
-        "|   RefBlock: \n"
-        "|       Variable [scan_0]\n"
+        "Root [{scan_0}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [scan_0]\n"
@@ -1674,11 +1565,7 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaKeepOuterTraverse) {
     // The inner Traverses should be eliminated, and the Not ... Eq combined as Neq.
     // We have to keep the outer traverse since 'a' is multikey.
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       scan_0\n"
-        "|   RefBlock: \n"
-        "|       Variable [scan_0]\n"
+        "Root [{scan_0}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [scan_0]\n"
@@ -1742,11 +1629,7 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaFailsWithFreeVar) {
     // The Not should be gone: combined into Neq.
     // But the Lambda [x] should still be there, because 'x' is still used.
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       scan_0\n"
-        "|   RefBlock: \n"
-        "|       Variable [scan_0]\n"
+        "Root [{scan_0}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [scan_0]\n"
@@ -1807,11 +1690,7 @@ TEST(LogicalRewriter, RemoveTraverseSplitComposeM) {
 
     // We should end up with a Sargable node and no residual Filter.
     ASSERT_EXPLAIN_V2_AUTO(  // NOLINT (test auto-update)
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       scan_0\n"
-        "|   RefBlock: \n"
-        "|       Variable [scan_0]\n"
+        "Root [{scan_0}]\n"
         "Sargable [Complete]\n"
         "|   |   |   |   requirementsMap: \n"
         "|   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathGet [b] PathIdentity ["
@@ -1884,11 +1763,7 @@ TEST(LogicalRewriter, TraverseComposeMTraverse) {
     //   of doubly-nested arrays.
     // (We may also get a perfOnly Sargable node; that's not the point of this test.)
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       scan_0\n"
-        "|   RefBlock: \n"
-        "|       Variable [scan_0]\n"
+        "Root [{scan_0}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [scan_0]\n"
@@ -1966,11 +1841,7 @@ TEST(LogicalRewriter, RelaxComposeM) {
     phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       root\n"
-        "|   RefBlock: \n"
-        "|       Variable [root]\n"
+        "Root [{root}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [root]\n"
@@ -2189,11 +2060,7 @@ TEST(LogicalRewriter, EmptyArrayIndexBounds) {
     phaseManager.optimize(rootNode);
 
     ASSERT_EXPLAIN_V2_AUTO(  // NOLINT (test auto-update)
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       root\n"
-        "|   RefBlock: \n"
-        "|       Variable [root]\n"
+        "Root [{root}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [root]\n"

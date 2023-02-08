@@ -7,8 +7,6 @@ Exchange []
 |   |       type: HashPartitioning
 |   |           projections: 
 |   |               proj0
-|   RefBlock: 
-|       Variable [proj0]
 Evaluation [{proj1}]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -32,8 +30,6 @@ Exchange []
 |   |       type: Centralized
 |   |           projections: 
 |   |               proj0
-|   RefBlock: 
-|       Variable [proj0]
 Evaluation [{proj1}]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -57,8 +53,6 @@ Exchange []
 |   |       type: RoundRobin
 |   |           projections: 
 |   |               proj0
-|   RefBlock: 
-|       Variable [proj0]
 Evaluation [{proj1}]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -82,8 +76,6 @@ Exchange []
 |   |       type: Replicated
 |   |           projections: 
 |   |               proj0
-|   RefBlock: 
-|       Variable [proj0]
 Evaluation [{proj1}]
 |   FunctionCall [getField]
 |   |   Const ["a"]

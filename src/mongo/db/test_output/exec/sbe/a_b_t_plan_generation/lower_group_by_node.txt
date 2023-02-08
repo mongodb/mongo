@@ -2,11 +2,7 @@
 
 ==== VARIATION: GroupByNode one output with type Complete ====
 -- INPUT:
-GroupBy []
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [key1]
-|   |           Variable [key2]
+GroupBy [{key1, key2}]
 |   aggregations: 
 |       [outFunc1]
 |           FunctionCall [$sum]
@@ -34,11 +30,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 ==== VARIATION: GroupByNode multiple outputs with type Complete ====
 -- INPUT:
-GroupBy []
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [key1]
-|   |           Variable [key2]
+GroupBy [{key1, key2}]
 |   aggregations: 
 |       [outFunc1]
 |           FunctionCall [$sum]
@@ -74,11 +66,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 ==== VARIATION: GroupByNode one output with type Local ====
 -- INPUT:
-GroupBy [Local]
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [key1]
-|   |           Variable [key2]
+GroupBy [{key1, key2}, Local]
 |   aggregations: 
 |       [outFunc1]
 |           FunctionCall [$sum]
@@ -106,11 +94,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 ==== VARIATION: GroupByNode multiple outputs with type Local ====
 -- INPUT:
-GroupBy [Local]
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [key1]
-|   |           Variable [key2]
+GroupBy [{key1, key2}, Local]
 |   aggregations: 
 |       [outFunc1]
 |           FunctionCall [$sum]
@@ -146,11 +130,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 ==== VARIATION: GroupByNode one output with type Global ====
 -- INPUT:
-GroupBy [Global]
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [key1]
-|   |           Variable [key2]
+GroupBy [{key1, key2}, Global]
 |   aggregations: 
 |       [outFunc1]
 |           FunctionCall [$sum]
@@ -178,11 +158,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 ==== VARIATION: GroupByNode multiple outputs with type Global ====
 -- INPUT:
-GroupBy [Global]
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [key1]
-|   |           Variable [key2]
+GroupBy [{key1, key2}, Global]
 |   aggregations: 
 |       [outFunc1]
 |           FunctionCall [$sum]

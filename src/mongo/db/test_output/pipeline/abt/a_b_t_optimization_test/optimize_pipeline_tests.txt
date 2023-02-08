@@ -32,11 +32,7 @@ optimization phases:
 	MemoSubstitutionPhase
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 Sargable [Complete]
 |   |   |   |   requirementsMap: 
 |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
@@ -83,11 +79,7 @@ optimization phases:
 	MemoSubstitutionPhase
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 Sargable [Complete]
 |   |   |   |   requirementsMap: 
 |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
@@ -122,11 +114,7 @@ optimization phases:
 	PathFuse
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       combinedProjection_0
-|   RefBlock: 
-|       Variable [combinedProjection_0]
+Root [{combinedProjection_0}]
 Evaluation [{combinedProjection_0}]
 |   EvalPath []
 |   |   Const [{}]
@@ -170,11 +158,7 @@ optimization phases:
 	MemoSubstitutionPhase
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 Filter []
 |   EvalFilter []
 |   |   Variable [evalTemp_3]
@@ -208,11 +192,7 @@ optimization phases:
 	ConstEvalPre
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       combinedProjection_0
-|   RefBlock: 
-|       Variable [combinedProjection_0]
+Root [{combinedProjection_0}]
 Evaluation [{combinedProjection_0}]
 |   EvalPath []
 |   |   Variable [scan_0]
@@ -261,15 +241,10 @@ optimization phases:
 	MemoSubstitutionPhase
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       agg_project_0
-|   RefBlock: 
-|       Variable [agg_project_0]
+Root [{agg_project_0}]
 Exchange []
 |   |   distribution: 
 |   |       type: Centralized
-|   RefBlock: 
 Evaluation [{agg_project_0}]
 |   EvalPath []
 |   |   Const [{}]
@@ -280,10 +255,7 @@ Evaluation [{agg_project_0}]
 |   PathField [_id]
 |   PathConstant []
 |   Variable [groupByProj_0]
-GroupBy [Global]
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [groupByProj_0]
+GroupBy [{groupByProj_0}, Global]
 |   aggregations: 
 |       [field_agg_0]
 |           FunctionCall [$sum]
@@ -293,12 +265,7 @@ Exchange []
 |   |       type: HashPartitioning
 |   |           projections: 
 |   |               groupByProj_0
-|   RefBlock: 
-|       Variable [groupByProj_0]
-GroupBy [Local]
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [groupByProj_0]
+GroupBy [{groupByProj_0}, Local]
 |   aggregations: 
 |       [preagg_0]
 |           FunctionCall [$sum]
@@ -330,16 +297,10 @@ optimization phases:
 	PathLower
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       embedProj_0
-|   RefBlock: 
-|       Variable [embedProj_0]
+Root [{embedProj_0}]
 Collation []
 |   |   collation: 
 |   |       sort_0: Ascending
-|   RefBlock: 
-|       Variable [sort_0]
 Evaluation [{sort_0}]
 |   Variable [unwoundProj_0]
 Evaluation [{embedProj_0}]
@@ -354,7 +315,7 @@ Evaluation [{embedProj_0}]
 |   |   Variable [scan_0]
 |   FunctionCall [exists]
 |   Variable [unwoundProj_0]
-Unwind []
+Unwind [{unwoundProj_0, unwoundPid_0}]
 PhysicalScan [{'<root>': scan_0, 'x': unwoundProj_0}, collection]
 
 
@@ -394,17 +355,11 @@ optimization phases:
 	MemoSubstitutionPhase
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
 |   LimitSkip [limit: 1, skip: 0]
 |   Seek [ridProjection: rid_0, {'<root>': scan_0}, collection]
-|   RefBlock: 
-|       Variable [rid_0]
 IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [10]}]
 
 
@@ -445,11 +400,7 @@ optimization phases:
 	PathFuse
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       combinedProjection_0
-|   RefBlock: 
-|       Variable [combinedProjection_0]
+Root [{combinedProjection_0}]
 Evaluation [{combinedProjection_0}]
 |   EvalPath []
 |   |   Const [{}]
@@ -496,11 +447,7 @@ optimization phases:
 	PathFuse
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       combinedProjection_0
-|   RefBlock: 
-|       Variable [combinedProjection_0]
+Root [{combinedProjection_0}]
 Evaluation [{combinedProjection_0}]
 |   EvalPath []
 |   |   Const [{}]
@@ -552,11 +499,7 @@ optimization phases:
 	PathFuse
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       combinedProjection_0
-|   RefBlock: 
-|       Variable [combinedProjection_0]
+Root [{combinedProjection_0}]
 Evaluation [{combinedProjection_0}]
 |   EvalPath []
 |   |   Const [{}]
@@ -613,11 +556,7 @@ optimization phases:
 	PathFuse
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       combinedProjection_0
-|   RefBlock: 
-|       Variable [combinedProjection_0]
+Root [{combinedProjection_0}]
 Evaluation [{combinedProjection_0}]
 |   EvalPath []
 |   |   Const [{}]
@@ -682,11 +621,7 @@ optimization phases:
 	PathFuse
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       combinedProjection_0
-|   RefBlock: 
-|       Variable [combinedProjection_0]
+Root [{combinedProjection_0}]
 Evaluation [{combinedProjection_0}]
 |   EvalPath []
 |   |   Const [{}]
@@ -740,22 +675,14 @@ optimization phases:
 	MemoSubstitutionPhase
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 Collation []
 |   |   collation: 
 |   |       sort_0: Ascending
-|   RefBlock: 
-|       Variable [sort_0]
 NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
 |   LimitSkip [limit: 1, skip: 0]
 |   Seek [ridProjection: rid_0, {'<root>': scan_0, 'a': sort_0}, collection]
-|   RefBlock: 
-|       Variable [rid_0]
 IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [10]}]
 
 
@@ -795,27 +722,18 @@ optimization phases:
 	MemoSubstitutionPhase
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
 |   LimitSkip [limit: 1, skip: 0]
 |   Seek [ridProjection: rid_0, {'<root>': scan_0}, collection]
-|   RefBlock: 
-|       Variable [rid_0]
 Filter []
 |   EvalFilter []
 |   |   FunctionCall [getArraySize]
 |   |   Variable [sides_0]
 |   PathCompare [Eq]
 |   Const [2]
-GroupBy []
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [rid_0]
+GroupBy [{rid_0}]
 |   aggregations: 
 |       [sides_0]
 |           FunctionCall [$addToSet]
@@ -871,17 +789,11 @@ optimization phases:
 	MemoSubstitutionPhase
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
 |   LimitSkip [limit: 1, skip: 0]
 |   Seek [ridProjection: rid_0, {'<root>': scan_0}, collection]
-|   RefBlock: 
-|       Variable [rid_0]
 IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [2 | 2]}]
 
 
@@ -922,11 +834,7 @@ optimization phases:
 	MemoSubstitutionPhase
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
 |   Filter []
@@ -937,8 +845,6 @@ NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [2]
 |   LimitSkip [limit: 1, skip: 0]
 |   Seek [ridProjection: rid_0, {'<root>': scan_0, 'b': evalTemp_4}, collection]
-|   RefBlock: 
-|       Variable [rid_0]
 IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [2]}]
 
 
@@ -966,11 +872,7 @@ optimization phases:
 	PathLower
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       agg_project_0
-|   RefBlock: 
-|       Variable [agg_project_0]
+Root [{agg_project_0}]
 Evaluation [{agg_project_0}]
 |   Let [inputField_1]
 |   |   If []
@@ -995,10 +897,7 @@ Evaluation [{agg_project_0}]
 |   |   Const [{}]
 |   FunctionCall [exists]
 |   Variable [groupByProj_0]
-GroupBy []
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [groupByProj_0]
+GroupBy [{groupByProj_0}]
 |   aggregations: 
 |       [field_agg_0]
 |           FunctionCall [$first]
@@ -1036,11 +935,7 @@ optimization phases:
 	MemoSubstitutionPhase
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 Union [{scan_0}]
 |   Filter []
 |   |   EvalFilter []
@@ -1081,11 +976,7 @@ optimization phases:
 	ConstEvalPre
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       combinedProjection_0
-|   RefBlock: 
-|       Variable [combinedProjection_0]
+Root [{combinedProjection_0}]
 Evaluation [{combinedProjection_0}]
 |   EvalPath []
 |   |   Variable [scan_0]
@@ -1133,11 +1024,7 @@ optimization phases:
 	PathFuse
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       combinedProjection_1
-|   RefBlock: 
-|       Variable [combinedProjection_1]
+Root [{combinedProjection_1}]
 Evaluation [{combinedProjection_1}]
 |   EvalPath []
 |   |   Const [{}]
@@ -1147,10 +1034,7 @@ Evaluation [{combinedProjection_1}]
 |   |   FunctionCall [getArraySize]
 |   |   Variable [field_agg_0]
 |   PathKeep []
-GroupBy []
-|   |   groupings: 
-|   |       RefBlock: 
-|   |           Variable [groupByProj_0]
+GroupBy [{groupByProj_0}]
 |   aggregations: 
 |       [field_agg_0]
 |           FunctionCall [$addToSet]
@@ -1178,11 +1062,7 @@ optimization phases:
 	MemoSubstitutionPhase
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 Sargable [Complete]
 |   |   |   |   requirementsMap: 
 |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}

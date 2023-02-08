@@ -278,13 +278,7 @@ TEST(Optimizer, Basic) {
                        std::move(evalNode));
 
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    P1\n"
-        "    ptest\n"
-        "  RefBlock: \n"
-        "    Variable [P1]\n"
-        "    Variable [ptest]\n"
+        "Root [{P1, ptest}]\n"
         "  Evaluation [{P1}]\n"
         "    EvalPath []\n"
         "      PathConstant []\n"
@@ -302,13 +296,7 @@ TEST(Optimizer, Basic) {
 
     ABT clonedNode = rootNode;
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    P1\n"
-        "    ptest\n"
-        "  RefBlock: \n"
-        "    Variable [P1]\n"
-        "    Variable [ptest]\n"
+        "Root [{P1, ptest}]\n"
         "  Evaluation [{P1}]\n"
         "    EvalPath []\n"
         "      PathConstant []\n"
@@ -356,22 +344,8 @@ TEST(Optimizer, GroupBy) {
         std::move(groupByNode));
 
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    p1\n"
-        "    p2\n"
-        "    a1\n"
-        "    a2\n"
-        "  RefBlock: \n"
-        "    Variable [a1]\n"
-        "    Variable [a2]\n"
-        "    Variable [p1]\n"
-        "    Variable [p2]\n"
-        "  GroupBy []\n"
-        "    groupings: \n"
-        "      RefBlock: \n"
-        "        Variable [p1]\n"
-        "        Variable [p2]\n"
+        "Root [{a1, a2, p1, p2}]\n"
+        "  GroupBy [{p1, p2}]\n"
         "    aggregations: \n"
         "      [a1]\n"
         "        Const [10]\n"
@@ -424,13 +398,7 @@ TEST(Optimizer, Union) {
     }
 
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    ptest\n"
-        "    B\n"
-        "  RefBlock: \n"
-        "    Variable [B]\n"
-        "    Variable [ptest]\n"
+        "Root [{B, ptest}]\n"
         "  Union [{B, ptest}]\n"
         "    Evaluation [{B}]\n"
         "      Const [3]\n"
@@ -487,16 +455,8 @@ TEST(Optimizer, Unwind) {
     }
 
     ASSERT_EXPLAIN_AUTO(
-        "Root []\n"
-        "  projections: \n"
-        "    p1\n"
-        "    p2\n"
-        "    p2pid\n"
-        "  RefBlock: \n"
-        "    Variable [p1]\n"
-        "    Variable [p2]\n"
-        "    Variable [p2pid]\n"
-        "  Unwind [retainNonArrays]\n"
+        "Root [{p1, p2, p2pid}]\n"
+        "  Unwind [{p2, p2pid}, retainNonArrays]\n"
         "    Evaluation [{p2}]\n"
         "      EvalPath []\n"
         "        PathConstant []\n"
@@ -530,9 +490,6 @@ TEST(Optimizer, Collation) {
         "  collation: \n"
         "    a: Ascending\n"
         "    b: Clustered\n"
-        "  RefBlock: \n"
-        "    Variable [a]\n"
-        "    Variable [b]\n"
         "  Evaluation [{b}]\n"
         "    EvalPath []\n"
         "      PathConstant []\n"
@@ -587,8 +544,6 @@ TEST(Optimizer, Distribution) {
         "    type: HashPartitioning\n"
         "      projections: \n"
         "        b\n"
-        "  RefBlock: \n"
-        "    Variable [b]\n"
         "  Evaluation [{b}]\n"
         "    EvalPath []\n"
         "      PathConstant []\n"
@@ -801,11 +756,7 @@ TEST(Optimizer, ExplainRIDUnion) {
                                   std::move(unionNode));
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       root\n"
-        "|   RefBlock: \n"
-        "|       Variable [root]\n"
+        "Root [{root}]\n"
         "RIDUnion [root]\n"
         "|   Scan [c1, {root}]\n"
         "Filter []\n"

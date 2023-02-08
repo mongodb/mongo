@@ -711,8 +711,8 @@ public:
         }
     }
 
-    static void printProjections(ExplainPrinter& printer,
-                                 const ProjectionNameOrderedSet& projections) {
+    template <class T>
+    static void printProjectionsUnordered(ExplainPrinter& printer, const T& projections) {
         if constexpr (version < ExplainVersion::V3) {
             if (!projections.empty()) {
                 printer.separator("{");
@@ -740,25 +740,20 @@ public:
         }
     }
 
-    static void printProjections(ExplainPrinter& printer, const ProjectionNameVector& projections) {
+    template <class T>
+    static void printProjectionsOrdered(ExplainPrinter& printer, const T& projections) {
         ProjectionNameOrderedSet projectionSet(projections.begin(), projections.end());
-        printProjections(printer, projectionSet);
+        printProjectionsUnordered(printer, projectionSet);
     }
 
     static void printProjection(ExplainPrinter& printer, const ProjectionName& projection) {
-        ProjectionNameOrderedSet projectionSet = {projection};
-        printProjections(printer, projectionSet);
+        printProjectionsUnordered(printer, ProjectionNameVector{projection});
     }
 
-    static void printCorrelatedProjections(
-        ExplainPrinter& printer, const mongo::optimizer::ProjectionNameSet& correlatedProjections) {
-        ProjectionNameOrderedSet ordered;
-        for (const ProjectionName& projName : correlatedProjections) {
-            ordered.insert(projName);
-        }
-
+    static void printCorrelatedProjections(ExplainPrinter& printer,
+                                           const ProjectionNameSet& projections) {
         printer.fieldName("correlatedProjections", ExplainVersion::V3);
-        printProjections(printer, ordered);
+        printProjectionsOrdered(printer, projections);
     }
 
 
@@ -769,7 +764,14 @@ public:
                              const References& references,
                              std::vector<ExplainPrinter> inResults) {
         ExplainPrinter printer;
-        printer.separator("RefBlock: ").printAppend(inResults);
+        if constexpr (version < ExplainVersion::V3) {
+            // The ref block is redundant for V1 and V2. We typically explain the references in the
+            // blocks ([]) of the individual elements.
+        } else if constexpr (version == ExplainVersion::V3) {
+            printer.printAppend(inResults);
+        } else {
+            MONGO_UNREACHABLE;
+        }
         return printer;
     }
 
@@ -1679,12 +1681,10 @@ public:
                              ExplainPrinter /*refsResult*/) {
         ExplainPrinter printer("Union");
         maybePrintProps(printer, node);
-        if (version < ExplainVersion::V3) {
+        if constexpr (version < ExplainVersion::V3) {
             printer.separator(" [");
-            printProjections(printer, node.binder().names());
+            printProjectionsOrdered(printer, node.binder().names());
             printer.separator("]");
-        } else {
-            printer.separator(" []");
         }
         nodeCEPropsPrint(printer, n, node);
         printer.setChildCount(childResults.size() + 1)
@@ -1712,10 +1712,28 @@ public:
         ExplainPrinter printer("GroupBy");
         maybePrintProps(printer, node);
         printer.separator(" [");
-        if (version >= ExplainVersion::V3 || node.getType() != GroupNodeType::Complete) {
+
+        const auto printTypeFn = [&]() {
             printer.fieldName("type", ExplainVersion::V3)
                 .print(GroupNodeTypeEnum::toString[static_cast<int>(node.getType())]);
+        };
+        bool displayGroupings = true;
+        if constexpr (version < ExplainVersion::V3) {
+            displayGroupings = false;
+            const auto& gbProjNames = node.getGroupByProjectionNames();
+            printProjectionsUnordered(printer, gbProjNames);
+            if (node.getType() != GroupNodeType::Complete) {
+                if (!gbProjNames.empty()) {
+                    printer.separator(", ");
+                }
+                printTypeFn();
+            }
+        } else if constexpr (version == ExplainVersion::V3) {
+            printTypeFn();
+        } else {
+            MONGO_UNREACHABLE;
         }
+
         printer.separator("]");
         nodeCEPropsPrint(printer, n, node);
 
@@ -1732,7 +1750,9 @@ public:
         }
 
         ExplainPrinter gbPrinter;
-        gbPrinter.fieldName("groupings").print(refsGbResult);
+        if (displayGroupings) {
+            gbPrinter.fieldName("groupings").print(refsGbResult);
+        }
 
         ExplainPrinter aggPrinter;
         aggPrinter.fieldName("aggregations").print(aggPrinters);
@@ -1753,7 +1773,14 @@ public:
         ExplainPrinter printer("Unwind");
         maybePrintProps(printer, node);
         printer.separator(" [");
-        printBooleanFlag(printer, "retainNonArrays", node.getRetainNonArrays(), false /*addComma*/);
+
+        if constexpr (version < ExplainVersion::V3) {
+            printProjectionsUnordered(
+                printer,
+                ProjectionNameVector{node.getProjectionName(), node.getPIDProjectionName()});
+        }
+
+        printBooleanFlag(printer, "retainNonArrays", node.getRetainNonArrays(), true /*addComma*/);
         printer.separator("]");
         nodeCEPropsPrint(printer, n, node);
 
@@ -1815,9 +1842,9 @@ public:
             .separator(", ")
             .fieldName("id")
             .print(node.getSpoolId());
-        if (version < ExplainVersion::V3) {
+        if constexpr (version < ExplainVersion::V3) {
             printer.separator(", ");
-            printProjections(printer, node.binder().names());
+            printProjectionsOrdered(printer, node.binder().names());
         }
         printer.separator("]");
 
@@ -1842,9 +1869,9 @@ public:
             .separator(", ")
             .fieldName("id")
             .print(node.getSpoolId());
-        if (version < ExplainVersion::V3) {
+        if constexpr (version < ExplainVersion::V3) {
             printer.separator(", ");
-            printProjections(printer, node.binder().names());
+            printProjectionsOrdered(printer, node.binder().names());
         }
         printer.separator("]");
 
@@ -2206,7 +2233,7 @@ public:
     template <class P, class V, class C>
     static ExplainPrinter printProps(const std::string& description, const C& props) {
         ExplainPrinter printer;
-        if (version < ExplainVersion::V3) {
+        if constexpr (version < ExplainVersion::V3) {
             printer.print(description).print(":");
         }
 
@@ -2241,16 +2268,24 @@ public:
                              ExplainPrinter refsResult) {
         ExplainPrinter printer("Root");
         maybePrintProps(printer, node);
-        printer.separator(" []");
-        nodeCEPropsPrint(printer, n, node);
 
-        printer.setChildCount(3);
-        printProjectionRequirementProperty(printer, node.getProperty(), false /*directToParent*/);
-        printer.fieldName("references", ExplainVersion::V3)
-            .print(refsResult)
-            .fieldName("child", ExplainVersion::V3)
-            .print(childResult);
+        if constexpr (version < ExplainVersion::V3) {
+            printer.separator(" [");
+            printProjectionsOrdered(printer, node.getProperty().getProjections().getVector());
+            printer.separator("]");
+            nodeCEPropsPrint(printer, n, node);
+            printer.setChildCount(1, true /*noInline*/);
+        } else if constexpr (version == ExplainVersion::V3) {
+            nodeCEPropsPrint(printer, n, node);
+            printer.setChildCount(3);
+            printProjectionRequirementProperty(
+                printer, node.getProperty(), false /*directToParent*/);
+            printer.fieldName("references", ExplainVersion::V3).print(refsResult);
+        } else {
+            MONGO_UNREACHABLE;
+        }
 
+        printer.fieldName("child", ExplainVersion::V3).print(childResult);
         return printer;
     }
 

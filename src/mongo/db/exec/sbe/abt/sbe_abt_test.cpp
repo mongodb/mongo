@@ -503,11 +503,7 @@ TEST_F(NodeSBE, Lower2) {
     phaseManager.optimize(root);
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       pa\n"
-        "|   RefBlock: \n"
-        "|       Variable [pa]\n"
+        "Root [{pa}]\n"
         "MergeJoin []\n"
         "|   |   |   Condition\n"
         "|   |   |       rid_0 = rid_1\n"
@@ -562,11 +558,7 @@ TEST_F(NodeSBE, Lower2) {
 
     // Now we should have a plan with a SortedMerge in it.
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       pa\n"
-        "|   RefBlock: \n"
-        "|       Variable [pa]\n"
+        "Root [{pa}]\n"
         "SortedMerge []\n"
         "|   |   |   collation: \n"
         "|   |   |       rid_0: Ascending\n"
@@ -760,11 +752,7 @@ TEST_F(NodeSBE, SpoolFibonacci) {
                     .finish(_coscan());
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       val\n"
-        "|   RefBlock: \n"
-        "|       Variable [val]\n"
+        "Root [{val}]\n"
         "SpoolProducer [Lazy, id: 1, {it, val, val_prev}]\n"
         "|   |   Const [true]\n"
         "Union [{it, val, val_prev}]\n"

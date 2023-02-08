@@ -14,11 +14,7 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 Filter []
 |   EvalFilter []
 |   |   Variable [scan_0]
@@ -45,11 +41,7 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 Filter []
 |   EvalFilter []
 |   |   Variable [scan_0]
@@ -81,11 +73,7 @@ metadata:
 			CE type: -1
 
 -- OUTPUT:
-Root []
-|   |   projections: 
-|   |       scan_0
-|   RefBlock: 
-|       Variable [scan_0]
+Root [{scan_0}]
 Filter []
 |   EvalFilter []
 |   |   Variable [scan_0]
