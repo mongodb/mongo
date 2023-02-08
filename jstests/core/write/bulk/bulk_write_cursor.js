@@ -110,6 +110,9 @@ assert.commandWorked(res);
 assert(res.cursor.id == 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: 11000});
+// Make sure that error extra info was correctly added
+assert.docEq(res.cursor.firstBatch[1].keyPattern, {_id: 1});
+assert.docEq(res.cursor.firstBatch[1].keyValue, {_id: 1});
 assert(!res.cursor.firstBatch[2]);
 
 assert.eq(coll.find().itcount(), 1);

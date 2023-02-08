@@ -270,9 +270,7 @@ env.Library(
 
 env.Library(
     target='bulk_write_parser',
-    source=[
-        'bulk_write.idl',
-    ],
+    source=['bulk_write.idl', 'bulk_write_parser.cpp'],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/fle_fields',
         '$BUILD_DIR/mongo/db/commands',

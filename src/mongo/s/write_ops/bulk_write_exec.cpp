@@ -73,7 +73,7 @@ void execute(OperationContext* opCtx,
 
     // Reassemble the final response based on responses from sub-batches.
     auto replies = std::vector<BulkWriteReplyItem>();
-    replies.emplace_back(1, 0);
+    replies.emplace_back(0);
     reply->setCursor(BulkWriteCommandResponseCursor(0, replies));
 
     LOGV2_DEBUG(7263701, 4, "Finished execution of bulkWrite");

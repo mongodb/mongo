@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/client/read_preference.h"
+        - "mongo/db/commands/bulk_write_parser.h"
         - "mongo/db/repl/optime.h"
 
 imports:
@@ -39,6 +40,15 @@ imports:
     - "mongo/db/repl/read_concern_args.idl"
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/write_concern_options.idl"
+
+types:
+    BulkWriteReplyItem:
+        bson_serialization_type: object
+        description: "Structure used to report a single reply resulting from a batch write
+                      command."
+        cpp_type: "mongo::BulkWriteReplyItem"
+        serializer: "mongo::BulkWriteReplyItem::serialize"
+        deserializer: "mongo::BulkWriteReplyItem::parse"  
 
 structs:
 
@@ -79,49 +89,7 @@ structs:
                               mongos on the time-series view, but got rewritten to target
                               time-series buckets namespace before being sent to shards."
                 type: optionalBool
-                stability: internal               
-
-    BulkWriteReplyItem:
-        description: "A single item in a batch of results in a 'bulkWrite' command response."
-        strict: true
-        fields:
-            ok:
-                type: safeDouble
-                validator: { gte: 0.0, lte: 1.0 }
-                stability: unstable
-            idx:
-                description: "Holds the index of the batch entry."
-                type: int
-                validator: { gte: 0 }
-                stability: unstable
-            n:
-                description: "For insert: number of documents inserted.
-                              For update: number of documents that matched the query predicate.
-                              For delete: number of documents deleted."
-                type: int
-                optional: true
-                stability: unstable
-            nModified:
-                description: "Number of updated documents."
-                type: int
-                optional: true
-                stability: unstable
-            upserted:
-                type: Upserted
-                optional: true
-                stability: unstable
-            value:
-                type: IDLAnyTypeOwned
-                optional: true
-                stability: unstable
-            code:
-                type: int
-                optional: true
-                stability: unstable
-            errmsg:
-                type: string
-                optional: true
-                stability: unstable
+                stability: internal             
 
     BulkWriteCommandResponseCursor:
         description: "Cursor holding results for a successful 'bulkWrite' command."

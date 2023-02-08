@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/commands/bulk_write_parser.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/not_primary_error_tracker.h"
@@ -184,12 +185,10 @@ public:
             // message generation.
             if (auto error = write_ops_exec::generateError(
                     opCtx, writes.results[i].getStatus(), i, 0 /* numErrors */)) {
-                auto replyItem = BulkWriteReplyItem(0, idx);
-                replyItem.setCode(error.get().getStatus().code());
-                replyItem.setErrmsg(StringData(error.get().getStatus().reason()));
+                auto replyItem = BulkWriteReplyItem(idx, error.get().getStatus());
                 _replies.emplace_back(replyItem);
             } else {
-                auto replyItem = BulkWriteReplyItem(1, idx);
+                auto replyItem = BulkWriteReplyItem(idx);
                 replyItem.setN(writes.results[i].getValue().getN());
                 _replies.emplace_back(replyItem);
             }
