@@ -95,6 +95,35 @@ public:
     }
 
     /**
+     * Make a Wildcard IndexEntry with the provided key pattern and multikey paths.
+     */
+    IndexEntry buildWildcardIndexEntry(const BSONObj& kp,
+                                       const MultikeyPaths& mkp,
+                                       const size_t wildcardPos = 0) {
+        bool isMultikey = false;
+        for (const auto& val : mkp) {
+            if (!val.empty()) {
+                isMultikey = true;
+                break;
+            }
+        }
+        return {kp,
+                IndexType::INDEX_WILDCARD,
+                IndexDescriptor::kLatestIndexVersion,
+                isMultikey,  // multikey
+                mkp,         // multikey paths
+                {},
+                false,
+                false,
+                IndexEntry::Identifier{"test_wildcard"},
+                nullptr,
+                {},
+                nullptr,
+                nullptr,
+                wildcardPos};
+    }
+
+    /**
      * Given a list of queries in 'toUnion', translate into index bounds and return
      * the union of these bounds in the out-parameter 'oilOut'.
      */

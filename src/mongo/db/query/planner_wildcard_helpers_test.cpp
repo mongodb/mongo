@@ -28,7 +28,9 @@
  */
 
 #include "mongo/db/index/wildcard_key_generator.h"
+#include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
+#include "mongo/db/query/query_solution.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
@@ -159,6 +161,83 @@ TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_WithoutProjection)
     }
 }
 
+TEST(PlannerWildcardHelpersTest, FinalizeBasicPatternInCompoundWildcardIndexScanConfiguration) {
+    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
+
+    IndexEntryMock wildcardIndex{
+        BSON("a" << 1 << "$**" << 1 << "c" << 1), BSON("b" << 1), {FieldRef{"b"_sd}}};
+    std::vector<IndexEntry> expandedIndexes{};
+    stdx::unordered_set<std::string> fields{"b"};
+    expandWildcardIndexEntry(*wildcardIndex.indexEntry, fields, &expandedIndexes);
+
+    ASSERT_EQ(1, expandedIndexes.size());
+
+    const auto& expandedIndex = expandedIndexes[0];
+
+    MultikeyPaths expectedMks{{}, {0}, {}};
+    ASSERT_EQ(expectedMks, expandedIndex.multikeyPaths);
+
+    // Create an 'IndexScanNode' with the expanded 'IndexEntry' for testing finalization.
+    IndexScanNode idxScan{expandedIndex};
+
+    std::vector<interval_evaluation_tree::Builder> ietBuilders;
+    ietBuilders.resize(3);
+    idxScan.bounds.fields = {{"a"}, {"b"}, {"c"}};
+    finalizeWildcardIndexScanConfiguration(&idxScan, &ietBuilders);
+
+    auto expectedPattern = BSON("a" << 1 << "$_path" << 1 << "b" << 1 << "c" << 1);
+    ASSERT_EQ(expectedPattern.woCompare(idxScan.index.keyPattern), 0);
+    ASSERT_EQ(4, ietBuilders.size());
+    ASSERT_EQ(4, idxScan.bounds.fields.size());
+    ASSERT_EQ("$_path", idxScan.bounds.fields[idxScan.index.wildcardFieldPos - 1].name);
+    ASSERT_EQ(2, idxScan.index.wildcardFieldPos);
+
+    MultikeyPaths expectedExpandedMks{{}, {}, {0}, {}};
+    ASSERT_EQ(expectedExpandedMks, idxScan.index.multikeyPaths);
+}
+
+TEST(PlannerWildcardHelpersTest, AddSubpathBoundsIfBoundsOverlapWithObjects) {
+    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
+
+    IndexEntryMock wildcardIndex{BSON("$**" << 1 << "b" << 1), BSON("a" << 1), {}};
+    std::vector<IndexEntry> expandedIndexes{};
+    stdx::unordered_set<std::string> fields{"a"};
+    expandWildcardIndexEntry(*wildcardIndex.indexEntry, fields, &expandedIndexes);
+
+    ASSERT_EQ(1, expandedIndexes.size());
+
+    const auto& expandedIndex = expandedIndexes[0];
+
+    // Create an 'IndexScanNode' with the expanded 'IndexEntry' for testing finalization.
+    IndexScanNode idxScan{expandedIndex};
+
+    std::vector<interval_evaluation_tree::Builder> ietBuilders;
+    ietBuilders.resize(2);
+    idxScan.bounds.fields = {{"a"}, {"b"}};
+    auto objectPointInterval = fromjson("{'': {a: 1}, '': {a: 1}}");
+    idxScan.bounds.fields[0].intervals.push_back({objectPointInterval, true, true});
+    finalizeWildcardIndexScanConfiguration(&idxScan, &ietBuilders);
+
+    // Because the interval "[{a: 1}, {a: 1}]" overlaps with the Object type bracket we should add
+    // all sub-paths to $_path's interval by adding a range interval - ["a.", "a/")
+    ASSERT_EQ(2, idxScan.bounds.fields[0].intervals.size());
+    ASSERT_EQ("[\"a\", \"a\"]", idxScan.bounds.fields[0].intervals[0].toString(false));
+    ASSERT_EQ("[\"a.\", \"a/\")", idxScan.bounds.fields[0].intervals[1].toString(false));
+}
+
+TEST(PlannerWildcardHelpersTest, GetCorrectWildcardElement) {
+    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
+    IndexEntryMock wildcardIndex{BSON("$**" << 1 << "b" << 1), BSON("a" << 1), {}};
+    wildcardIndex.indexEntry->wildcardFieldPos = 0;
+    auto elem = getWildcardField(*wildcardIndex.indexEntry);
+    ASSERT_EQ(0, elem.woCompare(BSON("$**" << 1).firstElement()));
+
+    IndexEntryMock wildcardIndex2{BSON("a" << 1 << "$**" << 1 << "b" << 1), BSON("c" << 1), {}};
+    wildcardIndex2.indexEntry->wildcardFieldPos = 1;
+    elem = getWildcardField(*wildcardIndex2.indexEntry);
+    ASSERT_EQ(0, elem.woCompare(BSON("$**" << 1).firstElement()));
+}
+
 TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_NumericComponents) {
     RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
 
@@ -180,5 +259,4 @@ TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_NumericComponents)
     ASSERT_FALSE(expandedIndexes.front().multikey);
     ASSERT_EQ(expectedMks, expandedIndexes.front().multikeyPaths);
 }
-
 }  // namespace mongo::wildcard_planning

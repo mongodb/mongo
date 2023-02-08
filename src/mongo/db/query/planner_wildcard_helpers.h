@@ -69,10 +69,12 @@ BoundsTightness translateWildcardIndexBoundsAndTightness(
     interval_evaluation_tree::Builder* ietBuilder);
 
 /**
- * During planning, the expanded $** IndexEntry's keyPattern and bounds are in the single-field
- * format {'path': 1}. Once planning is complete, it is necessary to call this method in order to
- * prepare the IndexEntry and bounds for execution. This function performs the following actions:
- * - Converts the keyPattern to the {$_path: 1, "path": 1} format expected by the $** index.
+ * During planning, the expanded $** IndexEntry's keyPattern and bounds are in the format with
+ * expanded field path, like {..., 'path': 1, ...}. Once planning is complete, it is necessary to
+ * call this method in order to prepare the IndexEntry and bounds for execution. This function
+ * performs the following actions:
+ * - Converts the keyPattern to the {..., $_path: 1, "path": 1, ...} format expected by the $**
+ *   index.
  * - Adds a new entry '$_path' to the bounds vector, and computes the necessary intervals on it.
  * - Adds a new, empty entry to 'multikeyPaths' for '$_path'.
  * - Updates shouldDedup for index scan node.
@@ -88,10 +90,10 @@ void finalizeWildcardIndexScanConfiguration(
 bool isWildcardObjectSubpathScan(const IndexScanNode* node);
 
 /**
- * Return true if the intervals on the 'value' field will include subobjects, and
- * thus require the bounds on $_path to include ["path.", "path/").
+ * It's not obvious which element is the wildcard element in a compound wildcard index key pattern.
+ * This helper can give you the wildcard element based on the position tracked in 'IndexEntry'.
+ * 'index' must be a WILDCARD index.
  */
-bool requiresSubpathBounds(const OrderedIntervalList& intervals);
-
+BSONElement getWildcardField(const IndexEntry& index);
 }  // namespace wildcard_planning
 }  // namespace mongo

@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/expression_index.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -1934,4 +1935,64 @@ TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTESubObjectContainingBadVal
     assertIET(inputParamIdMap, ietBuilder, elt, testIndex, oil);
 }
 
+TEST_F(IndexBoundsBuilderTest, TranslateBoundsForWildcardIndexes) {
+    BSONObj keyPattern = BSON("a" << 1);
+    auto testIndex = buildWildcardIndexEntry(keyPattern, {{}});
+    BSONObj obj = fromjson("{a: {$lte: 1}}");
+    auto [expr, inputParamIdMap] = parseMatchExpression(obj);
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    interval_evaluation_tree::Builder ietBuilder{};
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(fromjson("{'': -Infinity, '': 1}"), true, true)));
+    ASSERT(tightness == IndexBoundsBuilder::EXACT);
+    assertIET(inputParamIdMap, ietBuilder, elt, testIndex, oil);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateBoundsForCompoundWildcardIndexes) {
+    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
+
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
+    auto testIndex = buildWildcardIndexEntry(keyPattern, {{}}, 0);
+    BSONObj obj = fromjson("{a: {$lt: 1}}");
+    auto [expr, inputParamIdMap] = parseMatchExpression(obj);
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    interval_evaluation_tree::Builder ietBuilder{};
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(fromjson("{'': -Infinity, '': 1}"), true, false)));
+    ASSERT(tightness == IndexBoundsBuilder::EXACT);
+    assertIET(inputParamIdMap, ietBuilder, elt, testIndex, oil);
+}
+
+TEST_F(IndexBoundsBuilderTest, AdjustIndexBoundsForWildcardIndexesIfObjectIncluded) {
+    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
+
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
+    auto testIndex = buildWildcardIndexEntry(keyPattern, {{}}, 0);
+    BSONObj obj = fromjson("{a: {$eq: {a: 1}}}");
+    auto [expr, inputParamIdMap] = parseMatchExpression(obj);
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    interval_evaluation_tree::Builder ietBuilder{};
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(BSON("" << MINKEY << "" << MAXKEY), true, true)));
+    ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
+    assertIET(inputParamIdMap, ietBuilder, elt, testIndex, oil);
+}
 }  // namespace

@@ -313,7 +313,7 @@ void fillOutIndexEntries(OperationContext* opCtx,
              indexType == IndexType::INDEX_COLUMN || ice->descriptor()->isSparse()))
             continue;
 
-        // TODO SERVER-72466: Allow the planner to utilize compound wildcard indexes.
+        // TODO SERVER-72467: Allow the planner to utilize compound wildcard indexes.
         if (indexType == IndexType::INDEX_WILDCARD &&
             feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
                 serverGlobalParams.featureCompatibility) &&
