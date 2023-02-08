@@ -1957,9 +1957,7 @@ ExpressionDateToString::ExpressionDateToString(ExpressionContext* const expCtx,
                                                intrusive_ptr<Expression> timeZone,
                                                intrusive_ptr<Expression> onNull)
     : Expression(expCtx,
-                 {std::move(format), std::move(date), std::move(timeZone), std::move(onNull)}) {
-    expCtx->sbeCompatible = false;
-}
+                 {std::move(format), std::move(date), std::move(timeZone), std::move(onNull)}) {}
 
 intrusive_ptr<Expression> ExpressionDateToString::optimize() {
     _children[_kDate] = _children[_kDate]->optimize();

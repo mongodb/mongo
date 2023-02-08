@@ -3095,6 +3095,51 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateDiff(ArityTy
     return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateToString(ArityType arity) {
+    invariant(arity == 4);
+
+    auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
+    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBValue);
+
+    // Get date.
+    auto [dateOwn, dateTag, dateValue] = getFromStack(1);
+    if (!coercibleToDate(dateTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto date = getDate(dateTag, dateValue);
+
+    // Get format.
+    auto [formatOwn, formatTag, formatValue] = getFromStack(2);
+    if (!value::isString(formatTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto formatString = value::getStringView(formatTag, formatValue);
+    if (!TimeZone::isValidToStringFormat(formatString)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    // Get timezone.
+    auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(3);
+    if (!isValidTimezone(timezoneTag, timezoneValue, timezoneDB)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto timezone = getTimezone(timezoneTag, timezoneValue, timezoneDB);
+
+    StringBuilder formatted;
+
+    auto status = timezone.outputDateWithFormat(formatted, formatString, date);
+
+    if (status != Status::OK()) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto [strTag, strValue] = sbe::value::makeNewString(formatted.str());
+    return {true, strTag, strValue};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateTrunc(ArityType arity) {
     invariant(arity == 6);
 
@@ -3988,6 +4033,19 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsTimezone(Arity
     }
     auto timezoneStr = value::getStringView(timezoneTag, timezoneVal);
     if (timezoneDB->isTimeZoneIdentifier(timezoneStr)) {
+        return {false, value::TypeTags::Boolean, true};
+    }
+    return {false, value::TypeTags::Boolean, false};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsValidToStringFormat(
+    ArityType arity) {
+    auto [formatOwn, formatTag, formatVal] = getFromStack(0);
+    if (!value::isString(formatTag)) {
+        return {false, value::TypeTags::Boolean, false};
+    }
+    auto formatStr = value::getStringView(formatTag, formatVal);
+    if (TimeZone::isValidToStringFormat(formatStr)) {
         return {false, value::TypeTags::Boolean, true};
     }
     return {false, value::TypeTags::Boolean, false};
@@ -5283,6 +5341,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinDayOfMonth(arity);
         case Builtin::dayOfWeek:
             return builtinDayOfWeek(arity);
+        case Builtin::dateToString:
+            return builtinDateToString(arity);
         case Builtin::split:
             return builtinSplit(arity);
         case Builtin::regexMatch:
@@ -5427,6 +5487,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinIsTimeUnit(arity);
         case Builtin::isTimezone:
             return builtinIsTimezone(arity);
+        case Builtin::isValidToStringFormat:
+            return builtinIsValidToStringFormat(arity);
         case Builtin::setUnion:
             return builtinSetUnion(arity);
         case Builtin::setIntersection:
@@ -5520,6 +5582,8 @@ std::string builtinToString(Builtin b) {
             return "dayOfWeek";
         case Builtin::datePartsWeekYear:
             return "datePartsWeekYear";
+        case Builtin::dateToString:
+            return "dateToString";
         case Builtin::dropFields:
             return "dropFields";
         case Builtin::newArray:
@@ -5658,6 +5722,8 @@ std::string builtinToString(Builtin b) {
             return "isTimeUnit";
         case Builtin::isTimezone:
             return "isTimezone";
+        case Builtin::isValidToStringFormat:
+            return "isValidToStringFormat";
         case Builtin::setUnion:
             return "setUnion";
         case Builtin::setIntersection:

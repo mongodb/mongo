@@ -116,27 +116,45 @@ const std::vector<timelib_format_specifier> kDateToStringFormatMap = {
     {'z', TIMELIB_FORMAT_TIMEZONE_OFFSET},
     {'Z', TIMELIB_FORMAT_TIMEZONE_OFFSET_MINUTES}};
 
-
 // Verifies that any '%' is followed by a valid format character as indicated by 'allowedFormats',
 // and that the 'format' string ends with an even number of '%' symbols.
-void validateFormat(StringData format,
-                    const std::vector<timelib_format_specifier>& allowedFormats) {
+template <bool UserErrorMessage>
+bool checkFormatString(StringData format,
+                       const std::vector<timelib_format_specifier>& allowedFormats) {
     for (auto it = format.begin(); it != format.end(); ++it) {
         if (*it != '%') {
             continue;
         }
 
         ++it;  // next character must be format modifier
-        uassert(18535, "Unmatched '%' at end of format string", it != format.end());
+        if constexpr (UserErrorMessage) {
+            uassert(18535, "Unmatched '%' at end of format string", it != format.end());
+        } else if (it == format.end()) {
+            return false;
+        }
 
         const bool validSpecifier = (*it == '%') ||
             std::find_if(allowedFormats.begin(), allowedFormats.end(), [=](const auto& format) {
                 return format.specifier == *it;
             }) != allowedFormats.end();
-        uassert(18536,
-                str::stream() << "Invalid format character '%" << *it << "' in format string",
-                validSpecifier);
+        if constexpr (UserErrorMessage) {
+            uassert(18536,
+                    str::stream() << "Invalid format character '%" << *it << "' in format string",
+                    validSpecifier);
+        } else if (!validSpecifier) {
+            return false;
+        }
     }
+    return true;
+}
+
+bool isValidFormat(StringData format, const std::vector<timelib_format_specifier>& allowedFormats) {
+    return checkFormatString<false>(format, allowedFormats);
+}
+
+void validateFormat(StringData format,
+                    const std::vector<timelib_format_specifier>& allowedFormats) {
+    checkFormatString<true>(format, allowedFormats);
 }
 
 }  // namespace
@@ -644,6 +662,14 @@ std::string TimeZone::threeLetterMonthName(int monthNum) const {
     return iterator->second;
 }
 
+
+bool TimeZone::isValidToStringFormat(StringData format) {
+    return isValidFormat(format, kDateToStringFormatMap);
+}
+
+bool TimeZone::isValidFromStringFormat(StringData format) {
+    return isValidFormat(format, kDateFromStringFormatMap);
+}
 
 void TimeZone::validateToStringFormat(StringData format) {
     return validateFormat(format, kDateToStringFormatMap);

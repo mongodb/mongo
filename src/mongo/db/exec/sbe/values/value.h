@@ -211,6 +211,10 @@ inline constexpr bool isArray(TypeTags tag) noexcept {
     return tag == TypeTags::Array || tag == TypeTags::ArraySet || tag == TypeTags::bsonArray;
 }
 
+inline constexpr bool isNullish(TypeTags tag) noexcept {
+    return tag == TypeTags::Nothing || tag == TypeTags::Null || tag == TypeTags::bsonUndefined;
+}
+
 inline constexpr bool isObjectId(TypeTags tag) noexcept {
     return tag == TypeTags::ObjectId || tag == TypeTags::bsonObjectId;
 }

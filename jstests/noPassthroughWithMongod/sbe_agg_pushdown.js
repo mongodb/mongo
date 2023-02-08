@@ -7,6 +7,12 @@
 
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
+// Storing the expression we assume is unsupported as a constant, so we can easily change it when we
+// implement $toBool in SBE.
+const kUnsupportedExpression = {
+    $toBool: {date: "$b"}
+};
+
 const isSBEEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 if (!isSBEEnabled) {
     jsTestLog("Skipping test because the SBE feature flag is disabled");
@@ -34,7 +40,7 @@ assert.commandWorked(coll.insertMany([
 ]));
 
 // Test query with no supported expressions is executed with the classic engine.
-assertPushdownQueryExecMode([{$project: {_id: 0, c: {$dateToString: {date: "$b"}}}}], "1");
+assertPushdownQueryExecMode([{$project: {_id: 0, c: {kUnsupportedExpression}}}], "1");
 
 // Test query that contains an expression unsupported by SBE that isn't pushed down. In this case,
 // we still expect SBE to be used if the unsupported expression isn't pushed down.
@@ -42,14 +48,14 @@ assertPushdownQueryExecMode(
     [
         {$match: {a: 2}},
         {$_internalInhibitOptimization: {}},
-        {$project: {_id: 0, c: {$dateToString: {date: "$b"}}}}
+        {$project: {_id: 0, c: {kUnsupportedExpression}}}
     ],
     "2");
 
 // Test query with an unsupported expression in a $project stage that's pushed down executes with
 // the classic engine.
-assertPushdownQueryExecMode(
-    [{$match: {a: 2}}, {$project: {_id: 0, c: {$dateToString: {date: "$b"}}}}], "1");
+assertPushdownQueryExecMode([{$match: {a: 2}}, {$project: {_id: 0, c: {kUnsupportedExpression}}}],
+                            "1");
 
 // Test query with fully supported expressions are executed with SBE when pushed down.
 assertPushdownQueryExecMode(

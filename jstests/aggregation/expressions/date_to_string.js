@@ -1,4 +1,5 @@
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
+load("jstests/aggregation/extras/utils.js");        // For assertErrorCode
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 (function() {
 "use strict";
@@ -250,14 +251,13 @@ assert.eq([{_id: 0, date: null}],
                   }
               })
               .toArray());
-
 /* --------------------------------------------------------------------------------------- */
 
 let pipeline = [
     {$project: {date: {$dateToString: {date: new ISODate("2017-01-04T15:08:51.911Z"), format: 5}}}}
 ];
-assertErrCodeAndErrMsgContains(
-    coll, pipeline, 18533, "$dateToString requires that 'format' be a string");
+let res = coll.runCommand("aggregate", {pipeline: pipeline, cursor: {}});
+assert.commandFailedWithCode(res, 18533);
 
 pipeline = [{$project: {date: {$dateToString: {format: "%Y-%m-%d %H:%M:%S", timezone: "$tz"}}}}];
 assertErrCodeAndErrMsgContains(coll, pipeline, 18628, "Missing 'date' parameter to $dateToString");
@@ -273,11 +273,12 @@ pipeline = [{
         }
     }
 }];
-assertErrCodeAndErrMsgContains(coll, pipeline, 40517, "timezone must evaluate to a string");
+res = coll.runCommand("aggregate", {pipeline: pipeline, cursor: {}});
+assert.commandFailedWithCode(res, 40517);
 
 pipeline = [{$project: {date: {$dateToString: {format: "%Y-%m-%d %H:%M:%S", date: 42}}}}];
-assertErrCodeAndErrMsgContains(
-    coll, pipeline, 16006, "can't convert from BSON type double to Date");
+res = coll.runCommand("aggregate", {pipeline: pipeline, cursor: {}});
+assert.commandFailedWithCode(res, 16006);
 
 pipeline = [{
     $project: {
@@ -290,7 +291,9 @@ pipeline = [{
         }
     }
 }];
-assertErrCodeAndErrMsgContains(coll, pipeline, 40485, "unrecognized time zone identifier");
+
+res = coll.runCommand("aggregate", {pipeline: pipeline, cursor: {}});
+assert.commandFailedWithCode(res, 40485);
 
 pipeline = [{
     $project: {date: {$dateToString: {date: new ISODate("2017-01-04T15:08:51.911Z"), format: "%"}}}

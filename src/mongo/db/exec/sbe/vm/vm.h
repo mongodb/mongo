@@ -604,6 +604,7 @@ enum class Builtin : uint8_t {
     dayOfMonth,
     dayOfWeek,
     datePartsWeekYear,
+    dateToString,
     dropFields,
     newArray,
     keepFields,
@@ -699,6 +700,7 @@ enum class Builtin : uint8_t {
     isDayOfWeek,
     isTimeUnit,
     isTimezone,
+    isValidToStringFormat,
     setUnion,
     setIntersection,
     setDifference,
@@ -1236,7 +1238,6 @@ private:
                                                              int64_t binSize,
                                                              TimeZone timezone,
                                                              DayOfWeek startOfWeek);
-
     FastTuple<bool, value::TypeTags, value::Value> builtinSplit(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDate(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDateWeekYear(ArityType arity);
@@ -1335,6 +1336,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinIsDayOfWeek(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIsTimeUnit(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIsTimezone(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinIsValidToStringFormat(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSetUnion(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSetIntersection(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSetDifference(ArityType arity);
@@ -1364,6 +1366,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinTsSecond(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinTsIncrement(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinTypeMatch(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDateToString(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDateTrunc(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinMinMaxFromArray(ArityType arity,
                                                                           Builtin f);

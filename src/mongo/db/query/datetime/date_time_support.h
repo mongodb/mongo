@@ -360,6 +360,8 @@ public:
      * Verifies that any '%' is followed by a valid format character, and that 'format' string
      * ends with an even number of '%' symbols.
      */
+    static bool isValidToStringFormat(StringData format);
+    static bool isValidFromStringFormat(StringData format);
     static void validateToStringFormat(StringData format);
     static void validateFromStringFormat(StringData format);
     std::unique_ptr<_timelib_time, TimelibTimeDeleter> getTimelibTime(Date_t) const;

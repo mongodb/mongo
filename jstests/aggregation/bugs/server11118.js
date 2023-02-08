@@ -3,6 +3,7 @@
 "use strict";
 
 load('jstests/aggregation/extras/utils.js');
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 const coll = db.server11118;
 

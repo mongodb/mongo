@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/query/expression_walker.h"
+#include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
@@ -1578,7 +1579,122 @@ public:
     }
 
     void visit(const ExpressionDateToString* expr) final {
-        unsupportedExpression("$dateFromString");
+        auto children = expr->getChildren();
+        invariant(children.size() == 4);
+        _context->ensureArity(1 + (expr->isFormatSpecified() ? 1 : 0) +
+                              (expr->isTimezoneSpecified() ? 1 : 0) +
+                              (expr->isOnNullSpecified() ? 1 : 0));
+
+        // Get child expressions.
+        auto onNullExpression =
+            expr->isOnNullSpecified() ? _context->popABTExpr() : optimizer::Constant::null();
+
+        auto timezoneExpression = expr->isTimezoneSpecified() ? _context->popABTExpr()
+                                                              : optimizer::Constant::str("UTC"_sd);
+        auto dateExpression = _context->popABTExpr();
+
+        auto formatExpression = expr->isFormatSpecified()
+            ? _context->popABTExpr()
+            : optimizer::Constant::str("%Y-%m-%dT%H:%M:%S.%LZ"_sd);
+
+        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
+        auto timeZoneDBVar = makeVariable(timeZoneDBName);
+        auto [timezoneDBTag, timezoneDBVal] =
+            _context->state.data->env->getAccessor(timeZoneDBSlot)->getViewOfValue();
+        uassert(4997900,
+                "$dateToString first argument must be a timezoneDB object",
+                timezoneDBTag == sbe::value::TypeTags::timeZoneDB);
+        auto timezoneDB = sbe::value::getTimeZoneDBView(timezoneDBVal);
+
+        // Local bind to hold the date expression result
+        auto dateName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto dateVar = makeVariable(dateName);
+
+        // Set parameters for an invocation of built-in "dateToString" function.
+        optimizer::ABTVector arguments;
+        arguments.push_back(timeZoneDBVar);
+        arguments.push_back(dateExpression);
+        arguments.push_back(formatExpression);
+        arguments.push_back(timezoneExpression);
+
+        // Create an expression to invoke built-in "dateToString" function.
+        auto dateToStringFunctionCall =
+            optimizer::make<optimizer::FunctionCall>("dateToString", std::move(arguments));
+        auto dateToStringName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto dateToStringVar = makeVariable(dateToStringName);
+
+        // Create expressions to check that each argument to "dateToString" function exists, is not
+        // null, and is of the correct type.
+        std::vector<ABTCaseValuePair> inputValidationCases;
+        // Return onNull if date is null or missing.
+        inputValidationCases.push_back(
+            {generateABTNullOrMissing(dateExpression), onNullExpression});
+        // Return null if format or timezone is null or missing.
+        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(formatExpression));
+        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(timezoneExpression));
+
+        // "date" parameter validation.
+        inputValidationCases.emplace_back(generateABTFailIfNotCoercibleToDate(
+            dateVar, ErrorCodes::Error{4997901}, "$dateToString"_sd, "date"_sd));
+
+        // "format" parameter validation.
+        if (auto* formatExpressionConst = formatExpression.cast<optimizer::Constant>();
+            formatExpressionConst) {
+            auto [formatTag, formatVal] = formatExpressionConst->get();
+            if (!sbe::value::isNullish(formatTag)) {
+                // We don't want to return an error on null.
+                uassert(4997902,
+                        "$dateToString parameter 'format' must be a string",
+                        sbe::value::isString(formatTag));
+                TimeZone::validateToStringFormat(getStringView(formatTag, formatVal));
+            }
+        } else {
+            inputValidationCases.emplace_back(
+                generateABTNonStringCheck(formatExpression),
+                makeABTFail(ErrorCodes::Error{4997903},
+                            "$dateToString parameter 'format' must be a string"));
+            inputValidationCases.emplace_back(
+                makeNot(makeABTFunction("isValidToStringFormat", formatExpression)),
+                makeABTFail(ErrorCodes::Error{4997904},
+                            "$dateToString parameter 'format' must be a valid format"));
+        }
+
+        // "timezone" parameter validation.
+        if (auto* timezoneExpressionConst = timezoneExpression.cast<optimizer::Constant>();
+            timezoneExpressionConst) {
+            auto [timezoneTag, timezoneVal] = timezoneExpressionConst->get();
+            if (!sbe::value::isNullish(timezoneTag)) {
+                // We don't want to error on null.
+                uassert(4997905,
+                        "$dateToString parameter 'timezone' must be a string",
+                        sbe::value::isString(timezoneTag));
+                uassert(4997906,
+                        "$dateToString parameter 'timezone' must be a valid timezone",
+                        sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
+            }
+        } else {
+            inputValidationCases.emplace_back(
+                generateABTNonStringCheck(timezoneExpression),
+                makeABTFail(ErrorCodes::Error{4997907},
+                            "$dateToString parameter 'timezone' must be a string"));
+            inputValidationCases.emplace_back(
+                makeNot(makeABTFunction("isTimezone", timeZoneDBVar, timezoneExpression)),
+                makeABTFail(ErrorCodes::Error{4997908},
+                            "$dateToString parameter 'timezone' must be a valid timezone"));
+        }
+
+        pushABT(optimizer::make<optimizer::Let>(
+            std::move(dateName),
+            std::move(dateExpression),
+            optimizer::make<optimizer::Let>(
+                std::move(dateToStringName),
+                std::move(dateToStringFunctionCall),
+                optimizer::make<optimizer::If>(
+                    makeABTFunction("exists", dateToStringVar),
+                    dateToStringVar,
+                    buildABTMultiBranchConditionalFromCaseValuePairs(
+                        std::move(inputValidationCases), optimizer::Constant::nothing())))));
     }
     void visit(const ExpressionDateTrunc* expr) final {
         auto children = expr->getChildren();
@@ -1697,22 +1813,22 @@ public:
             if (binSizeExpression.is<optimizer::Constant>()) {
                 auto [binSizeTag, binSizeValue] =
                     binSizeExpression.cast<optimizer::Constant>()->get();
-                tassert(
-                    7157937,
-                    "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit integer",
-                    sbe::value::isNumber(binSizeTag));
+                tassert(7157937,
+                        "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
+                        "integer",
+                        sbe::value::isNumber(binSizeTag));
                 auto [binSizeLongOwn, binSizeLongTag, binSizeLongValue] =
                     sbe::value::genericNumConvert(
                         binSizeTag, binSizeValue, sbe::value::TypeTags::NumberInt64);
-                tassert(
-                    7157938,
-                    "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit integer",
-                    binSizeLongTag != sbe::value::TypeTags::Nothing);
+                tassert(7157938,
+                        "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
+                        "integer",
+                        binSizeLongTag != sbe::value::TypeTags::Nothing);
                 auto binSize = sbe::value::bitcastTo<int64_t>(binSizeLongValue);
-                tassert(
-                    7157939,
-                    "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit integer",
-                    binSize > 0);
+                tassert(7157939,
+                        "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
+                        "integer",
+                        binSize > 0);
             } else {
                 inputValidationCases.emplace_back(
                     makeNot(optimizer::make<optimizer::BinaryOp>(
@@ -1850,7 +1966,8 @@ public:
                         return;
                     }
 
-                    // Obtain a slot for the top-level field referred to by 'expr', if one exists.
+                    // Obtain a slot for the top-level field referred to by 'expr', if one
+                    // exists.
                     auto topLevelField = std::make_pair(PlanStageSlots::kField, fp->front());
                     topLevelFieldSlot = slots->getIfExists(topLevelField);
                 }
@@ -2905,8 +3022,8 @@ private:
 
         size_t numChildren = expr->getChildren().size();
         if (numChildren == 0) {
-            // Empty $and and $or always evaluate to their logical operator's identity value: true
-            // and false, respectively.
+            // Empty $and and $or always evaluate to their logical operator's identity value:
+            // true and false, respectively.
             auto logicIdentityVal = (logicOp == optimizer::Operations::And);
             pushABT(optimizer::Constant::boolean(logicIdentityVal));
             return;
