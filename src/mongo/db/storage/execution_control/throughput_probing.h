@@ -29,35 +29,46 @@
 
 #pragma once
 
-#include "mongo/db/service_context.h"
-#include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/periodic_runner.h"
+#include "mongo/db/storage/ticketholder_monitor.h"
 
-namespace mongo {
+namespace mongo::execution_control {
 
-class TicketHolderMonitor {
+/**
+ * Adjusts the level of concurrency on the read and write ticket holders by probing up/down and
+ * attempting to maximize throughput. Assumes both ticket holders have the same starting concurrency
+ * level and always keeps the same concurrency level for both.
+ */
+class ThroughputProbing : public TicketHolderMonitor {
 public:
-    TicketHolderMonitor(ServiceContext* svcCtx,
-                        TicketHolder* readTicketHolder,
-                        TicketHolder* writeTicketHolder,
-                        Milliseconds interval);
-
-    virtual ~TicketHolderMonitor(){};
-
-    void start();
-
-protected:
-    TicketHolder* _readTicketHolder;
-    TicketHolder* _writeTicketHolder;
-
-    Milliseconds _interval() {
-        return _job.getPeriod();
-    }
+    ThroughputProbing(ServiceContext* svcCtx,
+                      TicketHolder* readTicketHolder,
+                      TicketHolder* writeTicketHolder,
+                      Milliseconds interval);
 
 private:
-    virtual void _run(Client*) = 0;
+    // TODO (SERVER-71286): Replace constants with server parameters.
+    static constexpr int kMinConcurrency = 5;
+    static constexpr int kMaxConcurrency = 128;
 
-    PeriodicJobAnchor _job;
+    enum class ProbingState {
+        kStable,
+        kUp,
+        kDown,
+    };
+
+    void _run(Client*) override;
+
+    void _probeStable(OperationContext* opCtx, double throughput);
+    void _probeUp(OperationContext* opCtx, double throughput);
+    void _probeDown(OperationContext* opCtx, double throughput);
+
+    void _setConcurrency(OperationContext* opCtx, int concurrency);
+
+    int _stableConcurrency;
+    double _stableThroughput = 0;
+    ProbingState _state = ProbingState::kStable;
+
+    int64_t _prevNumFinishedProcessing = 0;
 };
 
-}  // namespace mongo
+}  // namespace mongo::execution_control

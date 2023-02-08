@@ -49,6 +49,11 @@ PriorityTicketHolder::PriorityTicketHolder(int numTickets,
       _ticketsAvailable(numTickets),
       _serviceContext(serviceContext) {}
 
+int64_t PriorityTicketHolder::numFinishedProcessing() const {
+    return _stats[_enumToInt(QueueType::kLowPriority)].totalFinishedProcessing.load() +
+        _stats[_enumToInt(QueueType::kNormalPriority)].totalFinishedProcessing.load();
+}
+
 void PriorityTicketHolder::updateLowPriorityAdmissionBypassThreshold(
     const int& newBypassThreshold) {
     stdx::unique_lock<stdx::mutex> growthLock(_growthMutex);

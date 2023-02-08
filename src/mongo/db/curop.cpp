@@ -48,7 +48,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/telemetry.h"
 #include "mongo/db/stats/timer_stats.h"
-#include "mongo/db/storage/storage_engine_parameters_gen.h"
+#include "mongo/db/storage/storage_engine_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"

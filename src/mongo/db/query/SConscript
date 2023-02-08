@@ -397,6 +397,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/user_acquisition_stats',
         '$BUILD_DIR/mongo/db/prepare_conflict_tracker',
         '$BUILD_DIR/mongo/db/stats/resource_consumption_metrics',
+        # TODO (SERVER-66896): Remove this dependency.
+        '$BUILD_DIR/mongo/db/storage/storage_engine_feature_flags',
         '$BUILD_DIR/mongo/util/concurrency/admission_context',
         '$BUILD_DIR/mongo/util/md5',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',

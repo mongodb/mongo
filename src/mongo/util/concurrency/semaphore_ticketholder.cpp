@@ -43,6 +43,10 @@
 
 namespace mongo {
 
+int64_t SemaphoreTicketHolder::numFinishedProcessing() const {
+    return _semaphoreStats.totalFinishedProcessing.load();
+}
+
 void SemaphoreTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
     _appendCommonQueueImplStats(b, _semaphoreStats);
 }

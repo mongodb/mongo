@@ -207,14 +207,26 @@ env.Library(
 env.Library(
     target='storage_engine_parameters',
     source=[
+        'execution_control/throughput_probing.cpp',
         'ticketholder_manager.cpp',
         'ticketholder_monitor.cpp',
         'storage_engine_parameters.idl',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+        'storage_engine_feature_flags',
+    ],
+)
+
+env.Library(
+    target='storage_engine_feature_flags',
+    source=[
+        'storage_engine_feature_flags.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -369,6 +381,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         'storage_change_lock',
         'storage_control',
+        'storage_engine_feature_flags',
         'storage_engine_lock_file',
         'storage_engine_metadata',
         'storage_options',

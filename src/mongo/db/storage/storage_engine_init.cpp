@@ -42,6 +42,7 @@
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine_change_context.h"
+#include "mongo/db/storage/storage_engine_feature_flags_gen.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/storage_engine_parameters_gen.h"

@@ -41,8 +41,12 @@ env.Library(
         'ticketholder.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base', '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/third_party/shim_boost', 'admission_context',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        # TODO (SERVER-67104): Remove this dependency.
+        '$BUILD_DIR/mongo/db/storage/storage_engine_feature_flags',
+        '$BUILD_DIR/third_party/shim_boost',
+        'admission_context',
         'ticket_broker' if env.TargetOSIs('linux') else []
     ],
 )

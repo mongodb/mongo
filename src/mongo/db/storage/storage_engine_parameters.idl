@@ -38,6 +38,7 @@ enums:
     type: string
     values:
       kNone: ""
+      kThroughputProbing: "throughputProbing"
 
 server_parameters:
 
@@ -95,13 +96,3 @@ server_parameters:
     default: ""
     validator:
       callback: TicketHolderManager::validateConcurrencyAdjustmentAlgorithm
-
-feature_flags:
-  featureFlagExecutionControl:
-    description: Enables the dynamic adjustment of the number of concurrent storage engine transactions
-    cpp_varname: feature_flags::gFeatureFlagExecutionControl
-    default: false
-  featureFlagDeprioritizeLowPriorityOperations:
-    description: Enables the deprioritization of low priority operations
-    cpp_varname: feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
-    default: false

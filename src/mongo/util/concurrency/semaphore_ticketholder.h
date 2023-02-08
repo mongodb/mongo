@@ -59,6 +59,8 @@ public:
         return std::max(static_cast<int>(added - removed), 0);
     };
 
+    int64_t numFinishedProcessing() const override final;
+
 private:
     boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
                                                     AdmissionContext* admCtx,

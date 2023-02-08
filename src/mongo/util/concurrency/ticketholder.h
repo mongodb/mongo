@@ -100,6 +100,33 @@ public:
      */
     virtual void reportImmediatePriorityAdmission() = 0;
 
+    /**
+     * Instantaneous number of tickets 'available' (not checked out by an operation) in the ticket
+     * pool.
+     */
+    virtual int available() const = 0;
+
+    /**
+     * Instantaneous number of tickets that are checked out by an operation.
+     */
+    virtual int used() const = 0;
+
+    /**
+     * Peak number of tickets checked out at once since the previous time this function was called.
+     */
+    virtual int getAndResetPeakUsed() = 0;
+
+    /**
+     * The total number of tickets allotted to the ticket pool.
+     */
+    virtual int outof() const = 0;
+
+    /**
+     * The total number of operations that acquired a ticket, completed their work, and released the
+     * ticket.
+     */
+    virtual int64_t numFinishedProcessing() const = 0;
+
 private:
     /**
      * Releases a ticket back into the ticketing pool.
@@ -133,14 +160,11 @@ public:
      */
     void resize(OperationContext* opCtx, int newSize) noexcept override;
 
-    virtual int used() const {
+    int used() const override {
         return outof() - available();
     }
 
-    /**
-     * The total number of tickets allotted to the ticket pool.
-     */
-    int outof() const {
+    int outof() const override {
         return _outof.loadRelaxed();
     }
 
@@ -174,16 +198,12 @@ public:
         AtomicWord<std::int64_t> totalTimeQueuedMicros{0};
     };
 
+    int getAndResetPeakUsed() override;
+
     /**
      * Instantaneous number of operations waiting in queue for a ticket.
      */
     virtual int queued() const = 0;
-
-    /**
-     * Instantaneous number of tickets 'available' (not checked out by an operation) in the ticket
-     * pool.
-     */
-    virtual int available() const = 0;
 
 private:
     void _releaseToTicketPool(AdmissionContext* admCtx) noexcept override final;
@@ -207,9 +227,12 @@ private:
      */
     virtual QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept = 0;
 
+    void _updatePeakUsed();
+
     Mutex _resizeMutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2),
                                           "TicketHolderWithQueueingStats::_resizeMutex");
     AtomicWord<int> _outof;
+    AtomicWord<int> _peakUsed;
     AtomicWord<std::int64_t> _immediatePriorityAdmissionsCount;
 
 protected:

@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/service_context.h"
-#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine_feature_flags_gen.h"
+#include "mongo/util/concurrency/admission_context.h"
 
 #include <iostream>
 
@@ -101,6 +99,7 @@ boost::optional<Ticket> TicketHolderWithQueueingStats::tryAcquire(AdmissionConte
     if (ticket) {
         auto& queueStats = _getQueueStatsToUse(admCtx);
         updateQueueStatsOnTicketAcquisition(_serviceContext, queueStats, admCtx);
+        _updatePeakUsed();
     }
     return ticket;
 }
@@ -141,9 +140,26 @@ boost::optional<Ticket> TicketHolderWithQueueingStats::waitForTicketUntil(Operat
     if (ticket) {
         cancelWait.dismiss();
         updateQueueStatsOnTicketAcquisition(_serviceContext, queueStats, admCtx);
+        _updatePeakUsed();
         return ticket;
     } else {
         return boost::none;
+    }
+}
+
+int TicketHolderWithQueueingStats::getAndResetPeakUsed() {
+    return _peakUsed.swap(used());
+}
+
+void TicketHolderWithQueueingStats::_updatePeakUsed() {
+    if (!feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV()) {
+        return;
+    }
+
+    auto currentUsed = used();
+    auto peakUsed = _peakUsed.load();
+
+    while (currentUsed > peakUsed && !_peakUsed.compareAndSwap(&peakUsed, currentUsed)) {
     }
 }
 

@@ -71,6 +71,8 @@ public:
         return result;
     }
 
+    int64_t numFinishedProcessing() const override final;
+
     /**
      * Number of times low priority operations are expedited for ticket admission over normal
      * priority operations.
