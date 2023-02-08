@@ -10,7 +10,7 @@ variables:
   ###
   # Leave this section uncommented to enable compile.
   _real_remote_file: &_remote_file
-      ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile-variant|}-${version_id}.tar.gz
+      ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile_variant|}-${version_id}.tar.gz
   _real_compile: &_compile
     - variant: linux-wt-standalone
       name: compile
@@ -316,17 +316,17 @@ functions:
             load('jstests/hooks/run_validate_collections.actual.js');
           EOF
           fi
-          tar czf mongodb${compile-variant|}.tar.gz mongodb
+          tar czf mongodb${compile_variant|}.tar.gz mongodb
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongodb${compile-variant|}.tar.gz
-        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile-variant|}-${version_id}.tar.gz
+        local_file: src/mongodb${compile_variant|}.tar.gz
+        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile_variant|}-${version_id}.tar.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        display_name: mongodb${compile-variant|}.tar.gz
+        display_name: mongodb${compile_variant|}.tar.gz
   ###
 
   ## Schedule Tasks ##
