@@ -83,7 +83,8 @@ using std::shared_ptr;
 using std::vector;
 
 DocumentSourceGroupBase::~DocumentSourceGroupBase() {
-    groupCounters.incrementGroupCounters(_stats);
+    groupCounters.incrementGroupCounters(
+        _stats.spills, _stats.spilledDataStorageSize, _stats.spilledRecords);
 }
 
 Value DocumentSourceGroupBase::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
@@ -134,9 +135,11 @@ Value DocumentSourceGroupBase::serialize(boost::optional<ExplainOptions::Verbosi
             Value(static_cast<long long>(_stats.totalOutputDataSizeBytes));
         out["usedDisk"] = Value(_stats.spills > 0);
         out["spills"] = Value(static_cast<long long>(_stats.spills));
-        out["spillFileSizeBytes"] = Value(static_cast<long long>(_stats.spillFileSizeBytes));
+        out["spilledDataStorageSize"] =
+            Value(static_cast<long long>(_stats.spilledDataStorageSize));
         out["numBytesSpilledEstimate"] =
             Value(static_cast<long long>(_stats.numBytesSpilledEstimate));
+        out["spilledRecords"] = Value(static_cast<long long>(_stats.spilledRecords));
     }
 
     return out.freezeToValue();
@@ -592,6 +595,7 @@ void DocumentSourceGroupBase::resetReadyGroups() {
 void DocumentSourceGroupBase::spill() {
     _stats.spills++;
     _stats.numBytesSpilledEstimate += _memoryTracker.currentMemoryBytes();
+    _stats.spilledRecords += _groups->size();
 
     vector<const GroupsMap::value_type*> ptrs;  // using pointers to speed sorting
     ptrs.reserve(_groups->size());
@@ -644,7 +648,7 @@ void DocumentSourceGroupBase::spill() {
 
     _sortedFiles.emplace_back(writer.done());
     if (_spillStats) {
-        _stats.spillFileSizeBytes = _spillStats->bytesSpilled();
+        _stats.spilledDataStorageSize = _spillStats->bytesSpilled();
     }
 }
 

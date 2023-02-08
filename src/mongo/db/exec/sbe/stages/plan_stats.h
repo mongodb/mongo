@@ -320,7 +320,7 @@ struct HashAggStats : public SpecificStats {
 
     bool usedDisk{false};
     // The number of times that the entire hash table was spilled.
-    long long numSpills{0};
+    long long spills{0};
     // The number of individual records spilled to disk.
     long long spilledRecords{0};
     // An estimate, in bytes, of the size of the final spill table after all spill events have taken

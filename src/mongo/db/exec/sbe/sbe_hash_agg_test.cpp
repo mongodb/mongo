@@ -447,7 +447,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
     // Check that the spilling behavior matches the expected.
     auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
     ASSERT_FALSE(stats->usedDisk);
-    ASSERT_EQ(0, stats->numSpills);
+    ASSERT_EQ(0, stats->spills);
     ASSERT_EQ(0, stats->spilledRecords);
 
     stage->close();
@@ -514,7 +514,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
     // spilling after estimating that the memory budget is exceeded. These two factors result in
     // fewer expected spills than there are input records, even though only one record fits in
     // memory at a time.
-    ASSERT_EQ(stats->numSpills, 3);
+    ASSERT_EQ(stats->spills, 3);
     // The input has one run of two consecutive values, so we expect to spill as many records as
     // there are input values minus one.
     ASSERT_EQ(stats->spilledRecords, 8);
@@ -588,7 +588,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
     // Check that it did not spill.
     auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
     ASSERT_FALSE(stats->usedDisk);
-    ASSERT_EQ(0, stats->numSpills);
+    ASSERT_EQ(0, stats->spills);
     ASSERT_EQ(0, stats->spilledRecords);
 
     stage->close();
@@ -655,7 +655,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
     // spilling after estimating that the memory budget is exceeded. These two factors result in
     // fewer expected spills than there are input records, even though only one record fits in
     // memory at a time.
-    ASSERT_EQ(stats->numSpills, 3);
+    ASSERT_EQ(stats->spills, 3);
     // The input has one run of two consecutive values, so we expect to spill as many records as
     // there are input values minus one.
     ASSERT_EQ(stats->spilledRecords, 8);
@@ -715,7 +715,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
     // Check that the spilling behavior matches the expected.
     auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
     ASSERT_FALSE(stats->usedDisk);
-    ASSERT_EQ(0, stats->numSpills);
+    ASSERT_EQ(0, stats->spills);
     ASSERT_EQ(0, stats->spilledRecords);
 
     stage->close();
@@ -792,7 +792,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
     // Check that the spilling behavior matches the expected.
     auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
     ASSERT_TRUE(stats->usedDisk);
-    ASSERT_EQ(stats->numSpills, 3);
+    ASSERT_EQ(stats->spills, 3);
     // The input has one run of two consecutive values, so we expect to spill as many records as
     // there are input values minus one.
     ASSERT_EQ(stats->spilledRecords, 8);
@@ -871,7 +871,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
     auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
     ASSERT_TRUE(stats->usedDisk);
     // We expect each incoming value to result in a spill of a single record.
-    ASSERT_EQ(stats->numSpills, 9);
+    ASSERT_EQ(stats->spills, 9);
     ASSERT_EQ(stats->spilledRecords, 9);
 
     stage->close();

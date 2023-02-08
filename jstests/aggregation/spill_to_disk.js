@@ -45,7 +45,7 @@ function assertSpillingOccurredInSbeExplain(groupStats) {
     assert(groupStats);
     assert(groupStats.hasOwnProperty("usedDisk"), groupStats);
     assert(groupStats.usedDisk, groupStats);
-    assert.gt(groupStats.numSpills, 0, groupStats);
+    assert.gt(groupStats.spills, 0, groupStats);
     assert.gt(groupStats.spilledRecords, 0, groupStats);
     assert.gt(groupStats.spilledDataStorageSize, 0, groupStats);
 }

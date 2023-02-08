@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -100,6 +101,12 @@ std::unique_ptr<PlanStage> HashAggStage::clone() const {
                                           _commonStats.nodeId,
                                           _participateInTrialRunTracking,
                                           _forceIncreasedSpilling);
+}
+
+HashAggStage::~HashAggStage() {
+    groupCounters.incrementGroupCounters(_specificStats.spills,
+                                         _specificStats.spilledDataStorageSize,
+                                         _specificStats.spilledRecords);
 }
 
 void HashAggStage::doSaveState(bool relinquishCursor) {
@@ -313,7 +320,7 @@ void HashAggStage::spill(MemoryCheckData& mcd) {
 
     _ht->clear();
 
-    ++_specificStats.numSpills;
+    ++_specificStats.spills;
 }
 
 // Checks memory usage. Ideally, we'd want to know the exact size of already accumulated data, but
@@ -613,7 +620,7 @@ std::unique_ptr<PlanStageStats> HashAggStage::getStats(bool includeDebugInfo) co
 
         // Spilling stats.
         bob.appendBool("usedDisk", _specificStats.usedDisk);
-        bob.appendNumber("numSpills", _specificStats.numSpills);
+        bob.appendNumber("spills", _specificStats.spills);
         bob.appendNumber("spilledRecords", _specificStats.spilledRecords);
         bob.appendNumber("spilledDataStorageSize", _specificStats.spilledDataStorageSize);
 

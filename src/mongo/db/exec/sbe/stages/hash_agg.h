@@ -93,6 +93,8 @@ public:
                  bool participateInTrialRunTracking = true,
                  bool forceIncreasedSpilling = false);
 
+    virtual ~HashAggStage();
+
     std::unique_ptr<PlanStage> clone() const final;
 
     void prepare(CompileCtx& ctx) final;

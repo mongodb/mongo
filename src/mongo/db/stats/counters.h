@@ -433,19 +433,22 @@ class GroupCounters {
 public:
     GroupCounters() = default;
 
-    void incrementGroupCounters(const GroupStats& stats) {
-        spills.increment(stats.spills);
-        spillFileSizeBytes.increment(stats.spillFileSizeBytes);
-        numBytesSpilledEstimate.increment(stats.numBytesSpilledEstimate);
+    void incrementGroupCounters(uint64_t spills,
+                                uint64_t spilledDataStorageSize,
+                                uint64_t spilledRecords) {
+        groupSpills.increment(spills);
+        groupSpilledDataStorageSize.increment(spilledDataStorageSize);
+        groupSpilledRecords.increment(spilledRecords);
     }
 
-    CounterMetric spills{
+    // Counters tracking group stats across all execution engines.
+    CounterMetric groupSpills{
         "query.group.spills"};  // The total number of spills to disk from group stages.
-    CounterMetric spillFileSizeBytes{
-        "query.group.spillFileSizeBytes"};  // The size of the file spilled to disk.
-    CounterMetric numBytesSpilledEstimate{
-        "query.group.numBytesSpilledEstimate"};  // The number of bytes evicted from memory and
-                                                 // spilled to disk.
+    CounterMetric groupSpilledDataStorageSize{
+        "query.group.spilledDataStorageSize"};  // The size of the file or RecordStore spilled to
+                                                // disk.
+    CounterMetric groupSpilledRecords{
+        "query.group.spilledRecords"};  // The number of records spilled to disk.
 };
 extern GroupCounters groupCounters;
 
