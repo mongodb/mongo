@@ -9,6 +9,14 @@ import SCons
 # multiple compilation databases is not supported by ninja
 if env.GetOption('ninja') == 'disabled':
 
+    tidy_test_env = env.Clone()
+
+    # These test files will purposefully be error prone, so we can disable warnings any warnings we expect
+    # to see.
+    tidy_test_env.Append(CCFLAGS=[
+        '-Wno-unused-but-set-parameter',
+    ], )
+
     # This list represents the test source files, which should contain a single issue which will be flagged
     # by a clang tidy check. The issue should be isolated in as minimal way as possible.
     tests = [
@@ -23,13 +31,13 @@ if env.GetOption('ninja') == 'disabled':
     test_objs = []
     compilation_dbs = []
     for test in tests:
-        test_env = env.Clone()
+        test_env = tidy_test_env.Clone()
         compilation_dbs += test_env.CompilationDatabase(
             os.path.splitext(os.path.basename(test))[0] + ".json")
         test_objs += test_env.Object(test)
 
     # Building a program binary may not be necessary but it does validate the code and tie it together.
-    test_prog = env.Program(
+    test_prog = tidy_test_env.Program(
         target='MongoTidyCheck_test',
         source=['MongoTidyCheckTestMain.cpp'] + test_objs,
         LIBDEPS_NO_INHERIT=[
@@ -39,7 +47,7 @@ if env.GetOption('ninja') == 'disabled':
 
     # Here we setup the test execution. The test will pythons built in unittest framework
     # to execute clang tidy for each test source file from the list above.
-    test = env.Command(
+    test = tidy_test_env.Command(
         target='run_MongoTidyCheck_test',
         source=[
             'MongoTidyCheck_unittest.py',
@@ -52,11 +60,11 @@ if env.GetOption('ninja') == 'disabled':
                 '--clang-tidy-path=${SOURCES[1]}',
                 '--mongo-tidy-module=${SOURCES[2]}',
                 '${["--test-compiledbs=%s" % src for src in SOURCES[3:]]}',
-                f"{'' if env.Verbose() else '2> /dev/null'}",
+                f"{'' if tidy_test_env.Verbose() else '2> /dev/null'}",
             ]),
-            "" if env.Verbose() else "Runnning mongo tidy checks unittests.",
+            "" if tidy_test_env.Verbose() else "Runnning mongo tidy checks unittests.",
         ),
     )
 
-    env.Alias('+mongo-tidy-tests', test)
-    env.Depends(test, test_prog)
+    tidy_test_env.Alias('+mongo-tidy-tests', test)
+    tidy_test_env.Depends(test, test_prog)
