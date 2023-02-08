@@ -154,3 +154,31 @@ function analyzeFields(db, coll, fields) {
         assert.commandWorked(db.runCommand({analyze: coll.getName(), key: field}));
     }
 }
+/**
+ * Given a scalar histogram document print it combining bounds with the corresponding buckets.
+ * hist = { buckets: [{boundaryCount: 1, rangeCount: 0, ...}], bounds: [100, 500]}
+ */
+function printScalarHistogram(hist) {
+    assert.eq(hist.buckets.length, hist.bounds.length);
+    let i = 0;
+    while (i < hist.buckets.length) {
+        print(`BucketId: ${i}, ${hist.bounds[i]}, ${tojsononeline(hist.buckets[i])}\n`);
+        i++;
+    }
+}
+
+function printHistogram(hist) {
+    jsTestLog(`Histogram on field: ${hist._id}`);
+    print("Scalar Histogram:\n");
+    printScalarHistogram(hist.statistics.scalarHistogram);
+
+    if (hist.statistics.hasOwnProperty("arrayStatistics")) {
+        print("Array statistics:\n");
+        print("Unique Histogram:\n");
+        printScalarHistogram(hist.statistics.arrayStatistics.uniqueHistogram);
+        print("Min Histogram:\n");
+        printScalarHistogram(hist.statistics.arrayStatistics.minHistogram);
+        print("Max Histogram:\n");
+        printScalarHistogram(hist.statistics.arrayStatistics.maxHistogram);
+    }
+}

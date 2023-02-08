@@ -30,14 +30,24 @@ function generateComparisons(field, boundaries, fieldType) {
         if (i % 4 == 1) {
             for (const op of compOps) {
                 const pred = makeMatchPredicate(field, boundary, op);
-                const doc =
-                    {"pipeline": [pred], "qtype": op, "dtype": fieldType, "fieldName": field};
+                const doc = {
+                    "pipeline": [pred],
+                    "qtype": op,
+                    "dtype": fieldType,
+                    "fieldName": field,
+                    "elemMatch": false
+                };
                 docs.push(doc);
             }
         } else {
             const pred = makeMatchPredicate(field, boundary, compOps[j]);
-            const doc =
-                {"pipeline": [pred], "qtype": compOps[j], "dtype": fieldType, "fieldName": field};
+            const doc = {
+                "pipeline": [pred],
+                "qtype": compOps[j],
+                "dtype": fieldType,
+                "fieldName": field,
+                "elemMatch": false
+            };
             docs.push(doc);
             j = (j + 1) % 5;
         }
@@ -46,9 +56,10 @@ function generateComparisons(field, boundaries, fieldType) {
     return docs;
 }
 
+const min_char_code = '0'.codePointAt(0);
+const max_char_code = '~'.codePointAt(0);
+
 function nextChar(thisChar, distance) {
-    const min_char_code = '0'.codePointAt(0);
-    const max_char_code = '~'.codePointAt(0);
     const number_of_chars = max_char_code - min_char_code + 1;
     const char_code = thisChar.codePointAt(0);
     assert(min_char_code <= char_code <= max_char_code, "char is out of range");
@@ -64,6 +75,10 @@ function nextChar(thisChar, distance) {
  */
 function nextStr(str, distance) {
     const spec = {"small": 3, "medium": 2, "large": 1};
+    if (str.length == 0) {
+        const nextCharCode = min_char_code + 4 - spec[distance];
+        return String.fromCodePoint(nextCharCode);
+    }
     let pos = spec[distance] - 1;
     if (pos >= str.length) {
         pos = str.length - 1;
@@ -185,7 +200,8 @@ function generateRangePredicates(field, queryValues, fieldType) {
                 "pipeline": [pred],
                 "qtype": qSize + " range",
                 "dtype": fieldType,
-                "fieldName": field
+                "fieldName": field,
+                "elemMatch": false
             };
             docs.push(doc);
             if (fieldType == 'array' && range[0] <= range[1]) {
@@ -267,8 +283,10 @@ function selectHistogramBounds(statsColl, field, fieldType) {
     return values;
 }
 
-// Extract min/max values from a field. The initial unwind phase extracts the values in case the
-// field contains arrays.
+/**
+ * Extract min/max values from a field. The initial unwind phase extracts the values in case the
+ * field contains arrays.
+ */
 function getMinMax(coll, field) {
     const res = coll.aggregate([
                         {$unwind: field},
@@ -277,6 +295,48 @@ function getMinMax(coll, field) {
                     ])
                     .toArray();
     return res[0];
+}
+
+/**
+ * Extract query values from an array of sample arrays. Select up to three values per array element.
+ * {[1, 3, 5], [ 2, 4, 6, 8, 10], [100]] -> [1, 3, 5, 2, 6, 10, 100]
+ */
+function selectArrayValues(nestedArray) {
+    let values = [];
+    nestedArray.forEach(function(array) {
+        if (typeof array != "object") {
+            values.push(array);
+        } else {
+            const len = array.length;
+            if (len <= 3) {
+                values = values.concat(array);
+            } else {
+                for (let ratio of [0.1, 0.5, 0.9]) {
+                    const i = Math.trunc(ratio * len);
+                    values.push(array[i]);
+                }
+            }
+        }
+    });
+    return values;
+}
+
+function selectOutOfRangeValues(minMaxDoc) {
+    let values = [];
+    const min = minMaxDoc["min"];
+    if (typeof min == 'number') {
+        values.push(min - 1);
+    } else if (typeof min == 'string') {
+        const prevMin = (min.length > 1) ? min.at(0) : "";
+        values.push(prevMin);
+    }
+    const max = minMaxDoc["max"];
+    if (typeof max == 'number') {
+        values.push(max + 1);
+    } else if (typeof max == 'string') {
+        values.push(nextStr(max, "small"));
+    }
+    return values;
 }
 
 function sortValues(values) {
@@ -325,18 +385,21 @@ function selectQueryValues(coll, fields, fieldTypes, samplePos, statsColl) {
     while (i < fields.length) {
         const field = fields[i];
         const fieldType = fieldTypes[i];
-        const minMaxDoc = getMinMax(coll, "$" + field);
-        // TODO: using min/ max values and the field type, add out-of-range values.
 
         let v = selectFieldValues(sample, field);
         if (fieldType === 'array') {
-            v = v.flat();
+            v = selectArrayValues(v);
         }
 
+        const minMaxDoc = getMinMax(coll, "$" + field);
         v.push(minMaxDoc["min"]);
         v.push(minMaxDoc["max"]);
 
-        let histValues = selectHistogramBounds(statsColl, field, fieldType);
+        // Using min/ max values extract out-of-range values.
+        const outOfRange = selectOutOfRangeValues(minMaxDoc);
+        v = v.concat(outOfRange);
+
+        const histValues = selectHistogramBounds(statsColl, field, fieldType);
         v = v.concat(histValues);
 
         let values = sortValues(v);

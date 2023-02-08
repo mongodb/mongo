@@ -571,20 +571,20 @@ TEST_F(CEHistogramTest, TestArrayHistogramOnAtomicPredicates) {
     ASSERT_EQ_ELEMMATCH_CE(t, 0.0 /* CE */, 0.0 /* $elemMatch CE */, "a", "{$gt: 10}");
     ASSERT_EQ_ELEMMATCH_CE(t, 1.0 /* CE */, 1.0 /* $elemMatch CE */, "a", "{$gte: 10}");
 
-    ASSERT_EQ_ELEMMATCH_CE(t, 5.0 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$lte: 10}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$lt: 10}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$gt: 1}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 5.0 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$gte: 1}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 5.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$lte: 10}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$lt: 10}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gt: 1}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 5.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gte: 1}");
 
-    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$lte: 5}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$lt: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$lte: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$lt: 5}");
     ASSERT_EQ_ELEMMATCH_CE(t, 2.0 /* CE */, 2.0 /* $elemMatch CE */, "a", "{$gt: 5}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 2.0 /* CE */, 2.55085 /* $elemMatch CE */, "a", "{$gte: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 2.0 /* CE */, 2.40822 /* $elemMatch CE */, "a", "{$gte: 5}");
 
-    ASSERT_EQ_ELEMMATCH_CE(t, 2.45 /* CE */, 2.55085 /* $elemMatch CE */, "a", "{$gt: 2, $lt: 5}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 3.27 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$gte: 2, $lt: 5}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 2.45 /* CE */, 3.40113 /* $elemMatch CE */, "a", "{$gt: 2, $lte: 5}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 3.27 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$gte: 2, $lte: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 2.45 /* CE */, 2.40822 /* $elemMatch CE */, "a", "{$gt: 2, $lt: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 3.27 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gte: 2, $lt: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 2.45 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gt: 2, $lte: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 3.27 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gte: 2, $lte: 5}");
 }
 
 TEST_F(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
@@ -715,8 +715,8 @@ TEST_F(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
     ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$eq: 5}}, array: {$eq: 5}}", 35.0);
 
     // Test case with multiple predicates and ranges.
-    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$lt: 5}}", 70.2156);
-    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$gt: 5}}", 28.4848);
+    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$lt: 5}}", 67.1508);
+    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$gt: 5}}", 27.8562);
 
     // Test multiple $elemMatches.
     ASSERT_MATCH_CE(t, "{scalar: {$elemMatch: {$eq: 5}}, array: {$elemMatch: {$eq: 5}}}", 0.0);
@@ -734,8 +734,8 @@ TEST_F(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
                     "{scalar: {$elemMatch: {$eq: 5}}, mixed: {$elemMatch: {$eq: 5}}, array: "
                     "{$elemMatch: {$eq: 5}}}",
                     0.0);
-    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$elemMatch: {$lt: 5}}}", 34.1434);
-    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$elemMatch: {$gt: 5}}}", 45.5246);
+    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$elemMatch: {$lt: 5}}}", 31.7118);
+    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$elemMatch: {$gt: 5}}}", 42.2825);
 
     // Verify that we still return an estimate of 0.0 for any $elemMatch predicate on a scalar
     // field when we have a non-multikey index.

@@ -32,7 +32,8 @@ function computeAndPrintErrors(testcase, ceStrategies, collSize) {
         _id: testcase._id,
         qtype: testcase.qtype,
         dtype: testcase.dtype,
-        fieldName: testcase.fieldName
+        fieldName: testcase.fieldName,
+        elemMatch: testcase.elemMatch
     };
 
     ceStrategies.forEach(function(strategy) {
@@ -111,10 +112,11 @@ function aggregateErrorsPerCategory(errorColl, groupField, ceStrategies) {
 }
 
 /**
- * Aggregate errors in the 'errorColl' per CE strategy.
+ * Aggregate errors in the 'errorColl' per CE strategy. If a predicate is provided
+ * aggregate only the error documents which satisfy the predicate.
  */
-function aggregateAllErrorsPerStrategy(errorColl, ceStrategies) {
-    jsTestLog(`Mean errors per strategy:`);
+function aggregateErrorsPerStrategy(errorColl, ceStrategies, predicate = {}) {
+    jsTestLog(`Mean errors per strategy for predicate ${tojsononeline(predicate)}:`);
     for (const strategy of ceStrategies) {
         const absError = "$" + strategy + ".absError";
         const relError = "$" + strategy + ".relError";
@@ -122,6 +124,7 @@ function aggregateAllErrorsPerStrategy(errorColl, ceStrategies) {
         const res =
             errorColl
                 .aggregate([
+                    {$match: predicate},
                     {
                         $project: {
                             absError2: {$pow: [absError, 2]},

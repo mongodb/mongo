@@ -96,6 +96,7 @@ function runCETestForCollection(testDB, collMeta, sampleSize = 6) {
     // Queries are defined as documents. Example:
     // {_id: 1, pipeline: [{$match: {a: {$gt: 16}}}], "dtype": "int", "qtype" : "$gt"}.
     let testCases = generateQueries(coll, fields, fieldTypes, collSize, sampleSize, statsColl);
+    print(`Running ${testCases.length} queries over ${fields.length} fields.\n`);
 
     runQueries(coll, testCases, ceStrategies, fields);
 
@@ -122,8 +123,10 @@ function runCETestForCollection(testDB, collMeta, sampleSize = 6) {
     aggregateErrorsPerDataDistribution(errorColl, allStrategies);
     aggregateErrorsPerCategory(errorColl, "dtype", allStrategies);
 
+    // Aggregate $elemMatch query errors per strategy.
+    aggregateErrorsPerStrategy(errorColl, allStrategies, {"elemMatch": true});
     // Aggregate errors per strategy.
-    aggregateAllErrorsPerStrategy(errorColl, allStrategies);
+    aggregateErrorsPerStrategy(errorColl, allStrategies);
 
     printQueriesWithBadAccuracy(errorColl, testCases, "histogram", "relError");
     printQueriesWithBadAccuracy(errorColl, testCases, indexedStrategy("histogram"), "relError");

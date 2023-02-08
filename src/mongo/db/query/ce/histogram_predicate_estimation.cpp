@@ -322,9 +322,7 @@ CEType estimateCardRange(const ArrayHistogram& ah,
             const auto arrayMaxEst = estRange(ah.getArrayMax());
             const auto arrayUniqueEst = estRange(ah.getArrayUnique());
 
-            // ToDo: try using ah.getArrayCount() - ah.getEmptyArrayCount();
-            // when the number of empty arrays is provided by the statistics.
-            const double totalArrayCount = ah.getArrayCount();
+            const double totalArrayCount = ah.getArrayCount() - ah.getEmptyArrayCount();
 
             uassert(
                 6715101, "Array histograms should contain at least one array", totalArrayCount > 0);

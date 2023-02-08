@@ -232,7 +232,7 @@ runHistogramsTest(function verifyArrayHistograms() {
         ],
         // In this case, CE is only seeing one scalar interval. Because we don't get a PathArr
         // interval, we estimate this to include scalars.
-        ce: 4,
+        ce: 3,
         hint: idx
     });
     verifyCEForMatch({coll, predicate: {a: {$elemMatch: {$lt: "array"}}}, expected: [], hint: idx});
@@ -256,7 +256,7 @@ runHistogramsTest(function verifyArrayHistograms() {
         ],
         // In this case, CE is only seeing one scalar interval. Because we don't get a PathArr
         // interval, we estimate this to include scalars.
-        ce: 4,
+        ce: 3,
         hint: idx
     });
     verifyCEForMatch({
@@ -279,7 +279,7 @@ runHistogramsTest(function verifyArrayHistograms() {
         ],
         // In this case, CE is only seeing one scalar interval. Because we don't get a PathArr
         // interval, we estimate this to include scalars.
-        ce: 4,
+        ce: 3,
         hint: idx
     });
 });
