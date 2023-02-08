@@ -47,8 +47,11 @@ namespace mongo {
 namespace analyze_shard_key {
 namespace {
 
+const NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("testDb", "testColl0");
+const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("testDb", "testColl1");
+
 TEST(QueryAnalysisWriterBufferTest, AddBasic) {
-    auto buffer = QueryAnalysisWriter::Buffer();
+    auto buffer = QueryAnalysisWriter::Buffer(nss0);
 
     auto doc0 = BSON("a" << 0);
     buffer.add(doc0);
@@ -65,7 +68,7 @@ TEST(QueryAnalysisWriterBufferTest, AddBasic) {
 }
 
 TEST(QueryAnalysisWriterBufferTest, AddTooLarge) {
-    auto buffer = QueryAnalysisWriter::Buffer();
+    auto buffer = QueryAnalysisWriter::Buffer(nss0);
 
     auto doc = BSON(std::string(BSONObjMaxUserSize, 'a') << 1);
     buffer.add(doc);
@@ -75,7 +78,7 @@ TEST(QueryAnalysisWriterBufferTest, AddTooLarge) {
 
 TEST(QueryAnalysisWriterBufferTest, TruncateBasic) {
     auto testTruncateCommon = [](int oldCount, int newCount) {
-        auto buffer = QueryAnalysisWriter::Buffer();
+        auto buffer = QueryAnalysisWriter::Buffer(nss0);
 
         std::vector<BSONObj> docs;
         for (auto i = 0; i < oldCount; i++) {
@@ -104,7 +107,7 @@ TEST(QueryAnalysisWriterBufferTest, TruncateBasic) {
 }
 
 DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidIndex_Negative, "invariant") {
-    auto buffer = QueryAnalysisWriter::Buffer();
+    auto buffer = QueryAnalysisWriter::Buffer(nss0);
 
     auto doc = BSON("a" << 0);
     buffer.add(doc);
@@ -115,7 +118,7 @@ DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidIndex_Negative, "invari
 }
 
 DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidIndex_Positive, "invariant") {
-    auto buffer = QueryAnalysisWriter::Buffer();
+    auto buffer = QueryAnalysisWriter::Buffer(nss0);
 
     auto doc = BSON("a" << 0);
     buffer.add(doc);
@@ -126,7 +129,7 @@ DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidIndex_Positive, "invari
 }
 
 DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidSize_Negative, "invariant") {
-    auto buffer = QueryAnalysisWriter::Buffer();
+    auto buffer = QueryAnalysisWriter::Buffer(nss0);
 
     auto doc = BSON("a" << 0);
     buffer.add(doc);
@@ -137,7 +140,7 @@ DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidSize_Negative, "invaria
 }
 
 DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidSize_Zero, "invariant") {
-    auto buffer = QueryAnalysisWriter::Buffer();
+    auto buffer = QueryAnalysisWriter::Buffer(nss0);
 
     auto doc = BSON("a" << 0);
     buffer.add(doc);
@@ -148,7 +151,7 @@ DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidSize_Zero, "invariant")
 }
 
 DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidSize_Positive, "invariant") {
-    auto buffer = QueryAnalysisWriter::Buffer();
+    auto buffer = QueryAnalysisWriter::Buffer(nss0);
 
     auto doc = BSON("a" << 0);
     buffer.add(doc);
@@ -433,11 +436,6 @@ protected:
         ASSERT_EQ(parsedDiffDoc.getSampleId(), sampleId);
         assertBsonObjEqualUnordered(parsedDiffDoc.getDiff(), expectedDiff);
     }
-
-    const NamespaceString nss0 =
-        NamespaceString::createNamespaceString_forTest("testDb", "testColl0");
-    const NamespaceString nss1 =
-        NamespaceString::createNamespaceString_forTest("testDb", "testColl1");
 
     // Test with both empty and non-empty filter and collation to verify that the
     // QueryAnalysisWriter doesn't require filter or collation to be non-empty.

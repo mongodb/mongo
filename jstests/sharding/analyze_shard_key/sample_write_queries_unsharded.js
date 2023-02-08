@@ -13,7 +13,11 @@ load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 // period of 1 second to speed up the test.
 const st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 2, setParameter: {queryAnalysisWriterIntervalSecs: 1}},
+    rs: {
+        nodes: 2,
+        setParameter:
+            {queryAnalysisWriterIntervalSecs: 1, logComponentVerbosity: tojson({verbosity: 2})}
+    },
     mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs: 1}},
     other: {
         // Disable periodic index checker so its aggregate isn't incorrectly sampled. This is only a

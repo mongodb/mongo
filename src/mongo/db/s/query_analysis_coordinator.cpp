@@ -73,6 +73,8 @@ void QueryAnalysisCoordinator::onConfigurationInsert(const BSONObj& doc) {
 
     auto analyzerDoc =
         QueryAnalyzerDocument::parse(IDLParserContext("QueryAnalysisCoordinator"), doc);
+    LOGV2(7372308, "Detected new query analyzer configuration", "configuration"_attr = analyzerDoc);
+
     if (analyzerDoc.getMode() == QueryAnalyzerModeEnum::kOff) {
         // Do not create an entry for it if the mode is "off".
         return;
@@ -80,6 +82,7 @@ void QueryAnalysisCoordinator::onConfigurationInsert(const BSONObj& doc) {
 
     auto configuration = CollectionQueryAnalyzerConfiguration{
         analyzerDoc.getNs(), analyzerDoc.getCollectionUuid(), *analyzerDoc.getSampleRate()};
+
     _configurations.emplace(analyzerDoc.getCollectionUuid(), std::move(configuration));
 }
 
@@ -88,6 +91,10 @@ void QueryAnalysisCoordinator::onConfigurationUpdate(const BSONObj& doc) {
 
     auto analyzerDoc =
         QueryAnalyzerDocument::parse(IDLParserContext("QueryAnalysisCoordinator"), doc);
+    LOGV2(7372309,
+          "Detected a query analyzer configuration update",
+          "configuration"_attr = analyzerDoc);
+
     if (analyzerDoc.getMode() == QueryAnalyzerModeEnum::kOff) {
         // Remove the entry for it if the mode has been set to "off".
         _configurations.erase(analyzerDoc.getCollectionUuid());
@@ -105,8 +112,13 @@ void QueryAnalysisCoordinator::onConfigurationUpdate(const BSONObj& doc) {
 
 void QueryAnalysisCoordinator::onConfigurationDelete(const BSONObj& doc) {
     stdx::lock_guard<Latch> lk(_mutex);
+
     auto analyzerDoc =
         QueryAnalyzerDocument::parse(IDLParserContext("QueryAnalysisCoordinator"), doc);
+    LOGV2(7372310,
+          "Detected a query analyzer configuration delete",
+          "configuration"_attr = analyzerDoc);
+
     _configurations.erase(analyzerDoc.getCollectionUuid());
 }
 

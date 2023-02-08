@@ -16,6 +16,7 @@ const st = new ShardingTest({
         setParameter: {
             queryAnalysisWriterIntervalSecs: 1,
             queryAnalysisSampleExpirationSecs: 2,
+            logComponentVerbosity: tojson({verbosity: 2})
         }
     },
     mongosOptions: {

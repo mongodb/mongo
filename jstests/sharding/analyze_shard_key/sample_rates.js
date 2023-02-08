@@ -42,8 +42,11 @@ const st = new ShardingTest({
     shards: 3,
     rs: {
         nodes: 2,
-        setParameter:
-            {queryAnalysisSamplerConfigurationRefreshSecs, queryAnalysisWriterIntervalSecs}
+        setParameter: {
+            queryAnalysisSamplerConfigurationRefreshSecs,
+            queryAnalysisWriterIntervalSecs,
+            logComponentVerbosity: tojson({verbosity: 2})
+        }
     },
     configOptions: {
         setParameter: {queryAnalysisSamplerInActiveThresholdSecs: 3},

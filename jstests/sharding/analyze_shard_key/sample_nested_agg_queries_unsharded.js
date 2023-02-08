@@ -14,8 +14,11 @@ const st = new ShardingTest({
     shards: 2,
     rs: {
         nodes: 2,
-        setParameter:
-            {queryAnalysisSamplerConfigurationRefreshSecs, queryAnalysisWriterIntervalSecs}
+        setParameter: {
+            queryAnalysisSamplerConfigurationRefreshSecs,
+            queryAnalysisWriterIntervalSecs,
+            logComponentVerbosity: tojson({verbosity: 2})
+        }
     },
     // Disable query sampling on mongos to verify that the nested aggregate queries are sampled by
     // the shard that routes them.

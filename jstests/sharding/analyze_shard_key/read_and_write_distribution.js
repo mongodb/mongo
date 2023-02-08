@@ -372,7 +372,8 @@ const analyzeShardKeyNumRanges = 10;
             setParameter: {
                 queryAnalysisSamplerConfigurationRefreshSecs,
                 queryAnalysisWriterIntervalSecs,
-                analyzeShardKeyNumRanges
+                analyzeShardKeyNumRanges,
+                logComponentVerbosity: tojson({verbosity: 2})
             }
         },
         mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs}}
@@ -530,7 +531,8 @@ const analyzeShardKeyNumRanges = 10;
     jsTest.log("Verify that on a replica set the analyzeShardKey command doesn't return read " +
                "and write distribution metrics");
 
-    const rst = new ReplSetTest({nodes: 2});
+    const rst =
+        new ReplSetTest({nodes: 2, setParameter: {logComponentVerbosity: tojson({verbosity: 2})}});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

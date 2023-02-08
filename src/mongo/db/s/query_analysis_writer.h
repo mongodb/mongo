@@ -73,6 +73,12 @@ public:
      */
     struct Buffer {
     public:
+        Buffer(const NamespaceString& nss) : _nss(nss){};
+
+        const NamespaceString& getNss() const {
+            return _nss;
+        }
+
         /**
          * Adds the given document to the buffer if its size is below the limit (i.e.
          * BSONObjMaxUserSize - some padding) and increments the total number of bytes accordingly.
@@ -103,6 +109,8 @@ public:
         }
 
     private:
+        NamespaceString _nss;
+
         std::vector<BSONObj> _docs;
         long long _numBytes = 0;
     };
@@ -205,9 +213,9 @@ private:
 
     /**
      * The helper for '_flushQueries' and '_flushDiffs'. Inserts the documents in 'buffer' into the
-     * collection 'ns' in batches, and removes all the inserted documents from 'buffer'. Internally
-     * retries the inserts on retryable errors for a fixed number of times. Ignores DuplicateKey
-     * errors since they are expected for the following reasons:
+     * collection it is associated with in batches, and removes all the inserted documents from
+     * 'buffer'. Internally retries the inserts on retryable errors for a fixed number of times.
+     * Ignores DuplicateKey errors since they are expected for the following reasons:
      * - For the query buffer, a sampled query that is idempotent (e.g. a read or retryable write)
      *   could get added to the buffer (across nodes) more than once due to retries.
      * - For the diff buffer, a sampled multi-update query could end up generating multiple diffs
@@ -215,7 +223,7 @@ private:
      *
      * Throws an error if the inserts fail with any other error.
      */
-    void _flush(OperationContext* opCtx, const NamespaceString& nss, Buffer* buffer);
+    void _flush(OperationContext* opCtx, Buffer* buffer);
 
     /**
      * Returns true if the total size of the buffered queries and diffs has exceeded the maximum
@@ -226,10 +234,10 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisWriter::_mutex");
 
     PeriodicJobAnchor _periodicQueryWriter;
-    Buffer _queries;
+    Buffer _queries{NamespaceString::kConfigSampledQueriesNamespace};
 
     PeriodicJobAnchor _periodicDiffWriter;
-    Buffer _diffs;
+    Buffer _diffs{NamespaceString::kConfigSampledQueriesDiffNamespace};
 
     // Initialized on startup and joined on shutdown.
     std::shared_ptr<executor::TaskExecutor> _executor;

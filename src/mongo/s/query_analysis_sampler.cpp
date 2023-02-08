@@ -153,10 +153,22 @@ void QueryAnalysisSampler::SampleRateLimiter::_refill(double numTokensPerSecond,
     auto now = _serviceContext->getFastClockSource()->now();
     double numSecondsElapsed =
         duration_cast<Microseconds>(now - _lastRefillTime).count() / 1000000.0;
+
     if (numSecondsElapsed > 0) {
         _lastNumTokens =
             std::min(burstCapacity, numSecondsElapsed * numTokensPerSecond + _lastNumTokens);
         _lastRefillTime = now;
+
+        LOGV2_DEBUG(7372303,
+                    2,
+                    "Refilled the bucket",
+                    "namespace"_attr = _nss,
+                    "collectionUUID"_attr = _collUuid,
+                    "numSecondsElapsed"_attr = numSecondsElapsed,
+                    "numTokensPerSecond"_attr = numTokensPerSecond,
+                    "burstCapacity"_attr = burstCapacity,
+                    "lastNumTokens"_attr = _lastNumTokens,
+                    "lastRefillTime"_attr = _lastRefillTime);
     }
 }
 
@@ -165,13 +177,31 @@ bool QueryAnalysisSampler::SampleRateLimiter::tryConsume() {
 
     if (_lastNumTokens >= 1) {
         _lastNumTokens -= 1;
+        LOGV2_DEBUG(7372304,
+                    2,
+                    "Successfully consumed one token",
+                    "namespace"_attr = _nss,
+                    "collectionUUID"_attr = _collUuid,
+                    "lastNumTokens"_attr = _lastNumTokens);
         return true;
     } else if (isApproximatelyEqual(_lastNumTokens, 1, kEpsilon)) {
         // To avoid skipping queries that could have been sampled, allow one token to be consumed
         // if there is nearly one.
         _lastNumTokens = 0;
+        LOGV2_DEBUG(7372305,
+                    2,
+                    "Successfully consumed approximately one token",
+                    "namespace"_attr = _nss,
+                    "collectionUUID"_attr = _collUuid,
+                    "lastNumTokens"_attr = _lastNumTokens);
         return true;
     }
+    LOGV2_DEBUG(7372306,
+                2,
+                "Failed to consume one token",
+                "namespace"_attr = _nss,
+                "collectionUUID"_attr = _collUuid,
+                "lastNumTokens"_attr = _lastNumTokens);
     return false;
 }
 
@@ -227,6 +257,14 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
                 "Refreshed query analyzer configurations",
                 "numQueriesExecutedPerSecond"_attr = lastAvgCount,
                 "response"_attr = response);
+    if (response.getConfigurations().size() != _sampleRateLimiters.size()) {
+        LOGV2(7362407,
+              "Refreshed query analyzer configurations. The number of collections with active "
+              "sampling has changed.",
+              "before"_attr = _sampleRateLimiters.size(),
+              "after"_attr = response.getConfigurations().size(),
+              "response"_attr = response);
+    }
 
     stdx::lock_guard<Latch> lk(_mutex);
     std::map<NamespaceString, SampleRateLimiter> sampleRateLimiters;
