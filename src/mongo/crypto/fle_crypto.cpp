@@ -708,14 +708,14 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
     // condition
     while (flag) {
         // 7 a
-        BSONObj doc = reader.getById(collectionT::generateId(tagToken, rho + lambda));
+        bool docExists = reader.existsById(collectionT::generateId(tagToken, rho + lambda));
 
 #ifdef DEBUG_ENUM_BINARY
         std::cout << fmt::format("search1: rho: {},  doc: {}", rho, doc.toString()) << std::endl;
 #endif
 
         // 7 b
-        if (!doc.isEmpty()) {
+        if (docExists) {
             rho = 2 * rho;
         } else {
             flag = false;
@@ -739,7 +739,7 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
 
 
         // 9b
-        BSONObj doc = reader.getById(collectionT::generateId(tagToken, median + lambda));
+        bool docExists = reader.existsById(collectionT::generateId(tagToken, median + lambda));
 
 #ifdef DEBUG_ENUM_BINARY
         std::cout << fmt::format("search_stat: min: {}, median: {}, max: {}, i: {}, doc: {}",
@@ -752,7 +752,7 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
 #endif
 
         // 9c
-        if (!doc.isEmpty()) {
+        if (docExists) {
             // 9 c i
             min = median;
 
@@ -770,9 +770,9 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
             // explicitly
             if (j == maxIterations && min == 1) {
                 // 9 d ii A
-                BSONObj doc = reader.getById(collectionT::generateId(tagToken, 1 + lambda));
+                bool docExists2 = reader.existsById(collectionT::generateId(tagToken, 1 + lambda));
                 // 9 d ii B
-                if (!doc.isEmpty()) {
+                if (docExists2) {
                     i = 1 + lambda;
                 }
             } else if (j == maxIterations && min != 1) {
@@ -2485,12 +2485,12 @@ boost::optional<uint64_t> binarySearchCommon(const FLEStateCollectionReader& rea
 
     bool flag = true;
     while (flag) {
-        auto doc = reader.getById(idGenerator(rho + lambda));
+        bool docExists = reader.existsById(idGenerator(rho + lambda));
 
 #ifdef DEBUG_ENUM_BINARY
         std::cout << fmt::format("search1: rho: {},  doc: {}", rho, doc.toString()) << std::endl;
 #endif
-        if (!doc.isEmpty()) {
+        if (docExists) {
             rho = 2 * rho;
         } else {
             flag = false;
@@ -2504,7 +2504,7 @@ boost::optional<uint64_t> binarySearchCommon(const FLEStateCollectionReader& rea
         tracker.recordSuboperation();
         median = ceil(static_cast<double>(max - min) / 2) + min;
 
-        BSONObj doc = reader.getById(idGenerator(median + lambda));
+        bool docExists = reader.existsById(idGenerator(median + lambda));
 
 #ifdef DEBUG_ENUM_BINARY
         std::cout << fmt::format("search_stat: min: {}, median: {}, max: {}, i: {}, doc: {}",
@@ -2516,7 +2516,7 @@ boost::optional<uint64_t> binarySearchCommon(const FLEStateCollectionReader& rea
                   << std::endl;
 #endif
 
-        if (!doc.isEmpty()) {
+        if (docExists) {
             min = median;
             if (j == maxIterations) {
                 i = min + lambda;
@@ -2527,8 +2527,8 @@ boost::optional<uint64_t> binarySearchCommon(const FLEStateCollectionReader& rea
             // Binary search has ended without finding a document, check for the first document
             // explicitly
             if (j == maxIterations && min == 1) {
-                BSONObj doc2 = reader.getById(idGenerator(1 + lambda));
-                if (!doc2.isEmpty()) {
+                bool docExists2 = reader.existsById(idGenerator(1 + lambda));
+                if (docExists2) {
                     i = 1 + lambda;
                 }
             } else if (j == maxIterations && min != 1) {

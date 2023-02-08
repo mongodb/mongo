@@ -342,6 +342,13 @@ public:
      * Get a document by its _id.
      */
     virtual BSONObj getById(PrfBlock block) const = 0;
+
+    /**
+     * Return true by a document by _id if it exists.
+     */
+    virtual bool existsById(PrfBlock block) const {
+        return !getById(block).isEmpty();
+    }
 };
 
 class ESCCollection {
