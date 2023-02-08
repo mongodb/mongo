@@ -611,6 +611,11 @@ long long PlanExecutorImpl::executeDelete() {
             const SpecificStats* stats = _root->child()->getSpecificStats();
             return static_cast<const DeleteStats*>(stats)->docsDeleted;
         }
+        case StageType::STAGE_TIMESERIES_WRITE: {
+            const auto* tsWriteStats =
+                static_cast<const TimeseriesWriteStats*>(_root->getSpecificStats());
+            return tsWriteStats->measurementsDeleted;
+        }
         default: {
             invariant(StageType::STAGE_DELETE == _root->stageType() ||
                       StageType::STAGE_BATCHED_DELETE == _root->stageType());

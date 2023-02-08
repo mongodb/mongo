@@ -117,6 +117,9 @@ enum StageType {
     STAGE_TEXT_OR,
     STAGE_TEXT_MATCH,
 
+    // Stage for modifying bucket documents in a time-series bucket collection.
+    STAGE_TIMESERIES_WRITE,
+
     // Stage for choosing between two alternate plans based on an initial trial period.
     STAGE_TRIAL,
 

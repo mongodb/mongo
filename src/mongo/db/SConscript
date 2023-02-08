@@ -1354,6 +1354,7 @@ env.Library(
         'exec/subplan.cpp',
         'exec/text_match.cpp',
         'exec/text_or.cpp',
+        'exec/timeseries_write.cpp',
         'exec/trial_period_utils.cpp',
         'exec/trial_stage.cpp',
         'exec/unpack_timeseries_bucket.cpp',
