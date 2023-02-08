@@ -71,7 +71,10 @@ public:
     }
 
 protected:
-    bool advanceWTCursor() {
+    /**
+     * Returns true if and only if the cursor advanced to EOF.
+     */
+    [[nodiscard]] bool advanceWTCursor() {
         WT_CURSOR* c = _cursor->get();
         int ret = wiredTigerPrepareConflictRetry(
             _opCtx, [&] { return _forward ? c->next(c) : c->prev(c); });

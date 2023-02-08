@@ -948,20 +948,12 @@ public:
     }
 
     boost::optional<IndexKeyEntry> next(RequestedInfo parts) override {
-        if (!advanceNext()) {
-            return {};
-        }
+        advanceNext();
         return curr(parts);
     }
 
     boost::optional<KeyStringEntry> nextKeyString() override {
-        if (!advanceNext()) {
-            return {};
-        }
-        if (_eof) {
-            return {};
-        }
-
+        advanceNext();
         return getKeyStringEntry();
     }
 
@@ -993,9 +985,7 @@ public:
 
     boost::optional<KeyStringEntry> seekForKeyString(
         const KeyString::Value& keyStringValue) override {
-        if (!seekForKeyStringInternal(keyStringValue)) {
-            return boost::none;
-        }
+        seekForKeyStringInternal(keyStringValue);
         return getKeyStringEntry();
     }
 
@@ -1066,10 +1056,6 @@ public:
     }
 
 protected:
-    void advanceWTCursor() {
-        _cursorAtEof = WiredTigerIndexCursorGeneric::advanceWTCursor();
-    }
-
     // Called after _key has been filled in, ie a new key to be processed has been fetched.
     // Must not throw WriteConflictException, throwing a WriteConflictException will retry the
     // operation effectively skipping over this key.
@@ -1080,6 +1066,7 @@ protected:
             invariant(_rsKeyFormat == KeyFormat::String);
             _id = KeyString::decodeRecordIdStrAtEnd(_key.getBuffer(), _key.getSize());
         }
+        invariant(!_id.isNull());
 
         WT_CURSOR* c = _cursor->get();
         WT_ITEM item;
@@ -1143,6 +1130,7 @@ protected:
         setKey(c, searchKey.Get());
         return seekWTCursorInternal(searchKey, /*bounded*/ false);
     }
+    void checkOrderAfterSeek();
 
     bool seekWTCursorInternal(const WiredTigerItem searchKey, bool bounded) {
 
@@ -1176,44 +1164,41 @@ protected:
             return true;
         }
 
-        if (bounded) {
-            dassert(_forward ? cmp >= 0 : cmp <= 0);
-        } else {
-            // Make sure we land on a matching key (after/before for forward/reverse).
-            // If this operation is ignoring prepared updates and search_near() lands on a key that
-            // compares lower than the search key (for a forward cursor), calling next() is not
-            // guaranteed to return a key that compares greater than the search key. This is because
-            // ignoring prepare conflicts does not provide snapshot isolation and the call to next()
-            // may land on a newly-committed prepared entry. We must advance our cursor until we
-            // find a key that compares greater than the search key. The same principle applies to
-            // reverse cursors. See SERVER-56839.
-            const bool enforcingPrepareConflicts =
-                _opCtx->recoveryUnit()->getPrepareConflictBehavior() ==
-                PrepareConflictBehavior::kEnforce;
-            WT_ITEM curKey;
-            while (_forward ? cmp < 0 : cmp > 0) {
-                advanceWTCursor();
-                if (_cursorAtEof) {
-                    break;
-                }
+        dassert(!bounded || (_forward ? cmp >= 0 : cmp <= 0));
 
-                if (!kDebugBuild && enforcingPrepareConflicts) {
-                    break;
-                }
+        // Make sure we land on a matching key (after/before for forward/reverse).
+        // If this operation is ignoring prepared updates and search_near() lands on a key that
+        // compares lower than the search key (for a forward cursor), calling next() is not
+        // guaranteed to return a key that compares greater than the search key. This is because
+        // ignoring prepare conflicts does not provide snapshot isolation and the call to next()
+        // may land on a newly-committed prepared entry. We must advance our cursor until we
+        // find a key that compares greater than the search key. The same principle applies to
+        // reverse cursors. See SERVER-56839.
+        const bool enforcingPrepareConflicts =
+            _opCtx->recoveryUnit()->getPrepareConflictBehavior() ==
+            PrepareConflictBehavior::kEnforce;
+        WT_ITEM curKey;
+        while (_forward ? cmp < 0 : cmp > 0) {
+            _cursorAtEof = advanceWTCursor();
+            if (_cursorAtEof) {
+                break;
+            }
 
-                getKey(c, &curKey);
-                cmp =
-                    std::memcmp(curKey.data, searchKey.data, std::min(searchKey.size, curKey.size));
+            if (!kDebugBuild && enforcingPrepareConflicts) {
+                break;
+            }
 
-                LOGV2_TRACE_CURSOR(5683900, "cmp after advance: {cmp}", "cmp"_attr = cmp);
+            getKey(c, &curKey);
+            cmp = std::memcmp(curKey.data, searchKey.data, std::min(searchKey.size, curKey.size));
 
-                if (enforcingPrepareConflicts) {
-                    // If we are enforcing prepare conflicts, calling next() or prev() must always
-                    // give us a key that compares, respectively, greater than or less than our
-                    // search key. An exact match is also possible in the case of _id indexes,
-                    // because the recordid is not a part of the key.
-                    dassert(_forward ? cmp >= 0 : cmp <= 0);
-                }
+            LOGV2_TRACE_CURSOR(5683900, "cmp after advance: {cmp}", "cmp"_attr = cmp);
+
+            if (enforcingPrepareConflicts) {
+                // If we are enforcing prepare conflicts, calling next() or prev() must always
+                // give us a key that compares, respectively, greater than or less than our
+                // search key. An exact match is also possible in the case of _id indexes,
+                // because the recordid is not a part of the key.
+                dassert(_forward ? cmp >= 0 : cmp <= 0);
             }
         }
 
@@ -1225,82 +1210,92 @@ protected:
      * be called after a restore that did not restore to original state since that does not
      * logically move the cursor until the following call to next().
      */
-    void updatePosition(bool inNext = false) {
-        _lastMoveSkippedKey = false;
-        if (_cursorAtEof) {
-            _eof = true;
-            _id = RecordId();
-            return;
-        }
+    void updatePosition(const char* newKeyData, size_t newKeySize) {
+        // Store (a copy of) the new item data as the current key for this cursor.
+        _key.resetFromBuffer(newKeyData, newKeySize);
 
-        _eof = false;
+        _eof = atOrPastEndPointAfterSeeking();
+        if (_eof)
+            return;
+
+        updateIdAndTypeBits();
+    }
+
+    void checkKeyIsOrdered(const char* newKeyData, size_t newKeySize) {
+        if (!kDebugBuild || _key.isEmpty())
+            return;
+        // In debug mode, let's ensure that our index keys are actually in order. We've had
+        // issues in the past with our underlying cursors (WT-2307), but also with cursor
+        // mis-use (SERVER-55658). This check can help us catch such things earlier rather than
+        // later.
+        const int cmp =
+            std::memcmp(_key.getBuffer(), newKeyData, std::min(_key.getSize(), newKeySize));
+        bool outOfOrder = _forward ? (cmp > 0 || (cmp == 0 && _key.getSize() > newKeySize))
+                                   : (cmp < 0 || (cmp == 0 && _key.getSize() < newKeySize));
+
+        if (outOfOrder) {
+            LOGV2_FATAL(51790,
+                        "WTIndex::checkKeyIsOrdered: the new key is out of order with respect to "
+                        "the previous key",
+                        "newKey"_attr = redact(hexblob::encode(newKeyData, newKeySize)),
+                        "prevKey"_attr = redact(_key.toString()),
+                        "isForwardCursor"_attr = _forward);
+        }
+    }
+
+
+    void seekForKeyStringInternal(const KeyString::Value& keyStringValue) {
+        dassert(_opCtx->lockState()->isReadLocked());
+        seekWTCursor(keyStringValue);
+
+        _lastMoveSkippedKey = false;
+        _id = RecordId();
+
+        _eof = _cursorAtEof;
+        if (_eof)
+            return;
 
         WT_CURSOR* c = _cursor->get();
         WT_ITEM item;
         getKey(c, &item);
 
-        if (kDebugBuild && inNext && !_key.isEmpty()) {
-            // In debug mode, let's ensure that our index keys are actually in order. We've had
-            // issues in the past with our underlying cursors (WT-2307), but also with cursor
-            // mis-use (SERVER-55658). This check can help us catch such things earlier rather than
-            // later.
-            const int cmp =
-                std::memcmp(_key.getBuffer(), item.data, std::min(_key.getSize(), item.size));
-            bool outOfOrder = _forward ? (cmp > 0 || (cmp == 0 && _key.getSize() > item.size))
-                                       : (cmp < 0 || (cmp == 0 && _key.getSize() < item.size));
-
-            if (outOfOrder) {
-                LOGV2_FATAL(51790,
-                            "WTIndex::updatePosition: the new key is out of order with respect to "
-                            "the previous key",
-                            "newKey"_attr = redact(hexblob::encode(item.data, item.size)),
-                            "prevKey"_attr = redact(_key.toString()),
-                            "isForwardCursor"_attr = _forward);
-            }
-        }
-
-        // Store (a copy of) the new item data as the current key for this cursor.
-        _key.resetFromBuffer(item.data, item.size);
-
-        if (atOrPastEndPointAfterSeeking()) {
-            _eof = true;
-            return;
-        }
-
-        updateIdAndTypeBits();
+        updatePosition(static_cast<const char*>(item.data), item.size);
     }
 
-    bool seekForKeyStringInternal(const KeyString::Value& keyStringValue) {
-        dassert(_opCtx->lockState()->isReadLocked());
-        seekWTCursor(keyStringValue);
-
-        updatePosition();
-        if (_eof)
-            return false;
-
-        dassert(!atOrPastEndPointAfterSeeking());
-        dassert(!_id.isNull());
-
-        return true;
-    }
-
-    bool advanceNext() {
+    void advanceNext() {
         // Advance on a cursor at the end is a no-op.
-        if (_eof) {
-            return false;
-        }
+        if (_eof)
+            return;
 
         // Ensure an active transaction is open.
         WiredTigerRecoveryUnit::get(_opCtx)->getSession();
 
-        if (!_lastMoveSkippedKey) {
-            advanceWTCursor();
+        if (!_lastMoveSkippedKey)
+            _cursorAtEof = advanceWTCursor();
+
+        _lastMoveSkippedKey = false;
+
+        _eof = _cursorAtEof;
+        if (_eof) {
+            // In the normal case, _id will be updated in updatePosition. Making this reset
+            // unconditional affects performance noticeably.
+            _id = RecordId();
+            return;
         }
-        updatePosition(true);
-        return true;
+
+        WT_CURSOR* c = _cursor->get();
+        WT_ITEM item;
+        getKey(c, &item);
+
+        checkKeyIsOrdered(static_cast<const char*>(item.data), item.size);
+
+        updatePosition(static_cast<const char*>(item.data), item.size);
     }
 
-    KeyStringEntry getKeyStringEntry() {
+    boost::optional<KeyStringEntry> getKeyStringEntry() {
+        if (_eof)
+            return {};
+
         // Most keys will have a RecordId appended to the end, with the exception of the _id index
         // and timestamp unsafe unique indexes. The contract of this function is to always return a
         // KeyString with a RecordId, so append one if it does not exists already.

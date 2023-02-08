@@ -263,7 +263,7 @@ public:
             return {};
         }
         if (!_lastMoveSkippedKey) {
-            advanceWTCursor();
+            _eof = advanceWTCursor();
         }
 
         return curr();
@@ -389,7 +389,7 @@ private:
             PrepareConflictBehavior::kEnforce;
         WT_ITEM curKey;
         while (cmp < 0) {
-            advanceWTCursor();
+            _eof = advanceWTCursor();
 
             if (_eof) {
                 break;
@@ -417,10 +417,6 @@ private:
         }
 
         return cmp == 0;
-    }
-
-    void advanceWTCursor() {
-        _eof = WiredTigerIndexCursorGeneric::advanceWTCursor();
     }
 
     boost::optional<FullCellView> curr() {

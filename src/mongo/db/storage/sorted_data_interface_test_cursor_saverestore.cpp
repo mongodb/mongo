@@ -31,6 +31,7 @@
 
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
+#include <limits>
 #include <memory>
 
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -72,6 +73,56 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursor) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        int i = 0;
+        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
+             entry;
+             i++, entry = cursor->next()) {
+            ASSERT_LT(i, nToInsert);
+            ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
+
+            cursor->save();
+            cursor->restore();
+        }
+        ASSERT(!cursor->next());
+        ASSERT_EQ(i, nToInsert);
+    }
+}
+
+// Insert multiple keys and try to iterate through all of them
+// using a forward cursor with set end position, while calling savePosition() and
+// restorePosition() in succession.
+TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithEndPosition) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            BSONObj key = BSON("" << i);
+            RecordId loc(42, i * 2);
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        cursor->setEndPosition(BSON("" << std::numeric_limits<double>::infinity()), true);
+
         int i = 0;
         for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
              entry;
