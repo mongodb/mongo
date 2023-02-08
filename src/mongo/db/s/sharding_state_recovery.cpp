@@ -258,15 +258,22 @@ Status ShardingStateRecovery_DEPRECATED::recover(OperationContext* opCtx) {
         "flight. Contacting the config server primary in order to retrieve the most recent opTime",
         "inProgressMetadataOperationCount"_attr = recoveryDoc.getMinOpTimeUpdaters());
 
-    // Need to fetch the latest uptime from the config server, so do a logging write
-    Status status = ShardingLogging::get(opCtx)->logChangeChecked(
-        opCtx,
-        "Sharding minOpTime recovery",
-        NamespaceString::kServerConfigurationNamespace.ns(),
-        recoveryDocBSON,
-        ShardingCatalogClient::kMajorityWriteConcern);
-    if (!status.isOK())
-        return status;
+    // Need to fetch the latest uptime from the config server, so do a logging write.
+    //
+    // If this node is the config server, we skip the write because we may be in stepup and cannot
+    // perform majority writes. The write isn't required in this case, since the node must be in a
+    // recent enough version where configTime guarantees are maintained via the vector clock.
+    Status status = Status::OK();
+    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        status = ShardingLogging::get(opCtx)->logChangeChecked(
+            opCtx,
+            "Sharding minOpTime recovery",
+            NamespaceString::kServerConfigurationNamespace.ns(),
+            recoveryDocBSON,
+            ShardingCatalogClient::kMajorityWriteConcern);
+        if (!status.isOK())
+            return status;
+    }
 
     LOGV2(22087, "Sharding state recovered");
 

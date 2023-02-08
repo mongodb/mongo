@@ -9,6 +9,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
+
 const dbName = "foo";
 const collName = "bar";
 const ns = dbName + "." + collName;
@@ -103,6 +105,29 @@ const newShardName =
     // Basic CRUD and sharded DDL still works.
     basicCRUD(st.s);
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {skey: 40}}));
+}
+
+{
+    //
+    // ShardingStateRecovery doesn't block step up.
+    //
+
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 0}, to: configShardName}));
+
+    const hangMigrationFp = configureFailPoint(st.configRS.getPrimary(), "moveChunkHangAtStep5");
+    const moveChunkThread = new Thread(function(mongosHost, ns, newShardName) {
+        const mongos = new Mongo(mongosHost);
+        assert.commandWorked(
+            mongos.adminCommand({moveChunk: ns, find: {skey: 0}, to: newShardName}));
+    }, st.s.host, ns, newShardName);
+    moveChunkThread.start();
+    hangMigrationFp.wait();
+
+    // Stepping up shouldn't hang because of ShardingStateRecovery.
+    st.configRS.stepUp(st.configRS.getSecondary());
+
+    hangMigrationFp.off();
+    moveChunkThread.join();
 }
 
 st.stop();

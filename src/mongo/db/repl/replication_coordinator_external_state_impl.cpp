@@ -943,8 +943,8 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
     }
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         if (ShardingState::get(opCtx)->enabled()) {
-            Status status = ShardingStateRecovery_DEPRECATED::recover(opCtx);
             VectorClockMutable::get(opCtx)->recoverDirect(opCtx);
+            Status status = ShardingStateRecovery_DEPRECATED::recover(opCtx);
 
             // If the node is shutting down or it lost quorum just as it was becoming primary, don't
             // run the sharding onStepUp machinery. The onStepDown counterpart to these methods is
