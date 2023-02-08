@@ -592,11 +592,11 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
                                                       CreateIndexEntryFlags flags) {
     Status status = _isSpecOk(opCtx, collection, descriptor->infoObj());
     if (!status.isOK()) {
-        LOGV2_FATAL_NOTRACE(28782,
-                            "Found an invalid index",
-                            "descriptor"_attr = descriptor->infoObj(),
-                            "namespace"_attr = collection->ns(),
-                            "error"_attr = redact(status));
+        LOGV2_FATAL(28782,
+                    "Found an invalid index",
+                    "descriptor"_attr = descriptor->infoObj(),
+                    "namespace"_attr = collection->ns(),
+                    "error"_attr = redact(status));
     }
 
     auto engine = opCtx->getServiceContext()->getStorageEngine();
