@@ -16,6 +16,7 @@ const conn = MongoRunner.runMongod(options);
 let db = conn.getDB(jsTestName());
 if (!FeatureFlagUtil.isEnabled(db, "Telemetry")) {
     jsTestLog("Skipping test as featureFlagTelemetry is not enabled");
+    MongoRunner.stopMongod(conn);
     return;
 }
 
