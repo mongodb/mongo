@@ -514,6 +514,8 @@ error_codes:
     - {code: 391, name: ReauthenticationRequired}
     - {code: 392, name: InvalidJWT}
     - {code: 393, name: InvalidTenantId}
+
+    - {code: 394, name: MovePrimaryRecipientDocNotFound, categories: [InternalOnly]}
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
