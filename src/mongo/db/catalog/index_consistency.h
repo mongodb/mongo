@@ -114,8 +114,8 @@ public:
 
 protected:
     struct IndexKeyBucket {
-        uint32_t indexKeyCount;
-        uint32_t bucketSizeBytes;
+        uint32_t indexKeyCount = 0;
+        uint32_t bucketSizeBytes = 0;
     };
 
     CollectionValidation::ValidateState* _validateState;
