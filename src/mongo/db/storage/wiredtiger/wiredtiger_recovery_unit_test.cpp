@@ -995,77 +995,64 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, AbandonSnapshotAbortMode) {
     ASSERT_EQ(0, strncmp(key, returnedKey, strlen(key)));
 }
 
-size_t numOnOpenSnapshotCalled = 0;
-size_t numOnCloseSnapshotCalled = 0;
-
 class SnapshotTestDecoration {
 public:
-    SnapshotTestDecoration() {
-        numOnOpenSnapshotCalled++;
+    void hit() {
+        _hits++;
     }
 
-    ~SnapshotTestDecoration() {
-        numOnCloseSnapshotCalled++;
+    int getHits() {
+        return _hits;
     }
+
+private:
+    int _hits = 0;
 };
 
 const RecoveryUnit::Snapshot::Decoration<SnapshotTestDecoration> getSnapshotDecoration =
     RecoveryUnit::Snapshot::declareDecoration<SnapshotTestDecoration>();
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, AbandonSnapshotChange) {
-    numOnOpenSnapshotCalled = 0;
-    numOnCloseSnapshotCalled = 0;
-
-    // A snapshot is already open from when the RU was constructed.
     ASSERT(ru1->getSession());
-    ASSERT_EQ(0, numOnOpenSnapshotCalled);
-    ASSERT_EQ(0, numOnCloseSnapshotCalled);
+
+    getSnapshotDecoration(ru1->getSnapshot()).hit();
+    ASSERT_EQ(1, getSnapshotDecoration(ru1->getSnapshot()).getHits());
 
     ru1->abandonSnapshot();
 
-    // A snapshot is opened after closing the last one.
-    ASSERT_EQ(1, numOnOpenSnapshotCalled);
-    ASSERT_EQ(1, numOnCloseSnapshotCalled);
+    // A snapshot is closed, reconstructing our decoration.
+    ASSERT_EQ(0, getSnapshotDecoration(ru1->getSnapshot()).getHits());
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, CommitSnapshotChange) {
-    numOnOpenSnapshotCalled = 0;
-    numOnCloseSnapshotCalled = 0;
-
     ru1->beginUnitOfWork(/*readOnly=*/false);
-    ASSERT_EQ(0, numOnOpenSnapshotCalled);
-    ASSERT_EQ(0, numOnCloseSnapshotCalled);
 
-    // A snapshot is already open from when the RU was constructed.
+    getSnapshotDecoration(ru1->getSnapshot()).hit();
+    ASSERT_EQ(1, getSnapshotDecoration(ru1->getSnapshot()).getHits());
+
     ASSERT(ru1->getSession());
-    ASSERT_EQ(0, numOnOpenSnapshotCalled);
-    ASSERT_EQ(0, numOnCloseSnapshotCalled);
+
+    ASSERT_EQ(1, getSnapshotDecoration(ru1->getSnapshot()).getHits());
 
     ru1->commitUnitOfWork();
 
-    // A snapshot is opened after closing the last one.
-    ASSERT_EQ(1, numOnOpenSnapshotCalled);
-    ASSERT_EQ(1, numOnCloseSnapshotCalled);
+    // A snapshot is closed, reconstructing our decoration.
+    ASSERT_EQ(0, getSnapshotDecoration(ru1->getSnapshot()).getHits());
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, AbortSnapshotChange) {
-    numOnOpenSnapshotCalled = 0;
-    numOnCloseSnapshotCalled = 0;
-
     // A snapshot is already open from when the RU was constructed.
     ASSERT(ru1->getSession());
-    ASSERT_EQ(0, numOnOpenSnapshotCalled);
-    ASSERT_EQ(0, numOnCloseSnapshotCalled);
+    getSnapshotDecoration(ru1->getSnapshot()).hit();
+    ASSERT_EQ(1, getSnapshotDecoration(ru1->getSnapshot()).getHits());
 
     ru1->beginUnitOfWork(/*readOnly=*/false);
-    ASSERT_EQ(0, numOnOpenSnapshotCalled);
-    ASSERT_EQ(0, numOnCloseSnapshotCalled);
+    ASSERT_EQ(1, getSnapshotDecoration(ru1->getSnapshot()).getHits());
 
     ru1->abortUnitOfWork();
 
-    // A snapshot is opened after closing the last one.
-    ASSERT_EQ(1, numOnOpenSnapshotCalled);
-    ASSERT_EQ(1, numOnCloseSnapshotCalled);
+    // A snapshot is closed, reconstructing our decoration.
+    ASSERT_EQ(0, getSnapshotDecoration(ru1->getSnapshot()).getHits());
 }
 
 DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
