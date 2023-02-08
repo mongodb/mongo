@@ -551,13 +551,13 @@ class NinjaState:
                 "rspfile_content": "$rspc",
             },
             "COMPDB_CC": {
-                "command": "$CC @$out.rsp",
+                "command": "$CC $rspc",
                 "description": "Compiling $out",
                 "rspfile": "$out.rsp",
                 "rspfile_content": "$rspc",
             },
             "COMPDB_CXX": {
-                "command": "$CXX @$out.rsp",
+                "command": "$CXX $rspc",
                 "description": "Compiling $out",
                 "rspfile": "$out.rsp",
                 "rspfile_content": "$rspc",
@@ -935,8 +935,15 @@ class NinjaState:
                 rule = kwargs['rule'].replace(
                     precious_rule_suffix
                 ) if precious_rule_suffix in kwargs['rule'] else kwargs['rule']
-                rule = "COMPDB_" + rule
+
                 compdb_build = kwargs.copy()
+
+                # the tool list is stored in the rule variable, so remove any wrappers we find.
+                for wrapper in compdb_build['variables']['_COMPILATIONDB_IGNORE_WRAPPERS']:
+                    if wrapper in compdb_build['variables'][rule]:
+                        compdb_build['variables'][rule].remove(wrapper)
+
+                rule = "COMPDB_" + rule
 
                 compdb_build['rule'] = rule
                 compdb_build['outputs'] = [kwargs['outputs'] + ".compdb"]
@@ -1184,6 +1191,16 @@ def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False, custom
 
         variables = {"rspc": rsp_content}
         variables[rule] = cmd
+
+        if rule == 'CC' or rule == 'CXX':
+            # resolve and store any wrappers we want to remove later when we
+            # are constructing the compdb entries for the compiles.
+            wrappers = [
+                env.subst(wrapper, target=targets, source=sources)
+                for wrapper in env.get('_COMPILATIONDB_IGNORE_WRAPPERS', [])
+            ]
+            variables['_COMPILATIONDB_IGNORE_WRAPPERS'] = wrappers
+
         if use_command_env:
             variables["env"] = get_command_env(env, targets, sources)
 

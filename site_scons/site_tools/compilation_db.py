@@ -71,7 +71,6 @@ def makeEmitCompilationDbEntry(comstr):
     :param comstr: unevaluated command line
     :return: an emitter which has captured the above
     """
-    user_action = SCons.Action.Action(comstr)
 
     def EmitCompilationDbEntry(target, source, env):
         """
@@ -90,7 +89,7 @@ def makeEmitCompilationDbEntry(comstr):
             source=[],
             __COMPILATIONDB_UTARGET=target,
             __COMPILATIONDB_USOURCE=source,
-            __COMPILATIONDB_UACTION=user_action,
+            __COMPILATIONDB_COMSTR=comstr,
             __COMPILATIONDB_ENV=env,
         )
 
@@ -124,15 +123,36 @@ def CompilationDbEntryAction(target, source, env, **kw):
     :return: None
     """
 
-    command = env["__COMPILATIONDB_UACTION"].strfunction(
-        target=env["__COMPILATIONDB_UTARGET"],
-        source=env["__COMPILATIONDB_USOURCE"],
-        env=env["__COMPILATIONDB_ENV"],
-    )
+    # We will do some surgery on the command line. First we separate the args
+    # into a list, then we determine the index of the corresponding compiler
+    # value. Then we can extract a list of things before the compiler where are
+    # wrappers would be found. We extract the wrapper and put the command back
+    # together.
+    cmd_list = [
+        str(elem) for elem in env["__COMPILATIONDB_ENV"].subst_list(
+            env["__COMPILATIONDB_COMSTR"], target=env["__COMPILATIONDB_UTARGET"],
+            source=env["__COMPILATIONDB_USOURCE"])[0]
+    ]
+
+    if "CXX" in env["__COMPILATIONDB_COMSTR"]:
+        tool_subst = '$CXX'
+    else:
+        tool_subst = '$CC'
+    tool = env["__COMPILATIONDB_ENV"].subst(tool_subst, target=env["__COMPILATIONDB_UTARGET"],
+                                            source=env["__COMPILATIONDB_USOURCE"])
+    tool_index = cmd_list.index(tool) + 1
+    tool_list = cmd_list[:tool_index]
+    cmd_list = cmd_list[tool_index:]
+
+    for wrapper_ignore in env.get('_COMPILATIONDB_IGNORE_WRAPPERS', []):
+        wrapper = env.subst(wrapper_ignore, target=target, source=source)
+        if wrapper in tool_list:
+            tool_list.remove(wrapper)
+    cmd_list = tool_list + cmd_list
 
     entry = {
         "directory": env.Dir("#").abspath,
-        "command": command,
+        "command": ' '.join(cmd_list),
         "file": str(env["__COMPILATIONDB_USOURCE"][0]),
     }
 

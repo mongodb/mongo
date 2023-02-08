@@ -1325,6 +1325,13 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    'COMPILATIONDB_IGNORE_WRAPPERS',
+    help=
+    "Comma separated list of variables which reference wrapper binaries that should be excluded when generating compile_commands.json",
+    default="$ICECC,$ICERUN,$ICECREAM_RUN_ICECC,$CCACHE",
+)
+
+env_vars.Add(
     'OBJCOPY',
     help='Sets the path to objcopy',
     default=WhereIs('objcopy'),
@@ -5992,6 +5999,10 @@ env.Default(env.Alias("install-default"))
 
 # Load the compilation_db tool. We want to do this after configure so we don't end up with
 # compilation database entries for the configure tests, which is weird.
+# We also set a few tools we know will not work with compilationdb, these
+# wrapper tools get appended on the front of the command and in most
+# cases don't want that in the compilation database.
+env['_COMPILATIONDB_IGNORE_WRAPPERS'] = env.get('COMPILATIONDB_IGNORE_WRAPPERS', '').split(',')
 if get_option('ninja') == 'disabled':
     env.Tool("compilation_db")
 
