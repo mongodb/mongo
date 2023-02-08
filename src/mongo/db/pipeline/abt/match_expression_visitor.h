@@ -44,10 +44,4 @@ ABT generateMatchExpression(const MatchExpression* expr,
                             const ProjectionName& rootProjection,
                             PrefixId& prefixId);
 
-/**
- * Maximum number of paths conjunctions that we will decompose in match expressions during ABT
- * translation.
- */
-inline constexpr size_t kMaxPathConjunctionDecomposition = 20;
-
 }  // namespace mongo::optimizer

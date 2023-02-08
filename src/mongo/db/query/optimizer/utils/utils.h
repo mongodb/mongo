@@ -83,6 +83,26 @@ std::vector<ABT::reference_type> collectComposed(const ABT& n);
 std::vector<ABT::reference_type> collectComposedBounded(const ABT& n, size_t maxDepth);
 
 /**
+ * De-compose a path and an input to an EvalFilter into sequence of Filter nodes. If we have a path
+ * with a prefix of PathGet's followed by a series of nested PathComposeM, then split into two or
+ * more filter nodes at the composition and retain the prefix for each. The result is a tree of
+ * chained filter nodes. We return an empty result if we have less than "minDepth" sub-tress which
+ * are composed. If "minDepth" = 1, then we are guaranteed to return a result, which will consist of
+ * a single Filter node.
+ *
+ * If the number of compositions exceeds "maxDepth" then we return the a single FilterNode
+ * consisting of an EvalFilter over the original path and input.
+ *
+ * TODO: SERVER-73744. Consolidate usages in a new optimizer phase.
+ */
+constexpr size_t kMaxPathConjunctionDecomposition = 20;
+boost::optional<ABT> decomposeToFilterNodes(const ABT& input,
+                                            const ABT& path,
+                                            const ABT& pathInput,
+                                            size_t minDepth,
+                                            size_t maxDepth = kMaxPathConjunctionDecomposition);
+
+/**
  * Returns true if the path represented by 'node' is of the form PathGet "field" PathId
  */
 bool isSimplePath(const ABT& node);

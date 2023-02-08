@@ -720,13 +720,6 @@ static void convertFilterToSargableNode(ABT::reference_type node,
     }
 }
 
-static ABT appendFieldPath(const FieldPathType& fieldPath, ABT input) {
-    for (size_t index = fieldPath.size(); index-- > 0;) {
-        input = make<PathGet>(fieldPath.at(index), std::move(input));
-    }
-    return input;
-}
-
 /**
  * Takes an expression or path and attempts to remove Not nodes by pushing them
  * down toward the leaves. We only remove a Not if we can combine it into a
@@ -985,36 +978,13 @@ struct SubstituteConvert<FilterNode> {
     void operator()(ABT::reference_type node, RewriteContext& ctx) {
         const FilterNode& filterNode = *node.cast<FilterNode>();
 
-        // Sub-rewrite: attempt to de-compose filter. If we have a path with a prefix of PathGet's
-        // followed by a PathComposeM, then split into two filter nodes at the composition and
-        // retain the prefix for each.
-        // TODO SERVER-71584: Consider splitting this rewrite into its own phase. Share its
-        // implementation with the version of this optimization performed at the end of ABT
-        // translation.
+        // Sub-rewrite: attempt to de-compose filter into at least two new filter nodes.
         if (auto* evalFilter = filterNode.getFilter().cast<EvalFilter>()) {
-            ABT::reference_type pathRef = evalFilter->getPath().ref();
-            FieldPathType fieldPath;
-            for (;;) {
-                if (auto newPath = pathRef.cast<PathGet>(); newPath != nullptr) {
-                    fieldPath.push_back(newPath->name());
-                    pathRef = newPath->getPath().ref();
-                } else {
-                    break;
-                }
-            }
-
-            if (auto composition = pathRef.cast<PathComposeM>(); composition != nullptr) {
-                // Remove the path composition and insert two filter nodes.
-                ABT filterNode1 = make<FilterNode>(
-                    make<EvalFilter>(appendFieldPath(fieldPath, composition->getPath1()),
-                                     evalFilter->getInput()),
-                    filterNode.getChild());
-                ABT filterNode2 = make<FilterNode>(
-                    make<EvalFilter>(appendFieldPath(fieldPath, composition->getPath2()),
-                                     evalFilter->getInput()),
-                    std::move(filterNode1));
-
-                ctx.addNode(filterNode2, true /*substitute*/);
+            if (auto result = decomposeToFilterNodes(filterNode.getChild(),
+                                                     evalFilter->getPath(),
+                                                     evalFilter->getInput(),
+                                                     2 /*minDepth*/)) {
+                ctx.addNode(*result, true /*substitute*/);
                 return;
             }
         }

@@ -65,6 +65,41 @@ std::vector<ABT::reference_type> collectComposedBounded(const ABT& n, size_t max
     return collectComposed(n);
 }
 
+static ABT appendFieldPath(const FieldPathType& fieldPath, ABT input) {
+    for (size_t index = fieldPath.size(); index-- > 0;) {
+        input = make<PathGet>(fieldPath.at(index), std::move(input));
+    }
+    return input;
+}
+
+boost::optional<ABT> decomposeToFilterNodes(const ABT& input,
+                                            const ABT& path,
+                                            const ABT& pathInput,
+                                            const size_t minDepth,
+                                            const size_t maxDepth) {
+    ABT::reference_type subPathRef = path.ref();
+    FieldPathType fieldPath;
+    while (const auto newPath = subPathRef.cast<PathGet>()) {
+        fieldPath.push_back(newPath->name());
+        subPathRef = newPath->getPath().ref();
+    }
+
+    ABT subPath = subPathRef;
+    if (auto composition = collectComposedBounded(subPath, maxDepth);
+        composition.size() >= minDepth) {
+        // Remove the path composition and insert two filter nodes.
+        ABT result = input;
+        for (const auto& element : composition) {
+            result =
+                make<FilterNode>(make<EvalFilter>(appendFieldPath(fieldPath, element), pathInput),
+                                 std::move(result));
+        }
+        return result;
+    }
+
+    return boost::none;
+}
+
 bool isSimplePath(const ABT& node) {
     if (auto getPtr = node.cast<PathGet>();
         getPtr != nullptr && getPtr->getPath().is<PathIdentity>()) {

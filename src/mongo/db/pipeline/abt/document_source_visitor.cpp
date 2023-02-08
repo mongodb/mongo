@@ -361,13 +361,12 @@ void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
                                             entry._rootProjection,
                                             ctx.getPrefixId());
 
-    // If we have a top-level composition, flatten it into a chain of separate
-    // FilterNodes.
-    const auto& composition = collectComposedBounded(matchExpr, kMaxPathConjunctionDecomposition);
-    for (const auto& path : composition) {
-        ctx.setNode<FilterNode>(entry._rootProjection,
-                                make<EvalFilter>(path, make<Variable>(entry._rootProjection)),
-                                std::move(entry._node));
+    {
+        // If we have a top-level composition, flatten it into a chain of separate FilterNodes. We
+        // are adding the entire subtree to the context.
+        auto result = decomposeToFilterNodes(
+            entry._node, matchExpr, make<Variable>(entry._rootProjection), 1 /*minDepth*/);
+        ctx.setNode(entry._rootProjection, std::move(*result));
         entry = ctx.getNode();
     }
 }
