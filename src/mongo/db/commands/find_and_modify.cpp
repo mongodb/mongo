@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -464,6 +465,8 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
         }
 
         invariant(createdCollection);
+        createdCollection.makeYieldable(opCtx,
+                                        LockedCollectionYieldRestore(opCtx, createdCollection));
         collectionPtr = &createdCollection;
     }
     const auto& collection = *collectionPtr;
