@@ -51,6 +51,7 @@
 #include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/db/query/telemetry.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -65,6 +66,7 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/overloaded_visitor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -738,6 +740,11 @@ void abandonCacheIfSentToShards(Pipeline* shardsPipeline) {
     }
 }
 
+void setTelemetryKeyOnAggRequest(AggregateCommandRequest& request, ExpressionContext* expCtx) {
+    request.setHashedTelemetryKey(telemetry::telemetryKeyToShardedStoreId(
+        telemetry::getTelemetryKeyFromOpCtx(expCtx->opCtx), getHostNameCachedAndPort()));
+}
+
 }  // namespace
 
 std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
@@ -778,6 +785,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
     auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();
+    setTelemetryKeyOnAggRequest(aggRequest, expCtx.get());
     auto shardDispatchResults =
         dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
                               hasChangeStream,
@@ -946,6 +954,9 @@ BSONObj createPassthroughCommandForShard(
                        [SimpleCursorOptions::kBatchSizeFieldName] = Value(*overrideBatchSize);
         }
     }
+
+    telemetry::appendShardedTelemetryKeyIfApplicable(
+        targetedCmd, getHostNameCachedAndPort(), expCtx->opCtx);
 
     auto shardCommand = genericTransformForShards(std::move(targetedCmd),
                                                   expCtx,
@@ -1482,6 +1493,7 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
     }();
 
     AggregateCommandRequest aggRequest(expCtx->ns, rawStages);
+    setTelemetryKeyOnAggRequest(aggRequest, expCtx.get());
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
     auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();

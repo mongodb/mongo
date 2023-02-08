@@ -47,6 +47,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
@@ -71,6 +72,7 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -208,6 +210,8 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
             analyze_shard_key::appendSampleId(&cmdBuilder, *sampleId);
         }
 
+        telemetry::appendShardedTelemetryKeyIfApplicable(
+            cmdBuilder, getHostNameCachedAndPort(), opCtx);
         requests.emplace_back(shardId, cmdBuilder.obj());
     }
 

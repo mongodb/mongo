@@ -61,13 +61,11 @@ env.Library(
 )
 
 env.Library(
-    target='aggregation_request_helper',
-    source=[
+    target='aggregation_request_helper', source=[
         'aggregation_request_helper.cpp',
         'aggregate_command.idl',
         'external_data_source_option.idl',
-    ],
-    LIBDEPS=[
+    ], LIBDEPS=[
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers',
@@ -77,8 +75,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/write_concern_options',
         'document_sources_idl',
-    ],
-)
+    ], LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query/telemetry_idl',
+    ])
 
 env.Library(
     target='variable_validation',
@@ -178,6 +177,7 @@ env.Library(
         'sharded_agg_helpers.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/query/cluster_query',
         'aggregation',

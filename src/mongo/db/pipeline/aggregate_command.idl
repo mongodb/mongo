@@ -43,6 +43,7 @@ imports:
     - "mongo/db/pipeline/legacy_runtime_constants.idl"
     - "mongo/db/query/hint.idl"
     - "mongo/db/query/cursor_response.idl"
+    - "mongo/db/query/telemetry.idl"
     - "mongo/db/write_concern_options.idl"
 
 types:
@@ -309,3 +310,9 @@ commands:
                 type: optionalBool
                 cpp_name: isClusterQueryWithoutShardKeyCmd
                 stability: internal
+            hashedTelemetryKey:
+                description: "For sharded queries the telemetry key is calculated on mongos instead of from the full query shape locally"
+                type: ShardedTelemetryStoreKey 
+                optional: true
+                stability: internal
+            

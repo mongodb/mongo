@@ -250,6 +250,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
         'cursor_response_idl',
+        'telemetry_idl',
     ],
 )
 
@@ -389,6 +390,7 @@ env.Library(
         'memory_util',
         'query_knobs',
         'rate_limiting',
+        'telemetry_idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
@@ -396,7 +398,17 @@ env.Library(
         '$BUILD_DIR/mongo/db/prepare_conflict_tracker',
         '$BUILD_DIR/mongo/db/stats/resource_consumption_metrics',
         '$BUILD_DIR/mongo/util/concurrency/admission_context',
+        '$BUILD_DIR/mongo/util/md5',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+    ],
+)
+
+env.Library(
+    target='telemetry_idl',
+    source=['telemetry.idl'],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        "$BUILD_DIR/mongo/idl/idl_parser",
     ],
 )
 
