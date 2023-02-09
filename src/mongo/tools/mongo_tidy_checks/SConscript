@@ -30,10 +30,12 @@ if not toolchain_found or not toolchain_clang_tidy_dev_found:
 
 env = env.Clone()
 
-# TODO SERVER-73731
-# Instead of hardcoding these flags, we should load the flags used by the toolchain here
-env['CC'] = [f'{base_toolchain_bin}/gcc']
-env['CXX'] = [f'{base_toolchain_bin}/g++']
+# TODO SERVER-72147
+# This config was ripped from the toolchain build because our standard build config produced
+# mismatched ABI, as well as using z,defs which will not work in this situation, so I am not
+# sure what flags were specifically responsible and I just swapped them all. The toolchain build
+# should test the check module so that if the configuration of clang-tidy changes there it would
+# catch any issues here.
 env['CPPPATH'] = [str(tidy_include)]
 env['LIBPATH'] = []
 env['CCFLAGS'] = [
