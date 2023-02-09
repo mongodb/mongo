@@ -959,12 +959,14 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         if (interceptor) {
             auto multikeyPaths = interceptor->getMultikeyPaths();
             if (multikeyPaths) {
-                indexCatalogEntry->setMultikey(opCtx, collection, {}, multikeyPaths.value());
+                indexCatalogEntry->setMultikey(
+                    opCtx, CollectionPtr(collection), {}, multikeyPaths.value());
             }
 
             multikeyPaths = interceptor->getSkippedRecordTracker()->getMultikeyPaths();
             if (multikeyPaths) {
-                indexCatalogEntry->setMultikey(opCtx, collection, {}, multikeyPaths.value());
+                indexCatalogEntry->setMultikey(
+                    opCtx, CollectionPtr(collection), {}, multikeyPaths.value());
             }
         }
 
@@ -975,7 +977,8 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         // MultikeyPaths into IndexCatalogEntry::setMultikey here.
         const auto& bulkBuilder = _indexes[i].bulk;
         if (bulkBuilder->isMultikey()) {
-            indexCatalogEntry->setMultikey(opCtx, collection, {}, bulkBuilder->getMultikeyPaths());
+            indexCatalogEntry->setMultikey(
+                opCtx, CollectionPtr(collection), {}, bulkBuilder->getMultikeyPaths());
         }
 
         if (opCtx->getServiceContext()->getStorageEngine()->supportsCheckpoints()) {
@@ -1012,7 +1015,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         }
     }
 
-    CollectionQueryInfo::get(collection).clearQueryCache(opCtx, collection);
+    CollectionQueryInfo::get(collection).clearQueryCache(opCtx, CollectionPtr(collection));
     opCtx->recoveryUnit()->onCommit(
         [this](boost::optional<Timestamp> commitTime) { _buildIsCleanedUp = true; });
 

@@ -503,7 +503,7 @@ void createDatabase(OperationContext* opCtx, StringData dbName) {
 }
 
 bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
-    return AutoGetCollectionForRead(opCtx, nss).getCollection() != nullptr;
+    return static_cast<bool>(AutoGetCollectionForRead(opCtx, nss).getCollection());
 }
 
 void createIndex(OperationContext* opCtx,

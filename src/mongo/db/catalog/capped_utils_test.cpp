@@ -88,7 +88,7 @@ ServiceContext::UniqueOperationContext makeOpCtx() {
  * Returns true if collection exists.
  */
 bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
-    return AutoGetCollectionForRead(opCtx, nss).getCollection() != nullptr;
+    return static_cast<bool>(AutoGetCollectionForRead(opCtx, nss).getCollection());
 }
 
 /**

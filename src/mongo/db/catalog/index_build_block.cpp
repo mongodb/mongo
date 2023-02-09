@@ -73,7 +73,7 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
     // occurring while an index is being build in the background will be aware of whether or not
     // they need to modify any indexes.
     auto desc = getEntry(opCtx, collection)->descriptor();
-    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
+    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, CollectionPtr(collection));
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
         .registerIndex(desc->indexName(),
                        desc->keyPattern(),

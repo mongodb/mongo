@@ -575,7 +575,7 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
 }
 
 TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelection) {
-    CollectionPtr collection = nullptr;
+    CollectionPtr collection;
     {
         dbtests::WriteContextForTests ctx{opCtx(), nss.ns()};
         addIndex(BSON("p1" << 1 << "opt1" << 1));

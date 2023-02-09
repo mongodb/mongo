@@ -182,8 +182,8 @@ void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx) {
                 AutoGetCollection autoColl(
                     opCtx, NamespaceString::kIndexBuildEntryNamespace, LockMode::MODE_IX);
                 CollectionOptions defaultCollectionOptions;
-                CollectionPtr collection = db->createCollection(
-                    opCtx, NamespaceString::kIndexBuildEntryNamespace, defaultCollectionOptions);
+                CollectionPtr collection = CollectionPtr(db->createCollection(
+                    opCtx, NamespaceString::kIndexBuildEntryNamespace, defaultCollectionOptions));
 
                 // Ensure the collection exists.
                 invariant(collection);

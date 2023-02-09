@@ -129,7 +129,7 @@ Status _dropView(OperationContext* opCtx,
 
     // Views don't have UUIDs so if the expectedUUID is specified, we will always throw.
     try {
-        checkCollectionUUIDMismatch(opCtx, collectionName, nullptr, expectedUUID);
+        checkCollectionUUIDMismatch(opCtx, collectionName, CollectionPtr(), expectedUUID);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -469,7 +469,8 @@ Status _dropCollection(OperationContext* opCtx,
                 // and error if so because the caller expects the collection to exist. If no UUID
                 // was given, then it is OK to return success.
                 try {
-                    checkCollectionUUIDMismatch(opCtx, collectionName, nullptr, expectedUUID);
+                    checkCollectionUUIDMismatch(
+                        opCtx, collectionName, CollectionPtr(), expectedUUID);
                 } catch (const DBException& ex) {
                     return ex.toStatus();
                 }
@@ -492,7 +493,7 @@ Status _dropCollection(OperationContext* opCtx,
         // Any unhandled namespace not found errors should be converted into success. Unless the
         // caller specified a UUID and expects the collection to exist.
         try {
-            checkCollectionUUIDMismatch(opCtx, collectionName, nullptr, expectedUUID);
+            checkCollectionUUIDMismatch(opCtx, collectionName, CollectionPtr(), expectedUUID);
         } catch (const DBException& ex) {
             return ex.toStatus();
         }

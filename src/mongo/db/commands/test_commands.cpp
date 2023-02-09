@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/capped_collection_maintenance.h"
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -106,9 +107,11 @@ public:
         CollectionPtr collection =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
         if (!collection) {
-            collection = db->createCollection(opCtx, nss);
+            collection = CollectionPtr(db->createCollection(opCtx, nss));
             uassert(ErrorCodes::CannotCreateCollection, "could not create collection", collection);
         }
+        collection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, collection));
+
         OpDebug* const nullOpDebug = nullptr;
         Status status = collection_internal::insertDocument(
             opCtx, collection, InsertStatement(obj), nullOpDebug, false);

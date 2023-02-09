@@ -73,7 +73,7 @@ public:
         CollectionPtr coll =
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
-            coll = _context.db()->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(_context.db()->createCollection(&_opCtx, nss()));
         }
         ASSERT(coll);
         OpDebug* const nullOpDebug = nullptr;

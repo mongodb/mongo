@@ -247,7 +247,7 @@ private:
     AutoGetDb _autoDb;
     std::vector<CollectionNamespaceOrUUIDLock> _collLocks;
 
-    CollectionPtr _coll = nullptr;
+    CollectionPtr _coll;
     std::shared_ptr<const ViewDefinition> _view;
 
     // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it is

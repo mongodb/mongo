@@ -75,7 +75,7 @@ public:
                                                       << "x_1"
                                                       << "v" << 1))
             .status_with_transitional_ignore();
-        _coll = coll;
+        _coll = CollectionPtr(coll);
 
         for (int i = 0; i < kDocuments; i++) {
             insert(BSON(GENOID << "x" << i));

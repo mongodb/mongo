@@ -83,7 +83,7 @@ public:
             if (collection) {
                 _database->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
-            collection = _database->createCollection(&_opCtx, nss());
+            collection = CollectionPtr(_database->createCollection(&_opCtx, nss()));
             wunit.commit();
             _collection = std::move(collection);
         }
@@ -209,10 +209,11 @@ public:
             WriteUnitOfWork wunit(&_opCtx);
             Database* db = ctx.db();
             if (CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss())) {
-                _collection = nullptr;
+                _collection = CollectionPtr();
                 db->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
-            _collection = db->createCollection(&_opCtx, nss(), CollectionOptions(), false);
+            _collection =
+                CollectionPtr(db->createCollection(&_opCtx, nss(), CollectionOptions(), false));
             wunit.commit();
         }
         ASSERT(_collection);

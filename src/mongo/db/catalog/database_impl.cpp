@@ -871,7 +871,8 @@ Collection* DatabaseImpl::_createCollection(
             fullIdIndexSpec = uassertStatusOK(ic->createIndexOnEmptyCollection(
                 opCtx,
                 collection,
-                !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec(collection)));
+                !idIndex.isEmpty() ? idIndex
+                                   : ic->getDefaultIdIndexSpec(CollectionPtr(collection))));
             createColumnIndex = createColumnIndexOnAllCollections.shouldFail() &&
                 doesCollectionModificationsUpdateIndexes(nss);
         } else {
@@ -894,8 +895,13 @@ Collection* DatabaseImpl::_createCollection(
 
     hangBeforeLoggingCreateCollection.pauseWhileSet();
 
-    opCtx->getServiceContext()->getOpObserver()->onCreateCollection(
-        opCtx, collection, nss, optionsWithUUID, fullIdIndexSpec, createOplogSlot, fromMigrate);
+    opCtx->getServiceContext()->getOpObserver()->onCreateCollection(opCtx,
+                                                                    CollectionPtr(collection),
+                                                                    nss,
+                                                                    optionsWithUUID,
+                                                                    fullIdIndexSpec,
+                                                                    createOplogSlot,
+                                                                    fromMigrate);
 
     // It is necessary to create the system index *after* running the onCreateCollection so that
     // the storage timestamp for the index creation is after the storage timestamp for the

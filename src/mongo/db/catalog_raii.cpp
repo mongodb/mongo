@@ -428,7 +428,7 @@ Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx) {
             });
 
         // Set to writable collection. We are no longer yieldable.
-        _coll = _writableColl;
+        _coll = CollectionPtr(_writableColl);
     }
     return _writableColl;
 }
@@ -624,7 +624,7 @@ Collection* CollectionWriter::getWritableCollection(OperationContext* opCtx) {
                     }
                 });
             if (usingStoredCollection) {
-                _storedCollection = _writableCollection;
+                _storedCollection = CollectionPtr(_writableCollection);
             }
         }
     }
@@ -673,7 +673,7 @@ AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t
     }
 
     _oplogInfo = LocalOplogInfo::get(opCtx);
-    _oplog = _oplogInfo->getCollection();
+    _oplog = CollectionPtr(_oplogInfo->getCollection());
     _oplog.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _oplog));
 }
 

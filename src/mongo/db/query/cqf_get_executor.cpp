@@ -376,7 +376,7 @@ static void populateAdditionalScanDefs(
         // multi-collection queries.
         AutoGetCollectionForReadCommandMaybeLockFree ctx(opCtx, involvedNss);
         const CollectionPtr& collection = ctx ? ctx.getCollection() : CollectionPtr::null;
-        const bool collectionExists = collection != nullptr;
+        const bool collectionExists = static_cast<bool>(collection);
         const std::string uuidStr =
             collectionExists ? collection->uuid().toString() : "<missing_uuid>";
         const std::string collNameStr = involvedNss.coll().toString();
@@ -504,7 +504,7 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
                           QueryHints& queryHints,
                           PrefixId& prefixId) {
     auto opCtx = expCtx->opCtx;
-    const bool collectionExists = collection != nullptr;
+    const bool collectionExists = static_cast<bool>(collection);
 
     // Add the base collection metadata.
     opt::unordered_map<std::string, optimizer::IndexDefinition> indexDefs;
@@ -660,7 +660,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     validateCommandOptions(canonicalQuery.get(), collection, indexHint, involvedCollections);
 
     const bool requireRID = canonicalQuery ? canonicalQuery->getForceGenerateRecordId() : false;
-    const bool collectionExists = collection != nullptr;
+    const bool collectionExists = static_cast<bool>(collection);
     const std::string uuidStr = collectionExists ? collection->uuid().toString() : "<missing_uuid>";
     const std::string collNameStr = nss.coll().toString();
     const std::string scanDefName = collNameStr + "_" + uuidStr;

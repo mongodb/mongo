@@ -164,8 +164,9 @@ Status buildMissingIdIndex(OperationContext* opCtx, Collection* collection) {
         indexer.abortIndexBuild(opCtx, collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
     });
 
+    CollectionPtr collPtr(collection);
     const auto indexCatalog = collection->getIndexCatalog();
-    const auto idIndexSpec = indexCatalog->getDefaultIdIndexSpec(collection);
+    const auto idIndexSpec = indexCatalog->getDefaultIdIndexSpec(collPtr);
 
     CollectionWriter collWriter(collection);
     auto swSpecs = indexer.init(opCtx, collWriter, idIndexSpec, MultiIndexBlock::kNoopOnInitFn);
@@ -173,12 +174,12 @@ Status buildMissingIdIndex(OperationContext* opCtx, Collection* collection) {
         return swSpecs.getStatus();
     }
 
-    auto status = indexer.insertAllDocumentsInCollection(opCtx, collection);
+    auto status = indexer.insertAllDocumentsInCollection(opCtx, collPtr);
     if (!status.isOK()) {
         return status;
     }
 
-    status = indexer.checkConstraints(opCtx, collection);
+    status = indexer.checkConstraints(opCtx, collPtr);
     if (!status.isOK()) {
         return status;
     }

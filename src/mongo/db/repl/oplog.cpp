@@ -222,8 +222,9 @@ void createIndexForApplyOps(OperationContext* opCtx,
     // Check if collection exists.
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, indexNss.dbName());
-    auto indexCollection =
-        db ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, indexNss) : nullptr;
+    auto indexCollection = db
+        ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, indexNss)
+        : CollectionPtr();
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Failed to create index due to missing collection: " << indexNss.ns(),
             indexCollection);
@@ -533,7 +534,7 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
                  oplogEntry->getNss(),
                  &records,
                  timestamps,
-                 oplog,
+                 CollectionPtr(oplog),
                  slot,
                  wallClockTime,
                  isAbortIndexBuild);
@@ -647,11 +648,17 @@ std::vector<OpTime> logInsertOps(
     invariant(!opTimes.empty());
     auto lastOpTime = opTimes.back();
     invariant(!lastOpTime.isNull());
-    const auto& oplog = oplogInfo->getCollection();
+    const Collection* oplog = oplogInfo->getCollection();
     auto wallClockTime = oplogEntryTemplate->getWallClockTime();
     const bool isAbortIndexBuild = false;
-    _logOpsInner(
-        opCtx, nss, &records, timestamps, oplog, lastOpTime, wallClockTime, isAbortIndexBuild);
+    _logOpsInner(opCtx,
+                 nss,
+                 &records,
+                 timestamps,
+                 CollectionPtr(oplog),
+                 lastOpTime,
+                 wallClockTime,
+                 isAbortIndexBuild);
     wuow.commit();
     return opTimes;
 }
@@ -1350,7 +1357,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
     }
 
     NamespaceString requestNss;
-    CollectionPtr collection = nullptr;
+    CollectionPtr collection;
     if (auto uuid = op.getUuid()) {
         auto catalog = CollectionCatalog::get(opCtx);
         collection = catalog->lookupCollectionByUUID(opCtx, uuid.value());
@@ -1388,8 +1395,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
     if (op.getObject2())
         o2 = op.getObject2().value();
 
-    const IndexCatalog* indexCatalog =
-        collection == nullptr ? nullptr : collection->getIndexCatalog();
+    const IndexCatalog* indexCatalog = !collection ? nullptr : collection->getIndexCatalog();
     const bool haveWrappingWriteUnitOfWork = opCtx->lockState()->inAWriteUnitOfWork();
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "applyOps not supported on view: " << requestNss.ns(),
@@ -1770,7 +1776,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         // such as an updateCriteria of the form
                         // { _id:..., { x : {$size:...} }
                         // thus this is not ideal.
-                        if (collection == nullptr ||
+                        if (!collection ||
                             (indexCatalog->haveIdIndex(opCtx) &&
                              Helpers::findById(opCtx, collection, updateCriteria).isNull()) ||
                             // capped collections won't have an _id index

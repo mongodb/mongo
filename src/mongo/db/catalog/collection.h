@@ -729,7 +729,7 @@ public:
     // CollectionPtr yieldable call `makeYieldable` and provide appropriate implementation depending
     // on context.
     CollectionPtr() = default;
-    CollectionPtr(const Collection* collection);
+    explicit CollectionPtr(const Collection* collection);
 
     CollectionPtr(const CollectionPtr&) = delete;
     CollectionPtr(CollectionPtr&&);

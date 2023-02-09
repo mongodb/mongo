@@ -59,7 +59,7 @@ public:
 
         _ctx.db()->dropCollection(&_opCtx, nss()).transitional_ignore();
         _coll = _ctx.db()->createCollection(&_opCtx, nss());
-        _collPtr = _coll;
+        _collPtr = CollectionPtr(_coll);
 
         ASSERT_OK(_coll->getIndexCatalog()->createIndexOnEmptyCollection(
             &_opCtx,

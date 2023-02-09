@@ -45,7 +45,8 @@ namespace mongo {
 namespace {
 
 bool collectionExists(OperationContext* opCtx, NamespaceString nss) {
-    return CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss) != nullptr;
+    return static_cast<bool>(
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
 }
 
 class ConcurrentCreateCollectionTest {

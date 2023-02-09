@@ -64,7 +64,7 @@ public:
 
             wunit.commit();
 
-            _collection = collection;
+            _collection = CollectionPtr(collection);
         }
     }
 

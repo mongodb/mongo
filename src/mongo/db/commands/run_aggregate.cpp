@@ -833,7 +833,7 @@ Status runAggregate(OperationContext* opCtx,
             // collation. We do not inherit the collection's default collation or UUID, since
             // the stream may be resuming from a point before the current UUID existed.
             auto [collator, match] = PipelineD::resolveCollator(
-                opCtx, request.getCollation().get_value_or(BSONObj()), nullptr);
+                opCtx, request.getCollation().get_value_or(BSONObj()), CollectionPtr());
             collatorToUse.emplace(std::move(collator));
             collatorToUseMatchesDefault = match;
 
@@ -853,7 +853,7 @@ Status runAggregate(OperationContext* opCtx,
                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                                  0);
             auto [collator, match] = PipelineD::resolveCollator(
-                opCtx, request.getCollation().get_value_or(BSONObj()), nullptr);
+                opCtx, request.getCollation().get_value_or(BSONObj()), CollectionPtr());
             collatorToUse.emplace(std::move(collator));
             collatorToUseMatchesDefault = match;
             tassert(6235101,

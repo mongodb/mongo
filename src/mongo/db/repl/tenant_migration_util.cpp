@@ -115,7 +115,8 @@ void createOplogViewForTenantMigrations(OperationContext* opCtx, Database* db) {
                 CollectionPtr coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                     opCtx, NamespaceString(db->getSystemViewsName()));
                 if (!coll) {
-                    coll = db->createCollection(opCtx, NamespaceString(db->getSystemViewsName()));
+                    coll = CollectionPtr(
+                        db->createCollection(opCtx, NamespaceString(db->getSystemViewsName())));
                 }
                 invariant(coll);
                 wuow.commit();

@@ -130,7 +130,7 @@ public:
         CollectionPtr c =
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
         if (!c) {
-            c = ctx.db()->createCollection(&_opCtx, nss());
+            c = CollectionPtr(ctx.db()->createCollection(&_opCtx, nss()));
         }
 
         ASSERT(c->getIndexCatalog()->haveIdIndex(&_opCtx));
@@ -197,7 +197,7 @@ protected:
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wunit(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
             wunit.commit();
         }
 
@@ -293,7 +293,7 @@ protected:
         CollectionPtr coll =
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
-            coll = db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
         }
 
         auto lastApplied = repl::ReplicationCoordinator::get(_opCtx.getServiceContext())

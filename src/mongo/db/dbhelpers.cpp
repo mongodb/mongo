@@ -357,7 +357,8 @@ void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& ns
     repl::UnreplicatedWritesBlock uwb(opCtx);
     CollectionPtr collection = context.db()
         ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)
-        : nullptr;
+        : CollectionPtr();
+
     deleteObjects(opCtx, collection, nss, BSONObj(), false);
 }
 

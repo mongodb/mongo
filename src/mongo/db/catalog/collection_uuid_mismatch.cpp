@@ -39,7 +39,7 @@ void checkCollectionUUIDMismatch(OperationContext* opCtx,
                                  const NamespaceString& ns,
                                  const CollectionPtr& coll,
                                  const boost::optional<UUID>& uuid) {
-    checkCollectionUUIDMismatch(opCtx, CollectionCatalog::get(opCtx), ns, coll.get(), uuid);
+    checkCollectionUUIDMismatch(opCtx, CollectionCatalog::get(opCtx), ns, coll, uuid);
 }
 
 void checkCollectionUUIDMismatch(OperationContext* opCtx,

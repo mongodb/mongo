@@ -415,7 +415,7 @@ UUID _createCollectionWithUUID(OperationContext* opCtx, const NamespaceString& n
  * Returns true if collection exists.
  */
 bool _collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
-    return AutoGetCollectionForRead(opCtx, nss).getCollection() != nullptr;
+    return static_cast<bool>(AutoGetCollectionForRead(opCtx, nss).getCollection());
 }
 
 /**
@@ -509,7 +509,7 @@ CollectionPtr _getCollection_inlock(OperationContext* opCtx, const NamespaceStri
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto* db = databaseHolder->getDb(opCtx, DatabaseName(boost::none, nss.db()));
     if (!db) {
-        return nullptr;
+        return CollectionPtr();
     }
     return CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
 }

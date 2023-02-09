@@ -693,7 +693,7 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(OperationContext* op
 
     const auto& collection = coll.getCollection();
     if (!collection) {
-        checkCollectionUUIDMismatch(opCtx, nss, nullptr, cmd.getCollectionUUID());
+        checkCollectionUUIDMismatch(opCtx, nss, CollectionPtr(), cmd.getCollectionUUID());
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "ns does not exist for unique index conversion: " << nss);
     }
@@ -790,7 +790,7 @@ Status _collModInternal(OperationContext* opCtx,
             CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
                 ->checkShardVersionOrThrow(opCtx);
         }
-        checkCollectionUUIDMismatch(opCtx, nss, nullptr, cmd.getCollectionUUID());
+        checkCollectionUUIDMismatch(opCtx, nss, CollectionPtr(), cmd.getCollectionUUID());
         return Status(ErrorCodes::NamespaceNotFound, "ns does not exist");
     }
 

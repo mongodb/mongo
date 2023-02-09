@@ -799,7 +799,7 @@ public:
         CollectionPtr coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
             wuow.commit();
         }
 

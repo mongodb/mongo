@@ -318,7 +318,7 @@ void IndexCatalogImpl::_init(OperationContext* opCtx,
     if (!fromExisting) {
         // Only do this when we're not initializing an earlier collection from the shared state of
         // an existing collection.
-        CollectionQueryInfo::get(collection).init(opCtx, collection);
+        CollectionQueryInfo::get(collection).init(opCtx, CollectionPtr(collection));
     }
 }
 
@@ -590,7 +590,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
                                                       Collection* collection,
                                                       std::unique_ptr<IndexDescriptor> descriptor,
                                                       CreateIndexEntryFlags flags) {
-    Status status = _isSpecOk(opCtx, collection, descriptor->infoObj());
+    Status status = _isSpecOk(opCtx, CollectionPtr(collection), descriptor->infoObj());
     if (!status.isOK()) {
         LOGV2_FATAL(28782,
                     "Found an invalid index",
@@ -609,7 +609,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
 
     auto* const descriptorPtr = descriptor.get();
     auto entry = std::make_shared<IndexCatalogEntryImpl>(
-        opCtx, collection, ident, std::move(descriptor), frozen);
+        opCtx, CollectionPtr(collection), ident, std::move(descriptor), frozen);
 
     IndexDescriptor* desc = entry->descriptor();
 
@@ -660,7 +660,8 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
                             << " UUID: " << collection->uuid()
                             << " Count (from size storer): " << collection->numRecords(opCtx));
 
-    StatusWith<BSONObj> statusWithSpec = prepareSpecForCreate(opCtx, collection, spec);
+    StatusWith<BSONObj> statusWithSpec =
+        prepareSpecForCreate(opCtx, CollectionPtr(collection), spec);
     Status status = statusWithSpec.getStatus();
     if (!status.isOK())
         return status;
@@ -1290,8 +1291,10 @@ void IndexCatalogImpl::dropIndexes(OperationContext* opCtx,
 
     if (!didExclude) {
         if (numIndexesTotal() || numIndexesInCollectionCatalogEntry || _readyIndexes.size()) {
-            _logInternalState(
-                opCtx, collection, numIndexesInCollectionCatalogEntry, indexNamesToDrop);
+            _logInternalState(opCtx,
+                              CollectionPtr(collection),
+                              numIndexesInCollectionCatalogEntry,
+                              indexNamesToDrop);
         }
         fassert(17327, numIndexesTotal() == 0);
         fassert(17328, numIndexesInCollectionCatalogEntry == 0);
@@ -1475,7 +1478,7 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
     opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
         collection->ns(), collection->uuid(), released, collection->getSharedDecorations()));
 
-    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
+    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, CollectionPtr(collection));
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
         .unregisterIndex(indexName);
     _deleteIndexFromDisk(opCtx, collection, indexName, released);
@@ -1682,7 +1685,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
                        IndexFeatures::make(desc, collection->ns().isOnInternalDb()));
 
     // Last rebuild index data for CollectionQueryInfo for this Collection.
-    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
+    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, CollectionPtr(collection));
 
     opCtx->recoveryUnit()->onCommit([newEntry](auto commitTime) {
         if (commitTime) {

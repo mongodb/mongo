@@ -404,7 +404,7 @@ CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*()
         return CollectionPtr();
     }
 
-    return {_mapIter->second.get()};
+    return {CollectionPtr(_mapIter->second.get())};
 }
 
 Collection* CollectionCatalog::iterator::getWritableCollection(OperationContext* opCtx) {
@@ -1360,7 +1360,7 @@ CollectionPtr CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
     auto [found, uncommittedPtr, newColl] =
         UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
     if (found) {
-        return uncommittedPtr.get();
+        return CollectionPtr(uncommittedPtr.get());
     }
 
     // Return any previously instantiated collection on this namespace for this snapshot
@@ -1482,12 +1482,12 @@ CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* o
     // exists.
     auto [found, uncommittedPtr, newColl] = UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
     if (uncommittedPtr) {
-        return uncommittedPtr.get();
+        return CollectionPtr(uncommittedPtr.get());
     }
 
     // Report the drop or rename as nothing new was created.
     if (found) {
-        return nullptr;
+        return CollectionPtr();
     }
 
     // Return any previously instantiated collection on this namespace for this snapshot
@@ -1497,7 +1497,7 @@ CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* o
 
     auto it = _collections.find(nss);
     auto coll = (it == _collections.end() ? nullptr : it->second);
-    return (coll && coll->isCommitted()) ? CollectionPtr(coll.get()) : nullptr;
+    return (coll && coll->isCommitted()) ? CollectionPtr(coll.get()) : CollectionPtr();
 }
 
 boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationContext* opCtx,
@@ -1711,7 +1711,7 @@ bool CollectionCatalog::checkIfCollectionSatisfiable(UUID uuid, CollectionInfoFn
         return false;
     }
 
-    return predicate(collection.get());
+    return predicate(CollectionPtr(collection.get()));
 }
 
 std::vector<UUID> CollectionCatalog::getAllCollectionUUIDsFromDb(const DatabaseName& dbName) const {

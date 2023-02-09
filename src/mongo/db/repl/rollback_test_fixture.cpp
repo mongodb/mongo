@@ -252,7 +252,7 @@ void RollbackTest::_insertDocument(OperationContext* opCtx,
     } else {
         CollectionOptions options;
         options.uuid = UUID::gen();
-        insertDoc(_createCollection(opCtx, nss, options));
+        insertDoc(CollectionPtr(_createCollection(opCtx, nss, options)));
     }
 }
 

@@ -135,8 +135,9 @@ public:
         CollectionPtr collection1;
         {
             WriteUnitOfWork wuow(opCtx1.get());
-            collection1 = db->createCollection(opCtx1.get(), nss, CollectionOptions(), true);
-            ASSERT_TRUE(collection1 != nullptr);
+            collection1 =
+                CollectionPtr(db->createCollection(opCtx1.get(), nss, CollectionOptions(), true));
+            ASSERT_TRUE(collection1);
             ASSERT_TRUE(
                 collection_internal::insertDocument(
                     opCtx1.get(), collection1, InsertStatement(doc), nullptr /* opDebug */, false)
@@ -194,7 +195,7 @@ private:
             WriteUnitOfWork wuow2(opCtx2);
             auto collection2 =
                 CollectionCatalog::get(opCtx2)->lookupCollectionByNamespace(opCtx2, nss);
-            ASSERT(collection2 != nullptr);
+            ASSERT(collection2);
             auto lastApplied = repl::ReplicationCoordinator::get(opCtx2->getServiceContext())
                                    ->getMyLastAppliedOpTime()
                                    .getTimestamp();
@@ -241,7 +242,7 @@ private:
                 WriteUnitOfWork wuow2(opCtx2);
                 auto collection2 =
                     CollectionCatalog::get(opCtx2)->lookupCollectionByNamespace(opCtx2, nss);
-                ASSERT(collection2 != nullptr);
+                ASSERT(collection2);
 
                 BSONObj res;
                 ASSERT_THROWS(Helpers::findByIdAndNoopUpdate(opCtx2, collection2, idQuery, res),

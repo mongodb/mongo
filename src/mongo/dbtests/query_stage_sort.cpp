@@ -271,7 +271,7 @@ public:
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
             wuow.commit();
         }
 
@@ -294,7 +294,7 @@ public:
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
             wuow.commit();
         }
 
@@ -326,7 +326,7 @@ public:
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
             wuow.commit();
         }
 
@@ -352,7 +352,7 @@ public:
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
             wuow.commit();
         }
 
@@ -481,7 +481,7 @@ public:
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
             wuow.commit();
         }
 
@@ -587,7 +587,7 @@ public:
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
             wuow.commit();
         }
 

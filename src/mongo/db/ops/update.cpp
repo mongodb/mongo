@@ -33,6 +33,7 @@
 #include "mongo/db/ops/update.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
@@ -83,10 +84,12 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
                                                  << nsString << " during upsert"));
         }
         WriteUnitOfWork wuow(opCtx);
-        collection = db->createCollection(opCtx, nsString, CollectionOptions());
+        collection = CollectionPtr(db->createCollection(opCtx, nsString, CollectionOptions()));
         invariant(collection);
         wuow.commit();
     });
+
+    collection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, collection));
 
     // Parse the update, get an executor for it, run the executor, get stats out.
     const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
