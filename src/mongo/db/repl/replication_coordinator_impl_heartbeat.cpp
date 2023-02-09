@@ -1256,7 +1256,7 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(WithLock lk,
         _cancelCatchupTakeover_inlock();
         _cancelPriorityTakeover_inlock();
         _cancelAndRescheduleElectionTimeout_inlock();
-        if (_inShutdown) {
+        if (_inShutdown || _inQuiesceMode) {
             LOGV2_FOR_ELECTION(4615654, 0, "Not starting an election, since we are shutting down");
             return;
         }

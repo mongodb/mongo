@@ -264,6 +264,8 @@ last-continuous:
     ticket: SERVER-68648
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
     ticket: SERVER-69952
+  - test_file: jstests/replsets/quiesce_mode_fails_elections.js
+    ticket: SERVER-72774
   suites: null
 last-lts:
   all:
@@ -601,4 +603,6 @@ last-lts:
     ticket: SERVER-68648
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
     ticket: SERVER-69952
+  - test_file: jstests/replsets/quiesce_mode_fails_elections.js
+    ticket: SERVER-72774
   suites: null
