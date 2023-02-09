@@ -46,6 +46,8 @@ namespace mongo {
 namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(hangInWritingLastVoteForDryRun);
+MONGO_FAIL_POINT_DEFINE(electionHangsBeforeUpdateMemberState);
+MONGO_FAIL_POINT_DEFINE(hangBeforeOnVoteRequestCompleteCallback);
 
 class ReplicationCoordinatorImpl::ElectionState::LoseElectionGuardV1 {
     LoseElectionGuardV1(const LoseElectionGuardV1&) = delete;
@@ -134,7 +136,12 @@ ReplicationCoordinatorImpl::ElectionState::getElectionDryRunFinishedEvent(WithLo
 
 void ReplicationCoordinatorImpl::ElectionState::cancel(WithLock) {
     _isCanceled = true;
-    _voteRequester->cancel();
+    // This check is necessary because _voteRequester is only initialized in _startVoteRequester.
+    // Since we don't hold mutex during the entire election process, it is possible to get here
+    // before _startVoteRequester is ever called.
+    if (_voteRequester) {
+        _voteRequester->cancel();
+    }
 }
 
 void ReplicationCoordinatorImpl::ElectionState::start(WithLock lk, StartElectionReasonEnum reason) {
@@ -390,12 +397,15 @@ void ReplicationCoordinatorImpl::ElectionState::_requestVotesForRealElection(
     _replExecutor
         ->onEvent(nextPhaseEvh.getValue(),
                   [=](const executor::TaskExecutor::CallbackArgs&) {
+                      if (MONGO_unlikely(hangBeforeOnVoteRequestCompleteCallback.shouldFail())) {
+                          LOGV2(7277400,
+                                "Hang due to hangBeforeOnVoteRequestCompleteCallback failpoint");
+                          hangBeforeOnVoteRequestCompleteCallback.pauseWhileSet();
+                      }
                       _onVoteRequestComplete(newTerm, reason);
                   })
         .status_with_transitional_ignore();
 }
-
-MONGO_FAIL_POINT_DEFINE(electionHangsBeforeUpdateMemberState);
 
 void ReplicationCoordinatorImpl::ElectionState::_onVoteRequestComplete(
     long long newTerm, StartElectionReasonEnum reason) {

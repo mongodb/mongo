@@ -944,6 +944,10 @@ bool ReplicationCoordinatorImpl::enterQuiesceModeIfSecondary(Milliseconds quiesc
         return false;
     }
 
+    // Cancel any ongoing election so that the node cannot become primary once in quiesce mode,
+    // and do not wait for cancellation to complete.
+    _cancelElectionIfNeeded(lk);
+
     _inQuiesceMode = true;
     _quiesceDeadline = _replExecutor->now() + quiesceTime;
 
