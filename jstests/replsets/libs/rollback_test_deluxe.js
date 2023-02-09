@@ -55,8 +55,10 @@ Random.setRandomSeed();
  *
  * @param {string} [optional] name the name of the test being run
  * @param {Object} [optional] replSet the ReplSetTest instance to adopt
+ * @param {Object} [optional] nodeOptions command-line options to apply to all nodes in the replica
+ *     set. Ignored if 'replSet' is provided.
  */
-function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
+function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet, nodeOptions) {
     const State = {
         kStopped: "kStopped",
         kRollbackOps: "kRollbackOps",
@@ -96,7 +98,7 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
     let lastStandbySecondaryRBID;
 
     // Make sure we have a replica set up and running.
-    replSet = (replSet === undefined) ? performStandardSetup() : replSet;
+    replSet = (replSet === undefined) ? performStandardSetup(nodeOptions) : replSet;
     validateAndUseSetup(replSet);
 
     /**
@@ -143,9 +145,9 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
     function performStandardSetup() {
         let nodeOptions = {};
         if (TestData.logComponentVerbosity) {
-            nodeOptions["setParameter"] = {
-                "logComponentVerbosity": tojsononeline(TestData.logComponentVerbosity)
-            };
+            nodeOptions["setParameter"] = nodeOptions["setParameter"] || {};
+            nodeOptions["setParameter"]["logComponentVerbosity"] =
+                tojsononeline(TestData.logComponentVerbosity);
         }
         if (TestData.syncdelay) {
             nodeOptions["syncdelay"] = TestData.syncdelay;
