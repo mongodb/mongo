@@ -1,7 +1,7 @@
 /*
  * Test that tenant access blockers are removed when applying the recipient config
  *
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";

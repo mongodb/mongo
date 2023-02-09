@@ -11,7 +11,7 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
- *   requires_fcv_62
+ *   requires_fcv_63
  * ]
  */
 

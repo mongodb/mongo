@@ -2,7 +2,7 @@
  * Test the serverless operation lock is released from recipients when the state document is
  * removed.
  *
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {

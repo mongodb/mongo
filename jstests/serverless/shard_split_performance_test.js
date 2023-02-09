@@ -1,7 +1,7 @@
 /**
  *
  * Runs a number of shard split and moveChunk to compare the time it takes for both operations.
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";

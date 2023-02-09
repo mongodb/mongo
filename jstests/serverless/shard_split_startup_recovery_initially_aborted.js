@@ -3,7 +3,7 @@
  * recovered since we do not recover access blockers for aborted split marked garbage collectable.
  * Also verifies the serverless operation lock is not acquired when starting a split in aborted
  * state.
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {

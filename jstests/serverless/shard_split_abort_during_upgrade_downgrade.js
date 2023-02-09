@@ -1,7 +1,7 @@
 /*
  * Prove that shard splits are aborted during FCV upgrade/downgrade.
  *
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
@@ -11,7 +11,7 @@ load("jstests/libs/fail_point_util.js");
 // downgrade versions. Eventually, we will run this test when we have two consecutive versions
 // that support `commitShardSplit` without a feature flag. This check will be removed as part
 // of SERVER-66965.
-if (MongoRunner.compareBinVersions(latestFCV, "6.3") < 0) {
+if (MongoRunner.compareBinVersions(latestFCV, "7.0") < 0) {
     quit();
 }
 

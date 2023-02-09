@@ -1,6 +1,6 @@
 /**
  * Test that starts a shard split and abort it while doing a write.
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";

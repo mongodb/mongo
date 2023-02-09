@@ -1,7 +1,7 @@
 /*
  * Test that a well timed abortShardSplit command does not abort an already committed split.
  *
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";

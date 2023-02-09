@@ -1,6 +1,6 @@
 /**
  * Tests that runs a shard split to completion.
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {

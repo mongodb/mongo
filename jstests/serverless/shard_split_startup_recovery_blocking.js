@@ -1,7 +1,7 @@
 /**
  * Commits a shard split and shuts down while being in a blocking state. Tests that we recover the
  * tenant access blockers in blocking state with `blockOpTime` set.
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";

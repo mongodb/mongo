@@ -1,7 +1,7 @@
 /**
  *
  * Tests that runs a shard split to completion and tries to write before and during the split.
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {doWriteOperations, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";

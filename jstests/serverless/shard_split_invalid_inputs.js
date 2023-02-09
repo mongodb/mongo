@@ -7,7 +7,7 @@
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_persistence,
- *   requires_fcv_62,
+ *   requires_fcv_63,
  *   serverless,
  * ]
  */

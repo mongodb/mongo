@@ -1,6 +1,6 @@
 /**
  * Tests that a shard split handles change collections and cluster parameters.
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";

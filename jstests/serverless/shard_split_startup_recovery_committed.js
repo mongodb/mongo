@@ -1,7 +1,7 @@
 /**
  * Commits a shard split and shut down prior to marking the state document as garbage collectable.
  * Checks that we recover the tenant access blockers with `commitOpTime` and `blockOpTime` set.
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";

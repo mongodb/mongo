@@ -2,7 +2,7 @@
  * Prove that shard splits are eagerly aborted when the `setFeatureCompatibilityVersion` command is
  * received for both upgrade and downgrade paths.
  *
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
@@ -28,7 +28,7 @@ pauseAfterBlockingFp.off();
 assert.commandFailedWithCode(commitThread.returnData(), ErrorCodes.TenantMigrationAborted);
 
 jsTestLog("Test FCV Upgrade");
-if (lastContinuousFCV == "6.1") {
+if (lastContinuousFCV == "6.2") {
     const secondSplit = test.createSplitOperation(tenantIds);
     assert.commandFailedWithCode(secondSplit.commit(), ErrorCodes.IllegalOperation);
 } else {

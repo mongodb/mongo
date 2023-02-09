@@ -1,7 +1,7 @@
 /*
  * Test that a split config is removed after a decision is reached.
  *
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";

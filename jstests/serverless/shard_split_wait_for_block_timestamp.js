@@ -3,7 +3,7 @@
  * pausing replication and observing the operation time out, then reenabling replication and
  * observing a successful split.
  *
- * @tags: [requires_fcv_62, serverless]
+ * @tags: [requires_fcv_63, serverless]
  */
 
 import {
