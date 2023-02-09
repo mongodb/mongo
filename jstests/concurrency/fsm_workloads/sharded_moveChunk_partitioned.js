@@ -108,7 +108,13 @@ var $config = extendWorkload($config, function($config, $super) {
         else {
             msg = 'moveChunk failed but original shard did not contain all documents.\n' + msgBase +
                 ', waitForDelete: ' + waitForDelete + ', bounds: ' + tojson(bounds);
-            assertWhenOwnColl.eq(fromShardNumDocsAfter, numDocsBefore, msg);
+
+            // Skip because the migration could be resumed and succeed before this check in case of
+            // fast stepdown/up. More details in SERVER-66106.
+            const isStepdownSuite = typeof ContinuousStepdown !== 'undefined';
+            if (!isStepdownSuite) {
+                assertWhenOwnColl.eq(fromShardNumDocsAfter, numDocsBefore, msg);
+            }
         }
 
         // Verify that all config servers have the correct after-state.
