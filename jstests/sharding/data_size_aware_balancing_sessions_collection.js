@@ -2,9 +2,7 @@
  * Tests that the balancer splits the sessions collection and uniformly distributes the chunks
  * across shards in the cluster.
  * @tags: [
- * featureFlagBalanceAccordingToDataSize,
- * requires_fcv_61,
- * resource_intensive,
+ *  resource_intensive,
  * ]
  */
 (function() {

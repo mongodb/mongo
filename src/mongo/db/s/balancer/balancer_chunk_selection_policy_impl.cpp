@@ -454,12 +454,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
             continue;
         }
 
-        boost::optional<stdx::unordered_map<NamespaceString, CollectionDataSizeInfoForBalancing>>
-            collsDataSizeInfo;
-        if (feature_flags::gBalanceAccordingToDataSize.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            collsDataSizeInfo.emplace(getDataSizeInfoForCollections(opCtx, collBatch));
-        }
+        const auto collsDataSizeInfo = getDataSizeInfoForCollections(opCtx, collBatch);
 
         for (const auto& collFromBatch : collBatch) {
 
@@ -469,13 +464,8 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
 
             const auto& nss = collFromBatch.getNss();
 
-            boost::optional<CollectionDataSizeInfoForBalancing> optDataSizeInfo;
-            if (collsDataSizeInfo.has_value()) {
-                optDataSizeInfo.emplace(std::move(collsDataSizeInfo->at(nss)));
-            }
-
             auto candidatesStatus = _getMigrateCandidatesForCollection(
-                opCtx, nss, shardStats, optDataSizeInfo, availableShards);
+                opCtx, nss, shardStats, collsDataSizeInfo.at(nss), availableShards);
             if (candidatesStatus == ErrorCodes::NamespaceNotFound) {
                 // Namespace got dropped before we managed to get to it, so just skip it
                 continue;
@@ -521,14 +511,10 @@ StatusWith<MigrateInfosWithReason> BalancerChunkSelectionPolicyImpl::selectChunk
                    });
 
 
-    boost::optional<CollectionDataSizeInfoForBalancing> optCollDataSizeInfo;
-    if (feature_flags::gBalanceAccordingToDataSize.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        optCollDataSizeInfo.emplace(getDataSizeInfoForCollection(opCtx, nss));
-    }
+    const auto dataSizeInfo = getDataSizeInfoForCollection(opCtx, nss);
 
-    auto candidatesStatus = _getMigrateCandidatesForCollection(
-        opCtx, nss, shardStats, optCollDataSizeInfo, &availableShards);
+    auto candidatesStatus =
+        _getMigrateCandidatesForCollection(opCtx, nss, shardStats, dataSizeInfo, &availableShards);
     if (!candidatesStatus.isOK()) {
         return candidatesStatus.getStatus();
     }
@@ -562,7 +548,9 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* op
 
     const DistributionStatus& distribution = collInfoStatus.getValue();
 
-    return BalancerPolicy::balanceSingleChunk(chunk, shardStats, distribution);
+    const auto dataSizeInfo = getDataSizeInfoForCollection(opCtx, nss);
+
+    return BalancerPolicy::balanceSingleChunk(chunk, shardStats, distribution, dataSizeInfo);
 }
 
 Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* opCtx,
@@ -652,7 +640,7 @@ BalancerChunkSelectionPolicyImpl::_getMigrateCandidatesForCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardStatisticsVector& shardStats,
-    const boost::optional<CollectionDataSizeInfoForBalancing>& collDataSizeInfo,
+    const CollectionDataSizeInfoForBalancing& collDataSizeInfo,
     stdx::unordered_set<ShardId>* availableShards) {
     auto routingInfoStatus =
         Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx, nss);

@@ -135,10 +135,7 @@ shardTags = {
 };
 assertShardTags(configDB, shardTags);
 
-const balanceAccordingToDataSize = FeatureFlagUtil.isEnabled(
-    st.configRS.getPrimary().getDB('admin'), "BalanceAccordingToDataSize");
-let numChunksToMove = balanceAccordingToDataSize ? zoneChunkBounds["zoneB"].length - 1
-                                                 : zoneChunkBounds["zoneB"].length / 2;
+const numChunksToMove = zoneChunkBounds["zoneB"].length - 1;
 runBalancer(st, numChunksToMove);
 shardChunkBounds = {
     [st.shard0.shardName]: zoneChunkBounds["zoneB"].slice(0, numChunksToMove),

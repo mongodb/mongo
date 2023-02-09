@@ -8,7 +8,6 @@
  * @tags: [
  *   requires_sharding,
  *   assumes_balancer_on,
- *   featureFlagBalanceAccordingToDataSize,
  *   antithesis_incompatible,
  *  ]
  */

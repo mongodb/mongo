@@ -33,6 +33,7 @@
 #include "mongo/db/s/balancer/migration_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/random.h"
+#include "mongo/s/request_types/get_stats_for_balancing_gen.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 
 namespace mongo {
@@ -84,6 +85,23 @@ protected:
         onCommand([&resultBuilder](const RemoteCommandRequest& request) {
             ASSERT(request.cmdObj["serverStatus"]);
             resultBuilder.append("version", "MONGO_VERSION");
+            return resultBuilder.obj();
+        });
+    }
+
+    /**
+     * Sets up mock network to expect a _shardsvrGetStatsForBalancing command and returns a BSON
+     * response with a dummy version.
+     */
+    void expectGetStatsForBalancingCommand() {
+        BSONObjBuilder resultBuilder;
+        CommandHelpers::appendCommandStatusNoThrow(resultBuilder, Status::OK());
+
+        onCommand([&resultBuilder](const RemoteCommandRequest& request) {
+            ASSERT(request.cmdObj[ShardsvrGetStatsForBalancing::kCommandName]);
+
+            ShardsvrGetStatsForBalancingReply reply({CollStatsForBalancing(kNamespace, 12345)});
+            reply.serialize(&resultBuilder);
             return resultBuilder.obj();
         });
     }
@@ -189,8 +207,6 @@ TEST_F(BalancerChunkSelectionTest, ZoneRangesOverlap) {
 }
 
 TEST_F(BalancerChunkSelectionTest, ZoneRangeMaxNotAlignedWithChunkMax) {
-    RAIIServerParameterControllerForTest featureFlagBalanceAccordingToDataSize{
-        "featureFlagBalanceAccordingToDataSize", false};
     // Set up two shards in the metadata.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     NamespaceString::kConfigsvrShardsNamespace,
@@ -240,7 +256,11 @@ TEST_F(BalancerChunkSelectionTest, ZoneRangeMaxNotAlignedWithChunkMax) {
                 ASSERT_EQUALS(0U, candidateChunksStatus.getValue().size());
             });
 
-            expectGetStatsCommands(2);
+            const int numShards = 2;
+            expectGetStatsCommands(numShards);
+            for (int i = 0; i < numShards; i++) {
+                expectGetStatsForBalancingCommand();
+            }
             future.default_timed_get();
             removeAllChunks(kNamespace, collUUID);
         };
@@ -249,112 +269,6 @@ TEST_F(BalancerChunkSelectionTest, ZoneRangeMaxNotAlignedWithChunkMax) {
                               {BSON(kPattern << -5), kKeyPattern.globalMax()}});
     assertErrorWhenMoveChunk({{kKeyPattern.globalMin(), BSON(kPattern << -15)},
                               {BSON(kPattern << -15), kKeyPattern.globalMax()}});
-}
-
-TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeAutoSplitted) {
-    // Set up two shards in the metadata, each one with its own zone
-    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    NamespaceString::kConfigsvrShardsNamespace,
-                                                    appendZones(kShard0, {"A"}),
-                                                    kMajorityWriteConcern));
-    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    NamespaceString::kConfigsvrShardsNamespace,
-                                                    appendZones(kShard1, {"B"}),
-                                                    kMajorityWriteConcern));
-
-    // Set up a database and a sharded collection in the metadata.
-    const auto collUUID = UUID::gen();
-    ChunkVersion version({OID::gen(), Timestamp(42)}, {2, 0});
-    setUpDatabase(kDbName, kShardId0);
-
-    TypeCollectionTimeseriesFields tsFields;
-    tsFields.setTimeseriesOptions(TimeseriesOptions("fieldName"));
-    setUpCollection(kNamespace, collUUID, version, std::move(tsFields));
-
-    // Set up two zones
-    setUpZones(kNamespace,
-               {
-                   {"A", {kKeyPattern.globalMin(), BSON(kPattern << 0)}},
-                   {"B", {BSON(kPattern << 0), kKeyPattern.globalMax()}},
-               });
-
-    // Create just one chunk covering the whole space
-    setUpChunk(collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
-
-    auto future = launchAsync([this] {
-        ThreadClient tc(getServiceContext());
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-
-        // Requests chunks to be relocated requires running commands on each shard to
-        // get shard statistics. Set up dummy hosts for the source shards.
-        shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
-        shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
-
-        auto candidateChunksStatus = _chunkSelectionPolicy.get()->selectChunksToSplit(opCtx.get());
-        ASSERT_OK(candidateChunksStatus.getStatus());
-
-        ASSERT_EQUALS(1U, candidateChunksStatus.getValue().size());
-    });
-
-    expectGetStatsCommands(2);
-    future.default_timed_get();
-}
-
-TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeBalanced) {
-    RAIIServerParameterControllerForTest featureFlagBalanceAccordingToDataSize{
-        "featureFlagBalanceAccordingToDataSize", false};
-    // Set up two shards in the metadata.
-    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    NamespaceString::kConfigsvrShardsNamespace,
-                                                    kShard0,
-                                                    kMajorityWriteConcern));
-    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    NamespaceString::kConfigsvrShardsNamespace,
-                                                    kShard1,
-                                                    kMajorityWriteConcern));
-
-    // Set up a database and a sharded collection in the metadata.
-    const auto collUUID = UUID::gen();
-    ChunkVersion version({OID::gen(), Timestamp(42)}, {2, 0});
-    setUpDatabase(kDbName, kShardId0);
-
-    TypeCollectionTimeseriesFields tsFields;
-    tsFields.setTimeseriesOptions(TimeseriesOptions("fieldName"));
-    setUpCollection(kNamespace, collUUID, version, std::move(tsFields));
-
-    auto addChunk = [&](const BSONObj& min, const BSONObj& max) {
-        setUpChunk(collUUID, min, max, kShardId0, version);
-        version.incMinor();
-    };
-
-    addChunk(kKeyPattern.globalMin(), BSON(kPattern << 0));
-    for (int i = 1; i <= 100; ++i) {
-        addChunk(BSON(kPattern << (i - 1)), BSON(kPattern << i));
-    }
-    addChunk(BSON(kPattern << 100), kKeyPattern.globalMax());
-
-    auto future = launchAsync([this] {
-        ThreadClient tc(getServiceContext());
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-
-        // Requests chunks to be relocated requires running commands on each shard to
-        // get shard statistics. Set up dummy hosts for the source shards.
-        shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
-        shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
-
-        std::vector<ClusterStatistics::ShardStatistics> shardStats =
-            uassertStatusOK(_clusterStats.get()->getStats(opCtx.get()));
-        auto availableShards = getAllShardIds(shardStats);
-
-        auto candidateChunksStatus = _chunkSelectionPolicy.get()->selectChunksToMove(
-            opCtx.get(), shardStats, &availableShards);
-        ASSERT_OK(candidateChunksStatus.getStatus());
-
-        ASSERT_EQUALS(1, candidateChunksStatus.getValue().size());
-    });
-
-    expectGetStatsCommands(2);
-    future.default_timed_get();
 }
 
 }  // namespace

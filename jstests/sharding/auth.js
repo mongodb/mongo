@@ -186,22 +186,6 @@ assert.commandWorked(bulk.execute());
 
 s.startBalancer(60000);
 
-const balanceAccordingToDataSize = FeatureFlagUtil.isEnabled(
-    s.configRS.getPrimary().getDB('admin'), "BalanceAccordingToDataSize", adminUser);
-if (!balanceAccordingToDataSize) {
-    assert.soon(function() {
-        var d1Chunks =
-            findChunksUtil.countChunksForNs(s.getDB("config"), 'test.foo', {shard: "d1"});
-        var d2Chunks =
-            findChunksUtil.countChunksForNs(s.getDB("config"), 'test.foo', {shard: "d2"});
-        var totalChunks = findChunksUtil.countChunksForNs(s.getDB("config"), 'test.foo');
-
-        print("chunks: " + d1Chunks + " " + d2Chunks + " " + totalChunks);
-
-        return d1Chunks > 0 && d2Chunks > 0 && (d1Chunks + d2Chunks == totalChunks);
-    }, "Chunks failed to balance", 60000, 5000);
-}
-
 // SERVER-33753: count() without predicate can be wrong on sharded collections.
 // assert.eq(s.getDB("test").foo.count(), num+1);
 var numDocs = s.getDB("test").foo.find().itcount();

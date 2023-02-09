@@ -1,11 +1,6 @@
 /*
  * Test that the balancer is redistributing data based on the actual amount of data
  * for a collection on each node, converging when the size difference becomes small.
- *
- * @tags: [
- *     featureFlagBalanceAccordingToDataSize,
- *     requires_fcv_61,
- * ]
  */
 
 (function() {

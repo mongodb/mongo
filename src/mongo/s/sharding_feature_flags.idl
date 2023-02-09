@@ -37,11 +37,6 @@ feature_flags:
     cpp_varname: feature_flags::gNoMoreAutoSplitter
     default: true
     version: 6.0 # Starting from v6.0.3
-  featureFlagBalanceAccordingToDataSize:
-    description: Balancer taking decisions based on the data size if enabled, based on number of chunks if disabled
-    cpp_varname: feature_flags::gBalanceAccordingToDataSize
-    default: true
-    version: 6.0 # Starting from v6.0.3
   featureFlagGlobalIndexesShardingCatalog:
     description: "Feature flag for enabling sharding catalog features for global indexes"
     cpp_varname: feature_flags::gGlobalIndexesShardingCatalog

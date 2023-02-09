@@ -72,14 +72,14 @@ private:
         const ShardStatisticsVector& shardStats);
 
     /**
-     * Synchronous method, which iterates the collection's chunks and uses the cluster statistics to
-     * figure out where to place them.
+     * Synchronous method, which iterates the collection's size per shard  to figure out where to
+     * place them.
      */
     StatusWith<MigrateInfosWithReason> _getMigrateCandidatesForCollection(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ShardStatisticsVector& shardStats,
-        const boost::optional<CollectionDataSizeInfoForBalancing>& collDataSizeInfo,
+        const CollectionDataSizeInfoForBalancing& collDataSizeInfo,
         stdx::unordered_set<ShardId>* availableShards);
 
     // Source for obtaining cluster statistics. Not owned and must not be destroyed before the
