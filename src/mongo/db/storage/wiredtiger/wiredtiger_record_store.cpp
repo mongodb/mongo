@@ -221,7 +221,9 @@ WiredTigerRecordStore::OplogStones::OplogStones(OperationContext* opCtx, WiredTi
     unsigned long long numStones = maxSize / oplogStoneSize;
     size_t numStonesToKeep = std::min(kMaxStonesToKeep, std::max(kMinStonesToKeep, numStones));
     _minBytesPerStone = maxSize / numStonesToKeep;
-    invariant(_minBytesPerStone > 0);
+    uassert(7206300,
+            fmt::format("Cannot create oplog of size less than {} bytes", numStonesToKeep),
+            _minBytesPerStone > 0);
 
     _calculateStones(opCtx, numStonesToKeep);
     _pokeReclaimThreadIfNeeded();  // Reclaim stones if over the limit.
