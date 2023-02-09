@@ -199,10 +199,6 @@ public:
         return expr;
     }
 
-    MatchCategory getCategory() const final {
-        return MatchCategory::kOther;
-    }
-
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
     }

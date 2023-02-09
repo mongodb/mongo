@@ -1525,6 +1525,216 @@ TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaRequiredByIsOnlyDepe
     ASSERT_BSONOBJ_EQ(residualBob.obj(), fromjson("{b: {$eq: 1}}"));
 }
 
+// Verifies that $jsonSchema 'type' is supported by splitMatchExpressionBy().
+TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaTypeByIsOnlyDependentOn) {
+    ParsedMatchExpression matcher(R"({$jsonSchema: {properties: {a: {type: "number"}}}})");
+
+    // $jsonSchema expression will be split out by the meta field "a" and the meta field "a" will be
+    // renamed to "meta".
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        matcher.extractExpr(), {"a"}, {{"a", "meta"}}, expression::isOnlyDependentOn);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson(R"(
+{
+    $and: [{
+        $and: [{
+            $or: [
+                {meta: {$not: {$exists: true}}},
+                {$and: [{meta: {$_internalSchemaType: ["number"]}}]}
+            ]
+        }]
+    }]
+}
+        )"));
+
+    ASSERT_FALSE(residualExpr.get());
+}
+
+// Verifies that $jsonSchema 'bsonType' is supported by splitMatchExpressionBy().
+TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaBsonTypeByIsOnlyDependentOn) {
+    ParsedMatchExpression matcher(R"({$jsonSchema: {properties: {a: {bsonType: "long"}}}})");
+
+    // $jsonSchema expression will be split out by the meta field "a" and the meta field "a" will be
+    // renamed to "meta".
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        matcher.extractExpr(), {"a"}, {{"a", "meta"}}, expression::isOnlyDependentOn);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson(R"(
+{
+    $and: [{
+        $and: [
+            {$or: [{meta: {$not: {$exists: true}}}, {$and: [{meta: {$_internalSchemaType: [18]}}]}]}
+        ]
+    }]
+}
+        )"));
+
+    ASSERT_FALSE(residualExpr.get());
+}
+
+// Verifies that $jsonSchema 'enum' is supported by splitMatchExpressionBy().
+TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaEnumByIsOnlyDependentOn) {
+    ParsedMatchExpression matcher(R"({$jsonSchema: {properties: {a: {enum: [1,2]}}}})");
+
+    // $jsonSchema expression will be split out by the meta field "a" and the meta field "a" will be
+    // renamed to "meta".
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        matcher.extractExpr(), {"a"}, {{"a", "meta"}}, expression::isOnlyDependentOn);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson(R"(
+{
+    $and: [{
+        $and: [{
+            $or: [
+                {meta: {$not: {$exists: true}}},
+                {$and: [{$or: [{meta: {$_internalSchemaEq: 1}}, {meta: {$_internalSchemaEq: 2}}]}]}
+            ]
+        }]
+    }]
+}
+        )"));
+
+    ASSERT_FALSE(residualExpr.get());
+}
+
+// Verifies that $jsonSchema 'minimum' and 'maximum' are supported by splitMatchExpressionBy().
+TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaMinMaxByIsOnlyDependentOn) {
+    ParsedMatchExpression matcher("{$jsonSchema: {properties: {a: {minimum: 1, maximum: 10}}}}");
+
+    // $jsonSchema expression will be split out by the meta field "a" and the meta field "a" will be
+    // renamed to "meta".
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        matcher.extractExpr(), {"a"}, {{"a", "meta"}}, expression::isOnlyDependentOn);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson(R"(
+{
+    $and: [{
+        $and: [{
+            $or: [
+                {meta: {$not: {$exists: true}}},
+                {
+                    $and: [
+                        {
+                            $or: [
+                                {meta: {$not: {$_internalSchemaType: ["number"]}}},
+                                {meta: {$lte: 10}}
+                            ]
+                        },
+                        {
+                            $or: [
+                                {meta: {$not: {$_internalSchemaType: ["number"]}}},
+                                {meta: {$gte: 1}}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }]
+    }]
+}
+        )"));
+
+    ASSERT_FALSE(residualExpr.get());
+}
+
+// Verifies that $jsonSchema 'minLength' and 'maxLength' are supported by splitMatchExpressionBy().
+TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaMinMaxLengthByIsOnlyDependentOn) {
+    ParsedMatchExpression matcher(
+        "{$jsonSchema: {properties: {a: {minLength: 1, maxLength: 10}}}}");
+
+    // $jsonSchema expression will be split out by the meta field "a" and the meta field "a" will be
+    // renamed to "meta".
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        matcher.extractExpr(), {"a"}, {{"a", "meta"}}, expression::isOnlyDependentOn);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson(R"(
+{
+    $and: [{
+        $and: [{
+            $or: [
+                {meta: {$not: {$exists: true}}},
+                {
+                    $and: [
+                        {
+                            $or: [
+                                {meta: {$not: {$_internalSchemaType: [2]}}},
+                                {meta: {$_internalSchemaMaxLength: 10}}
+                            ]
+                        },
+                        {
+                            $or: [
+                                {meta: {$not: {$_internalSchemaType: [2]}}},
+                                {meta: {$_internalSchemaMinLength: 1}}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }]
+    }]
+}
+        )"));
+
+    ASSERT_FALSE(residualExpr.get());
+}
+
+// Verifies that $jsonSchema 'multipleOf' is supported by splitMatchExpressionBy().
+TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaMultipleOfByIsOnlyDependentOn) {
+    ParsedMatchExpression matcher("{$jsonSchema: {properties: {a: {multipleOf: 10}}}}");
+
+    // $jsonSchema expression will be split out by the meta field "a" and the meta field "a" will be
+    // renamed to "meta".
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        matcher.extractExpr(), {"a"}, {{"a", "meta"}}, expression::isOnlyDependentOn);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson(R"(
+{
+    $and: [{
+        $and: [{
+            $or: [
+                {meta: {$not: {$exists: true}}},
+                {
+                    $and: [{
+                        $or: [
+                            {meta: {$not: {$_internalSchemaType: ["number"]}}},
+                            {meta: {$_internalSchemaFmod: [10, 0]}}
+                        ]
+                    }]
+                }
+            ]
+        }]
+    }]
+}
+        )"));
+
+    ASSERT_FALSE(residualExpr.get());
+}
+
+// Verifies that $jsonSchema 'pattern' is supported by splitMatchExpressionBy().
+TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaPatternByIsOnlyDependentOn) {
+    ParsedMatchExpression matcher(R"({$jsonSchema: {properties: {a: {pattern: "[0-9]*"}}}})");
+    auto originalExpr = matcher.extractExpr();
+    auto originalExprCopy = originalExpr->shallowClone();
+
+    // $jsonSchema expression will be split out by the meta field "a" and the meta field "a" will be
+    // renamed to "meta".
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        std::move(originalExpr), {"a"}, {{"a", "meta"}}, expression::isOnlyDependentOn);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    // 'splitOutExpr' must be same as the expression after renaming 'a' to 'meta'.
+    expression::applyRenamesToExpression(originalExprCopy.get(), {{"a", "meta"}});
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), originalExprCopy->serialize());
+
+    ASSERT_FALSE(residualExpr.get());
+}
+
 TEST(ApplyRenamesToExpression, ShouldApplyBasicRenamesForAMatchWithExpr) {
     BSONObj matchPredicate = fromjson("{$expr: {$eq: ['$a.b', '$c']}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

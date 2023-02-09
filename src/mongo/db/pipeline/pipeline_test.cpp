@@ -2594,40 +2594,40 @@ TEST(PipelineOptimizationTest, MatchOnRootDocEqShouldNotSwapSinceCategoryIsOther
     assertPipelineOptimizesTo(inputPipe, inputPipe);
 }
 
-// Descriptive test. The following internal match expression *could* participate in pipeline
-// optimizations, but it currently does not.
-TEST(PipelineOptimizationTest, MatchOnInternalSchemaTypeShouldNotSwapSinceCategoryIsOther) {
+// Descriptive test. The following internal match expression can participate in pipeline
+// optimizations.
+TEST(PipelineOptimizationTest, MatchOnInternalSchemaTypeShouldSwap) {
     string inputPipe =
         "[{$project: {_id: true, a: '$b'}}, "
         "{$match: {a: {$_internalSchemaType: 1}}}]";
     string outputPipe =
-        "[{$project: {_id: true, a: '$b'}}, "
-        " {$match: {a: {$_internalSchemaType: [1]}}}]";
+        "[{$match: {b: {$_internalSchemaType: [1]}}}, "
+        "{$project: {_id: true, a: '$b'}}]";
     string serializedPipe =
-        "[{$project: {_id: true, a: '$b'}}, "
-        "{$match: {a: {$_internalSchemaType: 1}}}]";
+        "[{$match: {b: {$_internalSchemaType: [1]}}}, "
+        "{$project: {_id: true, a: '$b'}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe =
         "[{$project: {redacted: false}}, "
         "{$match: {a: {$_internalSchemaType: 1}}}]";
     outputPipe =
-        "[{$project: {redacted: false, _id: true}}, "
-        " {$match: {a: {$_internalSchemaType: [1]}}}]";
+        "[{$match: {a: {$_internalSchemaType: [1]}}}, "
+        "{$project: {redacted: false, _id: true}}]";
     serializedPipe =
-        "[{$project: {redacted: false, _id: true}}, "
-        "{$match: {a: {$_internalSchemaType: 1}}}]";
+        "[{$match: {a: {$_internalSchemaType: 1}}}, "
+        "{$project: {redacted: false, _id: true}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe =
         "[{$addFields : {a : {$const: 1}}}, "
         "{$match: {b: {$_internalSchemaType: 1}}}]";
     outputPipe =
-        "[{$addFields : {a : {$const: 1}}}, "
-        " {$match: {b: {$_internalSchemaType: [1]}}}]";
+        "[{$match: {b: {$_internalSchemaType: [1]}}}, "
+        "{$addFields : {a : {$const: 1}}}]";
     serializedPipe =
-        "[{$addFields : {a : {$const: 1}}}, "
-        "{$match: {b: {$_internalSchemaType: 1}}}]";
+        "[{$match: {b: {$_internalSchemaType: 1}}}, "
+        "{$addFields : {a : {$const: 1}}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
