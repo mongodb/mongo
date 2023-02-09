@@ -17,12 +17,16 @@ const $config = (function() {
     const kBatchSizeForDocsLookup = kInitialCollSize * 2;
 
     /**
-     * Utility function that asserts that the specified command is executed successfully. However,
-     * if the error is in `retryableErrorCodes`, then the command is retried.
+     * Utility function that asserts that the specified command is executed successfully, i.e. that
+     * no errors occur, or that any error is in `ignorableErrorCodes`. However, if the error is in
+     * `retryableErrorCodes`, then the command is retried.
      */
-    const assertCommandWorked = function(cmd, retryableErrorCodes) {
+    const assertCommandWorked = function(cmd, retryableErrorCodes, ignorableErrorCodes = []) {
         if (!Array.isArray(retryableErrorCodes)) {
             retryableErrorCodes = [retryableErrorCodes];
+        }
+        if (!Array.isArray(ignorableErrorCodes)) {
+            ignorableErrorCodes = [ignorableErrorCodes];
         }
 
         let res = undefined;
@@ -35,6 +39,8 @@ const $config = (function() {
                     for (let writeErr of err.getWriteErrors()) {
                         if (retryableErrorCodes.includes(writeErr.code)) {
                             return false;
+                        } else if (ignorableErrorCodes.includes(writeErr.code)) {
+                            continue;
                         } else {
                             throw err;
                         }
@@ -42,6 +48,8 @@ const $config = (function() {
                     return true;
                 } else if (retryableErrorCodes.includes(err.code)) {
                     return false;
+                } else if (ignorableErrorCodes.includes(err.code)) {
+                    return true;
                 }
                 throw err;
             }
@@ -84,15 +92,20 @@ const $config = (function() {
             this.session = db.getMongo().startSession({retryWrites: true});
             let sessionColl = this.session.getDatabase(db.getName()).getCollection(this.collName);
 
-            assertCommandWorked(() => {
-                let bulkOp = sessionColl.initializeUnorderedBulkOp();
-                for (let i = 0; i < kInitialCollSize; ++i) {
-                    bulkOp.insert(
-                        {_id: i, updateCount: 0},
-                    );
-                }
-                bulkOp.execute();
-            }, ErrorCodes.MovePrimaryInProgress);
+            assertCommandWorked(
+                () => {
+                    let bulkOp = sessionColl.initializeUnorderedBulkOp();
+                    for (let i = 0; i < kInitialCollSize; ++i) {
+                        bulkOp.insert(
+                            {_id: i, updateCount: 0},
+                        );
+                    }
+                    bulkOp.execute();
+                },
+                ErrorCodes.MovePrimaryInProgress,
+                // TODO (SERVER-32113): Retryable writes may cause double inserts if performed on a
+                // shard involved as the originator of a movePrimary operation.
+                ErrorCodes.DuplicateKey);
         },
         insert: function(db, collName, connCache) {
             // Insert a document into the collection, with an _id greater than all those already
