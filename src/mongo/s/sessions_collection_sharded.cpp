@@ -172,7 +172,9 @@ LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
             OpMsgRequest::fromDBAndBody(NamespaceString::kLogicalSessionsNamespace.db(), toSend)
                 .body;
         auto findCommand = query_request_helper::makeFromFindCommand(
-            toSend, NamespaceString::kLogicalSessionsNamespace, apiStrict);
+            toSend,
+            static_cast<const NamespaceString&>(NamespaceString::kLogicalSessionsNamespace),
+            apiStrict);
 
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto cq = uassertStatusOK(
