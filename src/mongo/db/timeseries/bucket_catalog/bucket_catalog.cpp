@@ -750,15 +750,15 @@ Bucket* BucketCatalog::_useAlternateBucket(Stripe* stripe,
             return potentialBucket;
         }
 
-        // If we still have an entry for the bucket in the open set, but it conflicts with
-        // insertion, then it must have been cleared, and we can clean it up.
-        invariant(state.value().isSet(BucketStateFlag::kCleared));
-        _abort(stripe,
-               stripeLock,
-               potentialBucket,
-               nullptr,
-               getTimeseriesBucketClearedError(potentialBucket->bucketId.ns,
-                                               potentialBucket->bucketId.oid));
+        // Clean up the bucket if it has been cleared.
+        if (state.value().isSet(BucketStateFlag::kCleared)) {
+            _abort(stripe,
+                   stripeLock,
+                   potentialBucket,
+                   nullptr,
+                   getTimeseriesBucketClearedError(potentialBucket->bucketId.ns,
+                                                   potentialBucket->bucketId.oid));
+        }
     }
 
     return nullptr;
