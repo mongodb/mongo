@@ -945,13 +945,13 @@ public:
         wuow.commit();
     }
 
-    void concurrentCreateCollectionAndOpenCollection(OperationContext* opCtx,
-                                                     const NamespaceString& nss,
-                                                     boost::optional<UUID> uuid,
-                                                     Timestamp timestamp,
-                                                     bool openSnapshotBeforeCommit,
-                                                     bool expectedExistence,
-                                                     int expectedNumIndexes) {
+    void concurrentCreateCollectionAndEstablishConsistentCollection(OperationContext* opCtx,
+                                                                    const NamespaceString& nss,
+                                                                    boost::optional<UUID> uuid,
+                                                                    Timestamp timestamp,
+                                                                    bool openSnapshotBeforeCommit,
+                                                                    bool expectedExistence,
+                                                                    int expectedNumIndexes) {
         NamespaceStringOrUUID readNssOrUUID = [&]() {
             if (uuid) {
                 return NamespaceStringOrUUID(nss.dbName(), *uuid);
@@ -959,7 +959,7 @@ public:
                 return NamespaceStringOrUUID(nss);
             }
         }();
-        _concurrentDDLOperationAndOpenCollection(
+        _concurrentDDLOperationAndEstablishConsistentCollection(
             opCtx,
             readNssOrUUID,
             timestamp,
@@ -969,25 +969,27 @@ public:
             expectedNumIndexes);
     }
 
-    void concurrentDropCollectionAndOpenCollection(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const NamespaceStringOrUUID& readNssOrUUID,
-                                                   Timestamp timestamp,
-                                                   bool openSnapshotBeforeCommit,
-                                                   bool expectedExistence,
-                                                   int expectedNumIndexes) {
-        _concurrentDDLOperationAndOpenCollection(opCtx,
-                                                 readNssOrUUID,
-                                                 timestamp,
-                                                 [this, &nss, &timestamp](OperationContext* opCtx) {
-                                                     _dropCollection(opCtx, nss, timestamp);
-                                                 },
-                                                 openSnapshotBeforeCommit,
-                                                 expectedExistence,
-                                                 expectedNumIndexes);
+    void concurrentDropCollectionAndEstablishConsistentCollection(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const NamespaceStringOrUUID& readNssOrUUID,
+        Timestamp timestamp,
+        bool openSnapshotBeforeCommit,
+        bool expectedExistence,
+        int expectedNumIndexes) {
+        _concurrentDDLOperationAndEstablishConsistentCollection(
+            opCtx,
+            readNssOrUUID,
+            timestamp,
+            [this, &nss, &timestamp](OperationContext* opCtx) {
+                _dropCollection(opCtx, nss, timestamp);
+            },
+            openSnapshotBeforeCommit,
+            expectedExistence,
+            expectedNumIndexes);
     }
 
-    void concurrentRenameCollectionAndOpenCollection(
+    void concurrentRenameCollectionAndEstablishConsistentCollection(
         OperationContext* opCtx,
         const NamespaceString& from,
         const NamespaceString& to,
@@ -997,7 +999,7 @@ public:
         bool expectedExistence,
         int expectedNumIndexes,
         std::function<void()> verifyStateCallback = {}) {
-        _concurrentDDLOperationAndOpenCollection(
+        _concurrentDDLOperationAndEstablishConsistentCollection(
             opCtx,
             lookupNssOrUUID,
             timestamp,
@@ -1010,42 +1012,46 @@ public:
             std::move(verifyStateCallback));
     }
 
-    void concurrentCreateIndexAndOpenCollection(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const NamespaceStringOrUUID& readNssOrUUID,
-                                                BSONObj indexSpec,
-                                                Timestamp timestamp,
-                                                bool openSnapshotBeforeCommit,
-                                                bool expectedExistence,
-                                                int expectedNumIndexes) {
-        _concurrentDDLOperationAndOpenCollection(opCtx,
-                                                 readNssOrUUID,
-                                                 timestamp,
-                                                 [this, &nss, &indexSpec](OperationContext* opCtx) {
-                                                     _createIndex(opCtx, nss, indexSpec);
-                                                 },
-                                                 openSnapshotBeforeCommit,
-                                                 expectedExistence,
-                                                 expectedNumIndexes);
+    void concurrentCreateIndexAndEstablishConsistentCollection(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const NamespaceStringOrUUID& readNssOrUUID,
+        BSONObj indexSpec,
+        Timestamp timestamp,
+        bool openSnapshotBeforeCommit,
+        bool expectedExistence,
+        int expectedNumIndexes) {
+        _concurrentDDLOperationAndEstablishConsistentCollection(
+            opCtx,
+            readNssOrUUID,
+            timestamp,
+            [this, &nss, &indexSpec](OperationContext* opCtx) {
+                _createIndex(opCtx, nss, indexSpec);
+            },
+            openSnapshotBeforeCommit,
+            expectedExistence,
+            expectedNumIndexes);
     }
 
-    void concurrentDropIndexAndOpenCollection(OperationContext* opCtx,
-                                              const NamespaceString& nss,
-                                              const NamespaceStringOrUUID& readNssOrUUID,
-                                              const std::string& indexName,
-                                              Timestamp timestamp,
-                                              bool openSnapshotBeforeCommit,
-                                              bool expectedExistence,
-                                              int expectedNumIndexes) {
-        _concurrentDDLOperationAndOpenCollection(opCtx,
-                                                 readNssOrUUID,
-                                                 timestamp,
-                                                 [this, &nss, &indexName](OperationContext* opCtx) {
-                                                     _dropIndex(opCtx, nss, indexName);
-                                                 },
-                                                 openSnapshotBeforeCommit,
-                                                 expectedExistence,
-                                                 expectedNumIndexes);
+    void concurrentDropIndexAndEstablishConsistentCollection(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const NamespaceStringOrUUID& readNssOrUUID,
+        const std::string& indexName,
+        Timestamp timestamp,
+        bool openSnapshotBeforeCommit,
+        bool expectedExistence,
+        int expectedNumIndexes) {
+        _concurrentDDLOperationAndEstablishConsistentCollection(
+            opCtx,
+            readNssOrUUID,
+            timestamp,
+            [this, &nss, &indexName](OperationContext* opCtx) {
+                _dropIndex(opCtx, nss, indexName);
+            },
+            openSnapshotBeforeCommit,
+            expectedExistence,
+            expectedNumIndexes);
     }
 
 protected:
@@ -1181,14 +1187,15 @@ private:
      * updating the in-memory catalog.
      */
     template <typename Callable>
-    void _concurrentDDLOperationAndOpenCollection(OperationContext* opCtx,
-                                                  const NamespaceStringOrUUID& nssOrUUID,
-                                                  Timestamp timestamp,
-                                                  Callable&& ddlOperation,
-                                                  bool openSnapshotBeforeCommit,
-                                                  bool expectedExistence,
-                                                  int expectedNumIndexes,
-                                                  std::function<void()> verifyStateCallback = {}) {
+    void _concurrentDDLOperationAndEstablishConsistentCollection(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nssOrUUID,
+        Timestamp timestamp,
+        Callable&& ddlOperation,
+        bool openSnapshotBeforeCommit,
+        bool expectedExistence,
+        int expectedNumIndexes,
+        std::function<void()> verifyStateCallback = {}) {
         mongo::Mutex mutex;
         stdx::condition_variable cv;
         int numCalls = 0;
@@ -1244,8 +1251,8 @@ private:
         // Stash the catalog so we may perform multiple lookups that will be in sync with our
         // snapshot
         CollectionCatalog::stash(opCtx, CollectionCatalog::get(opCtx));
-        CollectionPtr coll =
-            CollectionCatalog::get(opCtx)->openCollection(opCtx, nssOrUUID, boost::none);
+        CollectionPtr coll = CollectionCatalog::get(opCtx)->establishConsistentCollection(
+            opCtx, nssOrUUID, boost::none);
 
         // Notify the thread that our openCollection lookup is done.
         {
@@ -1383,8 +1390,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenCollectionBeforeCreateTimestamp) {
     const Timestamp readTimestamp(5, 5);
     Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
     OneOffRead oor(opCtx.get(), readTimestamp);
-    auto coll =
-        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
+    auto coll = CollectionCatalog::get(opCtx.get())
+                    ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
     ASSERT(!coll);
 
     // Lookups from the catalog should return the newly opened collection (in this case nullptr).
@@ -1414,8 +1421,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollection) {
     const Timestamp readTimestamp(15, 15);
     OneOffRead oor(opCtx.get(), readTimestamp);
     Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-    auto coll =
-        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
+    auto coll = CollectionCatalog::get(opCtx.get())
+                    ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
     ASSERT(coll);
     ASSERT_EQ(0, coll->getIndexCatalog()->numIndexesTotal());
 
@@ -1462,8 +1469,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithIndex) {
     const Timestamp readTimestamp(25, 25);
     OneOffRead oor(opCtx.get(), readTimestamp);
     Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-    auto coll =
-        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
+    auto coll = CollectionCatalog::get(opCtx.get())
+                    ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
     ASSERT(coll);
     ASSERT_EQ(1, coll->getIndexCatalog()->numIndexesTotal());
 
@@ -1509,8 +1516,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenLatestCollectionWithIndex) {
     const Timestamp readTimestamp(20, 20);
     OneOffRead oor(opCtx.get(), readTimestamp);
     Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-    auto coll =
-        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
+    auto coll = CollectionCatalog::get(opCtx.get())
+                    ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
     ASSERT(coll);
 
     // Verify that the CollectionCatalog returns the latest collection.
@@ -1567,8 +1574,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithDropPendingIndex
     const Timestamp readTimestamp(20, 20);
     OneOffRead oor(opCtx.get(), readTimestamp);
     Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-    auto coll =
-        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
+    auto coll = CollectionCatalog::get(opCtx.get())
+                    ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
     ASSERT(coll);
     ASSERT_EQ(coll->getIndexCatalog()->numIndexesReady(), 2);
 
@@ -1663,8 +1670,8 @@ TEST_F(CollectionCatalogTimestampTest,
     const Timestamp readTimestamp = tsBetweenDroppingYAndZ;
     OneOffRead oor(opCtx.get(), readTimestamp);
     Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-    auto coll =
-        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
+    auto coll = CollectionCatalog::get(opCtx.get())
+                    ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
     ASSERT(coll);
     ASSERT_EQ(coll->getIndexCatalog()->numIndexesReady(), 2);
 
@@ -1717,7 +1724,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierAlreadyDropPendingCollection) 
         // Open "a.b", which is not expired in the drop pending map.
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         auto openedColl = CollectionCatalog::get(opCtx.get())
-                              ->openCollection(opCtx.get(), firstNss, readTimestamp);
+                              ->establishConsistentCollection(opCtx.get(), firstNss, readTimestamp);
         ASSERT(openedColl);
         ASSERT_EQ(
             CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), firstNss),
@@ -1740,8 +1747,9 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierAlreadyDropPendingCollection) 
         // Before openCollection, looking up the collection returns null.
         ASSERT(CollectionCatalog::get(opCtx.get())
                    ->lookupCollectionByNamespace(opCtx.get(), secondNss) == nullptr);
-        auto openedColl = CollectionCatalog::get(opCtx.get())
-                              ->openCollection(opCtx.get(), secondNss, readTimestamp);
+        auto openedColl =
+            CollectionCatalog::get(opCtx.get())
+                ->establishConsistentCollection(opCtx.get(), secondNss, readTimestamp);
         ASSERT(openedColl);
         ASSERT_EQ(CollectionCatalog::get(opCtx.get())
                       ->lookupCollectionByNamespace(opCtx.get(), secondNss),
@@ -1785,8 +1793,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionUsingDropPendingCollecti
     OneOffRead oor(opCtx.get(), readTimestamp);
 
     Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-    auto openedColl =
-        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
+    auto openedColl = CollectionCatalog::get(opCtx.get())
+                          ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
     ASSERT(openedColl);
     ASSERT_NE(coll.get(), openedColl.get());
     // Ensure the idents are shared between the opened collection and the drop pending collection.
@@ -1832,7 +1840,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionWithReaper) {
         OneOffRead oor(opCtx.get(), createCollectionTs);
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         auto openedColl = CollectionCatalog::get(opCtx.get())
-                              ->openCollection(opCtx.get(), nss, createCollectionTs);
+                              ->establishConsistentCollection(opCtx.get(), nss, createCollectionTs);
         ASSERT(openedColl);
         ASSERT_EQ(coll->getSharedIdent(), openedColl->getSharedIdent());
 
@@ -1852,7 +1860,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionWithReaper) {
         OneOffRead oor(opCtx.get(), createCollectionTs);
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         ASSERT(!CollectionCatalog::get(opCtx.get())
-                    ->openCollection(opCtx.get(), nss, createCollectionTs));
+                    ->establishConsistentCollection(opCtx.get(), nss, createCollectionTs));
     }
 }
 
@@ -1878,7 +1886,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionWithReaper) {
 
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         auto openedColl = CollectionCatalog::get(opCtx.get())
-                              ->openCollection(opCtx.get(), nss, createCollectionTs);
+                              ->establishConsistentCollection(opCtx.get(), nss, createCollectionTs);
         ASSERT(openedColl);
 
         ASSERT_EQ(1, storageEngine->getDropPendingIdents().size());
@@ -1906,7 +1914,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionWithReaper) {
         OneOffRead oor(opCtx.get(), createCollectionTs);
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         ASSERT(!CollectionCatalog::get(opCtx.get())
-                    ->openCollection(opCtx.get(), nss, createCollectionTs));
+                    ->establishConsistentCollection(opCtx.get(), nss, createCollectionTs));
     }
 }
 
@@ -1955,8 +1963,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
         OneOffRead oor(opCtx.get(), createIndexTs);
 
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-        auto openedColl =
-            CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, createIndexTs);
+        auto openedColl = CollectionCatalog::get(opCtx.get())
+                              ->establishConsistentCollection(opCtx.get(), nss, createIndexTs);
         ASSERT(openedColl);
         ASSERT_EQ(openedColl->getSharedIdent(), coll->getSharedIdent());
         ASSERT_EQ(2, openedColl->getIndexCatalog()->numIndexesTotal());
@@ -1971,8 +1979,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
         OneOffRead oor(opCtx.get(), dropXIndexTs);
 
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
-        auto openedColl =
-            CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, dropXIndexTs);
+        auto openedColl = CollectionCatalog::get(opCtx.get())
+                              ->establishConsistentCollection(opCtx.get(), nss, dropXIndexTs);
         ASSERT(openedColl);
         ASSERT_EQ(openedColl->getSharedIdent(), coll->getSharedIdent());
         ASSERT_EQ(1, openedColl->getIndexCatalog()->numIndexesTotal());
@@ -1994,7 +2002,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
 
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         auto openedColl = CollectionCatalog::get(opCtx.get())
-                              ->openCollection(opCtx.get(), nss, createCollectionTs);
+                              ->establishConsistentCollection(opCtx.get(), nss, createCollectionTs);
         ASSERT(openedColl);
         ASSERT_EQ(openedColl->getSharedIdent(), coll->getSharedIdent());
         ASSERT_EQ(0, openedColl->getIndexCatalog()->numIndexesTotal());
@@ -2006,8 +2014,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
         OneOffRead oor(opCtx.get(), createIndexTs);
 
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-        ASSERT(
-            !CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, createIndexTs));
+        ASSERT(!CollectionCatalog::get(opCtx.get())
+                    ->establishConsistentCollection(opCtx.get(), nss, createIndexTs));
 
         ASSERT_EQ(2, storageEngine->getDropPendingIdents().size());
     }
@@ -2025,7 +2033,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
 
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         ASSERT(!CollectionCatalog::get(opCtx.get())
-                    ->openCollection(opCtx.get(), nss, createCollectionTs));
+                    ->establishConsistentCollection(opCtx.get(), nss, createCollectionTs));
     }
 }
 
@@ -2068,8 +2076,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
         OneOffRead oor(opCtx.get(), createIndexTs);
 
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
-        auto openedColl =
-            CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, createIndexTs);
+        auto openedColl = CollectionCatalog::get(opCtx.get())
+                              ->establishConsistentCollection(opCtx.get(), nss, createIndexTs);
         ASSERT(openedColl);
         ASSERT_EQ(2, openedColl->getIndexCatalog()->numIndexesTotal());
 
@@ -2083,8 +2091,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
         OneOffRead oor(opCtx.get(), dropXIndexTs);
 
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
-        auto openedColl =
-            CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, dropXIndexTs);
+        auto openedColl = CollectionCatalog::get(opCtx.get())
+                              ->establishConsistentCollection(opCtx.get(), nss, dropXIndexTs);
         ASSERT(openedColl);
         ASSERT_EQ(1, openedColl->getIndexCatalog()->numIndexesTotal());
 
@@ -2104,7 +2112,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
 
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         auto openedColl = CollectionCatalog::get(opCtx.get())
-                              ->openCollection(opCtx.get(), nss, createCollectionTs);
+                              ->establishConsistentCollection(opCtx.get(), nss, createCollectionTs);
         ASSERT(openedColl);
         ASSERT_EQ(0, openedColl->getIndexCatalog()->numIndexesTotal());
     }
@@ -2115,8 +2123,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
         OneOffRead oor(opCtx.get(), createIndexTs);
 
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-        ASSERT(
-            !CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, createIndexTs));
+        ASSERT(!CollectionCatalog::get(opCtx.get())
+                    ->establishConsistentCollection(opCtx.get(), nss, createIndexTs));
 
         ASSERT_EQ(2, storageEngine->getDropPendingIdents().size());
     }
@@ -2130,7 +2138,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
 
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         ASSERT(!CollectionCatalog::get(opCtx.get())
-                    ->openCollection(opCtx.get(), nss, createCollectionTs));
+                    ->establishConsistentCollection(opCtx.get(), nss, createCollectionTs));
     }
 }
 
@@ -2640,7 +2648,8 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingInsert) {
     {
         OneOffRead oor(opCtx.get(), Timestamp(1, 17));
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, Timestamp(1, 17));
+        CollectionCatalog::get(opCtx.get())
+            ->establishConsistentCollection(opCtx.get(), nss, Timestamp(1, 17));
 
         // Lookups before the inserted timestamp is still unknown
         ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 11)).result,
@@ -2666,7 +2675,8 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingInsert) {
         OneOffRead oor(opCtx.get(), Timestamp(1, 12));
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
 
-        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, Timestamp(1, 12));
+        CollectionCatalog::get(opCtx.get())
+            ->establishConsistentCollection(opCtx.get(), nss, Timestamp(1, 12));
 
         // We should now have extended the range from Timestamp(1, 17) to Timestamp(1, 12)
         ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 12)).result,
@@ -2693,7 +2703,8 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingInsert) {
     {
         OneOffRead oor(opCtx.get(), Timestamp(1, 25));
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, Timestamp(1, 25));
+        CollectionCatalog::get(opCtx.get())
+            ->establishConsistentCollection(opCtx.get(), nss, Timestamp(1, 25));
 
         // Check the entries, most didn't change
         ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 17)).result,
@@ -2720,7 +2731,8 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingInsert) {
     {
         OneOffRead oor(opCtx.get(), Timestamp(1, 25));
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, Timestamp(1, 26));
+        CollectionCatalog::get(opCtx.get())
+            ->establishConsistentCollection(opCtx.get(), nss, Timestamp(1, 26));
 
         // We should not have re-written the existing entry at Timestamp(1, 26)
         ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 17)).result,
@@ -2772,7 +2784,8 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingInsertUnknown) {
               CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
 
     // Try to instantiate a non existing collection at this timestamp.
-    CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, Timestamp(1, 15));
+    CollectionCatalog::get(opCtx.get())
+        ->establishConsistentCollection(opCtx.get(), nss, Timestamp(1, 15));
 
     // Lookup should now be not existing
     ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
@@ -2802,8 +2815,8 @@ TEST_F(CollectionCatalogTimestampTest, CollectionLifetimeTiedToStorageTransactio
         OneOffRead oor(opCtx.get(), readTimestamp);
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
 
-        auto coll =
-            CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
+        auto coll = CollectionCatalog::get(opCtx.get())
+                        ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
         ASSERT(coll);
 
         std::shared_ptr<const Collection> fetchedColl =
@@ -2821,8 +2834,8 @@ TEST_F(CollectionCatalogTimestampTest, CollectionLifetimeTiedToStorageTransactio
         OneOffRead oor(opCtx.get(), readTimestamp);
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
 
-        auto coll =
-            CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
+        auto coll = CollectionCatalog::get(opCtx.get())
+                        ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
         ASSERT(coll);
 
         WriteUnitOfWork wuow(opCtx.get());
@@ -2845,8 +2858,8 @@ TEST_F(CollectionCatalogTimestampTest, CollectionLifetimeTiedToStorageTransactio
         OneOffRead oor(opCtx.get(), readTimestamp);
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
 
-        auto coll =
-            CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
+        auto coll = CollectionCatalog::get(opCtx.get())
+                        ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
         ASSERT(coll);
 
         boost::optional<WriteUnitOfWork> wuow(opCtx.get());
@@ -2966,8 +2979,8 @@ DEATH_TEST_F(CollectionCatalogTimestampTest, OpenCollectionInWriteUnitOfWork, "i
     WriteUnitOfWork wuow(opCtx.get());
 
     Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-    auto coll =
-        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
+    auto coll = CollectionCatalog::get(opCtx.get())
+                    ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateCollectionAndOpenCollectionBeforeCommit) {
@@ -2979,7 +2992,7 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateCollectionAndOpenCollecti
 
     // When the snapshot is opened right before the create is committed to the durable catalog, the
     // collection instance should not exist yet.
-    concurrentCreateCollectionAndOpenCollection(
+    concurrentCreateCollectionAndEstablishConsistentCollection(
         opCtx.get(), nss, boost::none, createCollectionTs, true, false, 0);
 }
 
@@ -2992,7 +3005,7 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateCollectionAndOpenCollecti
 
     // When the snapshot is opened right after the create is committed to the durable catalog, the
     // collection instance should exist.
-    concurrentCreateCollectionAndOpenCollection(
+    concurrentCreateCollectionAndEstablishConsistentCollection(
         opCtx.get(), nss, boost::none, createCollectionTs, false, true, 0);
 }
 
@@ -3007,7 +3020,7 @@ TEST_F(CollectionCatalogTimestampTest,
 
     // When the snapshot is opened right before the create is committed to the durable catalog, the
     // collection instance should not exist yet.
-    concurrentCreateCollectionAndOpenCollection(
+    concurrentCreateCollectionAndEstablishConsistentCollection(
         opCtx.get(), nss, uuid, createCollectionTs, true, false, 0);
 }
 
@@ -3022,7 +3035,7 @@ TEST_F(CollectionCatalogTimestampTest,
 
     // When the snapshot is opened right after the create is committed to the durable catalog, the
     // collection instance should exist.
-    concurrentCreateCollectionAndOpenCollection(
+    concurrentCreateCollectionAndEstablishConsistentCollection(
         opCtx.get(), nss, uuid, createCollectionTs, false, true, 0);
 }
 
@@ -3038,7 +3051,7 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropCollectionAndOpenCollection
 
     // When the snapshot is opened right before the drop is committed to the durable catalog, the
     // collection instance should be returned.
-    concurrentDropCollectionAndOpenCollection(
+    concurrentDropCollectionAndEstablishConsistentCollection(
         opCtx.get(), nss, nss, dropCollectionTs, true, true, 0);
 }
 
@@ -3054,7 +3067,7 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropCollectionAndOpenCollection
 
     // When the snapshot is opened right after the drop is committed to the durable catalog, no
     // collection instance should be returned.
-    concurrentDropCollectionAndOpenCollection(
+    concurrentDropCollectionAndEstablishConsistentCollection(
         opCtx.get(), nss, nss, dropCollectionTs, false, false, 0);
 }
 
@@ -3074,7 +3087,7 @@ TEST_F(CollectionCatalogTimestampTest,
 
     // When the snapshot is opened right before the drop is committed to the durable catalog, the
     // collection instance should be returned.
-    concurrentDropCollectionAndOpenCollection(
+    concurrentDropCollectionAndEstablishConsistentCollection(
         opCtx.get(), nss, uuidWithDbName, dropCollectionTs, true, true, 0);
 }
 
@@ -3093,7 +3106,7 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropCollectionAndOpenCollection
 
     // When the snapshot is opened right after the drop is committed to the durable catalog, no
     // collection instance should be returned.
-    concurrentDropCollectionAndOpenCollection(
+    concurrentDropCollectionAndEstablishConsistentCollection(
         opCtx.get(), nss, uuidWithDbName, dropCollectionTs, false, false, 0);
 }
 
@@ -3111,7 +3124,7 @@ TEST_F(CollectionCatalogTimestampTest,
 
     // When the snapshot is opened right before the rename is committed to the durable catalog, and
     // the openCollection looks for the originalNss, the collection instance should be returned.
-    concurrentRenameCollectionAndOpenCollection(
+    concurrentRenameCollectionAndEstablishConsistentCollection(
         opCtx.get(), originalNss, newNss, originalNss, renameCollectionTs, true, true, 0);
 }
 
@@ -3132,7 +3145,7 @@ TEST_F(CollectionCatalogTimestampTest,
 
     // When the snapshot is opened right after the rename is committed to the durable catalog, and
     // the openCollection looks for the originalNss, no collection instance should be returned.
-    concurrentRenameCollectionAndOpenCollection(
+    concurrentRenameCollectionAndEstablishConsistentCollection(
         opCtx.get(), originalNss, newNss, originalNss, renameCollectionTs, false, false, 0, [&]() {
             // Verify that we can find the Collection when we search by UUID when the setup occured
             // during concurrent rename (rename is not affecting UUID), even if we can't find it by
@@ -3164,7 +3177,7 @@ TEST_F(CollectionCatalogTimestampTest,
 
     // When the snapshot is opened right before the rename is committed to the durable catalog, and
     // the openCollection looks for the newNss, no collection instance should be returned.
-    concurrentRenameCollectionAndOpenCollection(
+    concurrentRenameCollectionAndEstablishConsistentCollection(
         opCtx.get(), originalNss, newNss, newNss, renameCollectionTs, true, false, 0, [&]() {
             // Verify that we can find the Collection when we search by UUID when the setup occured
             // during concurrent rename (rename is not affecting UUID), even if we can't find it by
@@ -3193,7 +3206,7 @@ TEST_F(CollectionCatalogTimestampTest,
 
     // When the snapshot is opened right after the rename is committed to the durable catalog, and
     // the openCollection looks for the newNss, the collection instance should be returned.
-    concurrentRenameCollectionAndOpenCollection(
+    concurrentRenameCollectionAndEstablishConsistentCollection(
         opCtx.get(), originalNss, newNss, newNss, renameCollectionTs, false, true, 0);
 }
 
@@ -3214,7 +3227,7 @@ TEST_F(CollectionCatalogTimestampTest,
     NamespaceStringOrUUID uuidWithDbName(originalNss.dbName(), uuid);
     // When the snapshot is opened right before the rename is committed to the durable catalog, and
     // the openCollection looks for the originalNss, the collection instance should be returned.
-    concurrentRenameCollectionAndOpenCollection(
+    concurrentRenameCollectionAndEstablishConsistentCollection(
         opCtx.get(), originalNss, newNss, uuidWithDbName, renameCollectionTs, true, true, 0, [&]() {
             // Verify that we cannot find the Collection when we search by the new namespace as
             // the rename was committed when we read.
@@ -3242,23 +3255,23 @@ TEST_F(CollectionCatalogTimestampTest,
 
     // When the snapshot is opened right after the rename is committed to the durable catalog, and
     // the openCollection looks for the originalNss, no collection instance should be returned.
-    concurrentRenameCollectionAndOpenCollection(opCtx.get(),
-                                                originalNss,
-                                                newNss,
-                                                uuidWithDbName,
-                                                renameCollectionTs,
-                                                false,
-                                                true,
-                                                0,
-                                                [&]() {
-                                                    // Verify that we cannot find the Collection
-                                                    // when we search by the original namespace as
-                                                    // the rename was committed when we read.
-                                                    auto coll = CollectionCatalog::get(opCtx.get())
-                                                                    ->lookupCollectionByNamespace(
-                                                                        opCtx.get(), originalNss);
-                                                    ASSERT(!coll);
-                                                });
+    concurrentRenameCollectionAndEstablishConsistentCollection(
+        opCtx.get(),
+        originalNss,
+        newNss,
+        uuidWithDbName,
+        renameCollectionTs,
+        false,
+        true,
+        0,
+        [&]() {
+            // Verify that we cannot find the Collection
+            // when we search by the original namespace as
+            // the rename was committed when we read.
+            auto coll = CollectionCatalog::get(opCtx.get())
+                            ->lookupCollectionByNamespace(opCtx.get(), originalNss);
+            ASSERT(!coll);
+        });
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionBeforeCommit) {
@@ -3280,16 +3293,16 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionBef
 
     // When the snapshot is opened right before the second index create is committed to the durable
     // catalog, the collection instance should not have the second index.
-    concurrentCreateIndexAndOpenCollection(opCtx.get(),
-                                           nss,
-                                           nss,
-                                           BSON("v" << 2 << "name"
-                                                    << "y_1"
-                                                    << "key" << BSON("y" << 1)),
-                                           createYIndexTs,
-                                           true,
-                                           true,
-                                           1);
+    concurrentCreateIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                          nss,
+                                                          nss,
+                                                          BSON("v" << 2 << "name"
+                                                                   << "y_1"
+                                                                   << "key" << BSON("y" << 1)),
+                                                          createYIndexTs,
+                                                          true,
+                                                          true,
+                                                          1);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionAfterCommit) {
@@ -3311,16 +3324,16 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionAft
 
     // When the snapshot is opened right before the second index create is committed to the durable
     // catalog, the collection instance should have both indexes.
-    concurrentCreateIndexAndOpenCollection(opCtx.get(),
-                                           nss,
-                                           nss,
-                                           BSON("v" << 2 << "name"
-                                                    << "y_1"
-                                                    << "key" << BSON("y" << 1)),
-                                           createYIndexTs,
-                                           false,
-                                           true,
-                                           2);
+    concurrentCreateIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                          nss,
+                                                          nss,
+                                                          BSON("v" << 2 << "name"
+                                                                   << "y_1"
+                                                                   << "key" << BSON("y" << 1)),
+                                                          createYIndexTs,
+                                                          false,
+                                                          true,
+                                                          2);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionByUUIDBeforeCommit) {
@@ -3345,16 +3358,16 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionByU
 
     // When the snapshot is opened right before the second index create is committed to the durable
     // catalog, the collection instance should not have the second index.
-    concurrentCreateIndexAndOpenCollection(opCtx.get(),
-                                           nss,
-                                           uuidWithDbName,
-                                           BSON("v" << 2 << "name"
-                                                    << "y_1"
-                                                    << "key" << BSON("y" << 1)),
-                                           createYIndexTs,
-                                           true,
-                                           true,
-                                           1);
+    concurrentCreateIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                          nss,
+                                                          uuidWithDbName,
+                                                          BSON("v" << 2 << "name"
+                                                                   << "y_1"
+                                                                   << "key" << BSON("y" << 1)),
+                                                          createYIndexTs,
+                                                          true,
+                                                          true,
+                                                          1);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionByUUIDAfterCommit) {
@@ -3379,16 +3392,16 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionByU
 
     // When the snapshot is opened right before the second index create is committed to the durable
     // catalog, the collection instance should have both indexes.
-    concurrentCreateIndexAndOpenCollection(opCtx.get(),
-                                           nss,
-                                           uuidWithDbName,
-                                           BSON("v" << 2 << "name"
-                                                    << "y_1"
-                                                    << "key" << BSON("y" << 1)),
-                                           createYIndexTs,
-                                           false,
-                                           true,
-                                           2);
+    concurrentCreateIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                          nss,
+                                                          uuidWithDbName,
+                                                          BSON("v" << 2 << "name"
+                                                                   << "y_1"
+                                                                   << "key" << BSON("y" << 1)),
+                                                          createYIndexTs,
+                                                          false,
+                                                          true,
+                                                          2);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionBeforeCommit) {
@@ -3416,7 +3429,8 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionBefor
 
     // When the snapshot is opened right before the index drop is committed to the durable
     // catalog, the collection instance should not have the second index.
-    concurrentDropIndexAndOpenCollection(opCtx.get(), nss, nss, "y_1", dropIndexTs, true, true, 2);
+    concurrentDropIndexAndEstablishConsistentCollection(
+        opCtx.get(), nss, nss, "y_1", dropIndexTs, true, true, 2);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionAfterCommit) {
@@ -3444,7 +3458,8 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionAfter
 
     // When the snapshot is opened right before the index drop is committed to the durable
     // catalog, the collection instance should not have the second index.
-    concurrentDropIndexAndOpenCollection(opCtx.get(), nss, nss, "y_1", dropIndexTs, false, true, 1);
+    concurrentDropIndexAndEstablishConsistentCollection(
+        opCtx.get(), nss, nss, "y_1", dropIndexTs, false, true, 1);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionByUUIDBeforeCommit) {
@@ -3475,7 +3490,7 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionByUUI
 
     // When the snapshot is opened right before the index drop is committed to the durable
     // catalog, the collection instance should not have the second index.
-    concurrentDropIndexAndOpenCollection(
+    concurrentDropIndexAndEstablishConsistentCollection(
         opCtx.get(), nss, uuidWithDbName, "y_1", dropIndexTs, true, true, 2);
 }
 
@@ -3507,7 +3522,7 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionByUUI
 
     // When the snapshot is opened right before the index drop is committed to the durable
     // catalog, the collection instance should not have the second index.
-    concurrentDropIndexAndOpenCollection(
+    concurrentDropIndexAndEstablishConsistentCollection(
         opCtx.get(), nss, uuidWithDbName, "y_1", dropIndexTs, false, true, 1);
 }
 
@@ -3535,7 +3550,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenCollectionBetweenIndexBuildInProgress
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
 
         auto coll = CollectionCatalog::get(opCtx.get())
-                        ->openCollection(opCtx.get(), nss, createCollectionTs);
+                        ->establishConsistentCollection(opCtx.get(), nss, createCollectionTs);
         ASSERT(coll);
         ASSERT_EQ(coll->getIndexCatalog()->numIndexesReady(), 0);
 
@@ -3558,8 +3573,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenCollectionBetweenIndexBuildInProgress
         OneOffRead oor(opCtx.get(), createIndexTs);
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
 
-        auto coll =
-            CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, createIndexTs);
+        auto coll = CollectionCatalog::get(opCtx.get())
+                        ->establishConsistentCollection(opCtx.get(), nss, createIndexTs);
         ASSERT(coll);
         ASSERT_EQ(coll->getIndexCatalog()->numIndexesReady(), 0);
 

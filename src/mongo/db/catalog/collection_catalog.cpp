@@ -784,9 +784,24 @@ void CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseName&
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
 }
 
-bool CollectionCatalog::needsOpenCollection(OperationContext* opCtx,
-                                            const NamespaceStringOrUUID& nsOrUUID,
-                                            boost::optional<Timestamp> readTimestamp) const {
+CollectionPtr CollectionCatalog::establishConsistentCollection(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nssOrUUID,
+    boost::optional<Timestamp> readTimestamp) const {
+    if (_needsOpenCollection(opCtx, nssOrUUID, readTimestamp)) {
+        return _openCollection(opCtx, nssOrUUID, readTimestamp);
+    }
+
+    return lookupCollectionByNamespaceOrUUID(opCtx, nssOrUUID);
+}
+
+bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
+                                             const NamespaceStringOrUUID& nsOrUUID,
+                                             boost::optional<Timestamp> readTimestamp) const {
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+        return false;
+    }
+
     if (readTimestamp) {
         auto coll = lookupCollectionByNamespaceOrUUID(opCtx, nsOrUUID);
         return !coll || *readTimestamp < coll->getMinimumValidSnapshot();
@@ -799,9 +814,9 @@ bool CollectionCatalog::needsOpenCollection(OperationContext* opCtx,
     }
 }
 
-CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
-                                                const NamespaceStringOrUUID& nssOrUUID,
-                                                boost::optional<Timestamp> readTimestamp) const {
+CollectionPtr CollectionCatalog::_openCollection(OperationContext* opCtx,
+                                                 const NamespaceStringOrUUID& nssOrUUID,
+                                                 boost::optional<Timestamp> readTimestamp) const {
     if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
         return CollectionPtr();
     }

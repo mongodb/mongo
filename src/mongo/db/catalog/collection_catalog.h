@@ -216,31 +216,35 @@ public:
     void reloadViews(OperationContext* opCtx, const DatabaseName& dbName) const;
 
     /**
-     * Returns true if catalog information about this namespace or UUID should be looked up from the
-     * durable catalog rather than using the in-memory state of the catalog.
+     * Establish a collection instance consistent with the opened storage snapshot.
      *
-     * This is true when either:
-     *  - The readTimestamp is prior to the minimum valid timestamp for the collection corresponding
-     *    to this namespace, or
-     *  - There's no read timestamp provided and this namespace has a pending DDL operation that has
-     *    not completed yet (which would imply that the latest version of the catalog may or may not
-     *    match the state of the durable catalog for this collection).
-     */
-    bool needsOpenCollection(OperationContext* opCtx,
-                             const NamespaceStringOrUUID& nsOrUUID,
-                             boost::optional<Timestamp> readTimestamp) const;
-
-    /**
      * Returns the collection pointer representative of 'nssOrUUID' at the provided read timestamp.
-     * If no timestamp is provided, returns instance of the latest collection. The returned
-     * collection instance is only valid while the storage snapshot is open and becomes invalidated
-     * when the snapshot is closed.
+     * If no timestamp is provided, returns instance of the latest collection. When called
+     * concurrently with a DDL operation the latest collection returned may be the instance being
+     * committed by the concurrent DDL operation.
      *
      * Returns nullptr when reading from a point-in-time where the collection did not exist.
+     *
+     * The returned collection instance is only valid while a reference to this catalog instance is
+     * held or stashed and as long as the storage snapshot remains open. Releasing catalog reference
+     * or closing the storage snapshot invalidates the instance.
+     *
+     * Future calls to lookupCollection, lookupNSS, lookupUUID on this namespace/UUID will return
+     * results consistent with the opened storage snapshot.
+     *
+     * Depending on the internal state of the CollectionCatalog a read from the durable catalog may
+     * be performed and this call may block on I/O. No mutex should be held while calling this
+     * function.
+     *
+     * Multikey state is not guaranteed to be consistent with the storage snapshot. It may indicate
+     * an index to be multikey where it is not multikey in the storage snapshot. However, it will
+     * never be wrong in the other direction.
+     *
+     * No collection level lock is required to call this function.
      */
-    CollectionPtr openCollection(OperationContext* opCtx,
-                                 const NamespaceStringOrUUID& nssOrUUID,
-                                 boost::optional<Timestamp> readTimestamp) const;
+    CollectionPtr establishConsistentCollection(OperationContext* opCtx,
+                                                const NamespaceStringOrUUID& nssOrUUID,
+                                                boost::optional<Timestamp> readTimestamp) const;
 
     /**
      * Returns a shared_ptr to a drop pending index if it's found and not expired.
@@ -806,6 +810,33 @@ private:
     // catalogIds
     void _markNamespaceForCatalogIdCleanupIfNeeded(const NamespaceString& nss,
                                                    const std::vector<TimestampedCatalogId>& ids);
+
+    /**
+     * Returns true if catalog information about this namespace or UUID should be looked up from the
+     * durable catalog rather than using the in-memory state of the catalog.
+     *
+     * This is true when either:
+     *  - The readTimestamp is prior to the minimum valid timestamp for the collection corresponding
+     *    to this namespace, or
+     *  - There's no read timestamp provided and this namespace has a pending DDL operation that has
+     *    not completed yet (which would imply that the latest version of the catalog may or may not
+     *    match the state of the durable catalog for this collection).
+     */
+    bool _needsOpenCollection(OperationContext* opCtx,
+                              const NamespaceStringOrUUID& nsOrUUID,
+                              boost::optional<Timestamp> readTimestamp) const;
+
+    /**
+     * Returns the collection pointer representative of 'nssOrUUID' at the provided read timestamp.
+     * If no timestamp is provided, returns instance of the latest collection. The returned
+     * collection instance is only valid while the storage snapshot is open and becomes invalidated
+     * when the snapshot is closed.
+     *
+     * Returns nullptr when reading from a point-in-time where the collection did not exist.
+     */
+    CollectionPtr _openCollection(OperationContext* opCtx,
+                                  const NamespaceStringOrUUID& nssOrUUID,
+                                  boost::optional<Timestamp> readTimestamp) const;
 
     // Helpers to perform openCollection at latest or at point-in-time on Namespace/UUID.
     CollectionPtr _openCollectionAtLatestByNamespace(OperationContext* opCtx,

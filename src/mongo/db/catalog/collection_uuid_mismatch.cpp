@@ -45,7 +45,7 @@ void checkCollectionUUIDMismatch(OperationContext* opCtx,
 void checkCollectionUUIDMismatch(OperationContext* opCtx,
                                  const std::shared_ptr<const CollectionCatalog>& catalog,
                                  const NamespaceString& ns,
-                                 const Collection* coll,
+                                 const CollectionPtr& coll,
                                  const boost::optional<UUID>& uuid) {
     if (!uuid) {
         return;

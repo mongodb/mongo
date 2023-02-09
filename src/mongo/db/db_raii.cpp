@@ -127,22 +127,11 @@ void assertCollectionChangesCompatibleWithReadTimestamp(OperationContext* opCtx,
 }
 
 /**
- * Performs some sanity checks on the collection and database.
+ * Performs validation of special locking requirements for certain namespaces.
  */
-void verifyDbAndCollectionReadIntent(OperationContext* opCtx,
-                                     LockMode modeColl,
-                                     const NamespaceStringOrUUID& nsOrUUID,
-                                     const NamespaceString& resolvedNss,
-                                     CollectionPtr& coll,
-                                     Database* db) {
-    invariant(!nsOrUUID.uuid() || coll,
-              str::stream() << "Collection for " << resolvedNss.ns()
-                            << " disappeared after successfully resolving " << nsOrUUID.toString());
-
-    invariant(!nsOrUUID.uuid() || db,
-              str::stream() << "Database for " << resolvedNss.ns()
-                            << " disappeared after successfully resolving " << nsOrUUID.toString());
-
+void verifyNamespaceLockingRequirements(OperationContext* opCtx,
+                                        LockMode modeColl,
+                                        const NamespaceString& resolvedNss) {
     // In most cases we expect modifications for system.views to upgrade MODE_IX to MODE_X before
     // taking the lock. One exception is a query by UUID of system.views in a transaction. Usual
     // queries of system.views (by name, not UUID) within a transaction are rejected. However, if
@@ -474,32 +463,6 @@ void checkInvariantsForReadOptions(const NamespaceString& nss,
     }
 }
 
-/**
- * Returns a collection reference compatible with the specified 'readTimestamp'. Creates and places
- * a compatible PIT collection reference in the 'catalog' if needed and the collection exists at
- * that PIT.
- */
-CollectionPtr fetchOrCreatePITCollection(OperationContext* opCtx,
-                                         const CollectionCatalog* catalog,
-                                         const NamespaceString nss,
-                                         boost::optional<Timestamp> readTimestamp,
-                                         bool isPrimaryNs) {
-    if (catalog->needsOpenCollection(opCtx, nss, readTimestamp)) {
-        // Getting this far means that either the collection is not present in the catalog (it may
-        // have been dropped) or the read timestamp is earlier than the last DDL operation
-        // (minValidSnapshot). So try to create a valid past Collection instance for the
-        // readTimestamp.
-        (void)catalog->openCollection(opCtx, nss, readTimestamp);
-    }
-
-    // TODO SERVER-70846: openCollection does not set a yield handler on the CollectionPtr
-    // returned. Therefore, it is necessary to lookup the collection again via a different
-    // lookup fn to fetch a yielding-aware CollectionPtr from the catalog.
-    CollectionPtr coll = catalog->lookupCollectionByNamespace(opCtx, nss);
-    coll.makeYieldable(opCtx, LockedCollectionYieldRestore{opCtx, coll});
-    return coll;
-}
-
 }  // namespace
 
 AutoStatsTracker::AutoStatsTracker(
@@ -760,7 +723,6 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
         [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); });
 
     auto catalog = CollectionCatalog::get(opCtx);
-    auto databaseHolder = DatabaseHolder::get(opCtx);
 
     _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
 
@@ -780,14 +742,15 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
     const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
     const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
 
-    // Check that the collections are all safe to use. First acquire collection from our catalog.
-    _coll = fetchOrCreatePITCollection(
-        opCtx, catalog.get(), _resolvedNss, readTimestamp, true /* isPrimaryNs */);
+    // Check that the collections are all safe to use. First acquire collection from our catalog
+    // compatible with the specified 'readTimestamp'. Creates and places a compatible PIT collection
+    // reference in the 'catalog' if needed and the collection exists at that PIT.
+    _coll = catalog->establishConsistentCollection(opCtx, nsOrUUID, readTimestamp);
+    _coll.makeYieldable(opCtx, LockedCollectionYieldRestore{opCtx, _coll});
 
     // Validate primary collection.
     checkCollectionUUIDMismatch(opCtx, _resolvedNss, _coll, options._expectedUUID);
-    verifyDbAndCollectionReadIntent(
-        opCtx, modeColl, nsOrUUID, _resolvedNss, _coll, _autoDb.getDb());
+    verifyNamespaceLockingRequirements(opCtx, modeColl, _resolvedNss);
 
     // Check secondary collections and verify they are valid for use.
     if (!secondaryNssOrUUIDs.empty()) {
@@ -800,18 +763,13 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
         if (!_secondaryNssIsAViewOrSharded) {
             // Ensure that the readTimestamp is compatible with the latest Collection instances or
             // create PIT instances in the 'catalog' (if the collections existed at that PIT).
-            for (const auto& secondaryNss : *resolvedSecondaryNamespaces) {
-                auto secondaryCollectionAtPIT = fetchOrCreatePITCollection(
-                    opCtx, catalog.get(), secondaryNss, readTimestamp, false /* isPrimaryNs */);
+            for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
+                auto secondaryCollectionAtPIT = catalog->establishConsistentCollection(
+                    opCtx, secondaryNssOrUUID, readTimestamp);
                 if (secondaryCollectionAtPIT) {
                     invariant(secondaryCollectionAtPIT->ns().dbName() == _resolvedNss.dbName());
-                    verifyDbAndCollectionReadIntent(
-                        opCtx,
-                        MODE_IS,
-                        secondaryNss,
-                        secondaryNss,
-                        secondaryCollectionAtPIT,
-                        databaseHolder->getDb(opCtx, secondaryNss.dbName()));
+                    verifyNamespaceLockingRequirements(
+                        opCtx, MODE_IS, secondaryCollectionAtPIT->ns());
                 }
             }
         }
@@ -1197,42 +1155,7 @@ std::shared_ptr<const ViewDefinition> lookupView(
     return view;
 }
 
-const Collection* getCollectionFromCatalog(OperationContext* opCtx,
-                                           const std::shared_ptr<const CollectionCatalog>& catalog,
-                                           const NamespaceStringOrUUID& nsOrUUID,
-                                           const boost::optional<Timestamp>& readTimestamp) {
-    if (catalog->needsOpenCollection(opCtx, nsOrUUID, readTimestamp)) {
-        auto coll = catalog->openCollection(opCtx, nsOrUUID, readTimestamp).get();
-        if (coll) {
-            if (auto capSnap =
-                    CappedSnapshots::get(opCtx).getSnapshot(coll->getRecordStore()->getIdent())) {
-                // The only way openCollection can be required for a collection that uses capped
-                // snapshots (i.e. a collection that is unreplicated and capped) is:
-                //  * The present read operation is reading without a timestamp (since unreplicated
-                //    collections don't support timestamped reads), and
-                //  * When opening the storage snapshot (and thus when establishing the capped
-                //    snapshot), there was a DDL operation pending on the namespace or UUID
-                //    requested for this read (because this is the only time openCollection is
-                //    called for an untimestamped read).
-                //
-                // Because DDL operations require a collection X lock, there cannot have been any
-                // ongoing concurrent writes to the collection while establishing the capped
-                // snapshot. This means that if there was a capped snapshot, it should not have
-                // contained any uncommitted writes, and so the _lowestUncommittedRecord must be
-                // null.
-                invariant(!capSnap->hasUncommittedRecords());
-            }
-        }
-        return coll;
-    } else {
-        // It's safe to extract the raw pointer from the CollectionPtr returned by lookupCollection
-        // because it is owned by the catalog, which will remain valid for as long as we're using
-        // the collection returned here.
-        return catalog->lookupCollectionByNamespaceOrUUID(opCtx, nsOrUUID).get();
-    }
-}
-
-std::tuple<NamespaceString, const Collection*, std::shared_ptr<const ViewDefinition>>
+std::tuple<NamespaceString, CollectionPtr, std::shared_ptr<const ViewDefinition>>
 getCollectionForLockFreeRead(OperationContext* opCtx,
                              const std::shared_ptr<const CollectionCatalog>& catalog,
                              boost::optional<Timestamp> readTimestamp,
@@ -1250,8 +1173,11 @@ getCollectionForLockFreeRead(OperationContext* opCtx,
                 opCtx->getLogicalSessionId()->getId() == UUID::fromCDR(data["lsid"].uuid());
         });
 
-    auto coll = getCollectionFromCatalog(opCtx, catalog, nsOrUUID, readTimestamp);
 
+    // Returns a collection reference compatible with the specified 'readTimestamp'. Creates and
+    // places a compatible PIT collection reference in the 'catalog' if needed and the collection
+    // exists at that PIT.
+    CollectionPtr coll = catalog->establishConsistentCollection(opCtx, nsOrUUID, readTimestamp);
     // TODO (SERVER-71222): This is broken if the UUID doesn't exist in the latest catalog.
     //
     // Note: This call to resolveNamespaceStringOrUUID must happen after getCollectionFromCatalog
@@ -1260,7 +1186,9 @@ getCollectionForLockFreeRead(OperationContext* opCtx,
     const auto nss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
     checkCollectionUUIDMismatch(opCtx, catalog, nss, coll, options._expectedUUID);
 
-    return {nss, coll, coll ? nullptr : lookupView(opCtx, catalog, nss, options._viewMode)};
+    std::shared_ptr<const ViewDefinition> viewDefinition =
+        coll ? nullptr : lookupView(opCtx, catalog, nss, options._viewMode);
+    return {nss, std::move(coll), std::move(viewDefinition)};
 }
 
 static const Lock::GlobalLockSkipOptions kLockFreeReadsGlobalLockOptions{[] {
@@ -1269,16 +1197,11 @@ static const Lock::GlobalLockSkipOptions kLockFreeReadsGlobalLockOptions{[] {
     return options;
 }()};
 
-CollectionPtr makeCollectionPtrForLockFreeReadSubOperation(OperationContext* opCtx,
-                                                           const Collection* coll) {
-    return {coll};
-}
-
 struct CatalogStateForNamespace {
     std::shared_ptr<const CollectionCatalog> catalog;
     bool isAnySecondaryNssShardedOrAView;
     NamespaceString resolvedNss;
-    const Collection* collection;
+    CollectionPtr collection;
     std::shared_ptr<const ViewDefinition> view;
 };
 
@@ -1300,7 +1223,7 @@ CatalogStateForNamespace acquireCatalogStateForNamespace(
         getCollectionForLockFreeRead(opCtx, catalog, readTimestamp, nsOrUUID, options);
 
     return CatalogStateForNamespace{
-        catalog, isAnySecondaryNssShardedOrAView, resolvedNss, collection, view};
+        catalog, isAnySecondaryNssShardedOrAView, resolvedNss, std::move(collection), view};
 }
 
 boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
@@ -1339,7 +1262,7 @@ CollectionPtr::RestoreFn AutoGetCollectionForReadLockFreePITCatalog::_makeRestor
             _view = catalogStateForNamespace.view;
             _catalogStasher.stash(std::move(catalogStateForNamespace.catalog));
 
-            return catalogStateForNamespace.collection;
+            return catalogStateForNamespace.collection.get();
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
             // Calls to CollectionCatalog::resolveNamespaceStringOrUUID (called from
             // acquireCatalogStateForNamespace) will result in a NamespaceNotFound error if the
@@ -1397,7 +1320,7 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
         if (_view) {
             _lockFreeReadsBlock.reset();
         }
-        _collectionPtr = makeCollectionPtrForLockFreeReadSubOperation(opCtx, collection);
+        _collectionPtr = std::move(collection);
     } else {
         auto catalogStateForNamespace =
             acquireCatalogStateForNamespace(opCtx,
@@ -1415,9 +1338,7 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
         _catalogStasher.stash(std::move(catalogStateForNamespace.catalog));
         _secondaryNssIsAViewOrSharded = catalogStateForNamespace.isAnySecondaryNssShardedOrAView;
 
-        _collectionPtr = CollectionPtr(
-
-            catalogStateForNamespace.collection);
+        _collectionPtr = std::move(catalogStateForNamespace.collection);
         _collectionPtr.makeYieldable(
             opCtx,
             _makeRestoreFromYieldFn(options,
