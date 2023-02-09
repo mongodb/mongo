@@ -143,6 +143,74 @@ struct BoolExpr {
         return {};
     }
 
+    using ChildVisitor = std::function<void(Node& child, const size_t childIndex)>;
+    using ChildVisitorConst = std::function<void(const Node& child, const size_t childIndex)>;
+    using AtomVisitor = std::function<void(T& expr)>;
+    using AtomVisitorConst = std::function<void(const T& expr)>;
+
+    static size_t visitConjuncts(const Node& node, const ChildVisitorConst& visitor) {
+        size_t index = 0;
+        for (const auto& conj : node.template cast<Conjunction>()->nodes()) {
+            visitor(conj, index++);
+        }
+        return index;
+    }
+
+    static size_t visitConjuncts(Node& node, const ChildVisitor& visitor) {
+        size_t index = 0;
+        for (auto& conj : node.template cast<Conjunction>()->nodes()) {
+            visitor(conj, index++);
+        }
+        return index;
+    }
+
+    static size_t visitDisjuncts(const Node& node, const ChildVisitorConst& visitor) {
+        size_t index = 0;
+        for (const auto& conj : node.template cast<Disjunction>()->nodes()) {
+            visitor(conj, index++);
+        }
+        return index;
+    }
+
+    static size_t visitDisjuncts(Node& node, const ChildVisitor& visitor) {
+        size_t index = 0;
+        for (auto& conj : node.template cast<Disjunction>()->nodes()) {
+            visitor(conj, index++);
+        }
+        return index;
+    }
+
+    static void visitAtom(const Node& node, const AtomVisitorConst& visitor) {
+        visitor(node.template cast<Atom>()->getExpr());
+    }
+
+    static void visitAtom(Node& node, const AtomVisitor& visitor) {
+        visitor(node.template cast<Atom>()->getExpr());
+    }
+
+
+    static bool isCNF(const Node& n) {
+        if (n.template is<Conjunction>()) {
+            bool disjunctions = true;
+            visitConjuncts(n, [&](const Node& child, const size_t) {
+                disjunctions &= child.template is<Disjunction>();
+            });
+            return disjunctions;
+        }
+        return false;
+    }
+
+    static bool isDNF(const Node& n) {
+        if (n.template is<Disjunction>()) {
+            bool conjunctions = true;
+            visitDisjuncts(n, [&](const Node& child, const size_t) {
+                conjunctions &= child.template is<Conjunction>();
+            });
+            return conjunctions;
+        }
+        return false;
+    }
+
     /**
      * Builder which is used to create BoolExpr trees. It supports negation, which is translated
      * internally to conjunction and disjunction via deMorgan elimination. The following template
