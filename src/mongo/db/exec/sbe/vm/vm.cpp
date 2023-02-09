@@ -64,9 +64,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-
-MONGO_FAIL_POINT_DEFINE(failOnPoisonedFieldLookup);
-
 namespace mongo {
 namespace sbe {
 namespace vm {
@@ -962,10 +959,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTag
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTags objTag,
                                                                   value::Value objValue,
                                                                   StringData fieldStr) {
-    if (MONGO_unlikely(failOnPoisonedFieldLookup.shouldFail())) {
-        uassert(4623399, "Lookup of $POISON", fieldStr != "POISON");
-    }
-
     if (objTag == value::TypeTags::Object) {
         auto [tag, val] = value::getObjectView(objValue)->getField(fieldStr);
         return {false, tag, val};

@@ -2438,9 +2438,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     if (!groupNode->needWholeDocument) {
-        // Tracks whether we need to request kResult. One such case is lookup of the '$$POISON'
-        // field.
-        bool rootDocIsNeeded = containsPoisonTopLevelField(groupNode->requiredFields);
+        // Tracks whether we need to request kResult.
+        bool rootDocIsNeeded = false;
         auto referencesRoot = [&](const ExpressionFieldPath* fieldExpr) {
             rootDocIsNeeded = rootDocIsNeeded || fieldExpr->isROOT();
         };

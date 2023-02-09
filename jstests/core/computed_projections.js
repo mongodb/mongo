@@ -4,21 +4,10 @@
 load("jstests/aggregation/extras/utils.js");  // For arrayEq and orderedArrayEq.
 load("jstests/libs/sbe_assert_error_override.js");
 
-// It is safe for other tests to run while this failpoint is active, so long as those tests do not
-// use documents containing a field with "POISON" as their name. Note that this command can fail.
-// This failpoint does not exist on mongos and on older version of mongod, which we may be talking
-// to in sharding and/or multi-version passthrough suites. The test still functions but with reduced
-// coverage.
-const isPoisonFailPointEnabled =
-    db.adminCommand({configureFailPoint: "failOnPoisonedFieldLookup", mode: "alwaysOn"}).ok;
-if (!isPoisonFailPointEnabled) {
-    print("Unable to set 'failOnPoisonedFieldLookup' failpoint.");
-}
-
 const coll = db.computed_projection;
 coll.drop();
 const documents = [
-    {_id: 0, a: 1, b: "x", c: 10},
+    {_id: 0, a: 1, b: "x", c: 10, zero: 0},
     {_id: 1, a: 2, b: "y", c: 11},
     {_id: 2, a: 3, b: "z", c: 12},
     {_id: 3, x: {y: 1}},
@@ -40,7 +29,17 @@ const documents = [
     {_id: 19, i: {j: 5}, k: {l: 10}},
     {_id: 20, x: [[{y: 1}, {y: 2}], {y: 3}, {y: 4}, [[[{y: 5}]]], {y: 6}]},
     {_id: 21, x: [[{y: {z: 1}}, {y: 2}], {y: 3}, {y: {z: 2}}, [[[{y: 5}, {y: {z: 3}}]]], {y: 6}]},
-    {_id: 22, tf: [true, false], ff: [false, false], t: true, f: false, n: null, a: 1, b: 0},
+    {
+        _id: 22,
+        tf: [true, false],
+        ff: [false, false],
+        t: true,
+        f: false,
+        n: null,
+        a: 1,
+        b: 0,
+        zero: 0
+    },
     {_id: 23, i1: NumberInt(1), i2: NumberInt(-1), i3: NumberInt(-2147483648)},
     {_id: 24, l1: NumberLong("12345678900"), l2: NumberLong("-12345678900")},
     {_id: 25, s: "string", l: NumberLong("-9223372036854775808"), n: null},
@@ -646,35 +645,37 @@ const testCases = [
     },
     //
     // Test that short-circuited branches do not do any work, such as traversing an array. The
-    // 'failOnPoisonedFieldLookup' failpoint ensures that none of the "$POISON" lookups, which are
-    // in short-circuited branches, ever execute. If they were to execute, it would result in an
-    // error from the query that would cause the test to fail.
+    // short-circuited branches cointain divide by zero operation which if it were to execute
+    // would result in an error from the query that would cause the test to fail.
     //
     {
-        desc: "$POISON in short-circuited $and/$or branches",
-        expected: [{_id: 22, foo: false, bar: true}],
-        query: {_id: 22, a: 1},
-        proj: {foo: {$and: ["$f", "$POISON"]}, bar: {$or: ["$t", "$POISON"]}}
-    },
-    {
-        desc: "$POISON in nested short-circuited $or branches",
+        desc: "$divide by zero in short-circuited $and/$or branches",
         expected: [{_id: 22, foo: false, bar: true}],
         query: {_id: 22, a: 1},
         proj: {
-            foo: {$and: ["$f", {$or: ["$f", "$POISON"]}, {$eq: ["$a", 1]}]},
-            bar: {$and: ["$t", {$or: ["$t", "$POISON"]}, {$eq: ["$a", 1]}]}
+            foo: {$and: ["$f", {$divide: [1, "$zero"]}]},
+            bar: {$or: ["$t", {$divide: [1, "$zero"]}]}
         }
     },
     {
-        desc: "$POISON in untaken $switch cases",
+        desc: "$divide by zero in nested short-circuited $or branches",
+        expected: [{_id: 22, foo: false, bar: true}],
+        query: {_id: 22, a: 1},
+        proj: {
+            foo: {$and: ["$f", {$or: ["$f", {$divide: [1, "$zero"]}]}, {$eq: ["$a", 1]}]},
+            bar: {$and: ["$t", {$or: ["$t", {$divide: [1, "$zero"]}]}, {$eq: ["$a", 1]}]}
+        }
+    },
+    {
+        desc: "$divide by zero in untaken $switch cases",
         expected: [{_id: 0, foo: "x"}, {_id: 22, foo: 0}],
         query: {a: 1},
         proj: {
             foo: {
                 $switch: {
                     branches: [
-                        {case: {$eq: ["$a", 2]}, then: "$POISON"},
-                        {case: {$eq: ["$a", 3]}, then: "$POISON"}
+                        {case: {$eq: ["$a", 2]}, then: {$divide: [1, "$zero"]}},
+                        {case: {$eq: ["$a", 3]}, then: {$divide: [1, "$zero"]}}
                     ],
                     default: "$b"
                 }
@@ -682,30 +683,32 @@ const testCases = [
         }
     },
     {
-        desc: "$POISON in unevaluated case condition and untaken $switch default branch",
+        desc: "$divide by zero in unevaluated case condition and untaken $switch default branch",
         expected: [{_id: 0, foo: "x"}, {_id: 22, foo: 0}],
         query: {a: 1},
         proj: {
             foo: {
                 $switch: {
-                    branches:
-                        [{case: {$eq: ["$a", 1]}, then: "$b"}, {case: "$POISON", then: "$POISON"}],
-                    default: "$POISON"
+                    branches: [
+                        {case: {$eq: ["$a", 1]}, then: "$b"},
+                        {case: {$divide: [1, "$zero"]}, then: {$divide: [1, "$zero"]}}
+                    ],
+                    default: {$divide: [1, "$zero"]}
                 }
             }
         }
     },
     {
-        desc: "$POISON in untaken $cond branch (else)",
+        desc: "$divide by zero in untaken $cond branch (else)",
         expected: [{_id: 0, foo: "x"}, {_id: 22, foo: 0}],
         query: {a: 1},
-        proj: {foo: {$cond: {if: {$eq: ["$a", 1]}, then: "$b", else: "$POISON"}}}
+        proj: {foo: {$cond: {if: {$eq: ["$a", 1]}, then: "$b", else: {$divide: [1, "$zero"]}}}}
     },
     {
-        desc: "$POISON in untaken $cond branch (then)",
+        desc: "$divide by zero in untaken $cond branch (then)",
         expected: [{_id: 0, foo: "x"}, {_id: 22, foo: 0}],
         query: {a: 1},
-        proj: {foo: {$cond: {if: {$eq: ["$a", 2]}, then: "$POISON", else: "$b"}}}
+        proj: {foo: {$cond: {if: {$eq: ["$a", 2]}, then: {$divide: [1, "$zero"]}, else: "$b"}}}
     },
     //
     // $let tests.
@@ -1115,8 +1118,4 @@ testCases.forEach(function(test) {
             result, test.expectedErrorCode, Object.assign({result: result}, test));
     }
 });
-
-if (isPoisonFailPointEnabled) {
-    db.adminCommand({configureFailPoint: "failOnPoisonedFieldLookup", mode: "off"});
-}
 }());
