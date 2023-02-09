@@ -31,7 +31,7 @@
 
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 
 namespace mongo::optimizer {
 

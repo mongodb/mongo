@@ -28,6 +28,8 @@
  */
 
 #include "mongo/db/pipeline/abt/field_map_builder.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
+
 
 namespace mongo::optimizer {
 

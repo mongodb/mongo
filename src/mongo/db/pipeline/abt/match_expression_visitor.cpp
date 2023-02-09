@@ -63,7 +63,7 @@
 #include "mongo/db/pipeline/abt/agg_expression_visitor.h"
 #include "mongo/db/pipeline/abt/expr_algebrizer_context.h"
 #include "mongo/db/pipeline/abt/utils.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 
 namespace mongo::optimizer {
 

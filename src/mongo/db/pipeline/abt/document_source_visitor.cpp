@@ -38,11 +38,9 @@
 #include "mongo/db/pipeline/document_source_bucket_auto.h"
 #include "mongo/db/pipeline/document_source_coll_stats.h"
 #include "mongo/db/pipeline/document_source_current_op.h"
-#include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/pipeline/document_source_facet.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
-#include "mongo/db/pipeline/document_source_geo_near_cursor.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_index_stats.h"
@@ -62,7 +60,6 @@
 #include "mongo/db/pipeline/document_source_plan_cache_stats.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_redact.h"
-#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
@@ -76,7 +73,7 @@
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry_mongod.h"
 #include "mongo/db/pipeline/visitors/document_source_walker.h"
 #include "mongo/db/pipeline/visitors/transformer_interface_walker.h"
-#include "mongo/s/query/document_source_merge_cursors.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo::optimizer {

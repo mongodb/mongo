@@ -37,7 +37,7 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression_walker.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 
 namespace mongo::optimizer {
 

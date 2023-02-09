@@ -30,6 +30,7 @@ env.Library(
         "utils/abt_hash.cpp",
         "utils/ce_math.cpp",
         "utils/interval_utils.cpp",
+        "utils/path_utils.cpp",
         "utils/reftracker_utils.cpp",
         "utils/utils.cpp",
     ],

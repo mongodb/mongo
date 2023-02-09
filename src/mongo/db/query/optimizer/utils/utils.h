@@ -66,76 +66,6 @@ inline size_t computeHashSeq(const Args&... seq) {
 }
 
 /**
- * Returns a vector all paths nested under conjunctions (PathComposeM) in the given path.
- * For example, PathComposeM(PathComposeM(Foo, Bar), Baz) returns [Foo, Bar, Baz].
- * If the given path is not a conjunction, returns a vector with the given path.
- */
-std::vector<ABT::reference_type> collectComposed(const ABT& n);
-
-/**
- * Like collectComposed() but bounded by a maximum number of composed paths.
- * If the given path has more PathComposeM;s than specified by maxDepth, then return a vector
- * with the given path. Otherwise, returns the result of collectComposed().
- *
- * This is useful for preventing the optimizer from unintentionally creating a very deep tree which
- * causes stack-overflow on a recursive traversal.
- */
-std::vector<ABT::reference_type> collectComposedBounded(const ABT& n, size_t maxDepth);
-
-/**
- * De-compose a path and an input to an EvalFilter into sequence of Filter nodes. If we have a path
- * with a prefix of PathGet's followed by a series of nested PathComposeM, then split into two or
- * more filter nodes at the composition and retain the prefix for each. The result is a tree of
- * chained filter nodes. We return an empty result if we have less than "minDepth" sub-tress which
- * are composed. If "minDepth" = 1, then we are guaranteed to return a result, which will consist of
- * a single Filter node.
- *
- * If the number of compositions exceeds "maxDepth" then we return the a single FilterNode
- * consisting of an EvalFilter over the original path and input.
- *
- * TODO: SERVER-73744. Consolidate usages in a new optimizer phase.
- */
-constexpr size_t kMaxPathConjunctionDecomposition = 20;
-boost::optional<ABT> decomposeToFilterNodes(const ABT& input,
-                                            const ABT& path,
-                                            const ABT& pathInput,
-                                            size_t minDepth,
-                                            size_t maxDepth = kMaxPathConjunctionDecomposition);
-
-/**
- * Returns true if the path represented by 'node' is of the form PathGet "field" PathId
- */
-bool isSimplePath(const ABT& node);
-
-template <class Element = PathComposeM>
-inline void maybeComposePath(ABT& composition, ABT child) {
-    if (child.is<PathIdentity>()) {
-        return;
-    }
-    if (composition.is<PathIdentity>()) {
-        composition = std::move(child);
-        return;
-    }
-
-    composition = make<Element>(std::move(composition), std::move(child));
-}
-
-/**
- * Creates a balanced tree of composition elements over the input vector which it modifies in place.
- * In the end at most one element remains in the vector.
- */
-template <class Element = PathComposeM>
-inline void maybeComposePaths(ABTVector& paths) {
-    while (paths.size() > 1) {
-        const size_t half = paths.size() / 2;
-        for (size_t i = 0; i < half; i++) {
-            maybeComposePath<Element>(paths.at(i), std::move(paths.back()));
-            paths.pop_back();
-        }
-    }
-}
-
-/**
  * Used to access and manipulate the child of a unary node.
  */
 template <class NodeType>
@@ -273,42 +203,6 @@ CollationSplitResult splitCollationSpec(const boost::optional<ProjectionName>& r
                                         const ProjectionNameSet& leftProjections,
                                         const ProjectionNameSet& rightProjections);
 
-/**
- * Appends a path to another path. Performs the append at PathIdentity elements.
- */
-class PathAppender {
-public:
-    PathAppender(ABT suffix) : _suffix(std::move(suffix)) {}
-
-    void transport(ABT& n, const PathIdentity& node) {
-        n = _suffix;
-    }
-
-    template <typename T, typename... Ts>
-    void transport(ABT& /*n*/, const T& /*node*/, Ts&&...) {
-        // noop
-    }
-
-    /**
-     * Concatenate 'prefix' and 'suffix' by modifying 'prefix' in place.
-     */
-    static void appendInPlace(ABT& prefix, ABT suffix) {
-        PathAppender instance{std::move(suffix)};
-        algebra::transport<true>(prefix, instance);
-    }
-
-    /**
-     * Return the concatenation of 'prefix' and 'suffix'.
-     */
-    [[nodiscard]] static ABT append(ABT prefix, ABT suffix) {
-        appendInPlace(prefix, std::move(suffix));
-        return prefix;
-    }
-
-private:
-    ABT _suffix;
-};
-
 struct PartialSchemaReqConversion {
     PartialSchemaReqConversion(PartialSchemaRequirements reqMap);
     PartialSchemaReqConversion(ABT bound);
@@ -346,14 +240,6 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
     const ABT& expr, bool isFilterContext, const PathToIntervalFn& pathToInterval);
 
 /**
- * Given a path and a MultikeynessTrie describing the path's input,
- * removes any Traverse nodes that we know will never encounter an array.
- *
- * Returns true if any changes were made to the ABT.
- */
-bool simplifyTraverseNonArray(ABT& path, const MultikeynessTrie& multikeynessTrie);
-
-/**
  * Given a set of non-multikey paths, remove redundant Traverse elements from paths in a Partial
  * Schema Requirement structure. Returns true if we have an empty result after simplification.
  */
@@ -361,11 +247,6 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
                                    const MultikeynessTrie& multikeynessTrie,
                                    PartialSchemaRequirements& reqMap,
                                    const ConstFoldFn& constFold);
-
-/**
- * Check if a path contains a Traverse element.
- */
-bool checkPathContainsTraverse(const ABT& path);
 
 /**
  * Try to check whether the predicate 'lhs' is a subset of 'rhs'.
@@ -531,11 +412,6 @@ PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
                                 const std::map<size_t, SelectivityType>& indexPredSelMap,
                                 CEType indexCE,
                                 CEType scanGroupCE);
-
-/**
- * This helper checks to see if we have a PathTraverse + PathId at the end of the path.
- */
-bool pathEndsInTraverse(const optimizer::ABT& path);
 
 bool hasProperIntervals(const PartialSchemaRequirements& reqMap);
 }  // namespace mongo::optimizer

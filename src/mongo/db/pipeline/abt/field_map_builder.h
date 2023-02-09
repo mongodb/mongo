@@ -31,7 +31,6 @@
 
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/optimizer/node.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
 
 namespace mongo::optimizer {
 

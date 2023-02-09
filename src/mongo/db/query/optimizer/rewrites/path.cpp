@@ -28,7 +28,8 @@
  */
 
 #include "mongo/db/query/optimizer/rewrites/path.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
+
 
 namespace mongo::optimizer {
 ABT::reference_type PathFusion::follow(ABT::reference_type n) {

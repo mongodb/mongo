@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/abt/collation_translation.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
 #include "mongo/db/pipeline/abt/transformer_visitor.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 
 namespace mongo::optimizer {
 

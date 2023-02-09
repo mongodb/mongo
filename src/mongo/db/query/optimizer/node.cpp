@@ -31,6 +31,7 @@
 #include <stack>
 
 #include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 namespace mongo::optimizer {

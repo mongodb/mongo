@@ -41,6 +41,7 @@
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 
 #include "mongo/logv2/log.h"
 
