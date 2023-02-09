@@ -1816,9 +1816,9 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_InvalidArgs) {
 
 TEST(FLE_EDC, ServerSide_Payloads_V2_ParseInvalidInput) {
     ConstDataRange empty(0, 0);
-    PrfBlock token;
-    ServerDataEncryptionLevel1Token serverToken(token);
-    ServerDerivedFromDataToken serverDataDerivedToken(token);
+    auto serverToken =
+        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(getIndexKey());
+    ServerDerivedFromDataToken serverDataDerivedToken(serverToken.data);
 
     constexpr size_t cipherTextSize = 32;
     constexpr size_t typeOffset = UUID::kNumBytes;
