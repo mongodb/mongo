@@ -1004,40 +1004,6 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_RegexSta
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 }
 
-// ######################## PlacementHistory: SnapshotTooOld #####################
-TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_SnapshotTooOld) {
-    RAIIServerParameterControllerForTest featureFlagHistoricalPlacementShardingCatalog{
-        "featureFlagHistoricalPlacementShardingCatalog", true};
-    /*Quering the placementHistory must throw SnapshotTooOld when the returned list of shards
-    contains at least one shard no longer active*/
-    auto opCtx = operationContext();
-
-    setupConfigPlacementHistory(
-        opCtx,
-        {{Timestamp(1, 0), "db", {"shard1"}},
-         {Timestamp(2, 0), "db.collection1", {"shard1", "shard2", "shard3"}},
-         {Timestamp(3, 0), "db.collection2", {"shard1", "shard2", "shard3"}}});
-
-    setupConfigShard(opCtx, 2 /*nShards*/);
-
-    ASSERT_THROWS_CODE(
-        catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-            opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(4, 0)),
-        DBException,
-        ErrorCodes::SnapshotTooOld);
-
-    ASSERT_THROWS_CODE(catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-                           opCtx,
-                           NamespaceString::createNamespaceString_forTest("db.collection1"),
-                           Timestamp(4, 0)),
-                       DBException,
-                       ErrorCodes::SnapshotTooOld);
-
-    ASSERT_THROWS_CODE(catalogClient()->getShardsThatOwnDataAtClusterTime(opCtx, Timestamp(4, 0)),
-                       DBException,
-                       ErrorCodes::SnapshotTooOld);
-}
-
 // ######################## PlacementHistory: EmptyHistory #####################
 TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_EmptyHistory) {
     RAIIServerParameterControllerForTest featureFlagHistoricalPlacementShardingCatalog{

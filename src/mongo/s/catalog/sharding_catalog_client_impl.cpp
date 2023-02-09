@@ -1344,10 +1344,6 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
         Stage 6. Flatten the array of arrays into a set
     (this will also remove duplicates)
         Stage 7. Access to the list of shards currently active in the cluster
-        Stage 8. Count the number of shards obtained on stage 6 that also appear in the list of
-            active shards
-        Stage 9. Do not return the list of active shards (used only for the count)
-
     - one pipeline "approximatePlacementData" retreiving the last "marker" which is a special entry
     where the nss is empty and the list of shard can be either empty or not.
         - In case the list is not empty: it means the clusterTime requested was during an fcv
@@ -1357,108 +1353,89 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
         - The pipeline selects only the fcv markers, sorts by decreasing timestamp and gets the
     first element.
 
-        regex=^db(\.collection)?$ // matches db or db.collection
-        {
+    regex=^db(\.collection)?$ // matches db or db.collection
+    db.placementHistory.aggregate([
+      {
         "$facet": {
-            "exactPlacementData": [
-                {
-                "$match": {
-                    "timestamp": {
-                    "$lte": <clusterTime>
-                    },
-                    "nss": {
-                    $regex: regex
-                    }
-                }
+          "exactPlacementData": [
+            {
+              "$match": {
+                "timestamp": {
+                  "$lte":<clusterTime>
                 },
-                {
-                "$sort": {
-                    "timestamp": -1
+                "nss": {
+                  $regex: regex
                 }
+              }
+            },
+            {
+              "$sort": {
+                "timestamp": -1
+              }
+            },
+            {
+              "$group": {
+                _id: "$nss",
+                shards: {
+                  $first: "$shards"
+                }
+              }
+            },
+            {
+              "$match": {
+                shards: {
+                  $not: {
+                    $size: 0
+                  }
+                }
+              }
+            },
+            {
+              "$group": {
+                _id: "",
+                shards: {
+                  $push: "$shards"
+                }
+              }
+            },
+            {
+              $project: {
+                "shards": {
+                  $reduce: {
+                    input: "$shards",
+                    initialValue: [],
+                    in: {
+                      "$setUnion": [
+                        "$$this",
+                        "$$value"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "approximatePlacementData": [
+            {
+              "$match": {
+                "timestamp": {
+                  "$lte": <clusterTime>
                 },
-                {
-                "$group": {
-                    _id: "$nss",
-                    shards: {
-                    $first: "$shards"
-                    }
-                }
-                },
-                {
-                "$match": {
-                    shards: {
-                    $not: {
-                        $size: 0
-                    }
-                    }
-                }
-                },
-                {
-                "$group": {
-                    _id: "",
-                    shards: {
-                    $push: "$shards"
-                    }
-                }
-                },
-                {
-                $project: {
-                    "shards": {
-                    $reduce: {
-                        input: "$shards",
-                        initialValue: [],
-                        in: {
-                        "$setUnion": [
-                            "$$this",
-                            "$$value"
-                        ]
-                        }
-                    }
-                    }
-                }
-                },
-                {
-                $lookup: {
-                    from: "shards",
-                    localField: "shards",
-                    foreignField: "_id",
-                    as: "activeShards"
-                }
-                },
-                {
-                "$set": {
-                    "numActiveShards": {
-                    "$size": "$activeShards"
-                    }
-                }
-                },
-                {
-                "$project": {
-                    "activeShards": 0,
-                    "_id": 0
-                }
-                }
-            ],
-            "approximatePlacementData": [
-                {
-                    "$match": {
-                        "timestamp": {
-                        "$lte": Timestamp(3, 0)
-                        },
-                        "nss":
-                    }
-                    },
-                    {
-                    "$sort": {
-                        "timestamp": -1
-                    }
-                    },
-                    {
-                    "$limit": 1
-                    }
-                }
-            ]
+                "nss": kConfigsvrPlacementHistoryFcvMarkerNamespace
+              }
+            },
+            {
+              "$sort": {
+                "timestamp": -1
+              }
+            },
+            {
+              "$limit": 1
+            }
+          ]
         }
+      }
+    ])
 
         */
 
@@ -1527,28 +1504,6 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
     auto projectStageFlatten = DocumentSourceProject::createFromBson(
         Document{{"$project", std::move(projectStageBson)}}.toBson().firstElement(), expCtx);
 
-
-    // Stage 7. Lookup active shards with left outer join on config.shards
-    Document lookupStageDoc = {
-        {"from", NamespaceString::kConfigsvrShardsNamespace.coll().toString()},
-        {"localField", StringData("shards")},
-        {"foreignField", StringData("_id")},
-        {"as", StringData("activeShards")}};
-
-    auto lookupStage = DocumentSourceLookUp::createFromBson(
-        Document{{"$lookup", std::move(lookupStageDoc)}}.toBson().firstElement(), expCtx);
-
-    // Stage 8. Count number of active shards
-    auto setStageDoc = Document(
-        {{"$set", Document{{"numActiveShards", Document{{"$size", "$activeShards"_sd}}}}}});
-    auto setStage =
-        DocumentSourceAddFields::createFromBson(setStageDoc.toBson().firstElement(), expCtx);
-
-    // Stage 9. Disable activeShards field to avoid sending it to the client
-    auto projectStageDoc = Document{{"activeShards", 0}};
-    auto projectStageHideActiveShards = DocumentSourceProject::createFromBson(
-        Document{{"$project", projectStageDoc.toBson()}}.toBson().firstElement(), expCtx);
-
     Pipeline::SourceContainer stages;
     stages.emplace_back(std::move(matchStage));
     stages.emplace_back(std::move(sortStage));
@@ -1556,20 +1511,17 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
     stages.emplace_back(std::move(noShardsFilter));
     stages.emplace_back(std::move(groupStageConcat));
     stages.emplace_back(std::move(projectStageFlatten));
-    stages.emplace_back(std::move(lookupStage));
-    stages.emplace_back(std::move(setStage));
-    stages.emplace_back(std::move(projectStageHideActiveShards));
     auto exactDataPipeline = Pipeline::create(stages, expCtx);
 
     // Build the pipeline for the approximate data.
-    auto MatchFcvMarkerStage = DocumentSourceMatch::create(
+    auto matchFcvMarkerStage = DocumentSourceMatch::create(
         BSON("timestamp" << BSON("$lte" << atClusterTime) << "nss" << kMarkerNss), expCtx);
-    auto SortFcvMarkerStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
-    auto LimitFcvMarkerStage = DocumentSourceLimit::create(expCtx, 1);
+    auto sortFcvMarkerStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
+    auto limitFcvMarkerStage = DocumentSourceLimit::create(expCtx, 1);
     Pipeline::SourceContainer stages2;
-    stages2.emplace_back(std::move(MatchFcvMarkerStage));
-    stages2.emplace_back(std::move(SortFcvMarkerStage));
-    stages2.emplace_back(std::move(LimitFcvMarkerStage));
+    stages2.emplace_back(std::move(matchFcvMarkerStage));
+    stages2.emplace_back(std::move(sortFcvMarkerStage));
+    stages2.emplace_back(std::move(limitFcvMarkerStage));
     auto approximateDataPipeline = Pipeline::create(stages2, expCtx);
 
 
@@ -1630,15 +1582,6 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
     if (exactShards.empty()) {
         return HistoricalPlacement{{}, true};
     }
-
-    // check that the shards in the exact data are all active shards
-    const int numActiveShards =
-        aggrResult.front()["exactPlacementData"].Array()[0]["numActiveShards"].Int();
-
-    uassert(ErrorCodes::SnapshotTooOld,
-            "Part of the history may no longer be retrieved because of one or more removed "
-            "shards.",
-            numActiveShards == static_cast<int>(exactShards.size()));
 
     return HistoricalPlacement{exactShards, true};
 }
