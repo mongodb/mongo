@@ -1008,7 +1008,7 @@ public:
          * |                | Commit/   | Other Txn |               |                  |
          * |                | Abort Cmd | Cmds      |               |                  |
          * |                |-----------------------|               |                  |
-         * |acquireTicket   | kSkip     |  kNoSkip  |  kNoSkip      |     kNoSkip      |
+         * |acquireTicket   | kSkip     |  kNoSkip  |  kNoSkip      |     kSkip        |
          * |----------------|-----------------------|---------------|------------------|
          * |maxLockTimeout  |     kAllowed          | kNotAllowed   |  kNotAllowed     |
          * -----------------------------------------------------------------------------

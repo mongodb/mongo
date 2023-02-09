@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index_builds_coordinator.h"
@@ -511,6 +512,10 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
         AlternativeClientRegion acr(newClient);
         for (const auto& sessionInfo : sessionsToReacquireLocks) {
             auto newOpCtx = cc().makeOperationContext();
+
+            // Avoid ticket acquisition during step up.
+            SetAdmissionPriorityForLock setTicketAquisition(newOpCtx.get(),
+                                                            AdmissionContext::Priority::kImmediate);
 
             // Synchronize with killOps to make this unkillable.
             {

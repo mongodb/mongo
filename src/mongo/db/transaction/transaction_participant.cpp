@@ -1598,9 +1598,7 @@ void TransactionParticipant::Participant::refreshLocksForPreparedTransaction(
     invariant(o().txnResourceStash);
     invariant(o().txnState.isPrepared());
 
-    // Lock and Ticket reacquisition of a prepared transaction should not fail for
-    // state transitions (step up/step down).
-    _releaseTransactionResourcesToOpCtx(opCtx, MaxLockTimeout::kNotAllowed, AcquireTicket::kNoSkip);
+    _releaseTransactionResourcesToOpCtx(opCtx, MaxLockTimeout::kNotAllowed, AcquireTicket::kSkip);
 
     // Snapshot transactions don't conflict with PBWM lock on both primary and secondary.
     invariant(!opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
