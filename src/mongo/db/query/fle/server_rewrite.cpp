@@ -141,7 +141,7 @@ public:
     RewriteBase(boost::intrusive_ptr<ExpressionContext> expCtx,
                 const NamespaceString& nss,
                 const EncryptionInformation& encryptInfo)
-        : expCtx(expCtx), db(nss.db()) {
+        : expCtx(expCtx), dbName(nss.dbName()) {
         auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
         esc = efc.getEscCollection()->toString();
         ecc = efc.getEccCollection()->toString();
@@ -154,7 +154,7 @@ public:
     boost::intrusive_ptr<ExpressionContext> expCtx;
     std::string esc;
     std::string ecc;
-    std::string db;
+    DatabaseName dbName;
 };
 
 // This class handles rewriting of an entire pipeline.
@@ -218,8 +218,8 @@ void doFLERewriteInTxn(OperationContext* opCtx,
     auto txn = getTxn(opCtx);
     auto swCommitResult = txn->runNoThrow(
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {
-            NamespaceString nssEsc(sharedBlock->db, sharedBlock->esc);
-            NamespaceString nssEcc(sharedBlock->db, sharedBlock->ecc);
+            NamespaceString nssEsc(sharedBlock->dbName, sharedBlock->esc);
+            NamespaceString nssEcc(sharedBlock->dbName, sharedBlock->ecc);
 
             // Construct FLE rewriter from the transaction client and encryptionInformation.
             auto queryInterface = FLEQueryInterfaceImpl(txnClient, getGlobalServiceContext());
