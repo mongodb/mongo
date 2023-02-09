@@ -1,0 +1,10 @@
+### Overrides for matrix suites that include opportunistic secondary targeting
+- name: enable
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              setParametersMongos:
+                opportunisticSecondaryTargeting: true

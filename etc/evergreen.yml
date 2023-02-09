@@ -206,7 +206,6 @@ variables:
   - name: .logical_session_cache
   - name: replica_sets_auth_gen
   - name: sasl
-  - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
 
 # TODO: SERVER-XYZ remove this duplicate task definition.
@@ -274,7 +273,6 @@ variables:
   - name: search_auth
   - name: search_ssl
   - name: sharding_auth_audit_gen
-  - name: sharding_auth_gen
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
@@ -318,6 +316,7 @@ buildvariants:
   tasks:
   - name: .aggregation !.encrypt
   - name: .auth !.audit !.multiversion
+  - name: sharding_auth_gen
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams !.secondary_reads
   - name: .clustered_collections
@@ -344,7 +343,7 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot
   - name: sharding_gen
-  - name: sharding_opportunistic_secondary_targeting_gen
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
 
 - <<: *linux-64-debug-required-template
   name: &linux-64-debug-wtdevelop linux-64-debug-wtdevelop
@@ -844,7 +843,7 @@ buildvariants:
     - windows-vsCurrent-large
   - name: session_jscore_passthrough
   - name: sharding_gen
-  - name: sharding_opportunistic_secondary_targeting_gen
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .stitch
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
@@ -905,9 +904,8 @@ buildvariants:
     - windows-vsCurrent-large
   - name: sasl
   - name: .sharding .txns
-  - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
-  - name: sharding_ese_gen
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
 
 - <<: *enterprise-windows-template
   name: &enterprise-windows-all-feature-flags-required enterprise-windows-all-feature-flags-required
@@ -972,10 +970,8 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: .sharding .txns
-  - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
-  - name: sharding_ese_gen
-  - name: sharding_opportunistic_secondary_targeting_gen
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
   - name: telemetry_passthrough
   - name: unittest_shell_hang_analyzer_gen
 
@@ -1043,7 +1039,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.multiversion
   - name: .sharding .txns !.multiversion
-  - name: .sharding .common !.csrs !.multiversion
+  - name: .sharding .common !.csrs !.multiversion !.gcm
   - name: .ssl
   - name: .stitch
   - name: .updatefuzzer !.multiversion
@@ -1634,7 +1630,7 @@ buildvariants:
   - name: .sharding .common
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: .serverless
-  - name: sharding_opportunistic_secondary_targeting_gen
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
@@ -1797,10 +1793,9 @@ buildvariants:
   - name: .rollbackfuzzer
   - name: .sharding .txns
   - name: sharding_gen
-  - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
-  - name: sharding_ese_gen
-  - name: sharding_ese_gcm_gen
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: sharding_csrs_continuous_config_stepdown_gen
   - name: sharded_multi_stmt_txn_jscore_passthrough
     distros:
@@ -1924,7 +1919,6 @@ buildvariants:
   - name: search_auth
   - name: search_ssl
   - name: sharding_auth_audit_gen
-  - name: sharding_auth_gen
   - name: .stitch
   - name: test_packages
     distros:
@@ -2088,7 +2082,6 @@ buildvariants:
   - name: search_auth
   - name: search_ssl
   - name: sharding_auth_audit_gen
-  - name: sharding_auth_gen
   - name: .stitch
 
 - name: &ubuntu1804-container ubuntu1804-container
@@ -2291,7 +2284,7 @@ buildvariants:
   - name: .serverless
     distros:
     - amazon2-arm64-large
-  - name: sharding_opportunistic_secondary_targeting_gen
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
@@ -2386,7 +2379,8 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .serverless
   - name: .watchdog
   - name: .stitch
@@ -2829,7 +2823,7 @@ buildvariants:
   # - name: sharding_api_version_jscore_passthrough_gen # Not passing
   # - name: .sharding .txns # Not passing
   # - name: .sharding .common # Not passing
-  # - name: sharding_opportunistic_secondary_targeting_gen # Not passing
+  # - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen # Not passing
   - name: .stitch
   # - name: .crypt # Doesn't pass on v4
   #   distros:
@@ -2911,7 +2905,7 @@ buildvariants:
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
   - name: .sharding .common
-  - name: sharding_opportunistic_secondary_targeting_gen
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   # - name: .crypt # Doesn't pass on v4
   #   distros:
   #   - rhel80-xlarge
@@ -3007,7 +3001,7 @@ buildvariants:
     distros:
     - rhel80-build
   - name: .aggregation !.no_async
-  - name: .sharding .auth
+  - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .integration !.audit
@@ -3016,7 +3010,8 @@ buildvariants:
   - name: noPassthroughWithMongod_gen
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
 
 - name: &enterprise-rhel80-sdam-replica-set-monitor-64-bit enterprise-rhel80-sdam-replica-set-monitor-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with SdamReplicaSetMonitor)"
@@ -3049,14 +3044,15 @@ buildvariants:
     distros:
     - rhel80-build
   - name: .aggregation !.no_async
-  - name: .sharding .auth
+  - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .integration !.audit
   - name: .jscore .common
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
 
 - name: &enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\"})"
@@ -3088,14 +3084,15 @@ buildvariants:
     distros:
     - rhel80-build
   - name: .aggregation !.no_async
-  - name: .sharding .auth
+  - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .integration !.audit
   - name: .jscore .common
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
 
 - name: &enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\"})"
@@ -3132,14 +3129,15 @@ buildvariants:
     distros:
     - rhel80-build
   - name: .aggregation !.no_async
-  - name: .sharding .auth
+  - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .integration !.audit
   - name: .jscore .common
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
 
 - name: &enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\"})"
@@ -3176,14 +3174,15 @@ buildvariants:
     distros:
     - rhel80-build
   - name: .aggregation !.no_async
-  - name: .sharding .auth
+  - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .integration !.audit
   - name: .jscore .common
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
 
 - name: &enterprise-rhel80-join-ingress-sessions-on-shutdown enterprise-rhel80-join-ingress-sessions-on-shutdown
   display_name: "~ Enterprise RHEL 8.0 (with {joinIngressSessionsOnShutdown: \"true\"})"
@@ -3214,7 +3213,7 @@ buildvariants:
     patch_only: true
   - name: .aggregation !.no_async
     patch_only: true
-  - name: .sharding .auth
+  - name: sharding_auth_gen
     patch_only: true
   - name: .sharding .causally_consistent !.wo_snapshot
     patch_only: true
@@ -3228,7 +3227,9 @@ buildvariants:
     patch_only: true
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
     patch_only: true
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.encrypt
+    patch_only: true
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
     patch_only: true
 
 - name: &shared-scons-cache-pruning shared-scons-cache-pruning

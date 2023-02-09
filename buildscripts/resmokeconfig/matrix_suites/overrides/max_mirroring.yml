@@ -8,3 +8,8 @@
             TestData:
               setParameters:
                 mirrorReads: "{samplingRate: 1.0}"
+
+- name: sharding_excluded_files
+  value:
+    exclude_files:
+    - jstests/sharding/query/mrShardedOutput.js

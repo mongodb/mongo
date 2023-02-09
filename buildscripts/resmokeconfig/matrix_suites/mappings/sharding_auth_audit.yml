@@ -1,0 +1,4 @@
+- suite_name: sharding_auth_audit
+  base_suite: sharding_auth
+  overrides:
+    - "audit.enable"

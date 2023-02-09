@@ -6345,14 +6345,6 @@ tasks:
       run_no_feature_flag_tests: "true"
 
 - <<: *gen_task_template
-  name: sharding_max_mirroring_gen
-  tags: ["sharding", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
   name: sharding_csrs_continuous_config_stepdown_gen
   tags: ["sharding", "common", "csrs", "non_live_record"]
   commands:
@@ -6361,17 +6353,28 @@ tasks:
       suite: sharding_continuous_config_stepdown
       use_large_distro: "true"
 
+# This is a subset of sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen and
+# sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen and should not be ran
+# in the same varient as them
 - <<: *gen_task_template
-  name: sharding_ese_gen
-  tags: ["sharding", "encrypt", "no_debug_mode"]
+  name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
+  tags: []
   commands:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
 
 - <<: *gen_task_template
-  name: sharding_ese_gcm_gen
-  tags: ["sharding", "encrypt", "gcm", "no_debug_mode"]
+  name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
+  tags: ["sharding", "common", "encrypt", "no_debug_mode"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
+  tags: ["sharding", "common", "encrypt", "gcm", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6379,7 +6382,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_auth_gen
-  tags: ["sharding", "auth", "no_debug_mode"]
+  tags: []
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6387,7 +6390,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_auth_audit_gen
-  tags: ["auth", "audit", "non_live_record", "no_debug_mode"]
+  tags: ["sharding", "auth", "audit", "non_live_record", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6411,14 +6414,6 @@ tasks:
       use_large_distro: "true"
       multiversion_exclude_tags_version: last_lts
       run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
-  name: sharding_opportunistic_secondary_targeting_gen
-  tags: ["sharding", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
 
 - <<: *gen_task_template
   name: analyze_shard_key_jscore_passthrough_gen
