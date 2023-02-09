@@ -791,6 +791,10 @@ bool OplogEntry::isPreparedCommit() const {
     return _entry.isPreparedCommit();
 }
 
+bool OplogEntry::isPreparedAbort() const {
+    return _entry.isPreparedAbort();
+}
+
 bool OplogEntry::isTerminalApplyOps() const {
     return _entry.isTerminalApplyOps();
 }

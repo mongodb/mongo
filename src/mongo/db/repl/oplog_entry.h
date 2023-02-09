@@ -538,6 +538,13 @@ public:
     }
 
     /**
+     * Returns if this is a prepared 'abortTransaction' oplog entry.
+     */
+    bool isPreparedAbort() const {
+        return getCommandType() == DurableOplogEntry::CommandType::kAbortTransaction;
+    }
+
+    /**
      * Returns whether the oplog entry represents an applyOps which is a self-contained atomic
      * operation, or the last applyOps of an unprepared transaction, as opposed to part of a
      * prepared transaction or a non-final applyOps in a transaction.
@@ -734,6 +741,7 @@ public:
     bool isPartialTransaction() const;
     bool isEndOfLargeTransaction() const;
     bool isPreparedCommit() const;
+    bool isPreparedAbort() const;
     bool isTerminalApplyOps() const;
     bool isSingleOplogEntryTransaction() const;
     bool isSingleOplogEntryTransactionWithCommand() const;

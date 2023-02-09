@@ -2020,7 +2020,7 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
     const Timestamp& commitTimestamp,
     const Timestamp& durableTimestamp) {
 
-    for (const repl::PooledSession& session :
+    for (const auto& sessInfos :
          splitPrepareManager->getSplitSessions(userSessionId, userTxnNumber).get()) {
 
         auto splitClientOwned = parentOpCtx->getServiceContext()->makeClient("tempSplitClient");
@@ -2030,6 +2030,7 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
         std::unique_ptr<MongoDSessionCatalog::Session> checkedOutSession;
 
         repl::UnreplicatedWritesBlock notReplicated(splitOpCtx.get());
+        const auto& session = sessInfos.session;
         splitOpCtx->setLogicalSessionId(session.getSessionId());
         splitOpCtx->setTxnNumber(session.getTxnNumber());
         splitOpCtx->setInMultiDocumentTransaction();

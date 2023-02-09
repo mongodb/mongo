@@ -38,7 +38,8 @@ namespace repl {
 
 enum class ApplicationInstruction {
     applyOplogEntry,
-    applySplitPrepareOps,
+    applySplitPrepareOp,
+    applySplitCommitOrAbortOp,
 };
 
 struct ApplierOperation {

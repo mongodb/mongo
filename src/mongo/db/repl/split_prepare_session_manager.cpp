@@ -35,28 +35,32 @@ namespace repl {
 SplitPrepareSessionManager::SplitPrepareSessionManager(InternalSessionPool* sessionPool)
     : _sessionPool(sessionPool) {}
 
-const std::vector<PooledSession>& SplitPrepareSessionManager::splitSession(
-    const LogicalSessionId& sessionId, TxnNumber txnNumber, uint32_t numSplits) {
+const std::vector<SplitSessionInfo>& SplitPrepareSessionManager::splitSession(
+    const LogicalSessionId& sessionId,
+    TxnNumber txnNumber,
+    const std::vector<uint32_t>& requesterIds) {
+
+    auto numSplits = requesterIds.size();
     invariant(numSplits > 0);
     stdx::lock_guard<Latch> lk(_mutex);
 
     auto [it, succ] =
-        _splitSessionMap.try_emplace(sessionId, txnNumber, std::vector<PooledSession>());
+        _splitSessionMap.try_emplace(sessionId, txnNumber, std::vector<SplitSessionInfo>());
 
     // The session must not be split before.
     invariant(succ);
 
-    auto& sessions = it->second.second;
-    sessions.reserve(numSplits);
+    auto& sessionInfos = it->second.second;
+    sessionInfos.reserve(numSplits);
 
-    for (uint32_t i = 0; i < numSplits; ++i) {
-        sessions.push_back(_sessionPool->acquireSystemSession());
+    for (auto reqId : requesterIds) {
+        sessionInfos.emplace_back(_sessionPool->acquireSystemSession(), reqId);
     }
 
-    return sessions;
+    return sessionInfos;
 }
 
-boost::optional<const std::vector<PooledSession>&> SplitPrepareSessionManager::getSplitSessions(
+boost::optional<const std::vector<SplitSessionInfo>&> SplitPrepareSessionManager::getSplitSessions(
     const LogicalSessionId& sessionId, TxnNumber txnNumber) const {
     stdx::lock_guard<Latch> lk(_mutex);
 
@@ -98,9 +102,9 @@ void SplitPrepareSessionManager::releaseSplitSessions(const LogicalSessionId& se
     // The txnNumber must not change after the session was split.
     invariant(txnNumber == it->second.first);
 
-    auto& sessions = it->second.second;
-    for (const auto& sess : sessions) {
-        _sessionPool->release(sess);
+    auto& sessionInfos = it->second.second;
+    for (const auto& sessInfo : sessionInfos) {
+        _sessionPool->release(sessInfo.session);
     }
 
     _splitSessionMap.erase(it);

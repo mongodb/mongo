@@ -115,6 +115,49 @@ public:
 
     /**
      * Adds a set of derived prepared transaction operations to writerVectors.
+     *
+     * The prepareOp and derivedOps are inputs that we use to generate ApplierOperation's to be
+     * added to the writerVectors. The derivedOps contains all the CRUD ops inside the applyOps
+     * part of the prepareOp. When this function finishes the writerVectors may look like this:
+     *
+     * ========================== for non-empty prepared transaction ==========================
+     * writer vector 1: [ ]
+     * writer vector 2: [
+     *     ApplierOperation{
+     *         op: prepareOp,
+     *         instruction: applySplitPrepareOp,
+     *         subSession: <split_session_id_1>,
+     *         splitPrepareOps: [ crud_op_1, crud_op_3 ],
+     *     },
+     * ]
+     * writer vector 3: [
+     *     // This op should already exist in the writerVector prior to this function call.
+     *     ApplierOperation{ op: <config.transaction_update_op>, instruction: applyOplogEntry },
+     * ]
+     * writer vector 4: [
+     *     ApplierOperation{
+     *         op: prepareOp,
+     *         instruction: applySplitPrepareOp,
+     *         subSession: <split_session_id_2>,
+     *         splitPrepareOps: [ crud_op_2, crud_op_4 ],
+     *     },
+     * ]
+     * ============================ for empty prepared transaction ============================
+     * writer vector 1: [ ]
+     * writer vector 2: [
+     *     // This op should already exist in the writerVector prior to this function call.
+     *     ApplierOperation{ op: <config.transaction_update_op>, instruction: applyOplogEntry },
+     * ]
+     * writer vector 3: [ ]
+     * writer vector 4: [
+     *     // The splitPrepareOps list is made empty, which we can still correctly apply.
+     *     ApplierOperation{
+     *         op: <original_prepare_op>,
+     *         instruction: applySplitPrepareOp,
+     *         subSession: <split_session_id_1>,
+     *         splitPrepareOps: [ ],
+     *     },
+     * ]
      */
     static void addDerivedPrepares(OperationContext* opCtx,
                                    OplogEntry* prepareOp,
@@ -123,9 +166,43 @@ public:
                                    CachedCollectionProperties* collPropertiesCache);
 
     /**
+     * Adds commit or abort transaction operations to the writerVectors.
+     *
+     * The commitOrAbortOp is the input that we use to generate ApplierOperation's to be added
+     * to those writerVectors that previously got assigned the prepare ops. When this function
+     * finishes the writerVectors may look like this:
+     *
+     * writer vector 1: [ ]
+     * writer vector 2: [
+     *     ApplierOperation{
+     *         op: commitOrAbortOp,
+     *         instruction: applySplitCommitOrAbortOp,
+     *         subSession: <split_session_id_1>,
+     *         splitPrepareOps: [ ],
+     *     },
+     * ]
+     * writer vector 3: [
+     *     // This op should already exist in the writerVector prior to this function call.
+     *     ApplierOperation{ op: <config.transaction_update_op>, instruction: applyOplogEntry },
+     * ]
+     * writer vector 4: [
+     *     ApplierOperation{
+     *         op: commitOrAbortOp,
+     *         instruction: applySplitCommitOrAbortOp,
+     *         subSession: <split_session_id_2>,
+     *         splitPrepareOps: [ ],
+     *     },
+     * ]
+     */
+    static void addDerivedCommitsOrAborts(OperationContext* opCtx,
+                                          OplogEntry* commitOrAbortOp,
+                                          std::vector<std::vector<ApplierOperation>>* writerVectors,
+                                          CachedCollectionProperties* collPropertiesCache);
+
+    /**
      * Returns the namespace string for this oplogEntry; if it has a UUID it looks up the
-     * corresponding namespace and returns it, otherwise it returns the oplog entry 'nss'.  If there
-     * is a UUID and no namespace with that ID is found, throws NamespaceNotFound.
+     * corresponding namespace and returns it, otherwise it returns the oplog entry 'nss'.  If
+     * there is a UUID and no namespace with that ID is found, throws NamespaceNotFound.
      */
     static NamespaceString parseUUIDOrNs(OperationContext* opCtx, const OplogEntry& oplogEntry);
 
