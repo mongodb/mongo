@@ -859,7 +859,7 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
             dropCollectionGlobalIndexesMetadata(opCtx.get(), _metadata.getTempReshardingNss());
         }
 
-        mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent(
+        resharding::data_copy::ensureCollectionDropped(
             opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
     }
 }

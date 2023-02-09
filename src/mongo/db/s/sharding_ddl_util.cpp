@@ -872,37 +872,5 @@ BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const Nam
                 << "rename"
                 << "from" << from.toString() << "to" << to.toString());
 }
-
-void ensureCollectionDroppedNoChangeEvent(OperationContext* opCtx,
-                                          const NamespaceString& nss,
-                                          const boost::optional<UUID>& uuid) {
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
-
-    writeConflictRetry(opCtx,
-                       "mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent",
-                       nss.toString(),
-                       [&] {
-                           try {
-                               AutoGetCollection coll(opCtx, nss, MODE_X);
-                               if (!coll || (uuid && coll->uuid() != uuid)) {
-                                   // If the collection doesn't exist or exists with a different
-                                   // UUID, then the requested collection has been dropped already.
-                                   return;
-                               }
-
-                               WriteUnitOfWork wuow(opCtx);
-                               uassertStatusOK(coll.getDb()->dropCollectionEvenIfSystem(
-                                   opCtx, nss, {} /* dropOpTime */, true /* markFromMigrate */));
-                               wuow.commit();
-                           } catch (const ExceptionFor<ErrorCodes::InvalidViewDefinition>&) {
-                               // AutoGetCollection may raise this exception when the collection
-                               // doesn't exist and the CollectionCatalog starts looking into the
-                               // list of existing views; the error can be ignored, and the
-                               // collection may be considered as already dropped.
-                               return;
-                           }
-                       });
-}
 }  // namespace sharding_ddl_util
 }  // namespace mongo
