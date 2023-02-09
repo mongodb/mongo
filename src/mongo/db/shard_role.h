@@ -40,6 +40,86 @@
 namespace mongo {
 
 /**
+ * Contains all the required properties for the acquisition of a collection. These properties are
+ * taken into account in addition to the ReadConcern of the transaction, which is stored in the
+ * OperationContext.
+ */
+struct NamespaceOrViewAcquisitionRequest {
+    static const AcquisitionPrerequisites::PlacementConcern kPretendUnshardedDueToDirectConnection;
+
+    /**
+     * Overload, which acquires a collection by NSS, ignoring the current UUID mapping.
+     */
+    NamespaceOrViewAcquisitionRequest(
+        NamespaceString nss,
+        AcquisitionPrerequisites::PlacementConcern placementConcern,
+        repl::ReadConcernArgs readConcern,
+        AcquisitionPrerequisites::OperationType operationType,
+        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kMustBeCollection)
+        : nss(nss),
+          placementConcern(placementConcern),
+          readConcern(readConcern),
+          operationType(operationType),
+          viewMode(viewMode) {}
+
+    /**
+     * Overload, which acquires a collection by NSS/UUID combination, requiring that the UUID of the
+     * namespace matches exactly.
+     */
+    NamespaceOrViewAcquisitionRequest(
+        NamespaceString nss,
+        UUID uuid,
+        AcquisitionPrerequisites::PlacementConcern placementConcern,
+        repl::ReadConcernArgs readConcern,
+        AcquisitionPrerequisites::OperationType operationType,
+        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kMustBeCollection)
+        : nss(nss),
+          uuid(uuid),
+          placementConcern(placementConcern),
+          readConcern(readConcern),
+          operationType(operationType),
+          viewMode(viewMode) {}
+
+    /**
+     * Overload, which acquires a collection by NSS or DB/UUID, without imposing an expected
+     * relationship between NSS and UUID.
+     */
+    NamespaceOrViewAcquisitionRequest(
+        NamespaceStringOrUUID nssOrUUID,
+        AcquisitionPrerequisites::PlacementConcern placementConcern,
+        repl::ReadConcernArgs readConcern,
+        AcquisitionPrerequisites::OperationType operationType,
+        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kMustBeCollection)
+        : dbname(nssOrUUID.dbName()),
+          nss(nssOrUUID.nss()),
+          uuid(nssOrUUID.uuid()),
+          placementConcern(placementConcern),
+          readConcern(readConcern),
+          operationType(operationType),
+          viewMode(viewMode) {}
+
+    /**
+     * Overload, which acquires a collection by NSS, ignoring the current UUID mapping. Takes the
+     * placement concern from the opCtx's OperationShardingState.
+     */
+    NamespaceOrViewAcquisitionRequest(
+        OperationContext* opCtx,
+        NamespaceString nss,
+        repl::ReadConcernArgs readConcern,
+        AcquisitionPrerequisites::OperationType operationType,
+        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kMustBeCollection);
+
+    boost::optional<DatabaseName> dbname;
+    boost::optional<NamespaceString> nss;
+    boost::optional<UUID> uuid;
+
+    AcquisitionPrerequisites::PlacementConcern placementConcern;
+    repl::ReadConcernArgs readConcern;
+    AcquisitionPrerequisites::OperationType operationType;
+    AcquisitionPrerequisites::ViewMode viewMode;
+};
+
+/**
  * See the comments on the TransactionResources class for the semantics of this class.
  */
 class ScopedCollectionOrViewAcquisition {
@@ -54,16 +134,11 @@ public:
 
     ~ScopedCollectionOrViewAcquisition();
 
-    static ScopedCollectionOrViewAcquisition make(
-        OperationContext* opCtx,
-        CollectionPtr&& collectionPtr,
-        ScopedCollectionDescription&& collectionDescription,
-        boost::optional<Lock::DBLock>&& dbLock,
-        boost::optional<Lock::CollectionLock>&& collectionLock);
+    ScopedCollectionOrViewAcquisition(
+        OperationContext* opCtx, const shard_role_details::AcquiredCollection& acquiredCollection)
+        : _opCtx(opCtx), _acquiredCollection(acquiredCollection) {}
 
-    const NamespaceString& nss() const {
-        return _acquiredCollection.nss;
-    }
+    const NamespaceString& nss() const;
 
     bool isView() const {
         // TODO: SERVER-73005 Support views
@@ -74,99 +149,19 @@ public:
     // stack
 
     // Sharding services
-    ScopedCollectionDescription getShardingDescription() const {
-        return _acquiredCollection.collectionDescription;
-    }
+    const ScopedCollectionDescription& getShardingDescription() const;
+    const boost::optional<ScopedCollectionFilter>& getCollectionFilter() const;
 
     // StorEx services
-    const CollectionPtr& getCollectionPtr() const {
-        return _acquiredCollection.collectionPtr;
-    }
+    const CollectionPtr& getCollectionPtr() const;
 
 private:
-    ScopedCollectionOrViewAcquisition(
-        OperationContext* opCtx,
-        const shard_role_details::TransactionResources::AcquiredCollection& acquiredCollection)
-        : _opCtx(opCtx), _acquiredCollection(acquiredCollection) {}
-
     OperationContext* _opCtx;
 
-    const shard_role_details::TransactionResources::AcquiredCollection& _acquiredCollection;
-};
-
-/**
- * Contains all the required properties for the acquisition of a collection. These properties are
- * taken into account in addition to the ReadConcern of the transaction, which is stored in the
- * OperationContext.
- */
-struct NamespaceOrViewAcquisitionRequest {
-    struct PlacementConcern {
-        boost::optional<DatabaseVersion> dbVersion;
-        boost::optional<ShardVersion> shardVersion;
-    };
-
-    static const PlacementConcern kPretendUnshardedDueToDirectConnection;
-
-    enum ViewMode { kMustBeCollection, kCanBeView };
-
-    /**
-     * Overload, which acquires a collection by NSS, ignoring the current UUID mapping.
-     */
-    NamespaceOrViewAcquisitionRequest(NamespaceString nss,
-                                      PlacementConcern placementConcern,
-                                      repl::ReadConcernArgs readConcern,
-                                      ViewMode viewMode = kMustBeCollection)
-        : nss(nss),
-          placementConcern(placementConcern),
-          readConcern(readConcern),
-          viewMode(viewMode) {}
-
-    /**
-     * Overload, which acquires a collection by NSS/UUID combination, requiring that the UUID of the
-     * namespace matches exactly.
-     */
-    NamespaceOrViewAcquisitionRequest(NamespaceString nss,
-                                      UUID uuid,
-                                      PlacementConcern placementConcern,
-                                      repl::ReadConcernArgs readConcern,
-                                      ViewMode viewMode = kMustBeCollection)
-        : nss(nss),
-          uuid(uuid),
-          placementConcern(placementConcern),
-          readConcern(readConcern),
-          viewMode(viewMode) {}
-
-    /**
-     * Overload, which acquires a collection by NSS or DB/UUID, without imposing an expected
-     * relationship between NSS and UUID.
-     */
-    NamespaceOrViewAcquisitionRequest(NamespaceStringOrUUID nssOrUUID,
-                                      PlacementConcern placementConcern,
-                                      repl::ReadConcernArgs readConcern,
-                                      ViewMode viewMode = kMustBeCollection)
-        : dbname(nssOrUUID.dbName()),
-          nss(nssOrUUID.nss()),
-          uuid(nssOrUUID.uuid()),
-          placementConcern(placementConcern),
-          readConcern(readConcern),
-          viewMode(viewMode) {}
-
-    /**
-     * Overload, which acquires a collection by NSS, ignoring the current UUID mapping. Takes the
-     * placement concern from the opCtx's OperationShardingState.
-     */
-    NamespaceOrViewAcquisitionRequest(OperationContext* opCtx,
-                                      NamespaceString nss,
-                                      repl::ReadConcernArgs readConcern,
-                                      ViewMode viewMode = kMustBeCollection);
-
-    boost::optional<DatabaseName> dbname;
-    boost::optional<NamespaceString> nss;
-    boost::optional<UUID> uuid;
-
-    PlacementConcern placementConcern;
-    repl::ReadConcernArgs readConcern;
-    ViewMode viewMode;
+    // Points to the acquired resources that live on the TransactionResources opCtx decoration. The
+    // lifetime of these resources is tied to the lifetime of this
+    // ScopedCollectionOrViewAcquisition.
+    const shard_role_details::AcquiredCollection& _acquiredCollection;
 };
 
 /**
@@ -198,10 +193,12 @@ class YieldedTransactionResources {
 public:
     ~YieldedTransactionResources();
 
-private:
-    YieldedTransactionResources(shard_role_details::TransactionResources&& yieldedResources);
+    YieldedTransactionResources() = default;
 
-    shard_role_details::TransactionResources _yieldedResources;
+    YieldedTransactionResources(
+        std::unique_ptr<shard_role_details::TransactionResources>&& yieldedResources);
+
+    std::unique_ptr<shard_role_details::TransactionResources> _yieldedResources;
 };
 
 YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx);

@@ -35,11 +35,11 @@ namespace shard_role_details {
 TransactionResources::TransactionResources(repl::ReadConcernArgs readConcern)
     : readConcern(std::move(readConcern)) {}
 
-TransactionResources::TransactionResources(TransactionResources&& other) {
-    *this = std::move(other);
+void TransactionResources::releaseAllResourcesOnCommitOrAbort() noexcept {
+    locker.reset();
+    lockSnapshot.reset();
+    acquiredCollections.clear();
 }
-
-TransactionResources& TransactionResources::operator=(TransactionResources&&) = default;
 
 TransactionResources::~TransactionResources() {
     invariant(!locker);

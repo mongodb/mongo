@@ -128,6 +128,10 @@ public:
     ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx,
                                               OrphanCleanupPolicy orphanCleanupPolicy,
                                               bool supportNonVersionedOperations) const override;
+    ScopedCollectionFilter getOwnershipFilter(
+        OperationContext* opCtx,
+        OrphanCleanupPolicy orphanCleanupPolicy,
+        const ShardVersion& receivedShardVersion) const override;
 
     void checkShardVersionOrThrow(OperationContext* opCtx) const override;
 

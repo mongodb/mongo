@@ -41,7 +41,47 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+struct AcquisitionPrerequisites {
+    struct PlacementConcern {
+        boost::optional<DatabaseVersion> dbVersion;
+        boost::optional<ShardVersion> shardVersion;
+    };
+
+    enum ViewMode { kMustBeCollection, kCanBeView };
+
+    enum OperationType { kRead, kWrite };
+
+    AcquisitionPrerequisites(NamespaceString nss,
+                             boost::optional<UUID> uuid,
+                             PlacementConcern placementConcern,
+                             OperationType operationType,
+                             ViewMode viewMode)
+        : nss(std::move(nss)),
+          uuid(std::move(uuid)),
+          placementConcern(std::move(placementConcern)),
+          operationType(operationType),
+          viewMode(viewMode) {}
+
+    NamespaceString nss;
+    boost::optional<UUID> uuid;
+
+    PlacementConcern placementConcern;
+    OperationType operationType;
+    ViewMode viewMode;
+};
+
 namespace shard_role_details {
+
+struct AcquiredCollection {
+    AcquisitionPrerequisites prerequisites;
+
+    boost::optional<Lock::DBLock> dbLock;
+    boost::optional<Lock::CollectionLock> collectionLock;
+    ScopedCollectionDescription collectionDescription;
+    boost::optional<ScopedCollectionFilter> ownershipFilter;
+    CollectionPtr collectionPtr;
+};
 
 /**
  * This class is a container for all the collection resources which are currently acquired by a
@@ -82,22 +122,13 @@ namespace shard_role_details {
 struct TransactionResources {
     TransactionResources(repl::ReadConcernArgs readConcern);
 
-    TransactionResources(TransactionResources&&);
-    TransactionResources& operator=(TransactionResources&&);
+    TransactionResources(TransactionResources&&) = delete;
+    TransactionResources& operator=(TransactionResources&&) = delete;
 
     TransactionResources(TransactionResources&) = delete;
     TransactionResources& operator=(TransactionResources&) = delete;
 
     ~TransactionResources();
-
-    struct AcquiredCollection {
-        NamespaceString nss;
-        UUID uuid;
-        CollectionPtr collectionPtr;
-        ScopedCollectionDescription collectionDescription;
-        boost::optional<Lock::DBLock> dbLock;
-        boost::optional<Lock::CollectionLock> collectionLock;
-    };
 
     // void addAcquiredCollection(const NamespaceString& nss, UUID uuid);
     const AcquiredCollection& addAcquiredCollection(AcquiredCollection&& acquiredCollection) {
@@ -106,7 +137,7 @@ struct TransactionResources {
 
     void releaseCollection(UUID uuid);
 
-    void releaseAllResourcesOnCommitOrAbort();
+    void releaseAllResourcesOnCommitOrAbort() noexcept;
 
     // The read concern with which the whole operation started. Remains the same for the duration of
     // the entire operation.

@@ -42,7 +42,6 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/decorable.h"
 
@@ -52,20 +51,21 @@ namespace mongo {
 namespace {
 
 auto getTransactionResources = OperationContext::declareDecoration<
-    boost::optional<shard_role_details::TransactionResources>>();
+    std::unique_ptr<shard_role_details::TransactionResources>>();
 
 shard_role_details::TransactionResources& getOrMakeTransactionResources(OperationContext* opCtx) {
     auto& readConcern = repl::ReadConcernArgs::get(opCtx);
     auto& optTransactionResources = getTransactionResources(opCtx);
     if (!optTransactionResources) {
-        optTransactionResources.emplace(readConcern);
+        optTransactionResources =
+            std::make_unique<shard_role_details::TransactionResources>(readConcern);
     }
 
     return *optTransactionResources;
 }
 
-NamespaceOrViewAcquisitionRequest::PlacementConcern getPlacementConcernFromOSS(
-    OperationContext* opCtx, const NamespaceString& nss) {
+AcquisitionPrerequisites::PlacementConcern getPlacementConcernFromOSS(OperationContext* opCtx,
+                                                                      const NamespaceString& nss) {
     const auto optDbVersion = OperationShardingState::get(opCtx).getDbVersion(nss.db());
     const auto optShardVersion = OperationShardingState::get(opCtx).getShardVersion(nss);
     return {optDbVersion, optShardVersion};
@@ -73,18 +73,11 @@ NamespaceOrViewAcquisitionRequest::PlacementConcern getPlacementConcernFromOSS(
 
 struct ResolvedNamespaceOrViewAcquisitionRequest {
     // Populated in the first phase of collection(s) acquisition
-    NamespaceString nss;
-
-    boost::optional<UUID> uuid;
-
-    NamespaceOrViewAcquisitionRequest::PlacementConcern tsPlacement;
-    NamespaceOrViewAcquisitionRequest::ViewMode viewMode;
+    AcquisitionPrerequisites prerequisites;
 
     // Populated optionally in the second phase of collection(s) acquisition
     boost::optional<Lock::DBLock> dbLock;
     boost::optional<Lock::CollectionLock> collLock;
-
-    boost::optional<ScopedCollectionFilter> filter;
 };
 
 using ResolvedNamespaceOrViewAcquisitionRequestsMap =
@@ -104,14 +97,11 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
                 checkCollectionUUIDMismatch(opCtx, *ar.nss, coll, *ar.uuid);
             }
 
+            AcquisitionPrerequisites prerequisites(
+                *ar.nss, ar.uuid, ar.placementConcern, ar.operationType, ar.viewMode);
+
             ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
-                *ar.nss,
-                ar.uuid,
-                ar.placementConcern,
-                ar.viewMode,
-                boost::none,
-                boost::none,
-                boost::none};
+                prerequisites, boost::none, boost::none};
             sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, *ar.nss),
                                               std::move(resolvedAcquisitionRequest));
         } else if (ar.dbname) {
@@ -129,14 +119,11 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
                 checkCollectionUUIDMismatch(opCtx, *ar.nss, coll, *ar.uuid);
             }
 
+            AcquisitionPrerequisites prerequisites(
+                coll->ns(), coll->uuid(), ar.placementConcern, ar.operationType, ar.viewMode);
+
             ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
-                coll->ns(),
-                coll->uuid(),
-                ar.placementConcern,
-                ar.viewMode,
-                boost::none,
-                boost::none,
-                boost::none};
+                prerequisites, boost::none, boost::none};
 
             sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, coll->ns()),
                                               std::move(resolvedAcquisitionRequest));
@@ -180,68 +167,84 @@ void verifyDbAndCollection(OperationContext* opCtx,
     }
 }
 
-void checkPlacementVersion(
-    OperationContext* opCtx,
-    const ResolvedNamespaceOrViewAcquisitionRequest& resolvedAcquisitionRequest) {
-    const auto& nss = resolvedAcquisitionRequest.nss;
+void checkPlacementVersion(OperationContext* opCtx, const AcquisitionPrerequisites& prerequisites) {
+    const auto& nss = prerequisites.nss;
 
-    const auto& receivedDbVersion = resolvedAcquisitionRequest.tsPlacement.dbVersion;
+    const auto& receivedDbVersion = prerequisites.placementConcern.dbVersion;
     if (receivedDbVersion) {
         DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.db(), *receivedDbVersion);
     }
 
-    const auto& receivedShardVersion = resolvedAcquisitionRequest.tsPlacement.shardVersion;
+    const auto& receivedShardVersion = prerequisites.placementConcern.shardVersion;
     if (receivedShardVersion) {
         const auto scopedCSS = CollectionShardingState::acquire(opCtx, nss);
         scopedCSS->checkShardVersionOrThrow(opCtx, *receivedShardVersion);
     }
 }
 
-ScopedCollectionOrViewAcquisition acquireResolvedCollectionOrView(
-    OperationContext* opCtx,
-    ResolvedNamespaceOrViewAcquisitionRequest& resolvedAcquisitionRequest) {
-    const auto& nss = resolvedAcquisitionRequest.nss;
+struct SnapshotedServices {
+    CollectionPtr collectionPtr;
+    ScopedCollectionDescription collectionDescription;
+    boost::optional<ScopedCollectionFilter> ownershipFilter;
+};
 
-    // Check placement version before acquiring the catalog snapshot
-    checkPlacementVersion(opCtx, resolvedAcquisitionRequest);
+CollectionPtr acquireCollectionPtr(OperationContext* opCtx,
+                                   const AcquisitionPrerequisites& prerequisites) {
+    const auto& nss = prerequisites.nss;
 
     const auto catalog = CollectionCatalog::get(opCtx);
     auto coll = catalog->lookupCollectionByNamespace(opCtx, nss);
-
-    // Checks after having established the storage catalog snapshot
-    if (resolvedAcquisitionRequest.uuid) {
-        checkCollectionUUIDMismatch(opCtx, nss, coll, resolvedAcquisitionRequest.uuid);
-    }
 
     if (coll) {
         verifyDbAndCollection(opCtx, nss, coll);
     } else if (catalog->lookupView(opCtx, nss)) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
                 str::stream() << "Namespace " << nss << " is a view, not a collection",
-                resolvedAcquisitionRequest.viewMode ==
-                    NamespaceOrViewAcquisitionRequest::ViewMode::kCanBeView);
+                prerequisites.viewMode == AcquisitionPrerequisites::kCanBeView);
     } else {
         uasserted(ErrorCodes::NamespaceNotFound,
                   str::stream() << "Namespace " << nss << "does not exist.");
     }
 
-    const bool isPlacementConcernVersioned = resolvedAcquisitionRequest.tsPlacement.dbVersion ||
-        resolvedAcquisitionRequest.tsPlacement.shardVersion;
+    // Checks after having established the storage catalog snapshot
+    checkCollectionUUIDMismatch(opCtx, nss, coll, prerequisites.uuid);
+
+    return coll;
+}
+
+SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
+                                           const AcquisitionPrerequisites& prerequisites) {
+    const auto& nss = prerequisites.nss;
+
+    // Check placement version before acquiring the catalog snapshot
+    checkPlacementVersion(opCtx, prerequisites);
+
+    auto coll = acquireCollectionPtr(opCtx, prerequisites);
+
+    const bool isPlacementConcernVersioned =
+        prerequisites.placementConcern.dbVersion || prerequisites.placementConcern.shardVersion;
 
     const auto scopedCSS = CollectionShardingState::acquire(opCtx, nss);
     auto collectionDescription =
         scopedCSS->getCollectionDescription(opCtx, isPlacementConcernVersioned);
 
+    invariant(!collectionDescription.isSharded() || prerequisites.placementConcern.shardVersion);
+    auto optOwnershipFilter = collectionDescription.isSharded()
+        ? boost::optional<ScopedCollectionFilter>(scopedCSS->getOwnershipFilter(
+              opCtx,
+              prerequisites.operationType == AcquisitionPrerequisites::kRead
+                  ? CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup
+                  : CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup,
+              *prerequisites.placementConcern.shardVersion))
+        : boost::none;
+
     // Recheck the placement version after having acquired the catalog snapshot. If the placement
     // version still matches, then the catalog we snapshoted is consistent with the placement
     // concern too.
-    checkPlacementVersion(opCtx, resolvedAcquisitionRequest);
+    checkPlacementVersion(opCtx, prerequisites);
 
-    return ScopedCollectionOrViewAcquisition::make(opCtx,
-                                                   std::move(coll),
-                                                   std::move(collectionDescription),
-                                                   std::move(resolvedAcquisitionRequest.dbLock),
-                                                   std::move(resolvedAcquisitionRequest.collLock));
+    return SnapshotedServices{
+        std::move(coll), std::move(collectionDescription), std::move(optOwnershipFilter)};
 }
 
 std::vector<ScopedCollectionOrViewAcquisition> acquireResolvedCollectionsOrViewsWithoutTakingLocks(
@@ -249,8 +252,36 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireResolvedCollectionsOrViews
     ResolvedNamespaceOrViewAcquisitionRequestsMap sortedAcquisitionRequests) {
     std::vector<ScopedCollectionOrViewAcquisition> acquisitions;
     for (auto& acquisitionRequest : sortedAcquisitionRequests) {
-        auto acquisition = acquireResolvedCollectionOrView(opCtx, acquisitionRequest.second);
-        acquisitions.emplace_back(std::move(acquisition));
+        tassert(7328900,
+                "Cannot acquire for write without locks",
+                acquisitionRequest.second.prerequisites.operationType ==
+                        AcquisitionPrerequisites::kRead ||
+                    acquisitionRequest.second.collLock);
+
+        auto& prerequisites = acquisitionRequest.second.prerequisites;
+        auto snapshotedServices = acquireServicesSnapshot(opCtx, prerequisites);
+
+        invariant(snapshotedServices.collectionPtr);
+        invariant(!prerequisites.uuid ||
+                  prerequisites.uuid == snapshotedServices.collectionPtr->uuid());
+        if (!prerequisites.uuid) {
+            // If the uuid wasn't originally set on the AcquisitionRequest, set it now on the
+            // prerequisites so that on restore from yield we can check we are restoring the same
+            // instance of the ns.
+            prerequisites.uuid = snapshotedServices.collectionPtr->uuid();
+        }
+
+        const shard_role_details::AcquiredCollection& acquiredCollection =
+            getOrMakeTransactionResources(opCtx).addAcquiredCollection(
+                {prerequisites,
+                 std::move(acquisitionRequest.second.dbLock),
+                 std::move(acquisitionRequest.second.collLock),
+                 std::move(snapshotedServices.collectionDescription),
+                 std::move(snapshotedServices.ownershipFilter),
+                 std::move(snapshotedServices.collectionPtr)});
+
+        ScopedCollectionOrViewAcquisition scopedAcquisition(opCtx, acquiredCollection);
+        acquisitions.emplace_back(std::move(scopedAcquisition));
     }
 
     return acquisitions;
@@ -258,7 +289,7 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireResolvedCollectionsOrViews
 
 }  // namespace
 
-const NamespaceOrViewAcquisitionRequest::PlacementConcern
+const AcquisitionPrerequisites::PlacementConcern
     NamespaceOrViewAcquisitionRequest::kPretendUnshardedDueToDirectConnection{boost::none,
                                                                               boost::none};
 
@@ -266,43 +297,42 @@ NamespaceOrViewAcquisitionRequest::NamespaceOrViewAcquisitionRequest(
     OperationContext* opCtx,
     NamespaceString nss,
     repl::ReadConcernArgs readConcern,
-    ViewMode viewMode)
+    AcquisitionPrerequisites::OperationType operationType,
+    AcquisitionPrerequisites::ViewMode viewMode)
     : nss(nss),
       placementConcern(getPlacementConcernFromOSS(opCtx, nss)),
       readConcern(readConcern),
+      operationType(operationType),
       viewMode(viewMode) {}
 
 ScopedCollectionOrViewAcquisition::~ScopedCollectionOrViewAcquisition() {
     if (_opCtx) {
-        auto& transactionResources = getOrMakeTransactionResources(_opCtx);
-        transactionResources.acquiredCollections.remove_if(
-            [& acquiredCollection = _acquiredCollection](
-                const shard_role_details::TransactionResources::AcquiredCollection&
-                    txnResourceAcquiredColl) {
-                return &txnResourceAcquiredColl == &acquiredCollection;
-            });
+        const auto& transactionResources = getTransactionResources(_opCtx);
+        if (transactionResources) {
+            transactionResources->acquiredCollections.remove_if(
+                [this](const shard_role_details::AcquiredCollection& txnResourceAcquiredColl) {
+                    return &txnResourceAcquiredColl == &(this->_acquiredCollection);
+                });
+        }
     }
 }
 
-ScopedCollectionOrViewAcquisition ScopedCollectionOrViewAcquisition::make(
-    OperationContext* opCtx,
-    CollectionPtr&& collectionPtr,
-    ScopedCollectionDescription&& collectionDescription,
-    boost::optional<Lock::DBLock>&& dbLock,
-    boost::optional<Lock::CollectionLock>&& collectionLock) {
-    invariant(collectionPtr);
+const NamespaceString& ScopedCollectionOrViewAcquisition::nss() const {
+    return _acquiredCollection.prerequisites.nss;
+}
 
-    const auto nss = collectionPtr->ns();
-    const auto uuid = collectionPtr->uuid();
-    const shard_role_details::TransactionResources::AcquiredCollection& acquiredCollection =
-        getOrMakeTransactionResources(opCtx).addAcquiredCollection({nss,
-                                                                    uuid,
-                                                                    std::move(collectionPtr),
-                                                                    collectionDescription,
-                                                                    std::move(dbLock),
-                                                                    std::move(collectionLock)});
+const ScopedCollectionDescription& ScopedCollectionOrViewAcquisition::getShardingDescription()
+    const {
+    return _acquiredCollection.collectionDescription;
+}
 
-    return ScopedCollectionOrViewAcquisition(opCtx, std::move(acquiredCollection));
+const boost::optional<ScopedCollectionFilter>&
+ScopedCollectionOrViewAcquisition::getCollectionFilter() const {
+    return _acquiredCollection.ownershipFilter;
+}
+
+const CollectionPtr& ScopedCollectionOrViewAcquisition::getCollectionPtr() const {
+    return _acquiredCollection.collectionPtr;
 }
 
 std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
@@ -326,9 +356,9 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
             // TODO: SERVER-73004 When acquiring multiple collections, avoid recursively locking the
             // dbLock because that causes recursive locking of the globalLock which prevents
             // yielding.
-            ar.second.dbLock.emplace(
-                opCtx, ar.second.nss.db(), isSharedLockMode(mode) ? MODE_IS : MODE_IX);
-            ar.second.collLock.emplace(opCtx, ar.second.nss, mode);
+            const auto& nss = ar.second.prerequisites.nss;
+            ar.second.dbLock.emplace(opCtx, nss.db(), isSharedLockMode(mode) ? MODE_IS : MODE_IX);
+            ar.second.collLock.emplace(opCtx, nss, mode);
         }
 
         try {
@@ -356,9 +386,79 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViewsWithoutT
     }
 }
 
-YieldedTransactionResources yieldTransactionResources(OperationContext* opCtx);
+YieldedTransactionResources::~YieldedTransactionResources() {
+    invariant(!_yieldedResources);
+}
 
-void restoreTransactionResources(OperationContext* opCtx,
-                                 YieldedTransactionResources&& yieldedResources);
+YieldedTransactionResources::YieldedTransactionResources(
+    std::unique_ptr<shard_role_details::TransactionResources>&& yieldedResources)
+    : _yieldedResources(std::move(yieldedResources)) {}
+
+YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx) {
+    auto transactionResources = std::move(getTransactionResources(opCtx));
+    if (!transactionResources) {
+        return YieldedTransactionResources();
+    }
+
+    invariant(!transactionResources->yielded);
+
+    invariant(!transactionResources->lockSnapshot.is_initialized());
+    transactionResources->lockSnapshot.emplace();
+    opCtx->lockState()->saveLockStateAndUnlock(&(*transactionResources->lockSnapshot));
+
+    transactionResources->yielded = true;
+
+    return YieldedTransactionResources(std::move(transactionResources));
+}
+
+void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
+                                                   YieldedTransactionResources&& yieldedResources) {
+    if (!yieldedResources._yieldedResources) {
+        // Nothing to restore.
+        return;
+    }
+
+    // On failure to restore, release the yielded resources.
+    ScopeGuard scopeGuard([&] {
+        yieldedResources._yieldedResources->releaseAllResourcesOnCommitOrAbort();
+        yieldedResources._yieldedResources.reset();
+    });
+
+    // Reacquire locks.
+    if (yieldedResources._yieldedResources->lockSnapshot) {
+        opCtx->lockState()->restoreLockState(opCtx,
+                                             *yieldedResources._yieldedResources->lockSnapshot);
+        yieldedResources._yieldedResources->lockSnapshot.reset();
+    }
+
+    // Reacquire service snapshots. Will throw if placement concern can no longer be met.
+    for (auto& acquiredCollection : yieldedResources._yieldedResources->acquiredCollections) {
+        const auto& prerequisites = acquiredCollection.prerequisites;
+
+        if (prerequisites.operationType == AcquisitionPrerequisites::OperationType::kRead) {
+            // Just reacquire the CollectionPtr. Reads don't care about placement changes because
+            // they have already established a ScopedCollectionFilter that acts as RangePreserver.
+            auto collectionPtr = acquireCollectionPtr(opCtx, prerequisites);
+
+            // Update the services snapshot on TransactionResources
+            acquiredCollection.collectionPtr = std::move(collectionPtr);
+
+        } else {
+            auto reacquiredServicesSnapshot = acquireServicesSnapshot(opCtx, prerequisites);
+
+            // Update the services snapshot on TransactionResources
+            acquiredCollection.collectionPtr = std::move(reacquiredServicesSnapshot.collectionPtr);
+            acquiredCollection.collectionDescription =
+                std::move(reacquiredServicesSnapshot.collectionDescription);
+            acquiredCollection.ownershipFilter =
+                std::move(reacquiredServicesSnapshot.ownershipFilter);
+        }
+    }
+
+    // Restore TransactionsResource on opCtx.
+    yieldedResources._yieldedResources->yielded = false;
+    getTransactionResources(opCtx) = std::move(yieldedResources)._yieldedResources;
+    scopeGuard.dismiss();
+}
 
 }  // namespace mongo

@@ -69,6 +69,13 @@ public:
         return {kUnshardedCollection};
     }
 
+    ScopedCollectionFilter getOwnershipFilter(
+        OperationContext*,
+        OrphanCleanupPolicy orphanCleanupPolicy,
+        const ShardVersion& receivedShardVersion) const override {
+        return {kUnshardedCollection};
+    }
+
     void checkShardVersionOrThrow(OperationContext*) const override {}
 
     void checkShardVersionOrThrow(OperationContext*, const ShardVersion&) const override {}

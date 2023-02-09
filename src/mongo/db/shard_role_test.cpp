@@ -30,6 +30,7 @@
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -64,7 +65,10 @@ void installUnshardedCollectionMetadata(OperationContext* opCtx, const Namespace
 void installShardedCollectionMetadata(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       const DatabaseVersion& dbVersion,
-                                      const ShardVersion& shardVersion) {
+                                      std::vector<ChunkType> chunks,
+                                      ShardId thisShardId) {
+    ASSERT(!chunks.empty());
+
     const auto uuid = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
         return autoColl.getCollection()->uuid();
@@ -72,24 +76,21 @@ void installShardedCollectionMetadata(OperationContext* opCtx,
 
     const std::string shardKey("skey");
     const ShardKeyPattern shardKeyPattern{BSON(shardKey << 1)};
-    const ShardId thisShardId("this");
+    const auto epoch = chunks.front().getVersion().epoch();
+    const auto timestamp = chunks.front().getVersion().getTimestamp();
 
-    auto rt = RoutingTableHistory::makeNew(
-        nss,
-        uuid,
-        shardKeyPattern.getKeyPattern(),
-        nullptr,
-        false,
-        shardVersion.placementVersion().epoch(),
-        shardVersion.placementVersion().getTimestamp(),
-        boost::none /* timeseriesFields */,
-        boost::none /* resharding Fields */,
-        boost::none /* chunkSizeBytes */,
-        true /* allowMigrations */,
-        {ChunkType{uuid,
-                   ChunkRange{BSON(shardKey << MINKEY), BSON(shardKey << MAXKEY)},
-                   shardVersion.placementVersion(),
-                   thisShardId}});
+    auto rt = RoutingTableHistory::makeNew(nss,
+                                           uuid,
+                                           shardKeyPattern.getKeyPattern(),
+                                           nullptr,
+                                           false,
+                                           epoch,
+                                           timestamp,
+                                           boost::none /* timeseriesFields */,
+                                           boost::none /* resharding Fields */,
+                                           boost::none /* chunkSizeBytes */,
+                                           true /* allowMigrations */,
+                                           chunks);
 
     const auto version = rt.getVersion();
     const auto rtHandle =
@@ -119,6 +120,8 @@ protected:
     void setUp() override;
     void tearDown() override;
 
+    const ShardId thisShardId{"this"};
+
     const DatabaseName dbNameTestDb{"test"};
     const DatabaseVersion dbVersionTestDb{UUID::gen(), Timestamp(1, 0)};
 
@@ -130,6 +133,13 @@ protected:
     const ShardVersion shardVersionShardedCollection1{
         ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(5, 0)}, CollectionPlacement(10, 1)),
         boost::optional<CollectionIndexes>(boost::none)};
+
+    // Workaround to be able to write parametrized TEST_F
+    void testRestoreFailsIfCollectionNoLongerExists(
+        AcquisitionPrerequisites::OperationType operationType);
+    void testRestoreFailsIfCollectionRenamed(AcquisitionPrerequisites::OperationType operationType);
+    void testRestoreFailsIfCollectionDroppedAndRecreated(
+        AcquisitionPrerequisites::OperationType operationType);
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
@@ -159,9 +169,17 @@ void ShardRoleTest::setUp() {
     installUnshardedCollectionMetadata(opCtx(), nssUnshardedCollection1);
 
     createTestCollection(opCtx(), nssShardedCollection1);
+    const auto uuidShardedCollection1 = getCollectionUUID(_opCtx.get(), nssShardedCollection1);
     installDatabaseMetadata(opCtx(), dbNameTestDb, dbVersionTestDb);
     installShardedCollectionMetadata(
-        opCtx(), nssShardedCollection1, dbVersionTestDb, shardVersionShardedCollection1);
+        opCtx(),
+        nssShardedCollection1,
+        dbVersionTestDb,
+        {ChunkType(uuidShardedCollection1,
+                   ChunkRange{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)},
+                   shardVersionShardedCollection1.placementVersion(),
+                   thisShardId)},
+        thisShardId);
 }
 
 void ShardRoleTest::tearDown() {
@@ -174,7 +192,8 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
     const auto nss = nssUnshardedCollection1;
 
     {
-        NamespaceOrViewAcquisitionRequest acquisitionRequest(opCtx(), nss, {});
+        NamespaceOrViewAcquisitionRequest acquisitionRequest(
+            opCtx(), nss, {}, AcquisitionPrerequisites::kWrite);
         ASSERT_EQ(boost::none, acquisitionRequest.placementConcern.dbVersion);
         ASSERT_EQ(boost::none, acquisitionRequest.placementConcern.shardVersion);
     }
@@ -184,7 +203,8 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
             NamespaceString::createNamespaceString_forTest("test2.foo");
         ScopedSetShardRole setShardRole(
             opCtx(), anotherCollection, ShardVersion::UNSHARDED(), dbVersionTestDb);
-        NamespaceOrViewAcquisitionRequest acquisitionRequest(opCtx(), nss, {});
+        NamespaceOrViewAcquisitionRequest acquisitionRequest(
+            opCtx(), nss, {}, AcquisitionPrerequisites::kWrite);
         ASSERT_EQ(boost::none, acquisitionRequest.placementConcern.dbVersion);
         ASSERT_EQ(boost::none, acquisitionRequest.placementConcern.shardVersion);
     }
@@ -193,7 +213,8 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         const auto dbVersion = boost::none;
         const auto shardVersion = boost::none;
         ScopedSetShardRole setShardRole(opCtx(), nss, shardVersion, dbVersion);
-        NamespaceOrViewAcquisitionRequest acquisitionRequest(opCtx(), nss, {});
+        NamespaceOrViewAcquisitionRequest acquisitionRequest(
+            opCtx(), nss, {}, AcquisitionPrerequisites::kWrite);
         ASSERT_EQ(dbVersion, acquisitionRequest.placementConcern.dbVersion);
         ASSERT_EQ(shardVersion, acquisitionRequest.placementConcern.shardVersion);
     }
@@ -202,7 +223,8 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         const auto dbVersion = dbVersionTestDb;
         const auto shardVersion = ShardVersion::UNSHARDED();
         ScopedSetShardRole setShardRole(opCtx(), nss, shardVersion, dbVersion);
-        NamespaceOrViewAcquisitionRequest acquisitionRequest(opCtx(), nss, {});
+        NamespaceOrViewAcquisitionRequest acquisitionRequest(
+            opCtx(), nss, {}, AcquisitionPrerequisites::kWrite);
         ASSERT_EQ(dbVersion, acquisitionRequest.placementConcern.dbVersion);
         ASSERT_EQ(shardVersion, acquisitionRequest.placementConcern.shardVersion);
     }
@@ -211,7 +233,8 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         const auto dbVersion = boost::none;
         const auto shardVersion = shardVersionShardedCollection1;
         ScopedSetShardRole setShardRole(opCtx(), nss, shardVersion, dbVersion);
-        NamespaceOrViewAcquisitionRequest acquisitionRequest(opCtx(), nss, {});
+        NamespaceOrViewAcquisitionRequest acquisitionRequest(
+            opCtx(), nss, {}, AcquisitionPrerequisites::kWrite);
         ASSERT_EQ(dbVersion, acquisitionRequest.placementConcern.dbVersion);
         ASSERT_EQ(shardVersion, acquisitionRequest.placementConcern.shardVersion);
     }
@@ -221,15 +244,15 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
 // Placement checks when acquiring unsharded collections
 
 TEST_F(ShardRoleTest, AcquireUnshardedCollWithCorrectPlacementVersion) {
-    NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern =
-        NamespaceOrViewAcquisitionRequest::PlacementConcern{dbVersionTestDb,
-                                                            ShardVersion::UNSHARDED()};
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
+        AcquisitionPrerequisites::PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
     const auto acquisitions =
         acquireCollectionsOrViews(opCtx(),
                                   {{nssUnshardedCollection1,
                                     placementConcern,
                                     repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
                                   MODE_IX);
 
     ASSERT_EQ(1, acquisitions.size());
@@ -237,20 +260,21 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithCorrectPlacementVersion) {
     ASSERT_EQ(nssUnshardedCollection1, acquisitions.front().getCollectionPtr()->ns());
     ASSERT_FALSE(acquisitions.front().isView());
     ASSERT_FALSE(acquisitions.front().getShardingDescription().isSharded());
+    ASSERT_FALSE(acquisitions.front().getCollectionFilter().has_value());
 }
 
 TEST_F(ShardRoleTest, AcquireUnshardedCollWithIncorrectPlacementVersionThrows) {
     const auto incorrectDbVersion = DatabaseVersion(UUID::gen(), Timestamp(50, 0));
 
-    NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern =
-        NamespaceOrViewAcquisitionRequest::PlacementConcern{incorrectDbVersion,
-                                                            ShardVersion::UNSHARDED()};
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
+        AcquisitionPrerequisites::PlacementConcern{incorrectDbVersion, ShardVersion::UNSHARDED()};
     ASSERT_THROWS_WITH_CHECK(
         acquireCollectionsOrViews(opCtx(),
                                   {{nssUnshardedCollection1,
                                     placementConcern,
                                     repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
                                   MODE_IX),
         ExceptionFor<ErrorCodes::StaleDbVersion>,
         [&](const DBException& ex) {
@@ -271,15 +295,15 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenShardDoesNotKnowThePlacementVersio
         scopedDss->clearDbInfo(opCtx());
     }
 
-    NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern =
-        NamespaceOrViewAcquisitionRequest::PlacementConcern{dbVersionTestDb,
-                                                            ShardVersion::UNSHARDED()};
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
+        AcquisitionPrerequisites::PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
     ASSERT_THROWS_WITH_CHECK(
         acquireCollectionsOrViews(opCtx(),
                                   {{nssUnshardedCollection1,
                                     placementConcern,
                                     repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
                                   MODE_IX),
         ExceptionFor<ErrorCodes::StaleDbVersion>,
         [&](const DBException& ex) {
@@ -303,15 +327,15 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenCriticalSectionIsActiveThrows) {
     }
 
     {
-        NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern =
-            NamespaceOrViewAcquisitionRequest::PlacementConcern{dbVersionTestDb,
-                                                                ShardVersion::UNSHARDED()};
+        AcquisitionPrerequisites::PlacementConcern placementConcern =
+            AcquisitionPrerequisites::PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
         ASSERT_THROWS_WITH_CHECK(
             acquireCollectionsOrViews(opCtx(),
                                       {{nssUnshardedCollection1,
                                         placementConcern,
                                         repl::ReadConcernArgs(),
-                                        NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+                                        AcquisitionPrerequisites::kWrite,
+                                        AcquisitionPrerequisites::kMustBeCollection}},
                                       MODE_IX),
             ExceptionFor<ErrorCodes::StaleDbVersion>,
             [&](const DBException& ex) {
@@ -334,14 +358,15 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenCriticalSectionIsActiveThrows) {
 }
 
 TEST_F(ShardRoleTest, AcquireUnshardedCollWithoutSpecifyingPlacementVersion) {
-    NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern =
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
         NamespaceOrViewAcquisitionRequest::kPretendUnshardedDueToDirectConnection;
     const auto acquisitions =
         acquireCollectionsOrViews(opCtx(),
                                   {{nssUnshardedCollection1,
                                     {placementConcern},
                                     repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
                                   MODE_IX);
 
     ASSERT_EQ(1, acquisitions.size());
@@ -349,21 +374,23 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithoutSpecifyingPlacementVersion) {
     ASSERT_EQ(nssUnshardedCollection1, acquisitions.front().getCollectionPtr()->ns());
     ASSERT_FALSE(acquisitions.front().isView());
     ASSERT_FALSE(acquisitions.front().getShardingDescription().isSharded());
+    ASSERT_FALSE(acquisitions.front().getCollectionFilter().has_value());
 }
 
 // ---------------------------------------------------------------------------
 // Placement checks when acquiring sharded collections
 
 TEST_F(ShardRoleTest, AcquireShardedCollWithCorrectPlacementVersion) {
-    NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern =
-        NamespaceOrViewAcquisitionRequest::PlacementConcern{{} /* dbVersion */,
-                                                            shardVersionShardedCollection1};
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
+        AcquisitionPrerequisites::PlacementConcern{{} /* dbVersion */,
+                                                   shardVersionShardedCollection1};
     const auto acquisitions =
         acquireCollectionsOrViews(opCtx(),
                                   {{nssShardedCollection1,
                                     placementConcern,
                                     repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
                                   MODE_IX);
 
     ASSERT_EQ(1, acquisitions.size());
@@ -371,18 +398,19 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithCorrectPlacementVersion) {
     ASSERT_EQ(nssShardedCollection1, acquisitions.front().getCollectionPtr()->ns());
     ASSERT_FALSE(acquisitions.front().isView());
     ASSERT_TRUE(acquisitions.front().getShardingDescription().isSharded());
+    ASSERT_TRUE(acquisitions.front().getCollectionFilter().has_value());
 }
 
 TEST_F(ShardRoleTest, AcquireShardedCollWithIncorrectPlacementVersionThrows) {
-    NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern =
-        NamespaceOrViewAcquisitionRequest::PlacementConcern{dbVersionTestDb,
-                                                            ShardVersion::UNSHARDED()};
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
+        AcquisitionPrerequisites::PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
     ASSERT_THROWS_WITH_CHECK(
         acquireCollectionsOrViews(opCtx(),
                                   {{nssShardedCollection1,
                                     placementConcern,
                                     repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
                                   MODE_IX),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
@@ -404,14 +432,15 @@ TEST_F(ShardRoleTest, AcquireShardedCollWhenShardDoesNotKnowThePlacementVersionT
             ->clearFilteringMetadata(opCtx());
     }
 
-    NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern =
-        NamespaceOrViewAcquisitionRequest::PlacementConcern{{}, shardVersionShardedCollection1};
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
+        AcquisitionPrerequisites::PlacementConcern{{}, shardVersionShardedCollection1};
     ASSERT_THROWS_WITH_CHECK(
         acquireCollectionsOrViews(opCtx(),
                                   {{nssShardedCollection1,
                                     placementConcern,
                                     repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
                                   MODE_IX),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
@@ -436,14 +465,15 @@ TEST_F(ShardRoleTest, AcquireShardedCollWhenCriticalSectionIsActiveThrows) {
     }
 
     {
-        NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern =
-            NamespaceOrViewAcquisitionRequest::PlacementConcern{{}, shardVersionShardedCollection1};
+        AcquisitionPrerequisites::PlacementConcern placementConcern =
+            AcquisitionPrerequisites::PlacementConcern{{}, shardVersionShardedCollection1};
         ASSERT_THROWS_WITH_CHECK(
             acquireCollectionsOrViews(opCtx(),
                                       {{nssShardedCollection1,
                                         placementConcern,
                                         repl::ReadConcernArgs(),
-                                        NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+                                        AcquisitionPrerequisites::kWrite,
+                                        AcquisitionPrerequisites::kMustBeCollection}},
                                       MODE_IX),
             ExceptionFor<ErrorCodes::StaleConfig>,
             [&](const DBException& ex) {
@@ -466,14 +496,15 @@ TEST_F(ShardRoleTest, AcquireShardedCollWhenCriticalSectionIsActiveThrows) {
 }
 
 TEST_F(ShardRoleTest, AcquireShardedCollWithoutSpecifyingPlacementVersion) {
-    NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern =
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
         NamespaceOrViewAcquisitionRequest::kPretendUnshardedDueToDirectConnection;
     const auto acquisitions =
         acquireCollectionsOrViews(opCtx(),
                                   {{nssShardedCollection1,
                                     placementConcern,
                                     repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
                                   MODE_IX);
 
     ASSERT_EQ(1, acquisitions.size());
@@ -483,6 +514,7 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithoutSpecifyingPlacementVersion) {
 
     // Note that the collection is treated as unsharded because the operation is unversioned.
     ASSERT_FALSE(acquisitions.front().getShardingDescription().isSharded());
+    ASSERT_FALSE(acquisitions.front().getCollectionFilter().has_value());
 }
 
 // ---------------------------------------------------------------------------
@@ -491,16 +523,16 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithoutSpecifyingPlacementVersion) {
 TEST_F(ShardRoleTest, AcquireCollectionFailsIfItDoesNotExist) {
     const NamespaceString inexistentNss =
         NamespaceString::createNamespaceString_forTest(dbNameTestDb, "inexistent");
-    NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern;
-    ASSERT_THROWS_CODE(
-        acquireCollectionsOrViews(opCtx(),
-                                  {{inexistentNss,
-                                    placementConcern,
-                                    repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
-                                  MODE_IX),
-        DBException,
-        ErrorCodes::NamespaceNotFound);
+    AcquisitionPrerequisites::PlacementConcern placementConcern;
+    ASSERT_THROWS_CODE(acquireCollectionsOrViews(opCtx(),
+                                                 {{inexistentNss,
+                                                   placementConcern,
+                                                   repl::ReadConcernArgs(),
+                                                   AcquisitionPrerequisites::kWrite,
+                                                   AcquisitionPrerequisites::kMustBeCollection}},
+                                                 MODE_IX),
+                       DBException,
+                       ErrorCodes::NamespaceNotFound);
 }
 
 TEST_F(ShardRoleTest, AcquireInexistentCollectionWithWrongPlacementThrowsBecauseWrongPlacement) {
@@ -508,13 +540,14 @@ TEST_F(ShardRoleTest, AcquireInexistentCollectionWithWrongPlacementThrowsBecause
     const NamespaceString inexistentNss =
         NamespaceString::createNamespaceString_forTest(dbNameTestDb, "inexistent");
 
-    NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern{incorrectDbVersion, {}};
+    AcquisitionPrerequisites::PlacementConcern placementConcern{incorrectDbVersion, {}};
     ASSERT_THROWS_WITH_CHECK(
         acquireCollectionsOrViews(opCtx(),
                                   {{inexistentNss,
                                     placementConcern,
                                     repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
                                   MODE_IX),
         ExceptionFor<ErrorCodes::StaleDbVersion>,
         [&](const DBException& ex) {
@@ -533,14 +566,15 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsAllWithCorrectPlacementConcern) 
     const auto acquisitions = acquireCollectionsOrViews(
         opCtx(),
         {{nssUnshardedCollection1,
-          NamespaceOrViewAcquisitionRequest::PlacementConcern{dbVersionTestDb,
-                                                              ShardVersion::UNSHARDED()},
+          AcquisitionPrerequisites::PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()},
           repl::ReadConcernArgs(),
-          NamespaceOrViewAcquisitionRequest::kMustBeCollection},
+          AcquisitionPrerequisites::kWrite,
+          AcquisitionPrerequisites::kMustBeCollection},
          {nssShardedCollection1,
-          NamespaceOrViewAcquisitionRequest::PlacementConcern{{}, shardVersionShardedCollection1},
+          AcquisitionPrerequisites::PlacementConcern{{}, shardVersionShardedCollection1},
           repl::ReadConcernArgs(),
-          NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+          AcquisitionPrerequisites::kWrite,
+          AcquisitionPrerequisites::kMustBeCollection}},
         MODE_IX);
 
     ASSERT_EQ(2, acquisitions.size());
@@ -554,6 +588,7 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsAllWithCorrectPlacementConcern) 
     ASSERT(acquisitionUnshardedColl != acquisitions.end());
     ASSERT_FALSE(acquisitionUnshardedColl->isView());
     ASSERT_FALSE(acquisitionUnshardedColl->getShardingDescription().isSharded());
+    ASSERT_FALSE(acquisitionUnshardedColl->getCollectionFilter().has_value());
 
     const auto& acquisitionShardedColl =
         std::find_if(acquisitions.begin(),
@@ -564,21 +599,24 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsAllWithCorrectPlacementConcern) 
     ASSERT(acquisitionShardedColl != acquisitions.end());
     ASSERT_FALSE(acquisitionShardedColl->isView());
     ASSERT_TRUE(acquisitionShardedColl->getShardingDescription().isSharded());
+    ASSERT_TRUE(acquisitionShardedColl->getCollectionFilter().has_value());
 }
 
 TEST_F(ShardRoleTest, AcquireMultipleCollectionsWithIncorrectPlacementConcernThrows) {
     ASSERT_THROWS_WITH_CHECK(
         acquireCollectionsOrViews(opCtx(),
                                   {{nssUnshardedCollection1,
-                                    NamespaceOrViewAcquisitionRequest::PlacementConcern{
+                                    AcquisitionPrerequisites::PlacementConcern{
                                         dbVersionTestDb, ShardVersion::UNSHARDED()},
                                     repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection},
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection},
                                    {nssShardedCollection1,
-                                    NamespaceOrViewAcquisitionRequest::PlacementConcern{
+                                    AcquisitionPrerequisites::PlacementConcern{
                                         dbVersionTestDb, ShardVersion::UNSHARDED()},
                                     repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
                                   MODE_IX),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
@@ -596,14 +634,14 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsWithIncorrectPlacementConcernThr
 
 TEST_F(ShardRoleTest, AcquireCollectionByUUID) {
     const auto uuid = getCollectionUUID(opCtx(), nssUnshardedCollection1);
-    const auto acquisitions =
-        acquireCollectionsOrViews(opCtx(),
-                                  {{NamespaceStringOrUUID(dbNameTestDb, uuid),
-                                    NamespaceOrViewAcquisitionRequest::PlacementConcern{
-                                        dbVersionTestDb, ShardVersion::UNSHARDED()},
-                                    repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
-                                  MODE_IX);
+    const auto acquisitions = acquireCollectionsOrViews(
+        opCtx(),
+        {{NamespaceStringOrUUID(dbNameTestDb, uuid),
+          AcquisitionPrerequisites::PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()},
+          repl::ReadConcernArgs(),
+          AcquisitionPrerequisites::kWrite,
+          AcquisitionPrerequisites::kMustBeCollection}},
+        MODE_IX);
 
     ASSERT_EQ(1, acquisitions.size());
     ASSERT_EQ(nssUnshardedCollection1, acquisitions.front().nss());
@@ -612,28 +650,28 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUID) {
 
 TEST_F(ShardRoleTest, AcquireCollectionByUUIDButWrongDbNameThrows) {
     const auto uuid = getCollectionUUID(opCtx(), nssUnshardedCollection1);
-    ASSERT_THROWS_CODE(
-        acquireCollectionsOrViews(opCtx(),
-                                  {{NamespaceStringOrUUID("anotherDbName", uuid),
-                                    {},
-                                    repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
-                                  MODE_IX),
-        DBException,
-        ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS_CODE(acquireCollectionsOrViews(opCtx(),
+                                                 {{NamespaceStringOrUUID("anotherDbName", uuid),
+                                                   {},
+                                                   repl::ReadConcernArgs(),
+                                                   AcquisitionPrerequisites::kWrite,
+                                                   AcquisitionPrerequisites::kMustBeCollection}},
+                                                 MODE_IX),
+                       DBException,
+                       ErrorCodes::NamespaceNotFound);
 }
 
 TEST_F(ShardRoleTest, AcquireCollectionByWrongUUID) {
     const auto uuid = UUID::gen();
-    ASSERT_THROWS_CODE(
-        acquireCollectionsOrViews(opCtx(),
-                                  {{NamespaceStringOrUUID(dbNameTestDb, uuid),
-                                    {},
-                                    repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
-                                  MODE_IX),
-        DBException,
-        ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS_CODE(acquireCollectionsOrViews(opCtx(),
+                                                 {{NamespaceStringOrUUID(dbNameTestDb, uuid),
+                                                   {},
+                                                   repl::ReadConcernArgs(),
+                                                   AcquisitionPrerequisites::kWrite,
+                                                   AcquisitionPrerequisites::kMustBeCollection}},
+                                                 MODE_IX),
+                       DBException,
+                       ErrorCodes::NamespaceNotFound);
 }
 
 // ---------------------------------------------------------------------------
@@ -647,7 +685,8 @@ TEST_F(ShardRoleTest, AcquireCollectionByNssAndExpectedUUID) {
                                     uuid,
                                     {},
                                     repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
                                   MODE_IX);
 
     ASSERT_EQ(1, acquisitions.size());
@@ -664,7 +703,8 @@ TEST_F(ShardRoleTest, AcquireCollectionByNssAndWrongExpectedUUIDThrows) {
                                     wrongUuid,
                                     {},
                                     repl::ReadConcernArgs(),
-                                    NamespaceOrViewAcquisitionRequest::kMustBeCollection}},
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
                                   MODE_IX),
         ExceptionFor<ErrorCodes::CollectionUUIDMismatch>,
         [&](const DBException& ex) {
@@ -674,6 +714,312 @@ TEST_F(ShardRoleTest, AcquireCollectionByNssAndWrongExpectedUUIDThrows) {
             ASSERT_EQ(nss.coll(), exInfo->expectedCollection());
             ASSERT_EQ(boost::none, exInfo->actualCollection());
         });
+}
+
+// ---------------------------------------------------------------------------
+// Yield and restore
+
+TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithLocks) {
+    const auto nss = nssUnshardedCollection1;
+
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
+        AcquisitionPrerequisites::PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    const auto acquisition =
+        acquireCollectionsOrViews(opCtx(),
+                                  {{nss,
+                                    placementConcern,
+                                    repl::ReadConcernArgs(),
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
+                                  MODE_IX);
+
+    ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+
+    // Yield the resources
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+
+    // Restore the resources
+    restoreTransactionResourcesToOperationContext(opCtx(), std::move(yieldedTransactionResources));
+    ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+}
+
+TEST_F(ShardRoleTest, RestoreForWriteFailsIfPlacementConcernNoLongerMet) {
+    const auto nss = nssShardedCollection1;
+
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
+        AcquisitionPrerequisites::PlacementConcern{{}, shardVersionShardedCollection1};
+    const auto acquisition =
+        acquireCollectionsOrViews(opCtx(),
+                                  {{nss,
+                                    placementConcern,
+                                    repl::ReadConcernArgs(),
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
+                                  MODE_IX);
+
+    // Yield the resources
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+
+    // Placement changes
+    const auto newShardVersion = [&]() {
+        auto newPlacementVersion = shardVersionShardedCollection1.placementVersion();
+        newPlacementVersion.incMajor();
+        return ShardVersion(newPlacementVersion, boost::optional<CollectionIndexes>(boost::none));
+    }();
+    const auto uuid = getCollectionUUID(opCtx(), nss);
+    installShardedCollectionMetadata(
+        opCtx(),
+        nss,
+        dbVersionTestDb,
+        {ChunkType(uuid,
+                   ChunkRange{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)},
+                   newShardVersion.placementVersion(),
+                   thisShardId)},
+        thisShardId);
+
+    // Try to restore the resources should fail because placement concern is no longer met.
+    ASSERT_THROWS_WITH_CHECK(restoreTransactionResourcesToOperationContext(
+                                 opCtx(), std::move(yieldedTransactionResources)),
+                             ExceptionFor<ErrorCodes::StaleConfig>,
+                             [&](const DBException& ex) {
+                                 const auto exInfo = ex.extraInfo<StaleConfigInfo>();
+                                 ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
+                                 ASSERT_EQ(shardVersionShardedCollection1,
+                                           exInfo->getVersionReceived());
+                                 ASSERT_EQ(newShardVersion, exInfo->getVersionWanted());
+                                 ASSERT_EQ(ShardId("this"), exInfo->getShardId());
+                                 ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
+                             });
+
+    ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+}
+
+TEST_F(ShardRoleTest, RestoreWithShardVersionIgnored) {
+    const auto nss = nssShardedCollection1;
+
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
+        AcquisitionPrerequisites::PlacementConcern{{}, ShardVersion::IGNORED()};
+    const auto acquisition =
+        acquireCollectionsOrViews(opCtx(),
+                                  {{nss,
+                                    placementConcern,
+                                    repl::ReadConcernArgs(),
+                                    AcquisitionPrerequisites::kWrite,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
+                                  MODE_IX);
+
+    ASSERT_TRUE(acquisition.front().getShardingDescription().isSharded());
+    ASSERT_TRUE(acquisition.front().getCollectionFilter().has_value());
+
+    // Yield the resources
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+
+    // Placement changes
+    const auto newShardVersion = [&]() {
+        auto newPlacementVersion = shardVersionShardedCollection1.placementVersion();
+        newPlacementVersion.incMajor();
+        return ShardVersion(newPlacementVersion, boost::optional<CollectionIndexes>(boost::none));
+    }();
+
+    const auto uuid = getCollectionUUID(opCtx(), nss);
+    installShardedCollectionMetadata(
+        opCtx(),
+        nss,
+        dbVersionTestDb,
+        {ChunkType(uuid,
+                   ChunkRange{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)},
+                   newShardVersion.placementVersion(),
+                   thisShardId)},
+        thisShardId);
+
+    // Try to restore the resources should work because placement concern (IGNORED) can be met.
+    restoreTransactionResourcesToOperationContext(opCtx(), std::move(yieldedTransactionResources));
+    ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+}
+
+void ShardRoleTest::testRestoreFailsIfCollectionNoLongerExists(
+    AcquisitionPrerequisites::OperationType operationType) {
+    const auto nss = nssShardedCollection1;
+
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
+        AcquisitionPrerequisites::PlacementConcern{{}, shardVersionShardedCollection1};
+    const auto acquisition =
+        acquireCollectionsOrViews(opCtx(),
+                                  {{nss,
+                                    placementConcern,
+                                    repl::ReadConcernArgs(),
+                                    operationType,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
+                                  MODE_IX);
+
+    // Yield the resources
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+
+    // Drop the collection
+    {
+        DBDirectClient client(opCtx());
+        client.dropCollection(nss);
+    }
+
+    // Try to restore the resources should fail because the collection no longer exists.
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           opCtx(), std::move(yieldedTransactionResources)),
+                       DBException,
+                       ErrorCodes::NamespaceNotFound);
+}
+TEST_F(ShardRoleTest, RestoreForReadFailsIfCollectionNoLongerExists) {
+    testRestoreFailsIfCollectionNoLongerExists(AcquisitionPrerequisites::kRead);
+}
+TEST_F(ShardRoleTest, RestoreForWriteFailsIfCollectionNoLongerExists) {
+    testRestoreFailsIfCollectionNoLongerExists(AcquisitionPrerequisites::kWrite);
+}
+
+void ShardRoleTest::testRestoreFailsIfCollectionRenamed(
+    AcquisitionPrerequisites::OperationType operationType) {
+    const auto nss = nssUnshardedCollection1;
+
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
+        AcquisitionPrerequisites::PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    const auto acquisition =
+        acquireCollectionsOrViews(opCtx(),
+                                  {{nss,
+                                    placementConcern,
+                                    repl::ReadConcernArgs(),
+                                    operationType,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
+                                  MODE_IX);
+
+    // Yield the resources
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+
+    // Rename the collection.
+    {
+        DBDirectClient client(opCtx());
+        BSONObj info;
+        ASSERT_TRUE(client.runCommand(
+            DatabaseName(boost::none, dbNameTestDb.db()),
+            BSON("renameCollection"
+                 << nss.ns() << "to"
+                 << NamespaceString::createNamespaceString_forTest(dbNameTestDb, "foo2").ns()),
+            info));
+    }
+
+    // Try to restore the resources should fail because the collection has been renamed.
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           opCtx(), std::move(yieldedTransactionResources)),
+                       DBException,
+                       ErrorCodes::NamespaceNotFound);
+}
+TEST_F(ShardRoleTest, RestoreForReadFailsIfCollectionRenamed) {
+    testRestoreFailsIfCollectionRenamed(AcquisitionPrerequisites::kRead);
+}
+TEST_F(ShardRoleTest, RestoreForWriteFailsIfCollectionRenamed) {
+    testRestoreFailsIfCollectionRenamed(AcquisitionPrerequisites::kWrite);
+}
+
+void ShardRoleTest::testRestoreFailsIfCollectionDroppedAndRecreated(
+    AcquisitionPrerequisites::OperationType operationType) {
+    const auto nss = nssUnshardedCollection1;
+
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
+        AcquisitionPrerequisites::PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    const auto acquisition =
+        acquireCollectionsOrViews(opCtx(),
+                                  {{nss,
+                                    placementConcern,
+                                    repl::ReadConcernArgs(),
+                                    operationType,
+                                    AcquisitionPrerequisites::kMustBeCollection}},
+                                  MODE_IX);
+
+    // Yield the resources
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+
+    // Drop the collection and create a new one with the same nss.
+    {
+        DBDirectClient client(opCtx());
+        client.dropCollection(nss);
+        createTestCollection(opCtx(), nss);
+    }
+
+    // Try to restore the resources should fail because the collection no longer exists.
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           opCtx(), std::move(yieldedTransactionResources)),
+                       DBException,
+                       ErrorCodes::CollectionUUIDMismatch);
+}
+TEST_F(ShardRoleTest, RestoreForWriteFailsIfCollectionDroppedAndRecreated) {
+    testRestoreFailsIfCollectionDroppedAndRecreated(AcquisitionPrerequisites::kWrite);
+}
+TEST_F(ShardRoleTest, RestoreForReadFailsIfCollectionDroppedAndRecreated) {
+    testRestoreFailsIfCollectionDroppedAndRecreated(AcquisitionPrerequisites::kRead);
+}
+
+TEST_F(ShardRoleTest, RestoreForReadSucceedsEvenIfPlacementHasChanged) {
+    const auto nss = nssShardedCollection1;
+
+    AcquisitionPrerequisites::PlacementConcern placementConcern =
+        AcquisitionPrerequisites::PlacementConcern{{}, shardVersionShardedCollection1};
+
+    SharedSemiFuture<void> ongoingQueriesCompletionFuture;
+
+    {
+        const auto acquisition =
+            acquireCollectionsOrViews(opCtx(),
+                                      {{nss,
+                                        placementConcern,
+                                        repl::ReadConcernArgs(),
+                                        AcquisitionPrerequisites::kRead,
+                                        AcquisitionPrerequisites::kMustBeCollection}},
+                                      MODE_IX);
+
+        ongoingQueriesCompletionFuture =
+            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx(), nss)
+                ->getOngoingQueriesCompletionFuture(
+                    getCollectionUUID(opCtx(), nss),
+                    ChunkRange(BSON("skey" << MINKEY), BSON("skey" << MAXKEY)));
+
+        // Yield the resources
+        auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+
+        ASSERT_FALSE(ongoingQueriesCompletionFuture.isReady());
+        ASSERT_TRUE(acquisition.front().getCollectionFilter().has_value());
+        ASSERT_TRUE(acquisition.front().getCollectionFilter()->keyBelongsToMe(BSON("skey" << 0)));
+
+        // Placement changes
+        const auto newShardVersion = [&]() {
+            auto newPlacementVersion = shardVersionShardedCollection1.placementVersion();
+            newPlacementVersion.incMajor();
+            return ShardVersion(newPlacementVersion,
+                                boost::optional<CollectionIndexes>(boost::none));
+        }();
+
+        const auto uuid = getCollectionUUID(opCtx(), nss);
+        installShardedCollectionMetadata(
+            opCtx(),
+            nss,
+            dbVersionTestDb,
+            {ChunkType(uuid,
+                       ChunkRange{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)},
+                       newShardVersion.placementVersion(),
+                       ShardId("anotherShard"))},
+            thisShardId);
+
+        // Restore should work for reads even though placement has changed.
+        restoreTransactionResourcesToOperationContext(opCtx(),
+                                                      std::move(yieldedTransactionResources));
+
+        ASSERT_FALSE(ongoingQueriesCompletionFuture.isReady());
+
+        // Even though placement has changed, the filter (and preserver) still point to the original
+        // placement.
+        ASSERT_TRUE(acquisition.front().getCollectionFilter().has_value());
+        ASSERT_TRUE(acquisition.front().getCollectionFilter()->keyBelongsToMe(BSON("skey" << 0)));
+    }
+
+    // Acquisition released. Now the range is no longer in use.
+    ASSERT_TRUE(ongoingQueriesCompletionFuture.isReady());
 }
 
 }  // namespace

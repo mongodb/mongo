@@ -147,6 +147,14 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     return {std::move(metadata)};
 }
 
+ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
+    OperationContext* opCtx,
+    OrphanCleanupPolicy orphanCleanupPolicy,
+    const ShardVersion& receivedShardVersion) const {
+    return _getMetadataWithVersionCheckAt(
+        opCtx, repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime(), receivedShardVersion);
+}
+
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
     OperationContext* opCtx) const {
     const bool operationIsVersioned = OperationShardingState::isComingFromRouter(opCtx);

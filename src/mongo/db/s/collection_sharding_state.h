@@ -166,6 +166,11 @@ public:
         OrphanCleanupPolicy orphanCleanupPolicy,
         bool supportNonVersionedOperations = false) const = 0;
 
+    virtual ScopedCollectionFilter getOwnershipFilter(
+        OperationContext* opCtx,
+        OrphanCleanupPolicy orphanCleanupPolicy,
+        const ShardVersion& receivedShardVersion) const = 0;
+
     /**
      * Checks whether the shard version in the operation context is compatible with the shard
      * version of the collection and if not, throws StaleConfigException populated with the received
