@@ -76,8 +76,8 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
     Lock::DBLock dblock(opCtx, nss.dbName(), MODE_IS);
 
-    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-        opCtx, nss.dbName(), DSSAcquisitionMode::kShared);
+    const auto scopedDss =
+        DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
     if (scopedDss->isMovePrimaryInProgress()) {
         LOGV2(4908600, "assertNoMovePrimaryInProgress", "namespace"_attr = nss.toString());
 

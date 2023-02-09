@@ -461,8 +461,7 @@ void MovePrimaryCoordinator::assertChangedMetadataOnConfig(
 
 void MovePrimaryCoordinator::clearDbMetadataOnPrimary(OperationContext* opCtx) const {
     AutoGetDb autoDb(opCtx, _dbName, MODE_IX);
-    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-        opCtx, _dbName, DSSAcquisitionMode::kExclusive);
+    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, _dbName);
     scopedDss->clearDbInfo(opCtx);
 }
 
@@ -511,15 +510,13 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
 
 void MovePrimaryCoordinator::blockWritesLegacy(OperationContext* opCtx) const {
     AutoGetDb autoDb(opCtx, _dbName, MODE_X);
-    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-        opCtx, _dbName, DSSAcquisitionMode::kExclusive);
+    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, _dbName);
     scopedDss->setMovePrimaryInProgress(opCtx);
 }
 
 void MovePrimaryCoordinator::unblockWritesLegacy(OperationContext* opCtx) const {
     AutoGetDb autoDb(opCtx, _dbName, MODE_IX);
-    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-        opCtx, _dbName, DSSAcquisitionMode::kExclusive);
+    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, _dbName);
     scopedDss->unsetMovePrimaryInProgress(opCtx);
 }
 

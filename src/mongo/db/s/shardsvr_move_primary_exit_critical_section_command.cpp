@@ -86,8 +86,8 @@ public:
                 {
                     // Clear database metadata on primary node.
                     AutoGetDb autoDb(newOpCtx.get(), dbName, MODE_IX);
-                    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-                        newOpCtx.get(), dbName, DSSAcquisitionMode::kExclusive);
+                    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+                        newOpCtx.get(), dbName);
                     scopedDss->clearDbInfo(newOpCtx.get());
                 }
 

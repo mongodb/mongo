@@ -129,10 +129,10 @@ public:
     void assertCriticalSectionCatchUpEnteredInMemory(const NamespaceString& nss) {
         if (nsIsDbOnly(nss.ns())) {
             AutoGetDb db(opCtx(), nss.dbName(), MODE_IS);
-            auto dss =
-                DatabaseShardingState::acquire(opCtx(), nss.dbName(), DSSAcquisitionMode::kShared);
-            ASSERT(dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
-            ASSERT(!dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
+            const auto scopedDss =
+                DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx(), nss.dbName());
+            ASSERT(scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
+            ASSERT(!scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
             AutoGetCollection coll(opCtx(), nss, MODE_IS);
             const auto csr =
@@ -147,10 +147,10 @@ public:
     void assertCriticalSectionCommitEnteredInMemory(const NamespaceString& nss) {
         if (nsIsDbOnly(nss.ns())) {
             AutoGetDb db(opCtx(), nss.dbName(), MODE_IS);
-            auto dss =
-                DatabaseShardingState::acquire(opCtx(), nss.dbName(), DSSAcquisitionMode::kShared);
-            ASSERT(dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
-            ASSERT(dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
+            const auto scopedDss =
+                DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx(), nss.dbName());
+            ASSERT(scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
+            ASSERT(scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
             AutoGetCollection coll(opCtx(), nss, MODE_IS);
             const auto csr =
@@ -164,10 +164,10 @@ public:
     void assertCriticalSectionLeftInMemory(const NamespaceString& nss) {
         if (nsIsDbOnly(nss.ns())) {
             AutoGetDb db(opCtx(), nss.dbName(), MODE_IS);
-            auto dss =
-                DatabaseShardingState::acquire(opCtx(), nss.dbName(), DSSAcquisitionMode::kShared);
-            ASSERT(!dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
-            ASSERT(!dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
+            const auto scopedDss =
+                DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx(), nss.dbName());
+            ASSERT(!scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
+            ASSERT(!scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
             AutoGetCollection coll(opCtx(), nss, MODE_IS);
             const auto csr =

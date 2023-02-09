@@ -50,8 +50,7 @@ void installDatabaseMetadata(OperationContext* opCtx,
                              const DatabaseName& dbName,
                              const DatabaseVersion& dbVersion) {
     AutoGetDb autoDb(opCtx, dbName, MODE_X, {});
-    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-        opCtx, dbName, DSSAcquisitionMode::kExclusive);
+    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
     scopedDss->setDbInfo(opCtx, {dbName.db(), ShardId("this"), dbVersion});
 }
 
@@ -290,8 +289,8 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenShardDoesNotKnowThePlacementVersio
     {
         // Clear the database metadata
         AutoGetDb autoDb(opCtx(), dbNameTestDb, MODE_X, {});
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-            opCtx(), dbNameTestDb, DSSAcquisitionMode::kExclusive);
+        auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx(), dbNameTestDb);
         scopedDss->clearDbInfo(opCtx());
     }
 
@@ -320,10 +319,10 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenCriticalSectionIsActiveThrows) {
     {
         // Enter critical section.
         AutoGetDb autoDb(opCtx(), dbNameTestDb, MODE_X, {});
-        const auto dss =
-            DatabaseShardingState::acquire(opCtx(), dbNameTestDb, DSSAcquisitionMode::kExclusive);
-        dss->enterCriticalSectionCatchUpPhase(opCtx(), criticalSectionReason);
-        dss->enterCriticalSectionCommitPhase(opCtx(), criticalSectionReason);
+        auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx(), dbNameTestDb);
+        scopedDss->enterCriticalSectionCatchUpPhase(opCtx(), criticalSectionReason);
+        scopedDss->enterCriticalSectionCommitPhase(opCtx(), criticalSectionReason);
     }
 
     {
@@ -351,9 +350,9 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenCriticalSectionIsActiveThrows) {
         // Exit critical section.
         AutoGetDb autoDb(opCtx(), dbNameTestDb, MODE_X, {});
         const BSONObj criticalSectionReason = BSON("reason" << 1);
-        const auto dss =
-            DatabaseShardingState::acquire(opCtx(), dbNameTestDb, DSSAcquisitionMode::kExclusive);
-        dss->exitCriticalSection(opCtx(), criticalSectionReason);
+        auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx(), dbNameTestDb);
+        scopedDss->exitCriticalSection(opCtx(), criticalSectionReason);
     }
 }
 

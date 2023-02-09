@@ -365,8 +365,8 @@ void dropReadyIndexes(OperationContext* opCtx,
 
 void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss) {
     try {
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-            opCtx, nss.dbName(), DSSAcquisitionMode::kShared);
+        const auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
         auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
 
         auto collDesc = scopedCss->getCollectionDescription(opCtx);

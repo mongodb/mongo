@@ -81,8 +81,8 @@ public:
 
             DatabaseName dbName(boost::none, _targetDb());
             AutoGetDb autoDb(opCtx, dbName, MODE_IS);
-            const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-                opCtx, dbName, DSSAcquisitionMode::kShared);
+            const auto scopedDss =
+                DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
 
             BSONObj versionObj;
             if (const auto dbVersion = scopedDss->getDbVersion(opCtx)) {

@@ -300,8 +300,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                         }
                         // TODO (SERVER-71444): Fix to be interruptible or document exception.
                         UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-                        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-                            opCtx, insertedNss.dbName(), DSSAcquisitionMode::kExclusive);
+                        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+                            opCtx, insertedNss.dbName());
                         scopedDss->enterCriticalSectionCatchUpPhase(opCtx, reason);
                     } else {
                         boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
@@ -433,8 +433,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
 
             DatabaseName dbName(boost::none, db);
             AutoGetDb autoDb(opCtx, dbName, MODE_X);
-            auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-                opCtx, dbName, DSSAcquisitionMode::kExclusive);
+            auto scopedDss =
+                DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
             scopedDss->clearDbInfo(opCtx);
         }
     }
@@ -476,8 +476,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
 
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
                     UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-                    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-                        opCtx, updatedNss.dbName(), DSSAcquisitionMode::kExclusive);
+                    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+                        opCtx, updatedNss.dbName());
                     scopedDss->enterCriticalSectionCommitPhase(opCtx, reason);
                 } else {
                     boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
@@ -660,8 +660,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
 
         DatabaseName dbName(boost::none, deletedDatabase);
         AutoGetDb autoDb(opCtx, dbName, MODE_X);
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-            opCtx, dbName, DSSAcquisitionMode::kExclusive);
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
         scopedDss->clearDbInfo(opCtx);
     }
 
@@ -699,8 +698,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
 
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
                     UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-                    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-                        opCtx, deletedNss.dbName(), DSSAcquisitionMode::kExclusive);
+                    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+                        opCtx, deletedNss.dbName());
 
                     // Secondary nodes must clear the database metadata before releasing the
                     // in-memory critical section.

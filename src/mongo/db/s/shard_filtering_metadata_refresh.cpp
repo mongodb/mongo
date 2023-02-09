@@ -63,10 +63,10 @@ MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshThread);
  * Returns 'true' if there were concurrent operations that had to be joined (in which case all locks
  * will be dropped). If there were none, returns false and the locks continue to be held.
  */
-bool joinDbVersionOperation(
-    OperationContext* opCtx,
-    boost::optional<Lock::DBLock>* dbLock,
-    boost::optional<DatabaseShardingState::ScopedDatabaseShardingState>* scopedDss) {
+template <typename ScopedDatabaseShardingState>
+bool joinDbVersionOperation(OperationContext* opCtx,
+                            boost::optional<Lock::DBLock>* dbLock,
+                            boost::optional<ScopedDatabaseShardingState>* scopedDss) {
     invariant(dbLock->has_value());
     invariant(scopedDss->has_value());
 
@@ -122,8 +122,7 @@ Status refreshDbMetadata(OperationContext* opCtx,
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         // Can be uninterruptible because the work done under it can never block.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-        auto scopedDss =
-            DatabaseShardingState::acquire(opCtx, dbName, DSSAcquisitionMode::kExclusive);
+        auto scopedDss = DatabaseShardingState::acquireExclusive(opCtx, dbName);
         scopedDss->resetDbMetadataRefreshFuture();
     });
 
@@ -136,8 +135,7 @@ Status refreshDbMetadata(OperationContext* opCtx,
     // the number of possible threads convoying on the exclusive lock below.
     {
         Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-        const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-            opCtx, dbName, DSSAcquisitionMode::kShared);
+        const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
 
         const auto cachedDbVersion = scopedDss->getDbVersion(opCtx);
         if (swDbMetadata.isOK() && swDbMetadata.getValue()->getVersion() <= cachedDbVersion) {
@@ -153,8 +151,7 @@ Status refreshDbMetadata(OperationContext* opCtx,
     }
 
     Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-        opCtx, dbName, DSSAcquisitionMode::kExclusive);
+    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
     if (!cancellationToken.isCanceled()) {
         if (swDbMetadata.isOK()) {
             // Set the refreshed database metadata in the local catalog.
@@ -246,9 +243,8 @@ void onDbVersionMismatch(OperationContext* opCtx,
             dbLock.emplace(opCtx, dbName, MODE_IS);
 
             if (receivedDbVersion) {
-                boost::optional<DatabaseShardingState::ScopedDatabaseShardingState> scopedDss(
-                    DatabaseShardingState::assertDbLockedAndAcquire(
-                        opCtx, dbName, DSSAcquisitionMode::kShared));
+                auto scopedDss = boost::make_optional(
+                    DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName));
 
                 if (joinDbVersionOperation(opCtx, &dbLock, &scopedDss)) {
                     // Waited for another thread to exit from the critical section or to complete an
@@ -273,9 +269,8 @@ void onDbVersionMismatch(OperationContext* opCtx,
                 return;
             }
 
-            boost::optional<DatabaseShardingState::ScopedDatabaseShardingState> scopedDss(
-                DatabaseShardingState::assertDbLockedAndAcquire(
-                    opCtx, dbName, DSSAcquisitionMode::kExclusive));
+            auto scopedDss = boost::make_optional(
+                DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName));
 
             if (joinDbVersionOperation(opCtx, &dbLock, &scopedDss)) {
                 // Waited for another thread to exit from the critical section or to complete an

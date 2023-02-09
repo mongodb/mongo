@@ -158,8 +158,8 @@ public:
         // directly
         DatabaseName databaseName(boost::none, _dbName);
         Lock::DBLock dbLock(_opCtx, databaseName, MODE_X);
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-            _opCtx, databaseName, DSSAcquisitionMode::kExclusive);
+        auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireExclusive(_opCtx, databaseName);
         scopedDss->enterCriticalSectionCatchUpPhase(_opCtx, _reason);
         scopedDss->enterCriticalSectionCommitPhase(_opCtx, _reason);
     }
@@ -171,8 +171,8 @@ public:
         // directly
         DatabaseName databaseName(boost::none, _dbName);
         Lock::DBLock dbLock(_opCtx, databaseName, MODE_X);
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-            _opCtx, databaseName, DSSAcquisitionMode::kExclusive);
+        auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireExclusive(_opCtx, databaseName);
         scopedDss->exitCriticalSection(_opCtx, _reason);
     }
 
@@ -247,8 +247,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
 void DropDatabaseCoordinator::_clearDatabaseInfoOnPrimary(OperationContext* opCtx) {
     DatabaseName dbName(boost::none, _dbName);
     AutoGetDb autoDb(opCtx, dbName, MODE_X);
-    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-        opCtx, dbName, DSSAcquisitionMode::kExclusive);
+    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
     scopedDss->clearDbInfo(opCtx);
 }
 

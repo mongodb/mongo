@@ -106,8 +106,8 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
         AutoGetDb autoDb(opCtx, getNss().dbName(), MODE_X);
         invariant(autoDb.ensureDbExists(opCtx), getNss().toString());
 
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-            opCtx, getNss().dbName(), DSSAcquisitionMode::kExclusive);
+        auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, getNss().dbName());
         scopedDss->setMovePrimaryInProgress(opCtx);
     }
 
@@ -175,8 +175,8 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
                                     << " was dropped during the movePrimary operation.");
         }
 
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-            opCtx, getNss().dbName(), DSSAcquisitionMode::kExclusive);
+        auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, getNss().dbName());
 
         // IMPORTANT: After this line, the critical section is in place and needs to be signaled
         scopedDss->enterCriticalSectionCatchUpPhase(opCtx, _critSecReason);
@@ -226,8 +226,8 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
                                     << " was dropped during the movePrimary operation.");
         }
 
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-            opCtx, getNss().dbName(), DSSAcquisitionMode::kExclusive);
+        auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, getNss().dbName());
 
         // Read operations must begin to wait on the critical section just before we send the
         // commit operation to the config server
@@ -287,8 +287,8 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
             }
 
             if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, getNss())) {
-                auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-                    opCtx, getNss().dbName(), DSSAcquisitionMode::kExclusive);
+                auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+                    opCtx, getNss().dbName());
                 scopedDss->clearDbInfo(opCtx);
                 uassertStatusOK(validateStatus.withContext(
                     str::stream() << "Unable to verify movePrimary commit for database: "
@@ -515,8 +515,8 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
         AutoGetDb autoDb(opCtx, getNss().dbName(), MODE_IX);
 
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-            opCtx, getNss().dbName(), DSSAcquisitionMode::kExclusive);
+        auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, getNss().dbName());
         scopedDss->unsetMovePrimaryInProgress(opCtx);
         scopedDss->clearDbInfo(opCtx);
 

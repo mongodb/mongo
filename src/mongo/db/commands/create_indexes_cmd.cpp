@@ -317,8 +317,8 @@ bool indexesAlreadyExist(OperationContext* opCtx,
 
 void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss) {
     try {
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-            opCtx, nss.dbName(), DSSAcquisitionMode::kShared);
+        const auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
 
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
 

@@ -36,8 +36,6 @@
 
 namespace mongo {
 
-enum class DSSAcquisitionMode { kShared, kExclusive };
-
 /**
  * Synchronizes access to this shard server's cached database version for Database.
  */
@@ -50,18 +48,15 @@ public:
     DatabaseShardingState& operator=(const DatabaseShardingState&) = delete;
 
     /**
-     * Obtains the sharding state for the specified database along with a resource lock protecting
-     * it from modifications, which will be held until the object goes out of scope.
+     * Obtains the sharding state for the specified database along with a resource lock in exclusive
+     * mode, which will be held until the object goes out of scope.
      */
-    class ScopedDatabaseShardingState {
+    class ScopedExclusiveDatabaseShardingState {
     public:
-        ScopedDatabaseShardingState(ScopedDatabaseShardingState&&);
-
-        ~ScopedDatabaseShardingState();
-
         DatabaseShardingState* operator->() const {
             return _dss;
         }
+
         DatabaseShardingState& operator*() const {
             return *_dss;
         }
@@ -69,18 +64,43 @@ public:
     private:
         friend class DatabaseShardingState;
 
-        ScopedDatabaseShardingState(Lock::ResourceLock lock, DatabaseShardingState* dss);
+        ScopedExclusiveDatabaseShardingState(Lock::ResourceLock lock, DatabaseShardingState* dss);
 
         Lock::ResourceLock _lock;
         DatabaseShardingState* _dss;
     };
 
-    static ScopedDatabaseShardingState assertDbLockedAndAcquire(OperationContext* opCtx,
-                                                                const DatabaseName& dbName,
-                                                                DSSAcquisitionMode mode);
-    static ScopedDatabaseShardingState acquire(OperationContext* opCtx,
-                                               const DatabaseName& dbName,
-                                               DSSAcquisitionMode mode);
+    /**
+     * Obtains the sharding state for the specified database along with a resource lock in shared
+     * mode, which will be held until the object goes out of scope.
+     */
+    class ScopedSharedDatabaseShardingState : public ScopedExclusiveDatabaseShardingState {
+    public:
+        const DatabaseShardingState* operator->() const {
+            return _dss;
+        }
+
+        const DatabaseShardingState& operator*() const {
+            return *_dss;
+        }
+
+    private:
+        friend class DatabaseShardingState;
+
+        ScopedSharedDatabaseShardingState(Lock::ResourceLock lock, DatabaseShardingState* dss);
+    };
+
+    static ScopedExclusiveDatabaseShardingState acquireExclusive(OperationContext* opCtx,
+                                                                 const DatabaseName& dbName);
+
+    static ScopedSharedDatabaseShardingState acquireShared(OperationContext* opCtx,
+                                                           const DatabaseName& dbName);
+
+    static ScopedExclusiveDatabaseShardingState assertDbLockedAndAcquireExclusive(
+        OperationContext* opCtx, const DatabaseName& dbName);
+
+    static ScopedSharedDatabaseShardingState assertDbLockedAndAcquireShared(
+        OperationContext* opCtx, const DatabaseName& dbName);
 
     /**
      * Returns the names of the databases that have a DatabaseShardingState.

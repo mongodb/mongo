@@ -508,8 +508,7 @@ void ShardingRecoveryService::recoverRecoverableCriticalSections(OperationContex
     }
     for (const auto& dbName : DatabaseShardingState::getDatabaseNames(opCtx)) {
         AutoGetDb dbLock(opCtx, dbName, MODE_X);
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-            opCtx, dbName, DSSAcquisitionMode::kExclusive);
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
         scopedDss->exitCriticalSectionNoChecks(opCtx);
     }
 
@@ -521,8 +520,8 @@ void ShardingRecoveryService::recoverRecoverableCriticalSections(OperationContex
         {
             if (nsIsDbOnly(nss.ns())) {
                 AutoGetDb dbLock(opCtx, nss.dbName(), MODE_X);
-                auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
-                    opCtx, nss.dbName(), DSSAcquisitionMode::kExclusive);
+                auto scopedDss =
+                    DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, nss.dbName());
                 scopedDss->enterCriticalSectionCatchUpPhase(opCtx, doc.getReason());
                 if (doc.getBlockReads()) {
                     scopedDss->enterCriticalSectionCommitPhase(opCtx, doc.getReason());
