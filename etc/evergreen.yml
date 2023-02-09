@@ -3277,6 +3277,9 @@ buildvariants:
     compile_variant: *commit-queue
   depends_on: []
   tasks:
+  - name: compile_ninja_quick_TG
+    distros:
+    - rhel80-xlarge-commitqueue
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
     - rhel80-xlarge-commitqueue

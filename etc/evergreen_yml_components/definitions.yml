@@ -2567,6 +2567,25 @@ tasks:
   - func: "ninja compile"
     vars:
       ninja_file: "build.ninja"
+      targets: "install-devcore compiledb"
+
+- name: compile_ninja_quick
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - func: "scons compile"
+    vars:
+      generating_for_ninja: true
+      separate_debug: off
+      task_compile_flags: >-
+        --ninja
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "build.ninja"
+      targets: "install-wiredtiger compiledb"
 
 - name: compile_ninja_default_profile
   tags: []
@@ -2604,6 +2623,7 @@ tasks:
   - func: "ninja compile"
     vars:
       ninja_file: "build.ninja"
+      targets: "install-devcore compiledb"
 
 - name: compile_ninja_opt_profile
   tags: []
@@ -2623,6 +2643,7 @@ tasks:
   - func: "ninja compile"
     vars:
       ninja_file: "opt.ninja"
+      targets: "install-devcore compiledb"
 
 - name: compile_ninja_fast_profile
   tags: []
@@ -2642,6 +2663,7 @@ tasks:
   - func: "ninja compile"
     vars:
       ninja_file: "fast.ninja"
+      targets: "install-devcore compiledb"
 
 - name: compile_ninja_san_profile
   tags: []
@@ -2662,6 +2684,7 @@ tasks:
   - func: "ninja compile"
     vars:
       ninja_file: "san.ninja"
+      targets: "install-devcore compiledb"
 
 - name: compile_ninja_compiledb_profile
   tags: []
@@ -2680,6 +2703,7 @@ tasks:
   - func: "ninja compile"
     vars:
       ninja_file: "compiledb.ninja"
+      targets: "install-devcore compiledb"
 
 - name: compile_ninja_next
   tags: []
@@ -2698,6 +2722,7 @@ tasks:
   - func: "ninja compile"
     vars:
       ninja_file: "build.ninja"
+      targets: "install-devcore compiledb"
 
 - name: compile_build_tools_next
   tags: []
@@ -8206,6 +8231,11 @@ task_groups:
       permissions: public-read
       content_type: text/plain
       display_name: build.ninja
+
+- <<: *compile_task_group_template
+  name: compile_ninja_quick_TG
+  tasks:
+  - compile_ninja_quick
 
 - <<: *compile_task_group_template
   name: compile_ninja_default_profile_TG
