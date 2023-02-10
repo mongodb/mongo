@@ -46,14 +46,10 @@ namespace mongo {
  */
 class TenantId {
 public:
-    /**
-     * kSystemTenantId must be unique across all possible tenant IDs.
-     * Since the first four bytes of an OID are a unix epoch timestamp,
-     * we can simply select a value prior to the inception of MongoDB,
-     * and be guaranteed to never have a collision with a value
-     * produced by OID::gen().
-     */
-    static const TenantId kSystemTenantId;
+    static const boost::optional<TenantId>& systemTenantId() {
+        static StaticImmortal<boost::optional<TenantId>> systemTenantId{};
+        return *systemTenantId;
+    }
 
     explicit TenantId(const OID& oid) : _oid(oid) {}
 

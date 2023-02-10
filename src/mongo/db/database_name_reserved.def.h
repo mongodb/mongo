@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,13 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/database_name.h"
+/**
+ * This file is included multiple times into `database_name.h`, in order to
+ * define DatabaseName constexpr values. The `DBNAME_CONSTANT` macro callback
+ * will be defined differently at each include. Lines here are of the form:
+ *
+ *     DBNAME_CONSTANT(id, db)
+ *
+ * - `id` is the `ConstantProxy` data member of `DatabaseName` being defined.
+ * - `db` : must be a constexpr StringData expression.
+ */
 
-namespace mongo {
+DBNAME_CONSTANT(kAdmin, "admin"_sd)
 
-DatabaseName DatabaseName::createSystemTenantDbName(StringData dbString) {
-    // TODO SERVER-62491 Use kSystemTenantId
-    return DatabaseName(boost::none, dbString);
-}
+DBNAME_CONSTANT(kLocal, "local"_sd)
 
-}  // namespace mongo
+DBNAME_CONSTANT(kConfig, "config"_sd)
+
+DBNAME_CONSTANT(kEmpty, ""_sd)

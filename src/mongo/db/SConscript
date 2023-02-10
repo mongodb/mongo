@@ -63,7 +63,6 @@ env.Library(
         'basic_types.idl',
         'catalog_shard_feature_flag.idl',
         'cluster_role.cpp',
-        'database_name.cpp',
         'feature_compatibility_version_document.idl',
         'feature_compatibility_version_parser.cpp',
         'feature_flag.cpp',

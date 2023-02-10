@@ -35,7 +35,7 @@
  *     NSS_CONSTANT(id, db, coll)
  *
  * - `id` is the `ConstantProxy` data member of `NamespaceString` being defined.
- * - `db` : must be a constexpr StringData expression.
+ * - `db` : must be a constexpr DatabaseName::ConstantProxy expression.
  * - `coll` must be a constexpr StringData expression.
  */
 
@@ -44,214 +44,198 @@
 // state of the server, which needs to be recovered/consulted at startup. Each document in this
 // namespace should have its _id set to some string, which meaningfully describes what it
 // represents. For example, 'shardIdentity' and 'featureCompatibilityVersion'.
-NSS_CONSTANT(kServerConfigurationNamespace, NamespaceString::kAdminDb, "system.version"_sd)
+NSS_CONSTANT(kServerConfigurationNamespace, DatabaseName::kAdmin, "system.version"_sd)
 
 // Namespace for storing the logical sessions information
-NSS_CONSTANT(kLogicalSessionsNamespace, NamespaceString::kConfigDb, "system.sessions"_sd)
+NSS_CONSTANT(kLogicalSessionsNamespace, DatabaseName::kConfig, "system.sessions"_sd)
 
 // Namespace for storing databases information
-NSS_CONSTANT(kConfigDatabasesNamespace, NamespaceString::kConfigDb, "databases"_sd)
+NSS_CONSTANT(kConfigDatabasesNamespace, DatabaseName::kConfig, "databases"_sd)
 
 // Namespace for storing the transaction information for each session
-NSS_CONSTANT(kSessionTransactionsTableNamespace, NamespaceString::kConfigDb, "transactions"_sd)
+NSS_CONSTANT(kSessionTransactionsTableNamespace, DatabaseName::kConfig, "transactions"_sd)
 
 // Name for a shard's collections metadata collection, each document of which indicates the
 // state of a specific collection
-NSS_CONSTANT(kShardConfigCollectionsNamespace, NamespaceString::kConfigDb, "cache.collections"_sd)
+NSS_CONSTANT(kShardConfigCollectionsNamespace, DatabaseName::kConfig, "cache.collections"_sd)
 
 // Name for a shard's databases metadata collection, each document of which indicates the state
 // of a specific database
-NSS_CONSTANT(kShardConfigDatabasesNamespace, NamespaceString::kConfigDb, "cache.databases"_sd)
+NSS_CONSTANT(kShardConfigDatabasesNamespace, DatabaseName::kConfig, "cache.databases"_sd)
 
 // Namespace for storing keys for signing and validating cluster times created by the cluster
 // that this node is in.
-NSS_CONSTANT(kKeysCollectionNamespace, NamespaceString::kAdminDb, "system.keys"_sd)
+NSS_CONSTANT(kKeysCollectionNamespace, DatabaseName::kAdmin, "system.keys"_sd)
 
 // Namespace for storing keys for validating cluster times created by other clusters.
-NSS_CONSTANT(kExternalKeysCollectionNamespace,
-             NamespaceString::kConfigDb,
-             "external_validation_keys"_sd)
+NSS_CONSTANT(kExternalKeysCollectionNamespace, DatabaseName::kConfig, "external_validation_keys"_sd)
 
 // Namespace of the the oplog collection.
-NSS_CONSTANT(kRsOplogNamespace, NamespaceString::kLocalDb, "oplog.rs"_sd)
+NSS_CONSTANT(kRsOplogNamespace, DatabaseName::kLocal, "oplog.rs"_sd)
 
 // Namespace for storing the persisted state of transaction coordinators.
 NSS_CONSTANT(kTransactionCoordinatorsNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "transaction_coordinators"_sd)
 
 // Namespace for storing the persisted state of migration coordinators.
-NSS_CONSTANT(kMigrationCoordinatorsNamespace,
-             NamespaceString::kConfigDb,
-             "migrationCoordinators"_sd)
+NSS_CONSTANT(kMigrationCoordinatorsNamespace, DatabaseName::kConfig, "migrationCoordinators"_sd)
 
 // Namespace for storing the persisted state of migration recipients.
-NSS_CONSTANT(kMigrationRecipientsNamespace, NamespaceString::kConfigDb, "migrationRecipients"_sd)
+NSS_CONSTANT(kMigrationRecipientsNamespace, DatabaseName::kConfig, "migrationRecipients"_sd)
 
 // Namespace for storing the persisted state of movePrimary operation recipients.
-NSS_CONSTANT(kMovePrimaryRecipientNamespace, NamespaceString::kConfigDb, "movePrimaryRecipients"_sd)
+NSS_CONSTANT(kMovePrimaryRecipientNamespace, DatabaseName::kConfig, "movePrimaryRecipients"_sd)
 
 // Namespace for storing the persisted state of tenant migration donors.
-NSS_CONSTANT(kTenantMigrationDonorsNamespace,
-             NamespaceString::kConfigDb,
-             "tenantMigrationDonors"_sd)
+NSS_CONSTANT(kTenantMigrationDonorsNamespace, DatabaseName::kConfig, "tenantMigrationDonors"_sd)
 
 // Namespace for storing the persisted state of tenant migration recipient service instances.
 NSS_CONSTANT(kTenantMigrationRecipientsNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "tenantMigrationRecipients"_sd)
 
 // Namespace for view on local.oplog.rs for tenant migrations.
-NSS_CONSTANT(kTenantMigrationOplogView,
-             NamespaceString::kLocalDb,
-             "system.tenantMigration.oplogView"_sd)
+NSS_CONSTANT(kTenantMigrationOplogView, DatabaseName::kLocal, "system.tenantMigration.oplogView"_sd)
 
 // Namespace for storing the persisted state of tenant split donors.
-NSS_CONSTANT(kShardSplitDonorsNamespace, NamespaceString::kConfigDb, "shardSplitDonors"_sd)
+NSS_CONSTANT(kShardSplitDonorsNamespace, DatabaseName::kConfig, "shardSplitDonors"_sd)
 
 // Namespace for replica set configuration settings.
-NSS_CONSTANT(kSystemReplSetNamespace, NamespaceString::kLocalDb, "system.replset"_sd)
+NSS_CONSTANT(kSystemReplSetNamespace, DatabaseName::kLocal, "system.replset"_sd)
 
 // Namespace for storing the last replica set election vote.
-NSS_CONSTANT(kLastVoteNamespace, NamespaceString::kLocalDb, "replset.election"_sd)
+NSS_CONSTANT(kLastVoteNamespace, DatabaseName::kLocal, "replset.election"_sd)
 
 // Namespace for index build entries.
-NSS_CONSTANT(kIndexBuildEntryNamespace, NamespaceString::kConfigDb, "system.indexBuilds"_sd)
+NSS_CONSTANT(kIndexBuildEntryNamespace, DatabaseName::kConfig, "system.indexBuilds"_sd)
 
 // Namespace for pending range deletions.
-NSS_CONSTANT(kRangeDeletionNamespace, NamespaceString::kConfigDb, "rangeDeletions"_sd)
+NSS_CONSTANT(kRangeDeletionNamespace, DatabaseName::kConfig, "rangeDeletions"_sd)
 
 // Namespace containing pending range deletions snapshots for rename operations.
-NSS_CONSTANT(kRangeDeletionForRenameNamespace,
-             NamespaceString::kConfigDb,
-             "rangeDeletionsForRename"_sd)
+NSS_CONSTANT(kRangeDeletionForRenameNamespace, DatabaseName::kConfig, "rangeDeletionsForRename"_sd)
 
 // Namespace for the coordinator's resharding operation state.
-NSS_CONSTANT(kConfigReshardingOperationsNamespace,
-             NamespaceString::kConfigDb,
-             "reshardingOperations"_sd)
+NSS_CONSTANT(kConfigReshardingOperationsNamespace, DatabaseName::kConfig, "reshardingOperations"_sd)
 
 // Namespace for the donor shard's local resharding operation state.
 NSS_CONSTANT(kDonorReshardingOperationsNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "localReshardingOperations.donor"_sd)
 
 // Namespace for the recipient shard's local resharding operation state.
 NSS_CONSTANT(kRecipientReshardingOperationsNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "localReshardingOperations.recipient"_sd)
 
 // Namespace for persisting sharding DDL coordinators state documents
 NSS_CONSTANT(kShardingDDLCoordinatorsNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "system.sharding_ddl_coordinators"_sd)
 
 // Namespace for persisting sharding DDL rename participant state documents
 NSS_CONSTANT(kShardingRenameParticipantsNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "localRenameParticipants"_sd)
 
 // Namespace for balancer settings and default read and write concerns.
-NSS_CONSTANT(kConfigSettingsNamespace, NamespaceString::kConfigDb, "settings"_sd)
+NSS_CONSTANT(kConfigSettingsNamespace, DatabaseName::kConfig, "settings"_sd)
 
 // Namespace for vector clock state.
-NSS_CONSTANT(kVectorClockNamespace, NamespaceString::kConfigDb, "vectorClock"_sd)
+NSS_CONSTANT(kVectorClockNamespace, DatabaseName::kConfig, "vectorClock"_sd)
 
 // Namespace for storing oplog applier progress for resharding.
 NSS_CONSTANT(kReshardingApplierProgressNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "localReshardingOperations.recipient.progress_applier"_sd)
 
 // Namespace for storing config.transactions cloner progress for resharding.
 NSS_CONSTANT(kReshardingTxnClonerProgressNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "localReshardingOperations.recipient.progress_txn_cloner"_sd)
 
 // Namespace for storing config.collectionCriticalSections documents
 NSS_CONSTANT(kCollectionCriticalSectionsNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "collection_critical_sections"_sd)
 
 // Dummy namespace used for forcing secondaries to handle an oplog entry on its own batch.
 NSS_CONSTANT(kForceOplogBatchBoundaryNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "system.forceOplogBatchBoundary"_sd)
 
 // Namespace used for storing retryable findAndModify images.
-NSS_CONSTANT(kConfigImagesNamespace, NamespaceString::kConfigDb, "image_collection"_sd)
+NSS_CONSTANT(kConfigImagesNamespace, DatabaseName::kConfig, "image_collection"_sd)
 
 // Namespace used for persisting ConfigsvrCoordinator state documents.
 NSS_CONSTANT(kConfigsvrCoordinatorsNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "sharding_configsvr_coordinators"_sd)
 
 // Namespace for storing user write blocking critical section documents
 NSS_CONSTANT(kUserWritesCriticalSectionsNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "user_writes_critical_sections"_sd)
 
 // Namespace used during the recovery procedure for the config server.
-NSS_CONSTANT(kConfigsvrRestoreNamespace,
-             NamespaceString::kLocalDb,
-             "system.collections_to_restore"_sd)
+NSS_CONSTANT(kConfigsvrRestoreNamespace, DatabaseName::kLocal, "system.collections_to_restore"_sd)
 
 // Namespace used for CompactParticipantCoordinator service.
 NSS_CONSTANT(kCompactStructuredEncryptionCoordinatorNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "compact_structured_encryption_coordinator"_sd)
 
 // Namespace used for storing cluster wide parameters on dedicated configurations.
-NSS_CONSTANT(kClusterParametersNamespace, NamespaceString::kConfigDb, "clusterParameters"_sd)
+NSS_CONSTANT(kClusterParametersNamespace, DatabaseName::kConfig, "clusterParameters"_sd)
 
 // Namespace used for storing the list of shards on the CSRS.
-NSS_CONSTANT(kConfigsvrShardsNamespace, NamespaceString::kConfigDb, "shards"_sd)
+NSS_CONSTANT(kConfigsvrShardsNamespace, DatabaseName::kConfig, "shards"_sd)
 
 // Namespace used for storing the list of sharded collections on the CSRS.
-NSS_CONSTANT(kConfigsvrCollectionsNamespace, NamespaceString::kConfigDb, "collections"_sd)
+NSS_CONSTANT(kConfigsvrCollectionsNamespace, DatabaseName::kConfig, "collections"_sd)
 
 // Namespace used for storing the index catalog on the CSRS.
-NSS_CONSTANT(kConfigsvrIndexCatalogNamespace, NamespaceString::kConfigDb, "csrs.indexes"_sd)
+NSS_CONSTANT(kConfigsvrIndexCatalogNamespace, DatabaseName::kConfig, "csrs.indexes"_sd)
 
 // Namespace used for storing the index catalog on the shards.
-NSS_CONSTANT(kShardIndexCatalogNamespace, NamespaceString::kConfigDb, "shard.indexes"_sd)
+NSS_CONSTANT(kShardIndexCatalogNamespace, DatabaseName::kConfig, "shard.indexes"_sd)
 
 // Namespace used for storing the collection catalog on the shards.
-NSS_CONSTANT(kShardCollectionCatalogNamespace, NamespaceString::kConfigDb, "shard.collections"_sd)
+NSS_CONSTANT(kShardCollectionCatalogNamespace, DatabaseName::kConfig, "shard.collections"_sd)
 
 // Namespace used for storing NamespacePlacementType docs on the CSRS.
-NSS_CONSTANT(kConfigsvrPlacementHistoryNamespace, NamespaceString::kConfigDb, "placementHistory"_sd)
+NSS_CONSTANT(kConfigsvrPlacementHistoryNamespace, DatabaseName::kConfig, "placementHistory"_sd)
 
 // Namespace value used to identify the "fcv marker entry" of
 // kConfigsvrPlacementHistoryNamespace collection which marks the start or the end of a FCV
 // upgrade/downgrade.
-NSS_CONSTANT(kConfigsvrPlacementHistoryFcvMarkerNamespace, StringData{}, StringData{})
+NSS_CONSTANT(kConfigsvrPlacementHistoryFcvMarkerNamespace, DatabaseName::kEmpty, StringData{})
 
 // TODO SERVER-68551: remove once 7.0 becomes last-lts
-NSS_CONSTANT(kLockpingsNamespace, NamespaceString::kConfigDb, "lockpings"_sd)
+NSS_CONSTANT(kLockpingsNamespace, DatabaseName::kConfig, "lockpings"_sd)
 
 // TODO SERVER-68551: remove once 7.0 becomes last-lts
-NSS_CONSTANT(kDistLocksNamepsace, NamespaceString::kConfigDb, "locks"_sd)
+NSS_CONSTANT(kDistLocksNamepsace, DatabaseName::kConfig, "locks"_sd)
 
 // Namespace used to store the state document of 'SetChangeStreamStateCoordinator'.
 NSS_CONSTANT(kSetChangeStreamStateCoordinatorNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "change_stream_coordinator"_sd)
 
 // Namespace used for storing global index cloner state documents.
 NSS_CONSTANT(kGlobalIndexClonerNamespace,
-             NamespaceString::kConfigDb,
+             DatabaseName::kConfig,
              "localGlobalIndexOperations.cloner"_sd)
 
 // Namespace used for storing query analyzer settings.
-NSS_CONSTANT(kConfigQueryAnalyzersNamespace, NamespaceString::kConfigDb, "queryAnalyzers"_sd)
+NSS_CONSTANT(kConfigQueryAnalyzersNamespace, DatabaseName::kConfig, "queryAnalyzers"_sd)
 
 // Namespace used for storing sampled queries.
-NSS_CONSTANT(kConfigSampledQueriesNamespace, NamespaceString::kConfigDb, "sampledQueries"_sd)
+NSS_CONSTANT(kConfigSampledQueriesNamespace, DatabaseName::kConfig, "sampledQueries"_sd)
 
 // Namespace used for storing the diffs for sampled update queries.
-NSS_CONSTANT(kConfigSampledQueriesDiffNamespace,
-             NamespaceString::kConfigDb,
-             "sampledQueriesDiff"_sd)
+NSS_CONSTANT(kConfigSampledQueriesDiffNamespace, DatabaseName::kConfig, "sampledQueriesDiff"_sd)
 
 // Namespace used for the health log.
-NSS_CONSTANT(kLocalHealthLogNamespace, NamespaceString::kLocalDb, "system.healthlog"_sd)
+NSS_CONSTANT(kLocalHealthLogNamespace, DatabaseName::kLocal, "system.healthlog"_sd)

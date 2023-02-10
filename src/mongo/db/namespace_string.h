@@ -69,14 +69,16 @@ public:
          */
         class SharedState {
         public:
-            constexpr SharedState(StringData db, StringData coll) : _db{db}, _coll{coll} {}
+            constexpr SharedState(DatabaseName::ConstantProxy dbName, StringData coll)
+                : _db{dbName}, _coll{coll} {}
 
             const NamespaceString& get() const {
                 std::call_once(_once, [this] { _nss = new NamespaceString{_db, _coll}; });
                 return *_nss;
             }
 
-            StringData _db;
+        private:
+            DatabaseName::ConstantProxy _db;
             StringData _coll;
             mutable std::once_flag _once;
             mutable const NamespaceString* _nss = nullptr;

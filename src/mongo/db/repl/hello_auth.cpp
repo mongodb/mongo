@@ -64,7 +64,7 @@ void handleHelloAuth(OperationContext* opCtx,
 
     uassert(6656100,
             "Cannot specify speculativeAuthenticate with a tenantId",
-            !dbName.tenantId() || dbName.tenantId() == TenantId::kSystemTenantId);
+            !dbName.tenantId() || dbName.tenantId() == TenantId::systemTenantId());
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "hello." << auth::kSpeculativeAuthenticate

@@ -33,11 +33,6 @@
 
 namespace mongo {
 
-const TenantId TenantId::kSystemTenantId(
-    OID("15650000"   /* timestamp: 1981-05-17 */
-        "0102030405" /* process id */
-        "060708" /* counter */));
-
 TenantId TenantId::parseFromBSON(const BSONElement& elem) {
     if (elem.isNull()) {
         uasserted(ErrorCodes::BadValue, "Could not deserialize TenantId from empty element");
