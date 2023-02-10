@@ -1,6 +1,10 @@
 // Check that count returns 0 in some exception cases.
 //
-// @tags: [requires_fastcount]
+// @tags: [
+//   requires_fastcount,
+//   # Uses $where operator
+//   requires_scripting,
+// ]
 
 (function() {
 'use strict';

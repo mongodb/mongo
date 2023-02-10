@@ -6,6 +6,8 @@
 //   requires_non_retryable_writes,
 //   # TODO SERVER-30466
 //   does_not_support_causal_consistency,
+//   # Uses $where operator
+//   requires_scripting,
 // ]
 
 // Tests for the arrayFilters option to update and findAndModify.

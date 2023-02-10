@@ -6,6 +6,8 @@
 //   does_not_support_stepdowns,
 //   requires_non_retryable_writes,
 //   requires_profiling,
+//   # Uses $where operator
+//   requires_scripting,
 // ]
 
 // Confirms that profiled delete execution contains all expected metrics with proper values.
