@@ -40,6 +40,10 @@
 #include <sys/types.h>
 #endif
 
+#ifdef __FreeBSD__
+#include <pthread_np.h>
+#endif
+
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -72,6 +76,10 @@ inline NativeProcessId getCurrentNativeThreadId() {
     uint64_t tid;
     invariant(::pthread_threadid_np(NULL, &tid) == 0);
     return tid;
+}
+#elif __FreeBSD__
+inline NativeProcessId getCurrentNativeThreadId() {
+    return pthread_getthreadid_np();
 }
 #else
 inline NativeProcessId getCurrentNativeThreadId() {
