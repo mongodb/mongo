@@ -499,13 +499,14 @@ inline void massertStatusOKWithLocation(const Status& status, const char* file, 
     }
 }
 
-#define MONGO_BASE_ASSERT_VA_FAILED(fail_func, ...)                                          \
-    do {                                                                                     \
-        auto mongoSourceLocation = MONGO_SOURCE_LOCATION();                                  \
-        [&]() MONGO_COMPILER_COLD_FUNCTION {                                                 \
-            fail_func(::mongo::error_details::makeStatus(__VA_ARGS__), mongoSourceLocation); \
-        }();                                                                                 \
-        MONGO_COMPILER_UNREACHABLE;                                                          \
+#define MONGO_BASE_ASSERT_VA_FAILED(fail_func, ...)                                     \
+    do {                                                                                \
+        static constexpr auto _failedAssertionSourceLocation = MONGO_SOURCE_LOCATION(); \
+        [&]() MONGO_COMPILER_COLD_FUNCTION {                                            \
+            fail_func(::mongo::error_details::makeStatus(__VA_ARGS__),                  \
+                      _failedAssertionSourceLocation);                                  \
+        }();                                                                            \
+        MONGO_COMPILER_UNREACHABLE;                                                     \
     } while (false)
 
 #define MONGO_BASE_ASSERT_VA_4(fail_func, code, msg, cond)         \
