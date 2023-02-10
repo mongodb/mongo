@@ -383,6 +383,16 @@ public:
         Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const = 0;
 
     /**
+     * If a stage's StageConstraints::PositionRequirement is kCustom, then it should also override
+     * this method, which will be called by the validation process.
+     */
+    virtual void validatePipelinePosition(bool alreadyOptimized,
+                                          Pipeline::SourceContainer::const_iterator pos,
+                                          const Pipeline::SourceContainer& container) const {
+        MONGO_UNIMPLEMENTED_TASSERT(7183905);
+    };
+
+    /**
      * Informs the stage that it is no longer needed and can release its resources. After dispose()
      * is called the stage must still be able to handle calls to getNext(), but can return kEOF.
      *

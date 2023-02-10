@@ -415,6 +415,11 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         }
 
         pipeline->optimizePipeline();
+
+        // Validate the pipeline post-optimization.
+        const bool alreadyOptimized = true;
+        pipeline->validateCommon(alreadyOptimized);
+
         return pipeline;
     };
 

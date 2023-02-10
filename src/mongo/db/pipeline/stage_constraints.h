@@ -55,11 +55,10 @@ struct StageConstraints {
     enum class PositionRequirement {
         kNone,
         kFirst,
-        // User can specify this stage anywhere, as long as the system can move the stage to be
-        // first. If pipeline optimization is disabled, then the stage must be first prior to
-        // optimization.
-        kFirstAfterOptimization,
-        kLast
+        kLast,
+        // Stages with 'kCustom' requirement must also implement the 'validatePipelinePosition()'
+        // method which is called during pipeline validation.
+        kCustom
     };
 
     /**
@@ -343,6 +342,11 @@ struct StageConstraints {
     // Indicates that a stage is allowed within a pipeline-stlye update.
     bool isAllowedWithinUpdatePipeline = false;
 
+    // If true, then this stage may only appear in the pipeline once, though it can appear at an
+    // arbitrary position. It is not necessary to consider this for stages which have a strict
+    // PositionRequirement, since the presence of a second stage will violate that constraint.
+    bool canAppearOnlyOnceInPipeline = false;
+
     // Indicates that a stage does not modify anything to do with a sort and can be done before a
     // following merge sort.
     bool preservesOrderAndMetadata = false;
@@ -358,6 +362,8 @@ struct StageConstraints {
             isIndependentOfAnyCollection == other.isIndependentOfAnyCollection &&
             canSwapWithMatch == other.canSwapWithMatch &&
             canSwapWithSkippingOrLimitingStage == other.canSwapWithSkippingOrLimitingStage &&
+            canSwapWithSingleDocTransform == other.canSwapWithSingleDocTransform &&
+            canAppearOnlyOnceInPipeline == other.canAppearOnlyOnceInPipeline &&
             isAllowedWithinUpdatePipeline == other.isAllowedWithinUpdatePipeline &&
             unionRequirement == other.unionRequirement &&
             preservesOrderAndMetadata == other.preservesOrderAndMetadata;

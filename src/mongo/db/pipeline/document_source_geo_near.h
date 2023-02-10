@@ -51,13 +51,24 @@ public:
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
-                PositionRequirement::kFirstAfterOptimization,
+                PositionRequirement::kCustom,
                 HostTypeRequirement::kAnyShard,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
                 TransactionRequirement::kAllowed,
                 LookupRequirement::kAllowed,
                 UnionRequirement::kAllowed};
+    }
+
+    void validatePipelinePosition(bool alreadyOptimized,
+                                  Pipeline::SourceContainer::const_iterator pos,
+                                  const Pipeline::SourceContainer& container) const final {
+        // This stage must be in the first position in the pipeline after optimization.
+        uassert(40603,
+                str::stream() << getSourceName()
+                              << " was not the first stage in the pipeline after optimization. Is "
+                                 "optimization disabled or inhibited?",
+                !alreadyOptimized || pos == container.cbegin());
     }
 
     /**
