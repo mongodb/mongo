@@ -36,6 +36,7 @@ var $config = extendWorkload($config, function($config, $super) {
         jsTestLog('setFCV state finished');
     };
 
+    // TODO (SERVER-73875): Include `movePrimary` state once 7.0 becomes last LTS.
     $config.transitions = {
         create: {create: 0.225, drop: 0.225, rename: 0.225, collMod: 0.225, setFCV: 0.10},
         drop: {create: 0.225, drop: 0.225, rename: 0.225, collMod: 0.225, setFCV: 0.10},

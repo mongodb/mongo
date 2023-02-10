@@ -73,11 +73,6 @@ var $config = (function() {
                     // occurs at this phase, the movePrimary operation does not recover.
                     7120202
                 ]);
-
-            // TODO (SERVER-71308): Remove explicit updating of database metadata on recipient. The
-            // recipient of a movePrimary operation is an agnostic participant of the protocol and
-            // doesn't update its cached metadata as a consequence of the operation.
-            assert.commandWorked(db.runCommand({listCollections: 1, nameOnly: true}));
         },
         collMod: function(db, collName, connCache) {
             db = getRandomDb(db);

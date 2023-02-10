@@ -6,8 +6,7 @@
  *
  * @tags: [
  *   requires_sharding,
- *   # TODO (SERVER-71308): As soon as the feature flag is enabled, replace it with requires_fcv_70.
- *   featureFlagResilientMovePrimary
+ *   requires_fcv_70
  *  ]
  */
 
