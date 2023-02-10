@@ -54,6 +54,11 @@ using NodeTraversalFunc = std::function<void(MatchExpression*, std::string)>;
 bool hasExistencePredicateOnPath(const MatchExpression& expr, StringData path);
 
 /**
+ * Checks if 'expr' has any children which do not have renaming implemented.
+ */
+bool hasOnlyRenameableMatchExpressionChildren(const MatchExpression& expr);
+
+/**
  * Returns true if the documents matched by 'lhs' are a subset of the documents matched by
  * 'rhs', i.e. a document matched by 'lhs' must also be matched by 'rhs', and false otherwise.
  *
@@ -183,6 +188,8 @@ splitMatchExpressionBy(std::unique_ptr<MatchExpression> expr,
  * to the new values of those paths. For example, suppose the original match expression is
  * {old: {$gt: 3}} and 'renames' contains the mapping "old" => "new". At the end, 'expr' will be
  * {new: {$gt: 3}}.
+ *
+ * The caller should make sure that `expr` is renamable as a whole.
  */
 void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames);
 

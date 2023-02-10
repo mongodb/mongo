@@ -616,7 +616,8 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
 
     // If we have a leaf predicate on a meta field, we can map it to the bucket's meta field.
     // This includes comparisons such as $eq and $lte, as well as other non-comparison predicates
-    // such as $exists, $mod, or $elemMatch.
+    // such as $exists, or $mod. Unrenamable expressions can't be split into a whole bucket level
+    // filter, when we should return nullptr.
     //
     // Metadata predicates are partially handled earlier, by splitting the match expression into a
     // metadata-only part, and measurement/time-only part. However, splitting a $match into two
@@ -634,12 +635,16 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
         if (!includeMetaField)
             return handleIneligible(policy, matchExpr, "cannot handle an excluded meta field");
 
-        auto looseResult = matchExpr->shallowClone();
-        expression::applyRenamesToExpression(
-            looseResult.get(),
-            {{bucketSpec.metaField().value(), timeseries::kBucketMetaFieldName.toString()}});
-        auto tightResult = looseResult->shallowClone();
-        return {std::move(looseResult), std::move(tightResult)};
+        if (expression::hasOnlyRenameableMatchExpressionChildren(*matchExpr)) {
+            auto looseResult = matchExpr->shallowClone();
+            expression::applyRenamesToExpression(
+                looseResult.get(),
+                {{bucketSpec.metaField().value(), timeseries::kBucketMetaFieldName.toString()}});
+            auto tightResult = looseResult->shallowClone();
+            return {std::move(looseResult), std::move(tightResult)};
+        } else {
+            return {nullptr, nullptr};
+        }
     }
 
     if (matchExpr->matchType() == MatchExpression::AND) {
