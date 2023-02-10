@@ -5744,11 +5744,11 @@ if get_option('ninja') != 'disabled':
 
     env['NINJA_GENERATED_SOURCE_ALIAS_NAME'] = 'generated-sources'
 
-gdb_index = env.get('GDB_INDEX')
-if gdb_index == 'auto' and link_model == 'dynamic':
-    gdb_index = True
+gdb_index_enabled = env.get('GDB_INDEX')
+if gdb_index_enabled == 'auto' and link_model == 'dynamic':
+    gdb_index_enabled = True
 
-if gdb_index == True:
+if gdb_index_enabled == True:
     gdb_index = Tool('gdb_index')
     if gdb_index.exists(env):
         gdb_index.generate(env)
@@ -5773,7 +5773,7 @@ if env['SPLIT_DWARF'] == "auto":
     env['SPLIT_DWARF'] = (not link_model == "dynamic" and env.ToolchainIs('gcc', 'clang')
                           and not env.TargetOSIs('darwin')
                           and env.CheckCCFLAGSSupported('-gsplit-dwarf')
-                          and env.get('DWARF_VERSION') == 4)
+                          and env.get('DWARF_VERSION') == 4 and not gdb_index_enabled)
 
 if env['SPLIT_DWARF']:
     if env.TargetOSIs('darwin'):
@@ -5781,6 +5781,10 @@ if env['SPLIT_DWARF']:
     if env.get('DWARF_VERSION') != 4:
         env.FatalError(
             'Running split dwarf outside of DWARF4 has shown compilation issues when using DWARF5 and gdb index. Disabling this functionality for now. Use SPLIT_DWARF=0 to disable building with split dwarf or use DWARF_VERSION=4 to pin to DWARF version 4.'
+        )
+    if gdb_index_enabled:
+        env.FatalError(
+            'SPLIT_DWARF is not supported when using GDB_INDEX. Use GDB_INDEX=0 to allow enabling SPLIT_DWARF'
         )
     env.Tool('split_dwarf')
 
