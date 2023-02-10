@@ -34,6 +34,16 @@ for (let i = 0; i < maxOplogDocsForScanning + 1; i++) {
     assert.commandWorked(coll.insert({m: 1 + i}));
 }
 
+// Ensure we have enough oplog entries in the oplog to avoid scanning.
+// Check counts reported by aggregation and fast count.
+const numOplogEntries = replSet.getPrimary().getDB("local").oplog.rs.countDocuments({});
+jsTestLog('Number of oplog entries before restarting (aggregation): ' + numOplogEntries);
+assert.gte(numOplogEntries, maxOplogDocsForScanning);
+const numOplogEntriesFastCount = replSet.getPrimary().getDB("local").oplog.rs.count();
+jsTestLog('Number of oplog entries before restarting (fast count): ' + numOplogEntriesFastCount);
+assert.gte(numOplogEntriesFastCount, maxOplogDocsForScanning);
+assert.lte(numOplogEntriesFastCount, numOplogEntries);
+
 // Restart replica set to load entries from the oplog for sampling.
 replSet.stopSet(null /* signal */, true /* forRestart */);
 replSet.startSet({restart: true});
