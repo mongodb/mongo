@@ -1914,7 +1914,6 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
-  - name: external_auth_oidc
   - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common

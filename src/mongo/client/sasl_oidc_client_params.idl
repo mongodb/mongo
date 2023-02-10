@@ -19,3 +19,36 @@ configs:
             grant flow.
         arg_vartype: String
         cpp_varname: oidcClientGlobalParams.oidcAccessToken
+
+structs:
+    OIDCDeviceAuthorizationResponse:
+        description: "IdP response from the deviceAuthorization endpoint."
+        strict: false
+        fields:
+            device_code:
+                description: "Device code to use in token request"
+                cpp_name: deviceCode
+                type: string
+            verification_uri_complete:
+                description: "URI for end user authentication"
+                cpp_name: verificationUriComplete
+                type: string
+
+    OIDCTokenResponse:
+        description: IdP response from the token endpoint.
+        strict: false
+        fields:
+            access_token:
+                description: "Access token returned to be sent to the server."
+                cpp_name: accessToken
+                type: string
+                optional: true
+            refresh_token:
+                description: "Refresh token returned to be used for token reacquisition."
+                cpp_name: refreshToken
+                type: string
+                optional: true
+            error:
+                description: "Error message returned by the token endpoint."
+                type: string
+                optional: true

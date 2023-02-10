@@ -53,6 +53,10 @@ public:
 
     StatusWith<bool> step(StringData inputData, std::string* outputData) override;
 
+    // Refreshes oidcClientGlobalParams.accessToken using oidcClientGlobalParams.refreshToken,
+    // returning the acquired access token if successful.
+    static StatusWith<std::string> doRefreshFlow();
+
 private:
     // Step of the conversation - can be 1, 2, or 3.
     int _step{0};

@@ -31,18 +31,22 @@
 
 #include "mongo/base/string_data.h"
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+
 namespace mongo {
 /**
  * OIDC Client parameters
  */
 struct OIDCClientGlobalParams {
     /**
-     * Access Token.
+     * Access Token. Populated either by configuration or token acquisition flow.
      */
     std::string oidcAccessToken;
 
     /**
-     * Refresh Token.
+     * Refresh Token. Populated during token acquisition flow.
      */
     std::string oidcRefreshToken;
 
@@ -51,6 +55,20 @@ struct OIDCClientGlobalParams {
      * authentication. This should be provided by tests, presumably as a JS function.
      */
     std::function<void(StringData, StringData)> oidcIdPAuthCallback;
+    /**
+     * Client ID. Populated via server SASL reply.
+     */
+    std::string oidcClientId;
+
+    /**
+     * Client Secret. Populated via server SASL reply.
+     */
+    std::string oidcClientSecret;
+
+    /**
+     * Token endpoint. Populated via server SASL reply.
+     */
+    std::string oidcTokenEndpoint;
 };
 
 extern OIDCClientGlobalParams oidcClientGlobalParams;

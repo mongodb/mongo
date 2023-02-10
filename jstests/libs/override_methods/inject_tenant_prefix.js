@@ -755,6 +755,7 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
  'isTLS',
  'getApiParameters',
  '_startSession',
+ '_refreshAccessToken',
  // Don't override this method, since it is never called directly in jstests. The expectation of is
  // that it will be run on the connection `Mongo.prototype.runCommand` chose.
  // '_runCommandImpl',

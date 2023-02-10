@@ -362,6 +362,23 @@ var {
                     }
                 }
 
+                // Handle ErrorCodes.Reauthentication first.
+                if (res !== undefined && res.code === ErrorCodes.ReauthenticationRequired) {
+                    try {
+                        const accessToken = client._refreshAccessToken();
+                        assert(client.getDB('$external').auth({
+                            oidcAccessToken: accessToken,
+                            mechanism: 'MONGODB-OIDC'
+                        }));
+                        continue;
+                    } catch (e) {
+                        // Could not automatically reauthenticate, return the error response
+                        // as-is.
+                        jsTest.log('Assertion thrown when performing refresh flow: ' + e);
+                        return res;
+                    }
+                }
+
                 if (numRetries > 0) {
                     --numRetries;
 

@@ -82,6 +82,7 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_runCommandImpl, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_startSession, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_setOIDCIdPAuthCallback, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_refreshAccessToken, MongoExternalInfo),
     JS_FS_END,
 };
 
@@ -657,6 +658,11 @@ void MongoBase::Functions::_setOIDCIdPAuthCallback::call(JSContext* cx, JS::Call
         });
 
     args.rval().setUndefined();
+}
+
+void MongoBase::Functions::_refreshAccessToken::call(JSContext* cx, JS::CallArgs args) {
+    auto accessToken = uassertStatusOK(SaslOIDCClientConversation::doRefreshFlow());
+    ValueReader(cx, args.rval()).fromStringData(accessToken);
 }
 
 void MongoExternalInfo::Functions::load::call(JSContext* cx, JS::CallArgs args) {
