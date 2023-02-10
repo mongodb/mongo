@@ -664,7 +664,7 @@ WriteResult performInserts(OperationContext* opCtx,
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setNS_inlock(wholeOp.getNamespace());
         curOp.setLogicalOp_inlock(LogicalOp::opInsert);
-        curOp.ensureStarted();
+        curOp.ensureStarted(opCtx);
         curOp.debug().additiveMetrics.ninserted = 0;
     }
 
@@ -967,7 +967,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
         curOp.setNetworkOp_inlock(dbUpdate);
         curOp.setLogicalOp_inlock(LogicalOp::opUpdate);
         curOp.setOpDescription_inlock(op.toBSON());
-        curOp.ensureStarted();
+        curOp.ensureStarted(opCtx);
     }
 
     uassert(ErrorCodes::InvalidOptions,
@@ -1181,7 +1181,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         curOp.setNetworkOp_inlock(dbDelete);
         curOp.setLogicalOp_inlock(LogicalOp::opDelete);
         curOp.setOpDescription_inlock(op.toBSON());
-        curOp.ensureStarted();
+        curOp.ensureStarted(opCtx);
     }
 
     auto request = DeleteRequest{};
@@ -2714,7 +2714,7 @@ write_ops::InsertCommandReply performTimeseriesWrites(
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setNS_inlock(ns(request));
         curOp.setLogicalOp_inlock(LogicalOp::opInsert);
-        curOp.ensureStarted();
+        curOp.ensureStarted(opCtx);
         curOp.debug().additiveMetrics.ninserted = 0;
     }
 

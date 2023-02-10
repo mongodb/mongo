@@ -157,7 +157,7 @@ boost::optional<SessionTxnRecord> ReshardingTxnCloner::_getNextRecord(OperationC
     // recipient spent waiting for documents from the donor shard. It doing so requires the CurOp to
     // be marked as having started.
     auto* curOp = CurOp::get(opCtx);
-    curOp->ensureStarted();
+    curOp->ensureStarted(opCtx);
     ON_BLOCK_EXIT([curOp] { curOp->done(); });
 
     auto doc = pipeline.getNext();

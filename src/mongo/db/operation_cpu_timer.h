@@ -29,11 +29,48 @@
 
 #pragma once
 
+#include <list>
+
 #include "mongo/util/duration.h"
 
 namespace mongo {
 
 class OperationContext;
+class OperationCPUTimer;
+
+/**
+ * Allocates and tracks CPU timers for an OperationContext.
+ */
+class OperationCPUTimers : public std::enable_shared_from_this<OperationCPUTimers> {
+public:
+    friend class OperationCPUTimer;
+
+    /**
+     * Returns `nullptr` if the platform does not support tracking of CPU consumption.
+     */
+    static OperationCPUTimers* get(OperationContext*);
+
+    /**
+     * Returns a timer bound to this OperationContext and the threads that it runs on. Timers
+     * created from this function may safely outlive the OperationCPUTimers container and the
+     * OperationContext, but only to simplify destruction ordering problems.
+     */
+    std::unique_ptr<OperationCPUTimer> makeTimer();
+
+    void onThreadAttach();
+    void onThreadDetach();
+
+    size_t count() const;
+
+private:
+    using Iterator = std::list<mongo::OperationCPUTimer*>::iterator;
+    Iterator _add(OperationCPUTimer* timer);
+    void _remove(Iterator it);
+
+    // List of active timers on this OperationContext. When an OperationCPUTimer is constructed, it
+    // will add itself to this list and remove itself on destruction.
+    std::list<OperationCPUTimer*> _timers;
+};
 
 /**
  * Implements the CPU timer for platforms that support CPU consumption tracking. Consider the
@@ -54,10 +91,8 @@ class OperationContext;
  */
 class OperationCPUTimer {
 public:
-    /**
-     * Returns `nullptr` if the platform does not support tracking of CPU consumption.
-     */
-    static OperationCPUTimer* get(OperationContext*);
+    OperationCPUTimer(const std::shared_ptr<OperationCPUTimers>& timers);
+    virtual ~OperationCPUTimer();
 
     virtual Nanoseconds getElapsed() const = 0;
 
@@ -66,6 +101,18 @@ public:
 
     virtual void onThreadAttach() = 0;
     virtual void onThreadDetach() = 0;
+
+    // Called by owning operation to indicate that the operation has ended and any pointers to the
+    // OperationCPUTimers are no longer valid. The timer will continue to function correctly.
+    void onOperationEnded();
+
+private:
+    // Weak reference to OperationContext-owned tracked list of timers. The Timers container can be
+    // destructed before this Timer.
+    std::weak_ptr<OperationCPUTimers> _timers;
+
+    // Iterator position to speed up deletion from the list of timers for this operation.
+    OperationCPUTimers::Iterator _it;
 };
 
 }  // namespace mongo

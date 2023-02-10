@@ -4,6 +4,7 @@
 //   not_allowed_with_security_token,
 //   # Asserts on the number of index keys modified.
 //   assumes_no_implicit_index_creation,
+//   requires_fcv_63,
 //   requires_profiling,
 // ]
 
@@ -11,7 +12,8 @@
 "use strict";
 
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
+load("jstests/libs/os_helpers.js");  // For isLinux().
+load("jstests/libs/profiler.js");    // For getLatestProfilerEntry.
 
 var testDB = db.getSiblingDB("profile_findandmodify");
 assert.commandWorked(testDB.dropDatabase());
@@ -53,6 +55,9 @@ assert.eq(profileObj.planSummary, "COLLSCAN", tojson(profileObj));
 assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
+if (isLinux()) {
+    assert(profileObj.hasOwnProperty("cpuNanos"), tojson(profileObj));
+}
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
 //

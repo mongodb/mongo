@@ -73,6 +73,9 @@ MONGO_FAIL_POINT_DEFINE(hangCPUTimerAfterOnThreadDetach);
 
 class PosixTimer final : public OperationCPUTimer {
 public:
+    PosixTimer(const std::shared_ptr<OperationCPUTimers>& timers) : OperationCPUTimer(timers) {}
+    ~PosixTimer() = default;
+
     Nanoseconds getElapsed() const override;
 
     void start() override;
@@ -157,14 +160,13 @@ Nanoseconds PosixTimer::_getThreadTime() const try {
     LOGV2_FATAL(4744601, "Failed to read the CPU time for the current thread", "error"_attr = ex);
 }
 
-static auto getCPUTimer = OperationContext::declareDecoration<PosixTimer>();
+// Set of timers created by this OperationContext.
+static auto getCPUTimers =
+    OperationContext::declareDecoration<std::shared_ptr<OperationCPUTimers>>();
 
 }  // namespace
 
-OperationCPUTimer* OperationCPUTimer::get(OperationContext* opCtx) {
-    invariant(Client::getCurrent() && Client::getCurrent()->getOperationContext() == opCtx,
-              "Operation not attached to the current thread");
-
+OperationCPUTimers* OperationCPUTimers::get(OperationContext* opCtx) {
     // Checks for time support on POSIX platforms. In particular, it checks for support in presence
     // of SMP systems.
     static bool isTimeSupported = [] {
@@ -184,15 +186,67 @@ OperationCPUTimer* OperationCPUTimer::get(OperationContext* opCtx) {
 
     if (!isTimeSupported)
         return nullptr;
-    return &getCPUTimer(opCtx);
+
+    auto& timers = getCPUTimers(opCtx);
+    if (!timers) {
+        timers = std::make_shared<OperationCPUTimers>();
+    }
+    return timers.get();
+}
+
+std::unique_ptr<OperationCPUTimer> OperationCPUTimers::makeTimer() {
+    return std::make_unique<PosixTimer>(shared_from_this());
 }
 
 #else  // not defined(__linux__)
 
-OperationCPUTimer* OperationCPUTimer::get(OperationContext*) {
+OperationCPUTimers* OperationCPUTimers::get(OperationContext*) {
     return nullptr;
 }
 
+std::unique_ptr<OperationCPUTimer> OperationCPUTimers::makeTimer() {
+    MONGO_UNREACHABLE;
+}
+
 #endif  // defined(__linux__)
+
+OperationCPUTimer::OperationCPUTimer(const std::shared_ptr<OperationCPUTimers>& timers)
+    : _timers(timers) {
+    _it = timers->_add(this);
+}
+
+OperationCPUTimer::~OperationCPUTimer() {
+    // It is possible for an OperationCPUTimer to outlive the OperationCPUTimers container that is
+    // decorated on the OperationContext. For example, a Timer can be owned by an OperationContext
+    // decoration, and may be destructed after the Timers container, an order which we cannot
+    // control. Therefore we must ensure the weak_ptr we hold is still valid.
+    if (auto timers = _timers.lock()) {
+        timers->_remove(_it);
+    }
+}
+
+OperationCPUTimers::Iterator OperationCPUTimers::_add(OperationCPUTimer* timer) {
+    return _timers.insert(_timers.end(), timer);
+}
+
+void OperationCPUTimers::_remove(OperationCPUTimers::Iterator it) {
+    _timers.erase(it);
+}
+
+size_t OperationCPUTimers::count() const {
+    return _timers.size();
+}
+
+void OperationCPUTimers::onThreadAttach() {
+    for (auto& timer : _timers) {
+        timer->onThreadAttach();
+    }
+}
+
+void OperationCPUTimers::onThreadDetach() {
+    for (auto& timer : _timers) {
+        timer->onThreadDetach();
+    }
+}
 
 }  // namespace mongo

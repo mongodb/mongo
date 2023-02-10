@@ -328,9 +328,9 @@ void ResourceConsumption::MetricsCollector::beginScopedCollecting(OperationConte
     _collecting = ScopedCollectionState::kInScopeCollecting;
     _hasCollectedMetrics = true;
 
-    // The OperationCPUTimer may be nullptr on unsupported systems.
-    _metrics.cpuTimer = OperationCPUTimer::get(opCtx);
-    if (_metrics.cpuTimer) {
+    // The OperationCPUTimers may be nullptr on unsupported systems.
+    if (auto timers = OperationCPUTimers::get(opCtx)) {
+        _metrics.cpuTimer = timers->makeTimer();
         _metrics.cpuTimer->start();
     }
 }

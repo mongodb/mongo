@@ -261,7 +261,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> GlobalIndexClonerFetcher::_restartPip
     // recipient spent waiting for documents from the donor shards. It doing so requires the CurOp
     // to be marked as having started.
     auto* curOp = CurOp::get(opCtx);
-    curOp->ensureStarted();
+    curOp->ensureStarted(opCtx);
     ON_BLOCK_EXIT([curOp] { curOp->done(); });
 
     auto pipeline = _targetAggregationRequest(*makePipeline(opCtx));

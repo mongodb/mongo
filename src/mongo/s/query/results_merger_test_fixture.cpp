@@ -76,7 +76,7 @@ void ResultsMergerTestFixture::setUp() {
 
     setupShards(shards);
 
-    CurOp::get(operationContext())->ensureStarted();
+    CurOp::get(operationContext())->ensureStarted(operationContext());
 }
 
 }  // namespace mongo

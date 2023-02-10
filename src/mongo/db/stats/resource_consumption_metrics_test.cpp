@@ -57,6 +57,11 @@ public:
         repl::ReplicationCoordinator::set(svcCtx, std::move(replCoord));
     }
 
+    void reset(ResourceConsumption::MetricsCollector& metrics) {
+        metrics.~MetricsCollector();
+        ::new (&metrics) ResourceConsumption::MetricsCollector();
+    }
+
     typedef std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
         ClientAndCtx;
 
@@ -171,7 +176,7 @@ TEST_F(ResourceConsumptionMetricsTest, NestedScopedMetricsCollector) {
     ASSERT_EQ(metricsCopy.count("db2"), 0);
     ASSERT_EQ(metricsCopy.count("db3"), 0);
 
-    operationMetrics.reset();
+    reset(operationMetrics);
 
     // Don't collect, nesting does not override that behavior.
     {
@@ -244,7 +249,7 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetrics) {
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.cursorSeeks, 1);
 
     // Clear metrics so we do not double-count.
-    operationMetrics.reset();
+    reset(operationMetrics);
 
     {
         ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
@@ -299,7 +304,7 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsSecondary) {
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.cursorSeeks, 1);
 
     // Clear metrics so we do not double-count.
-    operationMetrics.reset();
+    reset(operationMetrics);
 
     {
         ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
@@ -370,7 +375,7 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsAcrossStates) {
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsReturned.units(), 1 + 8);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.cursorSeeks, 1 + 1);
 
-    operationMetrics.reset();
+    reset(operationMetrics);
 
     // Start collecting metrics in the secondary state, then change to primary. Metrics should be
     // attributed to the primary state only.
@@ -650,7 +655,7 @@ TEST_F(ResourceConsumptionMetricsTest, CpuNanos) {
     auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
 
     // Do not run the test if a CPU timer is not available for this system.
-    if (!OperationCPUTimer::get(_opCtx.get())) {
+    if (!OperationCPUTimers::get(_opCtx.get())) {
         return;
     }
 

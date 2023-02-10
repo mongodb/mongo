@@ -2,6 +2,7 @@
 // @tags: [
 //   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
+//   requires_fcv_63,
 //   requires_profiling,
 // ]
 
@@ -10,8 +11,8 @@
 (function() {
 "use strict";
 
-// For 'getLatestProfilerEntry()'.
-load("jstests/libs/profiler.js");
+load("jstests/libs/os_helpers.js");  // For isLinux().
+load("jstests/libs/profiler.js");    // For 'getLatestProfilerEntry()'.
 
 var testDB = db.getSiblingDB("profile_distinct");
 assert.commandWorked(testDB.dropDatabase());
@@ -42,6 +43,9 @@ assert.eq(profileObj.protocol, "op_msg", tojson(profileObj));
 assert.eq(coll.getName(), profileObj.command.distinct, tojson(profileObj));
 assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
 assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
+if (isLinux()) {
+    assert(profileObj.hasOwnProperty("cpuNanos"), tojson(profileObj));
+}
 assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));

@@ -53,8 +53,12 @@ public:
         return getGlobalServiceContext()->makeClient("AlternativeClient");
     }
 
-    auto getTimer() const {
-        return OperationCPUTimer::get(_opCtx.get());
+    OperationCPUTimers* getTimers() const {
+        return OperationCPUTimers::get(_opCtx.get());
+    }
+
+    std::unique_ptr<OperationCPUTimer> makeTimer() const {
+        return getTimers()->makeTimer();
     }
 
     void setUp() {
@@ -73,6 +77,10 @@ public:
         blocker.join();
     }
 
+    void resetOpCtx() {
+        _opCtx.reset();
+    }
+
 private:
     ServiceContext::UniqueOperationContext _opCtx;
 };
@@ -80,7 +88,7 @@ private:
 #if defined(__linux__)
 
 TEST_F(OperationCPUTimerTest, TestTimer) {
-    auto timer = getTimer();
+    auto timer = makeTimer();
 
     timer->start();
     busyWait(Microseconds(1));  // A small delay to make sure the timer advances.
@@ -94,7 +102,7 @@ TEST_F(OperationCPUTimerTest, TestTimer) {
 }
 
 TEST_F(OperationCPUTimerTest, TestReset) {
-    auto timer = getTimer();
+    auto timer = makeTimer();
 
     timer->start();
     busyWait(Milliseconds(1));  // Introducing some delay for the timer to measure.
@@ -114,13 +122,16 @@ TEST_F(OperationCPUTimerTest, TestTimerDetachAndAttachHandlers) {
         {
             FailPointEnableBlock fpDetach("hangCPUTimerAfterOnThreadDetach");
             failPointsReady.countDownAndWait();
-            fpDetach->waitForTimesEntered(1);
+            fpDetach->waitForTimesEntered(fpDetach.initialTimesEntered() + 1);
         }
-        fpAttach->waitForTimesEntered(1);
+        fpAttach->waitForTimesEntered(fpAttach.initialTimesEntered() + 1);
     });
 
-    auto timer = getTimer();
-    timer->start();
+    auto timer1 = makeTimer();
+    timer1->start();
+
+    auto timer2 = makeTimer();
+    timer2->start();
 
     failPointsReady.countDownAndWait();
     {
@@ -128,41 +139,103 @@ TEST_F(OperationCPUTimerTest, TestTimerDetachAndAttachHandlers) {
         AlternativeClientRegion acr(client);
     }
 
-    timer->stop();
+    busyWait(Microseconds(1));  // A small delay to make sure the timers advance.
+
+    timer1->stop();
+    timer2->stop();
     observer.join();
+
+    ASSERT_GT(timer1->getElapsed(), Nanoseconds(0));
+    ASSERT_GT(timer2->getElapsed(), Nanoseconds(0));
 }
 
-DEATH_TEST_F(OperationCPUTimerTest,
-             AccessTimerForDetachedOperation,
-             "Operation not attached to the current thread") {
-    auto client = Client::releaseCurrent();
-    getTimer();
+TEST_F(OperationCPUTimerTest, MultipleTimers) {
+    auto timer1 = makeTimer();
+    timer1->start();
+
+    {
+        auto timer2 = makeTimer();
+        timer2->start();
+
+        busyWait(Microseconds(1));  // A small delay to make sure the timers advance.
+        ASSERT_GT(timer1->getElapsed(), Nanoseconds(0));
+        ASSERT_GT(timer2->getElapsed(), Nanoseconds(0));
+
+        ASSERT_EQ(2, getTimers()->count());
+    }
+
+    ASSERT_EQ(1, getTimers()->count());
+
+    timer1->stop();
+
+    auto elapsedAfterStop = timer1->getElapsed();
+    busyWait(Milliseconds(10));  // A small delay to make sure the timer could advance.
+    auto elapsedAfterSleep = timer1->getElapsed();
+    ASSERT_EQ(elapsedAfterSleep, elapsedAfterStop);
+}
+
+TEST_F(OperationCPUTimerTest, MultipleTimersOutOfOrder) {
+    auto timer1 = makeTimer();
+    timer1->start();
+
+    auto timer2 = makeTimer();
+    timer2->start();
+
+    busyWait(Microseconds(1));  // A small delay to make sure the timers advance.
+    ASSERT_GT(timer1->getElapsed(), Nanoseconds(0));
+    ASSERT_GT(timer2->getElapsed(), Nanoseconds(0));
+
+    // Note that there should be no restriction against stopping the first timer first.
+    timer1->stop();
+
+    auto elapsedAfterStop = timer1->getElapsed();
+    busyWait(Milliseconds(10));  // A small delay to make sure the timer could advance.
+    auto elapsedAfterSleep = timer1->getElapsed();
+    ASSERT_EQ(elapsedAfterSleep, elapsedAfterStop);
+
+    timer2->stop();
+    ASSERT_GT(timer2->getElapsed(), elapsedAfterStop);
+    elapsedAfterStop = timer2->getElapsed();
+    busyWait(Milliseconds(10));  // A small delay to make sure the timer could advance.
+    elapsedAfterSleep = timer2->getElapsed();
+    ASSERT_EQ(elapsedAfterSleep, elapsedAfterStop);
+
+    ASSERT_EQ(2, getTimers()->count());
+}
+
+TEST_F(OperationCPUTimerTest, TestOpCtxDestruction) {
+    auto timer = makeTimer();
+    timer->start();
+    resetOpCtx();
+    timer->stop();
 }
 
 DEATH_TEST_F(OperationCPUTimerTest, StopTimerBeforeStart, "Timer is not running") {
-    getTimer()->stop();
+    auto timer = makeTimer();
+    timer->stop();
 }
 
 DEATH_TEST_F(OperationCPUTimerTest, StartTimerMultipleTimes, "Timer has already started") {
-    getTimer()->start();
-    getTimer()->start();
+    auto timer = makeTimer();
+    timer->start();
+    timer->start();
 }
 
 DEATH_TEST_F(OperationCPUTimerTest, OnAttachForAttachedTimer, "Timer has already been attached") {
-    auto timer = getTimer();
+    auto timer = makeTimer();
     timer->start();
     timer->onThreadAttach();
 }
 
 DEATH_TEST_F(OperationCPUTimerTest, OnDetachForDetachedTimer, "Timer is not attached") {
-    auto timer = getTimer();
+    auto timer = makeTimer();
     timer->start();
     auto client = Client::releaseCurrent();
     timer->onThreadDetach();
 }
 
 DEATH_TEST_F(OperationCPUTimerTest, GetElapsedForPausedTimer, "Not attached to current thread") {
-    auto timer = getTimer();
+    auto timer = makeTimer();
     timer->start();
     auto client = Client::releaseCurrent();
     timer->getElapsed();
@@ -181,7 +254,7 @@ TEST_F(OperationCPUTimerTest, TimerPausesOnBlockingSleep) {
     const auto kMaxFailureRate = 0.1;
     const auto kMaxFailures = kMaxFailureRate * kRepeats;
 
-    auto timer = getTimer();
+    auto timer = makeTimer();
 
     auto checkTimer = [&] {
         auto elapsed = timer->getElapsed();
@@ -218,7 +291,7 @@ TEST_F(OperationCPUTimerTest, TimerPausesOnBlockingSleep) {
 #else
 
 TEST_F(OperationCPUTimerTest, TimerNotSetIfNotSupported) {
-    auto timer = getTimer();
+    auto timer = getTimers();
     ASSERT(timer == nullptr);
 }
 

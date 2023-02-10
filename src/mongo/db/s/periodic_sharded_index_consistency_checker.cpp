@@ -121,7 +121,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
             auto uniqueOpCtx = client->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
             auto curOp = CurOp::get(opCtx);
-            curOp->ensureStarted();
+            curOp->ensureStarted(opCtx);
             ON_BLOCK_EXIT([&] { curOp->done(); });
 
             try {

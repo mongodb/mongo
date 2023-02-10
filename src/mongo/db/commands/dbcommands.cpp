@@ -633,9 +633,8 @@ public:
                     NamespaceString::validDBName(dbname.db(),
                                                  NamespaceString::DollarInDbNameBehavior::Allow));
 
-            // TODO (Kal): OldClientContext legacy, needs to be removed
             {
-                CurOp::get(opCtx)->ensureStarted();
+                CurOp::get(opCtx)->ensureStarted(opCtx);
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->setNS_inlock(dbname);
             }
@@ -676,9 +675,10 @@ public:
             } else {
                 {
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    // TODO: OldClientContext legacy, needs to be removed
                     CurOp::get(opCtx)->enter_inlock(
-                        dbname, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbname));
+                        opCtx,
+                        dbname,
+                        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbname));
                 }
 
                 db->getStats(opCtx, &reply, cmd.getFreeStorage(), cmd.getScale());
