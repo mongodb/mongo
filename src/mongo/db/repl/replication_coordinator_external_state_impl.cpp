@@ -592,7 +592,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
                 {
                     // Writes to 'local.system.replset' must be untimestamped.
                     WriteUnitOfWork wuow(opCtx);
-                    Lock::DBLock dbWriteLock(opCtx, kConfigDatabaseName, MODE_X);
+                    AutoGetCollection coll(opCtx, NamespaceString::kSystemReplSetNamespace, MODE_X);
                     Helpers::putSingleton(opCtx, NamespaceString::kSystemReplSetNamespace, config);
                     wuow.commit();
                 }
@@ -622,7 +622,7 @@ Status ReplicationCoordinatorExternalStateImpl::replaceLocalConfigDocument(
     writeConflictRetry(
         opCtx, "replace replica set config", NamespaceString::kSystemReplSetNamespace.ns(), [&] {
             WriteUnitOfWork wuow(opCtx);
-            Lock::DBLock dbWriteLock(opCtx, kConfigDatabaseName, MODE_X);
+            AutoGetCollection coll(opCtx, NamespaceString::kSystemReplSetNamespace, MODE_X);
             Helpers::emptyCollection(opCtx, NamespaceString::kSystemReplSetNamespace);
             Helpers::putSingleton(opCtx, NamespaceString::kSystemReplSetNamespace, config);
             wuow.commit();
