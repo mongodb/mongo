@@ -125,6 +125,16 @@ public:
     static std::vector<std::string> extractIndexNames(const std::vector<BSONObj>& specs);
 
     /**
+     * Returns true if an index creation error is safe to ignore.
+     * Consolidates the checking for the multiple scenarios where we may create indexes.
+     * - createIndexes command on the primary;
+     * - during oplog application (both empty and non-empty collection cases); and
+     * - single-phase index creation for internal collections.
+     */
+    static bool isCreateIndexesErrorSafeToIgnore(
+        const Status& status, IndexBuildsManager::IndexConstraints indexConstraints);
+
+    /**
      * Sets up the in-memory and durable state of the index build. When successful, returns after
      * the index build has started and the first catalog write has been made, and if called on a
      * primary, when the startIndexBuild oplog entry has been written.

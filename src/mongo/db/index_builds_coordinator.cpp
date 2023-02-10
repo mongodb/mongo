@@ -516,6 +516,14 @@ std::vector<std::string> IndexBuildsCoordinator::extractIndexNames(
     return indexNames;
 }
 
+bool IndexBuildsCoordinator::isCreateIndexesErrorSafeToIgnore(
+    const Status& status, IndexBuildsManager::IndexConstraints indexConstraints) {
+    return (status == ErrorCodes::IndexAlreadyExists ||
+            ((status == ErrorCodes::IndexOptionsConflict ||
+              status == ErrorCodes::IndexKeySpecsConflict) &&
+             IndexBuildsManager::IndexConstraints::kRelax == indexConstraints));
+}
+
 StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::rebuildIndexesForRecovery(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -1804,10 +1812,7 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
             opCtx, collection, {spec}, buildUUID, onInitFn, options));
     } catch (DBException& ex) {
         const auto& status = ex.toStatus();
-        if (status == ErrorCodes::IndexAlreadyExists ||
-            ((status == ErrorCodes::IndexOptionsConflict ||
-              status == ErrorCodes::IndexKeySpecsConflict) &&
-             IndexBuildsManager::IndexConstraints::kRelax == indexConstraints)) {
+        if (IndexBuildsCoordinator::isCreateIndexesErrorSafeToIgnore(status, indexConstraints)) {
             LOGV2_DEBUG(4718200,
                         1,
                         "Ignoring indexing error",
@@ -2171,10 +2176,8 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
             opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
 
         const auto& status = ex.toStatus();
-        if (status == ErrorCodes::IndexAlreadyExists ||
-            ((status == ErrorCodes::IndexOptionsConflict ||
-              status == ErrorCodes::IndexKeySpecsConflict) &&
-             options.indexConstraints == IndexBuildsManager::IndexConstraints::kRelax)) {
+        if (IndexBuildsCoordinator::isCreateIndexesErrorSafeToIgnore(status,
+                                                                     options.indexConstraints)) {
             LOGV2_DEBUG(20662,
                         1,
                         "Ignoring indexing error: {error}",
