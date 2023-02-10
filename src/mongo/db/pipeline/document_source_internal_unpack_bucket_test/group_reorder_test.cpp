@@ -94,6 +94,25 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadata) {
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 
+// Test SERVER-73822 fix: complex $min and $max (i.e. not just straight field refs) work correctly.
+TEST_F(InternalUnpackBucketGroupReorder, MinMaxComplexGroupOnMetadata) {
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta1', timeField: 't', "
+        "bucketMaxSpanSeconds: 3600}}");
+    auto groupSpecObj = fromjson(
+        "{$group: {_id: '$meta1.a.b', accmin: {$min: {$add: ['$b', {$const: 0}]}}, accmax: {$max: "
+        "{$add: [{$const: 0}, '$c']}}}}");
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
+    pipeline->optimizePipeline();
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2, serialized.size());
+    // Order of fields may be different between original 'unpackSpecObj' and 'serialized[0]'.
+    //   ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+}
+
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetafield) {
     auto unpackSpecObj = fromjson(
         "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta1', timeField: 't', "

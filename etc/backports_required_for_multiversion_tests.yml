@@ -282,6 +282,8 @@ last-continuous:
     ticket: SERVER-72416
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/oplog_rollover.js
     ticket: SERVER-72422
+  - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
+    ticket: SERVER-73822
   suites: null
 last-lts:
   all:
@@ -639,4 +641,6 @@ last-lts:
     ticket: SERVER-72416
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/oplog_rollover.js
     ticket: SERVER-72422
+  - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
+    ticket: SERVER-73822
   suites: null
