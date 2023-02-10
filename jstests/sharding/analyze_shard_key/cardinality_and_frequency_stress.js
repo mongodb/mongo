@@ -26,9 +26,14 @@ function assertAggregationPlan(mongodConns, dbName, collName, isShardedColl, com
                     return;
                 }
 
+                const firstStage = doc.command.pipeline[0];
+
+                if (firstStage.hasOwnProperty("$collStats")) {
+                    return;
+                }
+
                 if (isShardedColl) {
-                    const isMerge = doc.command.pipeline[0].hasOwnProperty("$mergeCursors");
-                    if (isMerge) {
+                    if (firstStage.hasOwnProperty("$mergeCursors")) {
                         // The profiler output for $mergeCursors aggregate commands is not expected
                         // to have a "planSummary" field.
                         assert(doc.usedDisk, doc);

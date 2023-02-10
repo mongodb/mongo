@@ -60,37 +60,13 @@ namespace {
 
 constexpr StringData kGroupByKeyFieldName = "key"_sd;
 constexpr StringData kNumDocsFieldName = "numDocs"_sd;
+constexpr StringData kNumBytesFieldName = "numBytes"_sd;
 constexpr StringData kCardinalityFieldName = "cardinality"_sd;
 constexpr StringData kFrequencyFieldName = "frequency"_sd;
 constexpr StringData kIndexFieldName = "index"_sd;
 constexpr StringData kNumOrphanDocsFieldName = "numOrphanDocs"_sd;
 
 const std::vector<double> kPercentiles{0.99, 0.95, 0.9, 0.8, 0.5};
-
-/**
- * Performs a fast count to get the total number of documents in the collection.
- */
-long long getNumDocuments(OperationContext* opCtx, const NamespaceString& nss) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        // The ServiceEntryPoint expects the ReadConcernArgs to not be set.
-        auto originalReadConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        repl::ReadConcernArgs::get(opCtx) = repl::ReadConcernArgs();
-        ON_BLOCK_EXIT([&] { repl::ReadConcernArgs::get(opCtx) = originalReadConcernArgs; });
-
-        auto opMsgRequest =
-            OpMsgRequest::fromDBAndBody(nss.db(), BSON("clusterCount" << nss.coll()));
-        auto requestMessage = opMsgRequest.serialize();
-        auto dbResponse =
-            ServiceEntryPointMongos::handleRequestImpl(opCtx, requestMessage).get(opCtx);
-        auto cmdResponse = rpc::makeReply(&dbResponse.response)->getCommandReply();
-
-        uassertStatusOK(getStatusFromCommandResult(cmdResponse));
-        return cmdResponse.getField("n").exactNumberLong();
-    } else {
-        DBDirectClient client(opCtx);
-        return client.count(nss, BSONObj());
-    }
-}
 
 /**
  * Returns an aggregate command request for calculating the cardinality and frequency of the given
@@ -199,34 +175,39 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
 }
 
 struct CardinalityFrequencyMetrics {
-    long long numDocs = 0;
-    long long cardinality = 0;
+    int64_t numDocs = 0;
+    int64_t cardinality = 0;
     PercentileMetrics frequency;
 };
 
 /**
- * Returns the cardinality and frequency of the given shard key.
+ * Returns the cardinality and frequency metrics for a shard key given that the shard key is unique
+ * and the collection has the the given number of documents.
  */
-CardinalityFrequencyMetrics calculateCardinalityAndFrequency(OperationContext* opCtx,
-                                                             const NamespaceString& nss,
-                                                             const BSONObj& shardKey,
-                                                             const BSONObj& hintIndexKey,
-                                                             bool isShardKeyUnique) {
+CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(int64_t numDocs) {
     CardinalityFrequencyMetrics metrics;
 
-    if (isShardKeyUnique) {
-        long long numDocs = getNumDocuments(opCtx, nss);
+    metrics.numDocs = numDocs;
+    metrics.cardinality = numDocs;
+    metrics.frequency.setP99(1);
+    metrics.frequency.setP95(1);
+    metrics.frequency.setP90(1);
+    metrics.frequency.setP80(1);
+    metrics.frequency.setP50(1);
 
-        metrics.numDocs = numDocs;
-        metrics.cardinality = numDocs;
-        metrics.frequency.setP99(1);
-        metrics.frequency.setP95(1);
-        metrics.frequency.setP90(1);
-        metrics.frequency.setP80(1);
-        metrics.frequency.setP50(1);
+    return metrics;
+}
 
-        return metrics;
-    }
+/**
+ * Returns the cardinality and frequency metrics for the given shard key. Calculates the metrics by
+ * running aggregation against the collection. If the shard key is unique, please use the version
+ * above since the metrics can be determined without running any aggregations.
+ */
+CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationContext* opCtx,
+                                                                    const NamespaceString& nss,
+                                                                    const BSONObj& shardKey,
+                                                                    const BSONObj& hintIndexKey) {
+    CardinalityFrequencyMetrics metrics;
 
     auto aggRequest = makeAggregateRequestForCardinalityAndFrequency(nss, shardKey, hintIndexKey);
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
@@ -367,37 +348,48 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
     return metrics;
 }
 
+struct CollStatsMetrics {
+    int64_t numDocs;
+    int64_t avgDocSizeBytes;
+    boost::optional<int64_t> numOrphanDocs;
+};
+
 /**
- * Returns the number of orphan documents. If the collection is unsharded, returns none.
+ * Returns $collStat metrics for the given collection, i.e. the number of documents, the average
+ * document size in bytes and the number of orphan documents if the collection is sharded.
  */
-boost::optional<int64_t> getNumOrphanDocuments(OperationContext* opCtx,
-                                               const NamespaceString& nss) {
-    if (!serverGlobalParams.clusterRole.isShardRole()) {
-        return boost::none;
-    }
-
-    auto cm =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(opCtx, nss));
-
-    if (!cm.isSharded()) {
-        return boost::none;
-    }
+CollStatsMetrics calculateCollStats(OperationContext* opCtx, const NamespaceString& nss) {
+    CollStatsMetrics metrics;
 
     std::vector<BSONObj> pipeline;
-    pipeline.push_back(
-        BSON("$match" << BSON(RangeDeletionTask::kCollectionUuidFieldName << cm.getUUID())));
-    pipeline.push_back(
-        BSON("$group" << BSON("_id" << BSONNULL << kNumOrphanDocsFieldName
-                                    << BSON("$sum"
-                                            << "$" + RangeDeletionTask::kNumOrphanDocsFieldName))));
-    AggregateCommandRequest aggRequest(NamespaceString::kRangeDeletionNamespace, pipeline);
+    pipeline.push_back(BSON("$collStats" << BSON("storageStats" << BSONObj())));
+    pipeline.push_back(BSON("$group" << BSON("_id" << BSONNULL << kNumBytesFieldName
+                                                   << BSON("$sum"
+                                                           << "$storageStats.size")
+                                                   << kNumDocsFieldName
+                                                   << BSON("$sum"
+                                                           << "$storageStats.count")
+                                                   << kNumOrphanDocsFieldName
+                                                   << BSON("$sum"
+                                                           << "$storageStats.numOrphanDocs"))));
+    AggregateCommandRequest aggRequest(nss, pipeline);
 
-    long long numOrphanDocs = 0;
-    runAggregate(opCtx, nss, aggRequest, [&](const BSONObj& doc) {
-        numOrphanDocs += doc.getField(kNumOrphanDocsFieldName).exactNumberLong();
+    runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
+        metrics.numDocs = doc.getField(kNumDocsFieldName).exactNumberLong();
+        metrics.avgDocSizeBytes =
+            doc.getField(kNumBytesFieldName).exactNumberLong() / metrics.numDocs;
+
+        if (serverGlobalParams.clusterRole.isShardRole()) {
+            auto cm = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(opCtx, nss));
+
+            if (cm.isSharded()) {
+                metrics.numOrphanDocs = doc.getField(kNumOrphanDocsFieldName).exactNumberLong();
+            }
+        }
     });
 
-    return numOrphanDocs;
+    return metrics;
 }
 
 /**
@@ -464,7 +456,7 @@ std::pair<NamespaceString, Timestamp> generateSplitPoints(OperationContext* opCt
     };
 
     std::vector<BSONObj> splitPointsToInsert;
-    long long objSize = 0;
+    int64_t objSize = 0;
 
     for (const auto& splitPoint : splitPoints) {
         if (splitPoint.objsize() + objSize >= BSONObjMaxUserSize ||
@@ -522,13 +514,16 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
         metrics.setMonotonicity(monotonicityMetrics);
     }
 
-    auto cardinalityFrequencyMetrics = calculateCardinalityAndFrequency(
-        opCtx, nss, shardKeyBson, indexKeyBson, *metrics.getIsUnique());
+    auto collStatsMetrics = calculateCollStats(opCtx, nss);
+    metrics.setAvgDocSizeBytes(collStatsMetrics.avgDocSizeBytes);
+    metrics.setNumOrphanDocs(collStatsMetrics.numOrphanDocs);
+
+    auto cardinalityFrequencyMetrics = *metrics.getIsUnique()
+        ? calculateCardinalityAndFrequencyUnique(collStatsMetrics.numDocs)
+        : calculateCardinalityAndFrequencyGeneric(opCtx, nss, shardKeyBson, indexKeyBson);
     metrics.setNumDocs(cardinalityFrequencyMetrics.numDocs);
     metrics.setNumDistinctValues(cardinalityFrequencyMetrics.cardinality);
     metrics.setFrequency(cardinalityFrequencyMetrics.frequency);
-
-    metrics.setNumOrphanDocs(getNumOrphanDocuments(opCtx, nss));
 
     return metrics;
 }

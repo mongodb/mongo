@@ -134,6 +134,7 @@ function assertNoMetrics(res) {
     assert(!res.hasOwnProperty("numDistinctValues"), res);
     assert(!res.hasOwnProperty("frequency"), res);
     assert(!res.hasOwnProperty("monotonicity"), res);
+    assert(!res.hasOwnProperty("avgDocSizeBytes"), res);
 }
 
 function assertMetrics(res, {numDocs, isUnique, numDistinctValues, frequency}) {
@@ -142,6 +143,7 @@ function assertMetrics(res, {numDocs, isUnique, numDistinctValues, frequency}) {
     assert.eq(res.numDistinctValues, numDistinctValues, res);
     assert.eq(bsonWoCompare(res.frequency, frequency), 0, res);
     assert(res.hasOwnProperty("monotonicity"), res);
+    assert(res.hasOwnProperty("avgDocSizeBytes"), res);
 }
 
 /**
@@ -160,8 +162,13 @@ function assertReadQueryPlans(mongodConns, dbName, collName, comment) {
                     return;
                 }
 
-                const isMerge = doc.command.pipeline[0].hasOwnProperty("$mergeCursors");
-                if (!isMerge) {
+                const firstStage = doc.command.pipeline[0];
+
+                if (firstStage.hasOwnProperty("$collStats")) {
+                    return;
+                }
+
+                if (!firstStage.hasOwnProperty("$mergeCursors")) {
                     assert(doc.hasOwnProperty("planSummary"), doc);
                     assert(doc.planSummary.includes("IXSCAN"), doc);
                 }

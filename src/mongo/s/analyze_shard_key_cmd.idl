@@ -108,6 +108,11 @@ structs:
         type: MonotonicityMetrics
         description: "The monotonicity metrics for the shard key."
         optional: true
+      avgDocSizeBytes:
+        type: long
+        description: "The average document size in bytes."
+        validator: { gte: 0 }
+        optional: true
       numOrphanDocs:
         type: long
         description: "The number of the orphan documents in the collection."
