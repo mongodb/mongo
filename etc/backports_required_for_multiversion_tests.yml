@@ -75,8 +75,6 @@ all:
   ticket: SERVER-50140
 - test_file: jstests/replsets/disconnect_on_legacy_write_to_secondary.js
   ticket: SERVER-50416
-- test_file: jstests/sharding/prepare_transaction_then_migrate.js
-  ticket: SERVER-71219
 - test_file: jstests/sharding/migration_waits_for_majority_commit.js
   ticket: SERVER-52906
 - test_file: jstests/sharding/migration_ignore_interrupts_1.js
@@ -149,6 +147,8 @@ all:
   ticket: SERVER-67492
 - test_file: jstests/replsets/optime.js
   ticket: SERVER-67532
+- test_file: jstests/sharding/prepare_transaction_then_migrate.js
+  ticket: SERVER-71219
 suites:
   change_streams_multiversion: null
   concurrency_replication_multiversion: null
