@@ -939,10 +939,10 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
         return {};
     }
 
-    if (!_bucketUnpacker.bucketSpec().metaField()) {
+    if (!_bucketUnpacker.bucketSpec().metaField) {
         return {};
     }
-    const auto& metaField = *_bucketUnpacker.bucketSpec().metaField();
+    const auto& metaField = *_bucketUnpacker.bucketSpec().metaField;
 
     const auto& idFields = groupPtr->getIdFields();
     if (idFields.size() != 1) {
@@ -971,7 +971,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
             }
 
             const auto& rootFieldName = path.getFieldName(1);
-            if (rootFieldName == _bucketUnpacker.bucketSpec().timeField()) {
+            if (rootFieldName == _bucketUnpacker.bucketSpec().timeField) {
                 // Rewrite not valid for time field. We want to eliminate the bucket
                 // unpack stage here.
                 return {};
@@ -987,10 +987,10 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
                 }
             } else {
                 // Update aggregates to reference the control field.
-                const auto op = stmt.expr.name;
-                if (op == "$min") {
+                const auto op = stmt.makeAccumulator()->getOpName();
+                if (op == "$min"_sd) {
                     os << timeseries::kControlMinFieldNamePrefix;
-                } else if (op == "$max") {
+                } else if (op == "$max"_sd) {
                     os << timeseries::kControlMaxFieldNamePrefix;
                 } else {
                     // Rewrite is valid only for min and max aggregates.
@@ -1011,6 +1011,8 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
             AccumulationExpression accExpr = stmt.expr;
             accExpr.argument = newExpr;
             accumulationStatements.emplace_back(stmt.fieldName, std::move(accExpr));
+        } else {
+            return {};
         }
     }
 

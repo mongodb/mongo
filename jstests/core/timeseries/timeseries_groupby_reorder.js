@@ -5,7 +5,8 @@
  *   directly_against_shardsvrs_incompatible,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
- *   requires_fcv_61,
+ *   requires_fcv_50,
+ *   requires_timeseries,
  * ]
  */
 (function() {
@@ -37,7 +38,18 @@ if (!isMongos(db)) {
     });
 }
 
-const res = coll.aggregate([{$group: {_id: '$meta', accmin: {$min: '$b'}, accmax: {$max: '$c'}}}])
-                .toArray();
-assert.docEq(res, [{"_id": null, "accmin": 1, "accmax": 3}]);
+let res = coll.aggregate([{$group: {_id: '$meta', accmin: {$min: '$b'}, accmax: {$max: '$c'}}}])
+              .toArray();
+assert.docEq([{"_id": null, "accmin": 1, "accmax": 3}], res);
+
+// Test SERVER-73822 fix: complex $min and $max (i.e. not just straight field refs) work correctly.
+res = coll.aggregate([{
+              $group: {
+                  _id: '$meta',
+                  accmin: {$min: {$add: ["$b", "$c"]}},
+                  accmax: {$max: {$add: ["$b", "$c"]}}
+              }
+          }])
+          .toArray();
+assert.docEq(res, [{"_id": null, "accmin": 2, "accmax": 6}]);
 })();
