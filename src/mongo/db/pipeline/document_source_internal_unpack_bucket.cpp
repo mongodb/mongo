@@ -1373,9 +1373,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
 
         // Create a loose bucket predicate and push it before the unpacking stage.
         if (predicates.loosePredicate) {
-            BSONObjBuilder bob;
-            predicates.loosePredicate->serialize(&bob);
-            container->insert(itr, DocumentSourceMatch::create(bob.obj(), pExpCtx));
+            container->insert(
+                itr, DocumentSourceMatch::create(predicates.loosePredicate->serialize(), pExpCtx));
 
             // Give other stages a chance to optimize with the new $match.
             return std::prev(itr) == container->begin() ? std::prev(itr)

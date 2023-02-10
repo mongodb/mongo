@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,57 +29,47 @@
 
 #pragma once
 
-#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-namespace fts {
-class FTSQuery;
-}  // namespace fts
-
 /**
- * Common base class for $text match expression implementations.
+ * A MatchExpression may store BSONElements as arguments for expressions, to avoid copying large
+ * values. A BSONElement is essentially a pointer into a BSONObj, so use
+ * ParsedMatchExpressionForTest to ensure that the BSONObj outlives the MatchExpression, and the
+ * BSONElement arguments remain pointing to allocated memory.
  */
-class TextMatchExpressionBase : public LeafMatchExpression {
+class ParsedMatchExpressionForTest {
 public:
-    struct TextParams {
-        std::string query;
-        std::string language;
-        bool caseSensitive;
-        bool diacriticSensitive;
-    };
+    ParsedMatchExpressionForTest(const std::string& str,
+                                 const CollatorInterface* collator = nullptr)
+        : _obj(fromjson(str)) {
+        _expCtx = make_intrusive<ExpressionContextForTest>();
+        _expCtx->setCollator(CollatorInterface::cloneCollator(collator));
+        StatusWithMatchExpression result = MatchExpressionParser::parse(_obj, _expCtx);
+        ASSERT_OK(result.getStatus());
+        _expr = std::move(result.getValue());
+    }
 
-    static const bool kCaseSensitiveDefault;
-    static const bool kDiacriticSensitiveDefault;
-
-    explicit TextMatchExpressionBase(StringData path);
-    virtual ~TextMatchExpressionBase() {}
+    const MatchExpression* get() const {
+        return _expr.get();
+    }
 
     /**
-     * Returns a reference to the parsed text query that this TextMatchExpressionBase owns.
+     * Relinquishes ownership of the parsed expression and returns it as a unique_ptr to the caller.
+     * This 'ParsedMatchExpressionForTest' object still must outlive the returned value so that the
+     * BSONObj used to create it remains alive.
      */
-    virtual const fts::FTSQuery& getFTSQuery() const = 0;
-
-    BSONObj getSerializedRightHandSide(
-        boost::optional<StringData> replacementForLiteralArgs) const final {
-        // TODO SERVER-73676 is this going to be a problem? I don't see how this is unreachable...
-        MONGO_UNREACHABLE;
+    std::unique_ptr<MatchExpression> release() {
+        return std::move(_expr);
     }
 
-    //
-    // Methods inherited from MatchExpression.
-    //
-
-    void debugString(StringBuilder& debug, int indentationLevel = 0) const final;
-
-    void serialize(BSONObjBuilder* out, SerializationOptions opts) const final;
-
-    bool equivalent(const MatchExpression* other) const final;
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
+    const BSONObj _obj;
+    std::unique_ptr<MatchExpression> _expr;
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
-
 }  // namespace mongo

@@ -56,7 +56,9 @@ void InternalSchemaStrLengthMatchExpression::debugString(StringBuilder& debug,
     debug << "\n";
 }
 
-BSONObj InternalSchemaStrLengthMatchExpression::getSerializedRightHandSide() const {
+BSONObj InternalSchemaStrLengthMatchExpression::getSerializedRightHandSide(
+    boost::optional<StringData> replacementForLiteralArgs) const {
+    // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
     BSONObjBuilder objBuilder;
     objBuilder.append(_name, _strLen);
     return objBuilder.obj();

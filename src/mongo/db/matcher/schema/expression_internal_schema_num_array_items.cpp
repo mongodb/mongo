@@ -56,7 +56,9 @@ void InternalSchemaNumArrayItemsMatchExpression::debugString(StringBuilder& debu
     debug << "\n";
 }
 
-BSONObj InternalSchemaNumArrayItemsMatchExpression::getSerializedRightHandSide() const {
+BSONObj InternalSchemaNumArrayItemsMatchExpression::getSerializedRightHandSide(
+    boost::optional<StringData> replacementForLiteralArgs) const {
+    // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
     BSONObjBuilder objBuilder;
     objBuilder.append(_name, _numItems);
     return objBuilder.obj();

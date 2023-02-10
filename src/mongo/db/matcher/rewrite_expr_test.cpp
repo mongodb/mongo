@@ -57,7 +57,7 @@ void testExprRewrite(BSONObj expr, BSONObj expectedMatch) {
     if (!expectedMatch.isEmpty()) {
         ASSERT(result.matchExpression());
         BSONObjBuilder bob;
-        result.matchExpression()->serialize(&bob, true);
+        result.matchExpression()->serialize(&bob, {});
         ASSERT_BSONOBJ_EQ(expectedMatch, bob.obj());
     } else {
         ASSERT_FALSE(result.matchExpression());

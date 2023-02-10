@@ -122,10 +122,8 @@ unique_ptr<PlanStageStats> OrStage::getStats() {
     _commonStats.isEOF = isEOF();
 
     // Add a BSON representation of the filter to the stats tree, if there is one.
-    if (nullptr != _filter) {
-        BSONObjBuilder bob;
-        _filter->serialize(&bob);
-        _commonStats.filter = bob.obj();
+    if (_filter) {
+        _commonStats.filter = _filter->serialize();
     }
 
     unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_OR);

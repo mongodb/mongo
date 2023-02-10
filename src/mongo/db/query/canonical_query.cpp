@@ -153,9 +153,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     OperationContext* opCtx, const CanonicalQuery& baseQuery, MatchExpression* root) {
     auto findCommand = std::make_unique<FindCommandRequest>(baseQuery.nss());
-    BSONObjBuilder builder;
-    root->serialize(&builder, true);
-    findCommand->setFilter(builder.obj());
+    findCommand->setFilter(root->serialize());
     findCommand->setProjection(baseQuery.getFindCommandRequest().getProjection().getOwned());
     findCommand->setSort(baseQuery.getFindCommandRequest().getSort().getOwned());
     findCommand->setCollation(baseQuery.getFindCommandRequest().getCollation().getOwned());

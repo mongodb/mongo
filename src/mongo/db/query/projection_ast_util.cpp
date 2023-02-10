@@ -47,7 +47,7 @@ public:
 
     virtual void visit(const MatchExpressionASTNode* node) {
         static_cast<const MatchExpressionASTNode*>(node)->matchExpression()->serialize(
-            &_builders.top(), true);
+            &_builders.top(), {});
     }
 
     virtual void visit(const ProjectionPathASTNode* node) {

@@ -282,9 +282,7 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
     MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
     auto childCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), *baseCq, firstClauseExpr));
 
-    BSONObjBuilder expectedFilter;
-    firstClauseExpr->serialize(&expectedFilter);
-    ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getFilter(), expectedFilter.obj());
+    ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getFilter(), firstClauseExpr->serialize());
 
     ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getProjection(),
                       baseCq->getFindCommandRequest().getProjection());

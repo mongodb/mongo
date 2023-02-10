@@ -193,7 +193,9 @@ void statsToBSON(const QuerySolutionNode* node,
             if (!cisn->filtersByPath.empty()) {
                 BSONObjBuilder filtersBob(bob->subobjStart("filtersByPath"));
                 for (const auto& [path, matchExpr] : cisn->filtersByPath) {
-                    filtersBob.append(path, matchExpr->serialize(false /* includePath */));
+                    SerializationOptions opts;
+                    opts.includePath = false;
+                    filtersBob.append(path, matchExpr->serialize(opts));
                 }
             }
 

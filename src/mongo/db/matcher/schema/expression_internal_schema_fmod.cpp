@@ -76,7 +76,9 @@ void InternalSchemaFmodMatchExpression::debugString(StringBuilder& debug,
     debug << "\n";
 }
 
-BSONObj InternalSchemaFmodMatchExpression::getSerializedRightHandSide() const {
+BSONObj InternalSchemaFmodMatchExpression::getSerializedRightHandSide(
+    boost::optional<StringData> replacementForLiteralArgs) const {
+    // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
     BSONObjBuilder objMatchBob;
     BSONArrayBuilder arrBuilder(objMatchBob.subarrayStart("$_internalSchemaFmod"));
     arrBuilder.append(_divisor);

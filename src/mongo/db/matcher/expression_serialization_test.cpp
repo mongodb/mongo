@@ -49,9 +49,7 @@ using std::string;
 using std::unique_ptr;
 
 BSONObj serialize(MatchExpression* match) {
-    BSONObjBuilder bob;
-    match->serialize(&bob, true);
-    return bob.obj();
+    return match->serialize();
 }
 
 TEST(SerializeBasic, AndExpressionWithOneChildSerializesCorrectly) {

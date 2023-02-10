@@ -471,9 +471,7 @@ void CollectionScan::doReattachToOperationContext() {
 unique_ptr<PlanStageStats> CollectionScan::getStats() {
     // Add a BSON representation of the filter to the stats tree, if there is one.
     if (nullptr != _filter) {
-        BSONObjBuilder bob;
-        _filter->serialize(&bob);
-        _commonStats.filter = bob.obj();
+        _commonStats.filter = _filter->serialize();
     }
 
     unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_COLLSCAN);

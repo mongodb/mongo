@@ -724,17 +724,10 @@ TEST(ExprMatchTest, OptimizingExprAbsorbsAndOfAnd) {
 
     // The optimized match expression should not have and AND children of AND nodes. This should be
     // collapsed during optimization.
-    BSONObj serialized;
-    {
-        BSONObjBuilder builder;
-        optimized->serialize(&builder, true);
-        serialized = builder.obj();
-    }
-
     BSONObj expectedSerialization = fromjson(
         "{$and: [{$expr: {$and: [{$eq: ['$a', {$const: 1}]}, {$eq: ['$b', {$const: 2}]}]}},"
         "{a: {$_internalExprEq: 1}}, {b: {$_internalExprEq: 2}}]}");
-    ASSERT_BSONOBJ_EQ(serialized, expectedSerialization);
+    ASSERT_BSONOBJ_EQ(optimized->serialize(), expectedSerialization);
 }
 
 TEST(ExprMatchTest, OptimizingExprRemovesTrueConstantExpression) {

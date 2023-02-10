@@ -76,13 +76,15 @@ void InternalSchemaAllElemMatchFromIndexMatchExpression::debugString(StringBuild
     _expression->getFilter()->debugString(debug, indentationLevel + 1);
 }
 
-BSONObj InternalSchemaAllElemMatchFromIndexMatchExpression::getSerializedRightHandSide() const {
+BSONObj InternalSchemaAllElemMatchFromIndexMatchExpression::getSerializedRightHandSide(
+    boost::optional<StringData> replacementForLiteralArgs) const {
+    // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
     BSONObjBuilder allElemMatchBob;
     BSONArrayBuilder subArray(allElemMatchBob.subarrayStart(kName));
     subArray.append(_index);
     {
         BSONObjBuilder eBuilder(subArray.subobjStart());
-        _expression->getFilter()->serialize(&eBuilder, true);
+        _expression->getFilter()->serialize(&eBuilder, {});
         eBuilder.doneFast();
     }
     subArray.doneFast();

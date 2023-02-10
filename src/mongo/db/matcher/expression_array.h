@@ -90,7 +90,8 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    BSONObj getSerializedRightHandSide(
+        boost::optional<StringData> replacementForLiteralArgs) const final;
 
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return nullptr;
@@ -158,7 +159,8 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    BSONObj getSerializedRightHandSide(
+        boost::optional<StringData> replacementForLiteralArgs) const final;
 
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return &_subs;
@@ -233,7 +235,8 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    BSONObj getSerializedRightHandSide(
+        boost::optional<StringData> replacementForLiteralArgs) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 

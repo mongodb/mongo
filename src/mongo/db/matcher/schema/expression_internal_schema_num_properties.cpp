@@ -37,12 +37,13 @@ void InternalSchemaNumPropertiesMatchExpression::debugString(StringBuilder& debu
                                                              int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     BSONObjBuilder builder;
-    serialize(&builder, true);
+    serialize(&builder, {});
     debug << builder.obj().toString() << "\n";
 }
 
 void InternalSchemaNumPropertiesMatchExpression::serialize(BSONObjBuilder* out,
-                                                           bool includePath) const {
+                                                           SerializationOptions opts) const {
+    // TODO SERVER-73678 respect 'opts'.
     out->append(_name, _numProperties);
 }
 

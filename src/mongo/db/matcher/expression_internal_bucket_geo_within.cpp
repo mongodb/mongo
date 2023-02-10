@@ -51,7 +51,7 @@ void InternalBucketGeoWithinMatchExpression::debugString(StringBuilder& debug,
     _debugAddSpace(debug, indentationLevel);
 
     BSONObjBuilder builder;
-    serialize(&builder, true);
+    serialize(&builder, {});
     debug << builder.obj().toString() << "\n";
 
     const auto* tag = getTag();
@@ -194,7 +194,8 @@ bool InternalBucketGeoWithinMatchExpression::_matchesBSONObj(const BSONObj& obj)
 }
 
 void InternalBucketGeoWithinMatchExpression::serialize(BSONObjBuilder* builder,
-                                                       bool includePath) const {
+                                                       SerializationOptions opts) const {
+    // TODO SERVER-73676 respect 'opts'.
     BSONObjBuilder bob(builder->subobjStart(InternalBucketGeoWithinMatchExpression::kName));
     BSONObjBuilder withinRegionBob(
         bob.subobjStart(InternalBucketGeoWithinMatchExpression::kWithinRegion));

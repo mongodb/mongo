@@ -38,9 +38,7 @@ namespace mongo {
 namespace {
 
 BSONObj serializeMatcher(Matcher* matcher) {
-    BSONObjBuilder builder;
-    matcher->getMatchExpression()->serialize(&builder);
-    return builder.obj();
+    return matcher->getMatchExpression()->serialize();
 }
 
 TEST(PlannerAccessTest, PrepareForAccessPlanningSortsEqualNodesByTheirChildren) {

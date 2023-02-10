@@ -55,7 +55,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$or: [ {'control.max.a': {$_internalExprGt: 1}},"
                                "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
                                "{$type: [ \"$control.max.a\" ]} ]}} ]}"));
@@ -77,7 +77,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$or: [ {'control.max.a': {$_internalExprGte: 1}},"
                                "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
                                "{$type: [ \"$control.max.a\" ]} ]}} ]}"));
@@ -99,7 +99,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$or: [ {'control.min.a': {$_internalExprLt: 1}},"
                                "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
                                "{$type: [ \"$control.max.a\" ]} ]}} ]}"));
@@ -121,7 +121,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$or: [ {'control.min.a': {$_internalExprLte: 1}},"
                                "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
                                "{$type: [ \"$control.max.a\" ]} ]}} ]}"));
@@ -143,7 +143,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$or: [ {$and:[{'control.min.a': {$_internalExprLte: 1}},"
                                "{'control.max.a': {$_internalExprGte: 1}}]},"
                                "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
@@ -190,7 +190,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         "    ]}}"
         "  ]}"
         "]}");
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true), expected);
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(), expected);
     ASSERT_FALSE(predicate.tightPredicate);
 }
 
@@ -214,7 +214,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$or: [ {'control.max.a': {$_internalExprGt: 1}},"
                                "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
                                "{$type: [ \"$control.max.a\" ]} ]}} ]}"));
@@ -241,7 +241,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$or: [ {'control.max.a': {$_internalExprGte: 1}},"
                                "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
                                "{$type: [ \"$control.max.a\" ]} ]}} ]}"));
@@ -268,7 +268,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$or: [ {'control.min.a': {$_internalExprLt: 1}},"
                                "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
                                "{$type: [ \"$control.max.a\" ]} ]}} ]}"));
@@ -295,7 +295,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$or: [ {'control.min.a': {$_internalExprLte: 1}},"
                                "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
                                "{$type: [ \"$control.max.a\" ]} ]}} ]}"));
@@ -322,7 +322,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$or: [ {$and:[{'control.min.a': {$_internalExprLte: 1}},"
                                "{'control.max.a': {$_internalExprGte: 1}}]},"
                                "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
@@ -345,7 +345,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$and: [ {$or: [ {'control.max.b': {$_internalExprGt: 1}},"
                                "{$expr: {$ne: [ {$type: [ \"$control.min.b\" ]},"
                                "{$type: [ \"$control.max.b\" ]} ]}} ]},"
@@ -389,7 +389,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$or: ["
                                "  {'control.max.b': {$_internalExprGt: 1}},"
                                "  {$expr: {$ne: ["
@@ -416,7 +416,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$and: [ {$or: [ {'control.max.b': {$_internalExprGte: 2}},"
                                "{$expr: {$ne: [ {$type: [ \"$control.min.b\" ]},"
                                "{$type: [ \"$control.max.b\" ]} ]}} ]},"
@@ -445,7 +445,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT(predicate.loosePredicate);
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$or: ["
                                "  {$or: ["
                                "    {'control.max.b': {$_internalExprGt: 1}},"
@@ -522,7 +522,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$or: ["
                                "  {$or: ["
                                "    {'control.max.b': {$_internalExprGte: 2}},"
@@ -683,8 +683,8 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     // Meta predicates are mapped to the meta field, not the control min/max fields.
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true), fromjson("{meta: {$gt: 5}}"));
-    ASSERT_BSONOBJ_EQ(predicate.tightPredicate->serialize(true), fromjson("{meta: {$gt: 5}}"));
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(), fromjson("{meta: {$gt: 5}}"));
+    ASSERT_BSONOBJ_EQ(predicate.tightPredicate->serialize(), fromjson("{meta: {$gt: 5}}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
@@ -703,10 +703,8 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     // Meta predicates are mapped to the meta field, not the control min/max fields.
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
-                      fromjson("{'meta.foo': {$gt: 5}}"));
-    ASSERT_BSONOBJ_EQ(predicate.tightPredicate->serialize(true),
-                      fromjson("{'meta.foo': {$gt: 5}}"));
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(), fromjson("{'meta.foo': {$gt: 5}}"));
+    ASSERT_BSONOBJ_EQ(predicate.tightPredicate->serialize(), fromjson("{'meta.foo': {$gt: 5}}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
@@ -724,7 +722,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$and: ["
                                "  {$or: ["
                                "    {'control.max.a': {$_internalExprGt: 1}},"
@@ -776,10 +774,10 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             auto children = andExpr->getChildVector();
 
             ASSERT_EQ(children->size(), 3);
-            ASSERT_BSONOBJ_EQ((*children)[0]->serialize(true),
+            ASSERT_BSONOBJ_EQ((*children)[0]->serialize(),
                               BSON("control.min.time" << BSON("$_internalExprLt" << date)));
             ASSERT_BSONOBJ_EQ(
-                (*children)[1]->serialize(true),
+                (*children)[1]->serialize(),
                 BSON("control.max.time" << BSON("$_internalExprLt" << datePlusBucketSpan)));
 
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[2].get());
@@ -833,10 +831,10 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             auto children = andExpr->getChildVector();
 
             ASSERT_EQ(children->size(), 3);
-            ASSERT_BSONOBJ_EQ((*children)[0]->serialize(true),
+            ASSERT_BSONOBJ_EQ((*children)[0]->serialize(),
                               BSON("control.min.time" << BSON("$_internalExprLte" << date)));
             ASSERT_BSONOBJ_EQ(
-                (*children)[1]->serialize(true),
+                (*children)[1]->serialize(),
                 BSON("control.max.time" << BSON("$_internalExprLte" << datePlusBucketSpan)));
 
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[2].get());
@@ -882,15 +880,15 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             auto children = andExpr->getChildVector();
 
             ASSERT_EQ(children->size(), 6);
-            ASSERT_BSONOBJ_EQ((*children)[0]->serialize(true),
+            ASSERT_BSONOBJ_EQ((*children)[0]->serialize(),
                               BSON("control.min.time" << BSON("$_internalExprLte" << date)));
             ASSERT_BSONOBJ_EQ(
-                (*children)[1]->serialize(true),
+                (*children)[1]->serialize(),
                 BSON("control.min.time" << BSON("$_internalExprGte" << dateMinusBucketSpan)));
-            ASSERT_BSONOBJ_EQ((*children)[2]->serialize(true),
+            ASSERT_BSONOBJ_EQ((*children)[2]->serialize(),
                               BSON("control.max.time" << BSON("$_internalExprGte" << date)));
             ASSERT_BSONOBJ_EQ(
-                (*children)[3]->serialize(true),
+                (*children)[3]->serialize(),
                 BSON("control.max.time" << BSON("$_internalExprLte" << datePlusBucketSpan)));
 
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[4].get());
@@ -944,10 +942,10 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             auto children = andExpr->getChildVector();
 
             ASSERT_EQ(children->size(), 3);
-            ASSERT_BSONOBJ_EQ((*children)[0]->serialize(true),
+            ASSERT_BSONOBJ_EQ((*children)[0]->serialize(),
                               BSON("control.max.time" << BSON("$_internalExprGt" << date)));
             ASSERT_BSONOBJ_EQ(
-                (*children)[1]->serialize(true),
+                (*children)[1]->serialize(),
                 BSON("control.min.time" << BSON("$_internalExprGt" << dateMinusBucketSpan)));
 
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[2].get());
@@ -993,10 +991,10 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             auto children = andExpr->getChildVector();
 
             ASSERT_EQ(children->size(), 3);
-            ASSERT_BSONOBJ_EQ((*children)[0]->serialize(true),
+            ASSERT_BSONOBJ_EQ((*children)[0]->serialize(),
                               BSON("control.max.time" << BSON("$_internalExprGte" << date)));
             ASSERT_BSONOBJ_EQ(
-                (*children)[1]->serialize(true),
+                (*children)[1]->serialize(),
                 BSON("control.min.time" << BSON("$_internalExprGte" << dateMinusBucketSpan)));
 
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[2].get());
@@ -1144,7 +1142,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(true),
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
                       fromjson("{$_internalBucketGeoWithin: { withinRegion: { $geometry: { type : "
                                "\"Polygon\" ,coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 "
                                "] ] ]}},field: \"loc\"}}"));

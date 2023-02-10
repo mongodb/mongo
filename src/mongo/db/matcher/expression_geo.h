@@ -106,7 +106,8 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    BSONObj getSerializedRightHandSide(
+        boost::optional<StringData> replacementForLiteralArgs) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -208,7 +209,8 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    BSONObj getSerializedRightHandSide(
+        boost::optional<StringData> replacementForLiteralArgs) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -248,7 +250,7 @@ public:
     TwoDPtInAnnulusExpression(const R2Annulus& annulus, boost::optional<StringData> twoDPath)
         : LeafMatchExpression(INTERNAL_2D_POINT_IN_ANNULUS, twoDPath), _annulus(annulus) {}
 
-    void serialize(BSONObjBuilder* out, bool includePath) const final {
+    void serialize(BSONObjBuilder* out, SerializationOptions opts) const final {
         out->append("TwoDPtInAnnulusExpression", true);
     }
 
@@ -267,7 +269,9 @@ public:
     // These won't be called.
     //
 
-    BSONObj getSerializedRightHandSide() const final {
+    BSONObj getSerializedRightHandSide(
+        boost::optional<StringData> replacementForLiteralArgs) const final {
+        // TODO SERVER-73676 is this going to be a problem? I don't see how this is unreachable...
         MONGO_UNREACHABLE;
     }
 

@@ -99,7 +99,7 @@ public:
 protected:
     void _debugList(StringBuilder& debug, int indentationLevel) const;
 
-    void _listToBSON(BSONArrayBuilder* out, bool includePath) const;
+    void _listToBSON(BSONArrayBuilder* out, SerializationOptions opts) const;
 
 private:
     ExpressionOptimizerFunc getOptimizer() const final;
@@ -138,7 +138,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    virtual void serialize(BSONObjBuilder* out, bool includePath) const;
+    virtual void serialize(BSONObjBuilder* out, SerializationOptions opts) const;
 
     bool isTriviallyTrue() const final;
 
@@ -182,7 +182,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    virtual void serialize(BSONObjBuilder* out, bool includePath) const;
+    virtual void serialize(BSONObjBuilder* out, SerializationOptions opts) const;
 
     bool isTriviallyFalse() const final;
 
@@ -226,7 +226,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    virtual void serialize(BSONObjBuilder* out, bool includePath) const;
+    virtual void serialize(BSONObjBuilder* out, SerializationOptions opts) const;
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
@@ -267,7 +267,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    virtual void serialize(BSONObjBuilder* out, bool includePath) const;
+    virtual void serialize(BSONObjBuilder* out, SerializationOptions opts) const;
 
     bool equivalent(const MatchExpression* other) const final;
 
@@ -309,7 +309,7 @@ public:
 private:
     static void serializeNotExpressionToNor(MatchExpression* exp,
                                             BSONObjBuilder* out,
-                                            bool includePath);
+                                            SerializationOptions opts);
 
     ExpressionOptimizerFunc getOptimizer() const final;
 

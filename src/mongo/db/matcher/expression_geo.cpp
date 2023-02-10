@@ -434,7 +434,7 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
     _debugAddSpace(debug, indentationLevel);
 
     BSONObjBuilder builder;
-    serialize(&builder, true);
+    serialize(&builder, {});
     debug << "GEO raw = " << builder.obj().toString();
 
     MatchExpression::TagData* td = getTag();
@@ -445,8 +445,11 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
     debug << "\n";
 }
 
-BSONObj GeoMatchExpression::getSerializedRightHandSide() const {
+BSONObj GeoMatchExpression::getSerializedRightHandSide(
+    boost::optional<StringData> replacementForLiteralArgs) const {
     BSONObjBuilder subobj;
+    // TODO SERVER-73672 looks like we'll need to traverse '_rawObj' if 'replacementForLiteralArgs'
+    // is set.
     subobj.appendElements(_rawObj);
     return subobj.obj();
 }
@@ -503,7 +506,10 @@ void GeoNearMatchExpression::debugString(StringBuilder& debug, int indentationLe
     debug << "\n";
 }
 
-BSONObj GeoNearMatchExpression::getSerializedRightHandSide() const {
+BSONObj GeoNearMatchExpression::getSerializedRightHandSide(
+    boost::optional<StringData> replacementForLiteralArgs) const {
+    // TODO SERVER-73672 looks like we'll need to traverse '_rawObj' if 'replacementForLiteralArgs'
+    // is set.
     BSONObjBuilder objBuilder;
     objBuilder.appendElements(_rawObj);
     return objBuilder.obj();

@@ -161,7 +161,8 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    BSONObj getSerializedRightHandSide(
+        boost::optional<StringData> replacementForLiteralArgs) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -506,7 +507,8 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    BSONObj getSerializedRightHandSide(
+        boost::optional<StringData> replacementForLiteralArgs) const final;
 
     void serializeToBSONTypeRegex(BSONObjBuilder* out) const;
 
@@ -586,7 +588,8 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    BSONObj getSerializedRightHandSide(
+        boost::optional<StringData> replacementForLiteralArgs) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -651,7 +654,8 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    BSONObj getSerializedRightHandSide(
+        boost::optional<StringData> replacementForLiteralArgs) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -683,7 +687,8 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    BSONObj getSerializedRightHandSide(
+        boost::optional<StringData> replacementForLiteralArgs) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -826,7 +831,8 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    BSONObj getSerializedRightHandSide(
+        boost::optional<StringData> replacementForLiteralArgs) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 

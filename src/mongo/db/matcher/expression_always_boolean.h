@@ -62,7 +62,8 @@ public:
         debug << name() << ": 1\n";
     }
 
-    void serialize(BSONObjBuilder* out, bool includePath) const final {
+    void serialize(BSONObjBuilder* out, SerializationOptions opts) const final {
+        // TODO support 'opts.redactFieldNames.'
         out->append(name(), 1);
     }
 

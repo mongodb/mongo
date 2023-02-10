@@ -105,9 +105,7 @@ std::unique_ptr<PlanStageStats> TextOrStage::getStats() {
     _commonStats.isEOF = isEOF();
 
     if (_filter) {
-        BSONObjBuilder bob;
-        _filter->serialize(&bob);
-        _commonStats.filter = bob.obj();
+        _commonStats.filter = _filter->serialize();
     }
 
     unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_TEXT_OR);

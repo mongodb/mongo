@@ -1139,13 +1139,10 @@ TEST_F(DocumentSourceLookUpTest, ExprEmbeddedInMatchExpressionShouldBeOptimized)
     auto& matchSource = dynamic_cast<const DocumentSourceMatch&>(*secondSource);
 
     // Ensure that the '$$var' in the embedded expression got optimized to ExpressionConstant.
-    BSONObjBuilder builder;
-    matchSource.getMatchExpression()->serialize(&builder);
-    auto serializedMatch = builder.obj();
     auto expectedMatch =
         fromjson("{$and: [{_id: {$_internalExprEq: 5}}, {$expr: {$eq: ['$_id', {$const: 5}]}}]}");
 
-    ASSERT_VALUE_EQ(Value(serializedMatch), Value(expectedMatch));
+    ASSERT_VALUE_EQ(Value(matchSource.getMatchExpression()->serialize()), Value(expectedMatch));
 }
 
 TEST_F(DocumentSourceLookUpTest,

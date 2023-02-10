@@ -143,11 +143,17 @@ public:
         }
     }
 
-    void serialize(BSONObjBuilder* out, bool includePath) const override {
-        if (includePath) {
-            out->append(path(), getSerializedRightHandSide());
+    void serialize(BSONObjBuilder* out, SerializationOptions opts) const override {
+        // TODO SERVER-73678 do we need to pass 'includePath' or other options to
+        // `getSerializedRightHandSide()` here? I don't think we need 'includePath' for
+        // LeafMatchExpression subclasses, but the class comment on PathMatchExpression leaves me a
+        // bit confused over 'includePath' semantics here. Before we changed anything for query
+        // shape, it looks like 'includePath' was not forwarded through, so it's either not needed
+        // or there was a pre-existing bug.
+        if (opts.includePath) {
+            out->append(path(), getSerializedRightHandSide(opts.replacementForLiteralArgs));
         } else {
-            out->appendElements(getSerializedRightHandSide());
+            out->appendElements(getSerializedRightHandSide(opts.replacementForLiteralArgs));
         }
     }
 
@@ -156,8 +162,13 @@ public:
      * serialization of PathMatchExpression in cases where we do not want to serialize the path in
      * line with the expression. For example {x: {$not: {$eq: 1}}}, where $eq is the
      * PathMatchExpression.
+     *
+     * If the 'replacementForLiteralArgs' option is set, then any literal argument (like the number
+     * 1 in the example above), should be replaced with this string. 'literal' here is in contrast
+     * to another expression, if that is possible syntactically.
      */
-    virtual BSONObj getSerializedRightHandSide() const = 0;
+    virtual BSONObj getSerializedRightHandSide(
+        boost::optional<StringData> replacementForLiteralArgs = boost::none) const = 0;
 
 private:
     // ElementPath holds a FieldRef, which owns the underlying path string.

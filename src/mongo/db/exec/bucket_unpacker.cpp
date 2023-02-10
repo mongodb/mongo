@@ -910,9 +910,9 @@ std::pair<bool, BSONObj> BucketSpec::pushdownPredicate(
 
     BSONObjBuilder result;
     if (metaOnlyPredicate)
-        metaOnlyPredicate->serialize(&result);
+        metaOnlyPredicate->serialize(&result, {});
     if (bucketMetricPredicate)
-        bucketMetricPredicate->serialize(&result);
+        bucketMetricPredicate->serialize(&result, {});
     return std::make_pair(bucketMetricPredicate.get(), result.obj());
 }
 

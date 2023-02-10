@@ -61,10 +61,12 @@ void InternalSchemaObjectMatchExpression::debugString(StringBuilder& debug,
     _sub->debugString(debug, indentationLevel + 1);
 }
 
-BSONObj InternalSchemaObjectMatchExpression::getSerializedRightHandSide() const {
+BSONObj InternalSchemaObjectMatchExpression::getSerializedRightHandSide(
+    boost::optional<StringData> replacementForLiteralArgs) const {
+    // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
     BSONObjBuilder objMatchBob;
     BSONObjBuilder subBob(objMatchBob.subobjStart(kName));
-    _sub->serialize(&subBob, true);
+    _sub->serialize(&subBob, {});
     subBob.doneFast();
     return objMatchBob.obj();
 }

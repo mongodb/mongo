@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,36 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/matcher/expression_where_base.h"
+#include "mongo/db/matcher/expression.h"
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
+namespace mongo::query_shape {
 
-namespace mongo {
+constexpr StringData kLiteralArgString = "?"_sd;
 
-WhereMatchExpressionBase::WhereMatchExpressionBase(WhereParams params)
-    : MatchExpression(WHERE), _code(std::move(params.code)) {}
+/**
+ * Computes a BSONObj that is meant to be used to classify queries according to their shape, for the
+ * purposes of collecting telemetry.
+ *
+ * For example, if the MatchExpression represents {a: 2}, it will return the same BSONObj as the
+ * MatchExpression for {a: 1}, {a: 10}, and {a: {$eq: 2}} (identical bits but not sharing memory)
+ * because they are considered to be the same shape.
+ *
+ * Note that the shape of a MatchExpression is only part of the overall query shape - which should
+ * include other options like the sort and projection.
+ *
+ * TODO better consider how this interacts with persistent query settings project, and document it.
+ * TODO (TODO SERVER ticket) better distinguish this from a plan cache or CQ 'query shape'.
+ */
+BSONObj predicateShape(const MatchExpression* predicate);
 
-void WhereMatchExpressionBase::debugString(StringBuilder& debug, int indentationLevel) const {
-    _debugAddSpace(debug, indentationLevel);
-    debug << "$where\n";
-
-    _debugAddSpace(debug, indentationLevel + 1);
-    debug << "code: " << getCode() << "\n";
-}
-
-void WhereMatchExpressionBase::serialize(BSONObjBuilder* out, SerializationOptions opts) const {
-    // TODO SERVER-73676 respect 'opts.'
-    out->appendCode("$where", getCode());
-}
-
-bool WhereMatchExpressionBase::equivalent(const MatchExpression* other) const {
-    if (matchType() != other->matchType()) {
-        return false;
-    }
-    const WhereMatchExpressionBase* realOther = static_cast<const WhereMatchExpressionBase*>(other);
-    return getCode() == realOther->getCode();
-}
-
-}  // namespace mongo
+}  // namespace mongo::query_shape

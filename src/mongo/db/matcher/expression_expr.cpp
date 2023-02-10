@@ -77,7 +77,8 @@ Value ExprMatchExpression::evaluateExpression(const MatchableDocument* doc) cons
     return _expression->evaluate(document, &variables);
 }
 
-void ExprMatchExpression::serialize(BSONObjBuilder* out, bool includePath) const {
+void ExprMatchExpression::serialize(BSONObjBuilder* out, SerializationOptions opts) const {
+    // TODO aggregation expressions should support some of the new options.
     *out << "$expr" << _expression->serialize(false);
 }
 

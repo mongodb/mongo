@@ -41,6 +41,7 @@
 #include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/matchable.h"
 #include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/query/serialization_options.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -473,19 +474,27 @@ public:
     void setCollator(const CollatorInterface* collator);
 
     /**
-     * Serialize the MatchExpression to BSON, appending to 'out'. Output of this method is expected
-     * to be a valid query object, that, when parsed, produces a logically equivalent
-     * MatchExpression. If 'includePath' is false then the serialization should assume it's in a
-     * context where the path has been serialized elsewhere, such as within an $elemMatch value.
+     * Serialize the MatchExpression to BSON, appending to 'out'.
+     *
+     * See 'SerializationOptions' for some options.
+     *
+     * Generally, the output of this method is expected to be a valid query object that, when
+     * parsed, produces a logically equivalent MatchExpression. However, if special options are set,
+     * this no longer holds.
+     *
+     * If 'options.replacementForLiteralArgs' is set, the result is no longer expected to re-parse,
+     * since we will put strings in places where strings may not be accpeted syntactically (e.g. a
+     * number is always expected, as in with the $mod expression).
      */
-    virtual void serialize(BSONObjBuilder* out, bool includePath = true) const = 0;
+    virtual void serialize(BSONObjBuilder* out, SerializationOptions options) const = 0;
 
     /**
-     * Convenience method which serializes this MatchExpression to a BSONObj.
+     * Convenience method which serializes this MatchExpression to a BSONObj. See the override with
+     * a BSONObjBuilder* argument for details.
      */
-    BSONObj serialize(bool includePath = true) const {
+    BSONObj serialize(SerializationOptions options = {}) const {
         BSONObjBuilder bob;
-        serialize(&bob, includePath);
+        serialize(&bob, options);
         return bob.obj();
     }
 

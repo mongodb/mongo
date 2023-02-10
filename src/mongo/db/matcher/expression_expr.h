@@ -75,7 +75,7 @@ public:
         debug << "$expr " << _expression->serialize(false).toString();
     }
 
-    void serialize(BSONObjBuilder* out, bool includePath) const final;
+    void serialize(BSONObjBuilder* out, SerializationOptions opts) const final;
 
     bool isTriviallyTrue() const final;
 

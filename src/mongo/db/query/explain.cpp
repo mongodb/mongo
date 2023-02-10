@@ -123,7 +123,7 @@ void generatePlannerInfo(PlanExecutor* exec,
     auto query = exec->getCanonicalQuery();
     if (nullptr != query) {
         BSONObjBuilder parsedQueryBob(plannerBob.subobjStart("parsedQuery"));
-        query->root()->serialize(&parsedQueryBob);
+        query->root()->serialize(&parsedQueryBob, {});
         parsedQueryBob.doneFast();
 
         if (query->getCollator()) {

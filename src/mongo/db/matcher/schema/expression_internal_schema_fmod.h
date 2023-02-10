@@ -58,7 +58,8 @@ public:
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
 
-    BSONObj getSerializedRightHandSide() const final;
+    BSONObj getSerializedRightHandSide(
+        boost::optional<StringData> replacementForLiteralArgs) const final;
 
     bool equivalent(const MatchExpression* other) const final;
 

@@ -69,7 +69,7 @@ public:
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final;
 
-    void serialize(BSONObjBuilder* out, bool includePath) const final;
+    void serialize(BSONObjBuilder* out, SerializationOptions opts) const final;
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);

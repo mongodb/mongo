@@ -606,8 +606,6 @@ DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
     const auto matchSpec = BSON("a" << BSON("$elemMatch" << BSON("a.b" << 1)));
     const auto matchExpression =
         unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx));
-    BSONObjBuilder out;
-    matchExpression->serialize(&out);
     DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);
 }
 

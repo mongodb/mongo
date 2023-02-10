@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,36 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/query/query_shape.h"
 
-#include "mongo/db/matcher/expression_where_base.h"
+namespace mongo::query_shape {
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
-
-namespace mongo {
-
-WhereMatchExpressionBase::WhereMatchExpressionBase(WhereParams params)
-    : MatchExpression(WHERE), _code(std::move(params.code)) {}
-
-void WhereMatchExpressionBase::debugString(StringBuilder& debug, int indentationLevel) const {
-    _debugAddSpace(debug, indentationLevel);
-    debug << "$where\n";
-
-    _debugAddSpace(debug, indentationLevel + 1);
-    debug << "code: " << getCode() << "\n";
+BSONObj predicateShape(const MatchExpression* predicate) {
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = kLiteralArgString;
+    return predicate->serialize(opts);
 }
-
-void WhereMatchExpressionBase::serialize(BSONObjBuilder* out, SerializationOptions opts) const {
-    // TODO SERVER-73676 respect 'opts.'
-    out->appendCode("$where", getCode());
-}
-
-bool WhereMatchExpressionBase::equivalent(const MatchExpression* other) const {
-    if (matchType() != other->matchType()) {
-        return false;
-    }
-    const WhereMatchExpressionBase* realOther = static_cast<const WhereMatchExpressionBase*>(other);
-    return getCode() == realOther->getCode();
-}
-
-}  // namespace mongo
+}  // namespace mongo::query_shape

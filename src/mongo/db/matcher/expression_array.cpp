@@ -103,10 +103,10 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int inden
     _sub->debugString(debug, indentationLevel + 1);
 }
 
-BSONObj ElemMatchObjectMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder subBob;
-    _sub->serialize(&subBob, true);
-    return BSON("$elemMatch" << subBob.obj());
+BSONObj ElemMatchObjectMatchExpression::getSerializedRightHandSide(
+    boost::optional<StringData> replacementForLiteralArgs) const {
+    // TODO SERVER-73673 respect and test 'replacementForLiteralArgs'.
+    return BSON("$elemMatch" << _sub->serialize());
 }
 
 MatchExpression::ExpressionOptimizerFunc ElemMatchObjectMatchExpression::getOptimizer() const {
@@ -174,11 +174,15 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int indent
     }
 }
 
-BSONObj ElemMatchValueMatchExpression::getSerializedRightHandSide() const {
+BSONObj ElemMatchValueMatchExpression::getSerializedRightHandSide(
+    boost::optional<StringData> replacementForLiteralArgs) const {
     BSONObjBuilder emBob;
 
+    // TODO SERVER-73673 respect and test 'replacementForLiteralArgs'.
     for (auto&& child : _subs) {
-        child->serialize(&emBob, false);
+        SerializationOptions opts;
+        opts.includePath = false;
+        child->serialize(&emBob, opts);
     }
 
     return BSON("$elemMatch" << emBob.obj());
@@ -219,7 +223,9 @@ void SizeMatchExpression::debugString(StringBuilder& debug, int indentationLevel
     }
 }
 
-BSONObj SizeMatchExpression::getSerializedRightHandSide() const {
+BSONObj SizeMatchExpression::getSerializedRightHandSide(
+    boost::optional<StringData> replacementForLiteralArgs) const {
+    // TODO SERVER-73676 respect 'replacementForLiteralArgs.'
     return BSON("$size" << _size);
 }
 
