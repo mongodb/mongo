@@ -43,6 +43,8 @@
 #include <malloc/malloc.h>
 #elif defined(_WIN32)
 #include <malloc.h>
+#elif defined(__FreeBSD__)
+#include <malloc_np.h>
 #else
 #define MONGO_NO_MALLOC_USABLE_SIZE
 #endif
@@ -183,7 +185,7 @@ size_t get_current(void* ptr) {
         return 0;
 
     return *reinterpret_cast<size_t*>(static_cast<char*>(ptr) - kMaxAlign);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__FreeBSD__)
     return malloc_usable_size(ptr);
 #elif defined(__APPLE__)
     return malloc_size(ptr);
