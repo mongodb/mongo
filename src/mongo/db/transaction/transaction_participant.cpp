@@ -50,12 +50,10 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/write_ops_retryability.h"
-#include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -473,21 +471,6 @@ void updateSessionEntry(OperationContext* opCtx,
 //      code will be thrown, which will cause the write to not commit; if not specified, the write
 //      will be allowed to commit.
 MONGO_FAIL_POINT_DEFINE(onPrimaryTransactionalWrite);
-
-/**
- * Returns true if we are running retryable write or retryable internal multi-document transaction.
- */
-bool writeStageCommonIsRetryableWriteImpl(OperationContext* opCtx) {
-    if (!opCtx->writesAreReplicated() || !opCtx->isRetryableWrite()) {
-        return false;
-    }
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    return txnParticipant &&
-        (!opCtx->inMultiDocumentTransaction() || txnParticipant.transactionIsOpen());
-}
-
-auto isRetryableWriteRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
-    write_stage_common::isRetryableWrite, writeStageCommonIsRetryableWriteImpl);
 
 }  // namespace
 

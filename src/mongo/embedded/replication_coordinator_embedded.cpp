@@ -651,5 +651,9 @@ repl::SplitPrepareSessionManager* ReplicationCoordinatorEmbedded::getSplitPrepar
     UASSERT_NOT_IMPLEMENTED;
 }
 
+bool ReplicationCoordinatorEmbedded::isRetryableWrite(OperationContext* opCtx) const {
+    return false;
+}
+
 }  // namespace embedded
 }  // namespace mongo

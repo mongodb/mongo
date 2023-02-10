@@ -361,6 +361,8 @@ public:
 
     virtual repl::SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
 
+    virtual bool isRetryableWrite(OperationContext* opCtx) const override;
+
 private:
     // Back pointer to the ServiceContext that has started the instance.
     ServiceContext* const _service;

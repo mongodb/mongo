@@ -590,6 +590,8 @@ public:
      */
     WriteConcernTagChanges* getWriteConcernTagChanges() override;
 
+    bool isRetryableWrite(OperationContext* opCtx) const override;
+
 private:
     using CallbackFn = executor::TaskExecutor::CallbackFn;
 

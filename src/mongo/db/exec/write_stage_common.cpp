@@ -176,8 +176,8 @@ bool ensureStillMatches(const CollectionPtr& collection,
 }
 
 bool isRetryableWrite(OperationContext* opCtx) {
-    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(write_stage_common::isRetryableWrite);
-    return w(opCtx);
+    const auto replCoord{repl::ReplicationCoordinator::get(opCtx)};
+    return replCoord->isRetryableWrite(opCtx);
 }
 
 }  // namespace write_stage_common

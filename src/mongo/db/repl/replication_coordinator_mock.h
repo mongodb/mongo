@@ -432,6 +432,10 @@ public:
         _updateCommittedSnapshot = val;
     }
 
+    bool isRetryableWrite(OperationContext* opCtx) const override {
+        return false;
+    }
+
 private:
     void _setMyLastAppliedOpTimeAndWallTime(WithLock lk,
                                             const OpTimeAndWallTime& opTimeAndWallTime);

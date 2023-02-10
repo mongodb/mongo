@@ -620,5 +620,9 @@ SplitPrepareSessionManager* ReplicationCoordinatorNoOp::getSplitPrepareSessionMa
     MONGO_UNREACHABLE;
 }
 
+bool ReplicationCoordinatorNoOp::isRetryableWrite(OperationContext* opCtx) const {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo

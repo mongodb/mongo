@@ -1190,6 +1190,12 @@ public:
      */
     virtual SplitPrepareSessionManager* getSplitPrepareSessionManager() = 0;
 
+    /**
+     * Returns true if we are running retryable write or retryable internal multi-document
+     * transaction.
+     */
+    virtual bool isRetryableWrite(OperationContext* opCtx) const = 0;
+
 protected:
     ReplicationCoordinator();
 };

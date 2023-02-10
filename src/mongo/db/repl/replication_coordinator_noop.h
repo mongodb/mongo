@@ -351,6 +351,8 @@ public:
 
     virtual SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
 
+    virtual bool isRetryableWrite(OperationContext* opCtx) const override;
+
 private:
     ServiceContext* const _service;
 };
