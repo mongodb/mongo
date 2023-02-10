@@ -49,30 +49,71 @@ BSONObj _createCmdObj(const BSONObj& writeCmd,
                       const StringData& commandName,
                       const BSONObj& targetDocId,
                       const NamespaceString& nss) {
-    // Drop collation and writeConcern as
-    // targeting by _id uses default collation and writeConcern cannot be specified for
-    // commands run in internal transactions. This object will be used to construct the command
-    // request used by clusterWriteWithoutShardKey.
+
+    // Drop the writeConcern as it cannot be specified for commands run in internal transactions.
+    // This object will be used to construct the command request used by
+    // _clusterWriteWithoutShardKey.
     BSONObjBuilder writeCmdObjBuilder(
-        writeCmd.removeFields(std::set<std::string>{"collation", "writeConcern"}));
+        writeCmd.removeField(WriteConcernOptions::kWriteConcernField));
     writeCmdObjBuilder.appendElementsUnique(BSON("$db" << nss.dbName().toString()));
     auto writeCmdObj = writeCmdObjBuilder.obj();
 
     // Parse original write command and set _id as query filter for new command object.
     if (commandName == "update") {
         auto parsedUpdateRequest = write_ops::UpdateCommandRequest::parse(
-            IDLParserContext("_clusterWriteWithoutShardKey"), writeCmdObj);
+            IDLParserContext("_clusterWriteWithoutShardKeyForUpdate"), writeCmdObj);
+
+        // The original query and collation are sent along with the modified command for the
+        // purposes of query sampling.
+        if (parsedUpdateRequest.getUpdates().front().getSampleId()) {
+            auto writeCommandRequestBase = write_ops::WriteCommandRequestBase(
+                parsedUpdateRequest.getWriteCommandRequestBase());
+            writeCommandRequestBase.setOriginalQuery(
+                parsedUpdateRequest.getUpdates().front().getQ());
+            writeCommandRequestBase.setOriginalCollation(
+                parsedUpdateRequest.getUpdates().front().getCollation());
+            parsedUpdateRequest.setWriteCommandRequestBase(writeCommandRequestBase);
+        }
+
         parsedUpdateRequest.getUpdates().front().setQ(targetDocId);
+        // Unset the collation because targeting by _id uses default collation.
+        parsedUpdateRequest.getUpdates().front().setCollation(boost::none);
         return parsedUpdateRequest.toBSON(BSONObj());
     } else if (commandName == "delete") {
         auto parsedDeleteRequest = write_ops::DeleteCommandRequest::parse(
-            IDLParserContext("_clusterWriteWithoutShardKey"), writeCmdObj);
+            IDLParserContext("_clusterWriteWithoutShardKeyForDelete"), writeCmdObj);
+
+        // The original query and collation are sent along with the modified command for the
+        // purposes of query sampling.
+        if (parsedDeleteRequest.getDeletes().front().getSampleId()) {
+            auto writeCommandRequestBase = write_ops::WriteCommandRequestBase(
+                parsedDeleteRequest.getWriteCommandRequestBase());
+            writeCommandRequestBase.setOriginalQuery(
+                parsedDeleteRequest.getDeletes().front().getQ());
+            writeCommandRequestBase.setOriginalCollation(
+                parsedDeleteRequest.getDeletes().front().getCollation());
+            parsedDeleteRequest.setWriteCommandRequestBase(writeCommandRequestBase);
+        }
+
         parsedDeleteRequest.getDeletes().front().setQ(targetDocId);
+        // Unset the collation because targeting by _id uses default collation.
+        parsedDeleteRequest.getDeletes().front().setCollation(boost::none);
         return parsedDeleteRequest.toBSON(BSONObj());
     } else if (commandName == "findandmodify" || commandName == "findAndModify") {
         auto parsedFindAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
-            IDLParserContext("_clusterWriteWithoutShardKey"), writeCmdObj);
+            IDLParserContext("_clusterWriteWithoutShardKeyForFindAndModify"), writeCmdObj);
+
+        // The original query and collation are sent along with the modified command for the
+        // purposes of query sampling.
+        if (parsedFindAndModifyRequest.getSampleId()) {
+            parsedFindAndModifyRequest.setOriginalQuery(parsedFindAndModifyRequest.getQuery());
+            parsedFindAndModifyRequest.setOriginalCollation(
+                parsedFindAndModifyRequest.getCollation());
+        }
+
         parsedFindAndModifyRequest.setQuery(targetDocId);
+        // Unset the collation because targeting by _id uses default collation.
+        parsedFindAndModifyRequest.setCollation(boost::none);
         return parsedFindAndModifyRequest.toBSON(BSONObj());
     } else {
         uasserted(ErrorCodes::InvalidOptions,

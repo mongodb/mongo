@@ -1106,8 +1106,18 @@ WriteResult performUpdates(OperationContext* opCtx,
         });
 
         if (analyze_shard_key::supportsPersistingSampledQueries() && singleOp.getSampleId()) {
+            auto updateOp = wholeOp;
+
+            // If the initial query was a write without shard key, the two phase write protocol
+            // modifies the query in the write phase. In order to get correct metrics, we need to
+            // reconstruct the original query prior to sampling.
+            if (wholeOp.getOriginalQuery()) {
+                updateOp.getUpdates().front().setQ(*wholeOp.getOriginalQuery());
+                updateOp.getUpdates().front().setCollation(wholeOp.getOriginalCollation());
+            }
+
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                ->addUpdateQuery(wholeOp, currentOpIndex)
+                ->addUpdateQuery(updateOp, currentOpIndex)
                 .getAsync([](auto) {});
         }
 
@@ -1354,8 +1364,18 @@ WriteResult performDeletes(OperationContext* opCtx,
         });
 
         if (analyze_shard_key::supportsPersistingSampledQueries() && singleOp.getSampleId()) {
+            auto deleteOp = wholeOp;
+
+            // If the initial query was a write without shard key, the two phase write protocol
+            // modifies the query in the write phase. In order to get correct metrics, we need to
+            // reconstruct the original query prior to sampling.
+            if (wholeOp.getOriginalQuery()) {
+                deleteOp.getDeletes().front().setQ(*wholeOp.getOriginalQuery());
+                deleteOp.getDeletes().front().setCollation(wholeOp.getOriginalCollation());
+            }
+
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                ->addDeleteQuery(wholeOp, currentOpIndex)
+                ->addDeleteQuery(deleteOp, currentOpIndex)
                 .getAsync([](auto) {});
         }
 
@@ -1389,7 +1409,7 @@ WriteResult performDeletes(OperationContext* opCtx,
     }
 
     return out;
-}
+}  // namespace mongo::write_ops_exec
 
 Status performAtomicTimeseriesWrites(
     OperationContext* opCtx,

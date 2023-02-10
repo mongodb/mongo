@@ -94,9 +94,12 @@ function runAndVerifyCommand(testCase) {
                 writeCmd: {
                     update: collName,
                     updates: [
-                        {q: {}, u: {$set: {a: aFieldValue}}},
+                        {
+                            q: {},
+                            u: {$set: {a: aFieldValue}},
+                            collation: {locale: "simple"},
+                        },
                     ],
-                    collation: {locale: "simple"},
                     writeConcern: {w: "majority"},
                 },
                 shardId: shardConn,

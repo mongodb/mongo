@@ -3,7 +3,7 @@
  * distribution metrics, but on replica sets it does not since query sampling is only supported on
  * sharded clusters at this point.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey, featureFlagUpdateOneWithoutShardKey]
  */
 (function() {
 "use strict";
@@ -283,67 +283,63 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
         writeDistribution.numShardKeyUpdates++;
     }
 
-    // TODO (SERVER-73045): Remove the if below to add test coverage for sampling of single write
-    // without shard key.
-    if (!isShardedColl) {
-        // Below are writes targeting a variable number of shards.
+    // Below are writes targeting a variable number of shards.
 
-        for (let i = 0; i < getRandomCount(); i++) {
-            cmdObjs.push({
-                update: collName,
-                updates: [{q: {[shardKeyField]: {$gte: getNextVal()}}, u: {$set: {z: 0}}}]
-            });
-            writeDistribution.sampleSize.update++;
-            writeDistribution.sampleSize.total++;
-            if (isHashed) {
-                // For hashed sharding, range queries on the shard key target all shards.
-                writeDistribution.numScatterGather++;
-            } else {
-                writeDistribution.numVariableShard++;
-            }
-            writeDistribution.numSingleWritesWithoutShardKey++;
-        }
-
-        for (let i = 0; i < getRandomCount(); i++) {
-            cmdObjs.push(
-                {delete: collName, deletes: [{q: {[shardKeyField]: {$lte: minVal++}}, limit: 0}]});
-            writeDistribution.sampleSize.delete ++;
-            writeDistribution.sampleSize.total++;
-            if (isHashed) {
-                // For hashed sharding, range queries on the shard key target all shards.
-                writeDistribution.numScatterGather++;
-            } else {
-                writeDistribution.numVariableShard++;
-            }
-            writeDistribution.numMultiWritesWithoutShardKey++;
-        }
-
-        for (let i = 0; i < getRandomCount(); i++) {
-            cmdObjs.push({
-                findAndModify: collName,
-                query: {[shardKeyField]: {$lte: getNextVal()}},
-                update: {$set: {z: 0}}
-            });
-            writeDistribution.sampleSize.findAndModify++;
-            writeDistribution.sampleSize.total++;
-            if (isHashed) {
-                // For hashed sharding, range queries on the shard key target all shards.
-                writeDistribution.numScatterGather++;
-            } else {
-                writeDistribution.numVariableShard++;
-            }
-            writeDistribution.numSingleWritesWithoutShardKey++;
-        }
-
-        // Below are writes targeting all shards.
-
-        for (let i = 0; i < getRandomCount(); i++) {
-            cmdObjs.push({findAndModify: collName, query: {}, update: {$set: {z: 0}}});
-            writeDistribution.sampleSize.findAndModify++;
-            writeDistribution.sampleSize.total++;
+    for (let i = 0; i < getRandomCount(); i++) {
+        cmdObjs.push({
+            update: collName,
+            updates: [{q: {[shardKeyField]: {$gte: getNextVal()}}, u: {$set: {z: 0}}}]
+        });
+        writeDistribution.sampleSize.update++;
+        writeDistribution.sampleSize.total++;
+        if (isHashed) {
+            // For hashed sharding, range queries on the shard key target all shards.
             writeDistribution.numScatterGather++;
-            writeDistribution.numSingleWritesWithoutShardKey++;
+        } else {
+            writeDistribution.numVariableShard++;
         }
+        writeDistribution.numSingleWritesWithoutShardKey++;
+    }
+
+    for (let i = 0; i < getRandomCount(); i++) {
+        cmdObjs.push(
+            {delete: collName, deletes: [{q: {[shardKeyField]: {$lte: minVal++}}, limit: 0}]});
+        writeDistribution.sampleSize.delete ++;
+        writeDistribution.sampleSize.total++;
+        if (isHashed) {
+            // For hashed sharding, range queries on the shard key target all shards.
+            writeDistribution.numScatterGather++;
+        } else {
+            writeDistribution.numVariableShard++;
+        }
+        writeDistribution.numMultiWritesWithoutShardKey++;
+    }
+
+    for (let i = 0; i < getRandomCount(); i++) {
+        cmdObjs.push({
+            findAndModify: collName,
+            query: {[shardKeyField]: {$lte: getNextVal()}},
+            update: {$set: {z: 0}}
+        });
+        writeDistribution.sampleSize.findAndModify++;
+        writeDistribution.sampleSize.total++;
+        if (isHashed) {
+            // For hashed sharding, range queries on the shard key target all shards.
+            writeDistribution.numScatterGather++;
+        } else {
+            writeDistribution.numVariableShard++;
+        }
+        writeDistribution.numSingleWritesWithoutShardKey++;
+    }
+
+    // Below are writes targeting all shards.
+
+    for (let i = 0; i < getRandomCount(); i++) {
+        cmdObjs.push({findAndModify: collName, query: {}, update: {$set: {z: 0}}});
+        writeDistribution.sampleSize.findAndModify++;
+        writeDistribution.sampleSize.total++;
+        writeDistribution.numScatterGather++;
+        writeDistribution.numSingleWritesWithoutShardKey++;
     }
 
     return {cmdObjs, metrics: {readDistribution, writeDistribution}};
@@ -516,13 +512,12 @@ const analyzeShardKeyNumRanges = 10;
 
     runTest({isShardedColl: false, shardKeyField: "x", isHashed: false});
     runTest({isShardedColl: false, shardKeyField: "x", isHashed: true});
+
     // Note that {x: 1} is the current shard key for the sharded collection being tested.
     runTest({isShardedColl: true, shardKeyField: "x", isHashed: false});
     runTest({isShardedColl: true, shardKeyField: "x", isHashed: true});
-    // TODO (SERVER-73045): Uncomment the tests below to add test coverage for sampling of single
-    // writes without shard key.
-    // runTest({isShardedColl: true, shardKeyField: "y", isHashed: false});
-    // runTest({isShardedColl: true, shardKeyField: "y", isHashed: true});
+    runTest({isShardedColl: true, shardKeyField: "y", isHashed: false});
+    runTest({isShardedColl: true, shardKeyField: "y", isHashed: true});
 
     st.stop();
 }

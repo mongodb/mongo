@@ -205,6 +205,25 @@ structs:
                 type: EncryptionInformation
                 optional: true
                 stability: unstable
+            $_originalQuery:
+                description: "The original write query. This is used for updateOne/deleteOne 
+                              without shard key during the write phase of the two phase protocol in 
+                              order to make sure the shard key query analysis stores the correct 
+                              client query."
+                type: object
+                optional: true
+                cpp_name: originalQuery
+                stability: internal
+            $_originalCollation:
+                description: "The original write query. This is used for updateOne/deleteOne 
+                              without shard key during the write phase of the two phase protocol in 
+                              order to make sure the shard key query analysis stores the correct 
+                              client collation."
+                type: object
+                optional: true
+                cpp_name: originalCollation
+                stability: internal
+
 
     UpdateOpEntry:
         description: "Parser for the entries in the 'updates' array of an update command."
@@ -550,3 +569,22 @@ commands:
                 type: uuid
                 optional: true
                 stability: unstable
+            $_originalQuery:
+                description: "The original write query. This is used for findAndModify without shard 
+                              key during the write phase of the two phase protocol in order to make 
+                              sure the shard key query analysis stores the correct client 
+                              query."
+                type: object
+                optional: true
+                cpp_name: originalQuery
+                stability: internal
+            $_originalCollation:
+                description: "The original collation. This is used for findAndModify without shard 
+                              key during the write phase of the two phase protocol in order to make 
+                              sure the shard key query analysis stores the correct client 
+                              collation."
+                type: object
+                optional: true
+                cpp_name: originalCollation
+                stability: internal
+            

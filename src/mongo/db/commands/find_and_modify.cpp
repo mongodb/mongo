@@ -684,8 +684,18 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     }
 
     if (analyze_shard_key::supportsPersistingSampledQueries() && req.getSampleId()) {
-        analyze_shard_key::QueryAnalysisWriter::get(opCtx)->addFindAndModifyQuery(req).getAsync(
-            [](auto) {});
+        auto findAndModifyOp = req;
+
+        // If the initial query was a write without shard key, the two phase write protocol
+        // modifies the query in the write phase. In order to get correct metrics, we need to
+        // reconstruct the original query prior to sampling.
+        if (req.getOriginalQuery()) {
+            findAndModifyOp.setQuery(*req.getOriginalQuery());
+            findAndModifyOp.setCollation(req.getOriginalCollation());
+        }
+        analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+            ->addFindAndModifyQuery(findAndModifyOp)
+            .getAsync([](auto) {});
     }
 
     if (MONGO_unlikely(failAllFindAndModify.shouldFail())) {
