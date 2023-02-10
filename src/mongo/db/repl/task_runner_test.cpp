@@ -120,7 +120,9 @@ OpIdVector _testRunTaskTwice(TaskRunnerTest& test,
 
 std::vector<unsigned int> _testRunTaskTwice(TaskRunnerTest& test,
                                             TaskRunner::NextAction nextAction) {
-    auto schedule = [&](Task task) { test.getTaskRunner().schedule(std::move(task)); };
+    auto schedule = [&](Task task) {
+        test.getTaskRunner().schedule(std::move(task));
+    };
     return _testRunTaskTwice(test, nextAction, schedule);
 }
 

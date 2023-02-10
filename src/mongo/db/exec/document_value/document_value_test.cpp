@@ -548,7 +548,9 @@ public:
     int cmp(const BSONObj& a, const BSONObj& b) {
         int result = DocumentComparator().compare(fromBson(a), fromBson(b));
         return  // sign
-            result < 0 ? -1 : result > 0 ? 1 : 0;
+            result < 0   ? -1
+            : result > 0 ? 1
+                         : 0;
     }
     void assertComparison(int expectedResult, const BSONObj& a, const BSONObj& b) {
         ASSERT_EQUALS(expectedResult, cmp(a, b));
@@ -1162,7 +1164,12 @@ public:
     void run() {
         std::string longString(16793500, 'x');
         auto obj = BSON("str" << longString);
-        ASSERT_THROWS_CODE([&]() { Value{obj["str"]}; }(), DBException, 16493);
+        ASSERT_THROWS_CODE(
+            [&]() {
+                Value{obj["str"]};
+            }(),
+            DBException,
+            16493);
     }
 };
 

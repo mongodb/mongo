@@ -67,7 +67,8 @@ const ServiceContext::ConstructorActionRegisterer clientObserverRegisterer{
     [](ServiceContext* service) {
         service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
     },
-    [](ServiceContext* serviceContext) {}};
+    [](ServiceContext* serviceContext) {
+    }};
 
 class DConcurrencyTest : public benchmark::Fixture {
 public:

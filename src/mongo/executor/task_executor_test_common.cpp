@@ -115,7 +115,9 @@ public:
     void CET_##TEST_NAME::_doTest()
 
 auto makeSetStatusClosure(Status* target) {
-    return [target](const TaskExecutor::CallbackArgs& cbData) { *target = cbData.status; };
+    return [target](const TaskExecutor::CallbackArgs& cbData) {
+        *target = cbData.status;
+    };
 }
 
 auto makeSetStatusAndShutdownClosure(Status* target) {

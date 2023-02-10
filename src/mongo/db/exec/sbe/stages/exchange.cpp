@@ -44,7 +44,9 @@ MONGO_INITIALIZER(s_globalThreadPool)(InitializerContext* context) {
     options.threadNamePrefix = "ExchProd";
     options.minThreads = 0;
     options.maxThreads = 128;
-    options.onCreateThread = [](const std::string& name) { Client::initThread(name); };
+    options.onCreateThread = [](const std::string& name) {
+        Client::initThread(name);
+    };
     s_globalThreadPool = std::make_unique<ThreadPool>(options);
     s_globalThreadPool->startup();
 }

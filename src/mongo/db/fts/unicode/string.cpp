@@ -136,7 +136,9 @@ StringData String::substrToBufWithTransform(StackBufBuilder* buffer,
 }
 
 StringData String::substrToBuf(StackBufBuilder* buffer, size_t pos, size_t len) const {
-    const auto identityFunc = [](char32_t ch) { return ch; };
+    const auto identityFunc = [](char32_t ch) {
+        return ch;
+    };
     return substrToBufWithTransform(buffer, pos, len, identityFunc);
 }
 
@@ -144,7 +146,9 @@ StringData String::toLowerToBuf(StackBufBuilder* buffer,
                                 CaseFoldMode mode,
                                 size_t pos,
                                 size_t len) const {
-    const auto toLower = [mode](char32_t ch) { return codepointToLower(ch, mode); };
+    const auto toLower = [mode](char32_t ch) {
+        return codepointToLower(ch, mode);
+    };
     return substrToBufWithTransform(buffer, pos, len, toLower);
 }
 

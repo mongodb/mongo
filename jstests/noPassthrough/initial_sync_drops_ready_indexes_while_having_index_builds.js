@@ -101,11 +101,11 @@ IndexBuildTest.resumeIndexBuilds(secondary);
 awaitIndexBuild();
 
 IndexBuildTest.assertIndexes(
-    coll, /*numIndexes=*/2, /*readyIndexes=*/["_id_", "b_1"], /*notReadyIndexes=*/[]);
+    coll, /*numIndexes=*/ 2, /*readyIndexes=*/["_id_", "b_1"], /*notReadyIndexes=*/[]);
 
 const secondaryColl = secondary.getDB(dbName).getCollection(collName);
 IndexBuildTest.assertIndexes(
-    secondaryColl, /*numIndexes=*/2, /*readyIndexes=*/["_id_", "b_1"], /*notReadyIndexes=*/[]);
+    secondaryColl, /*numIndexes=*/ 2, /*readyIndexes=*/["_id_", "b_1"], /*notReadyIndexes=*/[]);
 
 rst.stopSet();
 }());

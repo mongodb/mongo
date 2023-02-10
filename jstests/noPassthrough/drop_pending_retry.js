@@ -40,7 +40,7 @@ assert.commandWorked(db.createCollection("toDrop"));
 assert.commandWorked(db.createCollection("toWrite"));
 
 const collUri = getUriForColl(db.getCollection("toDrop"));
-const indexUri = getUriForIndex(db.getCollection("toDrop"), /*indexName=*/"_id_");
+const indexUri = getUriForIndex(db.getCollection("toDrop"), /*indexName=*/ "_id_");
 
 assert(db.getCollection("toDrop").drop());
 

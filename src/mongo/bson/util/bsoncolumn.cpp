@@ -324,14 +324,15 @@ void BSONColumn::Iterator::_initializeInterleaving() {
         *_control == bsoncolumn::kInterleavedStartArrayRootControlByte ? Array : Object;
     _interleavedReferenceObj = BSONObj(_control + 1);
 
-    BSONObjTraversal t(_interleavedArrays,
-                       _interleavedRootType,
-                       [](StringData fieldName, const BSONObj& obj, BSONType type) { return true; },
-                       [this](const BSONElement& elem) {
-                           _states.emplace_back();
-                           _states.back()._loadLiteral(elem);
-                           return true;
-                       });
+    BSONObjTraversal t(
+        _interleavedArrays,
+        _interleavedRootType,
+        [](StringData fieldName, const BSONObj& obj, BSONType type) { return true; },
+        [this](const BSONElement& elem) {
+            _states.emplace_back();
+            _states.back()._loadLiteral(elem);
+            return true;
+        });
     t.traverse(_interleavedReferenceObj);
     uassert(6067610, "Invalid BSONColumn encoding", !_states.empty());
 

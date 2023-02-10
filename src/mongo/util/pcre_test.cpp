@@ -124,7 +124,9 @@ TEST(PcreTest, RegexMoveAssign) {
 }
 
 TEST(PcreTest, CodeSize) {
-    auto reSize = [](std::string p) { return Regex{std::move(p)}.codeSize(); };
+    auto reSize = [](std::string p) {
+        return Regex{std::move(p)}.codeSize();
+    };
     ASSERT_LT(reSize(""), reSize("hi"));
     ASSERT_LT(reSize("hi"), reSize("^(hi)*|(\\d{45})$"));
 }

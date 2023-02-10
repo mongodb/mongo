@@ -87,9 +87,11 @@ public:
     }
 };
 
-const auto implRegisterer = ServiceContext::ConstructorActionRegisterer{
-    "RemoteCommmandRunner",
-    [](ServiceContext* ctx) { getRCRImpl(ctx) = std::make_unique<AsyncRPCRunnerImpl>(); }};
+const auto implRegisterer =
+    ServiceContext::ConstructorActionRegisterer{"RemoteCommmandRunner", [](ServiceContext* ctx) {
+                                                    getRCRImpl(ctx) =
+                                                        std::make_unique<AsyncRPCRunnerImpl>();
+                                                }};
 
 AsyncRPCRunner* AsyncRPCRunner::get(ServiceContext* svcCtx) {
     return getRCRImpl(svcCtx).get();

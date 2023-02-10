@@ -796,7 +796,7 @@ public:
     explicit SharedStateHolder(boost::intrusive_ptr<SharedState<FakeVoid>>&& shared)
         : _inner(std::move(shared)) {}
     /*implicit*/ SharedStateHolder(Impl&& shared) : _inner(std::move(shared)) {}
-    /*implicit*/ operator Impl &&() && {
+    /*implicit*/ operator Impl&&() && {
         return std::move(_inner);
     }
 
@@ -955,15 +955,15 @@ public:
             [&](Status&& status) { call(func, StatusWith<T>(std::move(status))); },
             // on not ready yet:
             [&] {
-                _shared->callback = [func = std::forward<Func>(func)](SharedStateBase *
-                                                                      ssb) mutable noexcept {
-                    const auto input = checked_cast<SharedState<T>*>(ssb);
-                    if (input->status.isOK()) {
-                        call(func, StatusWith<T>(std::move(*input->data)));
-                    } else {
-                        call(func, StatusWith<T>(std::move(input->status)));
-                    }
-                };
+                _shared->callback =
+                    [func = std::forward<Func>(func)](SharedStateBase* ssb) mutable noexcept {
+                        const auto input = checked_cast<SharedState<T>*>(ssb);
+                        if (input->status.isOK()) {
+                            call(func, StatusWith<T>(std::move(*input->data)));
+                        } else {
+                            call(func, StatusWith<T>(std::move(input->status)));
+                        }
+                    };
             });
     }
 
@@ -981,13 +981,14 @@ public:
                 [&](Status&& status) { return FutureImpl<Result>::makeReady(std::move(status)); },
                 // on not ready yet:
                 [&] {
-                    return makeContinuation<Result>([func = std::forward<Func>(func)](
-                        SharedState<T> * input, SharedState<Result> * output) mutable noexcept {
-                        if (!input->status.isOK())
-                            return output->setError(std::move(input->status));
+                    return makeContinuation<Result>(
+                        [func = std::forward<Func>(func)](
+                            SharedState<T>* input, SharedState<Result>* output) mutable noexcept {
+                            if (!input->status.isOK())
+                                return output->setError(std::move(input->status));
 
-                        output->setFrom(statusCall(func, std::move(*input->data)));
-                    });
+                            output->setFrom(statusCall(func, std::move(*input->data)));
+                        });
                 });
         } else {
             using UnwrappedResult = typename Result::value_type;
@@ -1006,18 +1007,20 @@ public:
                 },
                 // on not ready yet:
                 [&] {
-                    return makeContinuation<UnwrappedResult>([func = std::forward<Func>(func)](
-                        SharedState<T> * input,
-                        SharedState<UnwrappedResult> * output) mutable noexcept {
-                        if (!input->status.isOK())
-                            return output->setError(std::move(input->status));
+                    return makeContinuation<UnwrappedResult>(
+                        [func = std::forward<Func>(func)](
+                            SharedState<T>* input,
+                            SharedState<UnwrappedResult>* output) mutable noexcept {
+                            if (!input->status.isOK())
+                                return output->setError(std::move(input->status));
 
-                        try {
-                            throwingCall(func, std::move(*input->data)).propagateResultTo(output);
-                        } catch (const DBException& ex) {
-                            output->setError(ex.toStatus());
-                        }
-                    });
+                            try {
+                                throwingCall(func, std::move(*input->data))
+                                    .propagateResultTo(output);
+                            } catch (const DBException& ex) {
+                                output->setError(ex.toStatus());
+                            }
+                        });
                 });
         }
     }
@@ -1041,14 +1044,15 @@ public:
                 },
                 // on not ready yet:
                 [&] {
-                    return makeContinuation<Result>([func = std::forward<Func>(func)](
-                        SharedState<T> * input, SharedState<Result> * output) mutable noexcept {
-                        if (!input->status.isOK())
-                            return output->setFrom(
-                                statusCall(func, Wrapper(std::move(input->status))));
+                    return makeContinuation<Result>(
+                        [func = std::forward<Func>(func)](
+                            SharedState<T>* input, SharedState<Result>* output) mutable noexcept {
+                            if (!input->status.isOK())
+                                return output->setFrom(
+                                    statusCall(func, Wrapper(std::move(input->status))));
 
-                        output->setFrom(statusCall(func, Wrapper(std::move(*input->data))));
-                    });
+                            output->setFrom(statusCall(func, Wrapper(std::move(*input->data))));
+                        });
                 });
         } else {
             using UnwrappedResult = typename Result::value_type;
@@ -1073,27 +1077,28 @@ public:
                 },
                 // on not ready yet:
                 [&] {
-                    return makeContinuation<UnwrappedResult>([func = std::forward<Func>(func)](
-                        SharedState<T> * input,
-                        SharedState<UnwrappedResult> * output) mutable noexcept {
-                        if (!input->status.isOK()) {
+                    return makeContinuation<UnwrappedResult>(
+                        [func = std::forward<Func>(func)](
+                            SharedState<T>* input,
+                            SharedState<UnwrappedResult>* output) mutable noexcept {
+                            if (!input->status.isOK()) {
+                                try {
+                                    throwingCall(func, Wrapper(std::move(input->status)))
+                                        .propagateResultTo(output);
+                                } catch (const DBException& ex) {
+                                    output->setError(ex.toStatus());
+                                }
+
+                                return;
+                            }
+
                             try {
-                                throwingCall(func, Wrapper(std::move(input->status)))
+                                throwingCall(func, Wrapper(std::move(*input->data)))
                                     .propagateResultTo(output);
                             } catch (const DBException& ex) {
                                 output->setError(ex.toStatus());
                             }
-
-                            return;
-                        }
-
-                        try {
-                            throwingCall(func, Wrapper(std::move(*input->data)))
-                                .propagateResultTo(output);
-                        } catch (const DBException& ex) {
-                            output->setError(ex.toStatus());
-                        }
-                    });
+                        });
                 });
         }
     }
@@ -1116,13 +1121,14 @@ public:
                 },
                 // on not ready yet:
                 [&] {
-                    return makeContinuation<T>([func = std::forward<Func>(func)](
-                        SharedState<T> * input, SharedState<T> * output) mutable noexcept {
-                        if (input->status.isOK())
-                            return output->emplaceValue(std::move(*input->data));
+                    return makeContinuation<T>(
+                        [func = std::forward<Func>(func)](SharedState<T>* input,
+                                                          SharedState<T>* output) mutable noexcept {
+                            if (input->status.isOK())
+                                return output->emplaceValue(std::move(*input->data));
 
-                        output->setFrom(statusCall(func, std::move(input->status)));
-                    });
+                            output->setFrom(statusCall(func, std::move(input->status)));
+                        });
                 });
         } else {
             return generalImpl(
@@ -1139,7 +1145,8 @@ public:
                 // on not ready yet:
                 [&] {
                     return makeContinuation<T>([func = std::forward<Func>(func)](
-                        SharedState<T> * input, SharedState<T> * output) mutable noexcept {
+                                                   SharedState<T>* input,
+                                                   SharedState<T>* output) mutable noexcept {
                         if (input->status.isOK())
                             return output->emplaceValue(std::move(*input->data));
 
@@ -1199,9 +1206,10 @@ public:
         static_assert(std::is_void<decltype(call(func, std::declval<const T&>()))>::value,
                       "func passed to tap must return void");
 
-        return tapImpl(std::forward<Func>(func),
-                       [](Func && successFunc, const T& val) noexcept { call(successFunc, val); },
-                       [](Func && failFunc, const Status& status) noexcept {});
+        return tapImpl(
+            std::forward<Func>(func),
+            [](Func&& successFunc, const T& val) noexcept { call(successFunc, val); },
+            [](Func&& failFunc, const Status& status) noexcept {});
     }
 
     TEMPLATE(typename Policy, typename Func)
@@ -1211,8 +1219,9 @@ public:
                       "func passed to tapError must return void");
 
         return tapImpl(
-            std::forward<Func>(func), [](Func && successFunc, const T& val) noexcept {}, [
-            ](Func && failFunc, const Status& status) noexcept { call(failFunc, status); });
+            std::forward<Func>(func),
+            [](Func&& successFunc, const T& val) noexcept {},
+            [](Func&& failFunc, const Status& status) noexcept { call(failFunc, status); });
     }
 
     TEMPLATE(typename Policy, typename Func)
@@ -1225,8 +1234,8 @@ public:
         using Wrapper = StatusOrStatusWith<T>;
         return tapImpl(
             std::forward<Func>(func),
-            [](Func && successFunc, const T& val) noexcept { call(successFunc, Wrapper(val)); },
-            [](Func && failFunc, const Status& status) noexcept {
+            [](Func&& successFunc, const T& val) noexcept { call(successFunc, Wrapper(val)); },
+            [](Func&& failFunc, const Status& status) noexcept {
                 call(failFunc, Wrapper(status));
             });
     }
@@ -1254,7 +1263,7 @@ public:
                 }
                 _shared->isJustForContinuation.store(true, std::memory_order_release);
 
-                _shared->callback = [](SharedStateBase * ssb) noexcept {
+                _shared->callback = [](SharedStateBase* ssb) noexcept {
                     const auto input = checked_cast<SharedState<T>*>(ssb);
                     const auto output = checked_cast<SharedState<T>*>(ssb->continuation.get());
                     output->fillFromMove(std::move(*input));
@@ -1327,16 +1336,17 @@ private:
                 return FutureImpl<T>::makeReady(std::move(status));
             },
             [&] {
-                return makeContinuation<T>([ success, fail, cb = std::forward<Callback>(cb) ](
-                    SharedState<T> * input, SharedState<T> * output) mutable noexcept {
-                    if (input->status.isOK()) {
-                        success(std::forward<Callback>(cb), stdx::as_const(*input->data));
-                    } else {
-                        fail(std::forward<Callback>(cb), stdx::as_const(input->status));
-                    }
+                return makeContinuation<T>(
+                    [success, fail, cb = std::forward<Callback>(cb)](
+                        SharedState<T>* input, SharedState<T>* output) mutable noexcept {
+                        if (input->status.isOK()) {
+                            success(std::forward<Callback>(cb), stdx::as_const(*input->data));
+                        } else {
+                            fail(std::forward<Callback>(cb), stdx::as_const(input->status));
+                        }
 
-                    output->fillFromMove(std::move(*input));
-                });
+                        output->fillFromMove(std::move(*input));
+                    });
             });
     }
 
@@ -1347,12 +1357,12 @@ private:
         auto continuation = make_intrusive<SharedState<Result>>();
         continuation->threadUnsafeIncRefCountTo(2);
         _shared->continuation.reset(continuation.get(), /*add ref*/ false);
-        _shared->callback = [onReady = std::forward<OnReady>(onReady)](SharedStateBase *
-                                                                       ssb) mutable noexcept {
-            const auto input = checked_cast<SharedState<T>*>(ssb);
-            const auto output = checked_cast<SharedState<Result>*>(ssb->continuation.get());
-            onReady(input, output);
-        };
+        _shared->callback =
+            [onReady = std::forward<OnReady>(onReady)](SharedStateBase* ssb) mutable noexcept {
+                const auto input = checked_cast<SharedState<T>*>(ssb);
+                const auto output = checked_cast<SharedState<Result>*>(ssb->continuation.get());
+                onReady(input, output);
+            };
         return FutureImpl<Result>(SharedStateHolder<Result>(std::move(continuation)));
     }
 
@@ -1455,7 +1465,7 @@ private:
 };
 
 template <typename T>
-    inline FutureImpl<void> FutureImpl<T>::ignoreValue() && noexcept {
+inline FutureImpl<void> FutureImpl<T>::ignoreValue() && noexcept {
     return std::move(*this).then(destroyDefault, [](auto&&) {});
 }
 

@@ -35,7 +35,8 @@ namespace mongo {
 namespace {
 bool initSet = false;
 std::function<void(ServiceContext* service)> tenantToShardCacheInitializer =
-    [](ServiceContext* service) {};
+    [](ServiceContext* service) {
+    };
 }  // namespace
 }  // namespace mongo
 

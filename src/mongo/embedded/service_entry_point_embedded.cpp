@@ -123,19 +123,19 @@ public:
 
     void attachCurOpErrInfo(OperationContext*, const BSONObj&) const override {}
 
-    bool refreshDatabase(OperationContext* opCtx, const StaleDbRoutingVersion& se) const
-        noexcept override {
+    bool refreshDatabase(OperationContext* opCtx,
+                         const StaleDbRoutingVersion& se) const noexcept override {
         return false;
     }
 
-    bool refreshCollection(OperationContext* opCtx, const StaleConfigInfo& se) const
-        noexcept override {
+    bool refreshCollection(OperationContext* opCtx,
+                           const StaleConfigInfo& se) const noexcept override {
         return false;
     }
 
-    bool refreshCatalogCache(OperationContext* opCtx,
-                             const ShardCannotRefreshDueToLocksHeldInfo& refreshInfo) const
-        noexcept override {
+    bool refreshCatalogCache(
+        OperationContext* opCtx,
+        const ShardCannotRefreshDueToLocksHeldInfo& refreshInfo) const noexcept override {
         return false;
     }
 

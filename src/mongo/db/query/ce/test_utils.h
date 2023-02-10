@@ -125,7 +125,9 @@ const auto isSargable1 = isSargableNode<1>;
 const auto isSargable2 = isSargableNode<2>;
 const auto isSargable3 = isSargableNode<3>;
 const auto isSargable4 = isSargableNode<4>;
-const auto isRoot = [](const ABT& n) -> bool { return n.is<optimizer::RootNode>(); };
+const auto isRoot = [](const ABT& n) -> bool {
+    return n.is<optimizer::RootNode>();
+};
 
 /**
  * A test utility class for helping verify the cardinality of CE transports on a given $match

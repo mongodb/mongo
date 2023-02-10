@@ -805,7 +805,9 @@ TEST(SortedDataInterface, Locate3Descending) {
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
-    auto buildEntry = [](int i) { return IndexKeyEntry(BSON("" << i), RecordId(1, i * 2)); };
+    auto buildEntry = [](int i) {
+        return IndexKeyEntry(BSON("" << i), RecordId(1, i * 2));
+    };
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

@@ -123,13 +123,13 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
                                                    /*forRecovery=*/false));
     ASSERT_EQUALS(0U, specs.size());
 
-    ASSERT_OK(
-        indexer->insertSingleDocumentForInitialSyncOrRecovery(operationContext(),
-                                                              coll.get(),
-                                                              {},
-                                                              {},
-                                                              /*saveCursorBeforeWrite*/ []() {},
-                                                              /*restoreCursorAfterWrite*/ []() {}));
+    ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(
+        operationContext(),
+        coll.get(),
+        {},
+        {},
+        /*saveCursorBeforeWrite*/ []() {},
+        /*restoreCursorAfterWrite*/ []() {}));
     ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll.get()));
     ASSERT_OK(indexer->checkConstraints(operationContext(), coll.get()));
 
@@ -158,13 +158,13 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    /*forRecovery=*/false));
     ASSERT_EQUALS(0U, specs.size());
-    ASSERT_OK(
-        indexer->insertSingleDocumentForInitialSyncOrRecovery(operationContext(),
-                                                              coll.get(),
-                                                              {},
-                                                              {},
-                                                              /*saveCursorBeforeWrite*/ []() {},
-                                                              /*restoreCursorAfterWrite*/ []() {}));
+    ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(
+        operationContext(),
+        coll.get(),
+        {},
+        {},
+        /*saveCursorBeforeWrite*/ []() {},
+        /*restoreCursorAfterWrite*/ []() {}));
     auto isResumable = false;
     indexer->abortWithoutCleanup(operationContext(), coll.get(), isResumable);
 }

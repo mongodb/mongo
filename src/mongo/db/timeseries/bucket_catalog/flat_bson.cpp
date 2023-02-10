@@ -101,20 +101,20 @@ FlatBSONStore<Element, Value>::Iterator::Iterator(
     : _pos(pos) {}
 
 template <class Element, class Value>
-typename FlatBSONStore<Element, Value>::Iterator::pointer FlatBSONStore<Element, Value>::Iterator::
-operator->() {
+typename FlatBSONStore<Element, Value>::Iterator::pointer
+FlatBSONStore<Element, Value>::Iterator::operator->() {
     return &_pos->_element;
 }
 
 template <class Element, class Value>
 typename FlatBSONStore<Element, Value>::Iterator::reference
-    FlatBSONStore<Element, Value>::Iterator::operator*() {
+FlatBSONStore<Element, Value>::Iterator::operator*() {
     return _pos->_element;
 }
 
 template <class Element, class Value>
-typename FlatBSONStore<Element, Value>::Iterator& FlatBSONStore<Element, Value>::Iterator::
-operator++() {
+typename FlatBSONStore<Element, Value>::Iterator&
+FlatBSONStore<Element, Value>::Iterator::operator++() {
     _pos += _pos->_offsetEnd;
     return *this;
 }
@@ -138,13 +138,13 @@ FlatBSONStore<Element, Value>::ConstIterator::ConstIterator(
 
 template <class Element, class Value>
 typename FlatBSONStore<Element, Value>::ConstIterator::pointer
-    FlatBSONStore<Element, Value>::ConstIterator::operator->() const {
+FlatBSONStore<Element, Value>::ConstIterator::operator->() const {
     return &_pos->_element;
 }
 
 template <class Element, class Value>
 typename FlatBSONStore<Element, Value>::ConstIterator::reference
-    FlatBSONStore<Element, Value>::ConstIterator::operator*() const {
+FlatBSONStore<Element, Value>::ConstIterator::operator*() const {
     return _pos->_element;
 }
 

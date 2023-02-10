@@ -202,14 +202,15 @@ TEST_F(FaultManagerTest,
     RAIIServerParameterControllerForTest _serverParamController{"activeFaultDurationSecs", 5};
 
     AtomicWord<bool> shouldBlock{true};
-    registerMockHealthObserver(FaultFacetType::kMock1,
-                               [&shouldBlock] {
-                                   while (shouldBlock.load()) {
-                                       sleepFor(Milliseconds(1));
-                                   }
-                                   return Severity::kOk;
-                               },
-                               Milliseconds(100));
+    registerMockHealthObserver(
+        FaultFacetType::kMock1,
+        [&shouldBlock] {
+            while (shouldBlock.load()) {
+                sleepFor(Milliseconds(1));
+            }
+            return Severity::kOk;
+        },
+        Milliseconds(100));
 
     ASSERT_TRUE(manager().getFaultState() == FaultState::kStartupCheck);
 

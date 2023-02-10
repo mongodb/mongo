@@ -164,7 +164,9 @@ TEST_F(MirroringSamplerFixture, SamplerFunction) {
             resetPseudoRandomSeed();
             resetHitCounts();
 
-            auto pseudoRandomGen = [&]() -> int { return this->nextPseudoRandom(); };
+            auto pseudoRandomGen = [&]() -> int {
+                return this->nextPseudoRandom();
+            };
 
             for (size_t i = 0; i < repeats; i++) {
                 auto targets = MirroringSampler::getMirroringTargets(hello, ratio, pseudoRandomGen);

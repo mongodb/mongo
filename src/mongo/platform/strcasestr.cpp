@@ -64,7 +64,9 @@ namespace pal {
 const char* STRCASESTR_EMULATION_NAME(const char* haystack, const char* needle) {
     StringData hay(haystack);
     StringData pat(needle);
-    auto caseEq = [](char a, char b) { return ctype::toLower(a) == ctype::toLower(b); };
+    auto caseEq = [](char a, char b) {
+        return ctype::toLower(a) == ctype::toLower(b);
+    };
     auto pos = std::search(hay.begin(), hay.end(), pat.begin(), pat.end(), caseEq);
     if (pos == hay.end())
         return nullptr;

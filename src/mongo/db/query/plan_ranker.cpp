@@ -47,18 +47,19 @@ void logScoreFormula(std::function<std::string()> formula,
                      double noSortBonus,
                      double noIxisectBonus,
                      double tieBreakers) {
-    LOGV2_DEBUG(20961, 2, "Score formula", "formula"_attr = [&]() {
-        StringBuilder sb;
-        sb << "score(" << str::convertDoubleToString(score) << ") = baseScore("
-           << str::convertDoubleToString(baseScore) << ")"
-           << " + productivity(" << formula() << " = " << str::convertDoubleToString(productivity)
-           << ")"
-           << " + tieBreakers(" << str::convertDoubleToString(noFetchBonus) << " noFetchBonus + "
-           << str::convertDoubleToString(noSortBonus) << " noSortBonus + "
-           << str::convertDoubleToString(noIxisectBonus)
-           << " noIxisectBonus = " << str::convertDoubleToString(tieBreakers) << ")";
-        return sb.str();
-    }());
+    LOGV2_DEBUG(
+        20961, 2, "Score formula", "formula"_attr = [&]() {
+            StringBuilder sb;
+            sb << "score(" << str::convertDoubleToString(score) << ") = baseScore("
+               << str::convertDoubleToString(baseScore) << ")"
+               << " + productivity(" << formula() << " = "
+               << str::convertDoubleToString(productivity) << ")"
+               << " + tieBreakers(" << str::convertDoubleToString(noFetchBonus)
+               << " noFetchBonus + " << str::convertDoubleToString(noSortBonus) << " noSortBonus + "
+               << str::convertDoubleToString(noIxisectBonus)
+               << " noIxisectBonus = " << str::convertDoubleToString(tieBreakers) << ")";
+            return sb.str();
+        }());
 }
 
 void logScoreBoost(double score) {

@@ -231,17 +231,16 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
 
     sb << builderForErrmsg.obj();
 
-    stdx::visit(
-        OverloadedVisitor{
-            [](stdx::monostate) {},
-            [&sb](const RecordId& rid) { sb << " found value: " << rid; },
-            [&sb](const BSONObj& obj) {
-                if (obj.objsize() < BSONObjMaxUserSize / 2) {
-                    sb << " found value: " << obj;
-                }
-            },
-        },
-        foundValue);
+    stdx::visit(OverloadedVisitor{
+                    [](stdx::monostate) {},
+                    [&sb](const RecordId& rid) { sb << " found value: " << rid; },
+                    [&sb](const BSONObj& obj) {
+                        if (obj.objsize() < BSONObjMaxUserSize / 2) {
+                            sb << " found value: " << obj;
+                        }
+                    },
+                },
+                foundValue);
 
     return Status(DuplicateKeyErrorInfo(keyPattern,
                                         builderForErrorExtraInfo.obj(),

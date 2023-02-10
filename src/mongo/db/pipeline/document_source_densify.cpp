@@ -513,29 +513,29 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::finishDensifyingPar
 
 DocumentSource::GetNextResult DocumentSourceInternalDensify::handleSourceExhausted() {
     _eof = true;
-    return stdx::visit(
-        OverloadedVisitor{
-            [&](RangeStatement::Full) {
-                if (_partitionExpr) {
-                    return finishDensifyingPartitionedInput();
-                } else {
-                    _densifyState = DensifyState::kDensifyDone;
-                    return DocumentSource::GetNextResult::makeEOF();
-                }
-            },
-            [&](RangeStatement::Partition) {
-                // We have already densified up to the last document in each partition.
-                _densifyState = DensifyState::kDensifyDone;
-                return DocumentSource::GetNextResult::makeEOF();
-            },
-            [&](RangeStatement::ExplicitBounds bounds) {
-                if (_partitionExpr) {
-                    return finishDensifyingPartitionedInput();
-                }
-                return densifyExplicitRangeAfterEOF();
-            },
-        },
-        _range.getBounds());
+    return stdx::visit(OverloadedVisitor{
+                           [&](RangeStatement::Full) {
+                               if (_partitionExpr) {
+                                   return finishDensifyingPartitionedInput();
+                               } else {
+                                   _densifyState = DensifyState::kDensifyDone;
+                                   return DocumentSource::GetNextResult::makeEOF();
+                               }
+                           },
+                           [&](RangeStatement::Partition) {
+                               // We have already densified up to the last document in each
+                               // partition.
+                               _densifyState = DensifyState::kDensifyDone;
+                               return DocumentSource::GetNextResult::makeEOF();
+                           },
+                           [&](RangeStatement::ExplicitBounds bounds) {
+                               if (_partitionExpr) {
+                                   return finishDensifyingPartitionedInput();
+                               }
+                               return densifyExplicitRangeAfterEOF();
+                           },
+                       },
+                       _range.getBounds());
 }
 
 
@@ -619,7 +619,9 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::handleNeedGenExplic
             _densifyState = DensifyState::kUninitializedOrBelowRange;
             return currentDoc;
         }
-        default: { MONGO_UNREACHABLE_TASSERT(5733705); }
+        default: {
+            MONGO_UNREACHABLE_TASSERT(5733705);
+        }
     }
 }
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalDensify::createFromBson(
@@ -716,7 +718,9 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
                         _densifyState = DensifyState::kNeedGen;
                         return nextDoc;
                     },
-                    [&](ExplicitBounds bounds) { return processFirstDocForExplicitRange(doc); }},
+                    [&](ExplicitBounds bounds) {
+                        return processFirstDocForExplicitRange(doc);
+                    }},
                 _range.getBounds());
         }
         case DensifyState::kNeedGen: {
@@ -869,7 +873,9 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
             }
             return doc;
         }
-        default: { MONGO_UNREACHABLE_TASSERT(5733706); }
+        default: {
+            MONGO_UNREACHABLE_TASSERT(5733706);
+        }
     }  // namespace mongo
 }
 

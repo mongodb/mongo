@@ -1081,7 +1081,9 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                     }
                     break;
                 }
-                default: { MONGO_UNREACHABLE; }
+                default: {
+                    MONGO_UNREACHABLE;
+                }
             }
         }
 

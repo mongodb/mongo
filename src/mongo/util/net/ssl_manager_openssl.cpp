@@ -1187,13 +1187,10 @@ private:
 const ServiceContext::Decoration<boost::optional<OCSPCache>> OCSPCache::getOCSPCache =
     ServiceContext::declareDecoration<boost::optional<OCSPCache>>();
 
-ServiceContext::ConstructorActionRegisterer OCSPCacheRegisterer("CreateOCSPCache",
-                                                                [](ServiceContext* context) {
-                                                                    OCSPCache::create(context);
-                                                                },
-                                                                [](ServiceContext* context) {
-                                                                    OCSPCache::destroy(context);
-                                                                });
+ServiceContext::ConstructorActionRegisterer OCSPCacheRegisterer(
+    "CreateOCSPCache",
+    [](ServiceContext* context) { OCSPCache::create(context); },
+    [](ServiceContext* context) { OCSPCache::destroy(context); });
 
 using OCSPCacheVal = OCSPCache::ValueHandle;
 

@@ -688,14 +688,14 @@ bool Socket::isStillConnected() {
     int nEvents = socketPoll(&pollInfo, 1, 0);
 
     auto ec = lastSocketError();
-    LOGV2_DEBUG(
-        23186,
-        2,
-        "polling for status of connection to {remoteHost}, {errorOrEventDetected}",
-        "Polling for status of connection to remote host",
-        "remoteHost"_attr = remoteString(),
-        "errorOrEventDetected"_attr =
-            (nEvents == 0 ? "no events" : nEvents == -1 ? "error detected" : "event detected"));
+    LOGV2_DEBUG(23186,
+                2,
+                "polling for status of connection to {remoteHost}, {errorOrEventDetected}",
+                "Polling for status of connection to remote host",
+                "remoteHost"_attr = remoteString(),
+                "errorOrEventDetected"_attr = (nEvents == 0        ? "no events"
+                                                   : nEvents == -1 ? "error detected"
+                                                                   : "event detected"));
 
     if (nEvents == 0) {
         // No events incoming, return still connected AFAWK

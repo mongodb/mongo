@@ -371,21 +371,20 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
         options.timeseries = std::move(*timeseries);
     }
     if (auto clusteredIndex = cmd.getClusteredIndex()) {
-        stdx::visit(
-            OverloadedVisitor{
-                [&](bool isClustered) {
-                    if (isClustered) {
-                        options.clusteredIndex =
-                            clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
-                    } else {
-                        options.clusteredIndex = boost::none;
-                    }
-                },
-                [&](const ClusteredIndexSpec& clusteredIndexSpec) {
-                    options.clusteredIndex =
-                        clustered_util::makeCanonicalClusteredInfo(clusteredIndexSpec);
-                }},
-            *clusteredIndex);
+        stdx::visit(OverloadedVisitor{
+                        [&](bool isClustered) {
+                            if (isClustered) {
+                                options.clusteredIndex =
+                                    clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
+                            } else {
+                                options.clusteredIndex = boost::none;
+                            }
+                        },
+                        [&](const ClusteredIndexSpec& clusteredIndexSpec) {
+                            options.clusteredIndex =
+                                clustered_util::makeCanonicalClusteredInfo(clusteredIndexSpec);
+                        }},
+                    *clusteredIndex);
     }
     if (auto expireAfterSeconds = cmd.getExpireAfterSeconds()) {
         options.expireAfterSeconds = expireAfterSeconds;

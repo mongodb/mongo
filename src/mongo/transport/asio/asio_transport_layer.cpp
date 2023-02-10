@@ -1215,7 +1215,9 @@ Status AsioTransportLayer::setup() {
         } catch (std::exception&) {
             // Allow the server to start when "ipv6: true" and "bindIpAll: true", but the platform
             // does not support ipv6 (e.g., ipv6 kernel module is not loaded in Linux).
-            auto bindAllFmt = [](auto p) { return fmt::format(":::{}", p); };
+            auto bindAllFmt = [](auto p) {
+                return fmt::format(":::{}", p);
+            };
             bool addrIsBindAll = addr.toString() == bindAllFmt(_listenerPort);
 
             if (!addrIsBindAll && _listenerOptions.loadBalancerPort) {

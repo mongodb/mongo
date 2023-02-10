@@ -140,7 +140,9 @@ public:
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _net = network.get();
         executor::ThreadPoolMock::Options thread_pool_options;
-        thread_pool_options.onCreateThread = [] { Client::initThread("TenantOplogApplier"); };
+        thread_pool_options.onCreateThread = [] {
+            Client::initThread("TenantOplogApplier");
+        };
         _executor = makeSharedThreadPoolTestExecutor(std::move(network), thread_pool_options);
         _executor->startup();
         _oplogBuffer.startup(nullptr);
@@ -464,9 +466,10 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_DatabaseMissing) {
         NamespaceString::createNamespaceString_forTest(_dbName.toStringWithTenantId(), "bar"),
         UUID::gen());
     bool onInsertsCalled = false;
-    _opObserver->onInsertsFn = [&](OperationContext* opCtx,
-                                   const NamespaceString&,
-                                   const std::vector<BSONObj>&) { onInsertsCalled = true; };
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
+            onInsertsCalled = true;
+        };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -495,9 +498,10 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_CollectionMissing) {
         NamespaceString::createNamespaceString_forTest(_dbName.toStringWithTenantId(), "bar"),
         UUID::gen());
     bool onInsertsCalled = false;
-    _opObserver->onInsertsFn = [&](OperationContext* opCtx,
-                                   const NamespaceString&,
-                                   const std::vector<BSONObj>&) { onInsertsCalled = true; };
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
+            onInsertsCalled = true;
+        };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -531,9 +535,10 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_InsertExisting) {
     auto entry = makeInsertOplogEntry(1, nss, uuid);
     bool onInsertsCalled = false;
     bool onUpdateCalled = false;
-    _opObserver->onInsertsFn = [&](OperationContext* opCtx,
-                                   const NamespaceString&,
-                                   const std::vector<BSONObj>&) { onInsertsCalled = true; };
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
+            onInsertsCalled = true;
+        };
     _opObserver->onUpdateFn = [&](OperationContext* opCtx, const OplogUpdateEntryArgs&) {
         onUpdateCalled = true;
     };
@@ -576,9 +581,10 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_UniqueKey_InsertExisting) {
     auto entry =
         makeOplogEntry(repl::OpTypeEnum::kInsert, nss, uuid, BSON("_id" << 1 << "data" << 2));
     bool onInsertsCalled = false;
-    _opObserver->onInsertsFn = [&](OperationContext* opCtx,
-                                   const NamespaceString&,
-                                   const std::vector<BSONObj>&) { onInsertsCalled = true; };
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
+            onInsertsCalled = true;
+        };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -713,9 +719,10 @@ TEST_F(TenantOplogApplierTest, ApplyUpdate_MissingDocument) {
                                 BSON("_id" << 0));
     bool onInsertsCalled = false;
     bool onUpdateCalled = false;
-    _opObserver->onInsertsFn = [&](OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   const std::vector<BSONObj>& docs) { onInsertsCalled = true; };
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+            onInsertsCalled = true;
+        };
     _opObserver->onUpdateFn = [&](OperationContext* opCtx, const OplogUpdateEntryArgs&) {
         onUpdateCalled = true;
     };
@@ -928,7 +935,9 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_CollExisting) {
                                             const CollectionPtr&,
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
-                                            const BSONObj&) { applyCmdCalled = true; };
+                                            const BSONObj&) {
+        applyCmdCalled = true;
+    };
     auto entry = OplogEntry(op);
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
@@ -970,7 +979,9 @@ TEST_F(TenantOplogApplierTest, ApplyRenameCollCommand_CollExisting) {
                                             const boost::optional<UUID>& uuid,
                                             const boost::optional<UUID>& dropTargetUUID,
                                             std::uint64_t numRecords,
-                                            bool stayTemp) { applyCmdCalled = true; };
+                                            bool stayTemp) {
+        applyCmdCalled = true;
+    };
     auto entry = OplogEntry(op);
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
@@ -1126,7 +1137,9 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_WrongNSS) {
                                             const CollectionPtr&,
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
-                                            const BSONObj&) { applyCmdCalled = true; };
+                                            const BSONObj&) {
+        applyCmdCalled = true;
+    };
     auto entry = OplogEntry(op);
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
@@ -1161,7 +1174,9 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_WrongNSS_Merge) {
                                             const CollectionPtr&,
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
-                                            const BSONObj&) { applyCmdCalled = true; };
+                                            const BSONObj&) {
+        applyCmdCalled = true;
+    };
     auto entry = OplogEntry(op);
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
@@ -1197,7 +1212,9 @@ TEST_F(TenantOplogApplierTest, ApplyDropIndexesCommand_IndexNotFound) {
                                      const NamespaceString& nss,
                                      const boost::optional<UUID>& uuid,
                                      const std::string& indexName,
-                                     const BSONObj& idxDescriptor) { applyCmdCalled = true; };
+                                     const BSONObj& idxDescriptor) {
+        applyCmdCalled = true;
+    };
 
     auto entry = OplogEntry(op);
     pushOps({entry});
@@ -1316,9 +1333,10 @@ TEST_F(TenantOplogApplierTest, ApplyCRUD_WrongNSS) {
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto entry = makeInsertOplogEntry(1, nss, uuid);
     bool onInsertsCalled = false;
-    _opObserver->onInsertsFn = [&](OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   const std::vector<BSONObj>& docs) { onInsertsCalled = true; };
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+            onInsertsCalled = true;
+        };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -1348,9 +1366,10 @@ TEST_F(TenantOplogApplierTest, ApplyCRUD_WrongNSS_Merge) {
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto entry = makeInsertOplogEntry(1, nss, uuid);
     bool onInsertsCalled = false;
-    _opObserver->onInsertsFn = [&](OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   const std::vector<BSONObj>& docs) { onInsertsCalled = true; };
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+            onInsertsCalled = true;
+        };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -1378,9 +1397,10 @@ TEST_F(TenantOplogApplierTest, ApplyCRUD_WrongUUID) {
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto entry = makeInsertOplogEntry(1, nss_to_apply, uuid);
     bool onInsertsCalled = false;
-    _opObserver->onInsertsFn = [&](OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   const std::vector<BSONObj>& docs) { onInsertsCalled = true; };
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+            onInsertsCalled = true;
+        };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 

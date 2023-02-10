@@ -86,7 +86,9 @@ TEST(StaticImmortalTest, DeducedValueTypeCopyInit) {
 }
 
 TEST(StaticImmortalTest, DeducedValueTypeExpression) {
-    static const StaticImmortal m = [] { return Map{{"hello", 123}, {"bye", 456}}; }();
+    static const StaticImmortal m = [] {
+        return Map{{"hello", 123}, {"bye", 456}};
+    }();
     ASSERT_EQ(m->find("bye")->second, 456);
 }
 

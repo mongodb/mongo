@@ -343,10 +343,10 @@ void lowerPartialSchemaRequirements(CEType scanGroupCE,
 
 void sortResidualRequirements(ResidualRequirementsWithCE& residualReq);
 
-void applyProjectionRenames(ProjectionRenames projectionRenames,
-                            ABT& node,
-                            const std::function<void(const ABT& node)>& visitor = [](const ABT&) {
-                            });
+void applyProjectionRenames(
+    ProjectionRenames projectionRenames,
+    ABT& node,
+    const std::function<void(const ABT& node)>& visitor = [](const ABT&) {});
 
 void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& requiredProjections,
                                        ResidualRequirements& residualReqs,

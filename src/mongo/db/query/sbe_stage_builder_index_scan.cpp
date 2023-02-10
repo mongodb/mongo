@@ -250,8 +250,8 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
 
     auto limitStage = sbe::makeS<sbe::LimitSkipStage>(
         sbe::makeS<sbe::CoScanStage>(planNodeId), 1, boost::none, planNodeId);
-    auto&& [boundsSlot, boundsStage] =
-        [&]() -> std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> {
+    auto&& [boundsSlot,
+            boundsStage] = [&]() -> std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> {
         if (intervals) {
             auto [boundsTag, boundsVal] = packIndexIntervalsInSbeArray(std::move(*intervals));
             const auto boundsSlot = slotIdGenerator->generate();

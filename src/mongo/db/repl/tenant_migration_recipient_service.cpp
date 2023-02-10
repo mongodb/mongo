@@ -1026,17 +1026,15 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_openBackupCursor(
 
     auto fetchStatus = std::make_shared<boost::optional<Status>>();
     auto uniqueMetadataInfo = std::make_unique<boost::optional<shard_merge_utils::MetadataInfo>>();
-    const auto fetcherCallback =
-        [
-            this,
-            self = shared_from_this(),
-            fetchStatus,
-            metadataInfoPtr = uniqueMetadataInfo.get(),
-            token,
-            startMigrationDonorTimestamp
-        ](const Fetcher::QueryResponseStatus& dataStatus,
-          Fetcher::NextAction* nextAction,
-          BSONObjBuilder* getMoreBob) noexcept {
+    const auto fetcherCallback = [this,
+                                  self = shared_from_this(),
+                                  fetchStatus,
+                                  metadataInfoPtr = uniqueMetadataInfo.get(),
+                                  token,
+                                  startMigrationDonorTimestamp](
+                                     const Fetcher::QueryResponseStatus& dataStatus,
+                                     Fetcher::NextAction* nextAction,
+                                     BSONObjBuilder* getMoreBob) noexcept {
         try {
             uassertStatusOK(dataStatus);
             uassert(ErrorCodes::CallbackCanceled, "backup cursor interrupted", !token.isCanceled());

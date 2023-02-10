@@ -104,8 +104,12 @@ TEST_F(ClusterExchangeTest, SingleMergeStageNotEligibleForExchangeIfOutputDataba
     });
 
     // Mock out a response as if the database doesn't exist.
-    expectFindSendBSONObjVector(kConfigHostAndPort, []() { return std::vector<BSONObj>{}; }());
-    expectFindSendBSONObjVector(kConfigHostAndPort, []() { return std::vector<BSONObj>{}; }());
+    expectFindSendBSONObjVector(kConfigHostAndPort, []() {
+        return std::vector<BSONObj>{};
+    }());
+    expectFindSendBSONObjVector(kConfigHostAndPort, []() {
+        return std::vector<BSONObj>{};
+    }());
 
     future.default_timed_get();
 }

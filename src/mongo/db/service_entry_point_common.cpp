@@ -2396,9 +2396,8 @@ void onHandleRequestException(const HandleRequest& hr, const Status& status) {
 }
 
 Future<DbResponse> ServiceEntryPointCommon::handleRequest(
-    OperationContext* opCtx,
-    const Message& m,
-    std::unique_ptr<const Hooks> behaviors) noexcept try {
+    OperationContext* opCtx, const Message& m, std::unique_ptr<const Hooks> behaviors) noexcept
+    try {
     HandleRequest hr(opCtx, m, std::move(behaviors));
     hr.startOperation();
 

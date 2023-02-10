@@ -76,7 +76,9 @@ StatusWith<EventHandle> ScatterGatherRunner::start() {
     //     RunnerImpl -> Callback in _callbacks -> RunnerImpl
     // We must remove callbacks after using them, to break this cycle.
     std::shared_ptr<RunnerImpl>& impl = _impl;
-    auto cb = [impl](const RemoteCommandCallbackArgs& cbData) { impl->processResponse(cbData); };
+    auto cb = [impl](const RemoteCommandCallbackArgs& cbData) {
+        impl->processResponse(cbData);
+    };
     return _impl->start(cb);
 }
 

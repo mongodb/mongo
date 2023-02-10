@@ -93,14 +93,18 @@ const OpTime lastOpTimeFetched(Timestamp(Seconds(100), 1U), 1LL);
 void SyncSourceResolverTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
 
-    _shouldFailRequest = [](const executor::RemoteCommandRequest&) { return false; };
+    _shouldFailRequest = [](const executor::RemoteCommandRequest&) {
+        return false;
+    };
     _executorProxy = std::make_unique<TaskExecutorWithFailureInScheduleRemoteCommand>(
         &getExecutor(), [this](const executor::RemoteCommandRequest& request) {
             return _shouldFailRequest(request);
         });
 
     _response.syncSourceStatus = getDetectableErrorStatus();
-    _onCompletion = [this](const SyncSourceResolverResponse& response) { _response = response; };
+    _onCompletion = [this](const SyncSourceResolverResponse& response) {
+        _response = response;
+    };
 
     _selector = std::make_unique<SyncSourceSelectorMock>();
     _resolver = _makeResolver(lastOpTimeFetched, OpTime());
@@ -167,7 +171,8 @@ TEST_F(SyncSourceResolverTest, InvalidConstruction) {
     SyncSourceSelectorMock selector;
     const OpTime lastOpTimeFetched(Timestamp(Seconds(100), 1U), 1LL);
     const OpTime requiredOpTime;
-    auto onCompletion = [](const SyncSourceResolverResponse&) {};
+    auto onCompletion = [](const SyncSourceResolverResponse&) {
+    };
 
     // Null task executor.
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -279,7 +284,9 @@ TEST_F(SyncSourceResolverTest,
 
 TEST_F(SyncSourceResolverTest,
        SyncSourceResolverReturnsScheduleErrorIfTaskExecutorFailsToScheduleRemoteCommand) {
-    _shouldFailRequest = [](const executor::RemoteCommandRequest&) { return true; };
+    _shouldFailRequest = [](const executor::RemoteCommandRequest&) {
+        return true;
+    };
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _resolver->startup());
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _response.syncSourceStatus);
 }

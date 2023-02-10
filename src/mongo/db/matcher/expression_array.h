@@ -262,7 +262,9 @@ public:
 
 private:
     virtual ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
+        return [](std::unique_ptr<MatchExpression> expression) {
+            return expression;
+        };
     }
 
     int _size;  // >= 0 real, < 0, nothing will match

@@ -78,7 +78,9 @@ TEST_F(SplitPrepareSessionManagerTest, SplitSessionsBasic) {
     auto sessInfoToSessId = [](const SplitSessionInfo& sessInfo) {
         return sessInfo.session.getSessionId();
     };
-    auto sessInfoToReqId = [](const SplitSessionInfo& sessInfo) { return sessInfo.requesterId; };
+    auto sessInfoToReqId = [](const SplitSessionInfo& sessInfo) {
+        return sessInfo.requesterId;
+    };
     std::transform(sessInfos1.begin(), sessInfos1.end(), sessionIds1.begin(), sessInfoToSessId);
     std::transform(sessInfos2.begin(), sessInfos2.end(), sessionIds2.begin(), sessInfoToSessId);
     std::transform(sessInfos1.begin(), sessInfos1.end(), returnedIds1.begin(), sessInfoToReqId);

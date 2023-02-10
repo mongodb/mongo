@@ -36,81 +36,84 @@ function testIndexKeyMetaProjection({
               aggExpectedResult);
 }
 
-[true, false].forEach((metadataAvailable) => {
-    let indexSpec;
-    if (metadataAvailable) {
-        indexSpec = {a: 1, b: 1};
-        assert.commandWorked(coll.createIndex(indexSpec));
-    } else {
-        indexSpec = {};
-        assert.commandWorked(coll.dropIndexes());
-    }
+[true,
+ false]
+    .forEach((metadataAvailable) => {
+        let indexSpec;
+        if (metadataAvailable) {
+            indexSpec = {a: 1, b: 1};
+            assert.commandWorked(coll.createIndex(indexSpec));
+        } else {
+            indexSpec = {};
+            assert.commandWorked(coll.dropIndexes());
+        }
 
-    // $meta with an inclusion projection.
-    testIndexKeyMetaProjection({
-        matchSpec: {a: {$gt: 20}},
-        projSpec: {_id: 0, a: 1},
-        indexSpec: indexSpec,
-        expectedResult: [Object.assign({a: 30}, metadataAvailable ? {c: {a: 30, b: 'z'}} : {})]
-    });
-
-    // $meta with an exclusion projection.
-    testIndexKeyMetaProjection({
-        matchSpec: {a: {$gt: 20}},
-        projSpec: {_id: 0, a: 0},
-        indexSpec: indexSpec,
-        expectedResult: [Object.assign({b: 'z'}, metadataAvailable ? {c: {a: 30, b: 'z'}} : {})]
-    });
-
-    // $meta with _id only (inclusion).
-    testIndexKeyMetaProjection({
-        matchSpec: {a: {$gt: 20}},
-        projSpec: {_id: 1},
-        indexSpec: indexSpec,
-        expectedResult: [Object.assign({_id: 3}, metadataAvailable ? {c: {a: 30, b: 'z'}} : {})]
-    });
-
-    // $meta with _id only (exclusion). Note that this type of projection is equivalent to a
-    // $meta-only projection, which is treated differently in find and aggregate (it's an inclusion
-    // projection in find, and exclusion in aggregate).
-    testIndexKeyMetaProjection({
-        matchSpec: {a: {$gt: 20}},
-        projSpec: {_id: 0},
-        indexSpec: indexSpec,
-        expectedResult:
-            [Object.assign({a: 30, b: 'z'}, metadataAvailable ? {c: {a: 30, b: 'z'}} : {})],
-        aggExpectedResult: [metadataAvailable ? {c: {a: 30, b: 'z'}} : {}]
-    });
-
-    // $meta only (see comment above regarding $meta-only projection in find and aggregate).
-    testIndexKeyMetaProjection({
-        matchSpec: {a: {$gt: 20}},
-        indexSpec: indexSpec,
-        expectedResult:
-            [Object.assign({_id: 3, a: 30, b: 'z'}, metadataAvailable ? {c: {a: 30, b: 'z'}} : {})],
-        aggExpectedResult: [Object.assign({_id: 3}, metadataAvailable ? {c: {a: 30, b: 'z'}} : {})]
-    });
-
-    // $meta with sort (when an index is available this should result in a non-blocking sort
-    // and the index key metadata should be available).
-    //
-    // If a collection is sharded, we will split the pipeline and dispatch only a $project stage,
-    // containing inclusion projection, to each shard, and apply the $meta projection on mongos.
-    // However, given than no information has been passed to the shard to request to include
-    // indexKey metadata to a document, the $meta expression won't be able to extract the
-    // indexKey. So, this scenario currently is not supported and we need to make sure that we
-    // run this test on an unsharded collection only.
-    if (!FixtureHelpers.isSharded(coll)) {
+        // $meta with an inclusion projection.
         testIndexKeyMetaProjection({
-            projSpec: {_id: 1},
-            sortSpec: {a: 1},
+            matchSpec: {a: {$gt: 20}},
+            projSpec: {_id: 0, a: 1},
             indexSpec: indexSpec,
-            expectedResult: [
-                Object.assign({_id: 1}, metadataAvailable ? {c: {a: 10, b: 'x'}} : {}),
-                Object.assign({_id: 2}, metadataAvailable ? {c: {a: 20, b: 'y'}} : {}),
-                Object.assign({_id: 3}, metadataAvailable ? {c: {a: 30, b: 'z'}} : {})
-            ]
+            expectedResult: [Object.assign({a: 30}, metadataAvailable ? {c: {a: 30, b: 'z'}} : {})]
         });
-    }
-});
+
+        // $meta with an exclusion projection.
+        testIndexKeyMetaProjection({
+            matchSpec: {a: {$gt: 20}},
+            projSpec: {_id: 0, a: 0},
+            indexSpec: indexSpec,
+            expectedResult: [Object.assign({b: 'z'}, metadataAvailable ? {c: {a: 30, b: 'z'}} : {})]
+        });
+
+        // $meta with _id only (inclusion).
+        testIndexKeyMetaProjection({
+            matchSpec: {a: {$gt: 20}},
+            projSpec: {_id: 1},
+            indexSpec: indexSpec,
+            expectedResult: [Object.assign({_id: 3}, metadataAvailable ? {c: {a: 30, b: 'z'}} : {})]
+        });
+
+        // $meta with _id only (exclusion). Note that this type of projection is equivalent to a
+        // $meta-only projection, which is treated differently in find and aggregate (it's an
+        // inclusion projection in find, and exclusion in aggregate).
+        testIndexKeyMetaProjection({
+            matchSpec: {a: {$gt: 20}},
+            projSpec: {_id: 0},
+            indexSpec: indexSpec,
+            expectedResult:
+                [Object.assign({a: 30, b: 'z'}, metadataAvailable ? {c: {a: 30, b: 'z'}} : {})],
+            aggExpectedResult: [metadataAvailable ? {c: {a: 30, b: 'z'}} : {}]
+        });
+
+        // $meta only (see comment above regarding $meta-only projection in find and aggregate).
+        testIndexKeyMetaProjection({
+            matchSpec: {a: {$gt: 20}},
+            indexSpec: indexSpec,
+            expectedResult: [Object.assign({_id: 3, a: 30, b: 'z'},
+                                           metadataAvailable ? {c: {a: 30, b: 'z'}} : {})],
+            aggExpectedResult:
+                [Object.assign({_id: 3}, metadataAvailable ? {c: {a: 30, b: 'z'}} : {})]
+        });
+
+        // $meta with sort (when an index is available this should result in a non-blocking sort
+        // and the index key metadata should be available).
+        //
+        // If a collection is sharded, we will split the pipeline and dispatch only a $project
+        // stage, containing inclusion projection, to each shard, and apply the $meta projection on
+        // mongos. However, given than no information has been passed to the shard to request to
+        // include indexKey metadata to a document, the $meta expression won't be able to extract
+        // the indexKey. So, this scenario currently is not supported and we need to make sure that
+        // we run this test on an unsharded collection only.
+        if (!FixtureHelpers.isSharded(coll)) {
+            testIndexKeyMetaProjection({
+                projSpec: {_id: 1},
+                sortSpec: {a: 1},
+                indexSpec: indexSpec,
+                expectedResult: [
+                    Object.assign({_id: 1}, metadataAvailable ? {c: {a: 10, b: 'x'}} : {}),
+                    Object.assign({_id: 2}, metadataAvailable ? {c: {a: 20, b: 'y'}} : {}),
+                    Object.assign({_id: 3}, metadataAvailable ? {c: {a: 30, b: 'z'}} : {})
+                ]
+            });
+        }
+    });
 }());

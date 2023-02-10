@@ -411,11 +411,15 @@ protected:
 
         InitialSyncerInterface::Options options;
         options.initialSyncRetryWait = Milliseconds(1);
-        options.getMyLastOptime = [this]() { return _myLastOpTime; };
+        options.getMyLastOptime = [this]() {
+            return _myLastOpTime;
+        };
         options.setMyLastOptime = [this](const OpTimeAndWallTime& opTimeAndWallTime) {
             _setMyLastOptime(opTimeAndWallTime);
         };
-        options.resetOptimes = [this]() { _myLastOpTime = OpTime(); };
+        options.resetOptimes = [this]() {
+            _myLastOpTime = OpTime();
+        };
         options.syncSourceSelector = this;
 
         _options = options;
@@ -550,13 +554,17 @@ private:
 
 executor::ThreadPoolMock::Options InitialSyncerTest::makeThreadPoolMockOptions() const {
     executor::ThreadPoolMock::Options options;
-    options.onCreateThread = []() { Client::initThread("InitialSyncerTest"); };
+    options.onCreateThread = []() {
+        Client::initThread("InitialSyncerTest");
+    };
     return options;
 }
 
 executor::ThreadPoolMock::Options InitialSyncerTest::makeClonerThreadPoolMockOptions() const {
     executor::ThreadPoolMock::Options options;
-    options.onCreateThread = []() { Client::initThread("ClonerThreadTest"); };
+    options.onCreateThread = []() {
+        Client::initThread("ClonerThreadTest");
+    };
     return options;
 }
 
@@ -701,11 +709,16 @@ void InitialSyncerTest::processSuccessfulFCVFetcherResponse(std::vector<BSONObj>
 
 TEST_F(InitialSyncerTest, InvalidConstruction) {
     InitialSyncerInterface::Options options;
-    options.getMyLastOptime = []() { return OpTime(); };
-    options.setMyLastOptime = [](const OpTimeAndWallTime&) {};
-    options.resetOptimes = []() {};
+    options.getMyLastOptime = []() {
+        return OpTime();
+    };
+    options.setMyLastOptime = [](const OpTimeAndWallTime&) {
+    };
+    options.resetOptimes = []() {
+    };
     options.syncSourceSelector = this;
-    auto callback = [](const StatusWith<OpTimeAndWallTime>&) {};
+    auto callback = [](const StatusWith<OpTimeAndWallTime>&) {
+    };
 
     // Null task executor in external state.
     {
@@ -990,7 +1003,9 @@ TEST_F(InitialSyncerTest,
     auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
-    _executorProxy->shouldFailScheduleWorkAtRequest = []() { return true; };
+    _executorProxy->shouldFailScheduleWorkAtRequest = []() {
+        return true;
+    };
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
 
     initialSyncer->join();
@@ -1016,7 +1031,9 @@ TEST_F(InitialSyncerTest,
 
     // Last choose sync source attempt should now be scheduled. Advance clock so we fail last
     // choose sync source attempt which cause the next initial sync attempt to be scheduled.
-    _executorProxy->shouldFailScheduleWorkAtRequest = []() { return true; };
+    _executorProxy->shouldFailScheduleWorkAtRequest = []() {
+        return true;
+    };
     advanceClock(net, _options.syncSourceRetryWait);
 
     initialSyncer->join();
@@ -3693,7 +3710,9 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchScheduleE
         // Before processing scheduled last oplog entry fetcher response, set flag in
         // TaskExecutorMock so that InitialSyncer will fail to schedule
         // _getNextApplierBatchCallback().
-        _executorProxy->shouldFailScheduleWorkRequest = []() { return true; };
+        _executorProxy->shouldFailScheduleWorkRequest = []() {
+            return true;
+        };
 
         // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
@@ -3750,7 +3769,9 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughSecondGetNextApplierBatchSch
         // Before processing scheduled last oplog entry fetcher response, set flag in
         // TaskExecutorMock so that InitialSyncer will fail to schedule second
         // _getNextApplierBatchCallback() at (now + options.getApplierBatchCallbackRetryWait).
-        _executorProxy->shouldFailScheduleWorkAtRequest = []() { return true; };
+        _executorProxy->shouldFailScheduleWorkAtRequest = []() {
+            return true;
+        };
 
         // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
@@ -4003,7 +4024,9 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierScheduleError) {
         getOplogFetcher()->receiveBatch(1LL, {makeOplogEntryObj(1), makeOplogEntryObj(2)});
 
         // Make MultiApplier::startup() fail.
-        _executorProxy->shouldFailScheduleWorkRequest = []() { return true; };
+        _executorProxy->shouldFailScheduleWorkRequest = []() {
+            return true;
+        };
 
         // Advance clock until _getNextApplierBatchCallback() runs.
         auto when = net->now() + _options.getApplierBatchCallbackRetryWait;

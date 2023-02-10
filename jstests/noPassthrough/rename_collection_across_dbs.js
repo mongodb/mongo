@@ -15,7 +15,7 @@ let dbName2 = testName + '1-2';
 const collName = "test";
 const collCount = 10;
 const maxInsertsCount = collCount;
-const maxInsertsSize = /*single object size=*/14 * maxInsertsCount * 3;
+const maxInsertsSize = /*single object size=*/ 14 * maxInsertsCount * 3;
 let srcNs = dbName1 + '.' + collName;
 let dstNs = dbName2 + '.' + collName;
 

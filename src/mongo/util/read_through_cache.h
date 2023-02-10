@@ -657,21 +657,22 @@ public:
 
         stdx::lock_guard lg(_cache._mutex);
         _valid = true;
-        _cancelToken.emplace(_cache._asyncWork([ this, promise = std::move(promise) ](
-            OperationContext * opCtx, const Status& status) mutable noexcept {
-            promise.setWith([&] {
-                uassertStatusOK(status);
-                if constexpr (std::is_same_v<Time, CacheNotCausallyConsistent>) {
-                    return _cache._lookupFn(opCtx, _key, _cachedValue);
-                } else {
-                    auto minTimeInStore = [&] {
-                        stdx::lock_guard lg(_cache._mutex);
-                        return _minTimeInStore;
-                    }();
-                    return _cache._lookupFn(opCtx, _key, _cachedValue, minTimeInStore);
-                }
-            });
-        }));
+        _cancelToken.emplace(
+            _cache._asyncWork([this, promise = std::move(promise)](
+                                  OperationContext* opCtx, const Status& status) mutable noexcept {
+                promise.setWith([&] {
+                    uassertStatusOK(status);
+                    if constexpr (std::is_same_v<Time, CacheNotCausallyConsistent>) {
+                        return _cache._lookupFn(opCtx, _key, _cachedValue);
+                    } else {
+                        auto minTimeInStore = [&] {
+                            stdx::lock_guard lg(_cache._mutex);
+                            return _minTimeInStore;
+                        }();
+                        return _cache._lookupFn(opCtx, _key, _cachedValue, minTimeInStore);
+                    }
+                });
+            }));
 
         return std::move(future);
     }

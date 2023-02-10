@@ -68,20 +68,21 @@ public:
     FaultManagerTestImpl(ServiceContext* svcCtx,
                          std::shared_ptr<executor::TaskExecutor> taskExecutor,
                          std::unique_ptr<FaultManagerConfig> config)
-        : FaultManager(svcCtx,
-                       taskExecutor,
-                       [&config]() -> std::unique_ptr<FaultManagerConfig> {
-                           if (config)
-                               return std::move(config);
-                           else
-                               return getConfigWithDisabledPeriodicChecks();
-                       }(),
-                       [](std::string cause) {
-                           // In tests, do not crash.
-                           LOGV2(5936606,
-                                 "Fault manager progress monitor triggered the termination",
-                                 "cause"_attr = cause);
-                       }) {}
+        : FaultManager(
+              svcCtx,
+              taskExecutor,
+              [&config]() -> std::unique_ptr<FaultManagerConfig> {
+                  if (config)
+                      return std::move(config);
+                  else
+                      return getConfigWithDisabledPeriodicChecks();
+              }(),
+              [](std::string cause) {
+                  // In tests, do not crash.
+                  LOGV2(5936606,
+                        "Fault manager progress monitor triggered the termination",
+                        "cause"_attr = cause);
+              }) {}
 
     void healthCheckTest(HealthObserver* observer, CancellationToken token) {
         healthCheck(observer, token);

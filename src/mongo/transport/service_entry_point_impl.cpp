@@ -434,7 +434,9 @@ void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
     size_t sessionCount = _sessions->size();
     size_t sessionsCreated = _sessions->created();
 
-    auto appendInt = [&](StringData n, auto v) { bob->append(n, static_cast<int>(v)); };
+    auto appendInt = [&](StringData n, auto v) {
+        bob->append(n, static_cast<int>(v));
+    };
 
     appendInt("current", sessionCount);
     appendInt("available", _maxSessions - sessionCount);

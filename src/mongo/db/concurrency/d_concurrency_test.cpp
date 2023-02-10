@@ -1065,13 +1065,13 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsNotInterruptibleWithLockGuard) {
     boost::optional<Lock::GlobalLock> globalLock = Lock::GlobalLock(opCtx1, MODE_X);
 
     // Killing the lock wait should not interrupt it.
-    auto result =
-        runTaskAndKill(opCtx2,
-                       [&]() {
-                           UninterruptibleLockGuard noInterrupt(opCtx2->lockState());  // NOLINT.
-                           Lock::GlobalLock g(opCtx2, MODE_S);
-                       },
-                       [&]() { globalLock.reset(); });
+    auto result = runTaskAndKill(
+        opCtx2,
+        [&]() {
+            UninterruptibleLockGuard noInterrupt(opCtx2->lockState());  // NOLINT.
+            Lock::GlobalLock g(opCtx2, MODE_S);
+        },
+        [&]() { globalLock.reset(); });
     // Should not throw an exception.
     result.get();
 }
@@ -1087,13 +1087,13 @@ TEST_F(DConcurrencyTestFixture, DBLockWaitIsNotInterruptibleWithLockGuard) {
         Lock::DBLock(opCtx1, DatabaseName(boost::none, "db"), MODE_X);
 
     // Killing the lock wait should not interrupt it.
-    auto result =
-        runTaskAndKill(opCtx2,
-                       [&]() {
-                           UninterruptibleLockGuard noInterrupt(opCtx2->lockState());  // NOLINT.
-                           Lock::DBLock d(opCtx2, DatabaseName(boost::none, "db"), MODE_S);
-                       },
-                       [&] { dbLock.reset(); });
+    auto result = runTaskAndKill(
+        opCtx2,
+        [&]() {
+            UninterruptibleLockGuard noInterrupt(opCtx2->lockState());  // NOLINT.
+            Lock::DBLock d(opCtx2, DatabaseName(boost::none, "db"), MODE_S);
+        },
+        [&] { dbLock.reset(); });
     // Should not throw an exception.
     result.get();
 }

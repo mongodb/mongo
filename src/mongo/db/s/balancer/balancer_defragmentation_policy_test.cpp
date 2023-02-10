@@ -71,7 +71,8 @@ protected:
         ShardType(kShardId2.toString(), kShardHost2.toString()),
         ShardType(kShardId3.toString(), kShardHost3.toString())};
 
-    const std::function<void()> onDefragmentationStateUpdated = [] {};
+    const std::function<void()> onDefragmentationStateUpdated = [] {
+    };
 
     BalancerDefragmentationPolicyTest()
         : _clusterStats(), _defragmentationPolicy(&_clusterStats, onDefragmentationStateUpdated) {}
@@ -598,28 +599,29 @@ TEST_F(BalancerDefragmentationPolicyTest, PhaseOneNotConsecutive) {
     uint8_t timesUpperRangeMergeFound = 0;
     uint8_t timesMiddleRangeDataSizeFound = 0;
     auto inspectAction = [&](const DefragmentationAction& action) {
-        stdx::visit(
-            OverloadedVisitor{
-                [&](const MergeInfo& mergeAction) {
-                    if (mergeAction.chunkRange.getMin().woCompare(kKeyAtMin) == 0 &&
-                        mergeAction.chunkRange.getMax().woCompare(BSON("x" << 5)) == 0) {
-                        ++timesLowerRangeMergeFound;
-                    }
-                    if (mergeAction.chunkRange.getMin().woCompare(BSON("x" << 6)) == 0 &&
-                        mergeAction.chunkRange.getMax().woCompare(kKeyAtMax) == 0) {
-                        ++timesUpperRangeMergeFound;
-                    }
-                },
-                [&](const DataSizeInfo& dataSizeAction) {
-                    if (dataSizeAction.chunkRange.getMin().woCompare(BSON("x" << 5)) == 0 &&
-                        dataSizeAction.chunkRange.getMax().woCompare(BSON("x" << 6)) == 0) {
-                        ++timesMiddleRangeDataSizeFound;
-                    }
-                },
-                [&](const AutoSplitVectorInfo& _) { FAIL("Unexpected action type"); },
-                [&](const SplitInfoWithKeyPattern& _) { FAIL("Unexpected action type"); },
-                [&](const MigrateInfo& _) { FAIL("Unexpected action type"); }},
-            action);
+        stdx::visit(OverloadedVisitor{
+                        [&](const MergeInfo& mergeAction) {
+                            if (mergeAction.chunkRange.getMin().woCompare(kKeyAtMin) == 0 &&
+                                mergeAction.chunkRange.getMax().woCompare(BSON("x" << 5)) == 0) {
+                                ++timesLowerRangeMergeFound;
+                            }
+                            if (mergeAction.chunkRange.getMin().woCompare(BSON("x" << 6)) == 0 &&
+                                mergeAction.chunkRange.getMax().woCompare(kKeyAtMax) == 0) {
+                                ++timesUpperRangeMergeFound;
+                            }
+                        },
+                        [&](const DataSizeInfo& dataSizeAction) {
+                            if (dataSizeAction.chunkRange.getMin().woCompare(BSON("x" << 5)) == 0 &&
+                                dataSizeAction.chunkRange.getMax().woCompare(BSON("x" << 6)) == 0) {
+                                ++timesMiddleRangeDataSizeFound;
+                            }
+                        },
+                        [&](const AutoSplitVectorInfo& _) { FAIL("Unexpected action type"); },
+                        [&](const SplitInfoWithKeyPattern& _) { FAIL("Unexpected action type"); },
+                        [&](const MigrateInfo& _) {
+                            FAIL("Unexpected action type");
+                        }},
+                    action);
     };
     inspectAction(*nextAction);
     inspectAction(*nextAction2);

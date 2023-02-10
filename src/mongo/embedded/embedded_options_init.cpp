@@ -62,17 +62,17 @@ GlobalInitializerRegisterer embeddedOptionsInitializer(
     {"BeginStartupOptionValidation", "AllFailPointsRegistered"},
     {"EndStartupOptionValidation"});
 
-GlobalInitializerRegisterer embeddedOptionsStore("EmbeddedOptions_Store",
-                                                 [](InitializerContext* context) {
-                                                     return storeOptions(
-                                                         optionenvironment::startupOptionsParsed);
-                                                 },
-                                                 [](DeinitializerContext* context) {
-                                                     resetOptions();
-                                                     return Status::OK();
-                                                 },
-                                                 {"BeginStartupOptionStorage"},
-                                                 {"EndStartupOptionStorage"});
+GlobalInitializerRegisterer embeddedOptionsStore(
+    "EmbeddedOptions_Store",
+    [](InitializerContext* context) {
+        return storeOptions(optionenvironment::startupOptionsParsed);
+    },
+    [](DeinitializerContext* context) {
+        resetOptions();
+        return Status::OK();
+    },
+    {"BeginStartupOptionStorage"},
+    {"EndStartupOptionStorage"});
 
 }  // namespace embedded
 }  // namespace mongo

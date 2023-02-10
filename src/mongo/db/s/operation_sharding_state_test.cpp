@@ -117,7 +117,9 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleAllowedShardVersionsWithFix
         CollectionGeneration gen(OID::gen(), Timestamp(1, 0));
         ShardVersion sv({gen, {1, 0}}, boost::optional<CollectionIndexes>(boost::none));
         ASSERT_THROWS_CODE(
-            [&] { ScopedSetShardRole scopedSetShardRole(operationContext(), kNss, sv, dbv); }(),
+            [&] {
+                ScopedSetShardRole scopedSetShardRole(operationContext(), kNss, sv, dbv);
+            }(),
             DBException,
             7331300);
     }

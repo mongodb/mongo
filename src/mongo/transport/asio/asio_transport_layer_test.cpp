@@ -115,7 +115,9 @@ class ConnectionThread {
 public:
     explicit ConnectionThread(int port) : ConnectionThread(port, nullptr) {}
     ConnectionThread(int port, std::function<void(ConnectionThread&)> onConnect)
-        : _port{port}, _onConnect{std::move(onConnect)}, _thread{[this] { _run(); }} {}
+        : _port{port}, _onConnect{std::move(onConnect)}, _thread{[this] {
+              _run();
+          }} {}
 
     ~ConnectionThread() {
         LOGV2(6109500, "connection: Tx stop request");
@@ -189,7 +191,9 @@ struct SessionThread {
     struct StopException {};
 
     explicit SessionThread(std::shared_ptr<transport::Session> s)
-        : _session{std::move(s)}, _thread{[this] { _run(); }} {}
+        : _session{std::move(s)}, _thread{[this] {
+              _run();
+          }} {}
 
     ~SessionThread() {
         if (!_thread.joinable())
@@ -611,7 +615,9 @@ TEST(AsioTransportLayer, EgressConnectionResetByPeerDuringSessionCtor) {
     // test, we need the server to respond when the client hits the failpoint
     // in the AsioSession ctor. So we have to disable TFO.
     auto savedTFOClient = std::exchange(transport::gTCPFastOpenClient, false);
-    ScopeGuard savedTFOClientRestore = [&] { transport::gTCPFastOpenClient = savedTFOClient; };
+    ScopeGuard savedTFOClientRestore = [&] {
+        transport::gTCPFastOpenClient = savedTFOClient;
+    };
     // The `server` accepts connections, only to immediately reset them.
     TestFixture tf;
     asio::io_context ioContext;
@@ -628,8 +634,12 @@ TEST(AsioTransportLayer, EgressConnectionResetByPeerDuringSessionCtor) {
         sleepFor(Seconds{1});
         fp.setMode(FailPoint::off);
     });
-    JoinThread ioThread{[&] { ioContext.run(); }};
-    ScopeGuard ioContextStop = [&] { ioContext.stop(); };
+    JoinThread ioThread{[&] {
+        ioContext.run();
+    }};
+    ScopeGuard ioContextStop = [&] {
+        ioContext.stop();
+    };
 
     fp.setMode(FailPoint::alwaysOn);
     LOGV2(6101602, "Connecting", "port"_attr = server.port());
@@ -667,8 +677,12 @@ TEST(AsioTransportLayer, ConfirmSocketSetOptionOnResetConnections) {
         sleepFor(Seconds{1});
         accepted.set(true);
     });
-    JoinThread ioThread{[&] { ioContext.run(); }};
-    ScopeGuard ioContextStop = [&] { ioContext.stop(); };
+    JoinThread ioThread{[&] {
+        ioContext.run();
+    }};
+    ScopeGuard ioContextStop = [&] {
+        ioContext.stop();
+    };
     JoinThread client{[&] {
         asio::ip::tcp::socket client{ioContext};
         client.connect(asio::ip::tcp::endpoint(asio::ip::address_v4::loopback(), server.port()));

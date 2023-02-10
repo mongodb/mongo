@@ -331,23 +331,22 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     // The thread pool task will be responsible for signalling the condition variable when the index
     // build thread is done running.
     onScopeExitGuard.dismiss();
-    _threadPool.schedule([
-        this,
-        buildUUID,
-        dbName,
-        nss,
-        indexBuildOptions,
-        logicalOp,
-        opDesc,
-        replState,
-        startPromise = std::move(startPromise),
-        startTimestamp,
-        shardVersion = oss.getShardVersion(nss),
-        dbVersion = oss.getDbVersion(dbName.toStringWithTenantId()),
-        resumeInfo,
-        impersonatedClientAttrs = std::move(impersonatedClientAttrs),
-        forwardableOpMetadata = std::move(forwardableOpMetadata)
-    ](auto status) mutable noexcept {
+    _threadPool.schedule([this,
+                          buildUUID,
+                          dbName,
+                          nss,
+                          indexBuildOptions,
+                          logicalOp,
+                          opDesc,
+                          replState,
+                          startPromise = std::move(startPromise),
+                          startTimestamp,
+                          shardVersion = oss.getShardVersion(nss),
+                          dbVersion = oss.getDbVersion(dbName.toStringWithTenantId()),
+                          resumeInfo,
+                          impersonatedClientAttrs = std::move(impersonatedClientAttrs),
+                          forwardableOpMetadata =
+                              std::move(forwardableOpMetadata)](auto status) mutable noexcept {
         ScopeGuard onScopeExitGuard([&] {
             stdx::unique_lock<Latch> lk(_throttlingMutex);
             _numActiveIndexBuilds--;
@@ -631,7 +630,9 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
         replState->clearVoteRequestCbk();
     };
 
-    auto needToVote = [replState]() -> bool { return !replState->getNextActionNoWait(); };
+    auto needToVote = [replState]() -> bool {
+        return !replState->getNextActionNoWait();
+    };
 
     // Retry 'voteCommitIndexBuild' command on error until we have been signaled either with commit
     // or abort. This way, we can make sure majority of nodes will never stop voting and wait for

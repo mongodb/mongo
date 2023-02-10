@@ -176,12 +176,16 @@ bool ChunkRange::operator<(const ChunkRange& other) const {
 }
 
 bool ChunkRange::covers(ChunkRange const& other) const {
-    auto le = [](auto const& a, auto const& b) { return a.woCompare(b) <= 0; };
+    auto le = [](auto const& a, auto const& b) {
+        return a.woCompare(b) <= 0;
+    };
     return le(_minKey, other._minKey) && le(other._maxKey, _maxKey);
 }
 
 boost::optional<ChunkRange> ChunkRange::overlapWith(ChunkRange const& other) const {
-    auto le = [](auto const& a, auto const& b) { return a.woCompare(b) <= 0; };
+    auto le = [](auto const& a, auto const& b) {
+        return a.woCompare(b) <= 0;
+    };
     if (le(other._maxKey, _minKey) || le(_maxKey, other._minKey)) {
         return boost::none;
     }
@@ -194,7 +198,9 @@ bool ChunkRange::overlaps(const ChunkRange& other) const {
 }
 
 ChunkRange ChunkRange::unionWith(ChunkRange const& other) const {
-    auto le = [](auto const& a, auto const& b) { return a.woCompare(b) <= 0; };
+    auto le = [](auto const& a, auto const& b) {
+        return a.woCompare(b) <= 0;
+    };
     return ChunkRange(le(_minKey, other._minKey) ? _minKey : other._minKey,
                       le(_maxKey, other._maxKey) ? other._maxKey : _maxKey);
 }

@@ -113,8 +113,7 @@ Future<Result> async(Func&& func) {
         } catch (const DBException& ex) {
             promise.setError(ex.toStatus());
         }
-    })
-        .detach();
+    }).detach();
 
     return std::move(pf.future);
 }

@@ -72,7 +72,9 @@ StatusWith<RecordId> keyForOptime(const Timestamp& opTime, const KeyFormat keyFo
             keyBuilder.appendTimestamp(opTime);
             return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
         }
-        default: { MONGO_UNREACHABLE_TASSERT(6521004); }
+        default: {
+            MONGO_UNREACHABLE_TASSERT(6521004);
+        }
     }
 
     MONGO_UNREACHABLE_TASSERT(6521005);

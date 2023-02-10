@@ -132,7 +132,7 @@ public:
     }
 
     /** Lock and return a holder to the value and lock. Const or non-const. */
-    auto operator-> () const {
+    auto operator->() const {
         return synchronize();
     }
     auto operator*() const {
@@ -144,7 +144,7 @@ public:
     }
 
     /** Mutators */
-    auto operator-> () {
+    auto operator->() {
         return synchronize();
     }
     auto operator*() {

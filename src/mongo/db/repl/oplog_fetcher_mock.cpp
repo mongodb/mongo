@@ -44,15 +44,16 @@ OplogFetcherMock::OplogFetcherMock(
     EnqueueDocumentsFn enqueueDocumentsFn,
     OnShutdownCallbackFn onShutdownCallbackFn,
     Config config)
-    : OplogFetcher(executor,
-                   // Pass a dummy OplogFetcherRestartDecision to the base OplogFetcher.
-                   std::make_unique<OplogFetcherRestartDecisionDefault>(0),
-                   dataReplicatorExternalState,
-                   // Pass a dummy EnqueueDocumentsFn to the base OplogFetcher.
-                   [](const auto& a1, const auto& a2, const auto& a3) { return Status::OK(); },
-                   // Pass a dummy OnShutdownCallbackFn to the base OplogFetcher.
-                   [](const auto& a, const int b) {},
-                   config),
+    : OplogFetcher(
+          executor,
+          // Pass a dummy OplogFetcherRestartDecision to the base OplogFetcher.
+          std::make_unique<OplogFetcherRestartDecisionDefault>(0),
+          dataReplicatorExternalState,
+          // Pass a dummy EnqueueDocumentsFn to the base OplogFetcher.
+          [](const auto& a1, const auto& a2, const auto& a3) { return Status::OK(); },
+          // Pass a dummy OnShutdownCallbackFn to the base OplogFetcher.
+          [](const auto& a, const int b) {},
+          config),
       _oplogFetcherRestartDecision(std::move(oplogFetcherRestartDecision)),
       _onShutdownCallbackFn(std::move(onShutdownCallbackFn)),
       _enqueueDocumentsFn(std::move(enqueueDocumentsFn)),

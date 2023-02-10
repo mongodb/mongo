@@ -60,7 +60,11 @@ inline int idx(T enumType) {
  * https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#topologytype-table
  */
 void mongo::sdam::TopologyStateMachine::initTransitionTable() {
-    auto bindThis = [&](auto&& pmf) { return [=](auto&&... a) { (this->*pmf)(a...); }; };
+    auto bindThis = [&](auto&& pmf) {
+        return [=](auto&&... a) {
+            (this->*pmf)(a...);
+        };
+    };
 
     // init the table to No-ops
     _stt.resize(allTopologyTypes().size() + 1);

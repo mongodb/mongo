@@ -166,22 +166,22 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     // Ensure the document still exists and matches the predicate.
     bool docStillMatches;
 
-    const auto ret =
-        handlePlanStageYield(expCtx(),
-                             "DeleteStage ensureStillMatches",
-                             collection()->ns().ns(),
-                             [&] {
-                                 docStillMatches = write_stage_common::ensureStillMatches(
-                                     collection(), opCtx(), _ws, id, _params->canonicalQuery);
-                                 return PlanStage::NEED_TIME;
-                             },
-                             [&] {
-                                 // yieldHandler
-                                 // There was a problem trying to detect if the document still
-                                 // exists, so retry.
-                                 memberFreer.dismiss();
-                                 prepareToRetryWSM(id, out);
-                             });
+    const auto ret = handlePlanStageYield(
+        expCtx(),
+        "DeleteStage ensureStillMatches",
+        collection()->ns().ns(),
+        [&] {
+            docStillMatches = write_stage_common::ensureStillMatches(
+                collection(), opCtx(), _ws, id, _params->canonicalQuery);
+            return PlanStage::NEED_TIME;
+        },
+        [&] {
+            // yieldHandler
+            // There was a problem trying to detect if the document still
+            // exists, so retry.
+            memberFreer.dismiss();
+            prepareToRetryWSM(id, out);
+        });
 
     if (ret != PlanStage::NEED_TIME) {
         return ret;
@@ -229,17 +229,18 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         uassertStatusOK(_params->removeSaver->goingToDelete(bsonObjDoc));
     }
 
-    handlePlanStageYield(expCtx(),
-                         "DeleteStage saveState",
-                         collection()->ns().ns(),
-                         [&] {
-                             child()->saveState();
-                             return PlanStage::NEED_TIME /* unused */;
-                         },
-                         [&] {
-                             // yieldHandler
-                             std::terminate();
-                         });
+    handlePlanStageYield(
+        expCtx(),
+        "DeleteStage saveState",
+        collection()->ns().ns(),
+        [&] {
+            child()->saveState();
+            return PlanStage::NEED_TIME /* unused */;
+        },
+        [&] {
+            // yieldHandler
+            std::terminate();
+        });
 
     // Do the write, unless this is an explain.
     if (!_params->isExplain) {
@@ -303,30 +304,30 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     // As restoreState may restore (recreate) cursors, cursors are tied to the transaction in
     // which they are created, and a WriteUnitOfWork is a transaction, make sure to restore the
     // state outside of the WriteUnitOfWork.
-    const auto restoreStateRet =
-        handlePlanStageYield(expCtx(),
-                             "DeleteStage restoreState",
-                             collection()->ns().ns(),
-                             [&] {
-                                 child()->restoreState(&collection());
-                                 return PlanStage::NEED_TIME;
-                             },
-                             [&] {
-                                 // yieldHandler
-                                 // Note we don't need to retry anything in this case since the
-                                 // delete already was committed. However, we still need to return
-                                 // the deleted document (if it was requested).
-                                 if (_params->returnDeleted) {
-                                     // member->obj should refer to the deleted document.
-                                     invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
+    const auto restoreStateRet = handlePlanStageYield(
+        expCtx(),
+        "DeleteStage restoreState",
+        collection()->ns().ns(),
+        [&] {
+            child()->restoreState(&collection());
+            return PlanStage::NEED_TIME;
+        },
+        [&] {
+            // yieldHandler
+            // Note we don't need to retry anything in this case since the
+            // delete already was committed. However, we still need to return
+            // the deleted document (if it was requested).
+            if (_params->returnDeleted) {
+                // member->obj should refer to the deleted document.
+                invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
 
-                                     _idReturning = id;
-                                     // Keep this member around so that we can return it on
-                                     // the next work() call.
-                                     memberFreer.dismiss();
-                                 }
-                                 *out = WorkingSet::INVALID_ID;
-                             });
+                _idReturning = id;
+                // Keep this member around so that we can return it on
+                // the next work() call.
+                memberFreer.dismiss();
+            }
+            *out = WorkingSet::INVALID_ID;
+        });
     if (restoreStateRet != PlanStage::NEED_TIME) {
         return ret;
     }

@@ -127,8 +127,7 @@ private:
 template <typename BodyCallable, typename ConditionCallable, typename Delay>
 class [[nodiscard]] AsyncTryUntilWithDelay {
 public:
-    explicit AsyncTryUntilWithDelay(
-        BodyCallable && body, ConditionCallable && condition, Delay delay)
+    explicit AsyncTryUntilWithDelay(BodyCallable&& body, ConditionCallable&& condition, Delay delay)
         : _body(std::move(body)), _condition(std::move(condition)), _delay(delay) {}
 
     /**
@@ -146,7 +145,7 @@ public:
      * that readies the returned future when the given duration has elapsed or token cancelled.
      */
     template <typename SleepableExecutor>
-    auto on(SleepableExecutor executor, CancellationToken cancelToken)&& {
+    auto on(SleepableExecutor executor, CancellationToken cancelToken) && {
         auto loop =
             std::make_shared<TryUntilLoopWithDelay<SleepableExecutor>>(std::move(executor),
                                                                        std::move(_body),
@@ -278,7 +277,7 @@ private:
 template <typename BodyCallable, typename ConditionCallable>
 class [[nodiscard]] AsyncTryUntil {
 public:
-    explicit AsyncTryUntil(BodyCallable && body, ConditionCallable && condition)
+    explicit AsyncTryUntil(BodyCallable&& body, ConditionCallable&& condition)
         : _body(std::move(body)), _condition(std::move(condition)) {}
 
     /**
@@ -286,7 +285,7 @@ public:
      * loop body.
      */
     template <typename DurationType>
-    auto withDelayBetweenIterations(DurationType delay)&& {
+    auto withDelayBetweenIterations(DurationType delay) && {
         return AsyncTryUntilWithDelay(
             std::move(_body), std::move(_condition), ConstDelay<DurationType>(std::move(delay)));
     }
@@ -296,7 +295,7 @@ public:
      * executing the loop body.
      */
     template <typename BackoffType>
-    auto withBackoffBetweenIterations(BackoffType backoff)&& {
+    auto withBackoffBetweenIterations(BackoffType backoff) && {
         return AsyncTryUntilWithDelay(
             std::move(_body), std::move(_condition), BackoffDelay<BackoffType>(std::move(backoff)));
     }
@@ -311,7 +310,7 @@ public:
      * iteration of the loop body threw an exception or otherwise returned an error status, the
      * returned ExecutorFuture will contain that error.
      */
-    auto on(ExecutorPtr executor, CancellationToken cancelToken)&& {
+    auto on(ExecutorPtr executor, CancellationToken cancelToken) && {
         auto loop = std::make_shared<TryUntilLoop>(
             std::move(executor), std::move(_body), std::move(_condition), std::move(cancelToken));
         // Launch the recursive chain using the helper class.
@@ -480,10 +479,10 @@ std::vector<T> variadicArgsToVector(U&&... elems) {
 template <typename Callable>
 class [[nodiscard]] AsyncTry {
 public:
-    explicit AsyncTry(Callable && callable) : _body(std::move(callable)) {}
+    explicit AsyncTry(Callable&& callable) : _body(std::move(callable)) {}
 
     template <typename Condition>
-    auto until(Condition && condition)&& {
+    auto until(Condition&& condition) && {
         return future_util_details::AsyncTryUntil(std::move(_body), std::move(condition));
     }
 
@@ -824,7 +823,7 @@ public:
      * running the launcher.
      */
     template <typename Launcher>
-        auto thenWithState(Launcher && launcher) && noexcept {
+    auto thenWithState(Launcher&& launcher) && noexcept {
         using namespace future_details;
         using ReturnType = FutureFor<NormalizedCallResult<Launcher, State*>>;
 
@@ -849,7 +848,7 @@ public:
      * If an exception would be emitted, it is instead stored in the AsyncState.
      */
     template <typename... Args>
-    static auto make(Args && ... args) noexcept {
+    static auto make(Args&&... args) noexcept {
         try {
             auto ptr = std::make_unique<State>(std::forward<Args>(args)...);
             return AsyncState(std::move(ptr));

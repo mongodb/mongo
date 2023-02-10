@@ -1792,17 +1792,17 @@ std::vector<DatabaseName> CollectionCatalog::getAllDbNamesForTenant(
 
 std::set<TenantId> CollectionCatalog::getAllTenants() const {
     std::set<TenantId> ret;
-    (void)_iterAllDbNamesHelper(boost::none,
-                                [&ret](const DatabaseName& dbName) {
-                                    if (const auto& tenantId = dbName.tenantId()) {
-                                        ret.insert(*tenantId);
-                                    }
-                                    return Status::OK();
-                                },
-                                [](const DatabaseName& dbName) {
-                                    return std::make_pair(DatabaseName(dbName.tenantId(), "\xff"),
-                                                          maxUuid);
-                                });
+    (void)_iterAllDbNamesHelper(
+        boost::none,
+        [&ret](const DatabaseName& dbName) {
+            if (const auto& tenantId = dbName.tenantId()) {
+                ret.insert(*tenantId);
+            }
+            return Status::OK();
+        },
+        [](const DatabaseName& dbName) {
+            return std::make_pair(DatabaseName(dbName.tenantId(), "\xff"), maxUuid);
+        });
     return ret;
 }
 

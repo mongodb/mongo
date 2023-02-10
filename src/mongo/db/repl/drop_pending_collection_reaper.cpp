@@ -139,7 +139,9 @@ bool DropPendingCollectionReaper::rollBackDropPendingCollection(
         const auto equalRange = _dropPendingNamespaces.equal_range(opTime);
         const auto& lowerBound = equalRange.first;
         const auto& upperBound = equalRange.second;
-        auto matcher = [&pendingNss](const auto& pair) { return pair.second == pendingNss; };
+        auto matcher = [&pendingNss](const auto& pair) {
+            return pair.second == pendingNss;
+        };
         auto it = std::find_if(lowerBound, upperBound, matcher);
         if (it == upperBound) {
             LOGV2_WARNING(21154,

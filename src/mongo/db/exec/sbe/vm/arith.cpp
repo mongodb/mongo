@@ -539,7 +539,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericDiv(value::TypeT
                                                                     value::Value lhsValue,
                                                                     value::TypeTags rhsTag,
                                                                     value::Value rhsValue) {
-    auto assertNonZero = [](bool nonZero) { uassert(4848401, "can't $divide by zero", nonZero); };
+    auto assertNonZero = [](bool nonZero) {
+        uassert(4848401, "can't $divide by zero", nonZero);
+    };
 
     if (value::isNumber(lhsTag) && value::isNumber(rhsTag)) {
         switch (getWidestNumericalType(lhsTag, rhsTag)) {
@@ -580,7 +582,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericIDiv(value::Type
                                                                      value::Value lhsValue,
                                                                      value::TypeTags rhsTag,
                                                                      value::Value rhsValue) {
-    auto assertNonZero = [](bool nonZero) { uassert(4848402, "can't $divide by zero", nonZero); };
+    auto assertNonZero = [](bool nonZero) {
+        uassert(4848402, "can't $divide by zero", nonZero);
+    };
 
     if (value::isNumber(lhsTag) && value::isNumber(rhsTag)) {
         switch (getWidestNumericalType(lhsTag, rhsTag)) {
@@ -632,7 +636,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericMod(value::TypeT
                                                                     value::Value lhsValue,
                                                                     value::TypeTags rhsTag,
                                                                     value::Value rhsValue) {
-    auto assertNonZero = [](bool nonZero) { uassert(4848403, "can't $mod by zero", nonZero); };
+    auto assertNonZero = [](bool nonZero) {
+        uassert(4848403, "can't $mod by zero", nonZero);
+    };
 
     if (value::isNumber(lhsTag) && value::isNumber(rhsTag)) {
         switch (getWidestNumericalType(lhsTag, rhsTag)) {

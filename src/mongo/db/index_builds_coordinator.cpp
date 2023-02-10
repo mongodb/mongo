@@ -793,7 +793,9 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(OperationContext* opCtx,
           "reason"_attr = reason);
 
     auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
-        auto indexBuildFilter = [=](const auto& replState) { return dbName == replState.dbName; };
+        auto indexBuildFilter = [=](const auto& replState) {
+            return dbName == replState.dbName;
+        };
         return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
     }();
     for (const auto& replState : builds) {
@@ -895,7 +897,9 @@ void IndexBuildsCoordinator::abortAllIndexBuildsForInitialSync(OperationContext*
     LOGV2(4833200, "About to abort all index builders running", "reason"_attr = reason);
 
     auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
-        auto indexBuildFilter = [](const auto& replState) { return true; };
+        auto indexBuildFilter = [](const auto& replState) {
+            return true;
+        };
         return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
     }();
     for (const auto& replState : builds) {
@@ -1425,7 +1429,9 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
             invariant(isPrimaryOrSinglePhase,
                       str::stream() << "singlePhase: "
                                     << (IndexBuildProtocol::kSinglePhase == replState->protocol));
-            auto onCleanUpFn = [&] { onAbortIndexBuild(opCtx, coll->ns(), *replState, reason); };
+            auto onCleanUpFn = [&] {
+                onAbortIndexBuild(opCtx, coll->ns(), *replState, reason);
+            };
             _indexBuildsManager.abortIndexBuild(opCtx, coll, replState->buildUUID, onCleanUpFn);
             removeIndexBuildEntryAfterCommitOrAbort(
                 opCtx, dbAndUUID, indexBuildEntryCollection, *replState);
@@ -1694,7 +1700,9 @@ bool IndexBuildsCoordinator::noIndexBuildInProgress() const {
 }
 
 int IndexBuildsCoordinator::numInProgForDb(const DatabaseName& dbName) const {
-    auto indexBuildFilter = [dbName](const auto& replState) { return dbName == replState.dbName; };
+    auto indexBuildFilter = [dbName](const auto& replState) {
+        return dbName == replState.dbName;
+    };
     auto dbIndexBuilds = activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
     return int(dbIndexBuilds.size());
 }
@@ -2942,7 +2950,9 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
 
         // If two phase index builds is enabled, index build will be coordinated using
         // startIndexBuild and commitIndexBuild oplog entries.
-        auto onCommitFn = [&] { onCommitIndexBuild(opCtx, collection->ns(), replState); };
+        auto onCommitFn = [&] {
+            onCommitIndexBuild(opCtx, collection->ns(), replState);
+        };
 
         auto onCreateEachFn = [&](const BSONObj& spec) {
             if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
@@ -3100,7 +3110,9 @@ StatusWith<std::shared_ptr<ReplIndexBuildState>> IndexBuildsCoordinator::_getInd
 }
 
 std::vector<std::shared_ptr<ReplIndexBuildState>> IndexBuildsCoordinator::_getIndexBuilds() const {
-    auto filter = [](const auto& replState) { return true; };
+    auto filter = [](const auto& replState) {
+        return true;
+    };
     return activeIndexBuilds.filterIndexBuilds(filter);
 }
 

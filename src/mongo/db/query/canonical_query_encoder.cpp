@@ -459,7 +459,9 @@ void encodeRegexFlagsForMatch(RegexIterator first, RegexIterator last, StringBui
 // Helper overload to prepare a vector of unique_ptrs for the heavy-lifting function above.
 void encodeRegexFlagsForMatch(const std::vector<std::unique_ptr<RegexMatchExpression>>& regexes,
                               StringBuilder* keyBuilder) {
-    const auto transformFunc = [](const auto& regex) { return regex.get(); };
+    const auto transformFunc = [](const auto& regex) {
+        return regex.get();
+    };
     encodeRegexFlagsForMatch(boost::make_transform_iterator(regexes.begin(), transformFunc),
                              boost::make_transform_iterator(regexes.end(), transformFunc),
                              keyBuilder);

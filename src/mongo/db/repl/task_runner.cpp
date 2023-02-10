@@ -79,7 +79,9 @@ TaskRunner::NextAction runSingleTask(const TaskRunner::Task& task,
 
 // static
 TaskRunner::Task TaskRunner::makeCancelTask() {
-    return [](OperationContext* opCtx, const Status& status) { return NextAction::kCancel; };
+    return [](OperationContext* opCtx, const Status& status) {
+        return NextAction::kCancel;
+    };
 }
 
 TaskRunner::TaskRunner(ThreadPool* threadPool)

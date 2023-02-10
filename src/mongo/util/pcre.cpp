@@ -479,7 +479,7 @@ MatchData& MatchData::operator=(MatchData&&) noexcept = default;
 
 IFWD(Regex, pattern, (const std::string&), (), ())
 IFWD(Regex, options, (CompileOptions), (), ())
-IFWD(Regex, operator bool,(), (), ())
+IFWD(Regex, operator bool, (), (), ())
 IFWD(Regex, error, (std::error_code), (), ())
 IFWD(Regex, errorPosition, (size_t), (), ())
 IFWD(Regex, captureCount, (size_t), (), ())
@@ -492,10 +492,10 @@ IFWD(Regex,
      (StringData r, std::string* s, MatchOptions o, size_t p),
      (r, s, o, p))
 
-IFWD(MatchData, operator bool,(), (), ())
+IFWD(MatchData, operator bool, (), (), ())
 IFWD(MatchData, captureCount, (size_t), (), ())
-IFWD(MatchData, operator[],(StringData), (size_t i), (i))
-IFWD(MatchData, operator[],(StringData), (const std::string& name), (name))
+IFWD(MatchData, operator[], (StringData), (size_t i), (i))
+IFWD(MatchData, operator[], (StringData), (const std::string& name), (name))
 IFWD(MatchData, getCaptures, (std::vector<StringData>), (), ())
 IFWD(MatchData, getMatchList, (std::vector<StringData>), (), ())
 IFWD(MatchData, error, (std::error_code), (), ())

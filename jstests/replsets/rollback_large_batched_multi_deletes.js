@@ -63,7 +63,7 @@ const nodeOptions = {
         maxNumberOfBatchedOperationsInSingleOplogEntry: 2,
     },
 };
-const rollbackTest = new RollbackTest(jsTestName(), /*replSet=*/undefined, nodeOptions);
+const rollbackTest = new RollbackTest(jsTestName(), /*replSet=*/ undefined, nodeOptions);
 
 if (!FeatureFlagUtil.isEnabled(rollbackTest.getPrimary(),
                                "InternalWritesAreReplicatedTransactionally")) {

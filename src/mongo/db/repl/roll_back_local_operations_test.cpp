@@ -347,7 +347,9 @@ private:
 void checkRemoteIterator(int numNetworkFailures, bool expectedToSucceed) {
 
     DBClientConnectionForTest conn(numNetworkFailures);
-    auto getConnection = [&]() -> DBClientBase* { return &conn; };
+    auto getConnection = [&]() -> DBClientBase* {
+        return &conn;
+    };
 
     auto localOperation = makeOpAndRecordId(1);
     OplogInterfaceRemote remoteOplogMock(

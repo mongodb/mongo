@@ -540,7 +540,9 @@ TEST_F(ClusterCursorManagerTest, KillCursorsSatisfyingAlwaysTrueKillsAllCursors)
                                                ClusterCursorManager::CursorLifetime::Mortal,
                                                boost::none));
     }
-    auto pred = [](CursorId, const ClusterCursorManager::CursorEntry&) { return true; };
+    auto pred = [](CursorId, const ClusterCursorManager::CursorEntry&) {
+        return true;
+    };
     auto nKilled = getManager()->killCursorsSatisfying(getOperationContext(), std::move(pred));
     ASSERT_EQ(nKilled, numCursors);
     for (size_t i = 0; i < numCursors; ++i) {
@@ -558,7 +560,9 @@ TEST_F(ClusterCursorManagerTest, KillCursorsSatisfyingAlwaysFalseKillsNoCursors)
                                                ClusterCursorManager::CursorLifetime::Mortal,
                                                boost::none));
     }
-    auto pred = [](CursorId, const ClusterCursorManager::CursorEntry&) { return false; };
+    auto pred = [](CursorId, const ClusterCursorManager::CursorEntry&) {
+        return false;
+    };
     auto nKilled = getManager()->killCursorsSatisfying(getOperationContext(), std::move(pred));
     ASSERT_EQ(nKilled, 0);
     for (size_t i = 0; i < numCursors; ++i) {
@@ -569,7 +573,9 @@ TEST_F(ClusterCursorManagerTest, KillCursorsSatisfyingAlwaysFalseKillsNoCursors)
 TEST_F(ClusterCursorManagerTest, KillCursorsSatisfyingOnlyKillsMatchingSubset) {
     const size_t numCursors = 10;
     stdx::unordered_set<CursorId> idsToKill;
-    auto shouldKillCursor = [](size_t idx) { return idx % 2 == 0; };
+    auto shouldKillCursor = [](size_t idx) {
+        return idx % 2 == 0;
+    };
     for (size_t i = 0; i < numCursors; ++i) {
         auto swCursorId =
             getManager()->registerCursor(getOperationContext(),

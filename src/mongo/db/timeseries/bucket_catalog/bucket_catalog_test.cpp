@@ -902,8 +902,9 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
 
     {
         auto task = RunBackgroundTaskAndWaitForFailpoint{
-            "hangWaitingForConflictingPreparedBatch",
-            [&]() { ASSERT_OK(_bucketCatalog->prepareCommit(batch2)); }};
+            "hangWaitingForConflictingPreparedBatch", [&]() {
+                ASSERT_OK(_bucketCatalog->prepareCommit(batch2));
+            }};
 
         // Finish the first batch.
         _bucketCatalog->finish(batch1, {});
@@ -955,8 +956,9 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
 
     {
         auto task = RunBackgroundTaskAndWaitForFailpoint{
-            "hangWaitingForConflictingPreparedBatch",
-            [&]() { ASSERT_NOT_OK(_bucketCatalog->prepareCommit(batch2)); }};
+            "hangWaitingForConflictingPreparedBatch", [&]() {
+                ASSERT_NOT_OK(_bucketCatalog->prepareCommit(batch2));
+            }};
 
         // If we abort the third batch, it should abort the second one too, as it isn't prepared.
         // However, since the first batch is prepared, we can't abort it or clean up the bucket. We

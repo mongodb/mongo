@@ -862,9 +862,15 @@ PRODUCER_CONSUMER_QUEUE_TEST(pipeCompiles, runPermutations<false, false>) {
     //
     // At some point this was working with a single move, and this pattern helped me catch some
     // lifetime screw ups
-    auto producer = [](auto p) { return std::move(p); }(std::move(pipe.producer));
-    auto controller = [](auto c) { return std::move(c); }(std::move(pipe.controller));
-    auto consumer = [](auto c) { return std::move(c); }(std::move(pipe.consumer));
+    auto producer = [](auto p) {
+        return std::move(p);
+    }(std::move(pipe.producer));
+    auto controller = [](auto c) {
+        return std::move(c);
+    }(std::move(pipe.controller));
+    auto consumer = [](auto c) {
+        return std::move(c);
+    }(std::move(pipe.consumer));
 
     producer.push(MoveOnly(1));
     std::array<MoveOnly, 1> container({MoveOnly(1)});

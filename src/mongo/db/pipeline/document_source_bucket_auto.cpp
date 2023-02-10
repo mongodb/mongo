@@ -419,10 +419,11 @@ intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(
     if (accumulationStatements.empty()) {
         accumulationStatements.emplace_back(
             "count",
-            AccumulationExpression(ExpressionConstant::create(pExpCtx.get(), Value(BSONNULL)),
-                                   ExpressionConstant::create(pExpCtx.get(), Value(1)),
-                                   [pExpCtx] { return AccumulatorSum::create(pExpCtx.get()); },
-                                   AccumulatorSum::kName));
+            AccumulationExpression(
+                ExpressionConstant::create(pExpCtx.get(), Value(BSONNULL)),
+                ExpressionConstant::create(pExpCtx.get(), Value(1)),
+                [pExpCtx] { return AccumulatorSum::create(pExpCtx.get()); },
+                AccumulatorSum::kName));
     }
     return new DocumentSourceBucketAuto(pExpCtx,
                                         groupByExpression,

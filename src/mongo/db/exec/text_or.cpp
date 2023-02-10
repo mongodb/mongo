@@ -151,19 +151,20 @@ PlanStage::StageState TextOrStage::doWork(WorkingSetID* out) {
 PlanStage::StageState TextOrStage::initStage(WorkingSetID* out) {
     *out = WorkingSet::INVALID_ID;
 
-    return handlePlanStageYield(expCtx(),
-                                "TextOrStage initStage",
-                                collection()->ns().ns(),
-                                [&] {
-                                    _recordCursor = collection()->getCursor(opCtx());
-                                    _internalState = State::kReadingTerms;
-                                    return PlanStage::NEED_TIME;
-                                },
-                                [&] {
-                                    // yieldHandler
-                                    invariant(_internalState == State::kInit);
-                                    _recordCursor.reset();
-                                });
+    return handlePlanStageYield(
+        expCtx(),
+        "TextOrStage initStage",
+        collection()->ns().ns(),
+        [&] {
+            _recordCursor = collection()->getCursor(opCtx());
+            _internalState = State::kReadingTerms;
+            return PlanStage::NEED_TIME;
+        },
+        [&] {
+            // yieldHandler
+            invariant(_internalState == State::kInit);
+            _recordCursor.reset();
+        });
 }
 
 PlanStage::StageState TextOrStage::readFromChildren(WorkingSetID* out) {
@@ -258,30 +259,30 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
 
         // Our parent expects RID_AND_OBJ members, so we fetch the document here if we haven't
         // already.
-        const auto ret =
-            handlePlanStageYield(expCtx(),
-                                 "TextOrStage addTerm",
-                                 collection()->ns().ns(),
-                                 [&] {
-                                     if (!WorkingSetCommon::fetch(opCtx(),
-                                                                  _ws,
-                                                                  wsid,
-                                                                  _recordCursor.get(),
-                                                                  collection(),
-                                                                  collection()->ns())) {
-                                         _ws->free(wsid);
-                                         textRecordData->score = -1;
-                                         return NEED_TIME;
-                                     }
-                                     ++_specificStats.fetches;
-                                     return PlanStage::ADVANCED;
-                                 },
-                                 [&] {
-                                     // yieldHandler
-                                     wsm->makeObjOwnedIfNeeded();
-                                     _idRetrying = wsid;
-                                     *out = WorkingSet::INVALID_ID;
-                                 });
+        const auto ret = handlePlanStageYield(
+            expCtx(),
+            "TextOrStage addTerm",
+            collection()->ns().ns(),
+            [&] {
+                if (!WorkingSetCommon::fetch(opCtx(),
+                                             _ws,
+                                             wsid,
+                                             _recordCursor.get(),
+                                             collection(),
+                                             collection()->ns())) {
+                    _ws->free(wsid);
+                    textRecordData->score = -1;
+                    return NEED_TIME;
+                }
+                ++_specificStats.fetches;
+                return PlanStage::ADVANCED;
+            },
+            [&] {
+                // yieldHandler
+                wsm->makeObjOwnedIfNeeded();
+                _idRetrying = wsid;
+                *out = WorkingSet::INVALID_ID;
+            });
 
         if (ret != PlanStage::ADVANCED) {
             return ret;

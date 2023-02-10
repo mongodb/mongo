@@ -61,7 +61,9 @@ WiredTigerStats::WiredTigerStats(WT_SESSION* session) {
             "Unable to open statistics cursor",
             !session->open_cursor(session, "statistics:session", nullptr, "statistics=(fast)", &c));
 
-    ScopeGuard guard{[c] { c->close(c); }};
+    ScopeGuard guard{[c] {
+        c->close(c);
+    }};
 
     int32_t key;
     uint64_t value;

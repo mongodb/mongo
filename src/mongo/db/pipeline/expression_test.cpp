@@ -989,11 +989,19 @@ TEST(ExpressionPowTest, ThrowsWhenBaseZeroAndExpNegative) {
 
     const auto expr =
         Expression::parseExpression(&expCtx, BSON("$pow" << BSON_ARRAY(0 << -5)), vps);
-    ASSERT_THROWS([&] { expr->evaluate({}, &expCtx.variables); }(), AssertionException);
+    ASSERT_THROWS(
+        [&] {
+            expr->evaluate({}, &expCtx.variables);
+        }(),
+        AssertionException);
 
     const auto exprWithLong =
         Expression::parseExpression(&expCtx, BSON("$pow" << BSON_ARRAY(0LL << -5LL)), vps);
-    ASSERT_THROWS([&] { expr->evaluate({}, &expCtx.variables); }(), AssertionException);
+    ASSERT_THROWS(
+        [&] {
+            expr->evaluate({}, &expCtx.variables);
+        }(),
+        AssertionException);
 }
 
 TEST(ExpressionPowTest, LargeExponentValuesWithBaseOfOne) {
@@ -2265,7 +2273,11 @@ TEST(ExpressionSubstrTest, ThrowsWithNegativeStart) {
     const auto str = "abcdef"_sd;
     const auto expr =
         Expression::parseExpression(&expCtx, BSON("$substrCP" << BSON_ARRAY(str << -5 << 1)), vps);
-    ASSERT_THROWS([&] { expr->evaluate({}, &expCtx.variables); }(), AssertionException);
+    ASSERT_THROWS(
+        [&] {
+            expr->evaluate({}, &expCtx.variables);
+        }(),
+        AssertionException);
 }
 
 }  // namespace SubstrBytes
@@ -2279,7 +2291,11 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithBadContinuationByte) {
     const auto continuationByte = "\x80\x00"_sd;
     const auto expr = Expression::parseExpression(
         &expCtx, BSON("$substrCP" << BSON_ARRAY(continuationByte << 0 << 1)), vps);
-    ASSERT_THROWS([&] { expr->evaluate({}, &expCtx.variables); }(), AssertionException);
+    ASSERT_THROWS(
+        [&] {
+            expr->evaluate({}, &expCtx.variables);
+        }(),
+        AssertionException);
 }
 
 TEST(ExpressionSubstrCPTest, DoesThrowWithInvalidLeadingByte) {
@@ -2289,7 +2305,11 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithInvalidLeadingByte) {
     const auto leadingByte = "\xFF\x00"_sd;
     const auto expr = Expression::parseExpression(
         &expCtx, BSON("$substrCP" << BSON_ARRAY(leadingByte << 0 << 1)), vps);
-    ASSERT_THROWS([&] { expr->evaluate({}, &expCtx.variables); }(), AssertionException);
+    ASSERT_THROWS(
+        [&] {
+            expr->evaluate({}, &expCtx.variables);
+        }(),
+        AssertionException);
 }
 
 TEST(ExpressionSubstrCPTest, WithStandardValue) {

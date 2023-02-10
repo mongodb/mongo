@@ -152,7 +152,7 @@ public:
     explicit PeriodicJobAnchor(std::shared_ptr<Job> handle);
 
     PeriodicJobAnchor() = default;
-    PeriodicJobAnchor(PeriodicJobAnchor &&) = default;
+    PeriodicJobAnchor(PeriodicJobAnchor&&) = default;
     PeriodicJobAnchor& operator=(PeriodicJobAnchor&&) = default;
 
     PeriodicJobAnchor(const PeriodicJobAnchor&) = delete;

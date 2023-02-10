@@ -60,8 +60,8 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 
-test(primary, /*index=*/true);
-test(primary, /*index=*/false);
+test(primary, /*index=*/ true);
+test(primary, /*index=*/ false);
 
 rst.stopSet();
 })();

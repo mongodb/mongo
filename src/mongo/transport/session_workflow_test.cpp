@@ -220,7 +220,9 @@ public:
     }
 
     void tearDown() override {
-        ScopeGuard guard = [&] { Base::tearDown(); };
+        ScopeGuard guard = [&] {
+            Base::tearDown();
+        };
         // Normal shutdown is a noop outside of ASAN.
         invariant(sep()->shutdownAndWait(Seconds{10}));
         _threadPool->shutdown();
@@ -292,8 +294,12 @@ private:
     class CustomMockSession : public CallbackMockSession {
     public:
         explicit CustomMockSession(SessionWorkflowTest* fixture) {
-            endCb = [this] { *_connected = false; };
-            isConnectedCb = [this] { return *_connected; };
+            endCb = [this] {
+                *_connected = false;
+            };
+            isConnectedCb = [this] {
+                return *_connected;
+            };
             waitForDataCb = [fixture] {
                 return fixture->_onMockEvent<Event::sessionWaitForData>(std::tie());
             };
@@ -307,7 +313,9 @@ private:
             auto async = [fixture](auto cb) {
                 return ExecutorFuture<void>(fixture->_threadPool).then(cb).unsafeToInlineFuture();
             };
-            asyncWaitForDataCb = [=, cb = waitForDataCb] { return async([cb] { return cb(); }); };
+            asyncWaitForDataCb = [=, cb = waitForDataCb] {
+                return async([cb] { return cb(); });
+            };
             asyncSourceMessageCb = [=, cb = sourceMessageCb](const BatonHandle&) {
                 return async([cb] { return cb(); });
             };
@@ -354,7 +362,8 @@ private:
         sep->onEndSessionCb = [=](const SessionHandle& session) {
             _onMockEvent<Event::sepEndSession>(std::tie(session));
         };
-        sep->derivedOnClientDisconnectCb = [&](Client*) {};
+        sep->derivedOnClientDisconnectCb = [&](Client*) {
+        };
         return sep;
     }
 
@@ -393,7 +402,9 @@ TEST_F(SessionWorkflowTest, OneNormalCommand) {
 
 TEST_F(SessionWorkflowTest, OnClientDisconnectCalledOnCleanup) {
     int disconnects = 0;
-    sep()->derivedOnClientDisconnectCb = [&](Client*) { ++disconnects; };
+    sep()->derivedOnClientDisconnectCb = [&](Client*) {
+        ++disconnects;
+    };
     startSession();
     ASSERT_EQ(disconnects, 0);
     expect<Event::sessionSourceMessage>(kClosedSessionError);

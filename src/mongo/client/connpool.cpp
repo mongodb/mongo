@@ -264,7 +264,9 @@ void PoolForHost::initializeHostName(const std::string& hostName) {
 }
 
 void PoolForHost::waitForFreeConnection(int timeout, stdx::unique_lock<Latch>& lk) {
-    auto condition = [&] { return (numInUse() < _maxInUse || _inShutdown.load()); };
+    auto condition = [&] {
+        return (numInUse() < _maxInUse || _inShutdown.load());
+    };
 
     if (timeout > 0) {
         stdx::chrono::seconds timeoutSeconds{timeout};

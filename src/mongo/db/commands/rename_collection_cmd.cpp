@@ -97,15 +97,14 @@ public:
             RenameCollectionOptions options;
             options.stayTemp = request().getStayTemp();
             options.expectedSourceUUID = request().getCollectionUUID();
-            stdx::visit(
-                OverloadedVisitor{
-                    [&options](bool dropTarget) { options.dropTarget = dropTarget; },
-                    [&options](const UUID& uuid) {
-                        options.dropTarget = true;
-                        options.expectedTargetUUID = uuid;
-                    },
-                },
-                request().getDropTarget());
+            stdx::visit(OverloadedVisitor{
+                            [&options](bool dropTarget) { options.dropTarget = dropTarget; },
+                            [&options](const UUID& uuid) {
+                                options.dropTarget = true;
+                                options.expectedTargetUUID = uuid;
+                            },
+                        },
+                        request().getDropTarget());
 
             validateAndRunRenameCollection(opCtx, fromNss, toNss, options);
         }

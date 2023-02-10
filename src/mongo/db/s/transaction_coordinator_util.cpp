@@ -635,20 +635,21 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
 Future<void> deleteCoordinatorDoc(txn::AsyncWorkScheduler& scheduler,
                                   const LogicalSessionId& lsid,
                                   const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
-    return txn::doWhile(scheduler,
-                        boost::none /* no need for a backoff */,
-                        [](const Status& s) { return s == ErrorCodes::Interrupted; },
-                        [&scheduler, lsid, txnNumberAndRetryCounter] {
-                            return scheduler.scheduleWork([lsid, txnNumberAndRetryCounter](
-                                                              OperationContext* opCtx) {
-                                getTransactionCoordinatorWorkerCurOpRepository()->set(
-                                    opCtx,
-                                    lsid,
-                                    txnNumberAndRetryCounter,
-                                    CoordinatorAction::kDeletingCoordinatorDoc);
-                                deleteCoordinatorDocBlocking(opCtx, lsid, txnNumberAndRetryCounter);
-                            });
-                        });
+    return txn::doWhile(
+        scheduler,
+        boost::none /* no need for a backoff */,
+        [](const Status& s) { return s == ErrorCodes::Interrupted; },
+        [&scheduler, lsid, txnNumberAndRetryCounter] {
+            return scheduler.scheduleWork(
+                [lsid, txnNumberAndRetryCounter](OperationContext* opCtx) {
+                    getTransactionCoordinatorWorkerCurOpRepository()->set(
+                        opCtx,
+                        lsid,
+                        txnNumberAndRetryCounter,
+                        CoordinatorAction::kDeletingCoordinatorDoc);
+                    deleteCoordinatorDocBlocking(opCtx, lsid, txnNumberAndRetryCounter);
+                });
+        });
 }
 
 std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(OperationContext* opCtx) {

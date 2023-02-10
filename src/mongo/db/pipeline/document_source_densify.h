@@ -62,7 +62,9 @@ public:
      */
     Value toValue() const {
         return stdx::visit(OverloadedVisitor{[&](Value unwrappedVal) { return unwrappedVal; },
-                                             [&](Date_t dateVal) { return Value(dateVal); }
+                                             [&](Date_t dateVal) {
+                                                 return Value(dateVal);
+                                             }
 
                            },
                            _value);
@@ -103,7 +105,9 @@ public:
 
     std::string toString() const {
         return stdx::visit(OverloadedVisitor{[&](Value v) { return v.toString(); },
-                                             [&](Date_t d) { return d.toString(); }},
+                                             [&](Date_t d) {
+                                                 return d.toString();
+                                             }},
                            _value);
     }
 
@@ -121,10 +125,11 @@ public:
      * Delegate to Value::getApproximateSize().
      */
     size_t getApproximateSize() const {
-        return stdx::visit(
-            OverloadedVisitor{[&](Value v) { return v.getApproximateSize(); },
-                              [&](Date_t d) { return Value(d).getApproximateSize(); }},
-            _value);
+        return stdx::visit(OverloadedVisitor{[&](Value v) { return v.getApproximateSize(); },
+                                             [&](Date_t d) {
+                                                 return Value(d).getApproximateSize();
+                                             }},
+                           _value);
     }
 
     /**

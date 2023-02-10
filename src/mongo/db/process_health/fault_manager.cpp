@@ -222,7 +222,11 @@ void FaultManager::setupStateMachine() {
         {FaultState::kActiveFault, {}},
     });
 
-    auto bindThis = [&](auto&& pmf) { return [=](auto&&... a) { return (this->*pmf)(a...); }; };
+    auto bindThis = [&](auto&& pmf) {
+        return [=](auto&&... a) {
+            return (this->*pmf)(a...);
+        };
+    };
 
     registerHandler(FaultState::kStartupCheck, bindThis(&FaultManager::handleStartupCheck))
         ->enter(bindThis(&FaultManager::logCurrentState))

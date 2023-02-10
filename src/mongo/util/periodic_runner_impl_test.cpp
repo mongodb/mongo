@@ -76,7 +76,8 @@ public:
     }
 
     auto makeStoppedJob() {
-        PeriodicRunner::PeriodicJob job("job", [](Client* client) {}, Seconds{1});
+        PeriodicRunner::PeriodicJob job(
+            "job", [](Client* client) {}, Seconds{1});
         auto jobAnchor = runner().makeJob(std::move(job));
         jobAnchor.start();
         jobAnchor.stop();
@@ -92,15 +93,16 @@ TEST_F(PeriodicRunnerImplTest, OneJobTest) {
     stdx::condition_variable cv;
 
     // Add a job, ensure that it runs once
-    PeriodicRunner::PeriodicJob job("job",
-                                    [&count, &mutex, &cv](Client*) {
-                                        {
-                                            stdx::unique_lock<Latch> lk(mutex);
-                                            count++;
-                                        }
-                                        cv.notify_all();
-                                    },
-                                    interval);
+    PeriodicRunner::PeriodicJob job(
+        "job",
+        [&count, &mutex, &cv](Client*) {
+            {
+                stdx::unique_lock<Latch> lk(mutex);
+                count++;
+            }
+            cv.notify_all();
+        },
+        interval);
 
     auto jobAnchor = runner().makeJob(std::move(job));
     jobAnchor.start();
@@ -125,15 +127,16 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobDoesNotRunWithoutStart) {
     stdx::condition_variable cv;
 
     // Add a job, ensure that it runs once
-    PeriodicRunner::PeriodicJob job("job",
-                                    [&count, &mutex, &cv](Client*) {
-                                        {
-                                            stdx::unique_lock<Latch> lk(mutex);
-                                            count++;
-                                        }
-                                        cv.notify_all();
-                                    },
-                                    interval);
+    PeriodicRunner::PeriodicJob job(
+        "job",
+        [&count, &mutex, &cv](Client*) {
+            {
+                stdx::unique_lock<Latch> lk(mutex);
+                count++;
+            }
+            cv.notify_all();
+        },
+        interval);
 
     auto jobAnchor = runner().makeJob(std::move(job));
     clockSource().advance(interval);
@@ -150,15 +153,16 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobRunsCorrectlyWithStart) {
     stdx::condition_variable cv;
 
     // Add a job, ensure that it runs once
-    PeriodicRunner::PeriodicJob job("job",
-                                    [&count, &mutex, &cv](Client*) {
-                                        {
-                                            stdx::unique_lock<Latch> lk(mutex);
-                                            count++;
-                                        }
-                                        cv.notify_all();
-                                    },
-                                    interval);
+    PeriodicRunner::PeriodicJob job(
+        "job",
+        [&count, &mutex, &cv](Client*) {
+            {
+                stdx::unique_lock<Latch> lk(mutex);
+                count++;
+            }
+            cv.notify_all();
+        },
+        interval);
 
     auto jobAnchor = runner().makeJob(std::move(job));
     jobAnchor.start();
@@ -183,17 +187,18 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobPausesCorrectly) {
     stdx::condition_variable cv;
 
     // Add a job, ensure that it runs once
-    PeriodicRunner::PeriodicJob job("job",
-                                    [&](Client*) {
-                                        {
-                                            stdx::unique_lock<Latch> lk(mutex);
-                                            // This will fail if pause does not work correctly.
-                                            ASSERT_FALSE(isPaused);
-                                            hasExecuted = true;
-                                        }
-                                        cv.notify_all();
-                                    },
-                                    interval);
+    PeriodicRunner::PeriodicJob job(
+        "job",
+        [&](Client*) {
+            {
+                stdx::unique_lock<Latch> lk(mutex);
+                // This will fail if pause does not work correctly.
+                ASSERT_FALSE(isPaused);
+                hasExecuted = true;
+            }
+            cv.notify_all();
+        },
+        interval);
 
     auto jobAnchor = runner().makeJob(std::move(job));
     jobAnchor.start();
@@ -227,15 +232,16 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobResumesCorrectly) {
     auto mutex = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
 
-    PeriodicRunner::PeriodicJob job("job",
-                                    [&count, &mutex, &cv](Client*) {
-                                        {
-                                            stdx::unique_lock<Latch> lk(mutex);
-                                            count++;
-                                        }
-                                        cv.notify_all();
-                                    },
-                                    interval);
+    PeriodicRunner::PeriodicJob job(
+        "job",
+        [&count, &mutex, &cv](Client*) {
+            {
+                stdx::unique_lock<Latch> lk(mutex);
+                count++;
+            }
+            cv.notify_all();
+        },
+        interval);
 
     auto jobAnchor = runner().makeJob(std::move(job));
     jobAnchor.start();
@@ -294,25 +300,27 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsTest) {
     stdx::condition_variable cv;
 
     // Add two jobs, ensure they both run the proper number of times
-    PeriodicRunner::PeriodicJob jobA("job",
-                                     [&countA, &mutex, &cv](Client*) {
-                                         {
-                                             stdx::unique_lock<Latch> lk(mutex);
-                                             countA++;
-                                         }
-                                         cv.notify_all();
-                                     },
-                                     intervalA);
+    PeriodicRunner::PeriodicJob jobA(
+        "job",
+        [&countA, &mutex, &cv](Client*) {
+            {
+                stdx::unique_lock<Latch> lk(mutex);
+                countA++;
+            }
+            cv.notify_all();
+        },
+        intervalA);
 
-    PeriodicRunner::PeriodicJob jobB("job",
-                                     [&countB, &mutex, &cv](Client*) {
-                                         {
-                                             stdx::unique_lock<Latch> lk(mutex);
-                                             countB++;
-                                         }
-                                         cv.notify_all();
-                                     },
-                                     intervalB);
+    PeriodicRunner::PeriodicJob jobB(
+        "job",
+        [&countB, &mutex, &cv](Client*) {
+            {
+                stdx::unique_lock<Latch> lk(mutex);
+                countB++;
+            }
+            cv.notify_all();
+        },
+        intervalB);
 
     auto jobAnchorA = runner().makeJob(std::move(jobA));
     auto jobAnchorB = runner().makeJob(std::move(jobB));
@@ -339,27 +347,29 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsDontDeadlock) {
     bool a = false;
     bool b = false;
 
-    PeriodicRunner::PeriodicJob jobA("job",
-                                     [&](Client*) {
-                                         stdx::unique_lock<Latch> lk(mutex);
-                                         a = true;
+    PeriodicRunner::PeriodicJob jobA(
+        "job",
+        [&](Client*) {
+            stdx::unique_lock<Latch> lk(mutex);
+            a = true;
 
-                                         cv.notify_one();
-                                         cv.wait(lk, [&] { return b; });
-                                         doneCv.notify_one();
-                                     },
-                                     Milliseconds(1));
+            cv.notify_one();
+            cv.wait(lk, [&] { return b; });
+            doneCv.notify_one();
+        },
+        Milliseconds(1));
 
-    PeriodicRunner::PeriodicJob jobB("job",
-                                     [&](Client*) {
-                                         stdx::unique_lock<Latch> lk(mutex);
-                                         b = true;
+    PeriodicRunner::PeriodicJob jobB(
+        "job",
+        [&](Client*) {
+            stdx::unique_lock<Latch> lk(mutex);
+            b = true;
 
-                                         cv.notify_one();
-                                         cv.wait(lk, [&] { return a; });
-                                         doneCv.notify_one();
-                                     },
-                                     Milliseconds(1));
+            cv.notify_one();
+            cv.wait(lk, [&] { return a; });
+            doneCv.notify_one();
+        },
+        Milliseconds(1));
 
     auto jobAnchorA = runner().makeJob(std::move(jobA));
     auto jobAnchorB = runner().makeJob(std::move(jobB));
@@ -387,15 +397,16 @@ TEST_F(PeriodicRunnerImplTest, ChangingIntervalWorks) {
     stdx::condition_variable cv;
 
     // Add a job, ensure that it runs once
-    PeriodicRunner::PeriodicJob job("job",
-                                    [&](Client*) {
-                                        {
-                                            stdx::unique_lock<Latch> lk(mutex);
-                                            timesCalled++;
-                                        }
-                                        cv.notify_one();
-                                    },
-                                    Milliseconds(5));
+    PeriodicRunner::PeriodicJob job(
+        "job",
+        [&](Client*) {
+            {
+                stdx::unique_lock<Latch> lk(mutex);
+                timesCalled++;
+            }
+            cv.notify_one();
+        },
+        Milliseconds(5));
 
     auto jobAnchor = runner().makeJob(std::move(job));
     jobAnchor.start();

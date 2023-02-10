@@ -118,7 +118,9 @@ protected:
 namespace {
 
 std::function<std::unique_ptr<KVHarnessHelper>(ServiceContext*)> basicFactory =
-    [](ServiceContext*) -> std::unique_ptr<KVHarnessHelper> { fassertFailed(40355); };
+    [](ServiceContext*) -> std::unique_ptr<KVHarnessHelper> {
+    fassertFailed(40355);
+};
 
 class KVEngineTestHarness : public ServiceContextTest {
 protected:

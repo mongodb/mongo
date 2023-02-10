@@ -418,7 +418,9 @@ private:
         std::vector<HostAndPort> selectedHostAndPorts;
         std::vector<HostAndPort> expectedHostAndPorts;
 
-        auto extractHost = [](const ServerDescriptionPtr& s) { return s->getAddress(); };
+        auto extractHost = [](const ServerDescriptionPtr& s) {
+            return s->getAddress();
+        };
         if (selectedServers) {
             std::transform(selectedServers->begin(),
                            selectedServers->end(),

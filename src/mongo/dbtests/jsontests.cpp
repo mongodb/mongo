@@ -1186,7 +1186,9 @@ TEST(FromJsonTest, NumericTypes) {
 TEST(FromJsonTest, EmbeddedDates) {
     const long long kMin = 1257829200000;
     const long long kMax = 1257829200100;
-    auto makeDate = [](long long ms) { return Date_t::fromMillisSinceEpoch(ms); };
+    auto makeDate = [](long long ms) {
+        return Date_t::fromMillisSinceEpoch(ms);
+    };
     const BSONObj bson =
         B().append("time.valid",
                    B().appendDate("$gt", makeDate(kMin)).appendDate("$lt", makeDate(kMax)).obj())

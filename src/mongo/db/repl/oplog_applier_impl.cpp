@@ -879,7 +879,9 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
 
     // Count each log op application as a separate operation, for reporting purposes
 
-    auto incrementOpsAppliedStats = [] { opsAppliedStats.increment(1); };
+    auto incrementOpsAppliedStats = [] {
+        opsAppliedStats.increment(1);
+    };
 
     auto clockSource = opCtx->getServiceContext()->getFastClockSource();
     auto applyStartTime = clockSource->now();

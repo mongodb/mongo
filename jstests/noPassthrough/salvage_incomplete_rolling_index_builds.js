@@ -68,7 +68,7 @@ jsTestLog("Standalone server will listen on port: " + standalonePort);
 
 function buildIndexOnNodeAsStandalone(node) {
     jsTestLog("A. Restarting as standalone: " + node.host);
-    replTest.stop(node, /*signal=*/null, /*opts=*/null, {forRestart: true, waitpid: true});
+    replTest.stop(node, /*signal=*/ null, /*opts=*/ null, {forRestart: true, waitpid: true});
     const standalone = MongoRunner.runMongod({
         restart: true,
         dbpath: node.dbpath,

@@ -254,7 +254,9 @@ protected:
     std::unique_ptr<RollbackImplForTest> _rollback;
 
     bool _transitionedToRollback = false;
-    std::function<void()> _onTransitionToRollbackFn = [this]() { _transitionedToRollback = true; };
+    std::function<void()> _onTransitionToRollbackFn = [this]() {
+        _transitionedToRollback = true;
+    };
 
     bool _recoveredToStableTimestamp = false;
     Timestamp _stableTimestamp;
@@ -265,10 +267,14 @@ protected:
         };
 
     bool _recoveredFromOplog = false;
-    std::function<void()> _onRecoverFromOplogFn = [this]() { _recoveredFromOplog = true; };
+    std::function<void()> _onRecoverFromOplogFn = [this]() {
+        _recoveredFromOplog = true;
+    };
 
     bool _incrementedRollbackID = false;
-    std::function<void()> _onRollbackIDIncrementedFn = [this]() { _incrementedRollbackID = true; };
+    std::function<void()> _onRollbackIDIncrementedFn = [this]() {
+        _incrementedRollbackID = true;
+    };
 
     bool _reconstructedPreparedTransactions = false;
     std::function<void()> _onPreparedTransactionsReconstructedFn = [this]() {
@@ -277,18 +283,25 @@ protected:
 
     Timestamp _commonPointFound;
     std::function<void(Timestamp commonPoint)> _onCommonPointFoundFn =
-        [this](Timestamp commonPoint) { _commonPointFound = commonPoint; };
+        [this](Timestamp commonPoint) {
+            _commonPointFound = commonPoint;
+        };
 
     Timestamp _truncatePoint;
     std::function<void(Timestamp truncatePoint)> _onSetOplogTruncateAfterPointFn =
-        [this](Timestamp truncatePoint) { _truncatePoint = truncatePoint; };
+        [this](Timestamp truncatePoint) {
+            _truncatePoint = truncatePoint;
+        };
 
     bool _triggeredOpObserver = false;
     std::function<void(const OpObserver::RollbackObserverInfo& rbInfo)> _onRollbackOpObserverFn =
-        [this](const OpObserver::RollbackObserverInfo& rbInfo) { _triggeredOpObserver = true; };
+        [this](const OpObserver::RollbackObserverInfo& rbInfo) {
+            _triggeredOpObserver = true;
+        };
 
     std::function<void(UUID, NamespaceString)> _onRollbackFileWrittenForNamespaceFn =
-        [this](UUID, NamespaceString) {};
+        [this](UUID, NamespaceString) {
+        };
 
     std::unique_ptr<Listener> _listener;
 
@@ -848,7 +861,9 @@ DEATH_TEST_F(RollbackImplTest,
     _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
 
     // Called before aborting prepared transactions.
-    _onRollbackIDIncrementedFn = [this]() { _incrementedRollbackID = true; };
+    _onRollbackIDIncrementedFn = [this]() {
+        _incrementedRollbackID = true;
+    };
 
     _onRecoverToStableTimestampFn = [this](Timestamp stableTimestamp) {
         _recoveredToStableTimestamp = true;
@@ -856,7 +871,9 @@ DEATH_TEST_F(RollbackImplTest,
     };
 
     // Called after reconstructing prepared transactions. We should not be getting here.
-    _onPreparedTransactionsReconstructedFn = [this]() { ASSERT(false); };
+    _onPreparedTransactionsReconstructedFn = [this]() {
+        ASSERT(false);
+    };
 
     // We expect to crash when we hit the exception.
     _rollback->runRollback(_opCtx.get()).ignore();

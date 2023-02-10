@@ -136,7 +136,7 @@ private:
 };
 
 template <typename T, std::enable_if_t<canStreamWithExtension<T>, int> = 0>
-Extension(const T& t)->Extension<T>;
+Extension(const T& t) -> Extension<T>;
 
 }  // namespace optional_io
 }  // namespace mongo

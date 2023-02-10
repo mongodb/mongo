@@ -108,15 +108,18 @@ function assertWouldChangeOwningShardUpdateResult(res, expectedUpdatedDoc) {
 //
 
 // Test behaviours common to update and upsert.
-[false, true].forEach(function(isUpsert) {
-    // Full shard key in query matches the update document.
-    assertUpdateWorked({x: 4, y: 3, z: 3}, {x: 4, y: 3, z: 3, a: 0}, isUpsert, 0);
-    assertUpdateWorked({x: 4, _id: 0, z: 3, y: 3}, {x: 4, y: 3, z: 3, a: 0}, isUpsert, 0);
+[false,
+ true]
+    .forEach(function(isUpsert) {
+        // Full shard key in query matches the update document.
+        assertUpdateWorked({x: 4, y: 3, z: 3}, {x: 4, y: 3, z: 3, a: 0}, isUpsert, 0);
+        assertUpdateWorked({x: 4, _id: 0, z: 3, y: 3}, {x: 4, y: 3, z: 3, a: 0}, isUpsert, 0);
 
-    // Case when upsert needs to insert a new document and the new document should belong in the
-    // same shard as the targeted shard. For non-upserts, it will be a no-op.
-    assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0}, {x: 1, z: 3, y: 110, a: 90}, isUpsert);
-});
+        // Case when upsert needs to insert a new document and the new document should belong in the
+        // same shard as the targeted shard. For non-upserts, it will be a no-op.
+        assertUpdateWorkedWithNoMatchingDoc(
+            {x: 4, y: 0, z: 0}, {x: 1, z: 3, y: 110, a: 90}, isUpsert);
+    });
 
 //
 // Test behaviours specific to non-upsert updates.
@@ -250,16 +253,18 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
 //
 
 // Test behaviours common to update and upsert.
-[false, true].forEach(function(isUpsert) {
-    // Full shard key in query.
-    assertUpdateWorked({x: 4, _id: 0, z: 3, y: 3}, {"$set": {opStyle: 1}}, isUpsert, 0);
-    assertUpdateWorked({x: 4, z: 3, y: 3}, {"$set": {opStyle: 2}}, isUpsert, 0);
+[false,
+ true]
+    .forEach(function(isUpsert) {
+        // Full shard key in query.
+        assertUpdateWorked({x: 4, _id: 0, z: 3, y: 3}, {"$set": {opStyle: 1}}, isUpsert, 0);
+        assertUpdateWorked({x: 4, z: 3, y: 3}, {"$set": {opStyle: 2}}, isUpsert, 0);
 
-    // Case when upsert needs to insert a new document and the new document should belong in the
-    // same shard as the targetted shard. For non-upserts, it will be a no op.
-    assertUpdateWorkedWithNoMatchingDoc(
-        {x: 4, y: 0, z: 0}, {"$set": {x: 1, z: 3, y: 111, a: 90}}, isUpsert);
-});
+        // Case when upsert needs to insert a new document and the new document should belong in the
+        // same shard as the targetted shard. For non-upserts, it will be a no op.
+        assertUpdateWorkedWithNoMatchingDoc(
+            {x: 4, y: 0, z: 0}, {"$set": {x: 1, z: 3, y: 111, a: 90}}, isUpsert);
+    });
 
 // Test behaviours specific to non-upsert updates.
 
@@ -366,41 +371,45 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
 //
 
 // Test behaviours common to update and upsert.
-[false, true].forEach(function(isUpsert) {
-    // Full shard key in query.
-    assertUpdateWorked(
-        {_id: 0, x: 4, z: 3, y: 3}, [{$addFields: {pipelineUpdate: isUpsert}}], isUpsert, 0);
-    assert.eq(1,
-              st.s.getDB(kDbName)
-                  .coll.find({_id: 0, x: 4, z: 3, y: 3, pipelineUpdate: isUpsert})
-                  .itcount());
-    assertUpdateWorkedWithNoMatchingDoc(
-        {_id: 15, x: 44, z: 3, y: 3}, [{$addFields: {pipelineUpdate: true}}], isUpsert);
-    assert.eq(isUpsert ? 1 : 0,
-              st.s.getDB(kDbName)
-                  .coll.find({_id: 15, x: 44, z: 3, y: 3, pipelineUpdate: true})
-                  .itcount());
+[false,
+ true]
+    .forEach(function(isUpsert) {
+        // Full shard key in query.
+        assertUpdateWorked(
+            {_id: 0, x: 4, z: 3, y: 3}, [{$addFields: {pipelineUpdate: isUpsert}}], isUpsert, 0);
+        assert.eq(1,
+                  st.s.getDB(kDbName)
+                      .coll.find({_id: 0, x: 4, z: 3, y: 3, pipelineUpdate: isUpsert})
+                      .itcount());
+        assertUpdateWorkedWithNoMatchingDoc(
+            {_id: 15, x: 44, z: 3, y: 3}, [{$addFields: {pipelineUpdate: true}}], isUpsert);
+        assert.eq(isUpsert ? 1 : 0,
+                  st.s.getDB(kDbName)
+                      .coll.find({_id: 15, x: 44, z: 3, y: 3, pipelineUpdate: true})
+                      .itcount());
 
-    assertUpdateWorkedWithNoMatchingDoc(
-        {x: 45, z: 4, y: 3}, [{$addFields: {pipelineUpdate: true}}], isUpsert);
-    assert.eq(isUpsert ? 1 : 0,
-              st.s.getDB(kDbName).coll.find({x: 45, z: 4, y: 3, pipelineUpdate: true}).itcount());
+        assertUpdateWorkedWithNoMatchingDoc(
+            {x: 45, z: 4, y: 3}, [{$addFields: {pipelineUpdate: true}}], isUpsert);
+        assert.eq(
+            isUpsert ? 1 : 0,
+            st.s.getDB(kDbName).coll.find({x: 45, z: 4, y: 3, pipelineUpdate: true}).itcount());
 
-    // Case when upsert needs to insert a new document and the new document should belong in the
-    // same shard as the targeted shard.
-    assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0},
-                                        [{
-                                            "$project": {
-                                                x: {$literal: 3},
-                                                y: {$literal: 33},
-                                                z: {$literal: 3},
-                                                pipelineUpdate: {$literal: true}
-                                            }
-                                        }],
-                                        isUpsert);
-    assert.eq(isUpsert ? 1 : 0,
-              st.s.getDB(kDbName).coll.find({x: 3, z: 3, y: 33, pipelineUpdate: true}).itcount());
-});
+        // Case when upsert needs to insert a new document and the new document should belong in the
+        // same shard as the targeted shard.
+        assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0},
+                                            [{
+                                                "$project": {
+                                                    x: {$literal: 3},
+                                                    y: {$literal: 33},
+                                                    z: {$literal: 3},
+                                                    pipelineUpdate: {$literal: true}
+                                                }
+                                            }],
+                                            isUpsert);
+        assert.eq(
+            isUpsert ? 1 : 0,
+            st.s.getDB(kDbName).coll.find({x: 3, z: 3, y: 33, pipelineUpdate: true}).itcount());
+    });
 
 // Test behaviours specific to non-upsert updates.
 

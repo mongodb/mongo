@@ -40,7 +40,7 @@ const awaitSecondIndexBuild = IndexBuildTest.startIndexBuild(
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, collName, "c_1");
 
 IndexBuildTest.assertIndexes(
-    coll, /*numIndexes=*/4, /*readyIndexes=*/["_id_", "a_1"], /*notReadyIndexes=*/["b_1", "c_1"]);
+    coll, /*numIndexes=*/ 4, /*readyIndexes=*/["_id_", "a_1"], /*notReadyIndexes=*/["b_1", "c_1"]);
 
 // 'dropIndexes' will only abort in-progress index builds if the 'index' parameter specifies all of
 // the indexes that a single builder is building together.
@@ -60,8 +60,10 @@ IndexBuildTest.resumeIndexBuilds(testDB.getMongo());
 awaitFirstIndexBuild();
 awaitSecondIndexBuild();
 
-IndexBuildTest.assertIndexes(
-    coll, /*numIndexes=*/4, /*readyIndexes=*/["_id_", "a_1", "b_1", "c_1"], /*notReadyIndexes=*/[]);
+IndexBuildTest.assertIndexes(coll,
+                             /*numIndexes=*/ 4,
+                             /*readyIndexes=*/["_id_", "a_1", "b_1", "c_1"],
+                             /*notReadyIndexes=*/[]);
 
 MongoRunner.stopMongod(conn);
 }());

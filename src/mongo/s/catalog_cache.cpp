@@ -795,16 +795,17 @@ void CatalogCache::Stats::report(BSONObjBuilder* builder) const {
 CatalogCache::DatabaseCache::DatabaseCache(ServiceContext* service,
                                            ThreadPoolInterface& threadPool,
                                            CatalogCacheLoader& catalogCacheLoader)
-    : ReadThroughCache(_mutex,
-                       service,
-                       threadPool,
-                       [this](OperationContext* opCtx,
-                              const std::string& dbName,
-                              const ValueHandle& db,
-                              const ComparableDatabaseVersion& previousDbVersion) {
-                           return _lookupDatabase(opCtx, dbName, db, previousDbVersion);
-                       },
-                       kDatabaseCacheSize),
+    : ReadThroughCache(
+          _mutex,
+          service,
+          threadPool,
+          [this](OperationContext* opCtx,
+                 const std::string& dbName,
+                 const ValueHandle& db,
+                 const ComparableDatabaseVersion& previousDbVersion) {
+              return _lookupDatabase(opCtx, dbName, db, previousDbVersion);
+          },
+          kDatabaseCacheSize),
       _catalogCacheLoader(catalogCacheLoader) {}
 
 CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDatabase(
@@ -853,17 +854,17 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
 CatalogCache::CollectionCache::CollectionCache(ServiceContext* service,
                                                ThreadPoolInterface& threadPool,
                                                CatalogCacheLoader& catalogCacheLoader)
-    : ReadThroughCache(_mutex,
-                       service,
-                       threadPool,
-                       [this](OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const ValueHandle& collectionHistory,
-                              const ComparableChunkVersion& previousChunkVersion) {
-                           return _lookupCollection(
-                               opCtx, nss, collectionHistory, previousChunkVersion);
-                       },
-                       kCollectionCacheSize),
+    : ReadThroughCache(
+          _mutex,
+          service,
+          threadPool,
+          [this](OperationContext* opCtx,
+                 const NamespaceString& nss,
+                 const ValueHandle& collectionHistory,
+                 const ComparableChunkVersion& previousChunkVersion) {
+              return _lookupCollection(opCtx, nss, collectionHistory, previousChunkVersion);
+          },
+          kCollectionCacheSize),
       _catalogCacheLoader(catalogCacheLoader) {}
 
 void CatalogCache::CollectionCache::reportStats(BSONObjBuilder* builder) const {
@@ -986,16 +987,17 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
 }
 
 CatalogCache::IndexCache::IndexCache(ServiceContext* service, ThreadPoolInterface& threadPool)
-    : ReadThroughCache(_mutex,
-                       service,
-                       threadPool,
-                       [this](OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const ValueHandle& indexes,
-                              const ComparableIndexVersion& previousIndexVersion) {
-                           return _lookupIndexes(opCtx, nss, indexes, previousIndexVersion);
-                       },
-                       kIndexCacheSize) {}
+    : ReadThroughCache(
+          _mutex,
+          service,
+          threadPool,
+          [this](OperationContext* opCtx,
+                 const NamespaceString& nss,
+                 const ValueHandle& indexes,
+                 const ComparableIndexVersion& previousIndexVersion) {
+              return _lookupIndexes(opCtx, nss, indexes, previousIndexVersion);
+          },
+          kIndexCacheSize) {}
 
 CatalogCache::IndexCache::LookupResult CatalogCache::IndexCache::_lookupIndexes(
     OperationContext* opCtx,

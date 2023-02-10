@@ -85,7 +85,8 @@ TEST_F(RollbackCheckerTest, InvalidConstruction) {
 }
 
 TEST_F(RollbackCheckerTest, ShutdownBeforeStart) {
-    auto callback = [](const RollbackChecker::Result&) {};
+    auto callback = [](const RollbackChecker::Result&) {
+    };
     shutdownExecutorThread();
     joinExecutorThread();
     ASSERT_NOT_OK(getRollbackChecker()->reset(callback).getStatus());
@@ -105,7 +106,8 @@ TEST_F(RollbackCheckerTest, ShutdownBeforeResetSync) {
 }
 
 TEST_F(RollbackCheckerTest, reset) {
-    auto callback = [](const RollbackChecker::Result&) {};
+    auto callback = [](const RollbackChecker::Result&) {
+    };
     auto cbh = unittest::assertGet(getRollbackChecker()->reset(callback));
     ASSERT(cbh);
 

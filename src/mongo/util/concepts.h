@@ -171,7 +171,7 @@
 
 // Same as above, but without the default argument since some compilers (correctly) disallow
 // repeating the default argument on the definition.
-#define REQUIRES_OUT_OF_LINE_DEF(...) std::enable_if_t<(__VA_ARGS__), int>>
+#define REQUIRES_OUT_OF_LINE_DEF(...) std::enable_if_t<(__VA_ARGS__), int> >
 
 // Need the second arg in the template to depend on both a template argument (so it is dependent),
 // and the current line number (so it can be overloaded). The __VA_ARGS__ expression will generally
@@ -186,22 +186,22 @@
 // Works by declaring a function template taking `decls` arguments and using expression-SFINAE using
 // `exprs` on the return type. A bool is defined as true if it is possible to instantiate the
 // template with the supplied arguments by taking its address.
-#define MONGO_MAKE_BOOL_TRAIT(name, tpl_params, tpl_args, decls, /*exprs*/...)            \
-    template <MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND tpl_params>                             \
-    auto make_trait_impl_##name##_fn(MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND decls)           \
-        ->decltype(__VA_ARGS__);                                                          \
-                                                                                          \
-    template <typename ALWAYS_VOID, MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND tpl_params>       \
-    constexpr inline bool make_trait_impl_##name##_bool = false;                          \
-                                                                                          \
-    template <MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND tpl_params>                             \
-    constexpr inline bool make_trait_impl_##name##_bool<                                  \
-        std::void_t<decltype(                                                             \
-            &make_trait_impl_##name##_fn<MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND tpl_args>)>, \
-        MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND tpl_args> = true;                             \
-                                                                                          \
-    template <MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND tpl_params>                             \
-    constexpr inline bool name =                                                          \
+#define MONGO_MAKE_BOOL_TRAIT(name, tpl_params, tpl_args, decls, /*exprs*/...)                     \
+    template <MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND tpl_params>                                      \
+    auto make_trait_impl_##name##_fn(MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND decls)                    \
+        ->decltype(__VA_ARGS__);                                                                   \
+                                                                                                   \
+    template <typename ALWAYS_VOID, MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND tpl_params>                \
+    constexpr inline bool make_trait_impl_##name##_bool = false;                                   \
+                                                                                                   \
+    template <MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND tpl_params>                                      \
+    constexpr inline bool make_trait_impl_##name##_bool<                                           \
+        std::void_t<                                                                               \
+            decltype(&make_trait_impl_##name##_fn<MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND tpl_args>)>, \
+        MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND tpl_args> = true;                                      \
+                                                                                                   \
+    template <MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND tpl_params>                                      \
+    constexpr inline bool name =                                                                   \
         make_trait_impl_##name##_bool<void, MONGO_MAKE_BOOL_TRAIT_HELPER_EXPAND tpl_args>
 
 #endif

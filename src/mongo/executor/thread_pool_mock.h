@@ -57,7 +57,8 @@ public:
     struct Options {
         // This function is run before the worker thread begins consuming tasks.
         using OnCreateThreadFn = std::function<void()>;
-        OnCreateThreadFn onCreateThread = []() {};
+        OnCreateThreadFn onCreateThread = []() {
+        };
     };
 
     /**

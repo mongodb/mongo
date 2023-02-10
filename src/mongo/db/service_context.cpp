@@ -490,7 +490,8 @@ ServiceContext::ConstructorActionRegisterer::ConstructorActionRegisterer(
     ConstructorAction constructor,
     DestructorAction destructor) {
     if (!destructor)
-        destructor = [](ServiceContext*) {};
+        destructor = [](ServiceContext*) {
+        };
     _registerer.emplace(
         std::move(name),
         [this, constructor, destructor](InitializerContext*) {

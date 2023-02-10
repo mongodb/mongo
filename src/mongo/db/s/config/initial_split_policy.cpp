@@ -476,7 +476,9 @@ InitialSplitPolicy::ShardCollectionConfig AbstractTagsBasedSplitPolicy::createFi
 AbstractTagsBasedSplitPolicy::SplitInfo PresplitHashedZonesSplitPolicy::buildSplitInfoForTag(
     TagsType tag, const ShardKeyPattern& shardKeyPattern) {
     // Returns the ceiling number for the decimal value of x/y.
-    auto ceilOfXOverY = [](auto x, auto y) { return (x / y) + (x % y != 0); };
+    auto ceilOfXOverY = [](auto x, auto y) {
+        return (x / y) + (x % y != 0);
+    };
 
     // This strategy presplits each tag such that at least 1 chunk is placed on every shard to which
     // the tag is assigned. We distribute the chunks such that at least '_numInitialChunks' are

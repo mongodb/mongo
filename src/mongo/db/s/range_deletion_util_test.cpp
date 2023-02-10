@@ -907,7 +907,9 @@ TEST_F(RenameRangeDeletionsTest, BasicRenameRangeDeletionsTest) {
  */
 TEST_F(RenameRangeDeletionsTest, IdempotentRenameRangeDeletionsTest) {
     PseudoRandom random(SecureRandom().nextInt64());
-    auto generateRandomNumberFrom1To10 = [&random]() { return random.nextInt32(9) + 1; };
+    auto generateRandomNumberFrom1To10 = [&random]() {
+        return random.nextInt32(9) + 1;
+    };
 
     const auto numTasks = 10;
     std::vector<RangeDeletionTask> tasks;

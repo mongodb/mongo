@@ -887,7 +887,9 @@ TEST(TransactionOperationsTest, LogOplogEntriesExtractsPreImage) {
     auto logApplyOps = [writeOpTime](repl::MutableOplogEntry*,
                                      bool firstOp,
                                      bool lastOp,
-                                     std::vector<StmtId> stmtIdsWritten) { return writeOpTime; };
+                                     std::vector<StmtId> stmtIdsWritten) {
+        return writeOpTime;
+    };
     ASSERT_EQ(ops.logOplogEntries(oplogSlots, info, kWallClockTime, logApplyOps, &imageToWrite),
               info.numberOfOplogSlotsUsed);
 
@@ -930,7 +932,9 @@ TEST(TransactionOperationsTest, LogOplogEntriesExtractsPostImage) {
     auto logApplyOps = [writeOpTime](repl::MutableOplogEntry*,
                                      bool firstOp,
                                      bool lastOp,
-                                     std::vector<StmtId> stmtIdsWritten) { return writeOpTime; };
+                                     std::vector<StmtId> stmtIdsWritten) {
+        return writeOpTime;
+    };
     ASSERT_EQ(ops.logOplogEntries(oplogSlots, info, kWallClockTime, logApplyOps, &imageToWrite),
               info.numberOfOplogSlotsUsed);
 

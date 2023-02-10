@@ -62,7 +62,8 @@ const ServiceContext::ConstructorActionRegisterer clientObserverRegisterer{
     [](ServiceContext* service) {
         service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
     },
-    [](ServiceContext* serviceContext) {}};
+    [](ServiceContext* serviceContext) {
+    }};
 
 ServiceContext* setupServiceContext() {
     auto serviceContext = ServiceContext::make();

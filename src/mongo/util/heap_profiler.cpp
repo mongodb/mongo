@@ -629,7 +629,9 @@ private:
         // Sort the stacks and find enough stacks to account for at least 99% of the active bytes
         // deem any stack that has ever met this criterion as "important".
         // Using heap structure to avoid comparing elements that won't make the cut anyway.
-        auto heapCompare = [](auto&& a, auto&& b) { return a.activeBytes > b.activeBytes; };
+        auto heapCompare = [](auto&& a, auto&& b) {
+            return a.activeBytes > b.activeBytes;
+        };
         std::make_heap(heap.begin(), heapEnd, heapCompare);
 
         size_t threshold = totalActiveBytes * 0.99;

@@ -1229,7 +1229,9 @@ void assertRoundingTestCase(const Decimal128& actual,
 }
 
 TEST(Decimal128Test, TestDecimal128RoundingFractionalValues) {
-    auto d = [](auto x) { return Decimal128{x}; };
+    auto d = [](auto x) {
+        return Decimal128{x};
+    };
 
     // 'pBig' is the largest positive integer value where Decimal128 can represent pBig + 0.1
     // without losing precision.

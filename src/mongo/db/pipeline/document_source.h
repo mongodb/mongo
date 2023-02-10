@@ -310,7 +310,9 @@ public:
         // 'DistributedPlanLogic' or until a following stage causes the given validation
         // function to return false. By default this will not allow swapping with any
         // following stages.
-        movePastFunctionType canMovePast = [](const DocumentSource&) { return false; };
+        movePastFunctionType canMovePast = [](const DocumentSource&) {
+            return false;
+        };
     };
 
     virtual ~DocumentSource() {}

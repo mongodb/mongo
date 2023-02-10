@@ -81,8 +81,7 @@ void finishShutdown(OperationContext* opCtx,
             }
 #endif
             shutdown(ExitCode::clean, shutdownArgs);  // this never returns
-        })
-            .detach();
+        }).detach();
     }
 
     // Client expects the shutdown command to abruptly close the socket as part of exiting.

@@ -119,26 +119,26 @@ StatusWith<bool> BulkWriteOp::target(
     // Used to track the set of shardIds (w/o shardVersion) we targeted.
     std::set<ShardId> targetedShards;
 
-    auto targetStatus = targetWriteOps(_opCtx,
-                                       _writeOps,
-                                       ordered,
-                                       recordTargetErrors,
-                                       // getTargeterFn:
-                                       [&](const WriteOp& writeOp) -> const NSTargeter& {
-                                           const auto opIdx = writeOp.getWriteItem().getItemIndex();
-                                           // TODO(SERVER-73281): Support bulkWrite update and
-                                           // delete.
-                                           const auto nsIdx =
-                                               _clientRequest.getOps()[opIdx].getInsert();
-                                           return *targeters[nsIdx];
-                                       },
-                                       // getWriteSizeFn:
-                                       [&](const WriteOp& writeOp) {
-                                           // TODO(SERVER-73536): Account for the size of the
-                                           // outgoing request.
-                                           return 1;
-                                       },
-                                       batchMap);
+    auto targetStatus = targetWriteOps(
+        _opCtx,
+        _writeOps,
+        ordered,
+        recordTargetErrors,
+        // getTargeterFn:
+        [&](const WriteOp& writeOp) -> const NSTargeter& {
+            const auto opIdx = writeOp.getWriteItem().getItemIndex();
+            // TODO(SERVER-73281): Support bulkWrite update and
+            // delete.
+            const auto nsIdx = _clientRequest.getOps()[opIdx].getInsert();
+            return *targeters[nsIdx];
+        },
+        // getWriteSizeFn:
+        [&](const WriteOp& writeOp) {
+            // TODO(SERVER-73536): Account for the size of the
+            // outgoing request.
+            return 1;
+        },
+        batchMap);
 
     if (!targetStatus.isOK()) {
         return targetStatus;

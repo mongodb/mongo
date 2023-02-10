@@ -95,7 +95,8 @@ private:
     OpTime _chooseNewSyncSourceOpTime;
 
     // This is run every time chooseNewSyncSource() is called.
-    ChooseNewSyncSourceHook _chooseNewSyncSourceHook = []() {};
+    ChooseNewSyncSourceHook _chooseNewSyncSourceHook = []() {
+    };
 
     // This is the most recently denylisted sync source passed to denylistSyncSource().
     HostAndPort _lastDenylistedSyncSource;

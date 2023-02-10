@@ -81,10 +81,12 @@ function testEpochChangeDuringAgg({mergeSpec, failpoint, failpointData}) {
 
     // Use a failpoint to make the query feeding into the aggregate hang while we drop the
     // collection.
-    [st.rs0.getPrimary(), st.rs1.getPrimary()].forEach((mongod) => {
-        assert.commandWorked(mongod.adminCommand(
-            {configureFailPoint: failpoint, mode: "alwaysOn", data: failpointData || {}}));
-    });
+    [st.rs0.getPrimary(),
+     st.rs1.getPrimary()]
+        .forEach((mongod) => {
+            assert.commandWorked(mongod.adminCommand(
+                {configureFailPoint: failpoint, mode: "alwaysOn", data: failpointData || {}}));
+        });
 
     let parallelShellJoiner;
     try {

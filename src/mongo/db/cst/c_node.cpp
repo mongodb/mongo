@@ -77,7 +77,9 @@ auto printNonZeroKey(const NonZeroKey& nonZeroKey) {
             [](const int& keyInt) { return "int "s + std::to_string(keyInt); },
             [](const long long& keyLong) { return "long "s + std::to_string(keyLong); },
             [](const double& keyDouble) { return "double "s + std::to_string(keyDouble); },
-            [](const Decimal128& keyDecimal) { return "decimal "s + keyDecimal.toString(); }},
+            [](const Decimal128& keyDecimal) {
+                return "decimal "s + keyDecimal.toString();
+            }},
         nonZeroKey);
 }
 
@@ -158,7 +160,9 @@ auto printValue(const T& payload) {
                 return "<UserDecimal "s + userDecimal.toString() + ">";
             },
             [](const UserMinKey& userMinKey) { return "<UserMinKey>"s; },
-            [](const UserMaxKey& userMaxKey) { return "<UserMaxKey>"s; }},
+            [](const UserMaxKey& userMaxKey) {
+                return "<UserMaxKey>"s;
+            }},
         payload);
 }
 
@@ -199,7 +203,9 @@ std::string CNode::toStringHelper(int numTabs) const {
                 return tabs(numTabs) + "<CompoundInconsistentKey>\n" +
                     compoundKey.obj->toStringHelper(numTabs + 1);
             },
-            [this, numTabs](auto&&) { return tabs(numTabs) + printValue(payload); }},
+            [this, numTabs](auto&&) {
+                return tabs(numTabs) + printValue(payload);
+            }},
         payload);
 }
 
@@ -274,15 +280,14 @@ std::pair<BSONObj, bool> CNode::toBsonWithArrayIndicator() const {
 }
 
 bool CNode::isNumber() const {
-    return stdx::visit(
-        OverloadedVisitor{
-            [](const UserLong&) { return true; },
-            [](const UserDouble&) { return true; },
-            [](const UserDecimal&) { return true; },
-            [](const UserInt&) { return true; },
-            [](auto&&) { return false; },
-        },
-        payload);
+    return stdx::visit(OverloadedVisitor{
+                           [](const UserLong&) { return true; },
+                           [](const UserDouble&) { return true; },
+                           [](const UserDecimal&) { return true; },
+                           [](const UserInt&) { return true; },
+                           [](auto&&) { return false; },
+                       },
+                       payload);
 }
 
 int CNode::numberInt() const {
@@ -314,7 +319,9 @@ long long CNode::numberLong() const {
                           [](const UserDecimal& userDecimal) {
                               return (BSON("" << userDecimal).firstElement()).safeNumberLong();
                           },
-                          [](auto &&) -> UserLong { MONGO_UNREACHABLE }},
+                          [](auto&&) -> UserLong {
+                              MONGO_UNREACHABLE
+                          }},
         payload);
 }
 

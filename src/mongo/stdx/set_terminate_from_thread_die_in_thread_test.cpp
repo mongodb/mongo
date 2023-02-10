@@ -50,14 +50,12 @@ void testTerminateDispatch() {
     stdx::thread{[] {
         std::cout << "Setting terminate handler" << std::endl;
         stdx::set_terminate(writeFeedbackAndCleanlyExit);
-    }}
-        .join();
+    }}.join();
     std::cout << "Starting background thread (which will terminate)." << std::endl;
     stdx::thread{[] {
         std::cout << "Calling terminate from background thread." << std::endl;
         std::terminate();
-    }}
-        .join();
+    }}.join();
     exit(static_cast<int>(mongo::ExitCode::fail));
 }
 }  // namespace

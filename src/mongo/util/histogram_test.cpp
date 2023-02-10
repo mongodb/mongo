@@ -49,7 +49,9 @@ public:
         boost::optional<T> lower, upper;
 
         friend bool operator==(const BucketSpec& a, const BucketSpec& b) {
-            auto lens = [](auto&& x) { return std::tie(x.count, x.lower, x.upper); };
+            auto lens = [](auto&& x) {
+                return std::tie(x.count, x.lower, x.upper);
+            };
             return lens(a) == lens(b);
         }
 

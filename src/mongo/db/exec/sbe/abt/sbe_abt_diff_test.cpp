@@ -144,10 +144,13 @@ const ServiceContext::ConstructorActionRegisterer clientObserverRegisterer{
     [](ServiceContext* service) {
         service->registerClientObserver(std::make_unique<TestObserver>());
     },
-    [](ServiceContext* serviceContext) {}};
+    [](ServiceContext* serviceContext) {
+    }};
 
 TEST_F(NodeSBE, DiffTestBasic) {
-    const auto contextFn = [this]() { return makeOperationContext(); };
+    const auto contextFn = [this]() {
+        return makeOperationContext();
+    };
     const auto compare = [&contextFn](const std::string& pipelineStr,
                                       const std::vector<std::string>& jsonVector) {
         return compareSBEABTAgainstPipeline(
@@ -173,7 +176,9 @@ TEST_F(NodeSBE, DiffTestBasic) {
 }
 
 TEST_F(NodeSBE, DiffTest) {
-    const auto contextFn = [this]() { return makeOperationContext(); };
+    const auto contextFn = [this]() {
+        return makeOperationContext();
+    };
     const auto compare = [&contextFn](const std::string& pipelineStr,
                                       const std::vector<std::string>& jsonVector) {
         return compareSBEABTAgainstPipeline(

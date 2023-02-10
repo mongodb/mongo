@@ -286,7 +286,8 @@ public:
 
     // Hook for onInserts. Defaults to a no-op function but may be overridden to inject exceptions
     // while mapReduce inserts its results into the temporary output collection.
-    std::function<void()> onInsertsFn = [] {};
+    std::function<void()> onInsertsFn = [] {
+    };
 
     // Holds indexes copied from existing output collection to the temporary collections.
     std::vector<BSONObj> indexesCreated;
@@ -494,7 +495,9 @@ TEST_F(MapReduceCommandTest, DropTemporaryCollectionsOnInsertError) {
     auto sourceDoc = BSON("_id" << 0);
     ASSERT_OK(_storage.insertDocument(_opCtx.get(), inputNss, {sourceDoc, Timestamp(0)}, 1LL));
 
-    _opObserver->onInsertsFn = [] { uasserted(ErrorCodes::OperationFailed, ""); };
+    _opObserver->onInsertsFn = [] {
+        uasserted(ErrorCodes::OperationFailed, "");
+    };
 
     auto mapCode = "function() { emit(this._id, this._id); }"_sd;
     auto reduceCode = "function(k, v) { return Array.sum(v); }"_sd;

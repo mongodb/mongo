@@ -580,8 +580,8 @@ ReplicationCoordinatorNoOp::getHelloResponseFuture(
     MONGO_UNREACHABLE;
 }
 
-StatusWith<OpTime> ReplicationCoordinatorNoOp::getLatestWriteOpTime(OperationContext* opCtx) const
-    noexcept {
+StatusWith<OpTime> ReplicationCoordinatorNoOp::getLatestWriteOpTime(
+    OperationContext* opCtx) const noexcept {
     return getMyLastAppliedOpTime();
 }
 

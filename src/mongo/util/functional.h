@@ -291,9 +291,9 @@ struct UFDeductionHelper<Ret (Class::*)(Args...) const&> : stdx::type_identity<R
  * non-overloaded, non-generic function objects such as lambdas that don't use `auto` arguments.
  */
 template <typename Ret, typename... Args>
-unique_function(Ret (*)(Args...))->unique_function<Ret(Args...)>;
+unique_function(Ret (*)(Args...)) -> unique_function<Ret(Args...)>;
 template <typename T, typename Sig = typename UFDeductionHelper<decltype(&T::operator())>::type>
-unique_function(T)->unique_function<Sig>;
+unique_function(T) -> unique_function<Sig>;
 
 template <typename Signature>
 bool operator==(const unique_function<Signature>& lhs, std::nullptr_t) noexcept {

@@ -94,7 +94,9 @@ inline CardinalityEstimatorFactoryFn makeHistogramEstimatorFactoryFn(
  * Returns a factory function to create a heuristics based estimator.
  */
 inline CardinalityEstimatorFactoryFn makeHeuristicEstimatorFactoryFn() {
-    return []() { return makeHeuristicCE(); };
+    return []() {
+        return makeHeuristicCE();
+    };
 }
 
 /**

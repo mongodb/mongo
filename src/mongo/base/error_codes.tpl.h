@@ -49,7 +49,7 @@ namespace $ec.extra_ns {
     //#end if
     class $ec.extra_class;
     //#if $ec.extra_ns
-}  // namespace $ec.extra_ns
+}  // namespace extra_ns
 //#end if
 //#end if
 //#end for

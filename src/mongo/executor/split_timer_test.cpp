@@ -156,8 +156,12 @@ struct SomePolicy {
 class SplitTimerTest : public unittest::Test {
 public:
     SplitTimerTest() {
-        policy.mockOnStart = [&](auto&&...) { ++starts; };
-        policy.mockOnFinish = [&](auto&&...) { ++finishes; };
+        policy.mockOnStart = [&](auto&&...) {
+            ++starts;
+        };
+        policy.mockOnFinish = [&](auto&&...) {
+            ++finishes;
+        };
         policy.clock = &clock;
     }
 

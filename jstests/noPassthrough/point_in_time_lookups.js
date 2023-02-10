@@ -112,118 +112,122 @@ const runPointInTimeTests = function() {
     (function oldestTimestampTests() {
         // Point-in-time reads on a collection before it was created should have like reading from a
         // non-existent collection.
-        find(coll().getName(), /*withIndex=*/false, oldestTS, /*numDocs=*/0);
-        find(coll().getName(), /*withIndex=*/true, oldestTS, /*numDocs=*/0);
-        find("renamed", /*withIndex=*/false, oldestTS, /*numDocs=*/0);
-        find("renamed", /*withIndex=*/true, oldestTS, /*numDocs=*/0);
+        find(coll().getName(), /*withIndex=*/ false, oldestTS, /*numDocs=*/ 0);
+        find(coll().getName(), /*withIndex=*/ true, oldestTS, /*numDocs=*/ 0);
+        find("renamed", /*withIndex=*/ false, oldestTS, /*numDocs=*/ 0);
+        find("renamed", /*withIndex=*/ true, oldestTS, /*numDocs=*/ 0);
     })();
 
     (function createTimestampTests() {
         // Reading at 'createTS' from the original collection should not find any document yet.
         // Using the index at this point returns BadValue from hint as it does not exist yet.
-        find(coll().getName(), /*withIndex=*/false, createTS, /*numDocs=*/0);
-        find(coll().getName(), /*withIndex=*/true, createTS, /*numDocs=*/0, /*expectedError=*/true);
+        find(coll().getName(), /*withIndex=*/ false, createTS, /*numDocs=*/ 0);
+        find(coll().getName(),
+             /*withIndex=*/ true,
+             createTS,
+             /*numDocs=*/ 0,
+             /*expectedError=*/ true);
 
         // Reading at 'createTS' from the renamed collection should not find any document as it was
         // non-existent.
-        find("renamed", /*withIndex=*/false, createTS, /*numDocs=*/0);
-        find("renamed", /*withIndex=*/true, createTS, /*numDocs=*/0);
+        find("renamed", /*withIndex=*/ false, createTS, /*numDocs=*/ 0);
+        find("renamed", /*withIndex=*/ true, createTS, /*numDocs=*/ 0);
     })();
 
     (function firstInsertTimestampTests() {
         // Reading at 'firstInsertTS' from the original collection should find a document. Using the
         // index at this point returns BadValue from hint as it does not exist yet.
-        find(coll().getName(), /*withIndex=*/false, firstInsertTS, /*numDocs=*/1);
+        find(coll().getName(), /*withIndex=*/ false, firstInsertTS, /*numDocs=*/ 1);
         find(coll().getName(),
-             /*withIndex=*/true,
+             /*withIndex=*/ true,
              firstInsertTS,
-             /*numDocs=*/0,
-             /*expectedError=*/true);
+             /*numDocs=*/ 0,
+             /*expectedError=*/ true);
 
         // Reading at 'firstInsertTS' from the renamed collection should not find any document as it
         // was non-existent.
-        find("renamed", /*withIndex=*/false, firstInsertTS, /*numDocs=*/0);
-        find("renamed", /*withIndex=*/true, firstInsertTS, /*numDocs=*/0);
+        find("renamed", /*withIndex=*/ false, firstInsertTS, /*numDocs=*/ 0);
+        find("renamed", /*withIndex=*/ true, firstInsertTS, /*numDocs=*/ 0);
     })();
 
     (function indexTimestampTests() {
         // Reading at 'indexTS' from the original collection should find a document. This includes
         // with the index as it now exists.
-        find(coll().getName(), /*withIndex=*/false, indexTS, /*numDocs=*/1);
-        find(coll().getName(), /*withIndex=*/true, indexTS, /*numDocs=*/1);
+        find(coll().getName(), /*withIndex=*/ false, indexTS, /*numDocs=*/ 1);
+        find(coll().getName(), /*withIndex=*/ true, indexTS, /*numDocs=*/ 1);
 
         // Reading at 'indexTS' from the renamed collection should not find any document as it was
         // non-existent.
-        find("renamed", /*withIndex=*/false, indexTS, /*numDocs=*/0);
-        find("renamed", /*withIndex=*/true, indexTS, /*numDocs=*/0);
+        find("renamed", /*withIndex=*/ false, indexTS, /*numDocs=*/ 0);
+        find("renamed", /*withIndex=*/ true, indexTS, /*numDocs=*/ 0);
     })();
 
     (function secondInsertTimestampTests() {
         // Reading at 'secondInsertTS' from the original collection should find two documents. This
         // includes with the index as it now exists.
-        find(coll().getName(), /*withIndex=*/false, secondInsertTS, /*numDocs=*/2);
-        find(coll().getName(), /*withIndex=*/true, secondInsertTS, /*numDocs=*/2);
+        find(coll().getName(), /*withIndex=*/ false, secondInsertTS, /*numDocs=*/ 2);
+        find(coll().getName(), /*withIndex=*/ true, secondInsertTS, /*numDocs=*/ 2);
 
         // Reading at 'secondInsertTS' from the renamed collection should not find any document as
         // it was non-existent.
-        find("renamed", /*withIndex=*/false, secondInsertTS, /*numDocs=*/0);
-        find("renamed", /*withIndex=*/true, secondInsertTS, /*numDocs=*/0);
+        find("renamed", /*withIndex=*/ false, secondInsertTS, /*numDocs=*/ 0);
+        find("renamed", /*withIndex=*/ true, secondInsertTS, /*numDocs=*/ 0);
     })();
 
     (function renameTimestampTests() {
         // Reading at 'renameTS' from the original collection should not find any document as it was
         // non-existent at this time.
-        find(coll().getName(), /*withIndex=*/false, renameTS, /*numDocs=*/0);
-        find(coll().getName(), /*withIndex=*/true, renameTS, /*numDocs=*/0);
+        find(coll().getName(), /*withIndex=*/ false, renameTS, /*numDocs=*/ 0);
+        find(coll().getName(), /*withIndex=*/ true, renameTS, /*numDocs=*/ 0);
 
         // Reading at 'renameTS' from the renamed collection should find two documents. This
         // includes with the index as it now exists.
-        find("renamed", /*withIndex=*/false, renameTS, /*numDocs=*/2);
-        find("renamed", /*withIndex=*/true, renameTS, /*numDocs=*/2);
+        find("renamed", /*withIndex=*/ false, renameTS, /*numDocs=*/ 2);
+        find("renamed", /*withIndex=*/ true, renameTS, /*numDocs=*/ 2);
     })();
 
     (function dropTimestampTests() {
         // Reading at 'dropTS' from the original collection should not find any document as it was
         // non-existent at this time.
-        find(coll().getName(), /*withIndex=*/false, dropTS, /*numDocs=*/0);
-        find(coll().getName(), /*withIndex=*/true, dropTS, /*numDocs=*/0);
+        find(coll().getName(), /*withIndex=*/ false, dropTS, /*numDocs=*/ 0);
+        find(coll().getName(), /*withIndex=*/ true, dropTS, /*numDocs=*/ 0);
 
         // Reading at 'dropTS' from the renamed collection should not find any document as it was
         // non-existent at this time.
-        find("renamed", /*withIndex=*/false, dropTS, /*numDocs=*/0);
-        find("renamed", /*withIndex=*/true, dropTS, /*numDocs=*/0);
+        find("renamed", /*withIndex=*/ false, dropTS, /*numDocs=*/ 0);
+        find("renamed", /*withIndex=*/ true, dropTS, /*numDocs=*/ 0);
     })();
 
     (function recreatedTimestampTests() {
         // Reading at 'recreatedTS' from the original collection should not find any document yet.
         // Using the index at this point returns BadValue from hint as it does not exist yet.
-        find(coll().getName(), /*withIndex=*/false, recreatedTS, /*numDocs=*/0);
+        find(coll().getName(), /*withIndex=*/ false, recreatedTS, /*numDocs=*/ 0);
         find(coll().getName(),
-             /*withIndex=*/true,
+             /*withIndex=*/ true,
              recreatedTS,
-             /*numDocs=*/0,
-             /*expectedError=*/true);
+             /*numDocs=*/ 0,
+             /*expectedError=*/ true);
 
         // Reading at 'recreatedTS' from the renamed collection should not find any document as it
         // was non-existent.
-        find("renamed", /*withIndex=*/false, recreatedTS, /*numDocs=*/0);
-        find("renamed", /*withIndex=*/true, recreatedTS, /*numDocs=*/0);
+        find("renamed", /*withIndex=*/ false, recreatedTS, /*numDocs=*/ 0);
+        find("renamed", /*withIndex=*/ true, recreatedTS, /*numDocs=*/ 0);
     })();
 
     (function thirdInsertTimestampTests() {
         // Reading at 'thirdInsertTS' from the original collection should find a document. Using the
         // index at this point returns BadValue from hint as it does not exist yet.
-        find(coll().getName(), /*withIndex=*/false, thirdInsertTS, /*numDocs=*/1);
+        find(coll().getName(), /*withIndex=*/ false, thirdInsertTS, /*numDocs=*/ 1);
         find(coll().getName(),
-             /*withIndex=*/true,
+             /*withIndex=*/ true,
              thirdInsertTS,
-             /*numDocs=*/0,
-             /*expectedError=*/true);
+             /*numDocs=*/ 0,
+             /*expectedError=*/ true);
 
         // Reading at 'thirdInsertTS' from the renamed collection should not find any document as it
         // was non-existent.
-        find("renamed", /*withIndex=*/false, thirdInsertTS, /*numDocs=*/0);
-        find("renamed", /*withIndex=*/true, thirdInsertTS, /*numDocs=*/0);
+        find("renamed", /*withIndex=*/ false, thirdInsertTS, /*numDocs=*/ 0);
+        find("renamed", /*withIndex=*/ true, thirdInsertTS, /*numDocs=*/ 0);
     })();
 };
 

@@ -360,10 +360,11 @@ Status storeServerOptions(const moe::Environment& params) {
                 serverGlobalParams.bind_ips.emplace_back("::");
             }
         } else {
-            boost::split(serverGlobalParams.bind_ips,
-                         bind_ip,
-                         [](char c) { return c == ','; },
-                         boost::token_compress_on);
+            boost::split(
+                serverGlobalParams.bind_ips,
+                bind_ip,
+                [](char c) { return c == ','; },
+                boost::token_compress_on);
         }
     }
 

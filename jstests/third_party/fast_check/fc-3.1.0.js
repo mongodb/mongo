@@ -2,9 +2,10 @@ var fc = (function() {
     'use strict';
 
     var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis
-                                                           : typeof window !== 'undefined'
-            ? window
-            : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
+        : typeof window !== 'undefined'                    ? window
+        : typeof global !== 'undefined'                    ? global
+        : typeof self !== 'undefined'                      ? self
+                                                           : {};
 
     function getDefaultExportFromCjs(x) {
         return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default')
@@ -1530,7 +1531,8 @@ var fc = (function() {
         } else {
             rangeSizeArrayIntValue.data[1] += 1;
         }
-        (0, UnsafeUniformArrayIntDistributionInternal_1.unsafeUniformArrayIntDistributionInternal)(
+        (0,
+         UnsafeUniformArrayIntDistributionInternal_1.unsafeUniformArrayIntDistributionInternal)(
             sharedData, rangeSizeArrayIntValue.data, rng);
         return sharedData[0] * 0x100000000 + sharedData[1] + from;
     }
@@ -2006,9 +2008,9 @@ var fc = (function() {
                     }
                     const mapper = (k) => `${
                         k === '__proto__' ? '["__proto__"]'
-                                          : typeof k === 'symbol'
-                                ? `[${stringifyInternal(k, currentValues, getAsyncContent)}]`
-                                : JSON.stringify(k)}:${
+                            : typeof k === 'symbol'
+                            ? `[${stringifyInternal(k, currentValues, getAsyncContent)}]`
+                            : JSON.stringify(k)}:${
                         stringifyInternal(value[k], currentValues, getAsyncContent)}`;
                     const stringifiedProperties = [
                         ...Object.keys(value).map(mapper),
@@ -2584,8 +2586,8 @@ var fc = (function() {
             const statusIcon = currentTree.status === ExecutionStatus_1.ExecutionStatus.Success
                 ? '\x1b[32m\u221A\x1b[0m'
                 : currentTree.status === ExecutionStatus_1.ExecutionStatus.Failure
-                    ? '\x1b[31m\xD7\x1b[0m'
-                    : '\x1b[33m!\x1b[0m';
+                ? '\x1b[31m\xD7\x1b[0m'
+                : '\x1b[33m!\x1b[0m';
             const leftPadding = Array(currentDepth).join('. ');
             summaryLines.push(`${leftPadding}${statusIcon} ${stringifyOne(currentTree.value)}`);
             for (const tree of currentTree.children.slice().reverse()) {
@@ -3491,8 +3493,7 @@ var fc = (function() {
                     `Unable to offset size based on the unknown defaulted one: ${defaultSize}`);
             }
             const resultingSizeInSize = defaultSizeInSize + sizeInRelative - 4;
-            return resultingSizeInSize < 0
-                ? orderedSize[0]
+            return resultingSizeInSize < 0                  ? orderedSize[0]
                 : resultingSizeInSize >= orderedSize.length ? orderedSize[orderedSize.length - 1]
                                                             : orderedSize[resultingSizeInSize];
         }
@@ -3501,9 +3502,9 @@ var fc = (function() {
             size, minLength, maxLength, specifiedMaxLength) {
             const {baseSize: defaultSize = exports.DefaultSize, defaultSizeToMaxWhenMaxSpecified} =
                 (0, GlobalParameters_1.readConfigureGlobal)() || {};
-            const definedSize = size !== undefined
-                ? size
-                : specifiedMaxLength && defaultSizeToMaxWhenMaxSpecified ? 'max' : defaultSize;
+            const definedSize = size !== undefined                       ? size
+                : specifiedMaxLength && defaultSizeToMaxWhenMaxSpecified ? 'max'
+                                                                         : defaultSize;
             if (definedSize === 'max') {
                 return maxLength;
             }
@@ -3517,9 +3518,9 @@ var fc = (function() {
             }
             const {baseSize: defaultSize = exports.DefaultSize, defaultSizeToMaxWhenMaxSpecified} =
                 (0, GlobalParameters_1.readConfigureGlobal)() || {};
-            const definedSize = depthSizeOrSize !== undefined
-                ? depthSizeOrSize
-                : specifiedMaxDepth && defaultSizeToMaxWhenMaxSpecified ? 'max' : defaultSize;
+            const definedSize = depthSizeOrSize !== undefined           ? depthSizeOrSize
+                : specifiedMaxDepth && defaultSizeToMaxWhenMaxSpecified ? 'max'
+                                                                        : defaultSize;
             if (definedSize === 'max') {
                 return 0;
             }
@@ -4683,8 +4684,9 @@ var fc = (function() {
     nat$1.nat = void 0;
     const IntegerArbitrary_1$3 = IntegerArbitrary$1;
     function nat(arg) {
-        const max =
-            typeof arg === 'number' ? arg : arg && arg.max !== undefined ? arg.max : 0x7fffffff;
+        const max = typeof arg === 'number' ? arg
+            : arg && arg.max !== undefined  ? arg.max
+                                            : 0x7fffffff;
         if (max < 0) {
             throw new Error('fc.nat value should be greater than or equal to 0');
         }

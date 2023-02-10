@@ -84,15 +84,20 @@ TEST(RedactStatusTest, StatusOK) {
 
 TEST(RedactExceptionTest, NoRedact) {
     logv2::setShouldRedactLogs(false);
-    ASSERT_THROWS_WITH_CHECK([] { uasserted(ErrorCodes::InternalError, kMsg); }(),
-                             DBException,
-                             [](const DBException& ex) { ASSERT_EQ(redact(ex), ex.toString()); });
+    ASSERT_THROWS_WITH_CHECK(
+        [] {
+            uasserted(ErrorCodes::InternalError, kMsg);
+        }(),
+        DBException,
+        [](const DBException& ex) { ASSERT_EQ(redact(ex), ex.toString()); });
 }
 
 TEST(RedactExceptionTest, BasicException) {
     logv2::setShouldRedactLogs(true);
     ASSERT_THROWS_WITH_CHECK(
-        [] { uasserted(ErrorCodes::InternalError, kMsg); }(),
+        [] {
+            uasserted(ErrorCodes::InternalError, kMsg);
+        }(),
         DBException,
         [](const DBException& ex) { ASSERT_EQ(redact(ex), "InternalError ###"); });
 }

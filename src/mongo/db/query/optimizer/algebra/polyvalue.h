@@ -312,8 +312,9 @@ private:
             // static constexpr std::array visitTbl = { &ControlBlockVTable<Ts, Ts...>::template
             // visit<V>... };
 
-            using FunPtrType = decltype(
-                &ControlBlockVTable<get_t<0>, Ts...>::template visit<Callback, Reference, Args...>);
+            using FunPtrType =
+                decltype(&ControlBlockVTable<get_t<0>,
+                                             Ts...>::template visit<Callback, Reference, Args...>);
             static constexpr FunPtrType visitTbl[] = {
                 &ControlBlockVTable<Ts, Ts...>::template visit<Callback, Reference, Args...>...};
 
@@ -328,9 +329,8 @@ private:
             // static constexpr std::array visitTbl = { &ControlBlockVTable<Ts, Ts...>::template
             // visitConst<V>... };
 
-            using FunPtrType = decltype(
-                &ControlBlockVTable<get_t<0>,
-                                    Ts...>::template visitConst<Callback, Reference, Args...>);
+            using FunPtrType = decltype(&ControlBlockVTable<get_t<0>, Ts...>::
+                                            template visitConst<Callback, Reference, Args...>);
             static constexpr FunPtrType visitTbl[] = {
                 &ControlBlockVTable<Ts,
                                     Ts...>::template visitConst<Callback, Reference, Args...>...};
@@ -439,8 +439,9 @@ public:
         // static constexpr std::array visitTbl = { &ControlBlockVTable<Ts, Ts...>::template
         // visit<V>... };
 
-        using FunPtrType = decltype(
-            &ControlBlockVTable<get_t<0>, Ts...>::template visit<Callback, PolyValue, Args...>);
+        using FunPtrType =
+            decltype(&ControlBlockVTable<get_t<0>,
+                                         Ts...>::template visit<Callback, PolyValue, Args...>);
         static constexpr FunPtrType visitTbl[] = {
             &ControlBlockVTable<Ts, Ts...>::template visit<Callback, PolyValue, Args...>...};
 

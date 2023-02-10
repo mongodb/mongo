@@ -108,7 +108,9 @@ Value translateLiteralToValue(const CNode& cst) {
                                          [](const CNode::ObjectChildren& object) {
                                              return translateLiteralObjectToValue(object);
                                          },
-                                         [&](auto&& payload) { return translateLiteralLeaf(cst); }},
+                                         [&](auto&& payload) {
+                                             return translateLiteralLeaf(cst);
+                                         }},
                        cst.payload);
 }
 
@@ -896,7 +898,7 @@ boost::intrusive_ptr<Expression> translateExpression(const CNode& cst,
                     vp);
             },
             // Everything else is a literal leaf.
-            [&](auto &&) -> boost::intrusive_ptr<Expression> {
+            [&](auto&&) -> boost::intrusive_ptr<Expression> {
                 return ExpressionConstant::create(expCtx, translateLiteralLeaf(cst));
             }},
         cst.payload);
@@ -936,7 +938,9 @@ Value translateLiteralLeaf(const CNode& cst) {
                           [](const UserMinKey&) { return Value{MINKEY}; },
                           [](const UserMaxKey&) { return Value{MAXKEY}; },
                           // The rest convert directly.
-                          [](auto&& payload) { return Value{payload}; }},
+                          [](auto&& payload) {
+                              return Value{payload};
+                          }},
         cst.payload);
 }
 

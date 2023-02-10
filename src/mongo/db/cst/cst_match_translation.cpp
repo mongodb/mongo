@@ -91,16 +91,17 @@ std::unique_ptr<MatchExpression> translateExists(const CNode::Fieldname& fieldNa
                                                  const CNode& argument) {
     auto root =
         std::make_unique<ExistsMatchExpression>(StringData(stdx::get<UserFieldname>(fieldName)));
-    if (stdx::visit(OverloadedVisitor{[&](const UserLong& userLong) { return userLong != 0; },
-                                      [&](const UserDouble& userDbl) { return userDbl != 0; },
-                                      [&](const UserDecimal& userDc) {
-                                          return userDc.isNotEqual(Decimal128(0));
-                                      },
-                                      [&](const UserInt& userInt) { return userInt != 0; },
-                                      [&](const UserBoolean& b) { return b; },
-                                      [&](const UserNull&) { return false; },
-                                      [&](const UserUndefined&) { return false; },
-                                      [&](auto&&) { return true; }},
+    if (stdx::visit(OverloadedVisitor{
+                        [&](const UserLong& userLong) { return userLong != 0; },
+                        [&](const UserDouble& userDbl) { return userDbl != 0; },
+                        [&](const UserDecimal& userDc) { return userDc.isNotEqual(Decimal128(0)); },
+                        [&](const UserInt& userInt) { return userInt != 0; },
+                        [&](const UserBoolean& b) { return b; },
+                        [&](const UserNull&) { return false; },
+                        [&](const UserUndefined&) { return false; },
+                        [&](auto&&) {
+                            return true;
+                        }},
                     argument.payload)) {
         return root;
     }
@@ -138,7 +139,9 @@ MatcherTypeSet getMatcherTypeSet(const CNode& argument) {
                     invariant(optValue);
                     ts.bsonTypes.insert(*optValue);
                 },
-                [&](auto&&) { MONGO_UNREACHABLE; }},
+                [&](auto&&) {
+                    MONGO_UNREACHABLE;
+                }},
             a.payload);
     };
     if (auto children = stdx::get_if<CNode::ArrayChildren>(&argument.payload)) {

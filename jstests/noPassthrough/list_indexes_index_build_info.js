@@ -178,7 +178,7 @@ const awaitIndexBuild = IndexBuildTest.startIndexBuild(conn,
                                                        {b: 1},
                                                        {name: buildingIndexName},
                                                        [],
-                                                       /*commitQuorum=*/"votingMembers");
+                                                       /*commitQuorum=*/ "votingMembers");
 const buildingOpId =
     IndexBuildTest.waitForIndexBuildToScanCollection(db, collName, buildingIndexName);
 
@@ -191,7 +191,7 @@ const awaitIndexBuildNonResumable =
                                    {c: 1},
                                    {name: buildingIndexNameNonResumable},
                                    [],
-                                   /*commitQuorum=*/0);
+                                   /*commitQuorum=*/ 0);
 const buildingOpIdNonResumable =
     IndexBuildTest.waitForIndexBuildToScanCollection(db, collName, buildingIndexNameNonResumable);
 

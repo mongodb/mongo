@@ -281,7 +281,9 @@ ReplicationCoordinator::Mode getReplicationModeFromSettings(const ReplSettings& 
 InitialSyncerInterface::Options createInitialSyncerOptions(
     ReplicationCoordinator* replCoord, ReplicationCoordinatorExternalState* externalState) {
     InitialSyncerInterface::Options options;
-    options.getMyLastOptime = [replCoord]() { return replCoord->getMyLastAppliedOpTime(); };
+    options.getMyLastOptime = [replCoord]() {
+        return replCoord->getMyLastAppliedOpTime();
+    };
     options.setMyLastOptime = [replCoord,
                                externalState](const OpTimeAndWallTime& opTimeAndWallTime) {
         // Note that setting the last applied opTime forward also advances the global timestamp.
@@ -293,7 +295,9 @@ InitialSyncerInterface::Options createInitialSyncerOptions(
         replCoord->getServiceContext()->getStorageEngine()->setOldestTimestamp(
             opTimeAndWallTime.opTime.getTimestamp());
     };
-    options.resetOptimes = [replCoord]() { replCoord->resetMyLastOpTimes(); };
+    options.resetOptimes = [replCoord]() {
+        replCoord->resetMyLastOpTimes();
+    };
     options.syncSourceSelector = replCoord;
     options.oplogFetcherMaxFetcherRestarts =
         externalState->getOplogFetcherInitialSyncMaxFetcherRestarts();
@@ -1128,7 +1132,9 @@ Status ReplicationCoordinatorImpl::waitForMemberState(Interruptible* interruptib
     }
 
     stdx::unique_lock<Latch> lk(_mutex);
-    auto pred = [this, expectedState]() { return _memberState == expectedState; };
+    auto pred = [this, expectedState]() {
+        return _memberState == expectedState;
+    };
     if (!interruptible->waitForConditionOrInterruptFor(_memberStateChange, lk, timeout, pred)) {
         return Status(ErrorCodes::ExceededTimeLimit,
                       str::stream()
@@ -2478,8 +2484,8 @@ std::shared_ptr<const HelloResponse> ReplicationCoordinatorImpl::awaitHelloRespo
     return statusWithHello.getValue();
 }
 
-StatusWith<OpTime> ReplicationCoordinatorImpl::getLatestWriteOpTime(OperationContext* opCtx) const
-    noexcept try {
+StatusWith<OpTime> ReplicationCoordinatorImpl::getLatestWriteOpTime(
+    OperationContext* opCtx) const noexcept try {
     ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
     Lock::GlobalLock globalLock(opCtx, MODE_IS);
     // Check if the node is primary after acquiring global IS lock.

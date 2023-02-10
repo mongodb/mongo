@@ -56,16 +56,16 @@ struct CachedValue {
 class Cache : public ReadThroughCache<std::string, CachedValue> {
 public:
     Cache(ServiceContext* service, ThreadPoolInterface& threadPool, size_t size, LookupFn lookupFn)
-        : ReadThroughCache(_mutex,
-                           service,
-                           threadPool,
-                           [this, lookupFn = std::move(lookupFn)](OperationContext* opCtx,
-                                                                  const std::string& key,
-                                                                  const ValueHandle& cachedValue) {
-                               ++countLookups;
-                               return lookupFn(opCtx, key, cachedValue);
-                           },
-                           size) {}
+        : ReadThroughCache(
+              _mutex,
+              service,
+              threadPool,
+              [this, lookupFn = std::move(lookupFn)](
+                  OperationContext* opCtx, const std::string& key, const ValueHandle& cachedValue) {
+                  ++countLookups;
+                  return lookupFn(opCtx, key, cachedValue);
+              },
+              size) {}
 
     int countLookups{0};
 
@@ -79,17 +79,18 @@ public:
                             ThreadPoolInterface& threadPool,
                             size_t size,
                             LookupFn lookupFn)
-        : ReadThroughCache(_mutex,
-                           service,
-                           threadPool,
-                           [this, lookupFn = std::move(lookupFn)](OperationContext* opCtx,
-                                                                  const std::string& key,
-                                                                  const ValueHandle& cachedValue,
-                                                                  Timestamp timeInStore) {
-                               ++countLookups;
-                               return lookupFn(opCtx, key, cachedValue, timeInStore);
-                           },
-                           size) {}
+        : ReadThroughCache(
+              _mutex,
+              service,
+              threadPool,
+              [this, lookupFn = std::move(lookupFn)](OperationContext* opCtx,
+                                                     const std::string& key,
+                                                     const ValueHandle& cachedValue,
+                                                     Timestamp timeInStore) {
+                  ++countLookups;
+                  return lookupFn(opCtx, key, cachedValue, timeInStore);
+              },
+              size) {}
 
     int countLookups{0};
 
@@ -318,7 +319,9 @@ TEST_F(ReadThroughCacheTest, InvalidateCacheSizeZeroReissuesLookup) {
 }
 
 TEST_F(ReadThroughCacheTest, KeyDoesNotExist) {
-    auto fnTest = [&](auto cache) { ASSERT(!cache.acquire(_opCtx, "TestKey")); };
+    auto fnTest = [&](auto cache) {
+        ASSERT(!cache.acquire(_opCtx, "TestKey"));
+    };
 
     fnTest(CacheWithThreadPool<Cache>(
         getServiceContext(),

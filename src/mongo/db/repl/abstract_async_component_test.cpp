@@ -351,7 +351,8 @@ TEST_F(AbstractAsyncComponentTest,
     component.shutdown();
     ASSERT_EQUALS(AbstractAsyncComponent::State::kShuttingDown, component.getState_forTest());
 
-    auto callback = [](const executor::TaskExecutor::CallbackArgs&) {};
+    auto callback = [](const executor::TaskExecutor::CallbackArgs&) {
+    };
     executor::TaskExecutor::CallbackHandle handle;
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled,
                   component.scheduleWorkAndSaveHandle_forTest(callback, &handle, "mytask"));
@@ -362,9 +363,12 @@ TEST_F(AbstractAsyncComponentTest,
     TaskExecutorMock taskExecutorMock(&getExecutor());
     MockAsyncComponent component(&taskExecutorMock);
 
-    taskExecutorMock.shouldFailScheduleWorkRequest = []() { return true; };
+    taskExecutorMock.shouldFailScheduleWorkRequest = []() {
+        return true;
+    };
 
-    auto callback = [](const executor::TaskExecutor::CallbackArgs&) {};
+    auto callback = [](const executor::TaskExecutor::CallbackArgs&) {
+    };
     executor::TaskExecutor::CallbackHandle handle;
     ASSERT_EQUALS(ErrorCodes::OperationFailed,
                   component.scheduleWorkAndSaveHandle_forTest(callback, &handle, "mytask"));
@@ -394,7 +398,8 @@ TEST_F(AbstractAsyncComponentTest,
     ASSERT_EQUALS(AbstractAsyncComponent::State::kShuttingDown, component.getState_forTest());
 
     auto when = getExecutor().now() + Seconds(1);
-    auto callback = [](const executor::TaskExecutor::CallbackArgs&) {};
+    auto callback = [](const executor::TaskExecutor::CallbackArgs&) {
+    };
     executor::TaskExecutor::CallbackHandle handle;
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled,
                   component.scheduleWorkAtAndSaveHandle_forTest(when, callback, &handle, "mytask"));
@@ -405,10 +410,13 @@ TEST_F(AbstractAsyncComponentTest,
     TaskExecutorMock taskExecutorMock(&getExecutor());
     MockAsyncComponent component(&taskExecutorMock);
 
-    taskExecutorMock.shouldFailScheduleWorkAtRequest = []() { return true; };
+    taskExecutorMock.shouldFailScheduleWorkAtRequest = []() {
+        return true;
+    };
 
     auto when = getExecutor().now() + Seconds(1);
-    auto callback = [](const executor::TaskExecutor::CallbackArgs&) {};
+    auto callback = [](const executor::TaskExecutor::CallbackArgs&) {
+    };
     executor::TaskExecutor::CallbackHandle handle;
     ASSERT_EQUALS(ErrorCodes::OperationFailed,
                   component.scheduleWorkAtAndSaveHandle_forTest(when, callback, &handle, "mytask"));

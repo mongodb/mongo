@@ -63,8 +63,8 @@ OplogBuffer* OplogApplier::getBuffer() const {
 
 Future<void> OplogApplier::startup() {
     auto pf = makePromiseFuture<void>();
-    auto callback =
-        [ this, promise = std::move(pf.promise) ](const CallbackArgs& args) mutable noexcept {
+    auto callback = [this,
+                     promise = std::move(pf.promise)](const CallbackArgs& args) mutable noexcept {
         invariant(args.status);
         LOGV2(21224, "Starting oplog application");
         _run(_oplogBuffer);

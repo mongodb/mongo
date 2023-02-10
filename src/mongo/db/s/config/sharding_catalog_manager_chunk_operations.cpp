@@ -1964,16 +1964,17 @@ void ShardingCatalogManager::bumpMultipleCollectionVersionsAndChangeMetadataInTx
     // migrations
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
-    withTransaction(opCtx,
-                    NamespaceString::kConfigReshardingOperationsNamespace,
-                    [&collNames, &changeMetadataFunc, configShard = _localConfigShard.get()](
-                        OperationContext* opCtx, TxnNumber txnNumber) {
-                        for (const auto& nss : collNames) {
-                            bumpCollectionMinorVersion(opCtx, configShard, nss, txnNumber);
-                        }
-                        changeMetadataFunc(opCtx, txnNumber);
-                    },
-                    writeConcern);
+    withTransaction(
+        opCtx,
+        NamespaceString::kConfigReshardingOperationsNamespace,
+        [&collNames, &changeMetadataFunc, configShard = _localConfigShard.get()](
+            OperationContext* opCtx, TxnNumber txnNumber) {
+            for (const auto& nss : collNames) {
+                bumpCollectionMinorVersion(opCtx, configShard, nss, txnNumber);
+            }
+            changeMetadataFunc(opCtx, txnNumber);
+        },
+        writeConcern);
 }
 
 void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,

@@ -729,13 +729,14 @@ TEST_F(DoWhileTest, LoopBodyExecutesAtLeastOnceWithBackoff) {
     AsyncWorkScheduler async(getServiceContext());
 
     int numLoops = 0;
-    auto future = doWhile(async,
-                          Backoff(Seconds(1), Milliseconds::max()),
-                          [](const StatusWith<int>& status) {
-                              uassertStatusOK(status);
-                              return false;
-                          },
-                          [&numLoops] { return Future<int>::makeReady(++numLoops); });
+    auto future = doWhile(
+        async,
+        Backoff(Seconds(1), Milliseconds::max()),
+        [](const StatusWith<int>& status) {
+            uassertStatusOK(status);
+            return false;
+        },
+        [&numLoops] { return Future<int>::makeReady(++numLoops); });
 
     ASSERT(future.isReady());
     ASSERT_EQ(1, numLoops);
@@ -746,13 +747,14 @@ TEST_F(DoWhileTest, LoopBodyExecutesManyIterationsWithoutBackoff) {
     AsyncWorkScheduler async(getServiceContext());
 
     int remainingLoops = 1000;
-    auto future = doWhile(async,
-                          boost::none,
-                          [&remainingLoops](const StatusWith<int>& status) {
-                              uassertStatusOK(status);
-                              return remainingLoops > 0;
-                          },
-                          [&remainingLoops] { return Future<int>::makeReady(--remainingLoops); });
+    auto future = doWhile(
+        async,
+        boost::none,
+        [&remainingLoops](const StatusWith<int>& status) {
+            uassertStatusOK(status);
+            return remainingLoops > 0;
+        },
+        [&remainingLoops] { return Future<int>::makeReady(--remainingLoops); });
 
     ASSERT_EQ(0, future.get());
     ASSERT_EQ(0, remainingLoops);
@@ -762,10 +764,11 @@ TEST_F(DoWhileTest, LoopObeysBackoff) {
     AsyncWorkScheduler async(getServiceContext());
 
     int numLoops = 0;
-    auto future = doWhile(async,
-                          Backoff(Seconds(1), Milliseconds::max()),
-                          [](const StatusWith<int>& status) { return uassertStatusOK(status) < 3; },
-                          [&numLoops] { return Future<int>::makeReady(++numLoops); });
+    auto future = doWhile(
+        async,
+        Backoff(Seconds(1), Milliseconds::max()),
+        [](const StatusWith<int>& status) { return uassertStatusOK(status) < 3; },
+        [&numLoops] { return Future<int>::makeReady(++numLoops); });
 
     // The loop body needs to execute at least once
     ASSERT(!future.isReady());
@@ -802,11 +805,11 @@ TEST_F(DoWhileTest, LoopObeysShutdown) {
     AsyncWorkScheduler async(getServiceContext());
 
     int numLoops = 0;
-    auto future =
-        doWhile(async,
-                boost::none,
-                [](const StatusWith<int>& status) { return status != ErrorCodes::InternalError; },
-                [&numLoops] { return Future<int>::makeReady(++numLoops); });
+    auto future = doWhile(
+        async,
+        boost::none,
+        [](const StatusWith<int>& status) { return status != ErrorCodes::InternalError; },
+        [&numLoops] { return Future<int>::makeReady(++numLoops); });
 
     // Wait for at least one loop
     while (numLoops == 0)

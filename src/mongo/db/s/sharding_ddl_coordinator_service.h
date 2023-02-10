@@ -84,7 +84,9 @@ public:
     void waitForOngoingCoordinatorsToFinish(
         OperationContext* opCtx,
         std::function<bool(const ShardingDDLCoordinator&)> pred = {
-            [](const ShardingDDLCoordinator&) { return true; }});
+            [](const ShardingDDLCoordinator&) {
+                return true;
+            }});
 
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,

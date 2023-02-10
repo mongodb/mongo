@@ -38,8 +38,8 @@ IndexBuildTest.waitForIndexBuildToScanCollection(
 assert.commandWorked(testDB.adminCommand({fsync: 1}));
 
 const collUri = getUriForColl(testDB.getCollection("a"));
-const indexIdUri = getUriForIndex(testDB.getCollection("a"), /*indexName=*/"_id_");
-const indexXUri = getUriForIndex(testDB.getCollection("a"), /*indexName=*/"x_1");
+const indexIdUri = getUriForIndex(testDB.getCollection("a"), /*indexName=*/ "_id_");
+const indexXUri = getUriForIndex(testDB.getCollection("a"), /*indexName=*/ "x_1");
 
 MongoRunner.stopMongod(mongod);
 awaitIndexBuild();

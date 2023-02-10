@@ -129,7 +129,9 @@ TEST_F(MigrationDestinationManagerTest, CloneDocumentsThrowsFetchErrors) {
         return nextBatch->getField("objects").Obj().isEmpty();
     };
 
-    auto insertBatchFn = [&](OperationContext* opCtx, BSONObj docs) { return true; };
+    auto insertBatchFn = [&](OperationContext* opCtx, BSONObj docs) {
+        return true;
+    };
 
     ASSERT_THROWS_CODE_AND_WHAT(MigrationDestinationManager::fetchAndApplyBatch(
                                     operationContext(), insertBatchFn, fetchBatchFn),

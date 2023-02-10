@@ -52,7 +52,9 @@ private:
 
 executor::ThreadPoolMock::Options MultiApplierTest::makeThreadPoolMockOptions() const {
     executor::ThreadPoolMock::Options options;
-    options.onCreateThread = []() { Client::initThread("MultiApplierTest"); };
+    options.onCreateThread = []() {
+        Client::initThread("MultiApplierTest");
+    };
     return options;
 }
 
@@ -91,7 +93,8 @@ TEST_F(MultiApplierTest, InvalidConstruction) {
     auto multiApply = [](OperationContext*, std::vector<OplogEntry>) -> StatusWith<OpTime> {
         return Status(ErrorCodes::InternalError, "not implemented");
     };
-    auto callback = [](const Status&) {};
+    auto callback = [](const Status&) {
+    };
 
     // Null executor.
     ASSERT_THROWS_CODE_AND_WHAT(MultiApplier(nullptr, operations, multiApply, callback),
@@ -127,7 +130,8 @@ TEST_F(MultiApplierTest, MultiApplierTransitionsDirectlyToCompleteIfShutdownBefo
     auto multiApply = [](OperationContext*, std::vector<OplogEntry>) -> StatusWith<OpTime> {
         return OpTime();
     };
-    auto callback = [](const Status&) {};
+    auto callback = [](const Status&) {
+    };
 
     MultiApplier multiApplier(&getExecutor(), operations, multiApply, callback);
     ASSERT_EQUALS(MultiApplier::State::kPreStart, multiApplier.getState_forTest());
@@ -147,7 +151,9 @@ TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUp
     };
 
     auto callbackResult = getDetectableErrorStatus();
-    auto callback = [&](const Status& result) { callbackResult = result; };
+    auto callback = [&](const Status& result) {
+        callbackResult = result;
+    };
 
     MultiApplier multiApplier(&getExecutor(), operations, multiApply, callback);
     ASSERT_EQUALS(MultiApplier::State::kPreStart, multiApplier.getState_forTest());
@@ -183,7 +189,9 @@ TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
     };
 
     auto callbackResult = getDetectableErrorStatus();
-    auto callback = [&](const Status& result) { callbackResult = result; };
+    auto callback = [&](const Status& result) {
+        callbackResult = result;
+    };
 
     MultiApplier multiApplier(&getExecutor(), operations, multiApply, callback);
     ASSERT_OK(multiApplier.startup());
@@ -212,7 +220,9 @@ TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCall
     };
 
     auto callbackResult = getDetectableErrorStatus();
-    auto callback = [&](const Status& result) { callbackResult = result; };
+    auto callback = [&](const Status& result) {
+        callbackResult = result;
+    };
 
     MultiApplier multiApplier(&getExecutor(), operations, multiApply, callback);
     ASSERT_OK(multiApplier.startup());

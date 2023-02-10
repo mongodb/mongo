@@ -47,7 +47,7 @@ let rollbackNode = rollbackTest.transitionToRollbackOperations();
 RollbackOps(rollbackNode);
 
 let syncSourceNode = rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
-SyncSourceOps(syncSourceNode, /*withinDB=*/true);
+SyncSourceOps(syncSourceNode, /*withinDB=*/ true);
 
 // Wait for rollback to finish.
 rollbackTest.transitionToSyncSourceOperationsDuringRollback();
@@ -66,7 +66,7 @@ RollbackOps(rollbackNodeAcrossDBs);
 
 let syncSourceNodeAcrossDBs =
     rollbackTestAcrossDBs.transitionToSyncSourceOperationsBeforeRollback();
-SyncSourceOps(syncSourceNodeAcrossDBs, /*withinDB=*/false);
+SyncSourceOps(syncSourceNodeAcrossDBs, /*withinDB=*/ false);
 
 // Wait for rollback to finish.
 rollbackTestAcrossDBs.transitionToSyncSourceOperationsDuringRollback();

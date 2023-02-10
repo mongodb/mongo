@@ -1025,7 +1025,9 @@ void visitPathTreeNodes(PathTreeNode<T>* treeRoot,
     boost::optional<std::string> path = std::move(rootPath);
     const std::string emptyPath;
 
-    auto getPath = [&]() -> const std::string& { return path ? *path : emptyPath; };
+    auto getPath = [&]() -> const std::string& {
+        return path ? *path : emptyPath;
+    };
     auto dfsPop = [&] {
         dfs.pop_back();
         if (isPathNeeded && path) {

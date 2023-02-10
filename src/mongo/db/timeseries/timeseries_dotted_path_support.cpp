@@ -275,7 +275,9 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
             }
             break;
         }
-        default: { MONGO_UNREACHABLE; }
+        default: {
+            MONGO_UNREACHABLE;
+        }
     }
 
     return boost::none;

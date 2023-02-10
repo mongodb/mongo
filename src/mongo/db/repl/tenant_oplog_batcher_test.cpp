@@ -55,7 +55,9 @@ public:
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _net = network.get();
         executor::ThreadPoolMock::Options thread_pool_options;
-        thread_pool_options.onCreateThread = [] { Client::initThread("TenantOplogBatcher"); };
+        thread_pool_options.onCreateThread = [] {
+            Client::initThread("TenantOplogBatcher");
+        };
         _executor = makeSharedThreadPoolTestExecutor(std::move(network), thread_pool_options);
         _executor->startup();
         _oplogBuffer.startup(nullptr);

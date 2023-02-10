@@ -206,8 +206,8 @@ Status addPathsFromTreeToSet(const CNode::ObjectChildren& children,
         // like '{"a.b": 1}'.
         auto currentPath = previousPath;
         if (auto&& fieldname = stdx::get_if<FieldnamePath>(&child.first))
-            for (auto&& component :
-                 stdx::visit([](auto&& fn) -> auto&& { return fn.components; }, *fieldname))
+            for (auto&& component : stdx::visit(
+                     [](auto&& fn) -> auto&& { return fn.components; }, *fieldname))
                 currentPath.emplace_back(component);
         // Or add a translaiton of _id if we have a key for that.
         else
@@ -301,7 +301,9 @@ Status validateSingleType(const CNode& element) {
                 }
                 return Status::OK();
             },
-            [&](auto &&) -> Status { MONGO_UNREACHABLE; }},
+            [&](auto&&) -> Status {
+                MONGO_UNREACHABLE;
+            }},
         element.payload);
 }
 }  // namespace

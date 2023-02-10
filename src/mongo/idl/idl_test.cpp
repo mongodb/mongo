@@ -3992,9 +3992,9 @@ TEST(IDLCommand, BasicNamespaceConstGetterCommand_TestNonConstGetterGeneration) 
     ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid().value(), uuid);
 
     // Verify that both const and non-const getters are generated.
-    assert_same_types<decltype(
-                          std::declval<BasicNamespaceConstGetterCommand>().getNamespaceOrUUID()),
-                      NamespaceStringOrUUID&>();
+    assert_same_types<
+        decltype(std::declval<BasicNamespaceConstGetterCommand>().getNamespaceOrUUID()),
+        NamespaceStringOrUUID&>();
     assert_same_types<
         decltype(std::declval<const BasicNamespaceConstGetterCommand>().getNamespaceOrUUID()),
         const NamespaceStringOrUUID&>();

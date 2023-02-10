@@ -48,7 +48,9 @@ namespace {
 void extract2Args(const BSONObj& args, BSONElement* elts) {
     const size_t nToExtract = 2;
 
-    auto fail = []() { uasserted(31220, "emit takes 2 args"); };
+    auto fail = []() {
+        uasserted(31220, "emit takes 2 args");
+    };
     BSONObjIterator it(args);
     for (size_t i = 0; i < nToExtract; ++i) {
         if (!it.more()) {

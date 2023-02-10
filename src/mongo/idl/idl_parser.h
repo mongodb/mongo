@@ -165,7 +165,7 @@ struct Ordering {
     const T& _v;
 };
 template <typename T>
-Ordering(const T&)->Ordering<T>;
+Ordering(const T&) -> Ordering<T>;
 
 /** fallback case */
 template <typename T>

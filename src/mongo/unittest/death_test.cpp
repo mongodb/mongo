@@ -201,7 +201,9 @@ void canonicalizeExe(std::string& arg0) {
                       "error"_attr = errorMessage(ec));
         return;
     }
-    ScopeGuard freeGuard = [&] { free(absPath); };
+    ScopeGuard freeGuard = [&] {
+        free(absPath);
+    };
     auto orig = std::exchange(arg0, std::string(absPath));
     LOGV2_INFO(7070502, "Canonical executable pathname", "orig"_attr = orig, "arg0"_attr = arg0);
 #else
@@ -256,7 +258,9 @@ void DeathTestBase::Subprocess::run() {
     if ((child = THROWY_LIBC(fork())) != 0) {
         THROWY_LIBC(close(pipes[1]));
         FILE* pf = THROWY_LIBC_IF(fdopen(pipes[0], "r"), [](FILE* f) { return !f; });
-        ScopeGuard pfGuard = [&] { THROWY_LIBC(fclose(pf)); };
+        ScopeGuard pfGuard = [&] {
+            THROWY_LIBC(fclose(pf));
+        };
         monitorChild(pf);
     } else {
         prepareChild(pipes);
@@ -301,11 +305,15 @@ void DeathTestBase::Subprocess::monitorChild(FILE* pf) {
     std::ostringstream os;
 
     LOGV2(5042601, "Death test starting");
-    ScopeGuard alwaysLogExit = [] { LOGV2(5042602, "Death test finishing"); };
+    ScopeGuard alwaysLogExit = [] {
+        LOGV2(5042602, "Death test finishing");
+    };
 
     char* lineBuf = nullptr;
     size_t lineBufSize = 0;
-    ScopeGuard lineBufGuard = [&] { free(lineBuf); };
+    ScopeGuard lineBufGuard = [&] {
+        free(lineBuf);
+    };
     while (true) {
         ssize_t bytesRead = eintrLoop([&] { return getline(&lineBuf, &lineBufSize, pf); });
         if (bytesRead == -1)

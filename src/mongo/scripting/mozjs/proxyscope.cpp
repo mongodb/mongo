@@ -288,7 +288,9 @@ void MozJSProxyScope::run(Closure&& closure) {
 
 template <typename Closure>
 void MozJSProxyScope::runWithoutInterruptionExceptAtGlobalShutdown(Closure&& closure) {
-    auto toRun = [&] { run(std::forward<Closure>(closure)); };
+    auto toRun = [&] {
+        run(std::forward<Closure>(closure));
+    };
 
     if (_opCtx) {
         return _opCtx->runWithoutInterruptionExceptAtGlobalShutdown(toRun);
@@ -310,7 +312,9 @@ void MozJSProxyScope::runOnImplThread(unique_function<void()> f) {
 
     Interruptible* interruptible = _opCtx ? _opCtx : Interruptible::notInterruptible();
 
-    auto pred = [&] { return _state == State::ImplResponse; };
+    auto pred = [&] {
+        return _state == State::ImplResponse;
+    };
 
     try {
         interruptible->waitForConditionOrInterrupt(_proxyCondvar, lk, pred);

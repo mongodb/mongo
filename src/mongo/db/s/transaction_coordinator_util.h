@@ -206,14 +206,14 @@ struct PrepareResponse {
     // Will only be set if the vote was kAbort or no value
     boost::optional<Status> abortReason;
 };
-Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
-                                           txn::AsyncWorkScheduler& scheduler,
-                                           const LogicalSessionId& lsid,
-                                           const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
-                                           const ShardId& shardId,
-                                           const BSONObj& prepareCommandObj,
-                                           OperationContextFn operationContextFn =
-                                               [](OperationContext*) {});
+Future<PrepareResponse> sendPrepareToShard(
+    ServiceContext* service,
+    txn::AsyncWorkScheduler& scheduler,
+    const LogicalSessionId& lsid,
+    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+    const ShardId& shardId,
+    const BSONObj& prepareCommandObj,
+    OperationContextFn operationContextFn = [](OperationContext*) {});
 
 /**
  * Sends a command corresponding to a commit decision (i.e. commitTransaction or*
@@ -226,13 +226,14 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
  * running is shut down. Because of this it can return only the following error code(s):
  *   - TransactionCoordinatorSteppingDown
  */
-Future<void> sendDecisionToShard(ServiceContext* service,
-                                 txn::AsyncWorkScheduler& scheduler,
-                                 const LogicalSessionId& lsid,
-                                 const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
-                                 const ShardId& shardId,
-                                 const BSONObj& commandObj,
-                                 OperationContextFn operationContextFn = [](OperationContext*) {});
+Future<void> sendDecisionToShard(
+    ServiceContext* service,
+    txn::AsyncWorkScheduler& scheduler,
+    const LogicalSessionId& lsid,
+    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+    const ShardId& shardId,
+    const BSONObj& commandObj,
+    OperationContextFn operationContextFn = [](OperationContext*) {});
 
 /**
  * Returns a string representation of the transaction id represented by the given session id and

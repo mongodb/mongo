@@ -76,7 +76,7 @@ auto PeriodicThreadToAbortExpiredTransactions::operator*() const noexcept -> Per
     return *_anchor;
 }
 
-auto PeriodicThreadToAbortExpiredTransactions::operator-> () const noexcept -> PeriodicJobAnchor* {
+auto PeriodicThreadToAbortExpiredTransactions::operator->() const noexcept -> PeriodicJobAnchor* {
     stdx::lock_guard lk(_mutex);
     return _anchor.get();
 }

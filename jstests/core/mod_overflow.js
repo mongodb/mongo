@@ -31,9 +31,9 @@ for (let divisor of [-1.0, NumberInt("-1"), NumberLong("-1"), NumberDecimal("-1"
             insertedDocs[0],
             {modVal: (divisor instanceof NumberDecimal ? NumberDecimal("-0") : NumberLong("0"))}),
         Object.merge(insertedDocs[1], {
-            modVal: (divisor instanceof NumberLong
-                         ? NumberLong("0")
-                         : divisor instanceof NumberDecimal ? NumberDecimal("-0") : 0)
+            modVal: (divisor instanceof NumberLong          ? NumberLong("0")
+                         : divisor instanceof NumberDecimal ? NumberDecimal("-0")
+                                                            : 0)
         })
     ];
     assert.docEq(

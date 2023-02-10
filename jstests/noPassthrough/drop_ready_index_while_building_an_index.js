@@ -41,18 +41,20 @@ IndexBuildTest.waitForIndexBuildToScanCollection(db, collName, "y_1");
 IndexBuildTest.waitForIndexBuildToScanCollection(secondaryDB, collName, "y_1");
 
 IndexBuildTest.assertIndexes(
-    coll, /*numIndexes=*/3, /*readyIndexes=*/["_id_", "x_1"], /*notReadyIndexes=*/["y_1"]);
-IndexBuildTest.assertIndexes(
-    secondaryColl, /*numIndexes=*/3, /*readyIndexes=*/["_id_", "x_1"], /*notReadyIndexes=*/["y_1"]);
+    coll, /*numIndexes=*/ 3, /*readyIndexes=*/["_id_", "x_1"], /*notReadyIndexes=*/["y_1"]);
+IndexBuildTest.assertIndexes(secondaryColl,
+                             /*numIndexes=*/ 3,
+                             /*readyIndexes=*/["_id_", "x_1"],
+                             /*notReadyIndexes=*/["y_1"]);
 
 // Drop the ready index while another index build is in-progress.
 assert.commandWorked(coll.dropIndex("x_1"));
 rst.awaitReplication();
 
 IndexBuildTest.assertIndexes(
-    coll, /*numIndexes=*/2, /*readyIndexes=*/["_id_"], /*notReadyIndexes=*/["y_1"]);
+    coll, /*numIndexes=*/ 2, /*readyIndexes=*/["_id_"], /*notReadyIndexes=*/["y_1"]);
 IndexBuildTest.assertIndexes(
-    secondaryColl, /*numIndexes=*/2, /*readyIndexes=*/["_id_"], /*notReadyIndexes=*/["y_1"]);
+    secondaryColl, /*numIndexes=*/ 2, /*readyIndexes=*/["_id_"], /*notReadyIndexes=*/["y_1"]);
 
 IndexBuildTest.resumeIndexBuilds(primary);
 IndexBuildTest.resumeIndexBuilds(secondary);
@@ -61,9 +63,9 @@ awaitIndexBuild();
 rst.awaitReplication();
 
 IndexBuildTest.assertIndexes(
-    coll, /*numIndexes=*/2, /*readyIndexes=*/["_id_", "y_1"], /*notReadyIndexes=*/[]);
+    coll, /*numIndexes=*/ 2, /*readyIndexes=*/["_id_", "y_1"], /*notReadyIndexes=*/[]);
 IndexBuildTest.assertIndexes(
-    secondaryColl, /*numIndexes=*/2, /*readyIndexes=*/["_id_", "y_1"], /*notReadyIndexes=*/[]);
+    secondaryColl, /*numIndexes=*/ 2, /*readyIndexes=*/["_id_", "y_1"], /*notReadyIndexes=*/[]);
 
 rst.stopSet();
 }());

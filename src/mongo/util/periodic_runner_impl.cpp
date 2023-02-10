@@ -105,7 +105,9 @@ void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
                 _job.job(client.get());
                 lk.lock();
 
-                auto getDeadlineFromInterval = [&] { return start + _job.interval; };
+                auto getDeadlineFromInterval = [&] {
+                    return start + _job.interval;
+                };
 
                 do {
                     auto deadline = getDeadlineFromInterval();

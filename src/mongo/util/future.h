@@ -203,8 +203,8 @@ public:
      *
      * Returns a non-okay status if the interruptible is interrupted.
      */
-    Status waitNoThrow(Interruptible* interruptible = Interruptible::notInterruptible()) const
-        noexcept {
+    Status waitNoThrow(
+        Interruptible* interruptible = Interruptible::notInterruptible()) const noexcept {
         return _impl.waitNoThrow(interruptible);
     }
 
@@ -231,8 +231,7 @@ public:
         return _impl.get(interruptible);
     }
     StatusOrStatusWith<T> getNoThrow(
-        Interruptible* interruptible = Interruptible::notInterruptible()) &&
-        noexcept {
+        Interruptible* interruptible = Interruptible::notInterruptible()) && noexcept {
         return std::move(_impl).getNoThrow(interruptible);
     }
     StatusOrStatusWith<T> getNoThrow(
@@ -284,7 +283,7 @@ private:
         : _impl(std::move(impl)) {}
 
     explicit SemiFuture(Impl&& impl) : _impl(std::move(impl)) {}
-    operator Impl &&() && {
+    operator Impl&&() && {
         return std::move(_impl);
     }
 
@@ -301,7 +300,7 @@ TEMPLATE(typename T)
 REQUIRES(!isStatusOrStatusWith<T> && !future_details::isFutureLike<T>)
 SemiFuture(T)->SemiFuture<T>;
 template <typename T>
-SemiFuture(StatusWith<T>)->SemiFuture<T>;
+SemiFuture(StatusWith<T>) -> SemiFuture<T>;
 
 /**
  * Future<T> is a SemiFuture<T> (which is logically a possibly deferred StatusOrStatusWith<T>),
@@ -612,7 +611,7 @@ TEMPLATE(typename T)
 REQUIRES(!isStatusOrStatusWith<T> && !future_details::isFutureLike<T>)
 Future(T)->Future<T>;
 template <typename T>
-Future(StatusWith<T>)->Future<T>;
+Future(StatusWith<T>) -> Future<T>;
 
 /**
  * An ExecutorFuture is like a Future that ensures that all callbacks are run on a supplied
@@ -700,16 +699,18 @@ public:
 
         // Can't use wrapCB since we don't want to return a future, just schedule a non-chainable
         // callback.
-        std::move(this->_impl).getAsync(policy, [
-            exec = std::move(_exec),  // Unlike wrapCB this can move because we won't need it later.
-            func = std::forward<Func>(func)
-        ](StatusOrStatusWith<T> arg) mutable noexcept {
-            exec->schedule([ func = std::move(func),
-                             arg = std::move(arg) ](Status execStatus) mutable noexcept {
-                if (execStatus.isOK())
-                    func(std::move(arg));
-            });
-        });
+        std::move(this->_impl)
+            .getAsync(
+                policy,
+                [exec = std::move(
+                     _exec),  // Unlike wrapCB this can move because we won't need it later.
+                 func = std::forward<Func>(func)](StatusOrStatusWith<T> arg) mutable noexcept {
+                    exec->schedule([func = std::move(func),
+                                    arg = std::move(arg)](Status execStatus) mutable noexcept {
+                        if (execStatus.isOK())
+                            func(std::move(arg));
+                    });
+                });
     }
 
     TEMPLATE(typename Policy, typename Func)
@@ -851,9 +852,9 @@ TEMPLATE(typename T)
 REQUIRES(!isStatusOrStatusWith<T> && !future_details::isFutureLike<T>)
 ExecutorFuture(ExecutorPtr, T)->ExecutorFuture<T>;
 template <typename T>
-ExecutorFuture(ExecutorPtr, future_details::FutureImpl<T>)->ExecutorFuture<T>;
+ExecutorFuture(ExecutorPtr, future_details::FutureImpl<T>) -> ExecutorFuture<T>;
 template <typename T>
-ExecutorFuture(ExecutorPtr, StatusWith<T>)->ExecutorFuture<T>;
+ExecutorFuture(ExecutorPtr, StatusWith<T>) -> ExecutorFuture<T>;
 ExecutorFuture(ExecutorPtr)->ExecutorFuture<void>;
 
 /** Constructor tag (see the corresponding `Promise` constructor). */
@@ -1094,8 +1095,8 @@ public:
         _shared.wait(interruptible);
     }
 
-    Status waitNoThrow(Interruptible* interruptible = Interruptible::notInterruptible()) const
-        noexcept {
+    Status waitNoThrow(
+        Interruptible* interruptible = Interruptible::notInterruptible()) const noexcept {
         return _shared.waitNoThrow(interruptible);
     }
 
@@ -1170,7 +1171,7 @@ TEMPLATE(typename T)
 REQUIRES(!isStatusOrStatusWith<T> && !future_details::isFutureLike<T>)
 SharedSemiFuture(T)->SharedSemiFuture<T>;
 template <typename T>
-SharedSemiFuture(StatusWith<T>)->SharedSemiFuture<T>;
+SharedSemiFuture(StatusWith<T>) -> SharedSemiFuture<T>;
 
 /**
  * This class represents the producer of SharedSemiFutures.
@@ -1360,23 +1361,24 @@ auto makeReadyFutureWith(Func&& func) -> Future<FutureContinuationResult<Func&&>
 template <typename T>
 template <typename UniqueFunc>
 auto ExecutorFuture<T>::_wrapCBHelper(ExecutorPtr exec, UniqueFunc&& func) {
-    return [ exec = std::move(exec), func = std::move(func) ](auto&&... args) mutable noexcept {
+    return [exec = std::move(exec), func = std::move(func)](auto&&... args) mutable noexcept {
         using FuncR = typename UniqueFunc::result_type;
         using BoundArgs = std::tuple<std::decay_t<decltype(args)>...>;
         Promise<future_details::UnwrappedType<FuncR>> promise{NonNullPromiseTag{}};
         auto future = promise.getFuture();
 
-        exec->schedule([
-            promise = std::move(promise),
-            func = std::move(func),
-            boundArgs = BoundArgs{std::forward<decltype(args)>(args)...}
-        ](Status execStatus) mutable noexcept {
+        exec->schedule([promise = std::move(promise),
+                        func = std::move(func),
+                        boundArgs = BoundArgs{std::forward<decltype(args)>(args)...}](
+                           Status execStatus) mutable noexcept {
             if (!execStatus.isOK()) {
                 promise.setError(std::move(execStatus));
                 return;
             }
             promise.setWith([&] {
-                auto closure = [&] { return std::apply(func, std::move(boundArgs)); };
+                auto closure = [&] {
+                    return std::apply(func, std::move(boundArgs));
+                };
                 if constexpr (future_details::isFutureLike<FuncR>) {
                     // Cheat and convert to an inline Future since we know we will schedule
                     // further user callbacks onto an executor.
@@ -1392,18 +1394,18 @@ auto ExecutorFuture<T>::_wrapCBHelper(ExecutorPtr exec, UniqueFunc&& func) {
 }
 
 template <typename T>
-    ExecutorFuture<T> SemiFuture<T>::thenRunOn(ExecutorPtr exec) && noexcept {
+ExecutorFuture<T> SemiFuture<T>::thenRunOn(ExecutorPtr exec) && noexcept {
     return ExecutorFuture<T>(std::move(exec), std::move(_impl));
 }
 
 template <typename T>
-    Future<T> SemiFuture<T>::unsafeToInlineFuture() && noexcept {
+Future<T> SemiFuture<T>::unsafeToInlineFuture() && noexcept {
     return Future<T>(std::move(_impl));
 }
 
 namespace future_details {
 template <typename T>
-    SharedSemiFuture<FakeVoidToVoid<T>> FutureImpl<T>::share() && noexcept {
+SharedSemiFuture<FakeVoidToVoid<T>> FutureImpl<T>::share() && noexcept {
     invariant(valid());
     using Out = SharedSemiFuture<FakeVoidToVoid<T>>;
     if (_immediate)

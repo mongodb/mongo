@@ -125,7 +125,7 @@ rst.startSet();
 rst.initiate();
 const primary = rst.getPrimary();
 prepareData(primary);
-rst.stopSet(/*signal=*/null, /*forRestart=*/true);
+rst.stopSet(/*signal=*/ null, /*forRestart=*/ true);
 
 const tightMemoryLimits = {
     internalDocumentSourceGroupMaxMemoryBytes: memoryLimitBytes,

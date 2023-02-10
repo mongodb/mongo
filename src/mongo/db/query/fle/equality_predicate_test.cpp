@@ -78,7 +78,9 @@ protected:
                     ASSERT(_tags.find({p.fieldNameStringData(), p.Int()}) != _tags.end());
                     return _tags.find({p.fieldNameStringData(), p.Int()})->second;
                 },
-                [&](std::reference_wrapper<Value> v) { return std::vector<PrfBlock>{}; }},
+                [&](std::reference_wrapper<Value> v) {
+                    return std::vector<PrfBlock>{};
+                }},
             payload);
     }
 

@@ -656,15 +656,15 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
         return std::make_unique<KeysCollectionClientSharded>(catalogClient);
     };
 
-    uassertStatusOK(
-        initializeGlobalShardingState(opCtx,
-                                      std::move(catalogCache),
-                                      std::move(shardRegistry),
-                                      [service] { return makeEgressHooksList(service); },
-                                      // We only need one task executor here because sharding task
-                                      // executors aren't used for user queries in mongod.
-                                      1,
-                                      initKeysClient));
+    uassertStatusOK(initializeGlobalShardingState(
+        opCtx,
+        std::move(catalogCache),
+        std::move(shardRegistry),
+        [service] { return makeEgressHooksList(service); },
+        // We only need one task executor here because sharding task
+        // executors aren't used for user queries in mongod.
+        1,
+        initKeysClient));
 
     auto const replCoord = repl::ReplicationCoordinator::get(service);
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&

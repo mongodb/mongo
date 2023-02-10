@@ -67,9 +67,9 @@ struct KeyConstraints {
 
 template <typename Hasher, typename Comparator, typename T, typename TT>
 inline constexpr bool IsComparableWith =
-    decltype(KeyConstraints<Hasher, Comparator>::IsHashable(std::declval<TT>()))::value&& decltype(
-        KeyConstraints<Hasher, Comparator>::IsComparable(std::declval<T>(),
-                                                         std::declval<TT>()))::value;
+    decltype(KeyConstraints<Hasher, Comparator>::IsHashable(std::declval<TT>()))::
+        value&& decltype(KeyConstraints<Hasher, Comparator>::IsComparable(
+            std::declval<T>(), std::declval<TT>()))::value;
 
 
 template <typename K,

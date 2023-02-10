@@ -410,22 +410,22 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         }
 
         bool docStillMatches;
-        const auto ensureStillMatchesRet =
-            handlePlanStageYield(expCtx(),
-                                 "UpdateStage ensureStillMatches",
-                                 collection()->ns().ns(),
-                                 [&] {
-                                     docStillMatches = write_stage_common::ensureStillMatches(
-                                         collection(), opCtx(), _ws, id, _params.canonicalQuery);
-                                     return PlanStage::NEED_TIME;
-                                 },
-                                 [&] {
-                                     // yieldHandler
-                                     // There was a problem trying to detect if the document still
-                                     // exists, so retry.
-                                     memberFreer.dismiss();
-                                     prepareToRetryWSM(id, out);
-                                 });
+        const auto ensureStillMatchesRet = handlePlanStageYield(
+            expCtx(),
+            "UpdateStage ensureStillMatches",
+            collection()->ns().ns(),
+            [&] {
+                docStillMatches = write_stage_common::ensureStillMatches(
+                    collection(), opCtx(), _ws, id, _params.canonicalQuery);
+                return PlanStage::NEED_TIME;
+            },
+            [&] {
+                // yieldHandler
+                // There was a problem trying to detect if the document still
+                // exists, so retry.
+                memberFreer.dismiss();
+                prepareToRetryWSM(id, out);
+            });
 
         if (ensureStillMatchesRet != PlanStage::NEED_TIME) {
             return ensureStillMatchesRet;
@@ -465,17 +465,18 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         invariant(oldObj.isOwned());
 
         // Save state before making changes.
-        handlePlanStageYield(expCtx(),
-                             "UpdateStage saveState",
-                             collection()->ns().ns(),
-                             [&] {
-                                 child()->saveState();
-                                 return PlanStage::NEED_TIME /* unused */;
-                             },
-                             [&] {
-                                 // yieldHandler
-                                 std::terminate();
-                             });
+        handlePlanStageYield(
+            expCtx(),
+            "UpdateStage saveState",
+            collection()->ns().ns(),
+            [&] {
+                child()->saveState();
+                return PlanStage::NEED_TIME /* unused */;
+            },
+            [&] {
+                // yieldHandler
+                std::terminate();
+            });
         // If we care about the pre-updated version of the doc, save it out here.
         SnapshotId oldSnapshot = member->doc.snapshotId();
 

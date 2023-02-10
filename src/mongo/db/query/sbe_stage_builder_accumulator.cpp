@@ -44,14 +44,14 @@ namespace {
 
 std::unique_ptr<sbe::EExpression> wrapMinMaxArg(std::unique_ptr<sbe::EExpression> arg,
                                                 sbe::value::FrameIdGenerator& frameIdGenerator) {
-    return makeLocalBind(&frameIdGenerator,
-                         [](sbe::EVariable input) {
-                             return sbe::makeE<sbe::EIf>(
-                                 generateNullOrMissing(input),
-                                 makeConstant(sbe::value::TypeTags::Nothing, 0),
-                                 input.clone());
-                         },
-                         std::move(arg));
+    return makeLocalBind(
+        &frameIdGenerator,
+        [](sbe::EVariable input) {
+            return sbe::makeE<sbe::EIf>(generateNullOrMissing(input),
+                                        makeConstant(sbe::value::TypeTags::Nothing, 0),
+                                        input.clone());
+        },
+        std::move(arg));
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorMin(
@@ -189,16 +189,16 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorAvg(
     aggs.push_back(makeFunction("aggDoubleDoubleSum", arg->clone()));
 
     // For the counter we need to skip non-numeric values ourselves.
-    auto addend = makeLocalBind(&frameIdGenerator,
-                                [](sbe::EVariable input) {
-                                    return sbe::makeE<sbe::EIf>(
-                                        makeBinaryOp(sbe::EPrimBinary::logicOr,
+    auto addend = makeLocalBind(
+        &frameIdGenerator,
+        [](sbe::EVariable input) {
+            return sbe::makeE<sbe::EIf>(makeBinaryOp(sbe::EPrimBinary::logicOr,
                                                      generateNullOrMissing(input),
                                                      generateNonNumericCheck(input)),
                                         makeConstant(sbe::value::TypeTags::NumberInt64, 0),
                                         makeConstant(sbe::value::TypeTags::NumberInt64, 1));
-                                },
-                                std::move(arg));
+        },
+        std::move(arg));
     auto counterExpr = makeFunction("sum", std::move(addend));
     aggs.push_back(std::move(counterExpr));
 
@@ -550,20 +550,19 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorMergeObjects(
     sbe::value::FrameIdGenerator& frameIdGenerator) {
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
 
-    auto filterExpr =
-        makeLocalBind(&frameIdGenerator,
-                      [](sbe::EVariable input) {
-                          auto typeCheckExpr =
-                              makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                           generateNullOrMissing(input),
-                                           makeFunction("isObject", input.clone()));
-                          return sbe::makeE<sbe::EIf>(
-                              std::move(typeCheckExpr),
-                              makeFunction("mergeObjects", input.clone()),
-                              sbe::makeE<sbe::EFail>(ErrorCodes::Error{5911200},
-                                                     "$mergeObjects only supports objects"));
-                      },
-                      std::move(arg));
+    auto filterExpr = makeLocalBind(
+        &frameIdGenerator,
+        [](sbe::EVariable input) {
+            auto typeCheckExpr = makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                              generateNullOrMissing(input),
+                                              makeFunction("isObject", input.clone()));
+            return sbe::makeE<sbe::EIf>(
+                std::move(typeCheckExpr),
+                makeFunction("mergeObjects", input.clone()),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5911200},
+                                       "$mergeObjects only supports objects"));
+        },
+        std::move(arg));
 
     aggs.push_back(std::move(filterExpr));
     return aggs;

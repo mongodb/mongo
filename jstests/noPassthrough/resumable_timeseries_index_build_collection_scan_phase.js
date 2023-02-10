@@ -54,7 +54,7 @@ ResumableIndexBuildTest.run(
     bucketColl.getName(),
     [[{"control.min.time": 1}, {"control.max.time": 1}]],
     [{name: "hangIndexBuildDuringCollectionScanPhaseAfterInsertion", logIdWithBuildUUID: 20386}],
-    /*iteration=*/0,
+    /*iteration=*/ 0,
     ["collection scan"],
     [{numScannedAfterResume: 2}]);
 

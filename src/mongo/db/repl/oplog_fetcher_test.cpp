@@ -367,7 +367,9 @@ protected:
 private:
     executor::ThreadPoolMock::Options makeThreadPoolMockOptions() const override {
         executor::ThreadPoolMock::Options options;
-        options.onCreateThread = []() { Client::initThread("OplogFetcherTest"); };
+        options.onCreateThread = []() {
+            Client::initThread("OplogFetcherTest");
+        };
         return options;
     };
 };
@@ -594,7 +596,9 @@ TEST_F(OplogFetcherTest, ShuttingExecutorDownShouldPreventOplogFetcherFromStarti
 
 TEST_F(OplogFetcherTest, OplogFetcherReturnsOperationFailedIfExecutorFailsToScheduleRunQuery) {
     TaskExecutorMock taskExecutorMock(&getExecutor());
-    taskExecutorMock.shouldFailScheduleWorkRequest = []() { return true; };
+    taskExecutorMock.shouldFailScheduleWorkRequest = []() {
+        return true;
+    };
 
     // The onShutdownFn should not be called because the oplog fetcher should fail during startup.
     auto oplogFetcher = makeOplogFetcherWithDifferentExecutor(
@@ -617,7 +621,9 @@ TEST_F(OplogFetcherTest, ShuttingExecutorDownAfterStartupButBeforeRunQuerySchedu
     // Defer scheduling work so that the executor's shutdown happens before startup's work is
     // scheduled.
     TaskExecutorMock taskExecutorMock(&getExecutor());
-    taskExecutorMock.shouldDeferScheduleWorkRequestByOneSecond = []() { return true; };
+    taskExecutorMock.shouldDeferScheduleWorkRequestByOneSecond = []() {
+        return true;
+    };
 
     auto oplogFetcher =
         makeOplogFetcherWithDifferentExecutor(&taskExecutorMock, std::ref(shutdownState));
@@ -640,7 +646,9 @@ TEST_F(OplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownBeforeRunQ
     // Defer scheduling work so that the oplog fetcher's shutdown happens before startup's work is
     // scheduled.
     TaskExecutorMock taskExecutorMock(&getExecutor());
-    taskExecutorMock.shouldDeferScheduleWorkRequestByOneSecond = []() { return true; };
+    taskExecutorMock.shouldDeferScheduleWorkRequestByOneSecond = []() {
+        return true;
+    };
 
     auto oplogFetcher =
         makeOplogFetcherWithDifferentExecutor(&taskExecutorMock, std::ref(shutdownState));

@@ -116,7 +116,9 @@ public:
 
     bool onTransactionPrepareThrowsException = false;
     bool transactionPrepared = false;
-    std::function<void()> onTransactionPrepareFn = [this]() { transactionPrepared = true; };
+    std::function<void()> onTransactionPrepareFn = [this]() {
+        transactionPrepared = true;
+    };
 
     void onUnpreparedTransactionCommit(
         OperationContext* opCtx, const TransactionOperations& transactionOperations) override {

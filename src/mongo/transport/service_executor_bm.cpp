@@ -144,7 +144,9 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::Sta
         unittest::Barrier startingLine{2};
     };
     LoopState* loopStatePtr = nullptr;
-    std::function<void(Status)> chainedTask = [&](Status) { loopStatePtr->done.set(); };
+    std::function<void(Status)> chainedTask = [&](Status) {
+        loopStatePtr->done.set();
+    };
     for (int step = 0; step != chainDepth; ++step)
         chainedTask = [this, chainedTask, &loopStatePtr](Status) {
             runOnExec(&*loopStatePtr->runner, chainedTask);

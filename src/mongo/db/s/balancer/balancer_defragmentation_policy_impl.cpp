@@ -274,72 +274,73 @@ public:
         if (_aborted) {
             return;
         }
-        stdx::visit(
-            OverloadedVisitor{
-                [&](const MergeInfo& mergeAction) {
-                    auto& mergeResponse = stdx::get<Status>(response);
-                    auto& shardingPendingActions = _pendingActionsByShards[mergeAction.shardId];
-                    handleActionResult(
-                        opCtx,
-                        _nss,
-                        _uuid,
-                        getType(),
-                        mergeResponse,
-                        [&]() {
-                            shardingPendingActions.rangesWithoutDataSize.emplace_back(
-                                mergeAction.chunkRange);
-                        },
-                        [&]() {
-                            shardingPendingActions.rangesToMerge.emplace_back(
-                                mergeAction.chunkRange);
-                        },
-                        [&]() { _abort(getType()); });
-                },
-                [&](const DataSizeInfo& dataSizeAction) {
-                    auto& dataSizeResponse = stdx::get<StatusWith<DataSizeResponse>>(response);
-                    handleActionResult(
-                        opCtx,
-                        _nss,
-                        _uuid,
-                        getType(),
-                        dataSizeResponse.getStatus(),
-                        [&]() {
-                            ChunkType chunk(dataSizeAction.uuid,
-                                            dataSizeAction.chunkRange,
-                                            dataSizeAction.version.placementVersion(),
-                                            dataSizeAction.shardId);
-                            auto catalogManager = ShardingCatalogManager::get(opCtx);
-                            // Max out the chunk size if it has has been estimated as bigger
-                            // than _smallChunkSizeThresholdBytes; this will exlude the
-                            // chunk from the list of candidates considered by
-                            // MoveAndMergeChunksPhase
-                            auto estimatedSize = dataSizeResponse.getValue().maxSizeReached
-                                ? kBigChunkMarker
-                                : dataSizeResponse.getValue().sizeBytes;
-                            catalogManager->setChunkEstimatedSize(
-                                opCtx,
-                                chunk,
-                                estimatedSize,
-                                ShardingCatalogClient::kMajorityWriteConcern);
-                        },
-                        [&]() {
+        stdx::visit(OverloadedVisitor{
+                        [&](const MergeInfo& mergeAction) {
+                            auto& mergeResponse = stdx::get<Status>(response);
                             auto& shardingPendingActions =
-                                _pendingActionsByShards[dataSizeAction.shardId];
-                            shardingPendingActions.rangesWithoutDataSize.emplace_back(
-                                dataSizeAction.chunkRange);
+                                _pendingActionsByShards[mergeAction.shardId];
+                            handleActionResult(
+                                opCtx,
+                                _nss,
+                                _uuid,
+                                getType(),
+                                mergeResponse,
+                                [&]() {
+                                    shardingPendingActions.rangesWithoutDataSize.emplace_back(
+                                        mergeAction.chunkRange);
+                                },
+                                [&]() {
+                                    shardingPendingActions.rangesToMerge.emplace_back(
+                                        mergeAction.chunkRange);
+                                },
+                                [&]() { _abort(getType()); });
                         },
-                        [&]() { _abort(getType()); });
-                },
-                [&](const AutoSplitVectorInfo& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                },
-                [&](const SplitInfoWithKeyPattern& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                },
-                [&](const MigrateInfo& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                }},
-            action);
+                        [&](const DataSizeInfo& dataSizeAction) {
+                            auto& dataSizeResponse =
+                                stdx::get<StatusWith<DataSizeResponse>>(response);
+                            handleActionResult(
+                                opCtx,
+                                _nss,
+                                _uuid,
+                                getType(),
+                                dataSizeResponse.getStatus(),
+                                [&]() {
+                                    ChunkType chunk(dataSizeAction.uuid,
+                                                    dataSizeAction.chunkRange,
+                                                    dataSizeAction.version.placementVersion(),
+                                                    dataSizeAction.shardId);
+                                    auto catalogManager = ShardingCatalogManager::get(opCtx);
+                                    // Max out the chunk size if it has has been estimated as bigger
+                                    // than _smallChunkSizeThresholdBytes; this will exlude the
+                                    // chunk from the list of candidates considered by
+                                    // MoveAndMergeChunksPhase
+                                    auto estimatedSize = dataSizeResponse.getValue().maxSizeReached
+                                        ? kBigChunkMarker
+                                        : dataSizeResponse.getValue().sizeBytes;
+                                    catalogManager->setChunkEstimatedSize(
+                                        opCtx,
+                                        chunk,
+                                        estimatedSize,
+                                        ShardingCatalogClient::kMajorityWriteConcern);
+                                },
+                                [&]() {
+                                    auto& shardingPendingActions =
+                                        _pendingActionsByShards[dataSizeAction.shardId];
+                                    shardingPendingActions.rangesWithoutDataSize.emplace_back(
+                                        dataSizeAction.chunkRange);
+                                },
+                                [&]() { _abort(getType()); });
+                        },
+                        [&](const AutoSplitVectorInfo& _) {
+                            uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                        },
+                        [&](const SplitInfoWithKeyPattern& _) {
+                            uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                        },
+                        [&](const MigrateInfo& _) {
+                            uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                        }},
+                    action);
     }
 
     bool isComplete() const override {
@@ -1133,12 +1134,15 @@ public:
         stdx::visit(
             OverloadedVisitor{[&](const MergeInfo& mergeAction) {
                                   auto& mergeResponse = stdx::get<Status>(response);
-                                  auto onSuccess = [] {};
+                                  auto onSuccess = [] {
+                                  };
                                   auto onRetriableError = [&] {
                                       _unmergedRangesByShard[mergeAction.shardId].emplace_back(
                                           mergeAction.chunkRange);
                                   };
-                                  auto onNonretriableError = [this] { _abort(getType()); };
+                                  auto onNonretriableError = [this] {
+                                      _abort(getType());
+                                  };
                                   handleActionResult(opCtx,
                                                      _nss,
                                                      _uuid,

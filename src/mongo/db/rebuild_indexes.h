@@ -49,9 +49,11 @@ typedef std::pair<std::vector<std::string>, std::vector<BSONObj>> IndexNameObjs;
  * @param filter is a predicate that is passed in an index name, returning true if the index
  *               should be included in the result.
  */
-StatusWith<IndexNameObjs> getIndexNameObjs(const CollectionPtr& collection,
-                                           std::function<bool(const std::string&)> filter =
-                                               [](const std::string& indexName) { return true; });
+StatusWith<IndexNameObjs> getIndexNameObjs(
+    const CollectionPtr& collection,
+    std::function<bool(const std::string&)> filter = [](const std::string& indexName) {
+        return true;
+    });
 
 /**
  * Rebuilds the indexes provided by the 'indexSpecs' on the given collection.

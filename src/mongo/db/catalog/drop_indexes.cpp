@@ -416,7 +416,9 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
                                                 [](const std::vector<std::string>& arg) {
                                                     return boost::algorithm::join(arg, ",");
                                                 },
-                                                [](const BSONObj& arg) { return arg.toString(); }},
+                                                [](const BSONObj& arg) {
+                                                    return arg.toString();
+                                                }},
                               index));
     }
 

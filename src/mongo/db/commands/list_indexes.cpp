@@ -113,9 +113,9 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
     bool buildUUID = cmd.getIncludeBuildUUIDs().value_or(false);
     bool indexBuildInfo = cmd.getIncludeIndexBuildInfo().value_or(false);
     invariant(!(buildUUID && indexBuildInfo));
-    ListIndexesInclude additionalInclude = buildUUID
-        ? ListIndexesInclude::BuildUUID
-        : indexBuildInfo ? ListIndexesInclude::IndexBuildInfo : ListIndexesInclude::Nothing;
+    ListIndexesInclude additionalInclude = buildUUID ? ListIndexesInclude::BuildUUID
+        : indexBuildInfo                             ? ListIndexesInclude::IndexBuildInfo
+                                                     : ListIndexesInclude::Nothing;
 
     // Since time-series collections don't have UUIDs, we skip the time-series lookup
     // if the target collection is specified as a UUID.

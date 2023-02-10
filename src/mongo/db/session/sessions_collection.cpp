@@ -97,7 +97,9 @@ void runBulkGeneric(TFactory makeT, AddLineFn addLine, SendFn sendBatch, const C
         thing.emplace(makeT());
     };
 
-    auto sendLocalBatch = [&] { sendBatch(thing.value()); };
+    auto sendLocalBatch = [&] {
+        sendBatch(thing.value());
+    };
 
     setupBatch();
 
@@ -225,7 +227,9 @@ void SessionsCollection::_doRemove(const NamespaceString& ns,
 
 LogicalSessionIdSet SessionsCollection::_doFindRemoved(
     const NamespaceString& ns, const std::vector<LogicalSessionId>& sessions, FindBatchFn send) {
-    auto makeT = [] { return std::vector<LogicalSessionId>{}; };
+    auto makeT = [] {
+        return std::vector<LogicalSessionId>{};
+    };
 
     auto add = [](std::vector<LogicalSessionId>& batch, const LogicalSessionId& record) {
         batch.push_back(record);

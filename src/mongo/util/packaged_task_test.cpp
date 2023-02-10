@@ -67,7 +67,9 @@ TEST(PackagedTaskTest, LambdaTaskMultipleArgs) {
 }
 
 TEST(PackagedTaskTest, UniqueFunctionTaskNoArgs) {
-    unique_function<BSONObj()> fn = [] { return BSON("x" << 42); };
+    unique_function<BSONObj()> fn = [] {
+        return BSON("x" << 42);
+    };
     auto packagedGetBSON = PackagedTask(std::move(fn));
     auto bsonFut = packagedGetBSON.getFuture();
     ASSERT_FALSE(bsonFut.isReady());

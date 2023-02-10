@@ -47,8 +47,12 @@ void MockSessionsCollectionImpl::setRemoveHook(RemoveHook hook) {
 }
 
 void MockSessionsCollectionImpl::clearHooks() {
-    _refresh = [=](const LogicalSessionRecordSet& sessions) { _refreshSessions(sessions); };
-    _remove = [=](const LogicalSessionIdSet& sessions) { _removeRecords(sessions); };
+    _refresh = [=](const LogicalSessionRecordSet& sessions) {
+        _refreshSessions(sessions);
+    };
+    _remove = [=](const LogicalSessionIdSet& sessions) {
+        _removeRecords(sessions);
+    };
 }
 
 void MockSessionsCollectionImpl::refreshSessions(const LogicalSessionRecordSet& sessions) {

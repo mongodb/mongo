@@ -50,11 +50,11 @@ template <typename F>
 class [[nodiscard]] ScopeGuard {
 public:
     template <typename FuncArg>
-    ScopeGuard(FuncArg && f) : _func(std::forward<FuncArg>(f)) {}
+    ScopeGuard(FuncArg&& f) : _func(std::forward<FuncArg>(f)) {}
 
     // Remove all move and copy, MCE (mandatory copy elision) covers us here.
     ScopeGuard(const ScopeGuard&) = delete;
-    ScopeGuard(ScopeGuard &&) = delete;
+    ScopeGuard(ScopeGuard&&) = delete;
     ScopeGuard& operator=(const ScopeGuard&) = delete;
     ScopeGuard& operator=(ScopeGuard&&) = delete;
 
@@ -74,7 +74,7 @@ private:
 };
 
 template <typename F>
-ScopeGuard(F &&)->ScopeGuard<std::decay_t<F>>;
+ScopeGuard(F&&) -> ScopeGuard<std::decay_t<F>>;
 
 }  // namespace mongo
 

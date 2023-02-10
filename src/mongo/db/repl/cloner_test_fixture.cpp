@@ -65,7 +65,9 @@ void ClonerTestFixture::setUp() {
     ThreadPool::Options options;
     options.minThreads = 1U;
     options.maxThreads = 1U;
-    options.onCreateThread = [](StringData threadName) { Client::initThread(threadName); };
+    options.onCreateThread = [](StringData threadName) {
+        Client::initThread(threadName);
+    };
     _dbWorkThreadPool = std::make_unique<ThreadPool>(options);
     _dbWorkThreadPool->startup();
     _source = HostAndPort{"local:1234"};

@@ -86,7 +86,9 @@ TEST(Builder, StackAllocatorShouldNotLeak) {
 
 template <typename T>
 void testStringBuilderIntegral() {
-    auto check = [](T num) { ASSERT_EQ(std::string(str::stream() << num), std::to_string(num)); };
+    auto check = [](T num) {
+        ASSERT_EQ(std::string(str::stream() << num), std::to_string(num));
+    };
 
     // Do some simple sanity checks.
     check(0);

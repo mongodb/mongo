@@ -39,7 +39,9 @@ WriteBatch::WriteBatch(const BucketHandle& b, OperationId o, ExecutionStatsContr
     : bucketHandle{b}, opId(o), stats(s) {}
 
 BSONObj WriteBatch::toBSON() const {
-    auto toFieldName = [](const auto& nameHashPair) { return nameHashPair.first; };
+    auto toFieldName = [](const auto& nameHashPair) {
+        return nameHashPair.first;
+    };
     return BSON("docs" << std::vector<BSONObj>(measurements.begin(), measurements.end())
                        << "bucketMin" << min << "bucketMax" << max << "numCommittedMeasurements"
                        << int(numPreviouslyCommittedMeasurements) << "newFieldNamesToBeInserted"

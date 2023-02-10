@@ -114,8 +114,8 @@ using call_prepare_t =
     decltype(std::declval<D>().prepare(std::declval<T&>(), std::declval<Args>()...));
 
 template <typename N, typename D, typename T, typename... Args>
-using call_prepare_slot_t = decltype(
-    std::declval<D>().prepare(std::declval<N&>(), std::declval<T&>(), std::declval<Args>()...));
+using call_prepare_slot_t = decltype(std::declval<D>().prepare(
+    std::declval<N&>(), std::declval<T&>(), std::declval<Args>()...));
 
 template <typename Void, template <class...> class Op, class... Args>
 struct has_prepare : std::false_type {};

@@ -117,7 +117,9 @@ public:
         std::function<std::unique_ptr<FunctorClonable>(const FunctorClonable&)>;
 
     static CloningFunctionType getCloningFunction() {
-        return [](const FunctorClonable& c) { return std::make_unique<FunctorClonable>(c); };
+        return [](const FunctorClonable& c) {
+            return std::make_unique<FunctorClonable>(c);
+        };
     }
 };
 
@@ -281,7 +283,8 @@ void construction() {
 
     // Test unique pointer construction (conversion)
     {
-        auto acceptor = [](const mongo::clonable_ptr<Clonable>&) {};
+        auto acceptor = [](const mongo::clonable_ptr<Clonable>&) {
+        };
         acceptor(std::make_unique<Clonable>());
     }
 

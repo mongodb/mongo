@@ -52,8 +52,9 @@ using MetricsPtr = std::unique_ptr<Metrics>;
 const auto getMetrics = ServiceContext::declareDecoration<MetricsPtr>();
 
 const auto metricsRegisterer = ServiceContext::ConstructorActionRegisterer{
-    "ShardingDataTransformMetrics",
-    [](ServiceContext* ctx) { getMetrics(ctx) = std::make_unique<Metrics>(); }};
+    "ShardingDataTransformMetrics", [](ServiceContext* ctx) {
+        getMetrics(ctx) = std::make_unique<Metrics>();
+    }};
 }  // namespace
 
 ShardingDataTransformCumulativeMetrics* ShardingDataTransformCumulativeMetrics::getForResharding(

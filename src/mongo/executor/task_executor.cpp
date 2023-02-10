@@ -293,11 +293,12 @@ StatusWith<TaskExecutor::CallbackHandle> TaskExecutor::scheduleRemoteCommand(
     const RemoteCommandRequest& request,
     const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
-    return scheduleRemoteCommandOnAny(request,
-                                      [cb](const RemoteCommandOnAnyCallbackArgs& args) {
-                                          cb({args, 0});
-                                      },
-                                      baton);
+    return scheduleRemoteCommandOnAny(
+        request,
+        [cb](const RemoteCommandOnAnyCallbackArgs& args) {
+            cb({args, 0});
+        },
+        baton);
 }
 
 ExecutorFuture<TaskExecutor::ResponseStatus> TaskExecutor::scheduleRemoteCommand(
@@ -330,11 +331,12 @@ StatusWith<TaskExecutor::CallbackHandle> TaskExecutor::scheduleExhaustRemoteComm
     const RemoteCommandRequest& request,
     const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
-    return scheduleExhaustRemoteCommandOnAny(request,
-                                             [cb](const RemoteCommandOnAnyCallbackArgs& args) {
-                                                 cb({args, 0});
-                                             },
-                                             baton);
+    return scheduleExhaustRemoteCommandOnAny(
+        request,
+        [cb](const RemoteCommandOnAnyCallbackArgs& args) {
+            cb({args, 0});
+        },
+        baton);
 }
 
 ExecutorFuture<TaskExecutor::ResponseStatus> TaskExecutor::scheduleExhaustRemoteCommand(

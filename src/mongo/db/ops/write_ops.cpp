@@ -370,7 +370,9 @@ int UpdateModification::objsize() const {
                 return size + kWriteCommandBSONArrayPerElementOverheadBytes;
             },
             [](const DeltaUpdate& delta) -> int { return delta.diff.objsize(); },
-            [](const TransformUpdate& transform) -> int { return 0; }},
+            [](const TransformUpdate& transform) -> int {
+                return 0;
+            }},
         _update);
 }
 
@@ -380,7 +382,9 @@ UpdateModification::Type UpdateModification::type() const {
                           [](const ModifierUpdate& modifier) { return Type::kModifier; },
                           [](const PipelineUpdate& pipelineUpdate) { return Type::kPipeline; },
                           [](const DeltaUpdate& delta) { return Type::kDelta; },
-                          [](const TransformUpdate& transform) { return Type::kTransform; }},
+                          [](const TransformUpdate& transform) {
+                              return Type::kTransform;
+                          }},
         _update);
 }
 
@@ -390,23 +394,23 @@ UpdateModification::Type UpdateModification::type() const {
  */
 void UpdateModification::serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
 
-    stdx::visit(OverloadedVisitor{[fieldName, bob](const ReplacementUpdate& replacement) {
-                                      *bob << fieldName << replacement.bson;
-                                  },
-                                  [fieldName, bob](const ModifierUpdate& modifier) {
-                                      *bob << fieldName << modifier.bson;
-                                  },
-                                  [fieldName, bob](const PipelineUpdate& pipeline) {
-                                      BSONArrayBuilder arrayBuilder(bob->subarrayStart(fieldName));
-                                      for (auto&& stage : pipeline) {
-                                          arrayBuilder << stage;
-                                      }
-                                      arrayBuilder.doneFast();
-                                  },
-                                  [fieldName, bob](const DeltaUpdate& delta) {
-                                      *bob << fieldName << delta.diff;
-                                  },
-                                  [](const TransformUpdate& transform) {}},
+    stdx::visit(OverloadedVisitor{
+                    [fieldName, bob](const ReplacementUpdate& replacement) {
+                        *bob << fieldName << replacement.bson;
+                    },
+                    [fieldName, bob](const ModifierUpdate& modifier) {
+                        *bob << fieldName << modifier.bson;
+                    },
+                    [fieldName, bob](const PipelineUpdate& pipeline) {
+                        BSONArrayBuilder arrayBuilder(bob->subarrayStart(fieldName));
+                        for (auto&& stage : pipeline) {
+                            arrayBuilder << stage;
+                        }
+                        arrayBuilder.doneFast();
+                    },
+                    [fieldName, bob](const DeltaUpdate& delta) { *bob << fieldName << delta.diff; },
+                    [](const TransformUpdate& transform) {
+                    }},
                 _update);
 }
 

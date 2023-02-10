@@ -55,7 +55,7 @@ TimeseriesTest.run(() => {
         for (const index of userIndexes) {
             if (index.name === indexName) {
                 sawIndex = true;
-                checkIndexSpec(index, /*userIndex=*/true, shouldHaveOriginalSpec);
+                checkIndexSpec(index, /*userIndex=*/ true, shouldHaveOriginalSpec);
             }
         }
 
@@ -63,7 +63,7 @@ TimeseriesTest.run(() => {
         for (const index of bucketIndexes) {
             if (index.name === indexName) {
                 sawIndex = true;
-                checkIndexSpec(index, /*userIndex=*/false, shouldHaveOriginalSpec);
+                checkIndexSpec(index, /*userIndex=*/ false, shouldHaveOriginalSpec);
             }
         }
 
@@ -74,35 +74,35 @@ TimeseriesTest.run(() => {
     };
 
     assert.commandWorked(coll.createIndex({[timeFieldName]: 1}, {name: "timefield_downgradable"}));
-    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/false, "timefield_downgradable");
+    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ false, "timefield_downgradable");
 
     assert.commandWorked(coll.createIndex({[metaFieldName]: 1}, {name: "metafield_downgradable"}));
-    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/false, "metafield_downgradable");
+    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ false, "metafield_downgradable");
 
     assert.commandWorked(coll.createIndex({[timeFieldName]: 1, [metaFieldName]: 1},
                                           {name: "time_meta_field_downgradable"}));
-    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/false, "time_meta_field_downgradable");
+    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ false, "time_meta_field_downgradable");
 
     if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
         assert.commandWorked(coll.createIndex({x: 1}, {name: "x_1"}));
-        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/true, "x_1");
+        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "x_1");
 
         assert.commandWorked(
             coll.createIndex({x: 1}, {name: "x_partial", partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/true, "x_partial");
+        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "x_partial");
 
         assert.commandWorked(coll.createIndex(
             {[timeFieldName]: 1}, {name: "time_partial", partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/true, "time_partial");
+        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "time_partial");
 
         assert.commandWorked(coll.createIndex(
             {[metaFieldName]: 1}, {name: "meta_partial", partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/true, "meta_partial");
+        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "meta_partial");
 
         assert.commandWorked(
             coll.createIndex({[metaFieldName]: 1, x: 1},
                              {name: "meta_x_partial", partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/true, "meta_x_partial");
+        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "meta_x_partial");
     }
 
     // Creating an index directly on the buckets collection is permitted. However, these types of

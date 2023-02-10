@@ -154,7 +154,9 @@ void NetworkInterfaceMock::cancelCommand(const CallbackHandle& cbHandle, const B
 void NetworkInterfaceMock::_interruptWithResponse_inlock(const CallbackHandle& cbHandle,
                                                          const ResponseStatus& response) {
 
-    auto matchFn = [&cbHandle](const auto& ops) { return ops.isForCallback(cbHandle); };
+    auto matchFn = [&cbHandle](const auto& ops) {
+        return ops.isForCallback(cbHandle);
+    };
     auto noi = std::find_if(_operations.begin(), _operations.end(), matchFn);
 
     // We've effectively observed the NetworkOperation.

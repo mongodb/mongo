@@ -139,7 +139,9 @@ TEST(ExtractBSON, ExtractIntegerField) {
     ASSERT_EQUALS(-(1LL << 55), v);
     ASSERT_OK(bsonExtractIntegerField(BSON("a" << 5178), "a", &v));
     ASSERT_EQUALS(5178, v);
-    auto pred = [](long long x) { return x > 0; };
+    auto pred = [](long long x) {
+        return x > 0;
+    };
     ASSERT_OK(bsonExtractIntegerFieldWithDefaultIf(BSON("a" << 1), "a", -1LL, pred, &v));
     ASSERT_OK(bsonExtractIntegerFieldWithDefaultIf(BSON("a" << 1), "b", 1LL, pred, &v));
     auto msg = "'a' has to be greater than zero";

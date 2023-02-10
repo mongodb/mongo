@@ -80,7 +80,7 @@ template <typename...>
 struct FastTuple;
 
 template <typename... Ts>
-FastTuple(Ts...)->FastTuple<Ts...>;
+FastTuple(Ts...) -> FastTuple<Ts...>;
 
 template <typename A, typename B, typename C>
 struct FastTuple<A, B, C> {

@@ -58,7 +58,7 @@ assert.commandWorked(secondary.adminCommand({fsync: 1}));
 jsTest.log("Checkpoints taken. Stopping replica set to restart individual nodes in standalone.");
 
 TestData.skipCheckDBHashes = true;
-rst.stopSet(/*signal=*/null, /*forRestart=*/true);
+rst.stopSet(/*signal=*/ null, /*forRestart=*/ true);
 TestData.skipCheckDBHashes = false;
 
 function restartStandalone(node) {

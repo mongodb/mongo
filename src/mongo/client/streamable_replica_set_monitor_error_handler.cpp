@@ -58,8 +58,12 @@ SdamErrorHandler::ErrorActions SdamErrorHandler::computeErrorActions(const HostA
     const auto setCreateServerDescriptionAction = [this, &result, &host, &status, bson]() {
         result.helloOutcome = _createErrorHelloOutcome(host, bson, status);
     };
-    const auto setImmediateCheckAction = [&result]() { result.requestImmediateCheck = true; };
-    const auto setDropConnectionsAction = [&result]() { result.dropConnections = true; };
+    const auto setImmediateCheckAction = [&result]() {
+        result.requestImmediateCheck = true;
+    };
+    const auto setDropConnectionsAction = [&result]() {
+        result.dropConnections = true;
+    };
 
     if (!_isNetworkError(status) && !_isNotMasterOrNodeRecovering(status)) {
         setCreateServerDescriptionAction();

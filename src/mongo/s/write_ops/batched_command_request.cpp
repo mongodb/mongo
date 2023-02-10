@@ -139,7 +139,9 @@ void BatchedCommandRequest::unsetLegacyRuntimeConstants() {
     _visit(OverloadedVisitor{
         [](write_ops::InsertCommandRequest&) {},
         [&](write_ops::UpdateCommandRequest& op) { op.setLegacyRuntimeConstants(boost::none); },
-        [&](write_ops::DeleteCommandRequest& op) { op.setLegacyRuntimeConstants(boost::none); }});
+        [&](write_ops::DeleteCommandRequest& op) {
+            op.setLegacyRuntimeConstants(boost::none);
+        }});
 }
 
 const boost::optional<LegacyRuntimeConstants>& BatchedCommandRequest::getLegacyRuntimeConstants()

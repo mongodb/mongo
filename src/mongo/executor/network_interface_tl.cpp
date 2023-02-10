@@ -1002,7 +1002,7 @@ void NetworkInterfaceTL::RequestState::resolve(Future<RemoteCommandResponse> fut
 
     std::move(anyFuture)                                    //
         .thenRunOn(makeGuaranteedExecutor(baton, reactor))  // Switch to the baton/reactor.
-        .getAsync([ this, anchor = shared_from_this() ](auto swr) noexcept {
+        .getAsync([this, anchor = shared_from_this()](auto swr) noexcept {
             auto response = uassertStatusOK(swr);
             auto status = response.status;
 

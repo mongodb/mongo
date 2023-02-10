@@ -56,18 +56,18 @@ assert.between(expectedSpilledRanges,
                indexBulkBuilderSection.spilledRanges,
                1 + expectedSpilledRanges,
                tojson(indexBulkBuilderSection),
-               /*inclusive=*/true);
+               /*inclusive=*/ true);
 assert.between(0,
                indexBulkBuilderSection.bytesSpilled,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection),
-               /*inclusive=*/true);
+               /*inclusive=*/ true);
 // We write out a single byte for every spilled doc, which is included in the uncompressed size.
 assert.between(0,
                indexBulkBuilderSection.bytesSpilledUncompressed,
                approxMemoryUsage + spillOverhead,
                tojson(indexBulkBuilderSection),
-               /*inclusive=*/true);
+               /*inclusive=*/ true);
 assert.eq(indexBulkBuilderSection.numSorted, numDocs, tojson(indexBulkBuilderSection));
 // Expect total bytes sorted to be greater than approxMemoryUsage because of the additional field in
 // the documents inserted which accounts for more bytes than in the rough calculation.
@@ -76,7 +76,7 @@ assert.between(0,
                indexBulkBuilderSection.memUsage,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection),
-               /*inclusive=*/true);
+               /*inclusive=*/ true);
 
 (function resumeIndexBuild() {
     jsTestLog(
@@ -85,14 +85,14 @@ assert.between(0,
     const createIdx = IndexBuildTest.startIndexBuild(primary,
                                                      coll.getFullName(),
                                                      {b: 1},
-                                                     /*options=*/{},
+                                                     /*options=*/ {},
                                                      [ErrorCodes.InterruptedDueToReplStateChange]);
     IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'b_1');
     const buildUUID = extractUUIDFromObject(
         IndexBuildTest
             .assertIndexes(coll, 3, ['_id_', 'a_1'], ['b_1'], {includeBuildUUIDs: true})['b_1']
             .buildUUID);
-    replSet.restart(/*nodeId=*/0);
+    replSet.restart(/*nodeId=*/ 0);
     createIdx();
     primary = replSet.getPrimary();
     testDB = primary.getDB('test');
@@ -112,14 +112,14 @@ assert.between(0,
                indexBulkBuilderSection.bytesSpilled,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection),
-               /*inclusive=*/true);
+               /*inclusive=*/ true);
 assert.between(0,
                indexBulkBuilderSection.bytesSpilledUncompressed,
                // We write out some extra data for every spilled doc, which is included in the
                // uncompressed size.
                approxMemoryUsage + spillOverhead,
                tojson(indexBulkBuilderSection),
-               /*inclusive=*/true);
+               /*inclusive=*/ true);
 assert.eq(indexBulkBuilderSection.numSorted, 0, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.bytesSorted, 0, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.memUsage, 0, tojson(indexBulkBuilderSection));
@@ -154,19 +154,19 @@ assert.between(expectedSpilledRanges,
                indexBulkBuilderSection.spilledRanges,
                1 + expectedSpilledRanges,
                tojson(indexBulkBuilderSection),
-               /*inclusive=*/true);
+               /*inclusive=*/ true);
 assert.between(0,
                indexBulkBuilderSection.bytesSpilled,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection),
-               /*inclusive=*/true);
+               /*inclusive=*/ true);
 assert.between(0,
                indexBulkBuilderSection.bytesSpilledUncompressed,
                // We write out some extra data for every spilled doc, which is included in the
                // uncompressed size.
                approxMemoryUsage + spillOverhead,
                tojson(indexBulkBuilderSection),
-               /*inclusive=*/true);
+               /*inclusive=*/ true);
 // Expect at least all documents in the collection are sorted for three indexes but there may also
 // be internal indexes with additional sorts.
 assert.gte(indexBulkBuilderSection.numSorted, numDocs * 3, tojson(indexBulkBuilderSection));
@@ -179,7 +179,7 @@ assert.between(0,
                indexBulkBuilderSection.memUsage,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection),
-               /*inclusive=*/true);
+               /*inclusive=*/ true);
 
 // Building multiple indexes in a single createIndex command increases count by the number of
 // indexes requested.
@@ -199,19 +199,19 @@ assert.between(expectedSpilledRanges,
                indexBulkBuilderSection.spilledRanges,
                1 + expectedSpilledRanges,
                tojson(indexBulkBuilderSection),
-               /*inclusive=*/true);
+               /*inclusive=*/ true);
 assert.between(0,
                indexBulkBuilderSection.bytesSpilled,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection),
-               /*inclusive=*/true);
+               /*inclusive=*/ true);
 assert.between(0,
                indexBulkBuilderSection.bytesSpilledUncompressed,
                // We write out some extra data for every spilled doc, which is included in the
                // uncompressed size.
                approxMemoryUsage + spillOverhead,
                tojson(indexBulkBuilderSection),
-               /*inclusive=*/true);
+               /*inclusive=*/ true);
 assert.eq(indexBulkBuilderSection.numSorted, numDocs * 3, tojson(indexBulkBuilderSection));
 // We are sorting on index keys and keystring sizes are encoded to its necessary bytes so we are
 // approximating that _id and b will be at least 3 bytes each to account for the integer value, the
@@ -222,7 +222,7 @@ assert.between(0,
                indexBulkBuilderSection.memUsage,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection),
-               /*inclusive=*/true);
+               /*inclusive=*/ true);
 
 replSet.stopSet();
 })();

@@ -367,9 +367,15 @@ private:
 template <typename Fn, typename AuthFn>
 using CmdT = MyCommand<typename std::decay<Fn>::type, typename std::decay<AuthFn>::type>;
 
-auto throwFn = [] { uasserted(ErrorCodes::UnknownError, "some error"); };
-auto authSuccessFn = [] { return; };
-auto authFailFn = [] { uasserted(ErrorCodes::Unauthorized, "Not authorized"); };
+auto throwFn = [] {
+    uasserted(ErrorCodes::UnknownError, "some error");
+};
+auto authSuccessFn = [] {
+    return;
+};
+auto authFailFn = [] {
+    uasserted(ErrorCodes::Unauthorized, "Not authorized");
+};
 
 ExampleIncrementCommand exampleIncrementCommand;
 ExampleMinimalCommand exampleMinimalCommand;

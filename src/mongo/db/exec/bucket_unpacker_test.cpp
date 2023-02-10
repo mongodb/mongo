@@ -569,11 +569,12 @@ TEST_F(BucketUnpackerTest, GetNextHandlesMissingMetaInBucket) {
 TEST_F(BucketUnpackerTest, EmptyDataRegionInBucketIsTolerated) {
     std::set<std::string> fields{};
 
-    auto bucket = Document{{"_id", 1},
-                           {"control", Document{{"version", 1}}},
-                           {"meta", Document{{"m1", 999}, {"m2", 9999}}},
-                           {"data", Document{}}}
-                      .toBson();
+    auto bucket = Document{
+        {"_id", 1},
+        {"control", Document{{"version", 1}}},
+        {"meta", Document{{"m1", 999}, {"m2", 9999}}},
+        {"data",
+         Document{}}}.toBson();
 
     auto test = [&](BSONObj bucket) {
         auto unpacker = makeBucketUnpacker(
@@ -694,11 +695,12 @@ TEST_F(BucketUnpackerTest, DetermineIncludeFieldIncludeMode) {
     std::string excludedMeasurementField = "measurementField2";
     std::set<std::string> fields{kUserDefinedTimeName.toString(), includedMeasurementField};
 
-    auto bucket = Document{{"_id", 1},
-                           {"control", Document{{"version", 1}}},
-                           {"meta", Document{{"m1", 999}, {"m2", 9999}}},
-                           {"data", Document{}}}
-                      .toBson();
+    auto bucket = Document{
+        {"_id", 1},
+        {"control", Document{{"version", 1}}},
+        {"meta", Document{{"m1", 999}, {"m2", 9999}}},
+        {"data",
+         Document{}}}.toBson();
 
     auto spec = BucketSpec{kUserDefinedTimeName.toString(),
                            kUserDefinedMetaName.toString(),
@@ -728,11 +730,12 @@ TEST_F(BucketUnpackerTest, DetermineIncludeFieldExcludeMode) {
     std::string excludedMeasurementField = "measurementField2";
     std::set<std::string> fields{kUserDefinedTimeName.toString(), includedMeasurementField};
 
-    auto bucket = Document{{"_id", 1},
-                           {"control", Document{{"version", 1}}},
-                           {"meta", Document{{"m1", 999}, {"m2", 9999}}},
-                           {"data", Document{}}}
-                      .toBson();
+    auto bucket = Document{
+        {"_id", 1},
+        {"control", Document{{"version", 1}}},
+        {"meta", Document{{"m1", 999}, {"m2", 9999}}},
+        {"data",
+         Document{}}}.toBson();
 
     auto spec = BucketSpec{kUserDefinedTimeName.toString(),
                            kUserDefinedMetaName.toString(),

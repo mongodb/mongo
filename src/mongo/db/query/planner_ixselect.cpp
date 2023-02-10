@@ -180,7 +180,9 @@ bool QueryPlannerIXSelect::notEqualsNullCanUseIndex(const IndexEntry& index,
 
 bool QueryPlannerIXSelect::canUseIndexForNin(const InMatchExpression* ime) {
     const std::vector<BSONElement>& inList = ime->getEqualities();
-    auto containsNull = [](const BSONElement& elt) { return elt.type() == jstNULL; };
+    auto containsNull = [](const BSONElement& elt) {
+        return elt.type() == jstNULL;
+    };
     auto containsEmptyArray = [](const BSONElement& elt) {
         return elt.type() == Array && elt.embeddedObject().isEmpty();
     };

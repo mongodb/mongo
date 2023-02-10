@@ -127,7 +127,9 @@ void ReplCoordTest::init() {
     _storageInterface->insertDocumentFn = [this](OperationContext* opCtx,
                                                  const NamespaceStringOrUUID& nsOrUUID,
                                                  const TimestampedBSONObj& doc,
-                                                 long long term) { return Status::OK(); };
+                                                 long long term) {
+        return Status::OK();
+    };
 
     _storageInterface->createCollFn = [this](OperationContext* opCtx,
                                              const NamespaceString& nss,
@@ -157,7 +159,9 @@ void ReplCoordTest::init() {
     auto externalState = std::make_unique<ReplicationCoordinatorExternalStateMock>();
     _externalState = externalState.get();
     executor::ThreadPoolMock::Options tpOptions;
-    tpOptions.onCreateThread = []() { Client::initThread("replexec"); };
+    tpOptions.onCreateThread = []() {
+        Client::initThread("replexec");
+    };
     auto pool = std::make_unique<executor::ThreadPoolMock>(_net, seed, tpOptions);
     auto replExec =
         std::make_unique<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
@@ -340,7 +344,8 @@ void ReplCoordTest::simulateSuccessfulDryRun(
 }
 
 void ReplCoordTest::simulateSuccessfulDryRun() {
-    auto onDryRunRequest = [](const RemoteCommandRequest& request) {};
+    auto onDryRunRequest = [](const RemoteCommandRequest& request) {
+    };
     simulateSuccessfulDryRun(onDryRunRequest);
 }
 

@@ -144,10 +144,14 @@ TEST_F(DynamicCatchTest, RealisticScenarios) {
         }
     };
 #define LOC MONGO_SOURCE_LOCATION()
-    trial(LOC, [] { throw TestForeignRootException{"oops"}; }, "TestForeignRootException: oops");
-    trial(LOC, [] { throw std::out_of_range{"testRange"}; }, "testRange");
-    trial(LOC, [] { throw SpecificStdException{"oops"}; }, "SpecificStdException: oops");
-    trial(LOC, [] { uasserted(ErrorCodes::UnknownError, "test"); }, "UnknownError.*test");
+    trial(
+        LOC, [] { throw TestForeignRootException{"oops"}; }, "TestForeignRootException: oops");
+    trial(
+        LOC, [] { throw std::out_of_range{"testRange"}; }, "testRange");
+    trial(
+        LOC, [] { throw SpecificStdException{"oops"}; }, "SpecificStdException: oops");
+    trial(
+        LOC, [] { uasserted(ErrorCodes::UnknownError, "test"); }, "UnknownError.*test");
 #undef LOC
 }
 

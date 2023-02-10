@@ -44,7 +44,9 @@ TEST(ClockSourceMockTest, ExpiredAlarmExecutesWhenSet) {
     ClockSourceMock cs;
     int alarmFiredCount = 0;
     const Date_t alarmDate = cs.now();
-    const auto alarmAction = [&] { ++alarmFiredCount; };
+    const auto alarmAction = [&] {
+        ++alarmFiredCount;
+    };
     cs.setAlarm(alarmDate, alarmAction);
     ASSERT_EQ(1, alarmFiredCount) << cs.now();
     alarmFiredCount = 0;
@@ -58,7 +60,9 @@ TEST(ClockSourceMockTest, AlarmExecutesAfterExpirationUsingAdvance) {
     ClockSourceMock cs;
     int alarmFiredCount = 0;
     const Date_t alarmDate = cs.now() + Seconds{10};
-    const auto alarmAction = [&] { ++alarmFiredCount; };
+    const auto alarmAction = [&] {
+        ++alarmFiredCount;
+    };
     cs.setAlarm(alarmDate, alarmAction);
     ASSERT_EQ(0, alarmFiredCount) << cs.now();
     cs.advance(Seconds{8});
@@ -76,7 +80,9 @@ TEST(ClockSourceMockTest, AlarmExecutesAfterExpirationUsingReset) {
     int alarmFiredCount = 0;
     const Date_t startDate = cs.now();
     const Date_t alarmDate = startDate + Seconds{10};
-    const auto alarmAction = [&] { ++alarmFiredCount; };
+    const auto alarmAction = [&] {
+        ++alarmFiredCount;
+    };
     cs.setAlarm(alarmDate, alarmAction);
     ASSERT_EQ(0, alarmFiredCount) << cs.now();
     cs.reset(startDate + Seconds{8});
@@ -93,7 +99,9 @@ TEST(ClockSourceMockTest, MultipleAlarmsWithSameDeadlineTriggeredAtSameTime) {
     ClockSourceMock cs;
     int alarmFiredCount = 0;
     const Date_t alarmDate = cs.now() + Seconds{10};
-    const auto alarmAction = [&] { ++alarmFiredCount; };
+    const auto alarmAction = [&] {
+        ++alarmFiredCount;
+    };
     cs.setAlarm(alarmDate, alarmAction);
     cs.setAlarm(alarmDate, alarmAction);
     ASSERT_EQ(0, alarmFiredCount) << cs.now();
@@ -104,7 +112,9 @@ TEST(ClockSourceMockTest, MultipleAlarmsWithSameDeadlineTriggeredAtSameTime) {
 TEST(ClockSourceMockTest, MultipleAlarmsWithDifferentDeadlineTriggeredAtSameTime) {
     ClockSourceMock cs;
     int alarmFiredCount = 0;
-    const auto alarmAction = [&] { ++alarmFiredCount; };
+    const auto alarmAction = [&] {
+        ++alarmFiredCount;
+    };
     cs.setAlarm(cs.now() + Seconds{1}, alarmAction);
     cs.setAlarm(cs.now() + Seconds{10}, alarmAction);
     ASSERT_EQ(0, alarmFiredCount) << cs.now();
@@ -115,7 +125,9 @@ TEST(ClockSourceMockTest, MultipleAlarmsWithDifferentDeadlineTriggeredAtSameTime
 TEST(ClockSourceMockTest, MultipleAlarmsWithDifferentDeadlineTriggeredAtDifferentTimes) {
     ClockSourceMock cs;
     int alarmFiredCount = 0;
-    const auto alarmAction = [&] { ++alarmFiredCount; };
+    const auto alarmAction = [&] {
+        ++alarmFiredCount;
+    };
     cs.setAlarm(cs.now() + Seconds{1}, alarmAction);
     cs.setAlarm(cs.now() + Seconds{10}, alarmAction);
     ASSERT_EQ(0, alarmFiredCount) << cs.now();

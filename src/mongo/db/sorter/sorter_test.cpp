@@ -1063,7 +1063,9 @@ public:
      */
     std::vector<Doc> sort(std::vector<Doc> input, int expectedSize = -1) {
         std::vector<Doc> output;
-        auto push = [&](Doc doc) { output.push_back(doc); };
+        auto push = [&](Doc doc) {
+            output.push_back(doc);
+        };
 
         for (auto&& doc : input) {
             sorter->add(doc.time, doc);

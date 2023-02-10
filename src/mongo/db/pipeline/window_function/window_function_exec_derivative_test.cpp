@@ -279,7 +279,9 @@ TEST_F(WindowFunctionExecDerivativeTest, Unit) {
     auto y1 = Value{6};
 
     // Calculate the derivative, expressed in the given TimeUnit.
-    auto calc = [&](TimeUnit unit) -> Value { return eval({t0, y0}, {t1, y1}, unit); };
+    auto calc = [&](TimeUnit unit) -> Value {
+        return eval({t0, y0}, {t1, y1}, unit);
+    };
     // Each ms, 'y' increased by 1/8.
     // (This should be exact, despite floating point, because 8 is a power of 2.)
     ASSERT_VALUE_EQ(calc(TimeUnit::millisecond), Value{1.0 / 8});

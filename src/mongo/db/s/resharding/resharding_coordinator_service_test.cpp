@@ -670,7 +670,9 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransi
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorTransitionsTokDoneWithInterrupt) {
 
-    const auto interrupt = [this] { killAllReshardingCoordinatorOps(); };
+    const auto interrupt = [this] {
+        killAllReshardingCoordinatorOps();
+    };
     runReshardingToCompletion(
         TransitionFunctionMap{{CoordinatorStateEnum::kPreparingToDonate, interrupt},
                               {CoordinatorStateEnum::kCloning, interrupt},

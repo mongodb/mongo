@@ -221,7 +221,9 @@ void handleWaitForUserCacheInvalidation(OperationContext* opCtx, const UserHandl
     constexpr auto kCheckPeriod = Milliseconds{1};
     auto m = MONGO_MAKE_LATCH();
     auto cv = stdx::condition_variable{};
-    auto pred = [&] { return !fp.isStillEnabled() || !user.isValid(); };
+    auto pred = [&] {
+        return !fp.isStillEnabled() || !user.isValid();
+    };
     auto waitOneCycle = [&] {
         auto lk = stdx::unique_lock(m);
         return !opCtx->waitForConditionOrInterruptFor(cv, lk, kCheckPeriod, pred);
@@ -600,13 +602,14 @@ AuthorizationManagerImpl::AuthSchemaVersionCache::AuthSchemaVersionCache(
     ServiceContext* service,
     ThreadPoolInterface& threadPool,
     AuthzManagerExternalState* externalState)
-    : ReadThroughCache(_mutex,
-                       service,
-                       threadPool,
-                       [this](OperationContext* opCtx, int key, const ValueHandle& cachedValue) {
-                           return _lookup(opCtx, key, cachedValue);
-                       },
-                       1 /* cacheSize */),
+    : ReadThroughCache(
+          _mutex,
+          service,
+          threadPool,
+          [this](OperationContext* opCtx, int key, const ValueHandle& cachedValue) {
+              return _lookup(opCtx, key, cachedValue);
+          },
+          1 /* cacheSize */),
       _externalState(externalState) {}
 
 AuthorizationManagerImpl::AuthSchemaVersionCache::LookupResult
@@ -627,13 +630,14 @@ AuthorizationManagerImpl::UserCacheImpl::UserCacheImpl(
     int cacheSize,
     AuthSchemaVersionCache* authSchemaVersionCache,
     AuthzManagerExternalState* externalState)
-    : UserCache(_mutex,
-                service,
-                threadPool,
-                [this](OperationContext* opCtx, const UserRequest& userReq, UserHandle cachedUser) {
-                    return _lookup(opCtx, userReq, cachedUser);
-                },
-                cacheSize),
+    : UserCache(
+          _mutex,
+          service,
+          threadPool,
+          [this](OperationContext* opCtx, const UserRequest& userReq, UserHandle cachedUser) {
+              return _lookup(opCtx, userReq, cachedUser);
+          },
+          cacheSize),
       _authSchemaVersionCache(authSchemaVersionCache),
       _externalState(externalState) {}
 

@@ -357,7 +357,7 @@ Simple8bBuilder<T>::PendingIterator::PendingIterator(
     : _begin(beginning), _it(it), _rleValue(rleValue), _rleCount(rleCount) {}
 
 template <typename T>
-auto Simple8bBuilder<T>::PendingIterator::operator-> () const -> pointer {
+auto Simple8bBuilder<T>::PendingIterator::operator->() const -> pointer {
     return &operator*();
 }
 

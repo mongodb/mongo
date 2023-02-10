@@ -435,7 +435,9 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
             // We haven't satisfied the split condition, so 'expr' belongs in the remaining match.
             return {nullptr, std::move(expr)};
         }
-        default: { MONGO_UNREACHABLE; }
+        default: {
+            MONGO_UNREACHABLE;
+        }
     }
 }
 

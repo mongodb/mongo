@@ -83,7 +83,8 @@ const ServiceContext::ConstructorActionRegisterer clientObserverRegisterer{
     [](ServiceContext* service) {
         service->registerClientObserver(std::make_unique<TestObserver>());
     },
-    [](ServiceContext* serviceContext) {}};
+    [](ServiceContext* serviceContext) {
+    }};
 
 static double estimateCard(const ScalarHistogram& hist, const int v, const EstimationType type) {
     const auto [tag, val] = makeInt64Value(v);

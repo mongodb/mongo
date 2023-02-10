@@ -88,21 +88,22 @@ void killSessionsAction(
 void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
                                              const SessionKiller::Matcher& matcher,
                                              ErrorCodes::Error reason) {
-    killSessionsAction(opCtx,
-                       matcher,
-                       [](const ObservableSession& session) {
-                           auto participant = TransactionParticipant::get(session);
-                           return participant.transactionIsInProgress();
-                       },
-                       [](OperationContext* opCtx, const SessionToKill& session) {
-                           auto participant = TransactionParticipant::get(session);
-                           // This is the same test as in the filter, but we must check again now
-                           // that the session is checked out.
-                           if (participant.transactionIsInProgress()) {
-                               participant.abortTransaction(opCtx);
-                           }
-                       },
-                       reason);
+    killSessionsAction(
+        opCtx,
+        matcher,
+        [](const ObservableSession& session) {
+            auto participant = TransactionParticipant::get(session);
+            return participant.transactionIsInProgress();
+        },
+        [](OperationContext* opCtx, const SessionToKill& session) {
+            auto participant = TransactionParticipant::get(session);
+            // This is the same test as in the filter, but we must check again now
+            // that the session is checked out.
+            if (participant.transactionIsInProgress()) {
+                participant.abortTransaction(opCtx);
+            }
+        },
+        reason);
 }
 
 SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
@@ -155,35 +156,37 @@ void killAllExpiredTransactions(OperationContext* opCtx) {
 void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    killSessionsAction(opCtx,
-                       matcherAllSessions,
-                       [](const ObservableSession& session) {
-                           return TransactionParticipant::get(session).transactionIsOpen();
-                       },
-                       [](OperationContext* opCtx, const SessionToKill& session) {
-                           TransactionParticipant::get(session).shutdown(opCtx);
-                       },
-                       ErrorCodes::InterruptedAtShutdown);
+    killSessionsAction(
+        opCtx,
+        matcherAllSessions,
+        [](const ObservableSession& session) {
+            return TransactionParticipant::get(session).transactionIsOpen();
+        },
+        [](OperationContext* opCtx, const SessionToKill& session) {
+            TransactionParticipant::get(session).shutdown(opCtx);
+        },
+        ErrorCodes::InterruptedAtShutdown);
 }
 
 void killSessionsAbortAllPreparedTransactions(OperationContext* opCtx) {
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    killSessionsAction(opCtx,
-                       matcherAllSessions,
-                       [](const ObservableSession& session) {
-                           // Filter for sessions that have a prepared transaction.
-                           return TransactionParticipant::get(session).transactionIsPrepared();
-                       },
-                       [](OperationContext* opCtx, const SessionToKill& session) {
-                           // We're holding the RSTL, so the transaction shouldn't be otherwise
-                           // affected.
-                           invariant(TransactionParticipant::get(session).transactionIsPrepared());
-                           // Abort the prepared transaction and invalidate the session it is
-                           // associated with.
-                           TransactionParticipant::get(session).abortTransaction(opCtx);
-                           TransactionParticipant::get(session).invalidate(opCtx);
-                       });
+    killSessionsAction(
+        opCtx,
+        matcherAllSessions,
+        [](const ObservableSession& session) {
+            // Filter for sessions that have a prepared transaction.
+            return TransactionParticipant::get(session).transactionIsPrepared();
+        },
+        [](OperationContext* opCtx, const SessionToKill& session) {
+            // We're holding the RSTL, so the transaction shouldn't be otherwise
+            // affected.
+            invariant(TransactionParticipant::get(session).transactionIsPrepared());
+            // Abort the prepared transaction and invalidate the session it is
+            // associated with.
+            TransactionParticipant::get(session).abortTransaction(opCtx);
+            TransactionParticipant::get(session).invalidate(opCtx);
+        });
 }
 
 void yieldLocksForPreparedTransactions(OperationContext* opCtx) {
@@ -232,18 +235,19 @@ void invalidateSessionsForStepdown(OperationContext* opCtx) {
     LOGV2(6015319, "Invalidating sessions for stepdown.");
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    killSessionsAction(opCtx,
-                       matcherAllSessions,
-                       [](const ObservableSession& session) {
-                           return !TransactionParticipant::get(session).transactionIsPrepared();
-                       },
-                       [](OperationContext* killerOpCtx, const SessionToKill& session) {
-                           auto txnParticipant = TransactionParticipant::get(session);
-                           if (!txnParticipant.transactionIsPrepared()) {
-                               txnParticipant.invalidate(killerOpCtx);
-                           }
-                       },
-                       ErrorCodes::InterruptedDueToReplStateChange);
+    killSessionsAction(
+        opCtx,
+        matcherAllSessions,
+        [](const ObservableSession& session) {
+            return !TransactionParticipant::get(session).transactionIsPrepared();
+        },
+        [](OperationContext* killerOpCtx, const SessionToKill& session) {
+            auto txnParticipant = TransactionParticipant::get(session);
+            if (!txnParticipant.transactionIsPrepared()) {
+                txnParticipant.invalidate(killerOpCtx);
+            }
+        },
+        ErrorCodes::InterruptedDueToReplStateChange);
 }
 
 }  // namespace mongo

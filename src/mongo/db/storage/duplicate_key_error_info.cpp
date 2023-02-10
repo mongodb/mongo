@@ -98,17 +98,16 @@ void DuplicateKeyErrorInfo::serialize(BSONObjBuilder* bob) const {
         bob->append("collation", _collation);
     }
 
-    stdx::visit(
-        OverloadedVisitor{
-            [](stdx::monostate) {},
-            [bob](const RecordId& rid) { rid.serializeToken("foundValue", bob); },
-            [bob](const BSONObj& obj) {
-                if (obj.objsize() < BSONObjMaxUserSize / 2) {
-                    bob->append("foundValue", obj);
-                }
-            },
-        },
-        _foundValue);
+    stdx::visit(OverloadedVisitor{
+                    [](stdx::monostate) {},
+                    [bob](const RecordId& rid) { rid.serializeToken("foundValue", bob); },
+                    [bob](const BSONObj& obj) {
+                        if (obj.objsize() < BSONObjMaxUserSize / 2) {
+                            bob->append("foundValue", obj);
+                        }
+                    },
+                },
+                _foundValue);
 
     if (_duplicateRid) {
         _duplicateRid->serializeToken("duplicateRid", bob);

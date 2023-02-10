@@ -781,8 +781,8 @@ std::shared_ptr<const HelloResponse> ReplicationCoordinatorMock::awaitHelloRespo
     return response;
 }
 
-StatusWith<OpTime> ReplicationCoordinatorMock::getLatestWriteOpTime(OperationContext* opCtx) const
-    noexcept {
+StatusWith<OpTime> ReplicationCoordinatorMock::getLatestWriteOpTime(
+    OperationContext* opCtx) const noexcept {
     return getMyLastAppliedOpTime();
 }
 

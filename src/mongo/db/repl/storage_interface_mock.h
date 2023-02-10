@@ -81,9 +81,15 @@ public:
     std::function<Status(std::vector<BSONObj>::const_iterator,
                          std::vector<BSONObj>::const_iterator)>
         insertDocsFn = [](const std::vector<BSONObj>::const_iterator,
-                          const std::vector<BSONObj>::const_iterator) { return Status::OK(); };
-    std::function<Status()> abortFn = []() { return Status::OK(); };
-    std::function<Status()> commitFn = []() { return Status::OK(); };
+                          const std::vector<BSONObj>::const_iterator) {
+            return Status::OK();
+        };
+    std::function<Status()> abortFn = []() {
+        return Status::OK();
+    };
+    std::function<Status()> commitFn = []() {
+        return Status::OK();
+    };
 };
 
 class StorageInterfaceMock : public StorageInterface {

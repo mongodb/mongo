@@ -119,8 +119,8 @@ private:
 };
 
 template <typename F, typename Sig = packaged_task_detail::SigFor<F>>
-PackagedTask(F&& f)->PackagedTask<Sig>;
+PackagedTask(F&& f) -> PackagedTask<Sig>;
 
 template <typename R, typename... Args>
-PackagedTask(R (*)(Args...))->PackagedTask<R(Args...)>;
+PackagedTask(R (*)(Args...)) -> PackagedTask<R(Args...)>;
 }  // namespace mongo

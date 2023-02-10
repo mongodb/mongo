@@ -51,8 +51,12 @@ void encodeImpl(Writer&& write, StringData in) {
     static_assert(Mode::kEncodeTable.size() == 64, "Invalid encoding table");
     const char* data = in.rawData();
     std::size_t size = in.size();
-    auto readOctet = [&data] { return static_cast<std::uint8_t>(*data++); };
-    auto encodeSextet = [](unsigned x) { return Mode::kEncodeTable[x & 0b11'1111]; };
+    auto readOctet = [&data] {
+        return static_cast<std::uint8_t>(*data++);
+    };
+    auto encodeSextet = [](unsigned x) {
+        return Mode::kEncodeTable[x & 0b11'1111];
+    };
 
     std::array<char, 512> buf;
     std::array<char, 512>::iterator p;
@@ -229,7 +233,9 @@ bool Base64Impl<Standard>::validate(StringData s) {
         return true;
     }
 
-    auto const unwindTerminator = [](auto it) { return (*(it - 1) == '=') ? (it - 1) : it; };
+    auto const unwindTerminator = [](auto it) {
+        return (*(it - 1) == '=') ? (it - 1) : it;
+    };
     auto const e = unwindTerminator(unwindTerminator(std::end(s)));
 
     return e == std::find_if(std::begin(s), e, [](const char ch) { return !valid<Standard>(ch); });
@@ -241,7 +247,9 @@ bool Base64Impl<URL>::validate(StringData s) {
         return true;
     }
 
-    auto const unwindTerminator = [](auto it) { return (*(it - 1) == '=') ? (it - 1) : it; };
+    auto const unwindTerminator = [](auto it) {
+        return (*(it - 1) == '=') ? (it - 1) : it;
+    };
     auto e = std::end(s);
 
     switch (s.size() % 4) {

@@ -423,7 +423,9 @@ void ClusterChunksResizePolicyImpl::applyActionResult(OperationContext* opCtx,
                 auto& splitResult = stdx::get<Status>(result);
                 auto match = _collectionsBeingProcessed.find(act.uuid);
                 if (match != _collectionsBeingProcessed.end()) {
-                    auto onSuccess = []() { return std::vector<ActionRequestInfo>(); };
+                    auto onSuccess = []() {
+                        return std::vector<ActionRequestInfo>();
+                    };
 
                     auto onRetriableError = [&act]() {
                         auto& splitInfo = act.info;

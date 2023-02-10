@@ -304,9 +304,9 @@ WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPat
             str::stream() << "the wildcard keyPattern " << keyPattern.toString() << " is invalid",
             !indexRoot.empty() && (suffixPos == std::string::npos || pathProjection.isEmpty()));
 
-    auto projSpec = (suffixPos != std::string::npos
-                         ? BSON(indexRoot.substr(0, suffixPos) << 1)
-                         : pathProjection.isEmpty() ? kDefaultProjection : pathProjection);
+    auto projSpec = (suffixPos != std::string::npos ? BSON(indexRoot.substr(0, suffixPos) << 1)
+                         : pathProjection.isEmpty() ? kDefaultProjection
+                                                    : pathProjection);
 
     // Construct a dummy ExpressionContext for ProjectionExecutor. It's OK to set the
     // ExpressionContext's OperationContext and CollatorInterface to 'nullptr' and the namespace

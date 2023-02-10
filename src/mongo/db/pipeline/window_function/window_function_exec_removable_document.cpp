@@ -45,27 +45,25 @@ WindowFunctionExecRemovableDocument::WindowFunctionExecRemovableDocument(
                                   std::move(function),
 
                                   memTracker) {
-    stdx::visit(
-        OverloadedVisitor{
-            [](const WindowBounds::Unbounded&) {
-                // If the window is left unbounded we should use the non-removable executor.
-                MONGO_UNREACHABLE_TASSERT(5339802);
-            },
-            [&](const WindowBounds::Current&) { _lowerBound = 0; },
-            [&](const int& lowerIndex) { _lowerBound = lowerIndex; },
-        },
-        bounds.lower);
+    stdx::visit(OverloadedVisitor{
+                    [](const WindowBounds::Unbounded&) {
+                        // If the window is left unbounded we should use the non-removable executor.
+                        MONGO_UNREACHABLE_TASSERT(5339802);
+                    },
+                    [&](const WindowBounds::Current&) { _lowerBound = 0; },
+                    [&](const int& lowerIndex) { _lowerBound = lowerIndex; },
+                },
+                bounds.lower);
 
-    stdx::visit(
-        OverloadedVisitor{
-            [](const WindowBounds::Unbounded&) {
-                // Pass. _upperBound defaults to boost::none which represents no upper
-                // bound.
-            },
-            [&](const WindowBounds::Current&) { _upperBound = 0; },
-            [&](const int& upperIndex) { _upperBound = upperIndex; },
-        },
-        bounds.upper);
+    stdx::visit(OverloadedVisitor{
+                    [](const WindowBounds::Unbounded&) {
+                        // Pass. _upperBound defaults to boost::none which represents no upper
+                        // bound.
+                    },
+                    [&](const WindowBounds::Current&) { _upperBound = 0; },
+                    [&](const int& upperIndex) { _upperBound = upperIndex; },
+                },
+                bounds.upper);
     _memTracker->set(sizeof(*this));
 }
 

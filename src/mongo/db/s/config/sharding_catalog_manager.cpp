@@ -1121,7 +1121,9 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
 
     // no-op callback
     auto callback = [](const std::vector<BSONObj>& batch,
-                       const boost::optional<BSONObj>& postBatchResumeToken) { return true; };
+                       const boost::optional<BSONObj>& postBatchResumeToken) {
+        return true;
+    };
 
     const Status status = _localConfigShard->runAggregation(opCtx, aggRequest, callback);
     uassertStatusOK(status);

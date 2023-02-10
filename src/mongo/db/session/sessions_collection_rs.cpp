@@ -117,31 +117,32 @@ auto SessionsCollectionRS::_dispatch(const NamespaceString& ns,
 }
 
 void SessionsCollectionRS::setupSessionsCollection(OperationContext* opCtx) {
-    _dispatch(NamespaceString::kLogicalSessionsNamespace,
-              opCtx,
-              [&] {
-                  try {
-                      checkSessionsCollectionExists(opCtx);
-                  } catch (const DBException& ex) {
+    _dispatch(
+        NamespaceString::kLogicalSessionsNamespace,
+        opCtx,
+        [&] {
+            try {
+                checkSessionsCollectionExists(opCtx);
+            } catch (const DBException& ex) {
 
-                      DBDirectClient client(opCtx);
-                      BSONObj cmd;
+                DBDirectClient client(opCtx);
+                BSONObj cmd;
 
-                      if (ex.code() == ErrorCodes::IndexOptionsConflict) {
-                          cmd = generateCollModCmd();
-                      } else {
-                          // Creating the TTL index will auto-generate the collection.
-                          cmd = generateCreateIndexesCmd();
-                      }
+                if (ex.code() == ErrorCodes::IndexOptionsConflict) {
+                    cmd = generateCollModCmd();
+                } else {
+                    // Creating the TTL index will auto-generate the collection.
+                    cmd = generateCreateIndexesCmd();
+                }
 
-                      BSONObj info;
-                      if (!client.runCommand(
-                              NamespaceString::kLogicalSessionsNamespace.dbName(), cmd, info)) {
-                          uassertStatusOK(getStatusFromCommandResult(info));
-                      }
-                  }
-              },
-              [&](DBClientBase*) { checkSessionsCollectionExists(opCtx); });
+                BSONObj info;
+                if (!client.runCommand(
+                        NamespaceString::kLogicalSessionsNamespace.dbName(), cmd, info)) {
+                    uassertStatusOK(getStatusFromCommandResult(info));
+                }
+            }
+        },
+        [&](DBClientBase*) { checkSessionsCollectionExists(opCtx); });
 }
 
 void SessionsCollectionRS::checkSessionsCollectionExists(OperationContext* opCtx) {
@@ -177,21 +178,21 @@ void SessionsCollectionRS::refreshSessions(OperationContext* opCtx,
                                            const LogicalSessionRecordSet& sessions) {
     const std::vector<LogicalSessionRecord> sessionsVector(sessions.begin(), sessions.end());
 
-    _dispatch(NamespaceString::kLogicalSessionsNamespace,
-              opCtx,
-              [&] {
-                  DBDirectClient client(opCtx);
-                  _doRefresh(
-                      NamespaceString::kLogicalSessionsNamespace,
-                      sessionsVector,
-                      makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
-              },
-              [&](DBClientBase* client) {
-                  _doRefresh(
-                      NamespaceString::kLogicalSessionsNamespace,
-                      sessionsVector,
-                      makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, client));
-              });
+    _dispatch(
+        NamespaceString::kLogicalSessionsNamespace,
+        opCtx,
+        [&] {
+            DBDirectClient client(opCtx);
+            _doRefresh(
+                NamespaceString::kLogicalSessionsNamespace,
+                sessionsVector,
+                makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
+        },
+        [&](DBClientBase* client) {
+            _doRefresh(NamespaceString::kLogicalSessionsNamespace,
+                       sessionsVector,
+                       makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, client));
+        });
 }
 
 void SessionsCollectionRS::removeRecords(OperationContext* opCtx,

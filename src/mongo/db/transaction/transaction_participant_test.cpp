@@ -125,14 +125,16 @@ public:
 
     bool onTransactionPrepareThrowsException = false;
     bool transactionPrepared = false;
-    std::function<void()> onTransactionPrepareFn = []() {};
+    std::function<void()> onTransactionPrepareFn = []() {
+    };
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                        const TransactionOperations& transactionOperations) override;
     bool onUnpreparedTransactionCommitThrowsException = false;
     bool unpreparedTransactionCommitted = false;
     std::function<void(const std::vector<repl::ReplOperation>&)> onUnpreparedTransactionCommitFn =
-        [](const std::vector<repl::ReplOperation>& statements) {};
+        [](const std::vector<repl::ReplOperation>& statements) {
+        };
 
 
     void onPreparedTransactionCommit(
@@ -145,7 +147,8 @@ public:
     std::function<void(OplogSlot, Timestamp, const std::vector<repl::ReplOperation>&)>
         onPreparedTransactionCommitFn = [](OplogSlot commitOplogEntryOpTime,
                                            Timestamp commitTimestamp,
-                                           const std::vector<repl::ReplOperation>& statements) {};
+                                           const std::vector<repl::ReplOperation>& statements) {
+        };
 
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) override;

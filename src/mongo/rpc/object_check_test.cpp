@@ -48,7 +48,9 @@ using std::swap;
 
 TEST(DataTypeValidated, BSONValidationEnabled) {
     bool wasEnabled = serverGlobalParams.objcheck;
-    const auto setValidation = [&](bool enabled) { serverGlobalParams.objcheck = enabled; };
+    const auto setValidation = [&](bool enabled) {
+        serverGlobalParams.objcheck = enabled;
+    };
     ON_BLOCK_EXIT([=] { setValidation(wasEnabled); });
 
     BSONObj valid = BSON("baz"

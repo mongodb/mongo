@@ -223,7 +223,9 @@ public:
         _net = net.get();
 
         executor::ThreadPoolMock::Options dbThreadPoolOptions;
-        dbThreadPoolOptions.onCreateThread = []() { Client::initThread("FetchMockTaskExecutor"); };
+        dbThreadPoolOptions.onCreateThread = []() {
+            Client::initThread("FetchMockTaskExecutor");
+        };
 
         auto pool = std::make_unique<executor::ThreadPoolMock>(_net, 1, dbThreadPoolOptions);
         _threadpoolTaskExecutor =

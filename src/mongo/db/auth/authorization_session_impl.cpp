@@ -1023,7 +1023,9 @@ auto AuthorizationSessionImpl::checkCursorSessionPrivilege(
     -> Status {
     _contract.addAccessCheck(AccessCheckEnum::kCheckCursorSessionPrivilege);
 
-    auto nobodyIsLoggedIn = [authSession = this] { return !authSession->isAuthenticated(); };
+    auto nobodyIsLoggedIn = [authSession = this] {
+        return !authSession->isAuthenticated();
+    };
 
     auto authHasImpersonatePrivilege = [authSession = this] {
         return authSession->isAuthorizedForPrivilege(

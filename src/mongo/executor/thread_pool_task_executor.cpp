@@ -733,7 +733,8 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaust
 
             if (cbState->canceled.load()) {
                 // Release any resources the callback function is holding
-                TaskExecutor::CallbackFn callback = [](const CallbackArgs&) {};
+                TaskExecutor::CallbackFn callback = [](const CallbackArgs&) {
+                };
                 std::swap(cbState->callback, callback);
 
                 _networkInProgressQueue.erase(cbState->iter);
@@ -828,7 +829,8 @@ void ThreadPoolTaskExecutor::runCallbackExhaust(std::shared_ptr<CallbackState> c
                       cbState->canceled.load() ? kCallbackCanceledErrorStatus : Status::OK());
 
     if (!cbState->isFinished.load()) {
-        TaskExecutor::CallbackFn callback = [](const CallbackArgs&) {};
+        TaskExecutor::CallbackFn callback = [](const CallbackArgs&) {
+        };
         {
             auto lk = stdx::lock_guard(_mutex);
             std::swap(cbState->callback, callback);

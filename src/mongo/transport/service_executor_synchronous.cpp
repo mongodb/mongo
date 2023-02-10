@@ -133,10 +133,14 @@ void ServiceExecutorSynchronous::SharedState::schedule(Task task) {
 
     Status status = launchServiceWorkerThread([w = std::move(workerInfo)] {
         w->sharedState->lock().onStartThread();
-        ScopeGuard onEndThreadGuard = [&] { w->sharedState->lock().onEndThread(); };
+        ScopeGuard onEndThreadGuard = [&] {
+            w->sharedState->lock().onEndThread();
+        };
 
         workerThreadInfoTls = &*w;
-        ScopeGuard resetTlsGuard = [&] { workerThreadInfoTls = nullptr; };
+        ScopeGuard resetTlsGuard = [&] {
+            workerThreadInfoTls = nullptr;
+        };
 
         w->run();
     });

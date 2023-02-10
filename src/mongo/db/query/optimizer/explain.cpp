@@ -233,7 +233,9 @@ public:
                     break;
                 }
 
-                default: { MONGO_UNREACHABLE; }
+                default: {
+                    MONGO_UNREACHABLE;
+                }
             }
         }
 

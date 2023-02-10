@@ -36,7 +36,7 @@ let specSecondary =
 assert.eq(false, specPrimary.hasOwnProperty('ns'));
 assert.eq(false, specSecondary.hasOwnProperty('ns'));
 
-replSet.stopSet(/*signal=*/null, /*forRestart=*/true);
+replSet.stopSet(/*signal=*/ null, /*forRestart=*/ true);
 
 // Both nodes should have no 'ns' field in the index spec on restart.
 const options = {

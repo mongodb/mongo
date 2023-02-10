@@ -49,57 +49,56 @@ SortPattern translateSortSpec(const CNode& cst,
     for (const auto& keyValPair : children) {
         auto&& path = path::vectorToString(
             std::move(stdx::get<SortPath>(stdx::get<FieldnamePath>(keyValPair.first)).components));
-        stdx::visit(
-            OverloadedVisitor{
-                [&](const CNode::ObjectChildren& object) {
-                    // $meta is always the only key in the object, and always has a KeyValue as its
-                    // value.
-                    // If sorting by textScore, put highest scores first. If $meta was specified
-                    // with randVal order doesn't matter, so always put descending.
-                    auto keyVal = stdx::get<KeyValue>(object[0].second.payload);
-                    switch (keyVal) {
-                        case KeyValue::randVal:
-                            sortKeys.push_back(SortPattern::SortPatternPart{
-                                false,
-                                boost::none,
-                                make_intrusive<ExpressionMeta>(expCtx.get(),
-                                                               DocumentMetadataFields::kRandVal)});
-                            break;
-                        case KeyValue::textScore:
-                            sortKeys.push_back(SortPattern::SortPatternPart{
-                                false,
-                                boost::none,
-                                make_intrusive<ExpressionMeta>(
-                                    expCtx.get(), DocumentMetadataFields::kTextScore)});
-                            break;
-                        default:
-                            MONGO_UNREACHABLE;
-                    }
-                },
-                [&](const KeyValue& keyValue) {
-                    switch (keyValue) {
-                        case KeyValue::intOneKey:
-                        case KeyValue::longOneKey:
-                        case KeyValue::doubleOneKey:
-                        case KeyValue::decimalOneKey:
-                            sortKeys.push_back(SortPattern::SortPatternPart{
-                                true, FieldPath{std::move(path)}, nullptr /* meta */});
+        stdx::visit(OverloadedVisitor{
+                        [&](const CNode::ObjectChildren& object) {
+                            // $meta is always the only key in the object, and always has a KeyValue
+                            // as its value. If sorting by textScore, put highest scores first. If
+                            // $meta was specified with randVal order doesn't matter, so always put
+                            // descending.
+                            auto keyVal = stdx::get<KeyValue>(object[0].second.payload);
+                            switch (keyVal) {
+                                case KeyValue::randVal:
+                                    sortKeys.push_back(SortPattern::SortPatternPart{
+                                        false,
+                                        boost::none,
+                                        make_intrusive<ExpressionMeta>(
+                                            expCtx.get(), DocumentMetadataFields::kRandVal)});
+                                    break;
+                                case KeyValue::textScore:
+                                    sortKeys.push_back(SortPattern::SortPatternPart{
+                                        false,
+                                        boost::none,
+                                        make_intrusive<ExpressionMeta>(
+                                            expCtx.get(), DocumentMetadataFields::kTextScore)});
+                                    break;
+                                default:
+                                    MONGO_UNREACHABLE;
+                            }
+                        },
+                        [&](const KeyValue& keyValue) {
+                            switch (keyValue) {
+                                case KeyValue::intOneKey:
+                                case KeyValue::longOneKey:
+                                case KeyValue::doubleOneKey:
+                                case KeyValue::decimalOneKey:
+                                    sortKeys.push_back(SortPattern::SortPatternPart{
+                                        true, FieldPath{std::move(path)}, nullptr /* meta */});
 
-                            break;
-                        case KeyValue::intNegOneKey:
-                        case KeyValue::longNegOneKey:
-                        case KeyValue::doubleNegOneKey:
-                        case KeyValue::decimalNegOneKey:
-                            sortKeys.push_back(SortPattern::SortPatternPart{
-                                false, FieldPath{std::move(path)}, nullptr /* meta */});
-                            break;
-                        default:
-                            MONGO_UNREACHABLE;
-                    }
-                },
-                [](auto&&) { MONGO_UNREACHABLE; },
-            },
-            keyValPair.second.payload);
+                                    break;
+                                case KeyValue::intNegOneKey:
+                                case KeyValue::longNegOneKey:
+                                case KeyValue::doubleNegOneKey:
+                                case KeyValue::decimalNegOneKey:
+                                    sortKeys.push_back(SortPattern::SortPatternPart{
+                                        false, FieldPath{std::move(path)}, nullptr /* meta */});
+                                    break;
+                                default:
+                                    MONGO_UNREACHABLE;
+                            }
+                        },
+                        [](auto&&) { MONGO_UNREACHABLE; },
+                    },
+                    keyValPair.second.payload);
     }
     return SortPattern(std::move(sortKeys));
 }

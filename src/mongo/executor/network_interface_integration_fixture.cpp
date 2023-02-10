@@ -78,7 +78,9 @@ void NetworkInterfaceIntegrationFixture::tearDown() {
     _net->shutdown();
 
     auto lk = stdx::unique_lock(_mutex);
-    auto checkIdle = [&]() { return _workInProgress == 0; };
+    auto checkIdle = [&]() {
+        return _workInProgress == 0;
+    };
     _fixtureIsIdle.wait(lk, checkIdle);
 }
 

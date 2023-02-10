@@ -215,9 +215,10 @@ TEST_F(StateMachineTestFixture, MoveWorks) {
     stateMachine.registerHandler(std::make_unique<NextStateHandler>(MachineState::B));
 
     int cnt = 0;
-    auto hook = [&cnt](MachineState oldState,
-                       MachineState newState,
-                       const SM::OptionalMessageType& m) { cnt++; };
+    auto hook =
+        [&cnt](MachineState oldState, MachineState newState, const SM::OptionalMessageType& m) {
+            cnt++;
+        };
     stateMachine.on(MachineState::B)->enter(hook);
 
     StateMachineTest stateMachine2 = std::move(stateMachine);
@@ -229,8 +230,8 @@ TEST_F(StateMachineTestFixture, MoveWorks) {
 
 DEATH_TEST_F(StateMachineTestFixture, CrashIfHooksAreRegisteredAfterStart, "5936505") {
     auto hook = []() {
-        return
-            [](MachineState oldState, MachineState newState, const SM::OptionalMessageType& m) {};
+        return [](MachineState oldState, MachineState newState, const SM::OptionalMessageType& m) {
+        };
     };
     subject()->start();
     subject()->on(MachineState::B)->enter(hook())->exit(hook());

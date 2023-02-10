@@ -153,15 +153,16 @@ void ClusterServerParameterInitializer::clearAllTenantParameters(
 
 void ClusterServerParameterInitializer::initializeAllTenantParametersFromDisk(
     OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
-    doLoadAllTenantParametersFromDisk(opCtx,
-                                      "initializing"_sd,
-                                      [this](OperationContext* opCtx,
-                                             const BSONObj& doc,
-                                             StringData mode,
-                                             const boost::optional<TenantId>& tenantId) {
-                                          updateParameter(opCtx, doc, mode, tenantId);
-                                      },
-                                      tenantId);
+    doLoadAllTenantParametersFromDisk(
+        opCtx,
+        "initializing"_sd,
+        [this](OperationContext* opCtx,
+               const BSONObj& doc,
+               StringData mode,
+               const boost::optional<TenantId>& tenantId) {
+            updateParameter(opCtx, doc, mode, tenantId);
+        },
+        tenantId);
 }
 
 void ClusterServerParameterInitializer::resynchronizeAllTenantParametersFromDisk(

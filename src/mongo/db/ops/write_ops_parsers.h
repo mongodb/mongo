@@ -174,22 +174,23 @@ public:
     std::string toString() const {
         StringBuilder sb;
 
-        stdx::visit(
-            OverloadedVisitor{
-                [&sb](const ReplacementUpdate& replacement) {
-                    sb << "{type: Replacement, update: " << replacement.bson << "}";
-                },
-                [&sb](const ModifierUpdate& modifier) {
-                    sb << "{type: Modifier, update: " << modifier.bson << "}";
-                },
-                [&sb](const PipelineUpdate& pipeline) {
-                    sb << "{type: Pipeline, update: " << Value(pipeline).toString() << "}";
-                },
-                [&sb](const DeltaUpdate& delta) {
-                    sb << "{type: Delta, update: " << delta.diff << "}";
-                },
-                [&sb](const TransformUpdate& transform) { sb << "{type: Transform}"; }},
-            _update);
+        stdx::visit(OverloadedVisitor{
+                        [&sb](const ReplacementUpdate& replacement) {
+                            sb << "{type: Replacement, update: " << replacement.bson << "}";
+                        },
+                        [&sb](const ModifierUpdate& modifier) {
+                            sb << "{type: Modifier, update: " << modifier.bson << "}";
+                        },
+                        [&sb](const PipelineUpdate& pipeline) {
+                            sb << "{type: Pipeline, update: " << Value(pipeline).toString() << "}";
+                        },
+                        [&sb](const DeltaUpdate& delta) {
+                            sb << "{type: Delta, update: " << delta.diff << "}";
+                        },
+                        [&sb](const TransformUpdate& transform) {
+                            sb << "{type: Transform}";
+                        }},
+                    _update);
 
         return sb.str();
     }

@@ -186,7 +186,7 @@ void ColumnStoreSorter::spill() {
         auto& [path, cellVector] = *pathWithCellVector;
 
         size_t cellVectorSize = std::accumulate(
-            cellVector.begin(), cellVector.end(), 0, [& path = path](size_t sum, auto& ridAndCell) {
+            cellVector.begin(), cellVector.end(), 0, [&path = path](size_t sum, auto& ridAndCell) {
                 return sum + path.size() + sizeof(RowId) + ridAndCell.second.size();
             });
 

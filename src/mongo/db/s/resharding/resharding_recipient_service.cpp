@@ -1201,7 +1201,9 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
     std::vector<std::pair<ShardId, boost::optional<ReshardingOplogApplierProgress>>>
         progressDocList;
     for (const auto& donor : _donorShards) {
-        auto setOrAdd = [](auto& opt, auto add) { opt = opt.value_or(0) + add; };
+        auto setOrAdd = [](auto& opt, auto add) {
+            opt = opt.value_or(0) + add;
+        };
         {
             AutoGetCollection oplogBufferColl(opCtx.get(),
                                               resharding::getLocalOplogBufferNamespace(

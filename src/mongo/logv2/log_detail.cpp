@@ -242,7 +242,9 @@ void doLogImpl(int32_t id,
     }
 
     loggingDepth++;
-    ScopeGuard updateDepth = [] { loggingDepth--; };
+    ScopeGuard updateDepth = [] {
+        loggingDepth--;
+    };
 
     try {
         _doLogImpl(id, severity, options, message, attrs);

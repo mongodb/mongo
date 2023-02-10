@@ -48,7 +48,9 @@ std::vector<T> toVector(boost::optional<stdx::variant<T, std::vector<T>>> optVal
         return {};
     }
     return stdx::visit(OverloadedVisitor{[](T val) { return std::vector<T>{val}; },
-                                         [](const std::vector<T>& vals) { return vals; }},
+                                         [](const std::vector<T>& vals) {
+                                             return vals;
+                                         }},
                        *optVals);
 }
 }  // namespace variant_util

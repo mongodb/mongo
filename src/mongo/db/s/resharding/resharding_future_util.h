@@ -100,23 +100,23 @@ ExecutorFuture<void> cancelWhenAnyErrorThenQuiesce(
 template <typename BodyCallable>
 class [[nodiscard]] WithAutomaticRetry {
 public:
-    explicit WithAutomaticRetry(BodyCallable && body) : _body{std::move(body)} {}
+    explicit WithAutomaticRetry(BodyCallable&& body) : _body{std::move(body)} {}
 
-    decltype(auto) onTransientError(unique_function<void(const Status&)> onTransientError)&& {
+    decltype(auto) onTransientError(unique_function<void(const Status&)> onTransientError) && {
         invariant(!_onTransientError, "Cannot call onTransientError() twice");
         _onTransientError = std::move(onTransientError);
         return std::move(*this);
     }
 
     decltype(auto) onUnrecoverableError(
-        unique_function<void(const Status&)> onUnrecoverableError)&& {
+        unique_function<void(const Status&)> onUnrecoverableError) && {
         invariant(!_onUnrecoverableError, "Cannot call onUnrecoverableError() twice");
         _onUnrecoverableError = std::move(onUnrecoverableError);
         return std::move(*this);
     }
 
     template <typename StatusType>
-    auto until(unique_function<bool(const StatusType&)> condition)&& {
+    auto until(unique_function<bool(const StatusType&)> condition) && {
         invariant(_onTransientError, "Must call onTransientError() first");
         invariant(_onUnrecoverableError, "Must call onUnrecoverableError() first");
 

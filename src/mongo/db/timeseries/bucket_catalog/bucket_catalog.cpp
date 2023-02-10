@@ -307,7 +307,9 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(
 }
 
 Status BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
-    auto getBatchStatus = [&] { return batch->promise.getFuture().getNoThrow().getStatus(); };
+    auto getBatchStatus = [&] {
+        return batch->promise.getFuture().getNoThrow().getStatus();
+    };
 
     if (isWriteBatchFinished(*batch)) {
         // In this case, someone else aborted the batch behind our back. Oops.

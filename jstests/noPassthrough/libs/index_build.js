@@ -247,7 +247,7 @@ var IndexBuildTest = class {
      */
     static buildIndexOnNodeAsStandalone(rst, node, port, dbName, collName, indexSpec, indexName) {
         jsTestLog('Restarting as standalone: ' + node.host);
-        rst.stop(node, /*signal=*/null, /*opts=*/null, {forRestart: true, waitpid: true});
+        rst.stop(node, /*signal=*/ null, /*opts=*/ null, {forRestart: true, waitpid: true});
         const standalone = MongoRunner.runMongod({
             restart: true,
             dbpath: node.dbpath,

@@ -71,16 +71,16 @@ Status isValidNameForUserWrite(StringData varName) {
     if (varName == "CURRENT") {
         return Status::OK();
     }
-    return isValidName(varName,
-                       [](char ch) -> bool {
-                           return (ch >= 'a' && ch <= 'z') || (ch & '\x80');  // non-ascii
-                       },
-                       [](char ch) -> bool {
-                           return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
-                               (ch >= '0' && ch <= '9') || (ch == '_') ||
-                               (ch & '\x80');  // non-ascii
-                       },
-                       1);
+    return isValidName(
+        varName,
+        [](char ch) -> bool {
+            return (ch >= 'a' && ch <= 'z') || (ch & '\x80');  // non-ascii
+        },
+        [](char ch) -> bool {
+            return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+                (ch >= '0' && ch <= '9') || (ch == '_') || (ch & '\x80');  // non-ascii
+        },
+        1);
 }
 
 void validateNameForUserWrite(StringData varName) {
@@ -88,16 +88,17 @@ void validateNameForUserWrite(StringData varName) {
 }
 
 void validateNameForUserRead(StringData varName) {
-    validateName(varName,
-                 [](char ch) -> bool {
-                     return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
-                         (ch & '\x80');  // non-ascii
-                 },
-                 [](char ch) -> bool {
-                     return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
-                         (ch >= '0' && ch <= '9') || (ch == '_') || (ch & '\x80');  // non-ascii
-                 },
-                 1);
+    validateName(
+        varName,
+        [](char ch) -> bool {
+            return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+                (ch & '\x80');  // non-ascii
+        },
+        [](char ch) -> bool {
+            return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+                (ch >= '0' && ch <= '9') || (ch == '_') || (ch & '\x80');  // non-ascii
+        },
+        1);
 }
 
 }  // namespace mongo::variableValidation

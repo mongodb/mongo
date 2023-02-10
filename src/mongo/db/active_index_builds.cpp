@@ -53,7 +53,9 @@ void ActiveIndexBuilds::waitForAllIndexBuildsToStopForShutdown(OperationContext*
         return;
     }
 
-    auto indexBuildToUUID = [](const auto& indexBuild) { return indexBuild.first; };
+    auto indexBuildToUUID = [](const auto& indexBuild) {
+        return indexBuild.first;
+    };
     auto begin = boost::make_transform_iterator(_allIndexBuilds.begin(), indexBuildToUUID);
     auto end = boost::make_transform_iterator(_allIndexBuilds.end(), indexBuildToUUID);
     LOGV2(4725201,
@@ -61,7 +63,9 @@ void ActiveIndexBuilds::waitForAllIndexBuildsToStopForShutdown(OperationContext*
           "indexBuilds"_attr = logv2::seqLog(begin, end));
 
     // Wait for all the index builds to stop.
-    auto pred = [this]() { return _allIndexBuilds.empty(); };
+    auto pred = [this]() {
+        return _allIndexBuilds.empty();
+    };
     _indexBuildsCondVar.wait(lk, pred);
 }
 
@@ -174,7 +178,9 @@ std::vector<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::_filterInde
 void ActiveIndexBuilds::awaitNoBgOpInProgForDb(OperationContext* opCtx,
                                                const DatabaseName& dbName) {
     stdx::unique_lock<Latch> lk(_mutex);
-    auto indexBuildFilter = [dbName](const auto& replState) { return dbName == replState.dbName; };
+    auto indexBuildFilter = [dbName](const auto& replState) {
+        return dbName == replState.dbName;
+    };
     auto pred = [&, this]() {
         auto dbIndexBuilds = _filterIndexBuilds_inlock(lk, indexBuildFilter);
         return dbIndexBuilds.empty();

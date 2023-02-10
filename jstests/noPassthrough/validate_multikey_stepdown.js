@@ -96,7 +96,7 @@ assert.eq(
 // For the purpose of reproducing the validation error in geo_2dsphere, it is important to skip
 // validation when restarting the primary node. Enabling validation here has an effect on the
 // validate command's behavior after restarting.
-primary = rst.restart(primary, {skipValidation: true}, /*signal=*/undefined, /*wait=*/true);
+primary = rst.restart(primary, {skipValidation: true}, /*signal=*/ undefined, /*wait=*/ true);
 testColl = primary.getCollection(testColl.getFullName());
 
 jsTestLog('Checking documents in collection after restart');

@@ -202,9 +202,10 @@ void buildUpdateDescriptionWithDeltaOplog(
 
                 while (auto nextSubDiff = reader->nextSubDiff()) {
                     stdx::variant<DocumentDiffReader*, ArrayDiffReader*> nextReader;
-                    stdx::visit(
-                        OverloadedVisitor{[&nextReader](auto& reader) { nextReader = &reader; }},
-                        nextSubDiff->second);
+                    stdx::visit(OverloadedVisitor{[&nextReader](auto& reader) {
+                                    nextReader = &reader;
+                                }},
+                                nextSubDiff->second);
                     buildUpdateDescriptionWithDeltaOplog(
                         nextReader, builder, {{nextSubDiff->first}});
                 }
@@ -220,18 +221,17 @@ void buildUpdateDescriptionWithDeltaOplog(
                 }
 
                 for (auto nextMod = reader->next(); nextMod; nextMod = reader->next()) {
-                    stdx::visit(
-                        OverloadedVisitor{
-                            [&](BSONElement elem) {
-                                builder->addToUpdatedFields(nextMod->first, Value(elem));
-                            },
+                    stdx::visit(OverloadedVisitor{
+                                    [&](BSONElement elem) {
+                                        builder->addToUpdatedFields(nextMod->first, Value(elem));
+                                    },
 
-                            [&](auto& nextReader) {
-                                buildUpdateDescriptionWithDeltaOplog(
-                                    &nextReader, builder, {{nextMod->first}});
-                            },
-                        },
-                        nextMod->second);
+                                    [&](auto& nextReader) {
+                                        buildUpdateDescriptionWithDeltaOplog(
+                                            &nextReader, builder, {{nextMod->first}});
+                                    },
+                                },
+                                nextMod->second);
                 }
             },
         },

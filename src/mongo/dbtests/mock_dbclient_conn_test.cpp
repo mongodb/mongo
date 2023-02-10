@@ -673,8 +673,12 @@ TEST(MockDBClientConnTest, Delay) {
     ASSERT_EQUALS(1U, server.getCmdCount());
 }
 
-const auto docObj = [](int i) { return BSON("_id" << i); };
-const auto metadata = [](int i) { return BSON("$fakeMetaData" << i); };
+const auto docObj = [](int i) {
+    return BSON("_id" << i);
+};
+const auto metadata = [](int i) {
+    return BSON("$fakeMetaData" << i);
+};
 const long long cursorId = 123;
 const bool moreToCome = true;
 const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");

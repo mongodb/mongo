@@ -143,7 +143,9 @@ ServiceContext::ConstructorActionRegisterer collectionShardingStateFactoryRegist
         CollectionShardingStateFactory::set(
             service, std::make_unique<CollectionShardingStateFactoryStandalone>(service));
     },
-    [](ServiceContext* service) { CollectionShardingStateFactory::clear(service); }};
+    [](ServiceContext* service) {
+        CollectionShardingStateFactory::clear(service);
+    }};
 
 }  // namespace
 

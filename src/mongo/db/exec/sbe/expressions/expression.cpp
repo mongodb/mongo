@@ -567,7 +567,9 @@ using ArityFn = bool (*)(size_t);
 /**
  * The arity test function that trivially accepts any number of arguments.
  */
-static constexpr ArityFn kAnyNumberOfArgs = [](size_t) { return true; };
+static constexpr ArityFn kAnyNumberOfArgs = [](size_t) {
+    return true;
+};
 
 /**
  * The builtin function description.

@@ -178,7 +178,9 @@ SelectivityType estimateInterval(const stats::ArrayHistogram* histogram,
                 // to enable this behavior.
                 return heuristicIntervalSel(interval, childResult);
             }
-            default: { MONGO_UNREACHABLE; }
+            default: {
+                MONGO_UNREACHABLE;
+            }
         }
     }
 }

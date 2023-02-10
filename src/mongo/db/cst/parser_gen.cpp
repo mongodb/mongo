@@ -1754,10 +1754,10 @@ int ParserGen::parse() {
         yystack_.clear();
         yypush_(YY_NULLPTR, 0, YY_MOVE(yyla));
 
-    /*-----------------------------------------------.
-    | yynewstate -- push a new symbol on the stack.  |
-    `-----------------------------------------------*/
-    yynewstate:
+/*-----------------------------------------------.
+| yynewstate -- push a new symbol on the stack.  |
+`-----------------------------------------------*/
+yynewstate:
         YYCDEBUG << "Entering state " << int(yystack_[0].state) << '\n';
         YY_STACK_PRINT();
 
@@ -1768,10 +1768,10 @@ int ParserGen::parse() {
         goto yybackup;
 
 
-    /*-----------.
-    | yybackup.  |
-    `-----------*/
-    yybackup:
+/*-----------.
+| yybackup.  |
+`-----------*/
+yybackup:
         // Try to take a decision without lookahead.
         yyn = yypact_[+yystack_[0].state];
         if (yy_pact_value_is_default_(yyn))
@@ -1831,20 +1831,20 @@ int ParserGen::parse() {
         goto yynewstate;
 
 
-    /*-----------------------------------------------------------.
-    | yydefault -- do the default action for the current state.  |
-    `-----------------------------------------------------------*/
-    yydefault:
+/*-----------------------------------------------------------.
+| yydefault -- do the default action for the current state.  |
+`-----------------------------------------------------------*/
+yydefault:
         yyn = yydefact_[+yystack_[0].state];
         if (yyn == 0)
             goto yyerrlab;
         goto yyreduce;
 
 
-    /*-----------------------------.
-    | yyreduce -- do a reduction.  |
-    `-----------------------------*/
-    yyreduce:
+/*-----------------------------.
+| yyreduce -- do a reduction.  |
+`-----------------------------*/
+yyreduce:
         yylen = yyr2_[yyn];
         {
             stack_symbol_type yylhs;
@@ -8826,10 +8826,10 @@ int ParserGen::parse() {
         goto yynewstate;
 
 
-    /*--------------------------------------.
-    | yyerrlab -- here on detecting error.  |
-    `--------------------------------------*/
-    yyerrlab:
+/*--------------------------------------.
+| yyerrlab -- here on detecting error.  |
+`--------------------------------------*/
+yyerrlab:
         // If not already recovering from an error, report this error.
         if (!yyerrstatus_) {
             ++yynerrs_;
@@ -8857,10 +8857,10 @@ int ParserGen::parse() {
         goto yyerrlab1;
 
 
-    /*---------------------------------------------------.
-    | yyerrorlab -- error raised explicitly by YYERROR.  |
-    `---------------------------------------------------*/
-    yyerrorlab:
+/*---------------------------------------------------.
+| yyerrorlab -- error raised explicitly by YYERROR.  |
+`---------------------------------------------------*/
+yyerrorlab:
         /* Pacify compilers when the user code never invokes YYERROR and
            the label yyerrorlab therefore never appears in user code.  */
         if (false)
@@ -8874,10 +8874,10 @@ int ParserGen::parse() {
         goto yyerrlab1;
 
 
-    /*-------------------------------------------------------------.
-    | yyerrlab1 -- common code for both syntax error and YYERROR.  |
-    `-------------------------------------------------------------*/
-    yyerrlab1:
+/*-------------------------------------------------------------.
+| yyerrlab1 -- common code for both syntax error and YYERROR.  |
+`-------------------------------------------------------------*/
+yyerrlab1:
         yyerrstatus_ = 3;  // Each real token shifted decrements this.
         // Pop stack until we find a state that shifts the error token.
         for (;;) {
@@ -8913,26 +8913,26 @@ int ParserGen::parse() {
         goto yynewstate;
 
 
-    /*-------------------------------------.
-    | yyacceptlab -- YYACCEPT comes here.  |
-    `-------------------------------------*/
-    yyacceptlab:
+/*-------------------------------------.
+| yyacceptlab -- YYACCEPT comes here.  |
+`-------------------------------------*/
+yyacceptlab:
         yyresult = 0;
         goto yyreturn;
 
 
-    /*-----------------------------------.
-    | yyabortlab -- YYABORT comes here.  |
-    `-----------------------------------*/
-    yyabortlab:
+/*-----------------------------------.
+| yyabortlab -- YYABORT comes here.  |
+`-----------------------------------*/
+yyabortlab:
         yyresult = 1;
         goto yyreturn;
 
 
-    /*-----------------------------------------------------.
-    | yyreturn -- parsing is finished, return the result.  |
-    `-----------------------------------------------------*/
-    yyreturn:
+/*-----------------------------------------------------.
+| yyreturn -- parsing is finished, return the result.  |
+`-----------------------------------------------------*/
+yyreturn:
         if (!yyla.empty())
             yy_destroy_("Cleanup: discarding lookahead", yyla);
 
@@ -8990,7 +8990,7 @@ std::string ParserGen::yytnamerr_(const char* yystr) {
                     else
                         goto append;
 
-                append:
+append:
                 default:
                     yyr += *yyp;
                     break;
@@ -8998,7 +8998,7 @@ std::string ParserGen::yytnamerr_(const char* yystr) {
                 case '"':
                     return yyr;
             }
-    do_not_strip_quotes:;
+do_not_strip_quotes:;
     }
 
     return yystr;

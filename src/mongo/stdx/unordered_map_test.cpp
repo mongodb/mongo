@@ -72,7 +72,9 @@ TEST(StdxUnorderedMapTest, EraseIf) {
         {106, 6},
         {107, 7},
     };
-    auto pred = [](auto&& e) { return e.second < 0; };
+    auto pred = [](auto&& e) {
+        return e.second < 0;
+    };
     size_t predCount = std::count_if(pre.begin(), pre.end(), pred);
 
     auto map = pre;

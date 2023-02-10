@@ -104,12 +104,14 @@ TEST_F(BatchedWritePolicyTest, TooFewDocumentsTest) {
     auto cm = CursorMock(rp);
     auto record = cm.next();
 
-    buildBatchedWritesWithPolicy(maxSizeBytes, 4, [&cm]() { return cm.next(); }, record, stmts);
+    buildBatchedWritesWithPolicy(
+        maxSizeBytes, 4, [&cm]() { return cm.next(); }, record, stmts);
     ASSERT_EQ(3, stmts.size());
 
     // Exhausted Cursor.
     stmts.clear();
-    buildBatchedWritesWithPolicy(maxSizeBytes, 4, [&cm]() { return cm.next(); }, record, stmts);
+    buildBatchedWritesWithPolicy(
+        maxSizeBytes, 4, [&cm]() { return cm.next(); }, record, stmts);
     ASSERT_EQ(0, stmts.size());
 }
 
@@ -122,11 +124,13 @@ TEST_F(BatchedWritePolicyTest, TooManyDocumentsTest) {
     auto cm = CursorMock(rp);
     auto record = cm.next();
 
-    buildBatchedWritesWithPolicy(maxSizeBytes, 4, [&cm]() { return cm.next(); }, record, stmts);
+    buildBatchedWritesWithPolicy(
+        maxSizeBytes, 4, [&cm]() { return cm.next(); }, record, stmts);
     ASSERT_EQ(4, stmts.size());
 
     stmts.clear();
-    buildBatchedWritesWithPolicy(maxSizeBytes, 4, [&cm]() { return cm.next(); }, record, stmts);
+    buildBatchedWritesWithPolicy(
+        maxSizeBytes, 4, [&cm]() { return cm.next(); }, record, stmts);
     ASSERT_EQ(1, stmts.size());
 }
 
@@ -162,11 +166,13 @@ TEST_F(BatchedWritePolicyTest, TooManyBigDocumentsTest) {
     auto cm = CursorMock(rp);
     auto record = cm.next();
 
-    buildBatchedWritesWithPolicy(4 * 14, maxNumDocs, [&cm]() { return cm.next(); }, record, stmts);
+    buildBatchedWritesWithPolicy(
+        4 * 14, maxNumDocs, [&cm]() { return cm.next(); }, record, stmts);
     ASSERT_EQ(4, stmts.size());
 
     stmts.clear();
-    buildBatchedWritesWithPolicy(4 * 14, maxNumDocs, [&cm]() { return cm.next(); }, record, stmts);
+    buildBatchedWritesWithPolicy(
+        4 * 14, maxNumDocs, [&cm]() { return cm.next(); }, record, stmts);
     ASSERT_EQ(1, stmts.size());
 }
 
@@ -180,15 +186,18 @@ TEST_F(BatchedWritePolicyTest, TooBigDocumentTest) {
     auto cm = CursorMock(rp);
     auto record = cm.next();
 
-    buildBatchedWritesWithPolicy(1, 10, [&cm]() { return cm.next(); }, record, stmts);
+    buildBatchedWritesWithPolicy(
+        1, 10, [&cm]() { return cm.next(); }, record, stmts);
     ASSERT_EQ(1, stmts.size());
 
     stmts.clear();
-    buildBatchedWritesWithPolicy(1, 10, [&cm]() { return cm.next(); }, record, stmts);
+    buildBatchedWritesWithPolicy(
+        1, 10, [&cm]() { return cm.next(); }, record, stmts);
     ASSERT_EQ(1, stmts.size());
 
     stmts.clear();
-    buildBatchedWritesWithPolicy(1, 10, [&cm]() { return cm.next(); }, record, stmts);
+    buildBatchedWritesWithPolicy(
+        1, 10, [&cm]() { return cm.next(); }, record, stmts);
     ASSERT_EQ(1, stmts.size());
 }
 

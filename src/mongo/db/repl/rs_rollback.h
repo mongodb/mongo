@@ -145,13 +145,14 @@ class RollbackSource;
  * 'sleepSecsFn' is an optional testing-only argument for overriding mongo::sleepsecs().
  */
 
-void rollback(OperationContext* opCtx,
-              const OplogInterface& localOplog,
-              const RollbackSource& rollbackSource,
-              int requiredRBID,
-              ReplicationCoordinator* replCoord,
-              ReplicationProcess* replicationProcess,
-              std::function<void(int)> sleepSecsFn = [](int secs) { sleepsecs(secs); });
+void rollback(
+    OperationContext* opCtx,
+    const OplogInterface& localOplog,
+    const RollbackSource& rollbackSource,
+    int requiredRBID,
+    ReplicationCoordinator* replCoord,
+    ReplicationProcess* replicationProcess,
+    std::function<void(int)> sleepSecsFn = [](int secs) { sleepsecs(secs); });
 
 /**
  * Initiates the rollback process after transition to ROLLBACK.

@@ -177,11 +177,9 @@ public:
               std::enable_if_t<!std::is_same_v<thread, std::decay_t<Function>>, int> = 0>
     explicit thread(Function f, Args&&... args) noexcept
         : ::std::thread::thread(  // NOLINT
-              [
-                  sigAltStackController = support::SigAltStackController(),
-                  f = std::move(f),
-                  pack = std::make_tuple(std::forward<Args>(args)...)
-              ]() mutable noexcept {
+              [sigAltStackController = support::SigAltStackController(),
+               f = std::move(f),
+               pack = std::make_tuple(std::forward<Args>(args)...)]() mutable noexcept {
 #if defined(_WIN32)
                   // On Win32 we have to set the terminate handler per thread.
                   // We set it to our universal terminate handler, which people can register via the

@@ -375,7 +375,9 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             // We should never see an unknown noop entry.
             MONGO_UNREACHABLE_TASSERT(5052201);
         }
-        default: { MONGO_UNREACHABLE_TASSERT(6330501); }
+        default: {
+            MONGO_UNREACHABLE_TASSERT(6330501);
+        }
     }
 
     // UUID should always be present except for invalidate and dropDatabase entries.

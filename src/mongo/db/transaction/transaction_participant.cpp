@@ -1399,8 +1399,7 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         swap(trs, o(lk).txnResourceStash);
         return trs;
-    }
-    ();
+    }();
 
     ScopeGuard releaseOnError([&] {
         // Restore the lock resources back to transaction participant.

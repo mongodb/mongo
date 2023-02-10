@@ -199,7 +199,9 @@ int recursionTestImpl(bool useSigAltStack) {
             void* deepestAddress;
             const std::function<void()> recur;
         };
-        MostlyInfiniteRecursion recursion = {0, &recursion, [&] { recursion.run(); }};
+        MostlyInfiniteRecursion recursion = {0, &recursion, [&] {
+                                                 recursion.run();
+                                             }};
 
         // When the signal handler fires, it will return to this sigsetjmp call, causing
         // it to return a nonzero value. This makes the child thread viable again, and

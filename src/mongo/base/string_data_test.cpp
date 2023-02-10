@@ -427,12 +427,29 @@ TEST(Ostream, StringDataMatchesStdString) {
         std::function<void(std::ostream&)> manip;
     };
     const TestCase testCases[] = {
-        {__LINE__, [](std::ostream& os) {}},
-        {__LINE__, [](std::ostream& os) { os << std::setw(5); }},
-        {__LINE__, [](std::ostream& os) { os << std::left << std::setw(5); }},
-        {__LINE__, [](std::ostream& os) { os << std::right << std::setw(5); }},
-        {__LINE__, [](std::ostream& os) { os << std::setfill('.') << std::left << std::setw(5); }},
-        {__LINE__, [](std::ostream& os) { os << std::setfill('.') << std::right << std::setw(5); }},
+        {__LINE__,
+         [](std::ostream& os) {
+         }},
+        {__LINE__,
+         [](std::ostream& os) {
+             os << std::setw(5);
+         }},
+        {__LINE__,
+         [](std::ostream& os) {
+             os << std::left << std::setw(5);
+         }},
+        {__LINE__,
+         [](std::ostream& os) {
+             os << std::right << std::setw(5);
+         }},
+        {__LINE__,
+         [](std::ostream& os) {
+             os << std::setfill('.') << std::left << std::setw(5);
+         }},
+        {__LINE__,
+         [](std::ostream& os) {
+             os << std::setfill('.') << std::right << std::setw(5);
+         }},
     };
     for (const auto& testCase : testCases) {
         const std::string location = std::string(" at line:") + std::to_string(testCase.line);
@@ -441,8 +458,12 @@ TEST(Ostream, StringDataMatchesStdString) {
             std::function<void(std::ostream&)> putter;
             std::ostringstream os;
         };
-        Experiment expected{[&](std::ostream& os) { os << s; }};
-        Experiment actual{[&](std::ostream& os) { os << StringData(s); }};
+        Experiment expected{[&](std::ostream& os) {
+            os << s;
+        }};
+        Experiment actual{[&](std::ostream& os) {
+            os << StringData(s);
+        }};
         for (auto& x : {&expected, &actual}) {
             x->os << ">>";
             testCase.manip(x->os);

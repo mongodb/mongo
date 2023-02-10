@@ -725,7 +725,9 @@ BuildInfoExecutor* BuildInfoExecutor::get(ServiceContext* svc) {
 const auto buildInfoExecutorRegisterer = ServiceContext::ConstructorActionRegisterer{
     "BuildInfoExecutor",
     [](ServiceContext* ctx) { getBuildInfoExecutor(ctx).start(); },
-    [](ServiceContext* ctx) { getBuildInfoExecutor(ctx).stop(); }};
+    [](ServiceContext* ctx) {
+        getBuildInfoExecutor(ctx).stop();
+    }};
 
 class CmdBuildInfo : public BasicCommand {
 public:

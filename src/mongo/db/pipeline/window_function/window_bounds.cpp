@@ -219,24 +219,23 @@ WindowBounds WindowBounds::parse(BSONObj args,
     }
 }
 void WindowBounds::serialize(MutableDocument& args) const {
-    stdx::visit(
-        OverloadedVisitor{
-            [&](const DocumentBased& docBounds) {
-                args[kArgDocuments] = Value{std::vector<Value>{
-                    serializeBound(docBounds.lower),
-                    serializeBound(docBounds.upper),
-                }};
-            },
-            [&](const RangeBased& rangeBounds) {
-                args[kArgRange] = Value{std::vector<Value>{
-                    serializeBound(rangeBounds.lower),
-                    serializeBound(rangeBounds.upper),
-                }};
-                if (rangeBounds.unit) {
-                    args[kArgUnit] = Value{serializeTimeUnit(*rangeBounds.unit)};
-                }
-            },
-        },
-        bounds);
+    stdx::visit(OverloadedVisitor{
+                    [&](const DocumentBased& docBounds) {
+                        args[kArgDocuments] = Value{std::vector<Value>{
+                            serializeBound(docBounds.lower),
+                            serializeBound(docBounds.upper),
+                        }};
+                    },
+                    [&](const RangeBased& rangeBounds) {
+                        args[kArgRange] = Value{std::vector<Value>{
+                            serializeBound(rangeBounds.lower),
+                            serializeBound(rangeBounds.upper),
+                        }};
+                        if (rangeBounds.unit) {
+                            args[kArgUnit] = Value{serializeTimeUnit(*rangeBounds.unit)};
+                        }
+                    },
+                },
+                bounds);
 }
 }  // namespace mongo

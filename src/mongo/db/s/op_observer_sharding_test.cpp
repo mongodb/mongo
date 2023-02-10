@@ -255,7 +255,9 @@ TEST_F(DocumentKeyStateTest, CheckDBVersion) {
     auto onInsert = [&]() {
         opObserver.onInserts(opCtx, *autoColl, toInsert.begin(), toInsert.end(), fromMigrate);
     };
-    auto onUpdate = [&]() { opObserver.onUpdate(opCtx, update); };
+    auto onUpdate = [&]() {
+        opObserver.onUpdate(opCtx, update);
+    };
     auto onDelete = [&]() {
         opObserver.aboutToDelete(opCtx, *autoColl, BSON("_id" << 0));
         opObserver.onDelete(opCtx, *autoColl, kUninitializedStmtId, {});

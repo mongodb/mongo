@@ -239,7 +239,9 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
         ? 0
         : (_maxAttributeSizeKB != 0 ? _maxAttributeSizeKB->loadRelaxed() * 1024
                                     : c::kDefaultMaxAttributeOutputSizeKB * 1024);
-    auto write = [&](StringData s) { buffer.append(s.rawData(), s.rawData() + s.size()); };
+    auto write = [&](StringData s) {
+        buffer.append(s.rawData(), s.rawData() + s.size());
+    };
 
     struct CommaTracker {
         StringData comma;
@@ -273,8 +275,16 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
         };
     };
 
-    auto strFn = [&](StringData s) { return [&, s] { write(s); }; };
-    auto escFn = [&](StringData s) { return [&, s] { str::escapeForJSON(buffer, s); }; };
+    auto strFn = [&](StringData s) {
+        return [&, s] {
+            write(s);
+        };
+    };
+    auto escFn = [&](StringData s) {
+        return [&, s] {
+            str::escapeForJSON(buffer, s);
+        };
+    };
     auto intFn = [&](auto x) {
         return [&, x] {
             fmt::format_int s{x};
@@ -314,10 +324,14 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
         });
     };
     auto bsonObjFn = [&](BSONObj o) {
-        return [&, o] { o.jsonStringBuffer(kFmt, 0, false, buffer, 0); };
+        return [&, o] {
+            o.jsonStringBuffer(kFmt, 0, false, buffer, 0);
+        };
     };
     auto bsonArrFn = [&](BSONArray a) {
-        return [&, a] { a.jsonStringBuffer(kFmt, 0, true, buffer, 0); };
+        return [&, a] {
+            a.jsonStringBuffer(kFmt, 0, true, buffer, 0);
+        };
     };
 
     jsobj([&](CommaTracker& top) {

@@ -177,19 +177,19 @@ void validateRangeIndex(BSONType fieldType, QueryTypeConfig& query) {
 
 void validateEncryptedField(const EncryptedField* field) {
     if (field->getQueries().has_value()) {
-        auto encryptedIndex = stdx::visit(
-            OverloadedVisitor{
-                [](QueryTypeConfig config) { return config; },
-                [](std::vector<QueryTypeConfig> configs) {
-                    // TODO SERVER-67421 - remove restriction that only one query type can be
-                    // specified per field
-                    uassert(6338404,
-                            "Exactly one query type should be specified per field",
-                            configs.size() == 1);
-                    return configs[0];
-                },
-            },
-            field->getQueries().value());
+        auto encryptedIndex =
+            stdx::visit(OverloadedVisitor{
+                            [](QueryTypeConfig config) { return config; },
+                            [](std::vector<QueryTypeConfig> configs) {
+                                // TODO SERVER-67421 - remove restriction that only one query type
+                                // can be specified per field
+                                uassert(6338404,
+                                        "Exactly one query type should be specified per field",
+                                        configs.size() == 1);
+                                return configs[0];
+                            },
+                        },
+                        field->getQueries().value());
 
         uassert(6412601,
                 "Bson type needs to be specified for an indexed field",

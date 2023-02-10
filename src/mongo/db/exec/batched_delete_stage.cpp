@@ -244,17 +244,18 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
         return PlanStage::NEED_TIME;
     }
 
-    handlePlanStageYield(expCtx(),
-                         "BatchedDeleteStage saveState",
-                         collection()->ns().ns(),
-                         [&] {
-                             child()->saveState();
-                             return PlanStage::NEED_TIME /* unused */;
-                         },
-                         [&] {
-                             // yieldHandler
-                             std::terminate();
-                         });
+    handlePlanStageYield(
+        expCtx(),
+        "BatchedDeleteStage saveState",
+        collection()->ns().ns(),
+        [&] {
+            child()->saveState();
+            return PlanStage::NEED_TIME /* unused */;
+        },
+        [&] {
+            // yieldHandler
+            std::terminate();
+        });
 
     std::set<WorkingSetID> recordsToSkip;
     unsigned int docsDeleted = 0;
@@ -469,17 +470,18 @@ void BatchedDeleteStage::_stageNewDelete(WorkingSetID* workingSetMemberID) {
 }
 
 PlanStage::StageState BatchedDeleteStage::_tryRestoreState(WorkingSetID* out) {
-    return handlePlanStageYield(expCtx(),
-                                "BatchedDeleteStage::_tryRestoreState",
-                                collection()->ns().ns(),
-                                [&] {
-                                    child()->restoreState(&collection());
-                                    return PlanStage::NEED_TIME;
-                                },
-                                [&] {
-                                    // yieldHandler
-                                    *out = WorkingSet::INVALID_ID;
-                                });
+    return handlePlanStageYield(
+        expCtx(),
+        "BatchedDeleteStage::_tryRestoreState",
+        collection()->ns().ns(),
+        [&] {
+            child()->restoreState(&collection());
+            return PlanStage::NEED_TIME;
+        },
+        [&] {
+            // yieldHandler
+            *out = WorkingSet::INVALID_ID;
+        });
 }
 
 void BatchedDeleteStage::_prepareToRetryDrainAfterYield(

@@ -154,7 +154,9 @@ void _testConcurrentLogOp(const F& makeTaskFunction,
     // Run 2 concurrent logOp() requests using the thread pool.
     ThreadPool::Options options;
     options.maxThreads = 2U;
-    options.onCreateThread = [](const std::string& name) { Client::initThread(name); };
+    options.onCreateThread = [](const std::string& name) {
+        Client::initThread(name);
+    };
     ThreadPool pool(options);
     pool.startup();
 

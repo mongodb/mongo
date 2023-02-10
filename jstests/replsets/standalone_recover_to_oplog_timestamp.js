@@ -37,7 +37,7 @@ const docs = [{_id: 1, a: 1}];
 const operationTime =
     assert.commandWorked(primaryDB.runCommand({insert: collName, documents: docs})).operationTime;
 
-rst.stopSet(/*signal=*/null, /*forRestart=*/true);
+rst.stopSet(/*signal=*/ null, /*forRestart=*/ true);
 
 // Restart as standalone in queryableBackupMode and run replication recovery up to the last insert.
 const primaryStandalone = MongoRunner.runMongod({

@@ -139,9 +139,9 @@ void censorBSONObjRecursive(const BSONObj& params,          // Object we are cen
     BSONObjIterator paramsIterator(params);
     while (paramsIterator.more()) {
         BSONElement param = paramsIterator.next();
-        std::string dottedName =
-            (parentPath.empty() ? param.fieldName()
-                                : isArray ? parentPath : parentPath + '.' + param.fieldName());
+        std::string dottedName = (parentPath.empty() ? param.fieldName()
+                                      : isArray      ? parentPath
+                                                     : parentPath + '.' + param.fieldName());
         if (param.type() == Array) {
             BSONObjBuilder subArray(result->subarrayStart(param.fieldName()));
             censorBSONObjRecursive(param.Obj(), dottedName, true, &subArray);

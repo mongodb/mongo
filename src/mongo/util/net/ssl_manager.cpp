@@ -154,11 +154,15 @@ std::string RFC4514Parser::extractAttributeName() {
     // If the first character is a digit, then this is an OID and can only contain
     // numbers and '.'
     if (ctype::isDigit(ch)) {
-        characterCheck = [](char ch) { return ctype::isDigit(ch) || ch == '.'; };
+        characterCheck = [](char ch) {
+            return ctype::isDigit(ch) || ch == '.';
+        };
         // If the first character is an alpha, then this is a short name and can only
         // contain alpha/digit/hyphen characters.
     } else if (ctype::isAlpha(ch)) {
-        characterCheck = [](char ch) { return ctype::isAlnum(ch) || ch == '-'; };
+        characterCheck = [](char ch) {
+            return ctype::isAlnum(ch) || ch == '-';
+        };
         // Otherwise this is an invalid attribute name
     } else {
         uasserted(ErrorCodes::BadValue,

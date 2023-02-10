@@ -262,36 +262,35 @@ void appendFieldNested(stdx::variant<mutablebson::Element, BSONElement> elt,
                        StringData outerValue,
                        StringData innerValue,
                        BSONObjBuilder* bob) {
-    stdx::visit(OverloadedVisitor{[&](const mutablebson::Element& element) {
-                                      auto fieldName = element.getFieldName();
-                                      if (element.getType() == BSONType::Object) {
-                                          auto elementObj = element.getValueObject();
-                                          if (!elementObj.isEmpty()) {
-                                              BSONObjBuilder subBob(bob->subobjStart(fieldName));
-                                              for (const auto& subElement : elementObj) {
-                                                  appendFieldNested(
-                                                      subElement, innerValue, innerValue, &subBob);
-                                              }
-                                              return;
-                                          }
-                                      }
-                                      bob->append(fieldName, outerValue);
-                                  },
-                                  [&](BSONElement element) {
-                                      auto fieldName = element.fieldNameStringData();
-                                      if (element.type() == BSONType::Object) {
-                                          auto elementObj = element.Obj();
-                                          if (!elementObj.isEmpty()) {
-                                              BSONObjBuilder subBob(bob->subobjStart(fieldName));
-                                              for (const auto& subElement : elementObj) {
-                                                  appendFieldNested(
-                                                      subElement, innerValue, innerValue, &subBob);
-                                              }
-                                              return;
-                                          }
-                                      }
-                                      bob->append(fieldName, outerValue);
-                                  }},
+    stdx::visit(OverloadedVisitor{
+                    [&](const mutablebson::Element& element) {
+                        auto fieldName = element.getFieldName();
+                        if (element.getType() == BSONType::Object) {
+                            auto elementObj = element.getValueObject();
+                            if (!elementObj.isEmpty()) {
+                                BSONObjBuilder subBob(bob->subobjStart(fieldName));
+                                for (const auto& subElement : elementObj) {
+                                    appendFieldNested(subElement, innerValue, innerValue, &subBob);
+                                }
+                                return;
+                            }
+                        }
+                        bob->append(fieldName, outerValue);
+                    },
+                    [&](BSONElement element) {
+                        auto fieldName = element.fieldNameStringData();
+                        if (element.type() == BSONType::Object) {
+                            auto elementObj = element.Obj();
+                            if (!elementObj.isEmpty()) {
+                                BSONObjBuilder subBob(bob->subobjStart(fieldName));
+                                for (const auto& subElement : elementObj) {
+                                    appendFieldNested(subElement, innerValue, innerValue, &subBob);
+                                }
+                                return;
+                            }
+                        }
+                        bob->append(fieldName, outerValue);
+                    }},
                 elt);
 }
 

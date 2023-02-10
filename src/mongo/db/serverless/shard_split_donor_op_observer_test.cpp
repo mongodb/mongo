@@ -227,7 +227,8 @@ TEST_F(ShardSplitDonorOpObserverTest, InitialInsertInvalidState) {
         auto stateDocument = defaultStateDocument();
         stateDocument.setState(state);
 
-        auto mtabVerifier = [](std::shared_ptr<TenantMigrationAccessBlocker>) {};
+        auto mtabVerifier = [](std::shared_ptr<TenantMigrationAccessBlocker>) {
+        };
 
         ASSERT_THROWS(runInsertTestCase(stateDocument, _tenantIds, mtabVerifier), DBException);
     }

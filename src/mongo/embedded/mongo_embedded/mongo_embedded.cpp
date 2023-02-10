@@ -263,8 +263,7 @@ mongo_embedded_v1_lib* capi_lib_init(mongo_embedded_v1_init_params const* params
         LogDomainGlobal::ConfigurationOptions config;
         config.makeDisabled();
         LogManager::global().getGlobalDomainInternal().configure(config).ignore();
-    }
-    ();
+    }();
     throw;
 }
 
@@ -441,10 +440,9 @@ void client_wire_protocol_rpc(mongo_embedded_v1_client* const client,
 
     // Assigning primitives in a tied tuple should be noexcept, so we force it to be so, for
     // our purposes.  This facilitates a runtime check should something WEIRD happen.
-    [ output, output_size, &outParams ]() noexcept {
+    [output, output_size, &outParams]() noexcept {
         std::tie(*output_size, *output) = std::move(outParams);
-    }
-    ();
+    }();
 }
 
 int capi_status_get_error(const mongo_embedded_v1_status* const status) noexcept {

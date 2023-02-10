@@ -57,16 +57,24 @@ StatusWith<std::vector<std::string>> getHostFQDNs(std::string hostName,
     using shim_addrinfo = struct addrinfo;
     shim_addrinfo* info = nullptr;
     const auto& shim_getaddrinfo = getaddrinfo;
-    const auto& shim_freeaddrinfo = [&info] { freeaddrinfo(info); };
+    const auto& shim_freeaddrinfo = [&info] {
+        freeaddrinfo(info);
+    };
     const auto& shim_getnameinfo = getnameinfo;
-    const auto& shim_toNativeString = [](const char* str) { return std::string(str); };
-    const auto& shim_fromNativeString = [](const std::string& str) { return str; };
+    const auto& shim_toNativeString = [](const char* str) {
+        return std::string(str);
+    };
+    const auto& shim_fromNativeString = [](const std::string& str) {
+        return str;
+    };
 #else
     using shim_char = wchar_t;
     using shim_addrinfo = struct addrinfoW;
     shim_addrinfo* info = nullptr;
     const auto& shim_getaddrinfo = GetAddrInfoW;
-    const auto& shim_freeaddrinfo = [&info] { FreeAddrInfoW(info); };
+    const auto& shim_freeaddrinfo = [&info] {
+        FreeAddrInfoW(info);
+    };
     const auto& shim_getnameinfo = GetNameInfoW;
     const auto& shim_toNativeString = toWideString;
     const auto& shim_fromNativeString = toUtf8String;

@@ -282,7 +282,9 @@ ServiceExecutorFixed* ServiceExecutorFixed::get(ServiceContext* ctx) {
 
 bool ServiceExecutorFixed::_waitForStop(stdx::unique_lock<Mutex>& lk,
                                         boost::optional<Milliseconds> timeout) {
-    auto isStopped = [&] { return _state == State::kStopped; };
+    auto isStopped = [&] {
+        return _state == State::kStopped;
+    };
     if (timeout)
         return _shutdownCondition.wait_for(lk, timeout->toSystemDuration(), isStopped);
     _shutdownCondition.wait(lk, isStopped);

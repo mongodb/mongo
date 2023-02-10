@@ -522,9 +522,12 @@ TEST(SSLManager, InitContextFromFileShouldFail) {
     params.sslCAFile = "jstests/libs/ca.pem";
     params.sslClusterFile = "jstests/libs/client.pem";
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
-    ASSERT_THROWS_CODE([&params] { SSLManagerInterface::create(params, true /* isSSLServer */); }(),
-                       DBException,
-                       ErrorCodes::InvalidSSLConfiguration);
+    ASSERT_THROWS_CODE(
+        [&params] {
+            SSLManagerInterface::create(params, true /* isSSLServer */);
+        }(),
+        DBException,
+        ErrorCodes::InvalidSSLConfiguration);
 #endif
 }
 

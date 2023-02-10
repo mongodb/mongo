@@ -135,23 +135,23 @@ void ScanStage::prepare(CompileCtx& ctx) {
         }
 
         const size_t offset = computeFieldMaskOffset(_fields[idx].c_str(), _fields[idx].size());
-        _maskOffsetToFieldAccessors[offset] = stdx::visit(
-            OverloadedVisitor{
-                [&](stdx::monostate _) -> FieldAccessorVariant {
-                    return std::make_pair(StringData{_fields[idx]}, accessorPtr);
-                },
-                [&](std::pair<StringData, value::OwnedValueAccessor*> pair)
-                    -> FieldAccessorVariant {
-                    StringMap<value::OwnedValueAccessor*> map;
-                    map.emplace(pair.first, pair.second);
-                    map.emplace(_fields[idx], accessorPtr);
-                    return map;
-                },
-                [&](StringMap<value::OwnedValueAccessor*> map) -> FieldAccessorVariant {
-                    map.emplace(_fields[idx], accessorPtr);
-                    return std::move(map);
-                }},
-            std::move(_maskOffsetToFieldAccessors[offset]));
+        _maskOffsetToFieldAccessors[offset] =
+            stdx::visit(OverloadedVisitor{
+                            [&](stdx::monostate _) -> FieldAccessorVariant {
+                                return std::make_pair(StringData{_fields[idx]}, accessorPtr);
+                            },
+                            [&](std::pair<StringData, value::OwnedValueAccessor*> pair)
+                                -> FieldAccessorVariant {
+                                StringMap<value::OwnedValueAccessor*> map;
+                                map.emplace(pair.first, pair.second);
+                                map.emplace(_fields[idx], accessorPtr);
+                                return map;
+                            },
+                            [&](StringMap<value::OwnedValueAccessor*> map) -> FieldAccessorVariant {
+                                map.emplace(_fields[idx], accessorPtr);
+                                return std::move(map);
+                            }},
+                        std::move(_maskOffsetToFieldAccessors[offset]));
     }
 
     if (_seekKeySlot) {

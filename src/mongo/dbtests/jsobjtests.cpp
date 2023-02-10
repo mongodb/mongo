@@ -1556,7 +1556,9 @@ struct BSONArrayBuilderTest {
         BSONObjBuilder objb;
         BSONArrayBuilder arrb;
 
-        auto fieldNameGenerator = [i = 0]() mutable { return std::to_string(i++); };
+        auto fieldNameGenerator = [i = 0]() mutable {
+            return std::to_string(i++);
+        };
 
         objb << fieldNameGenerator() << 100;
         arrb << 100;

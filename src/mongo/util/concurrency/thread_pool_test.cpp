@@ -284,7 +284,9 @@ TEST(ThreadPoolTest, JoinAllRetiredThreads) {
     options.minThreads = 4;
     options.maxThreads = 8;
     options.maxIdleThreadAge = Milliseconds(100);
-    options.onJoinRetiredThread = [&](const stdx::thread& t) { retiredThreads.addAndFetch(1); };
+    options.onJoinRetiredThread = [&](const stdx::thread& t) {
+        retiredThreads.addAndFetch(1);
+    };
     unittest::Barrier barrier(options.maxThreads + 1);
 
     ThreadPool pool(options);

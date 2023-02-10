@@ -117,13 +117,13 @@ function test(expireAfterSecondsVal) {
                           'o.index.name': 't_1',
                           'o.index.expireAfterSeconds': newNodeSpec.expireAfterSeconds
                       },
-                      /*limit=*/1)
+                      /*limit=*/ 1)
             .toArray();
     assert.eq(collModOplogEntries.length,
               1,
               'TTL index with ' + expireAfterSecondsVal +
                   ' expireAfterSeconds was not fixed using collMod during step-up: ' +
-                  tojson(rst.findOplog(primary, {op: {$ne: 'n'}}, /*limit=*/10).toArray()));
+                  tojson(rst.findOplog(primary, {op: {$ne: 'n'}}, /*limit=*/ 10).toArray()));
 
     rst.stopSet();
 }

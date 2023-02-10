@@ -89,7 +89,11 @@ TEST(StatusWith, nonDefaultConstructible) {
 
 TEST(StatusWith, ignoreTest) {
     // A compile-only test
-    [] { return StatusWith(false); }().getStatus().ignore();
+    [] {
+        return StatusWith(false);
+    }()
+        .getStatus()
+        .ignore();
 }
 
 }  // namespace

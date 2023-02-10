@@ -17,10 +17,14 @@ for (var i = 0; i < nItems; i++) {
     assert.commandWorked(coll.insert({_id: i}));
 }
 
-[0, 1, nItems, nItems + 1].forEach(function(size) {
-    var results = coll.aggregate([{$sample: {size: size}}]).toArray();
-    assert.eq(results.length, Math.min(size, nItems));
-});
+[0,
+ 1,
+ nItems,
+ nItems + 1]
+    .forEach(function(size) {
+        var results = coll.aggregate([{$sample: {size: size}}]).toArray();
+        assert.eq(results.length, Math.min(size, nItems));
+    });
 
 // Multiple $sample stages are allowed.
 var results = coll.aggregate([{$sample: {size: nItems}}, {$sample: {size: 1}}]).toArray();

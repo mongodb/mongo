@@ -108,13 +108,12 @@ private:
 
     void initialize() {
         auto needMore = [&](int index) {
-            return stdx::visit(
-                OverloadedVisitor{
-                    [&](const WindowBounds::Unbounded&) { return true; },
-                    [&](const WindowBounds::Current&) { return index == 0; },
-                    [&](const int& n) { return index <= n; },
-                },
-                _upperDocumentBound);
+            return stdx::visit(OverloadedVisitor{
+                                   [&](const WindowBounds::Unbounded&) { return true; },
+                                   [&](const WindowBounds::Current&) { return index == 0; },
+                                   [&](const int& n) { return index <= n; },
+                               },
+                               _upperDocumentBound);
         };
 
         _initialized = true;

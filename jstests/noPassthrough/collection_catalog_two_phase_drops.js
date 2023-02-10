@@ -53,8 +53,8 @@ for (let i = 0; i < 5; i++) {
 assert.commandWorked(coll.createIndex({x: 1}));
 
 const collUri = getUriForColl(coll);
-const idIndexUri = getUriForIndex(coll, /*indexName=*/"_id_");
-const xIndexUri = getUriForIndex(coll, /*indexName=*/"x_1");
+const idIndexUri = getUriForIndex(coll, /*indexName=*/ "_id_");
+const xIndexUri = getUriForIndex(coll, /*indexName=*/ "x_1");
 
 jsTestLog("Idents: " + tojson({collection: collUri, idIndex: idIndexUri, xIndex: xIndexUri}));
 

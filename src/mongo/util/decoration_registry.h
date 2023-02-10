@@ -114,7 +114,7 @@ public:
 
         auto iter = cbegin(_decorationInfo);
 
-        auto cleanupFunction = [&iter, container, this ]() noexcept->void {
+        auto cleanupFunction = [&iter, container, this]() noexcept -> void {
             using std::crend;
             std::for_each(std::make_reverse_iterator(iter),
                           crend(this->_decorationInfo),
@@ -149,7 +149,7 @@ public:
 
         auto iter = cbegin(_decorationInfo);
 
-        auto cleanupFunction = [&iter, container, this ]() noexcept->void {
+        auto cleanupFunction = [&iter, container, this]() noexcept -> void {
             using std::crend;
             std::for_each(std::make_reverse_iterator(iter),
                           crend(this->_decorationInfo),

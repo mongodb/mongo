@@ -407,20 +407,27 @@ public:
         CpuId parsedCpuId;
 
         auto cmp = [](auto&& a, auto&& b) {
-            auto tupLens = [](auto&& o) { return std::tie(o.core, o.physical); };
+            auto tupLens = [](auto&& o) {
+                return std::tie(o.core, o.physical);
+            };
             return tupLens(a) < tupLens(b);
         };
         std::set<CpuId, decltype(cmp)> cpuIds(cmp);
 
-        CpuInfoParser cpuInfoParser{
-            {
-                {"physical id", [&](const std::string& value) { parsedCpuId.physical = value; }},
-                {"core id", [&](const std::string& value) { parsedCpuId.core = value; }},
-            },
-            [&]() {
-                cpuIds.insert(parsedCpuId);
-                parsedCpuId = CpuId{};
-            }};
+        CpuInfoParser cpuInfoParser{{
+                                        {"physical id",
+                                         [&](const std::string& value) {
+                                             parsedCpuId.physical = value;
+                                         }},
+                                        {"core id",
+                                         [&](const std::string& value) {
+                                             parsedCpuId.core = value;
+                                         }},
+                                    },
+                                    [&]() {
+                                        cpuIds.insert(parsedCpuId);
+                                        parsedCpuId = CpuId{};
+                                    }};
         cpuInfoParser.run();
 
         physicalCores = cpuIds.size();
@@ -432,11 +439,14 @@ public:
     static int getNumCpuSockets() {
         std::set<std::string> socketIds;
 
-        CpuInfoParser cpuInfoParser{
-            {
-                {"physical id", [&](const std::string& value) { socketIds.insert(value); }},
-            },
-            []() {}};
+        CpuInfoParser cpuInfoParser{{
+                                        {"physical id",
+                                         [&](const std::string& value) {
+                                             socketIds.insert(value);
+                                         }},
+                                    },
+                                    []() {
+                                    }};
         cpuInfoParser.run();
 
         // On ARM64, the "physical id" field is unpopulated, causing there to be 0 sockets found. In
@@ -451,19 +461,37 @@ public:
 
         procCount = 0;
 
-        CpuInfoParser cpuInfoParser{
-            {
+        CpuInfoParser cpuInfoParser{{
 #ifdef __s390x__
-                {R"re(processor\s+\d+)re", [&](const std::string& value) { procCount++; }},
-                {"cpu MHz static", [&](const std::string& value) { freq = value; }},
-                {"features", [&](const std::string& value) { features = value; }},
+                                        {R"re(processor\s+\d+)re",
+                                         [&](const std::string& value) {
+                                             procCount++;
+                                         }},
+                                        {"cpu MHz static",
+                                         [&](const std::string& value) {
+                                             freq = value;
+                                         }},
+                                        {"features",
+                                         [&](const std::string& value) {
+                                             features = value;
+                                         }},
 #else
-                {"processor", [&](const std::string& value) { procCount++; }},
-                {"cpu MHz", [&](const std::string& value) { freq = value; }},
-                {"flags", [&](const std::string& value) { features = value; }},
+                                        {"processor",
+                                         [&](const std::string& value) {
+                                             procCount++;
+                                         }},
+                                        {"cpu MHz",
+                                         [&](const std::string& value) {
+                                             freq = value;
+                                         }},
+                                        {"flags",
+                                         [&](const std::string& value) {
+                                             features = value;
+                                         }},
 #endif
-            },
-            []() {}};
+                                    },
+                                    []() {
+                                    }};
         cpuInfoParser.run();
     }
 

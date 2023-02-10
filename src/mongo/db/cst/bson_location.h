@@ -66,11 +66,13 @@ public:
      */
     std::string toString() const {
         std::ostringstream stream;
-        stdx::visit(
-            OverloadedVisitor{
-                [&](const BSONElement& elem) { stream << "'" << elem.toString(false) << "'"; },
-                [&](const StringData& elem) { stream << "'" << elem << "'"; }},
-            _location);
+        stdx::visit(OverloadedVisitor{[&](const BSONElement& elem) {
+                                          stream << "'" << elem.toString(false) << "'";
+                                      },
+                                      [&](const StringData& elem) {
+                                          stream << "'" << elem << "'";
+                                      }},
+                    _location);
         // The assumption is that there is always at least one prefix that represents the entry
         // point to the parser (e.g. the 'pipeline' argument for an aggregation command).
         invariant(_prefix.size() > 0);
@@ -85,10 +87,11 @@ public:
         }
 
         // The final prefix (or first element in the vector) is the input description.
-        stdx::visit(
-            OverloadedVisitor{[&](const unsigned int& index) { MONGO_UNREACHABLE; },
-                              [&](const StringData& pref) { stream << " of input " << pref; }},
-            _prefix[0]);
+        stdx::visit(OverloadedVisitor{[&](const unsigned int& index) { MONGO_UNREACHABLE; },
+                                      [&](const StringData& pref) {
+                                          stream << " of input " << pref;
+                                      }},
+                    _prefix[0]);
         return stream.str();
     }
 

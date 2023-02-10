@@ -69,11 +69,11 @@ function executeTest(db) {
 
     // Reset. Test retryable findAndModify's.
     let sessionDb = db.getMongo().startSession({}).getDatabase("test");
-    retryableFindAndModify(db, "coll", {_id: 1}, false, false, false, /*remove=*/true);
-    retryableFindAndModify(db, "coll", {_id: 1}, doc, false, /*upsert=*/true, false);
+    retryableFindAndModify(db, "coll", {_id: 1}, false, false, false, /*remove=*/ true);
+    retryableFindAndModify(db, "coll", {_id: 1}, doc, false, /*upsert=*/ true, false);
     retryableFindAndModify(db, "coll", {_id: 1}, {$unset: {a: 1}}, false, false, false);
     retryableFindAndModify(
-        db, "coll", {_id: 1}, {$set: {a: bigStr}}, /*new(Image)=*/true, false, false);
+        db, "coll", {_id: 1}, {$set: {a: bigStr}}, /*new(Image)=*/ true, false, false);
 }
 
 {

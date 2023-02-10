@@ -22,7 +22,7 @@ const primary = rst.getPrimary();
 checkLog.containsJson(primary, 5295000);  // OplogCapMaintainerThread started.
 checkLog.containsJson(primary, 22382);    // Oplog stones calculated.
 
-rst.stopSet(/*signal=*/null, /*forRestart=*/true);
+rst.stopSet(/*signal=*/ null, /*forRestart=*/ true);
 
 // A subset of startup options prevent the oplog cap maintainer thread from being started. These
 // startup options are currently limited to readOnly, recoverFromOplogAsStandalone and repair.

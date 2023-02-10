@@ -155,15 +155,15 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
             stdx::unique_lock<Latch> ul(_mutex);
             uassertStatusOK(_shutdownStatus);
 
-            auto scheduledCommandHandle =
-                uassertStatusOK(_executor->scheduleRemoteCommand(request, [
-                    this,
-                    commandObj = std::move(commandObj),
-                    shardId = std::move(shardId),
-                    hostTargeted = std::move(hostAndShard.hostTargeted),
-                    shard = std::move(hostAndShard.shard),
-                    promise = std::make_shared<Promise<ResponseStatus>>(std::move(pf.promise))
-                ](const RemoteCommandCallbackArgs& args) mutable noexcept {
+            auto scheduledCommandHandle = uassertStatusOK(_executor->scheduleRemoteCommand(
+                request,
+                [this,
+                 commandObj = std::move(commandObj),
+                 shardId = std::move(shardId),
+                 hostTargeted = std::move(hostAndShard.hostTargeted),
+                 shard = std::move(hostAndShard.shard),
+                 promise = std::make_shared<Promise<ResponseStatus>>(std::move(pf.promise))](
+                    const RemoteCommandCallbackArgs& args) mutable noexcept {
                     auto status = args.response.status;
                     shard->updateReplSetMonitor(hostTargeted, status);
 

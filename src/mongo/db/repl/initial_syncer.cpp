@@ -629,7 +629,9 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
           "initialSyncMaxAttempts"_attr = initialSyncMaxAttempts);
 
     // This completion guard invokes _finishInitialSyncAttempt on destruction.
-    auto cancelRemainingWorkInLock = [this]() { _cancelRemainingWork_inlock(); };
+    auto cancelRemainingWorkInLock = [this]() {
+        _cancelRemainingWork_inlock();
+    };
     auto finishInitialSyncAttemptFn = [this](const StatusWith<OpTimeAndWallTime>& lastApplied) {
         _finishInitialSyncAttempt(lastApplied);
     };

@@ -44,8 +44,12 @@ using namespace fmt::literals;
 // Test compares `CompileOptions` as integers.
 TEST(PcreUtilTest, FlagsToOptions) {
     using namespace pcre::options;
-    auto parse = [](StringData flags) { return static_cast<uint32_t>(flagsToOptions(flags)); };
-    auto expect = [](pcre::CompileOptions o) { return static_cast<uint32_t>(o); };
+    auto parse = [](StringData flags) {
+        return static_cast<uint32_t>(flagsToOptions(flags));
+    };
+    auto expect = [](pcre::CompileOptions o) {
+        return static_cast<uint32_t>(o);
+    };
     ASSERT_EQ(parse(""), expect(UTF)) << " UTF is on by default";
     ASSERT_EQ(parse("i"), expect(UTF | CASELESS));
     ASSERT_EQ(parse("m"), expect(UTF | MULTILINE));
@@ -55,7 +59,9 @@ TEST(PcreUtilTest, FlagsToOptions) {
     ASSERT_EQ(parse("imsux"), expect(CASELESS | MULTILINE | DOTALL | UTF | EXTENDED));
     ASSERT_EQ(parse("xusmi"), expect(CASELESS | MULTILINE | DOTALL | UTF | EXTENDED));
 
-    auto isBadFlagException = [](const DBException& ex) { return ex.code() == 51108; };
+    auto isBadFlagException = [](const DBException& ex) {
+        return ex.code() == 51108;
+    };
     ASSERT_THROWS_WITH_CHECK(parse("z"), DBException, isBadFlagException);
     ASSERT_THROWS_WITH_CHECK(parse("iz"), DBException, isBadFlagException);
 }
@@ -66,7 +72,9 @@ TEST(PcreUtilTest, OptionsToFlags) {
     auto parse = [](pcre::CompileOptions flags) {
         return static_cast<std::string>(optionsToFlags(flags));
     };
-    auto expect = [](std::string o) { return (o); };
+    auto expect = [](std::string o) {
+        return (o);
+    };
     ASSERT_EQ(parse(UTF | CASELESS), expect("i"));
     ASSERT_EQ(parse(UTF | MULTILINE), expect("m"));
     ASSERT_EQ(parse(UTF | DOTALL), expect("s"));

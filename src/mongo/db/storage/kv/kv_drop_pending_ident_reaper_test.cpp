@@ -155,7 +155,9 @@ public:
 
     // Override to modify dropIdent() behavior.
     using DropIdentFn = std::function<Status(RecoveryUnit*, StringData)>;
-    DropIdentFn dropIdentFn = [](RecoveryUnit*, StringData) { return Status::OK(); };
+    DropIdentFn dropIdentFn = [](RecoveryUnit*, StringData) {
+        return Status::OK();
+    };
 };
 
 Status KVEngineMock::dropIdent(RecoveryUnit* ru,

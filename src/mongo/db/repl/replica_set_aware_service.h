@@ -186,24 +186,24 @@ public:
 
     public:
         explicit Registerer(std::string name, std::vector<std::string> prereqs = {})
-            : _registerer(std::move(name),
-                          std::move(prereqs),
-                          [&](ServiceContext* serviceContext) {
-                              if (!_registered) {
-                                  _registered =
-                                      ActualService::get(serviceContext)->_shouldRegister();
-                              }
-                              if (*_registered) {
-                                  ReplicaSetAwareServiceRegistry::get(serviceContext)
-                                      ._registerService(ActualService::get(serviceContext));
-                              }
-                          },
-                          [&](ServiceContext* serviceContext) {
-                              if (_registered && *_registered) {
-                                  ReplicaSetAwareServiceRegistry::get(serviceContext)
-                                      ._unregisterService(ActualService::get(serviceContext));
-                              }
-                          }) {}
+            : _registerer(
+                  std::move(name),
+                  std::move(prereqs),
+                  [&](ServiceContext* serviceContext) {
+                      if (!_registered) {
+                          _registered = ActualService::get(serviceContext)->_shouldRegister();
+                      }
+                      if (*_registered) {
+                          ReplicaSetAwareServiceRegistry::get(serviceContext)
+                              ._registerService(ActualService::get(serviceContext));
+                      }
+                  },
+                  [&](ServiceContext* serviceContext) {
+                      if (_registered && *_registered) {
+                          ReplicaSetAwareServiceRegistry::get(serviceContext)
+                              ._unregisterService(ActualService::get(serviceContext));
+                      }
+                  }) {}
 
     private:
         boost::optional<bool> _registered;

@@ -1140,7 +1140,9 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
                                 value::TypeTags tagInput,
                                 value::Value valInput,
                                 int64_t maxDepth) {
-    auto decrement = [](int64_t d) { return d == std::numeric_limits<int64_t>::max() ? d : d - 1; };
+    auto decrement = [](int64_t d) {
+        return d == std::numeric_limits<int64_t>::max() ? d : d - 1;
+    };
 
     auto [tagArrOutput, valArrOutput] = value::makeNewArray();
     auto arrOutput = value::getArrayView(valArrOutput);
@@ -3402,7 +3404,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToBool(Ari
             bool isNotZero = !value::bitcastTo<Decimal128>(operandVal).isZero();
             return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(isNotZero)};
         }
-        default: { return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true)}; }
+        default: {
+            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
+        }
     }
 }
 

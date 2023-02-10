@@ -50,7 +50,9 @@ MockNetwork::Matcher::Matcher(const BSONObj& matcherQuery) {
         NamespaceString::createNamespaceString_forTest("db.coll") /* dummy nss */);
     // Expression matcher doesn't have copy constructor, so wrap it in a shared_ptr for capture.
     auto m = std::make_shared<mongo::Matcher>(matcherQuery, std::move(expCtx));
-    _matcherFunc = [=](const BSONObj& request) { return m->matches(request); };
+    _matcherFunc = [=](const BSONObj& request) {
+        return m->matches(request);
+    };
 }
 
 bool MockNetwork::_allExpectationsSatisfied() const {

@@ -400,14 +400,14 @@ public:
         {
             WriteUnitOfWork wuow(_opCtx);
             // Timestamping index completion. Primaries write an oplog entry.
-            ASSERT_OK(
-                indexer.commit(_opCtx,
-                               coll.getWritableCollection(_opCtx),
-                               [&](const BSONObj& indexSpec) {
-                                   _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                                       _opCtx, coll->ns(), coll->uuid(), indexSpec, false);
-                               },
-                               MultiIndexBlock::kNoopOnCommitFn));
+            ASSERT_OK(indexer.commit(
+                _opCtx,
+                coll.getWritableCollection(_opCtx),
+                [&](const BSONObj& indexSpec) {
+                    _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                        _opCtx, coll->ns(), coll->uuid(), indexSpec, false);
+                },
+                MultiIndexBlock::kNoopOnCommitFn));
             // The timestamping repsponsibility is placed on the caller rather than the
             // MultiIndexBlock.
             wuow.commit();
@@ -1976,22 +1976,22 @@ public:
             // All callers of `MultiIndexBlock::commit` are responsible for timestamping index
             // completion  Primaries write an oplog entry. Secondaries explicitly set a
             // timestamp.
-            ASSERT_OK(
-                indexer.commit(_opCtx,
-                               autoColl.getWritableCollection(_opCtx),
-                               [&](const BSONObj& indexSpec) {
-                                   if (simulatePrimary) {
-                                       // The timestamping responsibility for each index is placed
-                                       // on the caller.
-                                       _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                                           _opCtx, nss, coll->uuid(), indexSpec, false);
-                                   } else {
-                                       const auto currentTime = _clock->getTime();
-                                       ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(
-                                           currentTime.clusterTime().asTimestamp()));
-                                   }
-                               },
-                               MultiIndexBlock::kNoopOnCommitFn));
+            ASSERT_OK(indexer.commit(
+                _opCtx,
+                autoColl.getWritableCollection(_opCtx),
+                [&](const BSONObj& indexSpec) {
+                    if (simulatePrimary) {
+                        // The timestamping responsibility for each index is placed
+                        // on the caller.
+                        _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                            _opCtx, nss, coll->uuid(), indexSpec, false);
+                    } else {
+                        const auto currentTime = _clock->getTime();
+                        ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(
+                            currentTime.clusterTime().asTimestamp()));
+                    }
+                },
+                MultiIndexBlock::kNoopOnCommitFn));
             wuow.commit();
         }
         abortOnExit.dismiss();
@@ -2733,14 +2733,14 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
 
     {
         WriteUnitOfWork wuow(_opCtx);
-        ASSERT_OK(
-            indexer.commit(_opCtx,
-                           collection.getWritableCollection(_opCtx),
-                           [&](const BSONObj& indexSpec) {
-                               _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                                   _opCtx, collection->ns(), collection->uuid(), indexSpec, false);
-                           },
-                           MultiIndexBlock::kNoopOnCommitFn));
+        ASSERT_OK(indexer.commit(
+            _opCtx,
+            collection.getWritableCollection(_opCtx),
+            [&](const BSONObj& indexSpec) {
+                _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                    _opCtx, collection->ns(), collection->uuid(), indexSpec, false);
+            },
+            MultiIndexBlock::kNoopOnCommitFn));
         wuow.commit();
     }
     abortOnExit.dismiss();

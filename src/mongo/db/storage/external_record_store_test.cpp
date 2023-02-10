@@ -218,7 +218,9 @@ TEST_F(ExternalRecordStoreTest, NamedPipeReadUntilProducerDone) {
 
 TEST_F(ExternalRecordStoreTest, NamedPipeOpenNonExisting) {
     ASSERT_THROWS_CODE(
-        [] { (void)std::make_unique<InputStream<NamedPipeInput>>(nonExistingPath); }(),
+        [] {
+            (void)std::make_unique<InputStream<NamedPipeInput>>(nonExistingPath);
+        }(),
         DBException,
         ErrorCodes::FileNotOpen);
 }

@@ -114,9 +114,7 @@ AsioSession::AsioSession(AsioTransportLayer* tl,
                          bool isIngressSession,
                          Endpoint endpoint,
                          std::shared_ptr<const SSLConnectionContext> transientSSLContext) try
-    : _socket(std::move(socket)),
-      _tl(tl),
-      _isIngressSession(isIngressSession) {
+    : _socket(std::move(socket)), _tl(tl), _isIngressSession(isIngressSession) {
     auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
     auto sev = logv2::LogSeverity::Debug(3);
     if (family == AF_INET || family == AF_INET6) {

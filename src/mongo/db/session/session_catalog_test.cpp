@@ -86,14 +86,12 @@ protected:
      * checking it back in.
      */
     void createSession(const LogicalSessionId& lsid) {
-        stdx::async(stdx::launch::async,
-                    [this, lsid] {
-                        ThreadClient tc(getServiceContext());
-                        auto opCtx = makeOperationContext();
-                        opCtx->setLogicalSessionId(lsid);
-                        OperationContextSession ocs(opCtx.get());
-                    })
-            .get();
+        stdx::async(stdx::launch::async, [this, lsid] {
+            ThreadClient tc(getServiceContext());
+            auto opCtx = makeOperationContext();
+            opCtx->setLogicalSessionId(lsid);
+            OperationContextSession ocs(opCtx.get());
+        }).get();
     }
 
     /**
@@ -311,14 +309,12 @@ TEST_F(SessionCatalogTest, ScanSession) {
         return {lsid0, lsid1, lsid2, lsid3};
     }();
     for (const auto& lsid : lsids) {
-        stdx::async(stdx::launch::async,
-                    [this, lsid] {
-                        ThreadClient tc(getServiceContext());
-                        auto opCtx = makeOperationContext();
-                        opCtx->setLogicalSessionId(lsid);
-                        OperationContextSession ocs(opCtx.get());
-                    })
-            .get();
+        stdx::async(stdx::launch::async, [this, lsid] {
+            ThreadClient tc(getServiceContext());
+            auto opCtx = makeOperationContext();
+            opCtx->setLogicalSessionId(lsid);
+            OperationContextSession ocs(opCtx.get());
+        }).get();
     }
 
     catalog()->scanSession(lsids[0], [&lsids](const ObservableSession& session) {
@@ -474,14 +470,12 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessions) {
         return {lsid0, lsid1, lsid2, lsid3};
     }();
     for (const auto& lsid : lsids) {
-        stdx::async(stdx::launch::async,
-                    [this, lsid] {
-                        ThreadClient tc(getServiceContext());
-                        auto opCtx = makeOperationContext();
-                        opCtx->setLogicalSessionId(lsid);
-                        OperationContextSession ocs(opCtx.get());
-                    })
-            .get();
+        stdx::async(stdx::launch::async, [this, lsid] {
+            ThreadClient tc(getServiceContext());
+            auto opCtx = makeOperationContext();
+            opCtx->setLogicalSessionId(lsid);
+            OperationContextSession ocs(opCtx.get());
+        }).get();
     }
 
     // Scan over all Sessions.

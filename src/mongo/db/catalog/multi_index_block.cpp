@@ -98,7 +98,8 @@ MultiIndexBlock::~MultiIndexBlock() {
     invariant(_buildIsCleanedUp);
 }
 
-MultiIndexBlock::OnCleanUpFn MultiIndexBlock::kNoopOnCleanUpFn = []() {};
+MultiIndexBlock::OnCleanUpFn MultiIndexBlock::kNoopOnCleanUpFn = []() {
+};
 
 MultiIndexBlock::OnCleanUpFn MultiIndexBlock::makeTimestampedOnCleanUpFn(
     OperationContext* opCtx, const CollectionPtr& coll) {
@@ -165,7 +166,9 @@ void MultiIndexBlock::ignoreUniqueConstraint() {
 }
 
 MultiIndexBlock::OnInitFn MultiIndexBlock::kNoopOnInitFn =
-    [](std::vector<BSONObj>& specs) -> Status { return Status::OK(); };
+    [](std::vector<BSONObj>& specs) -> Status {
+    return Status::OK();
+};
 
 MultiIndexBlock::OnInitFn MultiIndexBlock::makeTimestampedIndexOnInitFn(OperationContext* opCtx,
                                                                         const CollectionPtr& coll) {
@@ -638,21 +641,21 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
         // cursor around the side table write in case any write conflict exception occurs that would
         // otherwise reposition the cursor unexpectedly. All WUOW and write conflict exception
         // handling for the side table write is handled internally.
-        uassertStatusOK(
-            _insert(opCtx,
-                    collection,
-                    objToIndex,
-                    loc,
-                    /*saveCursorBeforeWrite*/
-                    [&exec, &objToIndex] {
-                        // Update objToIndex so that it continues to point to valid data when the
-                        // cursor is closed. A WCE may occur during a write to index A, and
-                        // objToIndex must still be used when the write is retried or for a write to
-                        // another index (if creating multiple indexes at once)
-                        objToIndex = objToIndex.getOwned();
-                        exec->saveState();
-                    },
-                    /*restoreCursorAfterWrite*/ [&] { exec->restoreState(&collection); }));
+        uassertStatusOK(_insert(
+            opCtx,
+            collection,
+            objToIndex,
+            loc,
+            /*saveCursorBeforeWrite*/
+            [&exec, &objToIndex] {
+                // Update objToIndex so that it continues to point to valid data when the
+                // cursor is closed. A WCE may occur during a write to index A, and
+                // objToIndex must still be used when the write is retried or for a write to
+                // another index (if creating multiple indexes at once)
+                objToIndex = objToIndex.getOwned();
+                exec->saveState();
+            },
+            /*restoreCursorAfterWrite*/ [&] { exec->restoreState(&collection); }));
 
         _failPointHangDuringBuild(opCtx,
                                   &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
@@ -896,8 +899,10 @@ Status MultiIndexBlock::checkConstraints(OperationContext* opCtx, const Collecti
     return Status::OK();
 }
 
-MultiIndexBlock::OnCreateEachFn MultiIndexBlock::kNoopOnCreateEachFn = [](const BSONObj& spec) {};
-MultiIndexBlock::OnCommitFn MultiIndexBlock::kNoopOnCommitFn = []() {};
+MultiIndexBlock::OnCreateEachFn MultiIndexBlock::kNoopOnCreateEachFn = [](const BSONObj& spec) {
+};
+MultiIndexBlock::OnCommitFn MultiIndexBlock::kNoopOnCommitFn = []() {
+};
 
 Status MultiIndexBlock::commit(OperationContext* opCtx,
                                Collection* collection,

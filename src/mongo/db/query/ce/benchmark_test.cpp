@@ -118,7 +118,7 @@ std::shared_ptr<const stats::ArrayHistogram> generateHistogram(int bucketCount,
 void generateHistorgrams(const BenchmarkDescriptor& descriptor,
                          std::shared_ptr<stats::CollectionStatistics> collStats) {
     for (auto&& [fieldName, valueType] : descriptor.valueTypes) {
-        const bool includeArrays = [& fieldName = fieldName, &descriptor]() {
+        const bool includeArrays = [&fieldName = fieldName, &descriptor]() {
             for (auto&& [indexName, indexDef] : descriptor.indexes) {
                 for (auto&& entry : indexDef.getCollationSpec())
                     if (entry._path ==

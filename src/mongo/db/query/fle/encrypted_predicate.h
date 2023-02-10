@@ -69,7 +69,9 @@ using BSONValue = stdx::variant<BSONElement, std::reference_wrapper<Value>>;
 template <typename T>
 T parseFindPayload(BSONValue payload) {
     return stdx::visit(OverloadedVisitor{[&](BSONElement payload) { return T(payload); },
-                                         [&](Value payload) { return T(payload); }},
+                                         [&](Value payload) {
+                                             return T(payload);
+                                         }},
                        payload);
 }
 

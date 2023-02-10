@@ -90,9 +90,9 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
                      "documents copied",
                      str::stream() << _sourceNss.toString() << " collection clone progress"),
       _scheduleDbWorkFn([this](executor::TaskExecutor::CallbackFn work) {
-          auto task = [ this, work = std::move(work) ](
-                          OperationContext * opCtx,
-                          const Status& status) mutable noexcept->TaskRunner::NextAction {
+          auto task = [this, work = std::move(work)](
+                          OperationContext* opCtx,
+                          const Status& status) mutable noexcept -> TaskRunner::NextAction {
               try {
                   work(executor::TaskExecutor::CallbackArgs(nullptr, {}, status, opCtx));
               } catch (const DBException& e) {

@@ -170,8 +170,10 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveChunkCommand) {
         globalFailPointRegistry().find("deferredCleanupCompletedCheckpoint");
     auto timesEnteredFailPoint =
         deferredCleanupCompletedCheckpoint->setMode(FailPoint::alwaysOn, 0);
-    auto remoteResponsesFuture = setRemoteResponses(
-        {[&](const executor::RemoteCommandRequest& request) { return OkReply().toBSON(); }});
+    auto remoteResponsesFuture =
+        setRemoteResponses({[&](const executor::RemoteCommandRequest& request) {
+            return OkReply().toBSON();
+        }});
 
     _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     MigrateInfo migrateInfo = makeMigrationInfo(0, kShardId1, kShardId0);
@@ -190,8 +192,10 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveRangeCommand) {
         globalFailPointRegistry().find("deferredCleanupCompletedCheckpoint");
     auto timesEnteredFailPoint =
         deferredCleanupCompletedCheckpoint->setMode(FailPoint::alwaysOn, 0);
-    auto remoteResponsesFuture = setRemoteResponses(
-        {[&](const executor::RemoteCommandRequest& request) { return OkReply().toBSON(); }});
+    auto remoteResponsesFuture =
+        setRemoteResponses({[&](const executor::RemoteCommandRequest& request) {
+            return OkReply().toBSON();
+        }});
     _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     ShardsvrMoveRange shardsvrRequest(kNss);
     shardsvrRequest.setDbName(NamespaceString::kAdminDb);
@@ -212,8 +216,10 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveRangeCommand) {
 }
 
 TEST_F(BalancerCommandsSchedulerTest, SuccessfulMergeChunkCommand) {
-    auto remoteResponsesFuture = setRemoteResponses(
-        {[&](const executor::RemoteCommandRequest& request) { return OkReply().toBSON(); }});
+    auto remoteResponsesFuture =
+        setRemoteResponses({[&](const executor::RemoteCommandRequest& request) {
+            return OkReply().toBSON();
+        }});
     _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
 
     ChunkRange range(BSON("x" << 0), BSON("x" << 20));
@@ -274,8 +280,10 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulAutoSplitVectorCommand) {
 }
 
 TEST_F(BalancerCommandsSchedulerTest, SuccessfulSplitChunkCommand) {
-    auto remoteResponsesFuture = setRemoteResponses(
-        {[&](const executor::RemoteCommandRequest& request) { return OkReply().toBSON(); }});
+    auto remoteResponsesFuture =
+        setRemoteResponses({[&](const executor::RemoteCommandRequest& request) {
+            return OkReply().toBSON();
+        }});
     _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     ChunkType splitChunk = makeChunk(0, kShardId0);
     auto futureResponse = _scheduler.requestSplitChunk(operationContext(),
@@ -296,8 +304,10 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulRequestChunkDataSizeCommand) {
     chunkSizeResponse.append("ok", "1");
     chunkSizeResponse.append("size", 156);
     chunkSizeResponse.append("numObjects", 25);
-    auto remoteResponsesFuture = setRemoteResponses(
-        {[&](const executor::RemoteCommandRequest& request) { return chunkSizeResponse.obj(); }});
+    auto remoteResponsesFuture =
+        setRemoteResponses({[&](const executor::RemoteCommandRequest& request) {
+            return chunkSizeResponse.obj();
+        }});
 
     _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     ChunkType chunk = makeChunk(0, kShardId0);
@@ -326,8 +336,10 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenNetworkReturnsError) {
     auto timesEnteredFailPoint =
         deferredCleanupCompletedCheckpoint->setMode(FailPoint::alwaysOn, 0);
     auto timeoutError = Status{ErrorCodes::NetworkTimeout, "Mock error: network timed out"};
-    auto remoteResponsesFuture = setRemoteResponses(
-        {[&](const executor::RemoteCommandRequest& request) { return timeoutError; }});
+    auto remoteResponsesFuture =
+        setRemoteResponses({[&](const executor::RemoteCommandRequest& request) {
+            return timeoutError;
+        }});
     _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     MigrateInfo migrateInfo = makeMigrationInfo(0, kShardId1, kShardId0);
 

@@ -162,7 +162,9 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
             boost::optional<std::string> childPath;
             const CollatorInterface* eqCollator = nullptr;
 
-            auto isRegEx = [](const BSONElement& elm) { return elm.type() == BSONType::RegEx; };
+            auto isRegEx = [](const BSONElement& elm) {
+                return elm.type() == BSONType::RegEx;
+            };
 
             // Check if all children are equality conditions or regular expressions with the
             // same path argument, and same collation.

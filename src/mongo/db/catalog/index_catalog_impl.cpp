@@ -1303,16 +1303,17 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
                                       Collection* collection,
                                       bool includingIdIndex,
                                       std::function<void(const IndexDescriptor*)> onDropFn) {
-    dropIndexes(opCtx,
-                collection,
-                [includingIdIndex](const IndexDescriptor* indexDescriptor) {
-                    if (includingIdIndex) {
-                        return true;
-                    }
+    dropIndexes(
+        opCtx,
+        collection,
+        [includingIdIndex](const IndexDescriptor* indexDescriptor) {
+            if (includingIdIndex) {
+                return true;
+            }
 
-                    return !indexDescriptor->isIdIndex();
-                },
-                onDropFn);
+            return !indexDescriptor->isIdIndex();
+        },
+        onDropFn);
 }
 
 Status IndexCatalogImpl::dropIndex(OperationContext* opCtx,

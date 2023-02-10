@@ -415,7 +415,9 @@ DBClientCursor::~DBClientCursor() {
 void DBClientCursor::kill() {
     DESTRUCTOR_GUARD({
         if (_cursorId && !globalInShutdownDeprecated()) {
-            auto killCursor = [&](auto&& conn) { conn->killCursor(_ns, _cursorId); };
+            auto killCursor = [&](auto&& conn) {
+                conn->killCursor(_ns, _cursorId);
+            };
 
             // We only need to kill the cursor if there aren't pending replies. Pending replies
             // indicates that this is an exhaust cursor, so the connection must be closed and the

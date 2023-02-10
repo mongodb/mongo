@@ -139,7 +139,9 @@ void BM_RecordIdSort(benchmark::State& state) {
         uint64_t key;
         V val;
     };
-    auto comp = [](const KV& left, const KV& right) { return left.key < right.key; };
+    auto comp = [](const KV& left, const KV& right) {
+        return left.key < right.key;
+    };
     std::vector<KV> data;
 
     for (auto j = 0; j < state.range(0); ++j)

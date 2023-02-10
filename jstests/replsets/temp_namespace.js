@@ -65,7 +65,7 @@ assert.eq(countIndexesFor(secondaryDB, /temp\d$/), 4);  // indexes (2 _id + 2 x)
 assert.eq(countCollection(secondaryDB, /keep\d$/), 4);
 
 // restart secondary and reconnect
-replTest.restart(replTest.getNodeId(secondary), {}, /*wait=*/true);
+replTest.restart(replTest.getNodeId(secondary), {}, /*wait=*/ true);
 
 // wait for the secondary to achieve secondary status
 assert.soon(function() {

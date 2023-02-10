@@ -47,7 +47,9 @@ public:
                                                  std::move(annotation)) {}
 
     Validator getComparator() const final {
-        return [strLen = strLen()](int lenWithoutNullTerm) { return lenWithoutNullTerm <= strLen; };
+        return [strLen = strLen()](int lenWithoutNullTerm) {
+            return lenWithoutNullTerm <= strLen;
+        };
     }
 
     std::unique_ptr<MatchExpression> shallowClone() const final {

@@ -915,7 +915,7 @@ void AutoGetCollectionForReadLockFreeLegacy::EmplaceHelper::emplace(
         _opCtx,
         _nsOrUUID,
         /* restoreFromYield */
-        [& catalogStasher = _catalogStasher, isSubOperation = _isLockFreeReadSubOperation](
+        [&catalogStasher = _catalogStasher, isSubOperation = _isLockFreeReadSubOperation](
             std::shared_ptr<const Collection>& collection, OperationContext* opCtx, UUID uuid) {
             // A sub-operation should never yield because it would break the consistent in-memory
             // and on-disk view of the higher level operation.

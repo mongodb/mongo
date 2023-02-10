@@ -465,7 +465,9 @@ void ThreadPool::Impl::_consumeTasks() {
                         "minThreads"_attr = _options.minThreads);
         }
 
-        auto wake = [&] { return _state != running || !_pendingTasks.empty(); };
+        auto wake = [&] {
+            return _state != running || !_pendingTasks.empty();
+        };
         MONGO_IDLE_THREAD_BLOCK;
         if (waitDeadline) {
             _workAvailable.wait_until(lk, waitDeadline->toSystemTimePoint(), wake);

@@ -688,12 +688,13 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                 // Inserts to indexed capped collections cannot be batched.
                 // Otherwise, CollectionImpl::_insertDocuments() will fail with
                 // OperationCannotBeBatched. See SERVER-21512.
-                buildBatchedWritesWithPolicy(batchedWriteMaxSizeBytes,
-                                             batchedWriteMaxNumberOfInserts,
-                                             [&cursor]() { return cursor->next(); },
-                                             record,
-                                             stmts,
-                                             canBeBatched);
+                buildBatchedWritesWithPolicy(
+                    batchedWriteMaxSizeBytes,
+                    batchedWriteMaxNumberOfInserts,
+                    [&cursor]() { return cursor->next(); },
+                    record,
+                    stmts,
+                    canBeBatched);
 
                 bool isGroupedOplogEntries = stmts.size() > 1U;
                 WriteUnitOfWork wunit(opCtx, isGroupedOplogEntries);

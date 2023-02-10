@@ -123,7 +123,9 @@ void escape(Buffer& buffer,
     };
 
     // Helper function to write a valid one byte UTF-8 sequence from the input stream
-    auto writeValid1Byte = [&]() { singleHandler(flushAndWrite, *it); };
+    auto writeValid1Byte = [&]() {
+        singleHandler(flushAndWrite, *it);
+    };
 
     // Helper function to write a valid two byte UTF-8 sequence from the input stream
     auto writeValid2Byte = [&]() {
@@ -138,7 +140,9 @@ void escape(Buffer& buffer,
     // Helper function to write an invalid UTF-8 sequence from the input stream
     // Will try and write up to num bytes but bail if we reach the end of the input.
     // Updates the position of 'it'.
-    auto writeInvalid = [&](uint8_t c) { invalidByteHandler(flushAndWrite, c); };
+    auto writeInvalid = [&](uint8_t c) {
+        invalidByteHandler(flushAndWrite, c);
+    };
 
 
     while (it != inLast) {
@@ -506,8 +510,10 @@ std::string escapeForJSON(StringData str, size_t maxLength, size_t* wouldWrite) 
 bool validUTF8(StringData str) {
     // No-op buffer and handlers, defined to re-use escape method logic.
     NoopBuffer buffer;
-    auto singleByteHandler = [](const auto& writer, uint8_t unescaped) {};
-    auto twoByteEscaper = [](const auto& writer, uint8_t first, uint8_t second) {};
+    auto singleByteHandler = [](const auto& writer, uint8_t unescaped) {
+    };
+    auto twoByteEscaper = [](const auto& writer, uint8_t first, uint8_t second) {
+    };
 
     // Throws an exception when an invalid UTF8 character is detected.
     auto invalidByteHandler = [](const auto& writer, uint8_t) {

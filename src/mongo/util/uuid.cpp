@@ -92,11 +92,9 @@ UUID UUID::parse(const BSONObj& obj) {
 bool UUID::isUUIDString(StringData s) {
     static constexpr auto pat = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"_sd;
     return s.size() == pat.size() &&
-        std::mismatch(s.begin(),
-                      s.end(),
-                      pat.begin(),
-                      [](char a, char b) { return b == 'x' ? ctype::isXdigit(a) : a == b; })
-            .first == s.end();
+        std::mismatch(s.begin(), s.end(), pat.begin(), [](char a, char b) {
+            return b == 'x' ? ctype::isXdigit(a) : a == b;
+        }).first == s.end();
 }
 
 bool UUID::isRFC4122v4() const {

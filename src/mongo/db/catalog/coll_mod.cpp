@@ -707,11 +707,12 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(OperationContext* op
     auto idx = cmr.indexRequest.idx;
     auto violatingRecordsList = scanIndexForDuplicates(opCtx, collection, idx);
 
-    CurOpFailpointHelpers::waitWhileFailPointEnabled(&hangAfterCollModIndexUniqueFullIndexScan,
-                                                     opCtx,
-                                                     "hangAfterCollModIndexUniqueFullIndexScan",
-                                                     []() {},
-                                                     nss);
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangAfterCollModIndexUniqueFullIndexScan,
+        opCtx,
+        "hangAfterCollModIndexUniqueFullIndexScan",
+        []() {},
+        nss);
 
     if (!violatingRecordsList.empty()) {
         uassertStatusOK(buildConvertUniqueErrorStatus(opCtx, collection, violatingRecordsList));

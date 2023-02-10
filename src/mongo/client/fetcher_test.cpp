@@ -104,7 +104,9 @@ FetcherTest::FetcherTest()
     : status(getDetectableErrorStatus()), cursorId(-1), nextAction(Fetcher::NextAction::kInvalid) {}
 
 Fetcher::CallbackFn FetcherTest::makeCallback() {
-    return [this](const auto& x, const auto& y, const auto& z) { return this->_callback(x, y, z); };
+    return [this](const auto& x, const auto& y, const auto& z) {
+        return this->_callback(x, y, z);
+    };
 }
 
 void FetcherTest::setUp() {
@@ -925,7 +927,8 @@ TEST_F(FetcherTest, EmptyGetMoreRequestAfterFirstBatchMakesFetcherInactiveAndKil
 
     callbackHook = [](const StatusWith<Fetcher::QueryResponse>& fetchResult,
                       Fetcher::NextAction* nextAction,
-                      BSONObjBuilder* getMoreBob) {};
+                      BSONObjBuilder* getMoreBob) {
+    };
 
     ASSERT_OK(fetcher->schedule());
 

@@ -42,8 +42,8 @@ function runTest(watchType, renameType) {
         cursorDst = testStreamDst.startWatchingChanges(
             {pipeline, collection: dstColl.getName(), doNotModifyInPassthroughs: true});
     } else if (watchType == "database") {
-        cursorSrc = testStreamSrc.startWatchingChanges({pipeline, collection: /*all colls=*/1});
-        cursorDst = testStreamDst.startWatchingChanges({pipeline, collection: /*all colls=*/1});
+        cursorSrc = testStreamSrc.startWatchingChanges({pipeline, collection: /*all colls=*/ 1});
+        cursorDst = testStreamDst.startWatchingChanges({pipeline, collection: /*all colls=*/ 1});
     }
 
     if (renameType == "dropTarget" || renameType == "noDropTarget") {

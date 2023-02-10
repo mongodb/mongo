@@ -153,7 +153,9 @@ const ServiceContext::ConstructorActionRegisterer migrationUtilExecutorRegistere
     [](ServiceContext* service) {
         // TODO SERVER-57253: start migration util executor at decoration construction time
     },
-    [](ServiceContext* service) { migrationUtilExecutorDecoration(service).shutDownAndJoin(); }};
+    [](ServiceContext* service) {
+        migrationUtilExecutorDecoration(service).shutDownAndJoin();
+    }};
 
 template <typename Cmd>
 void sendWriteCommandToRecipient(OperationContext* opCtx,

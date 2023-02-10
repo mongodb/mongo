@@ -775,14 +775,18 @@ void ExpressionBenchmarkFixture::benchmarkSetUnion(benchmark::State& state) {
 void ExpressionBenchmarkFixture::benchmarkSubtractIntegers(benchmark::State& state) {
     const int kCount = 1000;
     const int kMax = 1'000'000'000;
-    auto generator = [this]() { return random.nextInt32(kMax); };
+    auto generator = [this]() {
+        return random.nextInt32(kMax);
+    };
     testBinaryOpExpression("$subtract", randomPairs(kCount, generator), state);
 }
 
 void ExpressionBenchmarkFixture::benchmarkSubtractDoubles(benchmark::State& state) {
     const int kCount = 1000;
     const int kMax = 1'000'000'000;
-    auto generator = [this]() { return random.nextCanonicalDouble() * kMax; };
+    auto generator = [this]() {
+        return random.nextCanonicalDouble() * kMax;
+    };
     testBinaryOpExpression("$subtract", randomPairs(kCount, generator), state);
 }
 
@@ -817,14 +821,18 @@ void ExpressionBenchmarkFixture::benchmarkSubtractNullAndMissing(benchmark::Stat
 void ExpressionBenchmarkFixture::benchmarkAddIntegers(benchmark::State& state) {
     const int kCount = 1000;
     const int kMax = 1'000'000'000;
-    auto generator = [this]() { return random.nextInt32(kMax); };
+    auto generator = [this]() {
+        return random.nextInt32(kMax);
+    };
     testBinaryOpExpression("$add", randomPairs(kCount, generator), state);
 }
 
 void ExpressionBenchmarkFixture::benchmarkAddDoubles(benchmark::State& state) {
     const int kCount = 1000;
     const int kMax = 1'000'000'000;
-    auto generator = [this]() { return random.nextCanonicalDouble() * kMax; };
+    auto generator = [this]() {
+        return random.nextCanonicalDouble() * kMax;
+    };
     testBinaryOpExpression("$add", randomPairs(kCount, generator), state);
 }
 
@@ -886,14 +894,18 @@ void ExpressionBenchmarkFixture::benchmarkAddArray(benchmark::State& state) {
 void ExpressionBenchmarkFixture::benchmarkMultiplyIntegers(benchmark::State& state) {
     const int kCount = 1000;
     const int kMax = 1'000'000'000;
-    auto generator = [this]() { return random.nextInt32(kMax); };
+    auto generator = [this]() {
+        return random.nextInt32(kMax);
+    };
     testBinaryOpExpression("$add", randomPairs(kCount, generator), state);
 }
 
 void ExpressionBenchmarkFixture::benchmarkMultiplyDoubles(benchmark::State& state) {
     const int kCount = 1000;
     const int kMax = 1'000'000'000;
-    auto generator = [this]() { return random.nextCanonicalDouble() * kMax; };
+    auto generator = [this]() {
+        return random.nextCanonicalDouble() * kMax;
+    };
     testBinaryOpExpression("$multiply", randomPairs(kCount, generator), state);
 }
 

@@ -58,7 +58,9 @@ public:
     /** Spawn and return a `stdx::thread` that invokes `f` as if by `exec(f)`. */
     template <typename F>
     stdx::thread spawn(F&& f) {
-        return stdx::thread{[this, f = std::move(f)]() mutable { exec(std::move(f)); }};
+        return stdx::thread{[this, f = std::move(f)]() mutable {
+            exec(std::move(f));
+        }};
     }
 
     /** Spawn a thread that will invoke monitor.notifyDone()` when it finishes. */

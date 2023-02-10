@@ -196,13 +196,12 @@ PartitionIterator::AdvanceResult PartitionIterator::advanceInternal() {
 
 namespace {
 optional<int> numericBound(WindowBounds::Bound<int> bound) {
-    return stdx::visit(
-        OverloadedVisitor{
-            [](WindowBounds::Unbounded) -> optional<int> { return boost::none; },
-            [](WindowBounds::Current) -> optional<int> { return 0; },
-            [](int i) -> optional<int> { return i; },
-        },
-        bound);
+    return stdx::visit(OverloadedVisitor{
+                           [](WindowBounds::Unbounded) -> optional<int> { return boost::none; },
+                           [](WindowBounds::Current) -> optional<int> { return 0; },
+                           [](int i) -> optional<int> { return i; },
+                       },
+                       bound);
 }
 
 // Assumes both arguments are numeric, and performs Decimal128 addition on them.
@@ -259,141 +258,149 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
     };
 
     // 'lower' is the smallest offset in the partition that's within the lower bound of the window.
-    optional<int> lower = stdx::visit(
-        OverloadedVisitor{
-            [&](WindowBounds::Current) -> optional<int> {
-                // 'range: ["current", _]' means the current document, which is always offset 0.
-                return 0;
-            },
-            [&](WindowBounds::Unbounded) -> optional<int> {
-                // Find the leftmost document whose sortBy field evaluates to a numeric value.
+    optional<int> lower =
+        stdx::visit(OverloadedVisitor{
+                        [&](WindowBounds::Current) -> optional<int> {
+                            // 'range: ["current", _]' means the current document, which is always
+                            // offset 0.
+                            return 0;
+                        },
+                        [&](WindowBounds::Unbounded) -> optional<int> {
+                            // Find the leftmost document whose sortBy field evaluates to a numeric
+                            // value.
 
-                // Start from the beginning, or the hint, whichever is higher.
-                // Note that the hint may no longer be a valid offset, if some documents were
-                // released from the cache.
-                int start = getMinCachedOffset();
-                if (hint) {
-                    start = std::max(hint->first, start);
-                }
+                            // Start from the beginning, or the hint, whichever is higher.
+                            // Note that the hint may no longer be a valid offset, if some documents
+                            // were released from the cache.
+                            int start = getMinCachedOffset();
+                            if (hint) {
+                                start = std::max(hint->first, start);
+                            }
 
-                for (int i = start;; ++i) {
-                    auto doc = (*this)[i];
-                    if (!doc) {
-                        return boost::none;
-                    }
-                    Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
-                    if (hasExpectedType(v)) {
-                        return i;
-                    }
-                }
-            },
-            [&](const Value& delta) -> optional<int> {
-                Value threshold = add(base, delta);
+                            for (int i = start;; ++i) {
+                                auto doc = (*this)[i];
+                                if (!doc) {
+                                    return boost::none;
+                                }
+                                Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
+                                if (hasExpectedType(v)) {
+                                    return i;
+                                }
+                            }
+                        },
+                        [&](const Value& delta) -> optional<int> {
+                            Value threshold = add(base, delta);
 
-                // Start from the beginning, or the hint, whichever is higher.
-                // Note that the hint may no longer be a valid offset, if some documents were
-                // released from the cache.
-                int start = getMinCachedOffset();
-                if (hint) {
-                    start = std::max(hint->first, start);
-                }
+                            // Start from the beginning, or the hint, whichever is higher.
+                            // Note that the hint may no longer be a valid offset, if some documents
+                            // were released from the cache.
+                            int start = getMinCachedOffset();
+                            if (hint) {
+                                start = std::max(hint->first, start);
+                            }
 
-                boost::optional<Document> doc;
-                for (int i = start; (doc = (*this)[i]); ++i) {
-                    Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
-                    if (!lessThan(v, threshold)) {
-                        // This is the first doc we've scanned that crossed the threshold,
-                        // so it's the first doc in the window (as long as it's the expected type).
-                        if (hasExpectedType(v)) {
-                            return i;
-                        } else {
+                            boost::optional<Document> doc;
+                            for (int i = start; (doc = (*this)[i]); ++i) {
+                                Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
+                                if (!lessThan(v, threshold)) {
+                                    // This is the first doc we've scanned that crossed the
+                                    // threshold, so it's the first doc in the window (as long as
+                                    // it's the expected type).
+                                    if (hasExpectedType(v)) {
+                                        return i;
+                                    } else {
+                                        return boost::none;
+                                    }
+                                }
+                            }
+                            // We scanned every document in the partition, and none crossed the
+                            // threshold. So the window must be shifted so far to the right that no
+                            // documents fall in it.
                             return boost::none;
-                        }
-                    }
-                }
-                // We scanned every document in the partition, and none crossed the
-                // threshold. So the window must be shifted so far to the right that no
-                // documents fall in it.
-                return boost::none;
-            },
-        },
-        range.lower);
+                        },
+                    },
+                    range.lower);
 
     if (!lower)
         return boost::none;
 
     // 'upper' is the largest offset in the partition that's within the upper bound of the window.
-    optional<int> upper = stdx::visit(
-        OverloadedVisitor{
-            [&](WindowBounds::Current) -> optional<int> {
-                // 'range: [_, "current"]' means the current document, which is offset 0.
-                return 0;
-            },
-            [&](WindowBounds::Unbounded) -> optional<int> {
-                // Find the rightmost document whose sortBy field evaluates to a numeric value.
+    optional<int> upper =
+        stdx::visit(OverloadedVisitor{
+                        [&](WindowBounds::Current) -> optional<int> {
+                            // 'range: [_, "current"]' means the current document, which is offset
+                            // 0.
+                            return 0;
+                        },
+                        [&](WindowBounds::Unbounded) -> optional<int> {
+                            // Find the rightmost document whose sortBy field evaluates to a numeric
+                            // value.
 
-                // We know that the current document, the lower bound, and the hint (if present)
-                // are all numeric, so start scanning from whichever is highest.
-                int start = std::max(0, *lower);
-                if (hint) {
-                    start = std::max(hint->second, start);
-                }
+                            // We know that the current document, the lower bound, and the hint (if
+                            // present) are all numeric, so start scanning from whichever is
+                            // highest.
+                            int start = std::max(0, *lower);
+                            if (hint) {
+                                start = std::max(hint->second, start);
+                            }
 
-                boost::optional<Document> doc;
-                for (int i = start; (doc = (*this)[i]); ++i) {
-                    Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
-                    if (!hasExpectedType(v)) {
-                        // The previously scanned doc is the rightmost numeric one. Since we start
-                        // from '0', 'hint', or 'lower', which are all numeric, we should never hit
-                        // this case on the first iteration.
-                        tassert(5429412,
-                                "Failed to find the rightmost numeric document, "
-                                "while computing window bounds",
-                                i != start);
-                        return i - 1;
-                    }
-                }
-                return getMaxCachedOffset();
-            },
-            [&](const Value& delta) -> optional<int> {
-                // Pull in documents until the sortBy value crosses 'base + delta'.
-                Value threshold = add(base, delta);
+                            boost::optional<Document> doc;
+                            for (int i = start; (doc = (*this)[i]); ++i) {
+                                Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
+                                if (!hasExpectedType(v)) {
+                                    // The previously scanned doc is the rightmost numeric one.
+                                    // Since we start from '0', 'hint', or 'lower', which are all
+                                    // numeric, we should never hit this case on the first
+                                    // iteration.
+                                    tassert(5429412,
+                                            "Failed to find the rightmost numeric document, "
+                                            "while computing window bounds",
+                                            i != start);
+                                    return i - 1;
+                                }
+                            }
+                            return getMaxCachedOffset();
+                        },
+                        [&](const Value& delta) -> optional<int> {
+                            // Pull in documents until the sortBy value crosses 'base + delta'.
+                            Value threshold = add(base, delta);
 
-                // If there's no hint, start scanning from the lower bound.
-                // If there is a hint, start from whichever is greater: lower bound or hint.
-                // Usually the hint is greater, but with bounds like [0, 0] the new lower bound
-                // will be greater than the old upper bound.
-                int start = *lower;
-                if (hint) {
-                    start = std::max(hint->second, start);
-                }
+                            // If there's no hint, start scanning from the lower bound.
+                            // If there is a hint, start from whichever is greater: lower bound or
+                            // hint. Usually the hint is greater, but with bounds like [0, 0] the
+                            // new lower bound will be greater than the old upper bound.
+                            int start = *lower;
+                            if (hint) {
+                                start = std::max(hint->second, start);
+                            }
 
-                for (int i = start;; ++i) {
-                    auto doc = (*this)[i];
-                    if (!doc) {
-                        // We scanned every document in the partition, and none crossed the upper
-                        // bound. So the upper bound contains everything up to the end of the
-                        // partition.
-                        return getMaxCachedOffset();
-                    }
-                    Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
-                    if (lessThan(threshold, v)) {
-                        // This doc exceeded the upper bound.
-                        // The previously scanned doc (if any) is the greatest in-bounds one.
-                        if (i == start) {
-                            // This case can happen, for example, at the beginning of a partition
-                            // when the window is 'range: [-100, -5]'. There can be documents
-                            // within the lower bound of -100, but none within the upper bound of
-                            // -5.
-                            return boost::none;
-                        } else {
-                            return i - 1;
-                        }
-                    }
-                }
-            },
-        },
-        range.upper);
+                            for (int i = start;; ++i) {
+                                auto doc = (*this)[i];
+                                if (!doc) {
+                                    // We scanned every document in the partition, and none crossed
+                                    // the upper bound. So the upper bound contains everything up to
+                                    // the end of the partition.
+                                    return getMaxCachedOffset();
+                                }
+                                Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
+                                if (lessThan(threshold, v)) {
+                                    // This doc exceeded the upper bound.
+                                    // The previously scanned doc (if any) is the greatest in-bounds
+                                    // one.
+                                    if (i == start) {
+                                        // This case can happen, for example, at the beginning of a
+                                        // partition when the window is 'range: [-100, -5]'. There
+                                        // can be documents within the lower bound of -100, but none
+                                        // within the upper bound of -5.
+                                        return boost::none;
+                                    } else {
+                                        return i - 1;
+                                    }
+                                }
+                            }
+                        },
+                    },
+                    range.upper);
 
     if (!upper)
         return boost::none;
@@ -450,16 +457,15 @@ optional<std::pair<int, int>> PartitionIterator::getEndpoints(
 
     tassert(5423301, "getEndpoints assumes there is a current document", (*this)[0] != boost::none);
 
-    return stdx::visit(
-        OverloadedVisitor{
-            [&](const WindowBounds::DocumentBased docBounds) {
-                return getEndpointsDocumentBased(docBounds, hint);
-            },
-            [&](const WindowBounds::RangeBased rangeBounds) {
-                return getEndpointsRangeBased(rangeBounds, hint);
-            },
-        },
-        bounds.bounds);
+    return stdx::visit(OverloadedVisitor{
+                           [&](const WindowBounds::DocumentBased docBounds) {
+                               return getEndpointsDocumentBased(docBounds, hint);
+                           },
+                           [&](const WindowBounds::RangeBased rangeBounds) {
+                               return getEndpointsRangeBased(rangeBounds, hint);
+                           },
+                       },
+                       bounds.bounds);
 }
 
 void PartitionIterator::getNextDocument() {

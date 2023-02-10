@@ -364,7 +364,9 @@ BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
             ++numElementsReferenceObj;
         };
         if (!traverseLockStep(_is.referenceSubObj, obj, perElementLockStep)) {
-            BSONObj merged = [&] { return mergeObj(_is.referenceSubObj, obj); }();
+            BSONObj merged = [&] {
+                return mergeObj(_is.referenceSubObj, obj);
+            }();
             if (merged.isEmptyPrototype()) {
                 // If merge failed, flush current sub-object compression and start over.
                 _flushSubObjMode();
@@ -993,8 +995,8 @@ BSONColumnBuilder::InternalState::SubObjState::SubObjState(SubObjState&& other)
     state.init(&buffer, controlBlockWriter());
 }
 
-BSONColumnBuilder::InternalState::SubObjState& BSONColumnBuilder::InternalState::SubObjState::
-operator=(const SubObjState& rhs) {
+BSONColumnBuilder::InternalState::SubObjState&
+BSONColumnBuilder::InternalState::SubObjState::operator=(const SubObjState& rhs) {
     if (&rhs == this)
         return *this;
 
@@ -1005,8 +1007,8 @@ operator=(const SubObjState& rhs) {
     return *this;
 }
 
-BSONColumnBuilder::InternalState::SubObjState& BSONColumnBuilder::InternalState::SubObjState::
-operator=(SubObjState&& rhs) {
+BSONColumnBuilder::InternalState::SubObjState&
+BSONColumnBuilder::InternalState::SubObjState::operator=(SubObjState&& rhs) {
     if (&rhs == this)
         return *this;
 
