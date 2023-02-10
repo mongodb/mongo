@@ -729,6 +729,8 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
             AccumulationExpression accExpr = stmt.expr;
             accExpr.argument = newExpr;
             accumulationStatements.emplace_back(stmt.fieldName, std::move(accExpr));
+        } else {
+            return {};
         }
     }
 
