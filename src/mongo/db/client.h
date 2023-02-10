@@ -49,6 +49,7 @@
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -126,7 +127,7 @@ public:
     }
 
     boost::optional<std::string> getSniNameForSession() const {
-        return _session ? _session->getSniName() : boost::none;
+        return _session ? SSLPeerInfo::forSession(_session).sniName() : boost::none;
     }
 
     transport::SessionHandle session() && {

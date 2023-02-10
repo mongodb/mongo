@@ -294,14 +294,8 @@ bool AsioSession::isConnected() {
 }
 
 #ifdef MONGO_CONFIG_SSL
-const SSLConfiguration* AsioSession::getSSLConfiguration() const {
-    if (_sslContext->manager) {
-        return &_sslContext->manager->getSSLConfiguration();
-    }
-    return nullptr;
-}
 
-std::shared_ptr<SSLManagerInterface> AsioSession::getSSLManager() const {
+const std::shared_ptr<SSLManagerInterface>& AsioSession::getSSLManager() const {
     return _sslContext->manager;
 }
 
@@ -602,12 +596,6 @@ Future<void> AsioSession::opportunisticRead(Stream& stream,
         return futurize(ec);
     }
 }
-
-#ifdef MONGO_CONFIG_SSL
-boost::optional<std::string> AsioSession::getSniName() const {
-    return SSLPeerInfo::forSession(shared_from_this()).sniName();
-}
-#endif
 
 template <typename Stream, typename ConstBufferSequence>
 Future<void> AsioSession::opportunisticWrite(Stream& stream,

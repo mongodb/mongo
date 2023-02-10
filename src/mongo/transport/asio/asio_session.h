@@ -143,9 +143,7 @@ public:
     }
 
 #ifdef MONGO_CONFIG_SSL
-    const SSLConfiguration* getSSLConfiguration() const override;
-
-    std::shared_ptr<SSLManagerInterface> getSSLManager() const override;
+    const std::shared_ptr<SSLManagerInterface>& getSSLManager() const override;
 #endif
 
 protected:
@@ -256,8 +254,6 @@ private:
 
         return boost::none;
     }
-
-    boost::optional<std::string> getSniName() const override;
 #endif
 
     template <typename Stream, typename ConstBufferSequence>

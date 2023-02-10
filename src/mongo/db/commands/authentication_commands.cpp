@@ -205,11 +205,11 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 
     AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
 
-    auto sslConfiguration = opCtx->getClient()->session()->getSSLConfiguration();
+    auto sslConfiguration = opCtx->getClient()->session()->getSSLManager()->getSSLConfiguration();
 
     uassert(ErrorCodes::AuthenticationFailed,
             "Unable to verify x.509 certificate, as no CA has been provided.",
-            sslConfiguration->hasCA);
+            sslConfiguration.hasCA);
 
     uassert(ErrorCodes::ProtocolError,
             "X.509 authentication must always use the $external database.",
@@ -229,7 +229,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
         uassertStatusOK(authorizationSession->addAndAuthorizeUser(opCtx, request, boost::none));
     };
 
-    if (sslConfiguration->isClusterMember(clientName)) {
+    if (sslConfiguration.isClusterMember(clientName)) {
         // Handle internal cluster member auth, only applies to server-server connections
         if (!clusterAuthMode.allowsX509()) {
             uassert(ErrorCodes::AuthenticationFailed,

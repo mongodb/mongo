@@ -1027,9 +1027,10 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
             (cmd.getMechanisms() == boost::none) || !cmd.getMechanisms()->empty());
 
 #ifdef MONGO_CONFIG_SSL
-    auto configuration = opCtx->getClient()->session()->getSSLConfiguration();
+    auto& sslManager = opCtx->getClient()->session()->getSSLManager();
 
-    if (isExternal && configuration && configuration->isClusterMember(userName.getUser())) {
+    if (isExternal && sslManager &&
+        sslManager->getSSLConfiguration().isClusterMember(userName.getUser())) {
         if (gEnforceUserClusterSeparation) {
             uasserted(ErrorCodes::BadValue,
                       "Cannot create an x.509 user with a subjectname that would be "

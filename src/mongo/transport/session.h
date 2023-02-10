@@ -168,10 +168,6 @@ public:
     virtual const SockAddr& remoteAddr() const = 0;
     virtual const SockAddr& localAddr() const = 0;
 
-    virtual boost::optional<std::string> getSniName() const {
-        return boost::none;
-    }
-
     /**
      * Atomically set all of the session tags specified in the 'tagsToSet' bit field. If the
      * 'kPending' tag is set, indicating that no tags have yet been specified for the session, this
@@ -205,14 +201,9 @@ public:
 
 #ifdef MONGO_CONFIG_SSL
     /**
-     * Get the configuration from the SSL manager.
-     */
-    virtual const SSLConfiguration* getSSLConfiguration() const = 0;
-
-    /**
      * Get the SSL manager associated with this session.
      */
-    virtual std::shared_ptr<SSLManagerInterface> getSSLManager() const = 0;
+    virtual const std::shared_ptr<SSLManagerInterface>& getSSLManager() const = 0;
 #endif
 
 protected:

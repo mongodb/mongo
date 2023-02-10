@@ -178,9 +178,9 @@ Future<void> AsyncDBClient::authenticate(const BSONObj& params) {
     // We will only have a valid clientName if SSL is enabled.
     std::string clientName;
 #ifdef MONGO_CONFIG_SSL
-    auto sslConfiguration = _session->getSSLConfiguration();
-    if (sslConfiguration) {
-        clientName = sslConfiguration->clientSubjectName.toString();
+    auto& sslManager = _session->getSSLManager();
+    if (sslManager) {
+        clientName = sslManager->getSSLConfiguration().clientSubjectName.toString();
     }
 #endif
 
@@ -197,9 +197,9 @@ Future<void> AsyncDBClient::authenticateInternal(
     // We will only have a valid clientName if SSL is enabled.
     std::string clientName;
 #ifdef MONGO_CONFIG_SSL
-    auto sslConfiguration = _session->getSSLConfiguration();
-    if (sslConfiguration) {
-        clientName = sslConfiguration->clientSubjectName.toString();
+    auto& sslManager = _session->getSSLManager();
+    if (sslManager) {
+        clientName = sslManager->getSSLConfiguration().clientSubjectName.toString();
     }
 #endif
 

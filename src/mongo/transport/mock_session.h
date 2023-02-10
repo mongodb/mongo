@@ -83,12 +83,8 @@ public:
     }
 
 #ifdef MONGO_CONFIG_SSL
-    const SSLConfiguration* getSSLConfiguration() const override {
-        return nullptr;
-    }
-
-    std::shared_ptr<SSLManagerInterface> getSSLManager() const override {
-        return nullptr;
+    const std::shared_ptr<SSLManagerInterface>& getSSLManager() const override {
+        return _sslManager;
     }
 #endif
 
@@ -97,6 +93,7 @@ private:
     const HostAndPort _local;
     const SockAddr _remoteAddr;
     const SockAddr _localAddr;
+    std::shared_ptr<SSLManagerInterface> _sslManager;
 };
 
 class MockSession : public MockSessionBase {
