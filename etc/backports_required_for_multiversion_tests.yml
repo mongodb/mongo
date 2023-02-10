@@ -86,14 +86,14 @@ last-continuous:
     ticket: SERVER-67532
   - test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
     ticket: SERVER-68628
-  - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
-    ticket: SERVER-68728
   - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
     ticket: SERVER-68648
-  - test_file: jstests/sharding/timeseries_cluster_indexstats.js
-    ticket: SERVER-72620
+  - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
+    ticket: SERVER-68728
   - test_file: jstests/sharding/prepare_transaction_then_migrate.js
     ticket: SERVER-71219
+  - test_file: jstests/sharding/timeseries_cluster_indexstats.js
+    ticket: SERVER-72620
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -163,8 +163,6 @@ last-lts:
     ticket: SERVER-51259
   - test_file: jstests/core/txns/errors_on_committed_transaction.js
     ticket: SERVER-52547
-  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-71219
   - test_file: jstests/sharding/migration_waits_for_majority_commit.js
     ticket: SERVER-52906
   - test_file: jstests/sharding/migration_ignore_interrupts_1.js
@@ -277,10 +275,12 @@ last-lts:
     ticket: SERVER-67532
   - test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
     ticket: SERVER-68628
-  - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
-    ticket: SERVER-68728
   - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
     ticket: SERVER-68648
+  - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
+    ticket: SERVER-68728
+  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
+    ticket: SERVER-71219
   - test_file: jstests/sharding/timeseries_cluster_indexstats.js
     ticket: SERVER-72620
   suites:
