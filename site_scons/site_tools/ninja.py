@@ -1713,13 +1713,13 @@ def generate(env):
         env.NinjaRuleMapping("${" + var + "}", provider)
         env.NinjaRuleMapping(env[var], provider)
 
-    robust_rule_mapping("CCCOM", "CC", env["CC"])
-    robust_rule_mapping("SHCCCOM", "CC", env["CC"])
-    robust_rule_mapping("CXXCOM", "CXX", env["CXX"])
-    robust_rule_mapping("SHCXXCOM", "CXX", env["CXX"])
+    robust_rule_mapping("CCCOM", "CC", "$CC")
+    robust_rule_mapping("SHCCCOM", "CC", "$SHCC")
+    robust_rule_mapping("CXXCOM", "CXX", "$CXX")
+    robust_rule_mapping("SHCXXCOM", "CXX", "$SHCXX")
     robust_rule_mapping("LINKCOM", "LINK", "$LINK")
     robust_rule_mapping("SHLINKCOM", "LINK", "$SHLINK")
-    robust_rule_mapping("ARCOM", "AR", env["AR"])
+    robust_rule_mapping("ARCOM", "AR", "$AR")
 
     # Make SCons node walk faster by preventing unnecessary work
     env.Decider("timestamp-match")

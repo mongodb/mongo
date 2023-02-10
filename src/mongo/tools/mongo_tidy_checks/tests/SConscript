@@ -13,6 +13,12 @@ if env.GetOption('ninja') == 'disabled':
 
     mongo_tidy_test_env.Append(CPPPATH='.')
 
+    # These test files will purposefully be error prone, so we can disable warnings any warnings we expect
+    # to see.
+    mongo_tidy_test_env.Append(CCFLAGS=[
+        '-Wno-unused-but-set-parameter',
+    ], )
+
     # This list represents the test source files, which should contain a single issue which will be flagged
     # by a clang tidy check. The issue should be isolated in as minimal way as possible.
     tests = [
