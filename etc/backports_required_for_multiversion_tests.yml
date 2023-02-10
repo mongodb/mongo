@@ -220,16 +220,20 @@ last-continuous:
     ticket: SERVER-67800
   - test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
     ticket: SERVER-68628
+  - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
+    ticket: SERVER-68648
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-68728
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
     ticket: SERVER-69861
   - test_file: jstests/aggregation/expressions/switch_errors.js
     ticket: SERVER-70190
-  - test_file: jstests/core/cover_null_queries.js
-    ticket: SERVER-70436
   - test_file: jstests/replsets/wtimeout_too_large.js
     ticket: SERVER-70360
+  - test_file: jstests/core/cover_null_queries.js
+    ticket: SERVER-70436
+  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
+    ticket: SERVER-71219
   - test_file: jstests/sharding/all_collection_stats.js
     ticket: SERVER-71477
   - test_file: jstests/sharding/drop_collection.js
@@ -242,14 +246,10 @@ last-continuous:
     ticket: SERVER-72416
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/oplog_rollover.js
     ticket: SERVER-72422
-  - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
-    ticket: SERVER-68648
   - test_file: jstests/sharding/timeseries_cluster_indexstats.js
     ticket: SERVER-72620
   - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_extended_range.js
     ticket: SERVER-73110
-  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-71219
   suites: null
 last-lts:
   all:
@@ -317,8 +317,6 @@ last-lts:
     ticket: SERVER-51943
   - test_file: jstests/core/txns/errors_on_committed_transaction.js
     ticket: SERVER-52547
-  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-71219
   - test_file: jstests/sharding/migration_waits_for_majority_commit.js
     ticket: SERVER-52906
   - test_file: jstests/sharding/migration_ignore_interrupts_1.js
@@ -547,16 +545,20 @@ last-lts:
     ticket: SERVER-67800
   - test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
     ticket: SERVER-68628
+  - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
+    ticket: SERVER-68648
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-68728
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
     ticket: SERVER-69861
   - test_file: jstests/aggregation/expressions/switch_errors.js
     ticket: SERVER-70190
-  - test_file: jstests/core/cover_null_queries.js
-    ticket: SERVER-70436
   - test_file: jstests/replsets/wtimeout_too_large.js
     ticket: SERVER-70360
+  - test_file: jstests/core/cover_null_queries.js
+    ticket: SERVER-70436
+  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
+    ticket: SERVER-71219
   - test_file: jstests/sharding/all_collection_stats.js
     ticket: SERVER-71477
   - test_file: jstests/sharding/drop_collection.js
@@ -569,8 +571,6 @@ last-lts:
     ticket: SERVER-72416
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/oplog_rollover.js
     ticket: SERVER-72422
-  - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
-    ticket: SERVER-68648
   - test_file: jstests/sharding/timeseries_cluster_indexstats.js
     ticket: SERVER-72620
   - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_extended_range.js
