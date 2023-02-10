@@ -33,12 +33,27 @@ imports:
     - "mongo/db/basic_types.idl"
 
 server_parameters:
+    movePrimaryDonorServiceMinThreadCount:
+        description: The min number of threads in the movePrimary donor's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gMovePrimaryDonorServiceMinThreadCount
+        default: 0
+        validator:
+            gte: 0
+            lte: 256
+    movePrimaryDonorServiceMaxThreadCount:
+        description: The max number of threads in the movePrimary donor's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gMovePrimaryDonorServiceMaxThreadCount
+        default: 8
+        validator:
+            gte: 1
+            lte: 256
     movePrimaryRecipientServiceMaxThreadCount:
         description: The max number of threads in the movePrimary recipient's thread pool.
         set_at: startup
         cpp_vartype: int
         cpp_varname: gMovePrimaryRecipientServiceMaxThreadCount
         default: 3
-        validator:
-            gte: 1
-            lte: 256

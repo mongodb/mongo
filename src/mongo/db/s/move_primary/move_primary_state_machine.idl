@@ -61,8 +61,8 @@ enums:
             kDone: 5
 
 structs:
-    MovePrimaryDonorDocument:
-        description: "Represents an in-progress move primary operation on the donor."
+    MovePrimaryDonorMetadata:
+        description: "Immutable metadata fields for a movePrimary donor."
         strict: false
         fields:
             _id:
@@ -76,6 +76,13 @@ structs:
             toShard:
                 type: string
                 description: "The name of the recipient shard."
+    
+    MovePrimaryDonorMutableFields:
+        description: >-
+            Contains fields for a move primary donor which can be updated throughout the lifetime
+            of the operation.
+        strict: false
+        fields:
             state:
                 type: MovePrimaryDonorState
                 description: "The state of an in-progress movePrimary operation on the donor."
@@ -90,6 +97,17 @@ structs:
                 type: object_owned
                 description: "The error that caused the migration to abort."
                 optional: true
+
+    MovePrimaryDonorDocument:
+        description: "Represents an in-progress move primary operation on the donor."
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            MovePrimaryDonorMetadata: metadata
+        fields:
+            mutableFields:
+                type: MovePrimaryDonorMutableFields
+                default: true
 
     MovePrimaryRecipientDocument:
         description: "Represents an in-progress movePrimary operation on the recipient."
