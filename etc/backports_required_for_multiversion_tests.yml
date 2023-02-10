@@ -310,6 +310,8 @@ last-continuous:
     ticket: SERVER-72774
   - test_file: jstests/core/timeseries/timeseries_predicates.js
     ticket: SERVER-73697
+  - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
+    ticket: SERVER-73822
   suites: null
 last-lts:
   all:
@@ -695,4 +697,6 @@ last-lts:
     ticket: SERVER-72774
   - test_file: jstests/core/timeseries/timeseries_predicates.js
     ticket: SERVER-73697
+  - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
+    ticket: SERVER-73822
   suites: null
