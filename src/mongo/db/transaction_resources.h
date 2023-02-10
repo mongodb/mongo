@@ -156,9 +156,13 @@ struct TransactionResources {
     // Otherwise boost::none.
     boost::optional<Locker::LockSnapshot> lockSnapshot;
 
-    // The storage engine snapshot associated with this transaction
-    std::unique_ptr<RecoveryUnit> recoveryUnit;
-    WriteUnitOfWork::RecoveryUnitState recoveryUnitState;
+    // The storage engine snapshot associated with this transaction (when yielded).
+    struct YieldedRecoveryUnit {
+        std::unique_ptr<RecoveryUnit> recoveryUnit;
+        WriteUnitOfWork::RecoveryUnitState recoveryUnitState;
+    };
+
+    boost::optional<YieldedRecoveryUnit> yieldRecoveryUnit;
 
     ////////////////////////////////////////////////////////////////////////////////////////
     // Per-collection resources
