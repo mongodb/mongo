@@ -120,8 +120,7 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
     const std::string q4Text = "{$and: [{a0: {$gt:20}}, {a0: {$lt: 20}}]}";
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{scan_0}]\n"
-        "Evaluation [{scan_0}]\n"
-        "|   Const [Nothing]\n"
+        "Evaluation [{scan_0} = Const [Nothing]]\n"
         "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimizedQueryPlan(q4Text, testIndex));
@@ -146,8 +145,7 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         "40}}]}]}";
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{scan_0}]\n"
-        "Evaluation [{scan_0}]\n"
-        "|   Const [Nothing]\n"
+        "Evaluation [{scan_0} = Const [Nothing]]\n"
         "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimizedQueryPlan(q6Text, testIndex));
@@ -158,8 +156,7 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         "42}}]}]}";
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{scan_0}]\n"
-        "Evaluation [{scan_0}]\n"
-        "|   Const [Nothing]\n"
+        "Evaluation [{scan_0} = Const [Nothing]]\n"
         "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimizedQueryPlan(q7Text, testIndex));
@@ -178,8 +175,7 @@ TEST_F(IntervalIntersection, MultiFieldIntersection) {
         "{$and: [{a0: {$gt: 11}}, {a0: {$lt: 14}}, {b0: {$gt: 21}}, {b0: {$lt: 12}}]}";
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{scan_0}]\n"
-        "Evaluation [{scan_0}]\n"
-        "|   Const [Nothing]\n"
+        "Evaluation [{scan_0} = Const [Nothing]]\n"
         "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimizedQueryPlan(q1Text, testIndex));
@@ -188,8 +184,7 @@ TEST_F(IntervalIntersection, MultiFieldIntersection) {
         "{$and: [{a0: {$gt: 14}}, {a0: {$lt: 11}}, {b0: {$gt: 12}}, {b0: {$lt: 21}}]}";
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{scan_0}]\n"
-        "Evaluation [{scan_0}]\n"
-        "|   Const [Nothing]\n"
+        "Evaluation [{scan_0} = Const [Nothing]]\n"
         "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimizedQueryPlan(q2Text, testIndex));
@@ -198,8 +193,7 @@ TEST_F(IntervalIntersection, MultiFieldIntersection) {
         "{$and: [{a0: {$gt: 14}}, {a0: {$lt: 11}}, {b0: {$gt: 21}}, {b0: {$lt: 12}}]}";
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{scan_0}]\n"
-        "Evaluation [{scan_0}]\n"
-        "|   Const [Nothing]\n"
+        "Evaluation [{scan_0} = Const [Nothing]]\n"
         "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimizedQueryPlan(q3Text, testIndex));
@@ -207,8 +201,7 @@ TEST_F(IntervalIntersection, MultiFieldIntersection) {
     const std::string q4Text = "{$and: [{a0: 42}, {b0: {$gt: 21}}, {b0: {$lt: 12}}]}";
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{scan_0}]\n"
-        "Evaluation [{scan_0}]\n"
-        "|   Const [Nothing]\n"
+        "Evaluation [{scan_0} = Const [Nothing]]\n"
         "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimizedQueryPlan(q4Text, testIndex));

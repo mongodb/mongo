@@ -114,8 +114,7 @@ Evaluation [{combinedProjection_0}]
 |   |   PathConstant []
 |   |   Variable [projGetPath_0]
 |   PathKeep [_id, a]
-Evaluation [{projGetPath_0}]
-|   Const [[1, 2, 3, 4]]
+Evaluation [{projGetPath_0} = Const [[1, 2, 3, 4]]]
 Scan [collection, {scan_0}]
 
 

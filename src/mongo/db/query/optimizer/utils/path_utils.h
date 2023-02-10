@@ -36,6 +36,23 @@
 namespace mongo::optimizer {
 
 /**
+ * If the input expression is a constant or a variable, or it is an EvalFilter/Path which has an
+ * identity path and input which itself is constant or variable, then return a pointer to the deepst
+ * simple expression.
+ */
+template <class T>
+ABT::reference_type getTrivialExprPtr(const ABT& n) {
+    if (n.is<Constant>() || n.is<Variable>()) {
+        return n.ref();
+    }
+    if (const auto* ptr = n.cast<T>();
+        ptr != nullptr && ptr->getPath().template is<PathIdentity>()) {
+        return getTrivialExprPtr<T>(ptr->getInput());
+    }
+    return {};
+}
+
+/**
  * Returns a vector all paths nested under conjunctions (PathComposeM) in the given path.
  * For example, PathComposeM(PathComposeM(Foo, Bar), Baz) returns [Foo, Bar, Baz].
  * If the given path is not a conjunction, returns a vector with the given path.

@@ -351,12 +351,9 @@ TEST(Optimizer, GroupBy) {
         "        Const [10]\n"
         "      [a2]\n"
         "        Const [11]\n"
-        "    Evaluation [{p3}]\n"
-        "      Const [3]\n"
-        "      Evaluation [{p2}]\n"
-        "        Const [2]\n"
-        "        Evaluation [{p1}]\n"
-        "          Const [1]\n"
+        "    Evaluation [{p3} = Const [3]]\n"
+        "      Evaluation [{p2} = Const [2]]\n"
+        "        Evaluation [{p1} = Const [1]]\n"
         "          Scan [test, {ptest}]\n",
         rootNode);
 
@@ -400,14 +397,11 @@ TEST(Optimizer, Union) {
     ASSERT_EXPLAIN_AUTO(
         "Root [{B, ptest}]\n"
         "  Union [{B, ptest}]\n"
-        "    Evaluation [{B}]\n"
-        "      Const [3]\n"
+        "    Evaluation [{B} = Const [3]]\n"
         "      Scan [test, {ptest}]\n"
-        "    Evaluation [{B}]\n"
-        "      Const [4]\n"
+        "    Evaluation [{B} = Const [4]]\n"
         "      Scan [test, {ptest}]\n"
-        "    Evaluation [{B}]\n"
-        "      Const [5]\n"
+        "    Evaluation [{B} = Const [5]]\n"
         "      Evaluation [{ptest}]\n"
         "        EvalPath []\n"
         "          PathConstant []\n"

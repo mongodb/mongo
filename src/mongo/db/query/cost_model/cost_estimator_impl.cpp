@@ -30,6 +30,8 @@
 #include "mongo/db/query/cost_model/cost_estimator_impl.h"
 
 #include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
+
 
 namespace mongo::cost_model {
 
@@ -119,7 +121,7 @@ public:
     CostAndCEInternal operator()(const ABT& /*n*/, const FilterNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         double filterCost = childResult._cost;
-        if (!isTrivialExpr<EvalFilter>(node.getFilter())) {
+        if (getTrivialExprPtr<EvalFilter>(node.getFilter()).empty()) {
             // Non-trivial filter.
             filterCost += _coefficients.getFilterStartupCost() +
                 _coefficients.getFilterIncrementalCost() * childResult._ce._value;
@@ -130,7 +132,7 @@ public:
     CostAndCEInternal operator()(const ABT& /*n*/, const EvaluationNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         double evalCost = childResult._cost;
-        if (!isTrivialExpr<EvalPath>(node.getProjection())) {
+        if (getTrivialExprPtr<EvalPath>(node.getProjection()).empty()) {
             // Non-trivial projection.
             evalCost += _coefficients.getEvalStartupCost() +
                 _coefficients.getEvalIncrementalCost() * _cardinalityEstimate._value;
@@ -363,18 +365,6 @@ private:
           _childProps(childProps),
           _nodeCEMap(nodeCEMap),
           _coefficients(coefficients) {}
-
-    template <class T>
-    static bool isTrivialExpr(const ABT& n) {
-        if (n.is<Constant>() || n.is<Variable>()) {
-            return true;
-        }
-        if (const auto* ptr = n.cast<T>(); ptr != nullptr &&
-            ptr->getPath().template is<PathIdentity>() && isTrivialExpr<T>(ptr->getInput())) {
-            return true;
-        }
-        return false;
-    }
 
     static CostAndCEInternal deriveInternal(const Metadata& metadata,
                                             const Memo& memo,

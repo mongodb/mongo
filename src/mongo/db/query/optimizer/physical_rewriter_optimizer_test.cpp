@@ -91,10 +91,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|   PathGet [a]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
-        "Evaluation [{p2}]\n"
-        "|   EvalPath []\n"
-        "|   |   Variable [p1]\n"
-        "|   PathIdentity []\n"
+        "Evaluation [{p2} = Variable [p1]]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [p1]\n"
@@ -174,10 +171,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|           type: Centralized, disableExchanges\n"
         "|       indexingRequirement: \n"
         "|           Complete, dedupRID\n"
-        "Evaluation [{p2}]\n"
-        "|   EvalPath []\n"
-        "|   |   Variable [p1]\n"
-        "|   PathIdentity []\n"
+        "Evaluation [{p2} = Variable [p1]]\n"
         "Properties [cost: 0.428487, localCost: 0, adjustedCE: 100]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
@@ -280,14 +274,8 @@ TEST(PhysRewriter, GroupBy) {
         "|   aggregations: \n"
         "|       [c]\n"
         "|           Variable [b]\n"
-        "Evaluation [{b}]\n"
-        "|   EvalPath []\n"
-        "|   |   Variable [ptest]\n"
-        "|   PathIdentity []\n"
-        "Evaluation [{a}]\n"
-        "|   EvalPath []\n"
-        "|   |   Variable [ptest]\n"
-        "|   PathIdentity []\n"
+        "Evaluation [{b} = Variable [ptest]]\n"
+        "Evaluation [{a} = Variable [ptest]]\n"
         "PhysicalScan [{'<root>': ptest}, test]\n",
         optimized);
 }
@@ -341,8 +329,7 @@ TEST(PhysRewriter, GroupBy1) {
         "|   aggregations: \n"
         "|       [pb]\n"
         "|           Variable [pa]\n"
-        "Evaluation [{pa}]\n"
-        "|   Const [null]\n"
+        "Evaluation [{pa} = Const [null]]\n"
         "PhysicalScan [{}, test]\n",
         optimized);
 }
@@ -398,14 +385,8 @@ TEST(PhysRewriter, Unwind) {
         "|   |   Variable [a]\n"
         "|   PathIdentity []\n"
         "Unwind [{a, a_pid}]\n"
-        "Evaluation [{b}]\n"
-        "|   EvalPath []\n"
-        "|   |   Variable [ptest]\n"
-        "|   PathIdentity []\n"
-        "Evaluation [{a}]\n"
-        "|   EvalPath []\n"
-        "|   |   Variable [ptest]\n"
-        "|   PathIdentity []\n"
+        "Evaluation [{b} = Variable [ptest]]\n"
+        "Evaluation [{a} = Variable [ptest]]\n"
         "PhysicalScan [{'<root>': ptest}, test]\n",
         optimized);
 }
@@ -1222,10 +1203,7 @@ TEST(PhysRewriter, FilterIndexing5) {
         "|   |   Variable [pb]\n"
         "|   PathCompare [Gt]\n"
         "|   Const [0]\n"
-        "Evaluation [{pb}]\n"
-        "|   EvalPath []\n"
-        "|   |   Variable [evalTemp_0]\n"
-        "|   PathIdentity []\n"
+        "Evaluation [{pb} = Variable [evalTemp_0]]\n"
         "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': evalTemp_0}, scanDefName: c1, indexDefNa"
         "me: index1, interval: {>Const [0 | maxKey]}]\n",
         optimized);
@@ -1841,8 +1819,7 @@ TEST(PhysRewriter, SargableProjectionRenames) {
     // projections.
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{root}]\n"
-        "Evaluation [{pa1}]\n"
-        "|   Variable [pa]\n"
+        "Evaluation [{pa1} = Variable [pa]]\n"
         "Sargable [Complete]\n"
         "|   |   |   |   requirementsMap: \n"
         "|   |   |   |       refProjection: root, path: 'PathGet [a] PathIdentity []', boundProje"
@@ -2218,8 +2195,7 @@ TEST(PhysRewriter, EvalIndexing2) {
     // Verify collation is subsumed into the index scan.
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{pa2}]\n"
-        "Evaluation [{pa3}]\n"
-        "|   Variable [pa1]\n"
+        "Evaluation [{pa3} = Variable [pa1]]\n"
         "Evaluation [{pa2}]\n"
         "|   EvalPath []\n"
         "|   |   Const [0]\n"
@@ -2329,20 +2305,14 @@ TEST(PhysRewriter, MultiKeyIndex) {
             "|           FunctionCall [$addToSet]\n"
             "|           Variable [sideId_0]\n"
             "Union [{rid_0, sideId_0, unionTemp_0, unionTemp_1}]\n"
-            "|   Evaluation [{unionTemp_1}]\n"
-            "|   |   Variable [pb]\n"
-            "|   Evaluation [{unionTemp_0}]\n"
-            "|   |   Const [Nothing]\n"
-            "|   Evaluation [{sideId_0}]\n"
-            "|   |   Const [1]\n"
+            "|   Evaluation [{unionTemp_1} = Variable [pb]]\n"
+            "|   Evaluation [{unionTemp_0} = Const [Nothing]]\n"
+            "|   Evaluation [{sideId_0} = Const [1]]\n"
             "|   IndexScan [{'<indexKey> 0': pb, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
             "index2, interval: {[Const [maxKey], Const [2])}]\n"
-            "Evaluation [{unionTemp_1}]\n"
-            "|   Const [Nothing]\n"
-            "Evaluation [{unionTemp_0}]\n"
-            "|   Variable [pa]\n"
-            "Evaluation [{sideId_0}]\n"
-            "|   Const [0]\n"
+            "Evaluation [{unionTemp_1} = Const [Nothing]]\n"
+            "Evaluation [{unionTemp_0} = Variable [pa]]\n"
+            "Evaluation [{sideId_0} = Const [0]]\n"
             "IndexScan [{'<indexKey> 0': pa, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
             "index1, interval: {=Const [1]}]\n",
             optimized);
@@ -2367,8 +2337,7 @@ TEST(PhysRewriter, MultiKeyIndex) {
             "|   |   Condition\n"
             "|   |       rid_0 = rid_2\n"
             "|   Union [{rid_2}]\n"
-            "|   Evaluation [{rid_2}]\n"
-            "|   |   Variable [rid_0]\n"
+            "|   Evaluation [{rid_2} = Variable [rid_0]]\n"
             "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index2, interval: "
             "{[Const [maxKey], Const [2])}, reversed]\n"
             "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const "
@@ -3487,8 +3456,7 @@ TEST(PhysRewriter, ElemMatchIndexNoArrays) {
     // If we do not have arrays (index is not multikey) we simplify to unsatisfiable query.
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{root}]\n"
-        "Evaluation [{root}]\n"
-        "|   Const [Nothing]\n"
+        "Evaluation [{root} = Const [Nothing]]\n"
         "LimitSkip [limit: 0, skip: 0]\n"
         "CoScan []\n",
         optimized);
@@ -3732,12 +3700,10 @@ TEST(PhysRewriter, NestedElemMatch) {
         "|       [sides_0]\n"
         "|           FunctionCall [$addToSet] Variable [sideId_0]\n"
         "Union [{rid_0, sideId_0}]\n"
-        "|   Evaluation [{sideId_0}]\n"
-        "|   |   Const [1]\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: coll1, indexDefName: index1, interval: {[C"
-        "onst [[]], Const [BinData(0, )])}]\n"
-        "Evaluation [{sideId_0}]\n"
-        "|   Const [0]\n"
+        "|   Evaluation [{sideId_0} = Const [1]]\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: coll1, indexDefName: index1, interval: "
+        "{[Const [[]], Const [BinData(0, )])}]\n"
+        "Evaluation [{sideId_0} = Const [0]]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_3]\n"
@@ -5662,10 +5628,9 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
         "|   |   Collation\n"
         "|   |       Ascending\n"
         "|   Union [{rid_5}]\n"
-        "|   Evaluation [{rid_5}]\n"
-        "|   |   Variable [rid_0]\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index2, interval: {=Cons"
-        "t [2]}]\n"
+        "|   Evaluation [{rid_5} = Variable [rid_0]]\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index2, interval: {=Const "
+        "[2]}]\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const [1"
         "]}]\n",
         optimized);

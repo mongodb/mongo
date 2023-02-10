@@ -735,8 +735,7 @@ TEST(Path, ProjElim3) {
 
     ASSERT_EXPLAIN_AUTO(
         "Root [{p99}]\n"
-        "  Evaluation [{p99}]\n"
-        "    Variable [root]\n"
+        "  Evaluation [{p99} = Variable [root]]\n"
         "    Scan [test, {root}]\n",
         tree);
 }

@@ -132,8 +132,7 @@ Evaluation [{combinedProjection_0}]
 |   |   |   PathKeep [c]
 |   |   PathKeep [b]
 |   PathKeep [_id, a, a1]
-Evaluation [{projGetPath_0}]
-|   Const ["str"]
+Evaluation [{projGetPath_0} = Const ["str"]]
 Scan [collection, {scan_0}]
 
 

@@ -33,6 +33,7 @@
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/util/assert_util.h"
 
 
@@ -1223,23 +1224,32 @@ public:
                              ExplainPrinter projectionResult) {
         ExplainPrinter printer("Evaluation");
         maybePrintProps(printer, node);
-        printer.separator(" [");
 
-        // The bind block (projectionResult) is empty in V1-V2 explains. In the case of the
-        // Evaluation node, the bind block may have useful information about the embedded
-        // expression, so we make sure to print the projected expression.
         if constexpr (version < ExplainVersion::V3) {
+            const ABT& expr = node.getProjection();
+
+            printer.separator(" [");
+            // The bind block (projectionResult) is empty in V1-V2 explains. In the case of the
+            // Evaluation node, the bind block may have useful information about the embedded
+            // expression, so we make sure to print the projected expression.
             printProjection(printer, node.getProjectionName());
-        }
+            if (const auto ref = getTrivialExprPtr<EvalPath>(expr); !ref.empty()) {
+                ExplainPrinter local = generate(ref);
+                printer.separator(" = ").printSingleLevel(local).separator("]");
 
-        printer.separator("]");
-        nodeCEPropsPrint(printer, n, node);
-        printer.setChildCount(2);
+                nodeCEPropsPrint(printer, n, node);
+                printer.setChildCount(1, true /*noInline*/);
+            } else {
+                printer.separator("]");
 
-        if constexpr (version < ExplainVersion::V3) {
-            auto pathPrinter = generate(node.getProjection());
-            printer.print(pathPrinter);
+                nodeCEPropsPrint(printer, n, node);
+                printer.setChildCount(2);
+
+                auto pathPrinter = generate(expr);
+                printer.print(pathPrinter);
+            }
         } else if constexpr (version == ExplainVersion::V3) {
+            nodeCEPropsPrint(printer, n, node);
             printer.fieldName("projection").print(projectionResult);
         } else {
             MONGO_UNREACHABLE;
