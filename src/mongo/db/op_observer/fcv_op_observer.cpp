@@ -144,7 +144,9 @@ void FcvOpObserver::_onInsertOrUpdate(OperationContext* opCtx, const BSONObj& do
     }
 
     opCtx->recoveryUnit()->onCommit(
-        [opCtx, newVersion](boost::optional<Timestamp> ts) { _setVersion(opCtx, newVersion, ts); });
+        [newVersion](OperationContext* opCtx, boost::optional<Timestamp> ts) {
+            _setVersion(opCtx, newVersion, ts);
+        });
 }
 
 void FcvOpObserver::onInserts(OperationContext* opCtx,

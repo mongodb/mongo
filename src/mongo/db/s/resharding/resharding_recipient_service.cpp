@@ -1132,7 +1132,7 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
 
             WriteUnitOfWork wuow(opCtx.get());
 
-            opCtx->recoveryUnit()->onCommit([this](boost::optional<Timestamp> unusedCommitTime) {
+            opCtx->recoveryUnit()->onCommit([this](OperationContext*, boost::optional<Timestamp>) {
                 stdx::lock_guard<Latch> lk(_mutex);
                 _completionPromise.emplaceValue();
             });

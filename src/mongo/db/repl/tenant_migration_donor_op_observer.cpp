@@ -70,7 +70,7 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
         if (opCtx->writesAreReplicated()) {
             // onRollback is not registered on secondaries since secondaries should not fail to
             // apply the write.
-            opCtx->recoveryUnit()->onRollback([opCtx, donorStateDoc] {
+            opCtx->recoveryUnit()->onRollback([donorStateDoc](OperationContext* opCtx) {
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .remove(donorStateDoc.getTenantId(),
                             TenantMigrationAccessBlocker::BlockerType::kDonor);
@@ -89,7 +89,7 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
         if (opCtx->writesAreReplicated()) {
             // onRollback is not registered on secondaries since secondaries should not fail to
             // apply the write.
-            opCtx->recoveryUnit()->onRollback([opCtx, donorStateDoc] {
+            opCtx->recoveryUnit()->onRollback([donorStateDoc](OperationContext* opCtx) {
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .removeAccessBlockersForMigration(
                         donorStateDoc.getId(), TenantMigrationAccessBlocker::BlockerType::kDonor);
@@ -331,14 +331,15 @@ void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
         }
 
         auto migrationId = tmi->uuid;
-        opCtx->recoveryUnit()->onCommit([opCtx, migrationId](boost::optional<Timestamp>) {
-            LOGV2_INFO(6461601,
-                       "Removing expired migration access blocker",
-                       "migrationId"_attr = migrationId);
-            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .removeAccessBlockersForMigration(
-                    migrationId, TenantMigrationAccessBlocker::BlockerType::kDonor);
-        });
+        opCtx->recoveryUnit()->onCommit(
+            [migrationId](OperationContext* opCtx, boost::optional<Timestamp>) {
+                LOGV2_INFO(6461601,
+                           "Removing expired migration access blocker",
+                           "migrationId"_attr = migrationId);
+                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .removeAccessBlockersForMigration(
+                        migrationId, TenantMigrationAccessBlocker::BlockerType::kDonor);
+            });
     }
 }
 
@@ -348,7 +349,7 @@ repl::OpTime TenantMigrationDonorOpObserver::onDropCollection(OperationContext* 
                                                               std::uint64_t numRecords,
                                                               const CollectionDropType dropType) {
     if (collectionName == NamespaceString::kTenantMigrationDonorsNamespace) {
-        opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
+        opCtx->recoveryUnit()->onCommit([](OperationContext* opCtx, boost::optional<Timestamp>) {
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                 .removeAll(TenantMigrationAccessBlocker::BlockerType::kDonor);
 

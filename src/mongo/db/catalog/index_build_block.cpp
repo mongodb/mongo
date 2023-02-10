@@ -78,11 +78,11 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
         .registerIndex(desc->indexName(),
                        desc->keyPattern(),
                        IndexFeatures::make(desc, collection->ns().isOnInternalDb()));
-    opCtx->recoveryUnit()->onRollback(
-        [collectionDecorations = collection->getSharedDecorations(), indexName = _indexName] {
-            CollectionIndexUsageTrackerDecoration::get(collectionDecorations)
-                .unregisterIndex(indexName);
-        });
+    opCtx->recoveryUnit()->onRollback([collectionDecorations = collection->getSharedDecorations(),
+                                       indexName = _indexName](OperationContext*) {
+        CollectionIndexUsageTrackerDecoration::get(collectionDecorations)
+            .unregisterIndex(indexName);
+    });
 }
 
 Status IndexBuildBlock::initForResume(OperationContext* opCtx,
@@ -185,7 +185,8 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection, bo
 
     if (isBackgroundIndex) {
         opCtx->recoveryUnit()->onCommit(
-            [entry = indexCatalogEntry, coll = collection](boost::optional<Timestamp> commitTime) {
+            [entry = indexCatalogEntry, coll = collection](OperationContext*,
+                                                           boost::optional<Timestamp> commitTime) {
                 // This will prevent the unfinished index from being visible on index iterators.
                 if (commitTime) {
                     entry->setMinimumVisibleSnapshot(commitTime.value());
@@ -263,7 +264,7 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
          spec = _spec,
          entry = indexCatalogEntry,
          coll = collection,
-         buildUUID = _buildUUID](boost::optional<Timestamp> commitTime) {
+         buildUUID = _buildUUID](OperationContext*, boost::optional<Timestamp> commitTime) {
             // Note: this runs after the WUOW commits but before we release our X lock on the
             // collection. This means that any snapshot created after this must include the full
             // index, and no one can try to read this index before we set the visibility.

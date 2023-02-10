@@ -115,11 +115,12 @@ void commitWriteUnitOfWork(OperationContext* opCtx,
                            WriteUnitOfWork& wuow,
                            Timestamp expectedCommitTimestamp) {
     bool isCommitted = false;
-    opCtx->recoveryUnit()->onCommit([&](boost::optional<Timestamp> commitTimestamp) {
-        ASSERT(commitTimestamp) << "Storage transaction committed without timestamp";
-        ASSERT_EQ(*commitTimestamp, expectedCommitTimestamp);
-        isCommitted = true;
-    });
+    opCtx->recoveryUnit()->onCommit(
+        [&](OperationContext*, boost::optional<Timestamp> commitTimestamp) {
+            ASSERT(commitTimestamp) << "Storage transaction committed without timestamp";
+            ASSERT_EQ(*commitTimestamp, expectedCommitTimestamp);
+            isCommitted = true;
+        });
     ASSERT_FALSE(isCommitted);
     wuow.commit();
     ASSERT(isCommitted);
@@ -231,12 +232,13 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
         ASSERT_OK(rs->updateRecord(opCtx.get(), rid3, valueD.c_str(), valueD.size()));
 
         bool isCommitted = false;
-        opCtx->recoveryUnit()->onCommit([expectedCommitTimestamp = updateTimestamp,
-                                         &isCommitted](boost::optional<Timestamp> commitTimestamp) {
-            ASSERT(commitTimestamp) << "Storage transaction committed without timestamp";
-            ASSERT_EQ(*commitTimestamp, expectedCommitTimestamp);
-            isCommitted = true;
-        });
+        opCtx->recoveryUnit()->onCommit(
+            [expectedCommitTimestamp = updateTimestamp,
+             &isCommitted](OperationContext*, boost::optional<Timestamp> commitTimestamp) {
+                ASSERT(commitTimestamp) << "Storage transaction committed without timestamp";
+                ASSERT_EQ(*commitTimestamp, expectedCommitTimestamp);
+                isCommitted = true;
+            });
         ASSERT_FALSE(isCommitted);
         wuow.commit();
         ASSERT(isCommitted);

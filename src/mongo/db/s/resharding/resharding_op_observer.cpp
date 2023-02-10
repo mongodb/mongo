@@ -220,26 +220,27 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEn
     if (args.coll->ns() == NamespaceString::kConfigReshardingOperationsNamespace) {
         auto newCoordinatorDoc = ReshardingCoordinatorDocument::parse(
             IDLParserContext("reshardingCoordinatorDoc"), args.updateArgs->updatedDoc);
-        opCtx->recoveryUnit()->onCommit([opCtx, newCoordinatorDoc = std::move(newCoordinatorDoc)](
-                                            boost::optional<Timestamp> unusedCommitTime) mutable {
-            try {
-                // It is possible that the ReshardingCoordinatorService is still being rebuilt. We
-                // must defer calling ReshardingCoordinator::lookup() until after our storage
-                // transaction has committed to ensure we aren't holding open an oplog hole and
-                // preventing replication from making progress while we wait.
-                auto reshardingId = BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName
-                                         << newCoordinatorDoc.getReshardingUUID());
-                auto observer = getReshardingCoordinatorObserver(opCtx, reshardingId);
-                observer->onReshardingParticipantTransition(newCoordinatorDoc);
-            } catch (const DBException& ex) {
-                LOGV2_INFO(6148200,
-                           "Interrupted while waiting for resharding coordinator to be rebuilt;"
-                           " will retry on new primary",
-                           "namespace"_attr = newCoordinatorDoc.getSourceNss(),
-                           "reshardingUUID"_attr = newCoordinatorDoc.getReshardingUUID(),
-                           "error"_attr = redact(ex.toStatus()));
-            }
-        });
+        opCtx->recoveryUnit()->onCommit(
+            [newCoordinatorDoc = std::move(newCoordinatorDoc)](OperationContext* opCtx,
+                                                               boost::optional<Timestamp>) mutable {
+                try {
+                    // It is possible that the ReshardingCoordinatorService is still being rebuilt.
+                    // We must defer calling ReshardingCoordinator::lookup() until after our storage
+                    // transaction has committed to ensure we aren't holding open an oplog hole and
+                    // preventing replication from making progress while we wait.
+                    auto reshardingId = BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName
+                                             << newCoordinatorDoc.getReshardingUUID());
+                    auto observer = getReshardingCoordinatorObserver(opCtx, reshardingId);
+                    observer->onReshardingParticipantTransition(newCoordinatorDoc);
+                } catch (const DBException& ex) {
+                    LOGV2_INFO(6148200,
+                               "Interrupted while waiting for resharding coordinator to be rebuilt;"
+                               " will retry on new primary",
+                               "namespace"_attr = newCoordinatorDoc.getSourceNss(),
+                               "reshardingUUID"_attr = newCoordinatorDoc.getReshardingUUID(),
+                               "error"_attr = redact(ex.toStatus()));
+                }
+            });
     } else if (args.coll->ns().isTemporaryReshardingCollection()) {
         const std::vector<InsertStatement> updateDoc{InsertStatement{args.updateArgs->updatedDoc}};
         assertCanExtractShardKeyFromDocs(

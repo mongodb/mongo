@@ -103,7 +103,8 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx, const KeyString::
         return status.getStatus();
 
     auto numDuplicates = _duplicateCounter.addAndFetch(1);
-    opCtx->recoveryUnit()->onRollback([this]() { _duplicateCounter.fetchAndAdd(-1); });
+    opCtx->recoveryUnit()->onRollback(
+        [this](OperationContext*) { _duplicateCounter.fetchAndAdd(-1); });
 
     if (numDuplicates % 1000 == 0) {
         LOGV2_INFO(4806700,

@@ -708,8 +708,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             auto externalKey =
                 ExternalKeysCollectionDocument::parse(IDLParserContext("externalKey"), it->doc);
             opCtx->recoveryUnit()->onCommit(
-                [this, opCtx, externalKey = std::move(externalKey)](
-                    boost::optional<Timestamp> unusedCommitTime) mutable {
+                [this, externalKey = std::move(externalKey)](OperationContext* opCtx,
+                                                             boost::optional<Timestamp>) mutable {
                     auto validator = LogicalTimeValidator::get(opCtx);
                     if (validator) {
                         validator->cacheExternalKey(externalKey);

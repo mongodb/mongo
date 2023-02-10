@@ -125,7 +125,7 @@ void UncommittedCatalogUpdates::_createCollection(OperationContext* opCtx,
                 catalog.registerCollectionTwoPhase(opCtx, uuid, coll, /*ts=*/boost::none);
             });
 
-            opCtx->recoveryUnit()->onRollback([opCtx, uuid]() {
+            opCtx->recoveryUnit()->onRollback([uuid](OperationContext* opCtx) {
                 CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
                     catalog.deregisterCollection(
                         opCtx, uuid, /*isDropPending=*/false, /*ts=*/boost::none);
@@ -137,7 +137,7 @@ void UncommittedCatalogUpdates::_createCollection(OperationContext* opCtx,
     // We hold a reference to prevent the collection from being deleted when `PublishCatalogUpdates`
     // runs its rollback handler as that happens first. Other systems may have setup some rollback
     // handler that need to interact with this collection.
-    opCtx->recoveryUnit()->onRollback([coll]() {});
+    opCtx->recoveryUnit()->onRollback([coll](OperationContext*) {});
 }
 
 void UncommittedCatalogUpdates::writableCollection(std::shared_ptr<Collection> collection) {
@@ -228,7 +228,7 @@ void UncommittedCatalogUpdates::addView(OperationContext* opCtx, const Namespace
             catalog.registerUncommittedView(opCtx, nss);
         });
     });
-    opCtx->recoveryUnit()->onRollback([opCtx, nss]() {
+    opCtx->recoveryUnit()->onRollback([nss](OperationContext* opCtx) {
         CollectionCatalog::write(
             opCtx, [&](CollectionCatalog& catalog) { catalog.deregisterUncommittedView(nss); });
     });

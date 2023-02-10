@@ -168,10 +168,11 @@ void ReadWriteConcernDefaults::observeDirectWriteToConfigSettings(OperationConte
         ? RWConcernDefault::parse(IDLParserContext("RWDefaultsWriteObserver"), newDoc->getOwned())
         : RWConcernDefault();
 
-    opCtx->recoveryUnit()->onCommit([this, opCtx, newDefaultsDoc = std::move(newDefaultsDoc)](
-                                        boost::optional<Timestamp> unusedCommitTime) mutable {
-        setDefault(opCtx, std::move(newDefaultsDoc));
-    });
+    opCtx->recoveryUnit()->onCommit(
+        [this, newDefaultsDoc = std::move(newDefaultsDoc)](OperationContext* opCtx,
+                                                           boost::optional<Timestamp>) mutable {
+            setDefault(opCtx, std::move(newDefaultsDoc));
+        });
 }
 
 void ReadWriteConcernDefaults::invalidate() {

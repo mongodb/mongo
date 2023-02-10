@@ -47,7 +47,7 @@ const auto deletedDocumentDecoration = OperationContext::declareDecoration<BSONO
 void registerTaskWithOngoingQueriesOnOpLogEntryCommit(OperationContext* opCtx,
                                                       const RangeDeletionTask& rdt) {
 
-    opCtx->recoveryUnit()->onCommit([opCtx, rdt](boost::optional<Timestamp>) {
+    opCtx->recoveryUnit()->onCommit([rdt](OperationContext* opCtx, boost::optional<Timestamp>) {
         try {
             AutoGetCollection autoColl(opCtx, rdt.getNss(), MODE_IS);
             auto waitForActiveQueriesToComplete =

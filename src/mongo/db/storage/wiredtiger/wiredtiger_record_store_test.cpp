@@ -1189,8 +1189,10 @@ TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
         WriteUnitOfWork txn(ctx.get());
         // Registered changes are executed in reverse order.
         rs->deleteRecord(ctx.get(), rid);
-        ctx.get()->recoveryUnit()->onRollback([&]() { deleted->countDownAndWait(); });
-        ctx.get()->recoveryUnit()->onRollback([&]() { aborted->countDownAndWait(); });
+        ctx.get()->recoveryUnit()->onRollback(
+            [&](OperationContext*) { deleted->countDownAndWait(); });
+        ctx.get()->recoveryUnit()->onRollback(
+            [&](OperationContext*) { aborted->countDownAndWait(); });
     });
 
     // Wait for the other thread to abort.

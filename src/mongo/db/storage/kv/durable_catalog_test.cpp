@@ -601,7 +601,8 @@ public:
             // write. This onCommit handler is registered before any writes and will thus be
             // performed first, blocking all other onCommit handlers.
             opCtx->recoveryUnit()->onCommit(
-                [&mutex, &cv, &numMultikeyCalls](boost::optional<Timestamp> commitTime) {
+                [&mutex, &cv, &numMultikeyCalls](OperationContext*,
+                                                 boost::optional<Timestamp> commitTime) {
                     stdx::unique_lock lock(mutex);
 
                     // Let the main thread now we have committed to the storage engine

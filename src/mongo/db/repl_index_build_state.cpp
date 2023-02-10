@@ -154,10 +154,11 @@ void ReplIndexBuildState::start(OperationContext* opCtx) {
 
 void ReplIndexBuildState::commit(OperationContext* opCtx) {
     auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
-    opCtx->recoveryUnit()->onCommit([this, skipCheck](boost::optional<Timestamp> commitTime) {
-        stdx::unique_lock<Latch> lk(_mutex);
-        _indexBuildState.setState(IndexBuildState::kCommitted, skipCheck);
-    });
+    opCtx->recoveryUnit()->onCommit(
+        [this, skipCheck](OperationContext*, boost::optional<Timestamp>) {
+            stdx::unique_lock<Latch> lk(_mutex);
+            _indexBuildState.setState(IndexBuildState::kCommitted, skipCheck);
+        });
 }
 
 Timestamp ReplIndexBuildState::getCommitTimestamp() const {

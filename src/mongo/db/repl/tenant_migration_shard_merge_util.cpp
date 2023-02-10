@@ -219,9 +219,10 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
 
             // If the collection creation rolls back, ensure that the Top entry created for the
             // collection is deleted.
-            opCtx->recoveryUnit()->onRollback([nss, serviceContext = opCtx->getServiceContext()]() {
-                Top::get(serviceContext).collectionDropped(nss);
-            });
+            opCtx->recoveryUnit()->onRollback(
+                [nss, serviceContext = opCtx->getServiceContext()](OperationContext*) {
+                    Top::get(serviceContext).collectionDropped(nss);
+                });
 
             // Create Collection object.
             auto storageEngine = opCtx->getServiceContext()->getStorageEngine();

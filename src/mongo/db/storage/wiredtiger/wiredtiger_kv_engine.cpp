@@ -2542,7 +2542,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::pinOldestTimestamp(
         // should be atomic with this pin request. If the `WriteUnitOfWork` is rolled back, either
         // unpin the oldest timestamp or repin the previous value.
         opCtx->recoveryUnit()->onRollback(
-            [this, svcName = requestingServiceName, previousTimestamp]() {
+            [this, svcName = requestingServiceName, previousTimestamp](OperationContext*) {
                 if (previousTimestamp.isNull()) {
                     unpinOldestTimestamp(svcName);
                 } else {

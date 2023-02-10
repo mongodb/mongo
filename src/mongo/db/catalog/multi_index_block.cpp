@@ -214,7 +214,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         // On rollback in init(), cleans up _indexes so that ~MultiIndexBlock doesn't try to clean
         // up _indexes manually (since the changes were already rolled back). Due to this, it is
         // thus legal to call init() again after it fails.
-        opCtx->recoveryUnit()->onRollback([this, opCtx]() {
+        opCtx->recoveryUnit()->onRollback([this](OperationContext*) {
             _indexes.clear();
             _buildIsCleanedUp = true;
         });
@@ -354,18 +354,19 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             index.filterExpression = indexCatalogEntry->getFilterExpression();
         }
 
-        opCtx->recoveryUnit()->onCommit([ns = collection->ns(), this](auto commitTs) {
-            if (!_buildUUID) {
-                return;
-            }
+        opCtx->recoveryUnit()->onCommit(
+            [ns = collection->ns(), this](OperationContext*, boost::optional<Timestamp> commitTs) {
+                if (!_buildUUID) {
+                    return;
+                }
 
-            LOGV2(20346,
-                  "Index build: initialized",
-                  "buildUUID"_attr = _buildUUID,
-                  "collectionUUID"_attr = _collectionUUID,
-                  logAttrs(ns),
-                  "initializationTimestamp"_attr = commitTs);
-        });
+                LOGV2(20346,
+                      "Index build: initialized",
+                      "buildUUID"_attr = _buildUUID,
+                      "collectionUUID"_attr = _collectionUUID,
+                      logAttrs(ns),
+                      "initializationTimestamp"_attr = commitTs);
+            });
 
         wunit.commit();
         return indexInfoObjs;
@@ -1017,7 +1018,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
 
     CollectionQueryInfo::get(collection).clearQueryCache(opCtx, CollectionPtr(collection));
     opCtx->recoveryUnit()->onCommit(
-        [this](boost::optional<Timestamp> commitTime) { _buildIsCleanedUp = true; });
+        [this](OperationContext*, boost::optional<Timestamp>) { _buildIsCleanedUp = true; });
 
     return Status::OK();
 }

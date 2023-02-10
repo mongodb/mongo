@@ -582,14 +582,15 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
         if (!status.isOK())
             return status;
 
-        opCtx->recoveryUnit()->onCommit([opCtx, nss, uuid, ident = sharedIdent->getIdent()](
-                                            boost::optional<Timestamp> commitTime) {
-            if (!commitTime) {
-                return;
-            }
+        opCtx->recoveryUnit()->onCommit(
+            [nss, uuid, ident = sharedIdent->getIdent()](OperationContext* opCtx,
+                                                         boost::optional<Timestamp> commitTime) {
+                if (!commitTime) {
+                    return;
+                }
 
-            HistoricalIdentTracker::get(opCtx).recordDrop(ident, nss, uuid, commitTime.value());
-        });
+                HistoricalIdentTracker::get(opCtx).recordDrop(ident, nss, uuid, commitTime.value());
+            });
     }
 
     CollectionCatalog::get(opCtx)->dropCollection(
@@ -642,8 +643,9 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
     CollectionCatalog::get(opCtx)->onCollectionRename(opCtx, writableCollection, fromNss);
 
-    opCtx->recoveryUnit()->onCommit([opCtx, fromNss, writableCollection](
-                                        boost::optional<Timestamp> commitTime) {
+    opCtx->recoveryUnit()->onCommit([fromNss,
+                                     writableCollection](OperationContext* opCtx,
+                                                         boost::optional<Timestamp> commitTime) {
         if (!commitTime) {
             return;
         }

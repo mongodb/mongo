@@ -994,8 +994,10 @@ TEST_F(TxnParticipantTest, StashedRollbackDoesntHoldClientLock) {
     unittest::Barrier finishRollback(2);
 
     // Rollback changes are executed in reverse order.
-    opCtx()->recoveryUnit()->onRollback([&] { finishRollback.countDownAndWait(); });
-    opCtx()->recoveryUnit()->onRollback([&] { startedRollback.countDownAndWait(); });
+    opCtx()->recoveryUnit()->onRollback(
+        [&](OperationContext*) { finishRollback.countDownAndWait(); });
+    opCtx()->recoveryUnit()->onRollback(
+        [&](OperationContext*) { startedRollback.countDownAndWait(); });
 
     auto future = stdx::async(stdx::launch::async, [&] {
         startedRollback.countDownAndWait();

@@ -378,7 +378,7 @@ void WiredTigerRecordStore::OplogStones::updateCurrentStoneAfterInsertOnCommit(
 }
 
 void WiredTigerRecordStore::OplogStones::clearStonesOnCommit(OperationContext* opCtx) {
-    opCtx->recoveryUnit()->onCommit([this](boost::optional<Timestamp>) {
+    opCtx->recoveryUnit()->onCommit([this](OperationContext*, boost::optional<Timestamp>) {
         stdx::lock_guard<Latch> lk(_mutex);
 
         _currentRecords.store(0);
@@ -1991,7 +1991,7 @@ void WiredTigerRecordStore::_changeNumRecordsAndDataSize(OperationContext* opCtx
         return;
     }
 
-    opCtx->recoveryUnit()->onRollback([this, numRecordDiff, dataSizeDiff]() {
+    opCtx->recoveryUnit()->onRollback([this, numRecordDiff, dataSizeDiff](OperationContext*) {
         LOGV2_DEBUG(7105300,
                     3,
                     "WiredTigerRecordStore: rolling back change to numRecords and dataSize",

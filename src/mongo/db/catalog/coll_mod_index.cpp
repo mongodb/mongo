@@ -69,14 +69,15 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
         const auto& coll = autoColl->getCollection();
         // Do not refer to 'idx' within this commit handler as it may be be invalidated by
         // IndexCatalog::refreshEntry().
-        opCtx->recoveryUnit()->onCommit(
-            [ttlCache, uuid = coll->uuid(), indexName = idx->indexName()](auto _) {
-                // We assume the expireAfterSeconds field is valid, because we've already done
-                // validation of this field.
-                ttlCache->registerTTLInfo(
-                    uuid,
-                    TTLCollectionCache::Info{indexName, /*isExpireAfterSecondsInvalid=*/false});
-            });
+        opCtx->recoveryUnit()->onCommit([ttlCache,
+                                         uuid = coll->uuid(),
+                                         indexName = idx->indexName()](OperationContext*,
+                                                                       boost::optional<Timestamp>) {
+            // We assume the expireAfterSeconds field is valid, because we've already done
+            // validation of this field.
+            ttlCache->registerTTLInfo(
+                uuid, TTLCollectionCache::Info{indexName, /*isExpireAfterSecondsInvalid=*/false});
+        });
 
         // Change the value of "expireAfterSeconds" on disk.
         autoColl->getWritableCollection(opCtx)->updateTTLSetting(
@@ -105,7 +106,8 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
         auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
         const auto& coll = autoColl->getCollection();
         opCtx->recoveryUnit()->onCommit(
-            [ttlCache, uuid = coll->uuid(), indexName = idx->indexName()](auto _) {
+            [ttlCache, uuid = coll->uuid(), indexName = idx->indexName()](
+                OperationContext*, boost::optional<Timestamp>) {
                 ttlCache->unsetTTLIndexExpireAfterSecondsInvalid(uuid, indexName);
             });
         return;
@@ -313,7 +315,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
                                      oldPrepareUnique,
                                      newPrepareUnique,
                                      newForceNonUnique,
-                                     result](boost::optional<Timestamp>) {
+                                     result](OperationContext*, boost::optional<Timestamp>) {
         // add the fields to BSONObjBuilder result
         if (oldExpireSecs) {
             result->append("expireAfterSeconds_old", *oldExpireSecs);

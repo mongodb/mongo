@@ -144,7 +144,7 @@ void handleShardMergeDocInsertion(const TenantMigrationRecipientDocument& doc,
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                 .add(*doc.getTenantIds(), mtab);
 
-            opCtx->recoveryUnit()->onRollback([opCtx, migrationId = doc.getId()] {
+            opCtx->recoveryUnit()->onRollback([migrationId = doc.getId()](OperationContext* opCtx) {
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .removeAccessBlockersForMigration(
                         migrationId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
@@ -243,7 +243,8 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto recipientStateDoc = TenantMigrationRecipientDocument::parse(
             IDLParserContext("recipientStateDoc"), args.updateArgs->updatedDoc);
-        opCtx->recoveryUnit()->onCommit([opCtx, recipientStateDoc](boost::optional<Timestamp>) {
+        opCtx->recoveryUnit()->onCommit([recipientStateDoc](OperationContext* opCtx,
+                                                            boost::optional<Timestamp>) {
             if (recipientStateDoc.getExpireAt()) {
                 repl::TenantFileImporterService::get(opCtx->getServiceContext())
                     ->interrupt(recipientStateDoc.getId());
@@ -336,16 +337,17 @@ void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
         }
 
         auto migrationId = tmi->uuid;
-        opCtx->recoveryUnit()->onCommit([opCtx, migrationId](boost::optional<Timestamp>) {
-            LOGV2_INFO(6114101,
-                       "Removing expired migration access blocker",
-                       "migrationId"_attr = migrationId);
-            repl::TenantFileImporterService::get(opCtx->getServiceContext())
-                ->interrupt(migrationId);
-            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .removeAccessBlockersForMigration(
-                    migrationId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
-        });
+        opCtx->recoveryUnit()->onCommit(
+            [migrationId](OperationContext* opCtx, boost::optional<Timestamp>) {
+                LOGV2_INFO(6114101,
+                           "Removing expired migration access blocker",
+                           "migrationId"_attr = migrationId);
+                repl::TenantFileImporterService::get(opCtx->getServiceContext())
+                    ->interrupt(migrationId);
+                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .removeAccessBlockersForMigration(
+                        migrationId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+            });
     }
 }
 
@@ -356,7 +358,7 @@ repl::OpTime TenantMigrationRecipientOpObserver::onDropCollection(
     std::uint64_t numRecords,
     const CollectionDropType dropType) {
     if (collectionName == NamespaceString::kTenantMigrationRecipientsNamespace) {
-        opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
+        opCtx->recoveryUnit()->onCommit([](OperationContext* opCtx, boost::optional<Timestamp>) {
             repl::TenantFileImporterService::get(opCtx->getServiceContext())->interruptAll();
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                 .removeAll(TenantMigrationAccessBlocker::BlockerType::kRecipient);

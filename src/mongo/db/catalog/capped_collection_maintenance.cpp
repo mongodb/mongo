@@ -209,10 +209,10 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
         // Update the next record to be deleted. The next record must exist as we're using the same
         // snapshot the insert was performed on and we can't delete newly inserted records.
         invariant(record);
-        opCtx->recoveryUnit()->onCommit(
-            [&ccs, recordId = std::move(record->id)](boost::optional<Timestamp>) {
-                ccs.cappedFirstRecord = std::move(recordId);
-            });
+        opCtx->recoveryUnit()->onCommit([&ccs, recordId = std::move(record->id)](
+                                            OperationContext*, boost::optional<Timestamp>) {
+            ccs.cappedFirstRecord = std::move(recordId);
+        });
     }
 
     wuow.commit();

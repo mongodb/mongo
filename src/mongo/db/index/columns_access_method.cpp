@@ -524,17 +524,20 @@ Status ColumnStoreAccessMethod::applyIndexBuildSideWrite(OperationContext* opCtx
         case IndexBuildInterceptor::Op::kInsert:
             cursor->insert(path, rid.getLong(), cell);
             inc(keysInserted);
-            opCtx->recoveryUnit()->onRollback([keysInserted] { dec(keysInserted); });
+            opCtx->recoveryUnit()->onRollback(
+                [keysInserted](OperationContext*) { dec(keysInserted); });
             break;
         case IndexBuildInterceptor::Op::kDelete:
             cursor->remove(path, rid.getLong());
             inc(keysDeleted);
-            opCtx->recoveryUnit()->onRollback([keysDeleted] { dec(keysDeleted); });
+            opCtx->recoveryUnit()->onRollback(
+                [keysDeleted](OperationContext*) { dec(keysDeleted); });
             break;
         case IndexBuildInterceptor::Op::kUpdate:
             cursor->update(path, rid.getLong(), cell);
             inc(keysInserted);
-            opCtx->recoveryUnit()->onRollback([keysInserted] { dec(keysInserted); });
+            opCtx->recoveryUnit()->onRollback(
+                [keysInserted](OperationContext*) { dec(keysInserted); });
             break;
     }
 

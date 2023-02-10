@@ -730,7 +730,7 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
 
         *keysInserted += numInserted;
         opCtx->recoveryUnit()->onRollback(
-            [keysInserted, numInserted] { *keysInserted -= numInserted; });
+            [keysInserted, numInserted](OperationContext*) { *keysInserted -= numInserted; });
     } else {
         invariant(opType == IndexBuildInterceptor::Op::kDelete);
         int64_t numDeleted;
@@ -741,7 +741,7 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
 
         *keysDeleted += numDeleted;
         opCtx->recoveryUnit()->onRollback(
-            [keysDeleted, numDeleted] { *keysDeleted -= numDeleted; });
+            [keysDeleted, numDeleted](OperationContext*) { *keysDeleted -= numDeleted; });
     }
     return Status::OK();
 }

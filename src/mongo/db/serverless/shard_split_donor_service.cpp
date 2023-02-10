@@ -906,7 +906,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                            mtab->startBlockingWrites();
 
                            opCtx->recoveryUnit()->onRollback(
-                               [mtab] { mtab->rollBackStartBlocking(); });
+                               [mtab](OperationContext*) { mtab->rollBackStartBlocking(); });
                        }
 
                        // Reserve an opTime for the write.

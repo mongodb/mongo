@@ -3457,9 +3457,9 @@ void TransactionParticipant::Participant::_registerUpdateCacheOnCommit(
     OperationContext* opCtx,
     std::vector<StmtId> stmtIdsWritten,
     const repl::OpTime& lastStmtIdWriteOpTime) {
-    opCtx->recoveryUnit()->onCommit([opCtx,
-                                     stmtIdsWritten = std::move(stmtIdsWritten),
-                                     lastStmtIdWriteOpTime](boost::optional<Timestamp>) {
+    opCtx->recoveryUnit()->onCommit([stmtIdsWritten = std::move(stmtIdsWritten),
+                                     lastStmtIdWriteOpTime](OperationContext* opCtx,
+                                                            boost::optional<Timestamp>) {
         TransactionParticipant::Participant participant(opCtx);
         invariant(participant.p().isValid);
 

@@ -126,7 +126,8 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
 
         if (maxTopologyTime) {
             opCtx->recoveryUnit()->onCommit(
-                [opCtx, maxTopologyTime](boost::optional<Timestamp> commitTime) mutable {
+                [maxTopologyTime](OperationContext* opCtx,
+                                  boost::optional<Timestamp> commitTime) mutable {
                     invariant(commitTime);
                     TopologyTimeTicker::get(opCtx).onNewLocallyCommittedTopologyTimeAvailable(
                         *commitTime, *maxTopologyTime);
@@ -164,7 +165,8 @@ void ConfigServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdate
     // this point and passed it to the onCommit callback.
     auto& topologyTicker = TopologyTimeTicker::get(opCtx);
     opCtx->recoveryUnit()->onCommit(
-        [&topologyTicker, topologyTime](boost::optional<Timestamp> commitTime) mutable {
+        [&topologyTicker, topologyTime](OperationContext*,
+                                        boost::optional<Timestamp> commitTime) mutable {
             invariant(commitTime);
             topologyTicker.onNewLocallyCommittedTopologyTimeAvailable(*commitTime, topologyTime);
         });

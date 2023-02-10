@@ -371,7 +371,7 @@ Status EphemeralForTestRecordStore::doInsertRecords(OperationContext* opCtx,
         _data->records[loc] = rec;
         record->id = loc;
 
-        opCtx->recoveryUnit()->onRollback([this, loc = std::move(loc)]() {
+        opCtx->recoveryUnit()->onRollback([this, loc = std::move(loc)](OperationContext*) {
             stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
             Records::iterator it = _data->records.find(loc);

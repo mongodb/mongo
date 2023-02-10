@@ -162,7 +162,8 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
     if (isPrimary(opCtx)) {
         // onRollback is not registered on secondaries since secondaries should not fail to
         // apply the write.
-        opCtx->recoveryUnit()->onRollback([opCtx, migrationId = donorStateDoc.getId()] {
+        opCtx->recoveryUnit()->onRollback([migrationId =
+                                               donorStateDoc.getId()](OperationContext* opCtx) {
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                 .removeAccessBlockersForMigration(
                     migrationId, TenantMigrationAccessBlocker::BlockerType::kDonor);
@@ -397,7 +398,7 @@ void ShardSplitDonorOpObserver::onDelete(OperationContext* opCtx,
         return;
     }
 
-    opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
+    opCtx->recoveryUnit()->onCommit([](OperationContext* opCtx, boost::optional<Timestamp>) {
         // Donor access blockers are removed from donor nodes via the shard split op observer.
         // Donor access blockers are removed from recipient nodes when the node applies the
         // recipient config. When the recipient primary steps up it will delete its state
@@ -421,7 +422,7 @@ repl::OpTime ShardSplitDonorOpObserver::onDropCollection(OperationContext* opCtx
                                                          std::uint64_t numRecords,
                                                          const CollectionDropType dropType) {
     if (collectionName == NamespaceString::kShardSplitDonorsNamespace) {
-        opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
+        opCtx->recoveryUnit()->onCommit([](OperationContext* opCtx, boost::optional<Timestamp>) {
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                 .removeAll(TenantMigrationAccessBlocker::BlockerType::kDonor);
 

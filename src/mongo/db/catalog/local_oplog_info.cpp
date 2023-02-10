@@ -122,7 +122,7 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
     // stable timestamp if necessary, since this oplog hole may have been holding back the stable
     // timestamp.
     opCtx->recoveryUnit()->onRollback(
-        [replCoord]() { replCoord->attemptToAdvanceStableTimestamp(); });
+        [replCoord](OperationContext*) { replCoord->attemptToAdvanceStableTimestamp(); });
 
     return oplogSlots;
 }

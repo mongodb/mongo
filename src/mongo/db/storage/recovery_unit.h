@@ -663,6 +663,10 @@ public:
      * Registers a callback to be called if the current WriteUnitOfWork rolls back.
      *
      * Be careful about the lifetimes of all variables captured by the callback!
+
+     * Do not capture OperationContext in this callback because it is not guaranteed to be the same
+     * OperationContext to roll-back this unit of work. Use the OperationContext provided by the
+     * callback instead.
      */
     template <typename Callback>
     void onRollback(Callback callback) {
@@ -670,7 +674,7 @@ public:
         public:
             OnRollbackChange(Callback&& callback) : _callback(std::move(callback)) {}
             void rollback(OperationContext* opCtx) final {
-                _callback();
+                _callback(opCtx);
             }
             void commit(OperationContext* opCtx, boost::optional<Timestamp>) final {}
 
@@ -685,6 +689,10 @@ public:
      * Registers a callback to be called if the current WriteUnitOfWork commits.
      *
      * Be careful about the lifetimes of all variables captured by the callback!
+     *
+     * Do not capture OperationContext in this callback because it is not guaranteed to be the same
+     * OperationContext to commit this unit of work. Use the OperationContext provided by the
+     * callback instead.
      */
     template <typename Callback>
     void onCommit(Callback callback) {
@@ -693,7 +701,7 @@ public:
             OnCommitChange(Callback&& callback) : _callback(std::move(callback)) {}
             void rollback(OperationContext* opCtx) final {}
             void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) final {
-                _callback(commitTime);
+                _callback(opCtx, commitTime);
             }
 
         private:

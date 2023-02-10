@@ -221,7 +221,7 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
 
 void Scope::storedFuncMod(OperationContext* opCtx) {
     opCtx->recoveryUnit()->onCommit(
-        [](boost::optional<Timestamp>) { _lastVersion.fetchAndAdd(1); });
+        [](OperationContext*, boost::optional<Timestamp>) { _lastVersion.fetchAndAdd(1); });
 }
 
 void Scope::validateObjectIdString(const string& str) {

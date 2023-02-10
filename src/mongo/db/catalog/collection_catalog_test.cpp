@@ -1234,7 +1234,9 @@ private:
             // before any onCommit handlers set up in the operation.
             if (!openSnapshotBeforeCommit) {
                 newOpCtx.get()->recoveryUnit()->onCommit(
-                    [&commitHandler](boost::optional<Timestamp> commitTime) { commitHandler(); });
+                    [&commitHandler](OperationContext*, boost::optional<Timestamp>) {
+                        commitHandler();
+                    });
             }
 
             ddlOperation(newOpCtx.get());

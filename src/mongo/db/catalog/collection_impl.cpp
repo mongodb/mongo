@@ -373,10 +373,11 @@ void CollectionImpl::init(OperationContext* opCtx) {
             auto svcCtx = opCtx->getClient()->getServiceContext();
             auto uuid = *collectionOptions.uuid;
             if (opCtx->lockState()->inAWriteUnitOfWork()) {
-                opCtx->recoveryUnit()->onCommit([svcCtx, uuid](auto ts) {
-                    TTLCollectionCache::get(svcCtx).registerTTLInfo(
-                        uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
-                });
+                opCtx->recoveryUnit()->onCommit(
+                    [svcCtx, uuid](OperationContext*, boost::optional<Timestamp>) {
+                        TTLCollectionCache::get(svcCtx).registerTTLInfo(
+                            uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
+                    });
             } else {
                 TTLCollectionCache::get(svcCtx).registerTTLInfo(
                     uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
@@ -1671,7 +1672,7 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
         return false;
 
     opCtx->recoveryUnit()->onRollback(
-        [this, uncommittedMultikeys]() { uncommittedMultikeys->erase(this); });
+        [this, uncommittedMultikeys](OperationContext*) { uncommittedMultikeys->erase(this); });
 
     DurableCatalog::get(opCtx)->putMetaData(opCtx, getCatalogId(), *metadata);
 
@@ -1712,7 +1713,7 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
     // commiting/rolling back the transaction is fully complete.
     opCtx->recoveryUnit()->onCommit(
         [this, uncommittedMultikeys, setMultikey = std::move(setMultikey), concurrentWriteTracker](
-            auto ts) {
+            OperationContext*, boost::optional<Timestamp>) {
             // Merge in changes to this index, other indexes may have been updated since we made our
             // copy. Don't check for result as another thread could be setting multikey at the same
             // time
@@ -1766,12 +1767,13 @@ void CollectionImpl::forceSetIndexIsMultikey(OperationContext* opCtx,
     forceSetMultikey(*metadata);
 
     opCtx->recoveryUnit()->onRollback(
-        [this, uncommittedMultikeys]() { uncommittedMultikeys->erase(this); });
+        [this, uncommittedMultikeys](OperationContext*) { uncommittedMultikeys->erase(this); });
 
     DurableCatalog::get(opCtx)->putMetaData(opCtx, getCatalogId(), *metadata);
 
     opCtx->recoveryUnit()->onCommit(
-        [this, uncommittedMultikeys, forceSetMultikey = std::move(forceSetMultikey)](auto ts) {
+        [this, uncommittedMultikeys, forceSetMultikey = std::move(forceSetMultikey)](
+            OperationContext*, boost::optional<Timestamp>) {
             // Merge in changes to this index, other indexes may have been updated since we made our
             // copy.
             forceSetMultikey(*_metadata);

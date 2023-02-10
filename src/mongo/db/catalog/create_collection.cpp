@@ -207,9 +207,10 @@ Status _createView(OperationContext* opCtx,
 
         // If the view creation rolls back, ensure that the Top entry created for the view is
         // deleted.
-        opCtx->recoveryUnit()->onRollback([nss, serviceContext = opCtx->getServiceContext()]() {
-            Top::get(serviceContext).collectionDropped(nss);
-        });
+        opCtx->recoveryUnit()->onRollback(
+            [nss, serviceContext = opCtx->getServiceContext()](OperationContext*) {
+                Top::get(serviceContext).collectionDropped(nss);
+            });
 
         // Even though 'collectionOptions' is passed by rvalue reference, it is not safe to move
         // because 'userCreateNS' may throw a WriteConflictException.
@@ -397,7 +398,7 @@ Status _createTimeseries(OperationContext* opCtx,
             // If the buckets collection and time-series view creation roll back, ensure that their
             // Top entries are deleted.
             opCtx->recoveryUnit()->onRollback(
-                [serviceContext = opCtx->getServiceContext(), bucketsNs]() {
+                [serviceContext = opCtx->getServiceContext(), bucketsNs](OperationContext*) {
                     Top::get(serviceContext).collectionDropped(bucketsNs);
                 });
 
@@ -501,9 +502,10 @@ Status _createTimeseries(OperationContext* opCtx,
 
         // If the buckets collection and time-series view creation roll back, ensure that their
         // Top entries are deleted.
-        opCtx->recoveryUnit()->onRollback([serviceContext = opCtx->getServiceContext(), ns]() {
-            Top::get(serviceContext).collectionDropped(ns);
-        });
+        opCtx->recoveryUnit()->onRollback(
+            [serviceContext = opCtx->getServiceContext(), ns](OperationContext*) {
+                Top::get(serviceContext).collectionDropped(ns);
+            });
 
         if (MONGO_unlikely(failTimeseriesViewCreation.shouldFail(
                 [&ns](const BSONObj& data) { return data["ns"_sd].String() == ns.ns(); }))) {
@@ -606,9 +608,10 @@ Status _createCollection(
 
         // If the collection creation rolls back, ensure that the Top entry created for the
         // collection is deleted.
-        opCtx->recoveryUnit()->onRollback([nss, serviceContext = opCtx->getServiceContext()]() {
-            Top::get(serviceContext).collectionDropped(nss);
-        });
+        opCtx->recoveryUnit()->onRollback(
+            [nss, serviceContext = opCtx->getServiceContext()](OperationContext*) {
+                Top::get(serviceContext).collectionDropped(nss);
+            });
 
         // Even though 'collectionOptions' is passed by rvalue reference, it is not safe to move
         // because 'userCreateNS' may throw a WriteConflictException.

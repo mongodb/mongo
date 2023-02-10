@@ -252,8 +252,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                      * Perform shard identity initialization once we are certain that the document
                      * is committed.
                      */
-                    opCtx->recoveryUnit()->onCommit([opCtx,
-                                                     shardIdentity = std::move(shardIdentityDoc)](
+                    opCtx->recoveryUnit()->onCommit([shardIdentity = std::move(shardIdentityDoc)](
+                                                        OperationContext* opCtx,
                                                         boost::optional<Timestamp>) {
                         try {
                             ShardingInitializationMongoD::get(opCtx)->initializeFromShardIdentity(
@@ -290,9 +290,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                 IDLParserContext("ShardServerOpObserver"), insertedDoc);
             invariant(!collCSDoc.getBlockReads());
             opCtx->recoveryUnit()->onCommit(
-                [opCtx,
-                 insertedNss = collCSDoc.getNss(),
-                 reason = collCSDoc.getReason().getOwned()](boost::optional<Timestamp>) {
+                [insertedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
+                    OperationContext* opCtx, boost::optional<Timestamp>) {
                     if (nsIsDbOnly(insertedNss.ns())) {
                         boost::optional<AutoGetDb> lockDbIfNotPrimary;
                         if (!isStandaloneOrPrimary(opCtx)) {
@@ -466,8 +465,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         invariant(collCSDoc.getBlockReads());
 
         opCtx->recoveryUnit()->onCommit(
-            [opCtx, updatedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
-                boost::optional<Timestamp>) {
+            [updatedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
+                OperationContext* opCtx, boost::optional<Timestamp>) {
                 if (nsIsDbOnly(updatedNss.ns())) {
                     boost::optional<AutoGetDb> lockDbIfNotPrimary;
                     if (!isStandaloneOrPrimary(opCtx)) {
@@ -544,7 +543,8 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
         case ShardingIndexCatalogOpEnumEnum::insert: {
             auto indexEntry = ShardingIndexCatalogInsertEntry::parse(
                 IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
-            opCtx->recoveryUnit()->onCommit([opCtx, nss, indexEntry](auto _) {
+            opCtx->recoveryUnit()->onCommit([nss, indexEntry](OperationContext* opCtx,
+                                                              boost::optional<Timestamp>) {
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                     opCtx, nss);
                 scsr->addIndex(
@@ -557,7 +557,8 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
         case ShardingIndexCatalogOpEnumEnum::remove: {
             auto removeEntry = ShardingIndexCatalogRemoveEntry::parse(
                 IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
-            opCtx->recoveryUnit()->onCommit([opCtx, nss, removeEntry](auto _) {
+            opCtx->recoveryUnit()->onCommit([nss, removeEntry](OperationContext* opCtx,
+                                                               boost::optional<Timestamp>) {
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                     opCtx, nss);
                 scsr->removeIndex(opCtx,
@@ -569,7 +570,8 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
         case ShardingIndexCatalogOpEnumEnum::replace: {
             auto replaceEntry = ShardingIndexCatalogReplaceEntry::parse(
                 IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
-            opCtx->recoveryUnit()->onCommit([opCtx, nss, replaceEntry](auto _) {
+            opCtx->recoveryUnit()->onCommit([nss, replaceEntry](OperationContext* opCtx,
+                                                                boost::optional<Timestamp>) {
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                     opCtx, nss);
                 scsr->replaceIndexes(opCtx,
@@ -579,7 +581,8 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             break;
         }
         case ShardingIndexCatalogOpEnumEnum::clear:
-            opCtx->recoveryUnit()->onCommit([opCtx, nss](auto _) {
+            opCtx->recoveryUnit()->onCommit([nss](OperationContext* opCtx,
+                                                  boost::optional<Timestamp>) {
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                     opCtx, nss);
                 scsr->clearIndexes(opCtx);
@@ -587,7 +590,8 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
 
             break;
         case ShardingIndexCatalogOpEnumEnum::drop: {
-            opCtx->recoveryUnit()->onCommit([opCtx, nss](auto _) {
+            opCtx->recoveryUnit()->onCommit([nss](OperationContext* opCtx,
+                                                  boost::optional<Timestamp>) {
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                     opCtx, nss);
                 scsr->clearIndexes(opCtx);
@@ -598,7 +602,8 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
         case ShardingIndexCatalogOpEnumEnum::rename: {
             auto renameEntry = ShardingIndexCatalogRenameEntry::parse(
                 IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
-            opCtx->recoveryUnit()->onCommit([opCtx, renameEntry](auto _) {
+            opCtx->recoveryUnit()->onCommit([renameEntry](OperationContext* opCtx,
+                                                          boost::optional<Timestamp>) {
                 std::vector<IndexCatalogType> fromIndexes;
                 boost::optional<UUID> uuid;
                 {
@@ -688,8 +693,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
             IDLParserContext("ShardServerOpObserver"), deletedDoc);
 
         opCtx->recoveryUnit()->onCommit(
-            [opCtx, deletedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
-                boost::optional<Timestamp>) {
+            [deletedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
+                OperationContext* opCtx, boost::optional<Timestamp>) {
                 if (nsIsDbOnly(deletedNss.ns())) {
                     boost::optional<AutoGetDb> lockDbIfNotPrimary;
                     if (!isStandaloneOrPrimary(opCtx)) {
@@ -752,9 +757,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
             return uassertStatusOK(UUID::parse(std::move(collUuidElem)));
         }();
 
-        opCtx->recoveryUnit()->onCommit([opCtx = opCtx,
-                                         collUuid = std::move(collUuid),
-                                         numOrphanDocs](boost::optional<Timestamp>) {
+        opCtx->recoveryUnit()->onCommit([collUuid = std::move(collUuid), numOrphanDocs](
+                                            OperationContext* opCtx, boost::optional<Timestamp>) {
             BalancerStatsRegistry::get(opCtx)->onRangeDeletionTaskDeletion(collUuid, numOrphanDocs);
         });
     }

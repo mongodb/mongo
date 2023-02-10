@@ -55,7 +55,8 @@ void QueryAnalysisOpObserver::onInserts(OperationContext* opCtx,
         if (coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace) {
             for (auto it = begin; it != end; ++it) {
                 const auto& insertedDoc = it->doc;
-                opCtx->recoveryUnit()->onCommit([opCtx, insertedDoc](boost::optional<Timestamp>) {
+                opCtx->recoveryUnit()->onCommit([insertedDoc](OperationContext* opCtx,
+                                                              boost::optional<Timestamp>) {
                     analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationInsert(
                         insertedDoc);
                 });
@@ -63,10 +64,11 @@ void QueryAnalysisOpObserver::onInserts(OperationContext* opCtx,
         } else if (coll->ns() == MongosType::ConfigNS) {
             for (auto it = begin; it != end; ++it) {
                 const auto& insertedDoc = it->doc;
-                opCtx->recoveryUnit()->onCommit([opCtx, insertedDoc](boost::optional<Timestamp>) {
-                    analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerInsert(
-                        insertedDoc);
-                });
+                opCtx->recoveryUnit()->onCommit(
+                    [insertedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
+                        analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerInsert(
+                            insertedDoc);
+                    });
             }
         }
     }
@@ -76,16 +78,18 @@ void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdat
     if (analyze_shard_key::supportsCoordinatingQueryAnalysis()) {
         if (args.coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace) {
             const auto& updatedDoc = args.updateArgs->updatedDoc;
-            opCtx->recoveryUnit()->onCommit([opCtx, updatedDoc](boost::optional<Timestamp>) {
-                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationUpdate(
-                    updatedDoc);
-            });
+            opCtx->recoveryUnit()->onCommit(
+                [updatedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
+                    analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationUpdate(
+                        updatedDoc);
+                });
         } else if (args.coll->ns() == MongosType::ConfigNS) {
             const auto& updatedDoc = args.updateArgs->updatedDoc;
-            opCtx->recoveryUnit()->onCommit([opCtx, updatedDoc](boost::optional<Timestamp>) {
-                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerUpdate(
-                    updatedDoc);
-            });
+            opCtx->recoveryUnit()->onCommit(
+                [updatedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
+                    analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerUpdate(
+                        updatedDoc);
+                });
         }
     }
 
@@ -120,15 +124,17 @@ void QueryAnalysisOpObserver::onDelete(OperationContext* opCtx,
         if (coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace) {
             auto& doc = docToDeleteDecoration(opCtx);
             invariant(!doc.isEmpty());
-            opCtx->recoveryUnit()->onCommit([opCtx, doc](boost::optional<Timestamp>) {
+            opCtx->recoveryUnit()->onCommit([doc](OperationContext* opCtx,
+                                                  boost::optional<Timestamp>) {
                 analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationDelete(doc);
             });
         } else if (coll->ns() == MongosType::ConfigNS) {
             auto& doc = docToDeleteDecoration(opCtx);
             invariant(!doc.isEmpty());
-            opCtx->recoveryUnit()->onCommit([opCtx, doc](boost::optional<Timestamp>) {
-                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerDelete(doc);
-            });
+            opCtx->recoveryUnit()->onCommit(
+                [doc](OperationContext* opCtx, boost::optional<Timestamp>) {
+                    analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerDelete(doc);
+                });
         }
     }
 }

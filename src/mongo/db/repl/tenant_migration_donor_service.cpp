@@ -615,7 +615,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                            mtab->startBlockingWrites();
 
                            opCtx->recoveryUnit()->onRollback(
-                               [mtab] { mtab->rollBackStartBlocking(); });
+                               [mtab](OperationContext*) { mtab->rollBackStartBlocking(); });
                        }
 
                        // Reserve an opTime for the write.

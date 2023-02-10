@@ -1033,10 +1033,11 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
 
         WriteUnitOfWork wuow(opCtx.get());
 
-        opCtx->recoveryUnit()->onCommit([this, stepdownToken, aborted](boost::optional<Timestamp>) {
-            stdx::lock_guard<Latch> lk(_mutex);
-            _completionPromise.emplaceValue();
-        });
+        opCtx->recoveryUnit()->onCommit(
+            [this, stepdownToken, aborted](OperationContext*, boost::optional<Timestamp>) {
+                stdx::lock_guard<Latch> lk(_mutex);
+                _completionPromise.emplaceValue();
+            });
 
         deleteObjects(opCtx.get(),
                       *coll,

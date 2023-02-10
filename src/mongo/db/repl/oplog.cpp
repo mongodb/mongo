@@ -436,7 +436,8 @@ void _logOpsInner(OperationContext* opCtx,
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
     opCtx->recoveryUnit()->onCommit(
-        [opCtx, replCoord, finalOpTime, wallTime](boost::optional<Timestamp> commitTime) {
+        [replCoord, finalOpTime, wallTime](OperationContext* opCtx,
+                                           boost::optional<Timestamp> commitTime) {
             if (commitTime) {
                 // The `finalOpTime` may be less than the `commitTime` if multiple oplog entries
                 // are logging within one WriteUnitOfWork.

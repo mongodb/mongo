@@ -621,10 +621,12 @@ void _setClusteredExpireAfterSeconds(
                 // If this collection was not previously TTL, inform the TTL monitor when we commit.
                 if (!oldExpireAfterSeconds) {
                     auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
-                    opCtx->recoveryUnit()->onCommit([ttlCache, uuid = coll->uuid()](auto _) {
-                        ttlCache->registerTTLInfo(
-                            uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
-                    });
+                    opCtx->recoveryUnit()->onCommit(
+                        [ttlCache, uuid = coll->uuid()](OperationContext*,
+                                                        boost::optional<Timestamp>) {
+                            ttlCache->registerTTLInfo(
+                                uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
+                        });
                 }
 
                 invariant(newExpireAfterSeconds >= 0);

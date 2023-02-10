@@ -257,7 +257,8 @@ void IndexCatalogImpl::_init(OperationContext* opCtx,
                         [svcCtx = opCtx->getServiceContext(),
                          uuid = collection->uuid(),
                          indexName,
-                         hasInvalidExpireAfterSeconds](auto commitTime) {
+                         hasInvalidExpireAfterSeconds](OperationContext*,
+                                                       boost::optional<Timestamp>) {
                             TTLCollectionCache::get(svcCtx).registerTTLInfo(
                                 uuid,
                                 TTLCollectionCache::Info{indexName, hasInvalidExpireAfterSeconds});
@@ -641,7 +642,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
         const std::string indexName = descriptorPtr->indexName();
         opCtx->recoveryUnit()->onRollback(
             [collectionDecorations = collection->getSharedDecorations(),
-             indexName = std::move(indexName)] {
+             indexName = std::move(indexName)](OperationContext*) {
                 CollectionIndexUsageTrackerDecoration::get(collectionDecorations)
                     .unregisterIndex(indexName);
             });
@@ -1687,11 +1688,12 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     // Last rebuild index data for CollectionQueryInfo for this Collection.
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, CollectionPtr(collection));
 
-    opCtx->recoveryUnit()->onCommit([newEntry](auto commitTime) {
-        if (commitTime) {
-            newEntry->setMinimumVisibleSnapshot(*commitTime);
-        }
-    });
+    opCtx->recoveryUnit()->onCommit(
+        [newEntry](OperationContext*, boost::optional<Timestamp> commitTime) {
+            if (commitTime) {
+                newEntry->setMinimumVisibleSnapshot(*commitTime);
+            }
+        });
 
     // Return the new descriptor.
     return newEntry->descriptor();
@@ -2033,8 +2035,9 @@ void IndexCatalogImpl::indexBuildSuccess(OperationContext* opCtx,
     // Wait to unset the interceptor until the index actually commits. If a write conflict is
     // encountered and the index commit process is restated, the multikey information from the
     // interceptor may still be needed.
-    opCtx->recoveryUnit()->onCommit(
-        [index](boost::optional<Timestamp>) { index->setIndexBuildInterceptor(nullptr); });
+    opCtx->recoveryUnit()->onCommit([index](OperationContext*, boost::optional<Timestamp>) {
+        index->setIndexBuildInterceptor(nullptr);
+    });
     index->setIsReady(true);
 }
 
