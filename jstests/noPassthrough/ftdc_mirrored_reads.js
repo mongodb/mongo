@@ -135,10 +135,13 @@ assert.commandWorked(primary.adminCommand({setParameter: 1, mirrorReads: {sampli
               primarySentAfterReads - primarySentBeforeReads,
               primaryDataAfterReads);
 
-    jsTestLog("Verifying diagnostic collection for mirrored reads on secondaries");
-    let mirroredReadsSucceeded = getDiagnosticData(primary).succeeded;
-    let mirroredReadsProcessedAfter = getMirroredReadsProcessedAsSecondary();
-    assert.eq(mirroredReadsSucceeded, mirroredReadsProcessedAfter - mirroredReadsProcessedBefore);
+    assert.soon(() => {
+        jsTestLog("Verifying diagnostic collection for mirrored reads on secondaries");
+        let mirroredReadsSucceeded = getDiagnosticData(primary).succeeded;
+        let mirroredReadsProcessedAfter = getMirroredReadsProcessedAsSecondary();
+        return mirroredReadsSucceeded ==
+            (mirroredReadsProcessedAfter - mirroredReadsProcessedBefore);
+    }, "Failed to wait for secondary mirrored reads stats to converge", 10000);
 }
 rst.stopSet();
 })();
