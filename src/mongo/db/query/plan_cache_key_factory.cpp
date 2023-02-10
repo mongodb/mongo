@@ -29,30 +29,29 @@
 
 #include "mongo/db/query/plan_cache_key_factory.h"
 
+#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/s/operation_sharding_state.h"
 
 namespace mongo {
 namespace plan_cache_detail {
-// Delimiters for cache key encoding.
-const char kEncodeDiscriminatorsBegin = '<';
-const char kEncodeDiscriminatorsEnd = '>';
 
 void encodeIndexabilityForDiscriminators(const MatchExpression* tree,
                                          const IndexToDiscriminatorMap& discriminators,
                                          StringBuilder* keyBuilder) {
+
     for (auto&& indexAndDiscriminatorPair : discriminators) {
         *keyBuilder << indexAndDiscriminatorPair.second.isMatchCompatibleWithIndex(tree);
     }
 }
 
-void encodeIndexability(const MatchExpression* tree,
-                        const PlanCacheIndexabilityState& indexabilityState,
-                        StringBuilder* keyBuilder) {
+void encodeIndexabilityRecursive(const MatchExpression* tree,
+                                 const PlanCacheIndexabilityState& indexabilityState,
+                                 StringBuilder* keyBuilder) {
     if (!tree->path().empty()) {
         const IndexToDiscriminatorMap& discriminators =
-            indexabilityState.getDiscriminators(tree->path());
+            indexabilityState.getPathDiscriminators(tree->path());
         IndexToDiscriminatorMap wildcardDiscriminators =
             indexabilityState.buildWildcardDiscriminators(tree->path());
         if (!discriminators.empty() || !wildcardDiscriminators.empty()) {
@@ -72,8 +71,26 @@ void encodeIndexability(const MatchExpression* tree,
     }
 
     for (size_t i = 0; i < tree->numChildren(); ++i) {
-        encodeIndexability(tree->getChild(i), indexabilityState, keyBuilder);
+        encodeIndexabilityRecursive(tree->getChild(i), indexabilityState, keyBuilder);
     }
+}
+
+void encodeIndexability(const MatchExpression* tree,
+                        const PlanCacheIndexabilityState& indexabilityState,
+                        StringBuilder* keyBuilder) {
+    // Before encoding the indexability of the leaf MatchExpressions, apply the global
+    // discriminators to the expression as a whole. This is for cases such as partial indexes which
+    // must discriminate based on the entire query.
+    const auto& globalDiscriminators = indexabilityState.getGlobalDiscriminators();
+    if (!globalDiscriminators.empty()) {
+        *keyBuilder << kEncodeGlobalDiscriminatorsBegin;
+        for (auto&& indexAndDiscriminatorPair : globalDiscriminators) {
+            *keyBuilder << indexAndDiscriminatorPair.second.isMatchCompatibleWithIndex(tree);
+        }
+        *keyBuilder << kEncodeGlobalDiscriminatorsEnd;
+    }
+
+    encodeIndexabilityRecursive(tree, indexabilityState, keyBuilder);
 }
 
 PlanCacheKeyInfo makePlanCacheKeyInfo(const CanonicalQuery& query,

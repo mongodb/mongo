@@ -541,9 +541,18 @@ function getPlanCacheKeyFromExplain(explainRes, db) {
  * Helper to run a explain on the given query shape and get the "planCacheKey" from the explain
  * result.
  */
-function getPlanCacheKeyFromShape({query = {}, projection = {}, sort = {}, collection, db}) {
-    const explainRes =
-        assert.commandWorked(collection.explain().find(query, projection).sort(sort).finish());
+function getPlanCacheKeyFromShape({
+    query = {},
+    projection = {},
+    sort = {},
+    collation = {
+        locale: "simple"
+    },
+    collection,
+    db
+}) {
+    const explainRes = assert.commandWorked(
+        collection.explain().find(query, projection).collation(collation).sort(sort).finish());
 
     return getPlanCacheKeyFromExplain(explainRes, db);
 }
