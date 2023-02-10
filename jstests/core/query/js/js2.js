@@ -1,4 +1,8 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [
+//   requires_non_retryable_writes,
+//   # Uses $where operator
+//   requires_scripting,
+//]
 
 t = db.jstests_js2;
 t.remove({});
