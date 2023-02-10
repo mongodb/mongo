@@ -36,6 +36,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -55,11 +56,23 @@ void execute(OperationContext* opCtx,
 
     BulkWriteOp bulkWriteOp(opCtx, clientRequest);
 
+    bool refreshedTargeter = false;
+
     while (!bulkWriteOp.isFinished()) {
         // 1: Target remaining ops with the appropriate targeter based on the namespace index and
         // re-batch ops based on their targeted shard id.
         stdx::unordered_map<ShardId, std::unique_ptr<TargetedWriteBatch>> childBatches;
-        auto targetStatus = bulkWriteOp.target(targeters, &childBatches);
+
+        bool recordTargetErrors = refreshedTargeter;
+        auto targetStatus = bulkWriteOp.target(targeters, recordTargetErrors, childBatches);
+        if (!targetStatus.isOK()) {
+            dassert(childBatches.size() == 0u);
+            // TODO(SERVER-72982): Handle targeting errors.
+            for (auto& targeter : targeters) {
+                targeter->noteCouldNotTarget();
+            }
+            refreshedTargeter = true;
+        }
 
         // 2: Use MultiStatementTransactionRequestsSender to send any ready sub-batches to targeted
         // shard endpoints.
@@ -69,6 +82,7 @@ void execute(OperationContext* opCtx,
         // errors for ordered writes or transactions.
 
         // 4: Refresh the targeter(s) if we receive a stale config/db error.
+        // TODO(SERVER-72982): Handle targeting errors.
     }
 
     // Reassemble the final response based on responses from sub-batches.
@@ -94,13 +108,70 @@ BulkWriteOp::BulkWriteOp(OperationContext* opCtx, const BulkWriteCommandRequest&
 
 StatusWith<bool> BulkWriteOp::target(
     const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-    stdx::unordered_map<ShardId, std::unique_ptr<TargetedWriteBatch>>* targetedBatches) {
-    return false;
+    bool recordTargetErrors,
+    stdx::unordered_map<ShardId, std::unique_ptr<TargetedWriteBatch>>& targetedBatches) {
+    const auto ordered = _clientRequest.getOrdered();
+
+    // Used to track the shard endpoints (w/ shardVersion) we targeted and the batches to each of
+    // these shard endpoints.
+    TargetedBatchMap batchMap;
+
+    // Used to track the set of shardIds (w/o shardVersion) we targeted.
+    std::set<ShardId> targetedShards;
+
+    auto targetStatus = targetWriteOps(_opCtx,
+                                       _writeOps,
+                                       ordered,
+                                       recordTargetErrors,
+                                       // getTargeterFn:
+                                       [&](const WriteOp& writeOp) -> const NSTargeter& {
+                                           const auto opIdx = writeOp.getWriteItem().getItemIndex();
+                                           // TODO(SERVER-73281): Support bulkWrite update and
+                                           // delete.
+                                           const auto nsIdx =
+                                               _clientRequest.getOps()[opIdx].getInsert();
+                                           return *targeters[nsIdx];
+                                       },
+                                       // getWriteSizeFn:
+                                       [&](const WriteOp& writeOp) {
+                                           // TODO(SERVER-73536): Account for the size of the
+                                           // outgoing request.
+                                           return 1;
+                                       },
+                                       batchMap);
+
+    if (!targetStatus.isOK()) {
+        return targetStatus;
+    }
+
+    // Send back our targeted batches.
+    for (TargetedBatchMap::iterator it = batchMap.begin(); it != batchMap.end(); ++it) {
+        auto batch = std::move(it->second);
+        if (batch->getWrites().empty())
+            continue;
+
+        invariant(targetedBatches.find(batch->getEndpoint().shardName) == targetedBatches.end());
+        targetedBatches.emplace(batch->getEndpoint().shardName, std::move(batch));
+    }
+
+    return targetStatus;
 }
 
-bool BulkWriteOp::isFinished() {
+bool BulkWriteOp::isFinished() const {
     // TODO: Track ops lifetime.
+    const bool ordered = _clientRequest.getOrdered();
+    for (auto& writeOp : _writeOps) {
+        if (writeOp.getWriteState() < WriteOpState_Completed) {
+            return false;
+        } else if (ordered && writeOp.getWriteState() == WriteOpState_Error) {
+            return true;
+        }
+    }
     return true;
+}
+
+const WriteOp& BulkWriteOp::getWriteOp_forTest(int i) const {
+    return _writeOps[i];
 }
 }  // namespace bulkWriteExec
 

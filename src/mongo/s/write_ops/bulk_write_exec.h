@@ -37,7 +37,6 @@
 #include "mongo/s/write_ops/write_op.h"
 
 namespace mongo {
-
 namespace bulkWriteExec {
 /**
  * Executes a client bulkWrite request by sending child batches to several shard endpoints, and
@@ -84,15 +83,35 @@ public:
     BulkWriteOp(OperationContext* opCtx, const BulkWriteCommandRequest& clientRequest);
     ~BulkWriteOp() = default;
 
-    // TODO(SERVER-72787): Finish this.
+    /**
+     * Targets one or more of the next write ops in this bulkWrite request using the given
+     * NSTargeters (targeters[i] corresponds to the targeter of the collection in nsInfo[i]). The
+     * resulting TargetedWrites are aggregated together in the returned TargetedWriteBatches.
+     *
+     * If 'recordTargetErrors' is false, any targeting error will abort all current batches and
+     * the method will return the targeting error. No targetedBatches will be returned on error.
+     *
+     * Otherwise, if 'recordTargetErrors' is true, targeting errors will be recorded for each
+     * write op that fails to target, and the method will return OK.
+     *
+     * (The idea here is that if we are sure our NSTargeters are up-to-date we should record
+     * targeting errors, but if not we should refresh once first.)
+     *
+     * Returned TargetedWriteBatches are owned by the caller.
+     * If a write without a shard key is detected, return an OK StatusWith that has 'true' as the
+     * value.
+     */
     StatusWith<bool> target(
         const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-        stdx::unordered_map<ShardId, std::unique_ptr<TargetedWriteBatch>>* targetedBatches);
+        bool recordTargetErrors,
+        stdx::unordered_map<ShardId, std::unique_ptr<TargetedWriteBatch>>& targetedBatches);
 
     /**
      * Returns false if the bulk write op needs more processing.
      */
-    bool isFinished();
+    bool isFinished() const;
+
+    const WriteOp& getWriteOp_forTest(int i) const;
 
 private:
     // The OperationContext the client bulkWrite request is run on.

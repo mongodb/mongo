@@ -726,4 +726,44 @@ ShardEndpoint::ShardEndpoint(const ShardId& shardName,
         invariant(shardName == ShardId::kConfigServerId);
 }
 
+bool EndpointComp::operator()(const ShardEndpoint* endpointA,
+                              const ShardEndpoint* endpointB) const {
+    const int shardNameDiff = endpointA->shardName.compare(endpointB->shardName);
+    if (shardNameDiff)
+        return shardNameDiff < 0;
+
+    if (endpointA->shardVersion && endpointB->shardVersion) {
+        const int epochDiff = endpointA->shardVersion->placementVersion().epoch().compare(
+            endpointB->shardVersion->placementVersion().epoch());
+        if (epochDiff)
+            return epochDiff < 0;
+
+        const int shardVersionDiff = endpointA->shardVersion->placementVersion().toLong() -
+            endpointB->shardVersion->placementVersion().toLong();
+        if (shardVersionDiff)
+            return shardVersionDiff < 0;
+    } else if (!endpointA->shardVersion && !endpointB->shardVersion) {
+        // TODO (SERVER-51070): Can only happen if the destination is the config server
+        return false;
+    } else {
+        // TODO (SERVER-51070): Can only happen if the destination is the config server
+        return !endpointA->shardVersion && endpointB->shardVersion;
+    }
+
+    if (endpointA->databaseVersion && endpointB->databaseVersion) {
+        const int uuidDiff =
+            endpointA->databaseVersion->getUuid().compare(endpointB->databaseVersion->getUuid());
+        if (uuidDiff)
+            return uuidDiff < 0;
+
+        return endpointA->databaseVersion->getLastMod() < endpointB->databaseVersion->getLastMod();
+    } else if (!endpointA->databaseVersion && !endpointB->databaseVersion) {
+        return false;
+    } else {
+        return !endpointA->databaseVersion && endpointB->databaseVersion;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace mongo

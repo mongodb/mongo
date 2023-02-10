@@ -80,13 +80,6 @@ struct ShardWCError {
     WriteConcernErrorDetail error;
 };
 
-/**
- * Compares endpoints in a map.
- */
-struct EndpointComp {
-    bool operator()(const ShardEndpoint* endpointA, const ShardEndpoint* endpointB) const;
-};
-
 using TargetedBatchMap =
     std::map<const ShardEndpoint*, std::unique_ptr<TargetedWriteBatch>, EndpointComp>;
 
@@ -274,5 +267,17 @@ private:
     using TrackedErrorMap = stdx::unordered_map<int, std::vector<ShardError>>;
     TrackedErrorMap _errorMap;
 };
+
+typedef std::function<const NSTargeter&(const WriteOp& writeOp)> GetTargeterFn;
+typedef std::function<int(const WriteOp& writeOp)> GetWriteSizeFn;
+
+// Helper function to target ready writeOps. See BatchWriteOp::targetBatch for details.
+StatusWith<bool> targetWriteOps(OperationContext* opCtx,
+                                std::vector<WriteOp>& writeOps,
+                                bool ordered,
+                                bool recordTargetErrors,
+                                GetTargeterFn getTargeterFn,
+                                GetWriteSizeFn getWriteSizeFn,
+                                TargetedBatchMap& batchMap);
 
 }  // namespace mongo

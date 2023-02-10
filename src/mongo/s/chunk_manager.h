@@ -487,6 +487,13 @@ struct ShardEndpoint {
 };
 
 /**
+ * Compares shard endpoints in a map.
+ */
+struct EndpointComp {
+    bool operator()(const ShardEndpoint* endpointA, const ShardEndpoint* endpointB) const;
+};
+
+/**
  * Wrapper around a RoutingTableHistory, which pins it to a particular point in time.
  */
 class ChunkManager {
