@@ -261,6 +261,9 @@ def setup(test_args: TestArgs):
     # (non-forking) services and confuse the systemd emulator script.
     run_and_log("sed -Ei '/^PIDFile=|PermissionsStartOnly=|Type=/d' {}/mongod.service".format(
         test_args["systemd_units_dir"]))
+    # Ensure RuntimeDirectory has been added to the systemd unit file.
+    run_and_log("sed -Ei '/^ExecStart=.*/a RuntimeDirectory=mongodb' {}/mongod.service".format(
+        test_args["systemd_units_dir"]))
     # Remove the journal: line (and the next) from mongod.conf, which is a
     # removed configuration. The Debian version of the config never got updated.
     run_and_log("sed -i '/journal:/,+1d' /etc/mongod.conf")
@@ -323,6 +326,7 @@ def test_install_is_complete(test_args: TestArgs):
     ]  # type: List[pathlib.Path]
 
     required_dirs = [
+        pathlib.Path('/run/mongodb'),
         pathlib.Path(test_args['mongo_work_dir']),
     ]  # type: List[pathlib.Path]
 
