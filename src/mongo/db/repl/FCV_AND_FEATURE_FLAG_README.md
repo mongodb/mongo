@@ -423,7 +423,10 @@ be enabled by default for testing purposes on the Evergreen variants marked as "
 * If you have a JS test that depends on this feature flag being enabled, tag with a tag of the same 
 name as the feature flag in the format `featureFlagXX` (for example, `featureFlagToaster`). This 
 ensures that the test will only be run on the "all feature flags" variants where the feature flag is
-enabled. 
+enabled. This works by virtue of the feature flag being declared in the codebase without
+`default: true` which will cause it to make its way into the all_feature_flags.txt file used by
+resmoke.py to control either which flags to enable for "all feature flags", or which tags
+(e.g. featureFlagXX) to skip when it is not running "all feature flags."
     * Parallel test suite does not honor feature flag tags, due to which some tests may be 
     unexpectedly run in non-feature-flag build variants. If you want to skip such tests in 
     parallel suite, please add them to the exclusion list [here](https://github.com/mongodb/mongo/blob/eb75b6ccc62f7c8ea26a57c1b5eb96a41809396a/jstests/libs/parallelTester.js#L149).
