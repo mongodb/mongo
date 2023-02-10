@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
@@ -101,6 +102,47 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
 namespace mongo::write_ops_exec {
+class Atomic64Metric;
+}  // namespace mongo::write_ops_exec
+
+namespace mongo {
+template <>
+struct BSONObjAppendFormat<write_ops_exec::Atomic64Metric> : FormatKind<NumberLong> {};
+}  // namespace mongo
+
+
+namespace mongo::write_ops_exec {
+
+/**
+ * Atomic wrapper for long long type for Metrics.
+ */
+class Atomic64Metric {
+public:
+    /** Set _value to the max of the current or newMax. */
+    void setIfMax(long long newMax) {
+        /*  Note: compareAndSwap will load into val most recent value. */
+        for (long long val = _value.load(); val < newMax && !_value.compareAndSwap(&val, newMax);) {
+        }
+    }
+
+    /** store val into value. */
+    void set(long long val) {
+        _value.store(val);
+    }
+
+    /** Return the current value. */
+    long long get() const {
+        return _value.load();
+    }
+
+    /** TODO: SERVER-73806 Avoid implicit conversion to long long */
+    operator long long() const {
+        return get();
+    }
+
+private:
+    mongo::AtomicWord<long long> _value;
+};
 
 // Convention in this file: generic helpers go in the anonymous namespace. Helpers that are for a
 // single type of operation are static functions defined above their caller.
@@ -129,6 +171,43 @@ MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeReopeningQuery);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeWrite);
 MONGO_FAIL_POINT_DEFINE(failUnorderedTimeseriesInsert);
 
+
+/**
+ * Metrics group for the `updateMany` and `deleteMany` operations. For each
+ * operation, the `duration` and `numDocs` will contribute to aggregated total
+ * and max metrics.
+ */
+class MultiUpdateDeleteMetrics {
+public:
+    void operator()(Microseconds duration, size_t numDocs) {
+        _durationTotalMicroseconds.increment(durationCount<Microseconds>(duration));
+        _durationTotalMs.set(
+            durationCount<Milliseconds>(Microseconds{_durationTotalMicroseconds.get()}));
+        _durationMaxMs.setIfMax(durationCount<Milliseconds>(duration));
+
+        _numDocsTotal.increment(numDocs);
+        _numDocsMax.setIfMax(numDocs);
+    }
+
+private:
+    /**
+     * To avoid rapid accumulation of roundoff error in the duration total, it
+     * is maintained precisely, and we arrange for the corresponding
+     * Millisecond metric to hold an exported low-res image of it.
+     */
+    Counter64 _durationTotalMicroseconds;
+
+    Atomic64Metric& _durationTotalMs =
+        makeServerStatusMetric<Atomic64Metric>("query.updateDeleteManyDurationTotalMs");
+    Atomic64Metric& _durationMaxMs =
+        makeServerStatusMetric<Atomic64Metric>("query.updateDeleteManyDurationMaxMs");
+
+    CounterMetric _numDocsTotal{"query.updateDeleteManyDocumentsTotalCount"};
+    Atomic64Metric& _numDocsMax =
+        makeServerStatusMetric<Atomic64Metric>("query.updateDeleteManyDocumentsMaxCount");
+};
+
+MultiUpdateDeleteMetrics collectMultiUpdateDeleteMetrics;
 
 void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
     if (containsRetry) {
@@ -1130,7 +1209,12 @@ WriteResult performUpdates(OperationContext* opCtx,
                 ? *wholeOp.getStmtIds()
                 : std::vector<StmtId>{stmtId};
 
-            out.results.emplace_back(
+            boost::optional<Timer> timer;
+            if (singleOp.getMulti()) {
+                timer.emplace();
+            }
+
+            const SingleWriteResult&& reply =
                 performSingleUpdateOpWithDupKeyRetry(opCtx,
                                                      ns,
                                                      wholeOp.getCollectionUUID(),
@@ -1139,9 +1223,15 @@ WriteResult performUpdates(OperationContext* opCtx,
                                                      runtimeConstants,
                                                      wholeOp.getLet(),
                                                      source,
-                                                     forgoOpCounterIncrements));
+                                                     forgoOpCounterIncrements);
+            out.results.emplace_back(reply);
             forgoOpCounterIncrements = true;
             lastOpFixer.finishedOpSuccessfully();
+
+            if (singleOp.getMulti()) {
+                updateManyCount.increment(1);
+                collectMultiUpdateDeleteMetrics(timer->elapsed(), reply.getNModified());
+            }
         } catch (const DBException& ex) {
             out.canContinue = handleError(opCtx,
                                           ex,
@@ -1381,15 +1471,27 @@ WriteResult performDeletes(OperationContext* opCtx,
 
         try {
             lastOpFixer.startingOp();
-            out.results.push_back(performSingleDeleteOp(opCtx,
-                                                        ns,
-                                                        wholeOp.getCollectionUUID(),
-                                                        stmtId,
-                                                        singleOp,
-                                                        runtimeConstants,
-                                                        wholeOp.getLet(),
-                                                        source));
+
+            boost::optional<Timer> timer;
+            if (singleOp.getMulti()) {
+                timer.emplace();
+            }
+
+            const SingleWriteResult&& reply = performSingleDeleteOp(opCtx,
+                                                                    ns,
+                                                                    wholeOp.getCollectionUUID(),
+                                                                    stmtId,
+                                                                    singleOp,
+                                                                    runtimeConstants,
+                                                                    wholeOp.getLet(),
+                                                                    source);
+            out.results.push_back(reply);
             lastOpFixer.finishedOpSuccessfully();
+
+            if (singleOp.getMulti()) {
+                deleteManyCount.increment(1);
+                collectMultiUpdateDeleteMetrics(timer->elapsed(), reply.getN());
+            }
         } catch (const DBException& ex) {
             out.canContinue = handleError(opCtx,
                                           ex,
