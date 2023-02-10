@@ -8,6 +8,9 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
+load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+
+const numMostCommonValues = 5;
 
 function testAnalyzeShardKeyUnshardedCollection(conn) {
     const dbName = "testDb";
@@ -20,9 +23,13 @@ function testAnalyzeShardKeyUnshardedCollection(conn) {
     assert.commandWorked(coll.insert([{candidateKey: 1}]));
 
     const res = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: candidateKey}));
-    assert.eq(res.numDocs, 1, res);
-    assert.eq(res.numDistinctValues, 1, res);
-    assert.eq(bsonWoCompare(res.frequency, {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}), 0, res);
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
+        numDocs: 1,
+        isUnique: false,
+        numDistinctValues: 1,
+        mostCommonValues: [{value: {candidateKey: 1}, frequency: 1}],
+        numMostCommonValues
+    });
     assert(!res.hasOwnProperty("numOrphanDocs"), res);
     assert(!res.hasOwnProperty("note"), res);
 
@@ -40,11 +47,11 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert.commandWorked(coll.createIndex(currentKey));
     assert.commandWorked(coll.createIndex(candidateKey));
     assert.commandWorked(coll.insert([
-        {currentKey: -10, candidateKey: -10},
-        {currentKey: -5, candidateKey: -5},
+        {currentKey: -10, candidateKey: -100},
+        {currentKey: -5, candidateKey: -50},
         {currentKey: 0, candidateKey: 0},
-        {currentKey: 5, candidateKey: 5},
-        {currentKey: 10, candidateKey: 10}
+        {currentKey: 5, candidateKey: 50},
+        {currentKey: 10, candidateKey: 100}
     ]));
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
@@ -58,9 +65,19 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert.commandWorked(st.s.adminCommand(
         {moveChunk: ns, find: {currentKey: 0}, to: st.shard1.shardName, _waitForDelete: true}));
     let res = assert.commandWorked(st.s.adminCommand({analyzeShardKey: ns, key: candidateKey}));
-    assert.eq(res.numDocs, 5, res);
-    assert.eq(res.numDistinctValues, 5, res);
-    assert.eq(bsonWoCompare(res.frequency, {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}), 0, res);
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
+        numDocs: 5,
+        isUnique: false,
+        numDistinctValues: 5,
+        mostCommonValues: [
+            {value: {candidateKey: -100}, frequency: 1},
+            {value: {candidateKey: -50}, frequency: 1},
+            {value: {candidateKey: 0}, frequency: 1},
+            {value: {candidateKey: 50}, frequency: 1},
+            {value: {candidateKey: 100}, frequency: 1}
+        ],
+        numMostCommonValues
+    });
     assert(res.hasOwnProperty("numOrphanDocs"), res);
     assert.eq(res.numOrphanDocs, 0, res);
 
@@ -75,9 +92,19 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {currentKey: -5}, to: st.shard1.shardName}));
     res = assert.commandWorked(st.s.adminCommand({analyzeShardKey: ns, key: candidateKey}));
-    assert.eq(res.numDocs, 6, res);
-    assert.eq(res.numDistinctValues, 5, res);
-    assert.eq(bsonWoCompare(res.frequency, {p99: 2, p95: 2, p90: 2, p80: 1, p50: 1}), 0, res);
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
+        numDocs: 6,
+        isUnique: false,
+        numDistinctValues: 5,
+        mostCommonValues: [
+            {value: {candidateKey: -50}, frequency: 2},
+            {value: {candidateKey: -100}, frequency: 1},
+            {value: {candidateKey: 0}, frequency: 1},
+            {value: {candidateKey: 50}, frequency: 1},
+            {value: {candidateKey: 100}, frequency: 1}
+        ],
+        numMostCommonValues
+    });
     assert(res.hasOwnProperty("numOrphanDocs"), res);
     assert.eq(res.numOrphanDocs, 1, res);
 
@@ -88,9 +115,19 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {currentKey: 5}, to: st.shard0.shardName}));
     res = assert.commandWorked(st.s.adminCommand({analyzeShardKey: ns, key: candidateKey}));
-    assert.eq(res.numDocs, 8, res);
-    assert.eq(res.numDistinctValues, 5, res);
-    assert.eq(bsonWoCompare(res.frequency, {p99: 2, p95: 2, p90: 2, p80: 2, p50: 2}), 0, res);
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
+        numDocs: 8,
+        isUnique: false,
+        numDistinctValues: 5,
+        mostCommonValues: [
+            {value: {candidateKey: -50}, frequency: 2},
+            {value: {candidateKey: 50}, frequency: 2},
+            {value: {candidateKey: 100}, frequency: 2},
+            {value: {candidateKey: -100}, frequency: 1},
+            {value: {candidateKey: 0}, frequency: 1}
+        ],
+        numMostCommonValues
+    });
     assert(res.hasOwnProperty("numOrphanDocs"), res);
     assert.eq(res.numOrphanDocs, 3, res);
     assert(res.hasOwnProperty("note"), res);
@@ -107,7 +144,8 @@ function testAnalyzeShardKeyShardedCollection(st) {
             nodes: 2,
             setParameter: {
                 "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-                    tojson({mode: "alwaysOn"})
+                    tojson({mode: "alwaysOn"}),
+                analyzeShardKeyNumMostCommonValues: numMostCommonValues
             }
         }
     });
@@ -119,7 +157,10 @@ function testAnalyzeShardKeyShardedCollection(st) {
 }
 
 {
-    const rst = new ReplSetTest({nodes: 2});
+    const rst = new ReplSetTest({
+        nodes: 2,
+        nodeOptions: {setParameter: {analyzeShardKeyNumMostCommonValues: numMostCommonValues}}
+    });
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

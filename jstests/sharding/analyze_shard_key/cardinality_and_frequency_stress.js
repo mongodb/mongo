@@ -9,8 +9,9 @@
 
 load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 
-const kInternalDocumentSourceGroupMaxMemoryBytes = 1024 * 1024;
 const kSize100kB = 100 * 1024;
+const internalDocumentSourceGroupMaxMemoryBytes = 1024 * 1024;
+const numMostCommonValues = 5;
 
 /**
  * Finds the profiler entries for all aggregate and count commands with the given comment on the
@@ -57,8 +58,8 @@ function assertAggregationPlan(mongodConns, dbName, collName, isShardedColl, com
 }
 
 function testAnalyzeShardKeysUnshardedCollection(conn, mongodConns) {
-    const dbName = "testDbCandidateUnsharded";
-    const collName = "testColl";
+    const dbName = "testDb";
+    const collName = "testCollUnsharded";
     const ns = dbName + "." + collName;
     const candidateShardKey = {a: 1};
     const numDocs = 15;  // ~1.5MB in total.
@@ -72,20 +73,31 @@ function testAnalyzeShardKeysUnshardedCollection(conn, mongodConns) {
         `Testing analyzing a shard key for an unsharded collection: ${tojson({dbName, collName})}`);
 
     assert.commandWorked(coll.createIndex(candidateShardKey));
+
+    const mostCommonValues = [];
     for (let i = 1; i <= numDocs; i++) {
         const chars = i.toString();
         const doc = {a: new Array(kSize100kB / chars.length).join(chars)};
+
         assert.commandWorked(db.runCommand({insert: collName, documents: [doc]}));
+        mostCommonValues.push({
+            value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(
+                doc, candidateShardKey, candidateShardKey),
+            frequency: 1
+        });
     }
 
     AnalyzeShardKeyUtil.enableProfiler(mongodConns, dbName);
 
     const res = assert.commandWorked(
         conn.adminCommand({analyzeShardKey: ns, key: candidateShardKey, comment}));
-    assert.eq(res.numDocs, numDocs, res);
-    assert.eq(res.isUnique, false, res);
-    assert.eq(res.numDistinctValues, numDocs, res);
-    assert.eq(bsonWoCompare(res.frequency, {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}), 0, res);
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
+        numDocs,
+        isUnique: false,
+        numDistinctValues: numDocs,
+        mostCommonValues,
+        numMostCommonValues
+    });
 
     AnalyzeShardKeyUtil.disableProfiler(mongodConns, dbName);
     assertAggregationPlan(mongodConns, dbName, collName, false /* isShardedColl */, comment);
@@ -94,8 +106,8 @@ function testAnalyzeShardKeysUnshardedCollection(conn, mongodConns) {
 }
 
 function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
-    const dbName = "testDbCandidateSharded";
-    const collName = "testColl";
+    const dbName = "testDb";
+    const collName = "testCollSharded";
     const ns = dbName + "." + collName;
     const currentShardKey = {skey: 1};
     const currentShardKeySplitPoint = {skey: 0};
@@ -118,11 +130,19 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
         {moveChunk: ns, find: currentShardKeySplitPoint, to: st.shard1.shardName}));
     assert.commandWorked(coll.createIndex(candidateShardKey));
 
+    const mostCommonValues = [];
     let sign = 1;
     for (let i = 1; i <= numDocs; i++) {
         const chars = i.toString();
         const doc = {a: new Array(kSize100kB / chars.length).join(chars), skey: sign};
+
         assert.commandWorked(db.runCommand({insert: collName, documents: [doc]}));
+        mostCommonValues.push({
+            value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(
+                doc, candidateShardKey, candidateShardKey),
+            frequency: 1
+        });
+
         sign *= -1;
     }
 
@@ -130,10 +150,13 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
 
     const res = assert.commandWorked(
         st.s.adminCommand({analyzeShardKey: ns, key: candidateShardKey, comment}));
-    assert.eq(res.numDocs, numDocs, res);
-    assert.eq(res.isUnique, false, res);
-    assert.eq(res.numDistinctValues, numDocs, res);
-    assert.eq(bsonWoCompare(res.frequency, {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}), 0, res);
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
+        numDocs,
+        isUnique: false,
+        numDistinctValues: numDocs,
+        mostCommonValues,
+        numMostCommonValues
+    });
 
     AnalyzeShardKeyUtil.disableProfiler(mongodConns, dbName);
     assertAggregationPlan(mongodConns, dbName, collName, true /* isShardedColl */, comment);
@@ -150,8 +173,8 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
                 setParameter: {
                     "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
                         tojson({mode: "alwaysOn"}),
-                    internalDocumentSourceGroupMaxMemoryBytes:
-                        kInternalDocumentSourceGroupMaxMemoryBytes
+                    internalDocumentSourceGroupMaxMemoryBytes,
+                    analyzeShardKeyNumMostCommonValues: numMostCommonValues
                 }
             }
         }
@@ -171,8 +194,8 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
         nodes: 2,
         nodeOptions: {
             setParameter: {
-                internalDocumentSourceGroupMaxMemoryBytes:
-                    kInternalDocumentSourceGroupMaxMemoryBytes
+                internalDocumentSourceGroupMaxMemoryBytes,
+                analyzeShardKeyNumMostCommonValues: numMostCommonValues
             }
         }
     });

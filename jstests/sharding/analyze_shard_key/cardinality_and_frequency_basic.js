@@ -128,23 +128,7 @@ for (let testCaseBase of noIndexTestCases) {
     candidateKeyTestCases.push(testCase);
 }
 
-function assertNoMetrics(res) {
-    assert(!res.hasOwnProperty("numDocs"), res);
-    assert(!res.hasOwnProperty("isUnique"), res);
-    assert(!res.hasOwnProperty("numDistinctValues"), res);
-    assert(!res.hasOwnProperty("frequency"), res);
-    assert(!res.hasOwnProperty("monotonicity"), res);
-    assert(!res.hasOwnProperty("avgDocSizeBytes"), res);
-}
-
-function assertMetrics(res, {numDocs, isUnique, numDistinctValues, frequency}) {
-    assert.eq(res.numDocs, numDocs, res);
-    assert.eq(res.isUnique, isUnique, res);
-    assert.eq(res.numDistinctValues, numDistinctValues, res);
-    assert.eq(bsonWoCompare(res.frequency, frequency), 0, res);
-    assert(res.hasOwnProperty("monotonicity"), res);
-    assert(res.hasOwnProperty("avgDocSizeBytes"), res);
-}
+const numMostCommonValues = 5;
 
 /**
  * Finds the profiler entries for all aggregate and count commands with the given comment on the
@@ -168,15 +152,27 @@ function assertReadQueryPlans(mongodConns, dbName, collName, comment) {
                     return;
                 }
 
-                if (!firstStage.hasOwnProperty("$mergeCursors")) {
-                    assert(doc.hasOwnProperty("planSummary"), doc);
-                    assert(doc.planSummary.includes("IXSCAN"), doc);
-                }
                 assert(!doc.usedDisk, doc);
-                // Verify that it did not fetch any documents.
-                assert.eq(doc.docsExamined, 0, doc);
-                // Verify that it opted out of shard filtering.
-                assert.eq(doc.readConcern.level, "available", doc);
+                if (firstStage.hasOwnProperty("$match") || firstStage.hasOwnProperty("$limit")) {
+                    // This corresponds to the aggregation that the analyzeShardKey command runs
+                    // when analyzing a shard key with a unique supporting index, which should
+                    // fetch at most 'numMostCommonValues' documents.
+                    assert(doc.hasOwnProperty("planSummary"), doc);
+                    assert(doc.planSummary.includes("COLLSCAN"), doc);
+                    assert.lte(doc.docsExamined, numMostCommonValues, doc);
+                } else {
+                    // This corresponds to the aggregation that the analyzeShardKey command runs
+                    // when analyzing a shard key with a non-unique supporting index.
+                    if (!firstStage.hasOwnProperty("$mergeCursors")) {
+                        assert(doc.hasOwnProperty("planSummary"), doc);
+                        assert(doc.planSummary.includes("IXSCAN"), doc);
+                    }
+
+                    // Verify that it did not fetch any documents.
+                    assert.eq(doc.docsExamined, 0, doc);
+                    // Verify that it opted out of shard filtering.
+                    assert.eq(doc.readConcern.level, "available", doc);
+                }
             });
 
         profilerColl.find({"command.count": collName, "command.comment": comment}).forEach(doc => {
@@ -194,14 +190,13 @@ function assertReadQueryPlans(mongodConns, dbName, collName, comment) {
     });
 }
 
-function makeDocument(fieldNames, val) {
+/**
+ * Returns an object where each field name is set to the given value.
+ */
+function makeDocument(fieldNames, value) {
     const doc = {};
     fieldNames.forEach(fieldName => {
-        if (fieldName == "_id") {
-            // The _id must be unique so should be manually set to 'val'.
-            return;
-        }
-        AnalyzeShardKeyUtil.setDottedField(doc, fieldName, val);
+        AnalyzeShardKeyUtil.setDottedField(doc, fieldName, value);
     });
     return doc;
 }
@@ -216,124 +211,86 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
     const coll = db.getCollection(collName);
+
     const fieldNames = AnalyzeShardKeyUtil.getCombinedFieldNames(
         currentShardKey, testCase.shardKey, testCase.indexKey);
     const shardKeyContainsId = testCase.shardKey.hasOwnProperty("_id");
+    const isUnique = false;
 
-    // Analyze the shard key while the collection has less than 5 distinct shard key values.
-    assert.commandWorked(coll.remove({}));
-    assert.commandWorked(db.runCommand({
-        insert: collName,
-        documents: [makeDocument(fieldNames, -1), makeDocument(fieldNames, 1)],
-        ordered: false
-    }));
-    let res = assert.commandWorked(conn.adminCommand(
+    const makeSubTestCase = (numDistinctValues) => {
+        const docs = [];
+        const mostCommonValues = [];
+
+        const maxFrequency = shardKeyContainsId ? 1 : numDistinctValues;
+        let sign = 1;
+        for (let i = 1; i <= numDistinctValues; i++) {
+            const doc = makeDocument(fieldNames, sign * i);
+
+            const frequency = shardKeyContainsId ? 1 : i;
+            for (let j = 1; j <= frequency; j++) {
+                docs.push(doc);
+            }
+
+            const isMostCommon = (maxFrequency - frequency) < numMostCommonValues;
+            if (testCase.expectMetrics && isMostCommon) {
+                mostCommonValues.push({
+                    value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(
+                        doc, testCase.shardKey, testCase.indexKey),
+                    frequency
+                });
+            }
+
+            sign *= -1;
+        }
+
+        const metrics = {
+            numDocs: docs.length,
+            isUnique,
+            numDistinctValues,
+            mostCommonValues,
+            numMostCommonValues
+        };
+
+        return [docs, metrics];
+    };
+
+    // Analyze the shard key while the collection has less than 'numMostCommonValues' distinct shard
+    // key values.
+    const [docs0, metrics0] = makeSubTestCase(numMostCommonValues - 1);
+    assert.commandWorked(db.runCommand({insert: collName, documents: docs0, ordered: false}));
+    const res0 = assert.commandWorked(conn.adminCommand(
         {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
     if (testCase.expectMetrics) {
-        assertMetrics(res, {
-            numDocs: 2,
-            isUnique: false,
-            numDistinctValues: 2,
-            frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
-        });
+        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0, metrics0);
     } else {
-        assertNoMetrics(res);
+        AnalyzeShardKeyUtil.assertNoKeyCharacteristicsMetrics(res0);
     }
-
-    // Analyze the shard key while the collection has exactly 5 distinct shard key values.
     assert.commandWorked(coll.remove({}));
-    assert.commandWorked(db.runCommand({
-        insert: collName,
-        documents: [
-            makeDocument(fieldNames, -2),
-            makeDocument(fieldNames, -1),
-            makeDocument(fieldNames, 0),
-            makeDocument(fieldNames, 1),
-            makeDocument(fieldNames, 2)
-        ],
-        ordered: false
-    }));
-    res = assert.commandWorked(conn.adminCommand(
+
+    // Analyze the shard key while the collection has exactly 'numMostCommonValues' distinct shard
+    // key values.
+    const [docs1, metrics1] = makeSubTestCase(numMostCommonValues);
+    assert.commandWorked(db.runCommand({insert: collName, documents: docs1, ordered: false}));
+    const res1 = assert.commandWorked(conn.adminCommand(
         {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
     if (testCase.expectMetrics) {
-        assertMetrics(res, {
-            numDocs: 5,
-            isUnique: false,
-            numDistinctValues: 5,
-            frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
-        });
+        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res1, metrics1);
     } else {
-        assertNoMetrics(res);
+        AnalyzeShardKeyUtil.assertNoKeyCharacteristicsMetrics(res1);
     }
-
-    // Analyze the shard key the collection has exactly 100 distinct shard key values.
     assert.commandWorked(coll.remove({}));
-    let docs = [];
-    let sign = 1;
-    for (let i = 1; i <= 100; i++) {
-        for (let j = 1; j <= i; j++) {
-            docs.push(makeDocument(fieldNames, sign * i));
-        }
-        sign *= -1;
-    }
-    assert.commandWorked(db.runCommand({insert: collName, documents: docs, ordered: false}));
-    res = assert.commandWorked(conn.adminCommand(
+
+    // Analyze the shard key while the collection has more than 'numMostCommonValues' distinct shard
+    // key values.
+    const [docs2, metrics2] = makeSubTestCase(numMostCommonValues * 25);
+    assert.commandWorked(db.runCommand({insert: collName, documents: docs2, ordered: false}));
+    const res2 = assert.commandWorked(conn.adminCommand(
         {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
     if (testCase.expectMetrics) {
-        if (shardKeyContainsId) {
-            // The shard key contains the _id so each document has its own shard key value.
-            assertMetrics(res, {
-                numDocs: 5050,
-                isUnique: false,
-                numDistinctValues: 5050,
-                frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
-            });
-        } else {
-            assertMetrics(res, {
-                numDocs: 5050,
-                isUnique: false,
-                numDistinctValues: 100,
-                frequency: {p99: 99, p95: 95, p90: 90, p80: 80, p50: 50}
-            });
-        }
+        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res2, metrics2);
     } else {
-        assertNoMetrics(res);
+        AnalyzeShardKeyUtil.assertNoKeyCharacteristicsMetrics(res2);
     }
-
-    // Analyze the shard key the collection has more than 100 distinct shard key values.
-    assert.commandWorked(coll.remove({}));
-    docs = [];
-    sign = 1;
-    for (let i = 1; i <= 150; i++) {
-        for (let j = 1; j <= i; j++) {
-            docs.push(makeDocument(fieldNames, sign * i));
-        }
-        sign *= -1;
-    }
-    assert.commandWorked(db.runCommand({insert: collName, documents: docs, ordered: false}));
-    res = assert.commandWorked(conn.adminCommand(
-        {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
-    if (testCase.expectMetrics) {
-        if (shardKeyContainsId) {
-            // The shard key contains the _id so each document has its own shard key value.
-            assertMetrics(res, {
-                numDocs: 11325,
-                isUnique: false,
-                numDistinctValues: 11325,
-                frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
-            });
-        } else {
-            assertMetrics(res, {
-                numDocs: 11325,
-                isUnique: false,
-                numDistinctValues: 150,
-                frequency: {p99: 149, p95: 143, p90: 135, p80: 120, p50: 75}
-            });
-        }
-    } else {
-        assertNoMetrics(res);
-    }
-
     assert.commandWorked(coll.remove({}));
 }
 
@@ -348,89 +305,71 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
     const coll = db.getCollection(collName);
+
     const fieldNames = AnalyzeShardKeyUtil.getCombinedFieldNames(
         currentShardKey, testCase.shardKey, testCase.indexKey);
+    const isUnique = testCase.expectUnique;
 
-    // Analyze the shard key while the collection has less than 5 distinct shard key values.
-    assert.commandWorked(coll.remove({}));
-    assert.commandWorked(db.runCommand({
-        insert: collName,
-        documents: [makeDocument(fieldNames, -1), makeDocument(fieldNames, 1)],
-        ordered: false
-    }));
-    let res = assert.commandWorked(conn.adminCommand(
+    const makeSubTestCase = (numDistinctValues) => {
+        const docs = [];
+        const mostCommonValues = [];
+
+        let sign = 1;
+        for (let i = 1; i <= numDistinctValues; i++) {
+            const doc = makeDocument(fieldNames, sign * i);
+            docs.push(doc);
+            mostCommonValues.push({
+                value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(
+                    doc, testCase.shardKey, testCase.indexKey),
+                frequency: 1
+            });
+
+            sign *= -1;
+        }
+
+        const metrics = {
+            numDocs: docs.length,
+            isUnique,
+            numDistinctValues,
+            mostCommonValues,
+            numMostCommonValues
+        };
+
+        return [docs, metrics];
+    };
+
+    // Analyze the shard key while the collection has less than 'numMostCommonValues' distinct shard
+    // key values.
+    const [docs0, metrics0] = makeSubTestCase(numMostCommonValues - 1);
+
+    assert.commandWorked(db.runCommand({insert: collName, documents: docs0, ordered: false}));
+    const res0 = assert.commandWorked(conn.adminCommand(
         {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
-    assertMetrics(res, {
-        numDocs: 2,
-        isUnique: testCase.expectUnique,
-        numDistinctValues: 2,
-        frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
-    });
-
-    // Analyze the shard key while the collection has exactly 5 distinct shard key values.
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0, metrics0);
     assert.commandWorked(coll.remove({}));
-    assert.commandWorked(db.runCommand({
-        insert: collName,
-        documents: [
-            makeDocument(fieldNames, -2),
-            makeDocument(fieldNames, -1),
-            makeDocument(fieldNames, 0),
-            makeDocument(fieldNames, 1),
-            makeDocument(fieldNames, 2)
-        ],
-        ordered: false
-    }));
-    res = assert.commandWorked(conn.adminCommand(
-        {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
-    assertMetrics(res, {
-        numDocs: 5,
-        isUnique: testCase.expectUnique,
-        numDistinctValues: 5,
-        frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
-    });
 
-    // Analyze the shard key the collection has exactly 100 distinct shard key values.
+    // Analyze the shard key while the collection has exactly 'numMostCommonValues' distinct shard
+    // key values.
+    const [docs1, metrics1] = makeSubTestCase(numMostCommonValues);
+    assert.commandWorked(db.runCommand({insert: collName, documents: docs1, ordered: false}));
+    const res1 = assert.commandWorked(conn.adminCommand(
+        {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res1, metrics1);
     assert.commandWorked(coll.remove({}));
-    let docs = [];
-    let sign = 1;
-    for (let i = 1; i <= 100; i++) {
-        docs.push(makeDocument(fieldNames, sign * i));
-        sign *= -1;
-    }
-    assert.commandWorked(db.runCommand({insert: collName, documents: docs, ordered: false}));
-    res = assert.commandWorked(conn.adminCommand(
-        {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
-    assertMetrics(res, {
-        numDocs: 100,
-        isUnique: testCase.expectUnique,
-        numDistinctValues: 100,
-        frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
-    });
 
-    // Analyze the shard key the collection has more than 100 distinct shard key values.
-    assert.commandWorked(coll.remove({}));
-    docs = [];
-    sign = 1;
-    for (let i = 1; i <= 150; i++) {
-        docs.push(makeDocument(fieldNames, sign * i));
-        sign *= -1;
-    }
-    assert.commandWorked(db.runCommand({insert: collName, documents: docs, ordered: false}));
-    res = assert.commandWorked(conn.adminCommand(
+    // Analyze the shard key while the collection has more than 'numMostCommonValues' distinct shard
+    // key values.
+    const [docs2, metrics2] = makeSubTestCase(numMostCommonValues * 25);
+    assert.commandWorked(db.runCommand({insert: collName, documents: docs2, ordered: false}));
+    const res2 = assert.commandWorked(conn.adminCommand(
         {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
-    assertMetrics(res, {
-        numDocs: 150,
-        isUnique: testCase.expectUnique,
-        numDistinctValues: 150,
-        frequency: {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}
-    });
-
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res2, metrics2);
     assert.commandWorked(coll.remove({}));
 }
 
 function testAnalyzeCandidateShardKeysUnshardedCollection(conn, mongodConns) {
-    const dbName = "testDbCandidateUnsharded";
-    const collName = "testColl";
+    const dbName = "testDb";
+    const collName = "testCollUnshardedCandidate";
     const db = conn.getDB(dbName);
     const coll = db.getCollection(collName);
 
@@ -468,8 +407,8 @@ function testAnalyzeCandidateShardKeysUnshardedCollection(conn, mongodConns) {
 }
 
 function testAnalyzeCandidateShardKeysShardedCollection(st, mongodConns) {
-    const dbName = "testDbCandidateSharded";
-    const collName = "testColl";
+    const dbName = "testDb";
+    const collName = "testCollShardedCandidate";
     const ns = dbName + "." + collName;
     const currentShardKey = {skey: 1};
     const currentShardKeySplitPoint = {skey: 0};
@@ -525,7 +464,7 @@ function testAnalyzeCandidateShardKeysShardedCollection(st, mongodConns) {
 }
 
 function testAnalyzeCurrentShardKeys(st, mongodConns) {
-    const dbName = "testDbCurrentSharded";
+    const dbName = "testDb";
     const db = st.s.getDB(dbName);
 
     jsTest.log(`Testing current shard key for sharded collections: ${tojson({dbName})}`);
@@ -540,7 +479,7 @@ function testAnalyzeCurrentShardKeys(st, mongodConns) {
         // case.
         testCase.comment = UUID();
 
-        const collName = "testColl-" + testNum++;
+        const collName = "testCollShardedCurrent-" + testNum++;
         const ns = dbName + "." + collName;
         const currentShardKey = testCase.shardKey;
         const coll = st.s.getCollection(ns);
@@ -584,7 +523,8 @@ function testAnalyzeCurrentShardKeys(st, mongodConns) {
             nodes: 2,
             setParameter: {
                 "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-                    tojson({mode: "alwaysOn"})
+                    tojson({mode: "alwaysOn"}),
+                analyzeShardKeyNumMostCommonValues: numMostCommonValues
             }
         }
     });
@@ -600,7 +540,10 @@ function testAnalyzeCurrentShardKeys(st, mongodConns) {
 }
 
 {
-    const rst = new ReplSetTest({nodes: 2});
+    const rst = new ReplSetTest({
+        nodes: 2,
+        nodeOptions: {setParameter: {analyzeShardKeyNumMostCommonValues: numMostCommonValues}}
+    });
     rst.startSet();
     rst.initiate();
     const mongodConns = rst.nodes;

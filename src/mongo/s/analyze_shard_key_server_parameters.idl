@@ -45,6 +45,15 @@ server_parameters:
         validator:
             gt: 0
             lte: 1
+    analyzeShardKeyNumMostCommonValues:
+        description: The number of most common shard key values to return.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gNumMostCommonValues
+        default: 5
+        validator:
+            gt: 0
+            lte: 1000
     analyzeShardKeyNumRanges:
         description: The number of ranges to partition the shard key space into when calculating
                      the hotness of shard key ranges.

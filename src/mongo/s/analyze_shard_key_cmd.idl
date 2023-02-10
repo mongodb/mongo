@@ -43,23 +43,13 @@ enums:
       kUnknown: "unknown"
 
 structs:
-  PercentileMetrics:
-    description: "The percentile metrics for a set of non-negative integers."
+  ValueFrequencyMetrics:
+    description: "The value and frequency of a shard key value."
     strict: false
     fields:
-      p99:
-        type: long
-        validator: { gte: 0 }
-      p95:
-        type: long
-        validator: { gte: 0 }
-      p90:
-        type: long
-        validator: { gte: 0 }
-      p80:
-        type: long
-        validator: { gte: 0 }
-      p50:
+      value:
+        type: object_owned
+      frequency:
         type: long
         validator: { gte: 0 }
 
@@ -99,10 +89,9 @@ structs:
         description: "The number of distinct shard key values in the collection."
         validator: { gte: 0 }
         optional: true
-      frequency:
-        type: PercentileMetrics
-        description: "The percentile metrics for the number of documents for each distinct shard key
-                      value."
+      mostCommonValues:
+        type: array<ValueFrequencyMetrics>
+        description: "The value and frequency of the most common shard key values."
         optional: true
       monotonicity:
         type: MonotonicityMetrics

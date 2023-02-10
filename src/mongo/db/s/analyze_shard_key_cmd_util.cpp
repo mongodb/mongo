@@ -58,25 +58,22 @@ namespace analyze_shard_key {
 
 namespace {
 
-constexpr StringData kGroupByKeyFieldName = "key"_sd;
+constexpr StringData kIndexKeyFieldName = "key"_sd;
 constexpr StringData kNumDocsFieldName = "numDocs"_sd;
 constexpr StringData kNumBytesFieldName = "numBytes"_sd;
-constexpr StringData kCardinalityFieldName = "cardinality"_sd;
+constexpr StringData kNumDistinctValuesFieldName = "numDistinctValues"_sd;
 constexpr StringData kFrequencyFieldName = "frequency"_sd;
-constexpr StringData kIndexFieldName = "index"_sd;
 constexpr StringData kNumOrphanDocsFieldName = "numOrphanDocs"_sd;
 
-const std::vector<double> kPercentiles{0.99, 0.95, 0.9, 0.8, 0.5};
-
 /**
- * Returns an aggregate command request for calculating the cardinality and frequency of the given
- * shard key.
+ * Returns an aggregate command request for calculating the cardinality and frequency metrics for
+ * the given shard key.
  */
 AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(
     const NamespaceString& nss, const BSONObj& shardKey, const BSONObj& hintIndexKey) {
     std::vector<BSONObj> pipeline;
 
-    pipeline.push_back(BSON("$project" << BSON("_id" << 0 << kGroupByKeyFieldName
+    pipeline.push_back(BSON("$project" << BSON("_id" << 0 << kIndexKeyFieldName
                                                      << BSON("$meta"
                                                              << "indexKey"))));
 
@@ -84,36 +81,22 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(
     int fieldNum = 0;
     for (const auto& element : shardKey) {
         const auto fieldName = element.fieldNameStringData();
-        groupByBuilder.append(kGroupByKeyFieldName + std::to_string(fieldNum),
+        groupByBuilder.append(kIndexKeyFieldName + std::to_string(fieldNum),
                               BSON("$getField" << BSON("field" << fieldName << "input"
-                                                               << ("$" + kGroupByKeyFieldName))));
+                                                               << ("$" + kIndexKeyFieldName))));
         fieldNum++;
     }
     pipeline.push_back(BSON("$group" << BSON("_id" << groupByBuilder.obj() << kFrequencyFieldName
                                                    << BSON("$sum" << 1))));
 
-    pipeline.push_back(BSON("$project" << BSON("_id" << 0)));
-    pipeline.push_back(BSON(
-        "$setWindowFields" << BSON(
-            "sortBy" << BSON(kFrequencyFieldName << 1) << "output"
-                     << BSON(kNumDocsFieldName
-                             << BSON("$sum" << ("$" + kFrequencyFieldName)) << kCardinalityFieldName
-                             << BSON("$sum" << 1) << kIndexFieldName
-                             << BSON("$sum" << 1 << "window"
-                                            << BSON("documents" << BSON_ARRAY("unbounded"
-                                                                              << "current")))))));
+    pipeline.push_back(BSON("$setWindowFields"
+                            << BSON("sortBy"
+                                    << BSON(kFrequencyFieldName << -1) << "output"
+                                    << BSON(kNumDocsFieldName
+                                            << BSON("$sum" << ("$" + kFrequencyFieldName))
+                                            << kNumDistinctValuesFieldName << BSON("$sum" << 1)))));
 
-    BSONObjBuilder orBuilder;
-    BSONArrayBuilder arrayBuilder(orBuilder.subarrayStart("$or"));
-    for (const auto& percentile : kPercentiles) {
-        arrayBuilder.append(
-            BSON("$eq" << BSON_ARRAY(
-                     ("$" + kIndexFieldName)
-                     << BSON("$ceil" << BSON("$multiply" << BSON_ARRAY(
-                                                 percentile << ("$" + kCardinalityFieldName)))))));
-    }
-    arrayBuilder.done();
-    pipeline.push_back(BSON("$match" << BSON("$expr" << orBuilder.done())));
+    pipeline.push_back(BSON("$limit" << gNumMostCommonValues.load()));
 
     AggregateCommandRequest aggRequest(nss, pipeline);
     aggRequest.setHint(hintIndexKey);
@@ -176,24 +159,32 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
 
 struct CardinalityFrequencyMetrics {
     int64_t numDocs = 0;
-    int64_t cardinality = 0;
-    PercentileMetrics frequency;
+    int64_t numDistinctValues = 0;
+    std::vector<ValueFrequencyMetrics> mostCommonValues;
 };
 
 /**
  * Returns the cardinality and frequency metrics for a shard key given that the shard key is unique
  * and the collection has the the given number of documents.
  */
-CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(int64_t numDocs) {
+CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(OperationContext* opCtx,
+                                                                   const NamespaceString& nss,
+                                                                   const BSONObj& shardKey,
+                                                                   int64_t numDocs) {
     CardinalityFrequencyMetrics metrics;
 
     metrics.numDocs = numDocs;
-    metrics.cardinality = numDocs;
-    metrics.frequency.setP99(1);
-    metrics.frequency.setP95(1);
-    metrics.frequency.setP90(1);
-    metrics.frequency.setP80(1);
-    metrics.frequency.setP50(1);
+    metrics.numDistinctValues = numDocs;
+
+    std::vector<BSONObj> pipeline;
+    pipeline.push_back(BSON("$match" << BSONObj()));
+    pipeline.push_back(BSON("$limit" << gNumMostCommonValues.load()));
+    AggregateCommandRequest aggRequest(nss, pipeline);
+
+    runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
+        auto value = dotted_path_support::extractElementsBasedOnTemplate(doc.getOwned(), shardKey);
+        metrics.mostCommonValues.emplace_back(std::move(value), 1);
+    });
 
     return metrics;
 }
@@ -212,41 +203,26 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
     auto aggRequest = makeAggregateRequestForCardinalityAndFrequency(nss, shardKey, hintIndexKey);
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         auto numDocs = doc.getField(kNumDocsFieldName).exactNumberLong();
-        auto cardinality = doc.getField(kCardinalityFieldName).exactNumberLong();
-        auto frequency = doc.getField(kFrequencyFieldName).exactNumberLong();
-        auto index = doc.getField(kIndexFieldName).exactNumberLong();
-
         invariant(numDocs > 0);
-        invariant(cardinality > 0);
-        invariant(frequency > 0);
-
         if (metrics.numDocs == 0) {
             metrics.numDocs = numDocs;
         } else {
             invariant(metrics.numDocs == numDocs);
         }
 
-        if (metrics.cardinality == 0) {
-            metrics.cardinality = cardinality;
+        auto numDistinctValues = doc.getField(kNumDistinctValuesFieldName).exactNumberLong();
+        invariant(numDistinctValues > 0);
+        if (metrics.numDistinctValues == 0) {
+            metrics.numDistinctValues = numDistinctValues;
         } else {
-            invariant(metrics.cardinality == cardinality);
+            invariant(metrics.numDistinctValues == numDistinctValues);
         }
 
-        if (index == std::ceil(0.99 * cardinality)) {
-            metrics.frequency.setP99(frequency);
-        }
-        if (index == std::ceil(0.95 * cardinality)) {
-            metrics.frequency.setP95(frequency);
-        }
-        if (index == std::ceil(0.9 * cardinality)) {
-            metrics.frequency.setP90(frequency);
-        }
-        if (index == std::ceil(0.8 * cardinality)) {
-            metrics.frequency.setP80(frequency);
-        }
-        if (index == std::ceil(0.5 * cardinality)) {
-            metrics.frequency.setP50(frequency);
-        }
+        auto value = dotted_path_support::extractElementsBasedOnTemplate(
+            doc.getObjectField("_id").replaceFieldNames(shardKey), shardKey);
+        auto frequency = doc.getField(kFrequencyFieldName).exactNumberLong();
+        invariant(frequency > 0);
+        metrics.mostCommonValues.emplace_back(std::move(value), frequency);
     });
 
     uassert(ErrorCodes::InvalidOptions,
@@ -519,11 +495,11 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
     metrics.setNumOrphanDocs(collStatsMetrics.numOrphanDocs);
 
     auto cardinalityFrequencyMetrics = *metrics.getIsUnique()
-        ? calculateCardinalityAndFrequencyUnique(collStatsMetrics.numDocs)
+        ? calculateCardinalityAndFrequencyUnique(opCtx, nss, shardKeyBson, collStatsMetrics.numDocs)
         : calculateCardinalityAndFrequencyGeneric(opCtx, nss, shardKeyBson, indexKeyBson);
     metrics.setNumDocs(cardinalityFrequencyMetrics.numDocs);
-    metrics.setNumDistinctValues(cardinalityFrequencyMetrics.cardinality);
-    metrics.setFrequency(cardinalityFrequencyMetrics.frequency);
+    metrics.setNumDistinctValues(cardinalityFrequencyMetrics.numDistinctValues);
+    metrics.setMostCommonValues(cardinalityFrequencyMetrics.mostCommonValues);
 
     return metrics;
 }

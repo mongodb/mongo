@@ -53,7 +53,7 @@ const std::string kOrphanDocsWarningMessage = "If \"" +
     KeyCharacteristicsMetrics::kNumDocsFieldName +
     "\", you may want to rerun the command at some other time to get more accurate \"" +
     KeyCharacteristicsMetrics::kNumDistinctValuesFieldName + "\" and \"" +
-    KeyCharacteristicsMetrics::kFrequencyFieldName + "\" metrics.";
+    KeyCharacteristicsMetrics::kMostCommonValuesFieldName + "\" metrics.";
 
 void validateCommandOptions(OperationContext* opCtx,
                             const NamespaceString& nss,

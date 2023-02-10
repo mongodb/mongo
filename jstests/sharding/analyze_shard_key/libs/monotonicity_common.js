@@ -273,8 +273,8 @@ function testMonotonicity(conn, dbName, collName, currentShardKey, testCases, nu
 }
 
 function testAnalyzeShardKeysUnshardedCollection(conn, testCases, numDocsRange) {
-    const dbName = "testDbCandidateUnsharded";
-    const collName = "testColl";
+    const dbName = "testDb";
+    const collName = "testCollUnsharded";
     const db = conn.getDB(dbName);
 
     jsTest.log(`Testing analyzing a shard key for an unsharded collection: ${
@@ -285,8 +285,8 @@ function testAnalyzeShardKeysUnshardedCollection(conn, testCases, numDocsRange) 
 }
 
 function testAnalyzeShardKeysShardedCollection(st, testCases, numDocsRange) {
-    const dbName = "testDbCandidateSharded";
-    const collName = "testColl";
+    const dbName = "testDb";
+    const collName = "testCollSharded";
     const ns = dbName + "." + collName;
     const currentShardKey = {skey: 1};
     const currentShardKeySplitPoint = {skey: 0};
