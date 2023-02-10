@@ -770,7 +770,6 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
     return false;
 }
 
-// Checks if 'expr' has any children which do not have renaming implemented.
 bool hasOnlyRenameableMatchExpressionChildren(const MatchExpression& expr) {
     if (expr.matchType() == MatchExpression::MatchType::EXPRESSION) {
         return true;
