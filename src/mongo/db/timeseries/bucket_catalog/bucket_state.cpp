@@ -43,15 +43,38 @@ BucketState& BucketState::unsetFlag(BucketStateFlag flag) {
     return *this;
 }
 
+BucketState& BucketState::addDirectWrite() {
+    // Track the number of DirectWrites on the Bucket so we can properly unset the flag later on.
+    _numberOfDirectWrites++;
+    return setFlag(BucketStateFlag::kPendingDirectWrite);
+}
+
+BucketState& BucketState::removeDirectWrite() {
+    invariant(isSet(BucketStateFlag::kPendingDirectWrite));
+
+    // We only unset the 'kPendingDirectWrite' flag when the number of direct writers reaches 0.
+    _numberOfDirectWrites--;
+    if (_numberOfDirectWrites > 0) {
+        return *this;
+    }
+
+    // The last pending direct write must set the 'kCleared' flag.
+    return unsetFlag(BucketStateFlag::kPendingDirectWrite).setFlag(BucketStateFlag::kCleared);
+}
+
 BucketState& BucketState::reset() {
     _state = 0;
+    _numberOfDirectWrites = 0;
     return *this;
+}
+
+int32_t BucketState::getNumberOfDirectWrites() const {
+    return _numberOfDirectWrites;
 }
 
 bool BucketState::isSet(BucketStateFlag flag) const {
     return _state & static_cast<decltype(_state)>(flag);
 }
-
 
 bool BucketState::isPrepared() const {
     constexpr decltype(_state) mask = static_cast<decltype(_state)>(BucketStateFlag::kPrepared);
@@ -103,7 +126,7 @@ std::string BucketState::toString() const {
     }
 
     if (isSet(BucketStateFlag::kPendingDirectWrite)) {
-        output("pendingDirectWrite");
+        output("pendingDirectWrite(count=" + std::to_string(_numberOfDirectWrites) + ")");
     }
 
     if (isSet(BucketStateFlag::kUntracked)) {

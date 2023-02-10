@@ -449,16 +449,14 @@ void BucketCatalog::directWriteStart(const NamespaceString& ns, const OID& oid) 
         BucketId{ns, oid},
         [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
             if (input.has_value()) {
-                return input.value().setFlag(BucketStateFlag::kPendingDirectWrite);
+                return input.value().addDirectWrite();
             }
             // The underlying bucket isn't tracked by the catalog, but we need to insert a state
             // here so that we can conflict reopening this bucket until we've completed our write
             // and the reader has refetched.
-            return BucketState{}
-                .setFlag(BucketStateFlag::kPendingDirectWrite)
-                .setFlag(BucketStateFlag::kUntracked);
+            return BucketState{}.setFlag(BucketStateFlag::kUntracked).addDirectWrite();
         });
-    if (result && result.value().isPrepared()) {
+    if (result.has_value() && result.value().isPrepared()) {
         hangTimeseriesDirectModificationBeforeWriteConflict.pauseWhileSet();
         throwWriteConflictException("Prepared bucket can no longer be inserted into.");
     }
@@ -483,9 +481,7 @@ void BucketCatalog::directWriteFinish(const NamespaceString& ns, const OID& oid)
                 // state.
                 return boost::none;
             }
-            return input.value()
-                .unsetFlag(BucketStateFlag::kPendingDirectWrite)
-                .setFlag(BucketStateFlag::kCleared);
+            return input.value().removeDirectWrite();
         });
 }
 

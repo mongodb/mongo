@@ -614,5 +614,42 @@ TEST_F(BucketStateRegistryTest, DirectWriteFinishRemovesBucketState) {
     ASSERT_FALSE(state.has_value());
 }
 
+TEST_F(BucketStateRegistryTest, TestDirectWriteStartCounter) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+    auto bucket = createBucket(info1);
+    auto bucketId = bucket->bucketId;
+
+    // Under the hood, the BucketState will contain a counter on the number of ongoing DirectWrites.
+    int32_t dwCounter = 0;
+
+    // If no direct write has been initiated, the direct write counter should be 0.
+    auto state = getBucketState(_bucketStateRegistry, bucketId);
+    ASSERT_TRUE(state.has_value());
+    ASSERT_EQ(dwCounter, state.value().getNumberOfDirectWrites());
+
+    // Start a direct write and ensure the counter is incremented correctly.
+    while (dwCounter < 4) {
+        directWriteStart(ns1, bucketId.oid);
+        dwCounter++;
+        state = getBucketState(_bucketStateRegistry, bucketId);
+        ASSERT_TRUE(state.value().isSet(BucketStateFlag::kPendingDirectWrite));
+        ASSERT_EQ(dwCounter, state.value().getNumberOfDirectWrites());
+    }
+
+    while (dwCounter > 1) {
+        directWriteFinish(ns1, bucketId.oid);
+        dwCounter--;
+        state = getBucketState(_bucketStateRegistry, bucketId);
+        ASSERT_TRUE(state.value().isSet(BucketStateFlag::kPendingDirectWrite));
+        ASSERT_EQ(dwCounter, state.value().getNumberOfDirectWrites());
+    }
+
+    // When the number of direct writes reaches 0, we should clear the bucket.
+    directWriteFinish(ns1, bucketId.oid);
+    state = getBucketState(_bucketStateRegistry, bucketId);
+    ASSERT_TRUE(hasBeenCleared(bucket));
+}
+
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog
