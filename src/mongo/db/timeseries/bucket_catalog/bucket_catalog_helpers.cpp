@@ -330,8 +330,8 @@ void handleDirectWrite(OperationContext* opCtx, const NamespaceString& ns, const
     auto& bucketCatalog = BucketCatalog::get(opCtx);
     bucketCatalog.directWriteStart(resolvedNs, bucketId);
 
-    // Then register callbacks so we can let the BucketCatalog know that we are done with our
-    // direct write after the actual write takes place (or is abandoned), and allow reopening.
+    // Then register callbacks so we can let the BucketCatalog know that we are done with our direct
+    // write after the actual write takes place (or is abandoned), and allow reopening.
     opCtx->recoveryUnit()->onCommit(
         [svcCtx = opCtx->getServiceContext(), resolvedNs, bucketId](boost::optional<Timestamp>) {
             auto& bucketCatalog = BucketCatalog::get(svcCtx);

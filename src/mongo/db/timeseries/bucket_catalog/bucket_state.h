@@ -55,7 +55,11 @@ class BucketState {
 public:
     BucketState& setFlag(BucketStateFlag);
     BucketState& unsetFlag(BucketStateFlag);
+    BucketState& addDirectWrite();
+    BucketState& removeDirectWrite();
     BucketState& reset();
+
+    int32_t getNumberOfDirectWrites() const;
 
     bool isSet(BucketStateFlag) const;
     bool isPrepared() const;
@@ -67,6 +71,7 @@ public:
 
 private:
     std::underlying_type<BucketStateFlag>::type _state = 0;
+    int32_t _numberOfDirectWrites = 0;
 };
 
 }  // namespace mongo::timeseries::bucket_catalog
