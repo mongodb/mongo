@@ -280,9 +280,21 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
     // many as possible within memory limits.
     using ExtraIt = SimpleBSONObjSet::const_iterator;
     std::vector<ExtraIt> extraIndexEntriesBySize;
+    // Since the extra entries are stored in a map of sets, we have to iterate the entries in the
+    // map and sum the size of the sets in order to get the total number. Given that we can have at
+    // most 64 indexes per collection, and the total number of entries could potentially be in the
+    // millions, we expect that iterating the map will be much less costly than the additional
+    // allocations and copies that could result from not calling 'reserve' on the vector.
+    size_t totalExtraIndexEntriesCount =
+        std::accumulate(_extraIndexEntries.begin(),
+                        _extraIndexEntries.end(),
+                        0,
+                        [](size_t total, const std::pair<IndexKey, SimpleBSONObjSet>& set) {
+                            return total + set.second.size();
+                        });
+    extraIndexEntriesBySize.reserve(totalExtraIndexEntriesCount);
     for (const auto& extraIndexEntry : _extraIndexEntries) {
         const SimpleBSONObjSet& entries = extraIndexEntry.second;
-        extraIndexEntriesBySize.reserve(extraIndexEntriesBySize.size() + entries.size());
         for (auto it = entries.begin(); it != entries.end(); ++it) {
             extraIndexEntriesBySize.push_back(it);
         }
