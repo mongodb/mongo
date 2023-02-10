@@ -30,6 +30,8 @@ last-continuous:
     ticket: SERVER-53335
   - test_file: jstests/replsets/replSetGetStatus_member_wall_times.js
     ticket: SERVER-54909
+  - test_file: jstests/sharding/migration_server_status.js
+    ticket: SERVER-56186
   - test_file: jstests/sharding/cwwc_conflict_add_shard.js
     ticket: SERVER-56800
   - test_file: jstests/sharding/reconfig_fails_no_cwwc_set_sharding.js
@@ -254,12 +256,16 @@ last-continuous:
     ticket: SERVER-67723
   - test_file: jstests/sharding/collection_uuid_shard_capped_collection.js
     ticket: SERVER-67885
+  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
+    ticket: SERVER-68361
   - test_file: jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
     ticket: SERVER-68556
   - test_file: jstests/core/txns/no_writes_to_system_collections_in_txn.js
     ticket: SERVER-68556
   - test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
     ticket: SERVER-68628
+  - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
+    ticket: SERVER-68648
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-68728
   - test_file: jstests/sharding/resharding_critical_section_metrics.js
@@ -272,26 +278,22 @@ last-continuous:
     ticket: SERVER-69861
   - test_file: jstests/aggregation/expressions/switch_errors.js
     ticket: SERVER-70190
-  - test_file: jstests/core/cover_null_queries.js
-    ticket: SERVER-70436
-  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-68361
-  - test_file: jstests/sharding/migration_server_status.js
-    ticket: SERVER-56186
-  - test_file: jstests/replsets/apply_ops_strips_hash.js
-    ticket: SERVER-70841
   - test_file: jstests/replsets/wtimeout_too_large.js
     ticket: SERVER-70360
-  - test_file: jstests/sharding/all_collection_stats.js
-    ticket: SERVER-71477
+  - test_file: jstests/core/cover_null_queries.js
+    ticket: SERVER-70436
   - test_file: jstests/sharding/timeseries_sharding_admin_commands.js
     ticket: SERVER-70790
+  - test_file: jstests/replsets/apply_ops_strips_hash.js
+    ticket: SERVER-70841
+  - test_file: jstests/sharding/all_collection_stats.js
+    ticket: SERVER-71477
+  - test_file: jstests/sharding/hidden_index.js
+    ticket: SERVER-71638
   - test_file: jstests/sharding/invalid_system_views_sharded_collection.js
     ticket: SERVER-71667
   - test_file: jstests/sharding/drop_collection.js
     ticket: SERVER-71689
-  - test_file: jstests/sharding/hidden_index.js
-    ticket: SERVER-71638
   - test_file: jstests/core/query/project/project_with_collation.js
     ticket: SERVER-72416
   - test_file: jstests/core/collation.js
@@ -300,8 +302,6 @@ last-continuous:
     ticket: SERVER-72416
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/oplog_rollover.js
     ticket: SERVER-72422
-  - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
-    ticket: SERVER-68648
   - test_file: jstests/sharding/timeseries_cluster_indexstats.js
     ticket: SERVER-72620
   - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_extended_range.js
@@ -409,6 +409,8 @@ last-lts:
     ticket: SERVER-55305
   - test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_from_vectored_inserts.js
     ticket: SERVER-55305
+  - test_file: jstests/sharding/migration_server_status.js
+    ticket: SERVER-56186
   - test_file: jstests/sharding/time_zone_info_mongos.js
     ticket: SERVER-56371
   - test_file: jstests/concurrency/fsm_workloads/findAndModify_flip_location.js
@@ -641,12 +643,16 @@ last-lts:
     ticket: SERVER-67723
   - test_file: jstests/sharding/collection_uuid_shard_capped_collection.js
     ticket: SERVER-67885
+  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
+    ticket: SERVER-68361
   - test_file: jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
     ticket: SERVER-68556
   - test_file: jstests/core/txns/no_writes_to_system_collections_in_txn.js
     ticket: SERVER-68556
   - test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
     ticket: SERVER-68628
+  - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
+    ticket: SERVER-68648
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-68728
   - test_file: jstests/replsets/tenant_migration_recipient_forget_migration.js
@@ -657,26 +663,22 @@ last-lts:
     ticket: SERVER-69861
   - test_file: jstests/aggregation/expressions/switch_errors.js
     ticket: SERVER-70190
-  - test_file: jstests/core/cover_null_queries.js
-    ticket: SERVER-70436
-  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-68361
-  - test_file: jstests/sharding/migration_server_status.js
-    ticket: SERVER-56186
-  - test_file: jstests/replsets/apply_ops_strips_hash.js
-    ticket: SERVER-70841
   - test_file: jstests/replsets/wtimeout_too_large.js
     ticket: SERVER-70360
-  - test_file: jstests/sharding/all_collection_stats.js
-    ticket: SERVER-71477
+  - test_file: jstests/core/cover_null_queries.js
+    ticket: SERVER-70436
   - test_file: jstests/sharding/timeseries_sharding_admin_commands.js
     ticket: SERVER-70790
+  - test_file: jstests/replsets/apply_ops_strips_hash.js
+    ticket: SERVER-70841
+  - test_file: jstests/sharding/all_collection_stats.js
+    ticket: SERVER-71477
+  - test_file: jstests/sharding/hidden_index.js
+    ticket: SERVER-71638
   - test_file: jstests/sharding/invalid_system_views_sharded_collection.js
     ticket: SERVER-71667
   - test_file: jstests/sharding/drop_collection.js
     ticket: SERVER-71689
-  - test_file: jstests/sharding/hidden_index.js
-    ticket: SERVER-71638
   - test_file: jstests/core/query/project/project_with_collation.js
     ticket: SERVER-72416
   - test_file: jstests/core/collation.js
@@ -685,8 +687,6 @@ last-lts:
     ticket: SERVER-72416
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/oplog_rollover.js
     ticket: SERVER-72422
-  - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
-    ticket: SERVER-68648
   - test_file: jstests/sharding/timeseries_cluster_indexstats.js
     ticket: SERVER-72620
   - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_extended_range.js
