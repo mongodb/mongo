@@ -62,18 +62,6 @@ function runTest(numDocs) {
         failPoint.off();
     }
 
-    // Initial sync fails due to unhandled IndexOptionsConflict error on empty collection.
-    if (numDocs == 0) {
-        assert.soon(function() {
-            return rawMongoProgramOutput().search(
-                       /Fatal assertion.*40088.*IndexOptionsConflict.*name.*a_2d/) >= 0;
-        });
-
-        rst.stop(secondary, /*signal=*/undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
-        rst.stopSet();
-        return;
-    }
-
     // Wait for initial sync to finish.
     rst.awaitSecondaryNodes();
 
