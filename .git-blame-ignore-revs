@@ -1,0 +1,14 @@
+# SERVER-72197 Clang format v12.0.1
+f63255ee677ecae5896d6f35dd712ed60ae8c39a
+
+# SERVER-41772 Clang format v7.0.1
+134a4083953270e8a11430395357fb70a29047ad
+
+# SERVER-23971 Clang-Format code
+6dcdd23dd37ef12c87e71cf59ef01cd82432efe0
+
+# SERVER-22470 Format JS code with approved style
+f5a6c794a0af1a5d57db2617c2e9464eaad9f221
+
+# SERVER-18579: Clang-Format - reformat code
+9c2ed42daa8fbbef4a919c21ec564e2db55e8d60
