@@ -30,7 +30,8 @@ assert.eq(res.oplogTruncation.processingMethod, "scanning");
 
 // Insert enough documents to force oplog sampling to occur on the following start up.
 const maxOplogDocsForScanning = 2000;
-for (let i = 0; i < maxOplogDocsForScanning + 1; i++) {
+const numDocsOverScanningThreshold = 1000;
+for (let i = 0; i < maxOplogDocsForScanning + numDocsOverScanningThreshold; i++) {
     assert.commandWorked(coll.insert({m: 1 + i}));
 }
 
