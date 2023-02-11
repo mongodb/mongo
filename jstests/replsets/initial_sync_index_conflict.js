@@ -27,8 +27,6 @@ const secondary = rst.add({
     rsConfig: {votes: 0, priority: 0},
     setParameter: {numInitialSyncAttempts: 1},
 });
-secondary.setSecondaryOk();
-const secondaryColl = secondary.getDB(dbName).getCollection(collectionName);
 
 // While the secondary is hung, we create the same index multiple times to
 // reproduce the interaction between single and two phase index builds on the
