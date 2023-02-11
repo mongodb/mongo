@@ -289,15 +289,20 @@ void createIndexForApplyOps(OperationContext* opCtx,
         try {
             indexBuildsCoordinator->createIndexesOnEmptyCollection(
                 opCtx, coll, {indexSpec}, fromMigrate);
-        } catch (const ExceptionFor<ErrorCodes::IndexAlreadyExists>& e) {
-            // Ignore the "IndexAlreadyExists" error during oplog application.
-            LOGV2_DEBUG(7261800,
-                        1,
-                        "Ignoring indexing error",
-                        "error"_attr = redact(e.toStatus()),
-                        logAttrs(indexCollection->ns()),
-                        logAttrs(indexCollection->uuid()),
-                        "spec"_attr = indexSpec);
+        } catch (DBException& ex) {
+            // Some indexing errors can be ignored during oplog application.
+            const auto& status = ex.toStatus();
+            if (IndexBuildsCoordinator::isCreateIndexesErrorSafeToIgnore(status, constraints)) {
+                LOGV2_DEBUG(7261800,
+                            1,
+                            "Ignoring indexing error",
+                            "error"_attr = redact(status),
+                            logAttrs(indexCollection->ns()),
+                            logAttrs(indexCollection->uuid()),
+                            "spec"_attr = indexSpec);
+                return;
+            }
+            throw;
         }
         wuow.commit();
     } else {
