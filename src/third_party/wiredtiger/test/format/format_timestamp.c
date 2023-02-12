@@ -38,6 +38,9 @@ timestamp_maximum_committed(void)
     TINFO **tlp;
     uint64_t commit_ts, ts;
 
+    if (GV(RUNS_PREDICTABLE_REPLAY))
+        return replay_maximum_committed();
+
     /* A barrier additionally prevents using cache values here. */
     WT_ORDERED_READ(ts, g.timestamp);
     if (tinfo_list != NULL)
@@ -96,7 +99,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
     static const char *oldest_timestamp_str = "oldest_timestamp=";
     static const char *stable_timestamp_str = "stable_timestamp=";
     WT_CONNECTION *conn;
-    uint64_t oldest_timestamp, stable_timestamp;
+    uint64_t oldest_timestamp, stable_timestamp, stop_timestamp;
     char buf[WT_TS_HEX_STRING_SIZE * 2 + 64];
 
     conn = g.wts_conn;
@@ -106,7 +109,24 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
     if (oldest_timestamp == 0)
         return;
 
-    if (!final) {
+    if (GV(RUNS_PREDICTABLE_REPLAY)) {
+        /*
+         * For predictable replay, we need the oldest timestamp to lag when the process exits. That
+         * allows two runs that finish with stable timestamps in the same ballpark to be compared.
+         */
+        if (stable_timestamp > 10 * WT_THOUSAND)
+            oldest_timestamp = stable_timestamp - 10 * WT_THOUSAND;
+        else
+            oldest_timestamp = stable_timestamp / 2;
+
+        /*
+         * For predictable replay, our end state is to have the stable timestamp represent a precise
+         * number of operations.
+         */
+        WT_ORDERED_READ(stop_timestamp, g.stop_timestamp);
+        if (stable_timestamp > stop_timestamp && stop_timestamp != 0)
+            stable_timestamp = stop_timestamp;
+    } else if (!final) {
         /*
          * If lag is permitted, update the oldest timestamp halfway to the largest timestamp that's
          * no longer in use, otherwise update the oldest timestamp to that timestamp. Update stable
@@ -152,11 +172,22 @@ timestamp(void *arg)
     memset(&sap, 0, sizeof(sap));
     wt_wrap_open_session(conn, &sap, NULL, &session);
 
-    /* Update the oldest and stable timestamps at least once every 15 seconds. */
+    /*
+     * Update the oldest and stable timestamps at least once every 15 seconds. For predictable
+     * replay, update at a much faster pace. We can't afford to get behind because that means more
+     * rollback errors, and we don't have the luxury of giving up on an operation that has rolled
+     * back.
+     */
     while (!g.workers_finished) {
-        random_sleep(&g.rnd, 15);
-
-        timestamp_once(session, true, false);
+        if (!GV(RUNS_PREDICTABLE_REPLAY))
+            random_sleep(&g.extra_rnd, 15);
+        else {
+            if ((rng(&g.extra_rnd) & 0x1) == 1)
+                __wt_yield();
+            else
+                __wt_sleep(0, 10 * WT_THOUSAND);
+        }
+        timestamp_once(session, !GV(RUNS_PREDICTABLE_REPLAY), false);
     }
 
     wt_wrap_close_session(session);

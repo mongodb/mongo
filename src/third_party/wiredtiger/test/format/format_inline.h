@@ -112,10 +112,7 @@ read_op(WT_CURSOR *cursor, read_operation op, int *exactp)
 static inline uint32_t
 rng(WT_RAND_STATE *rnd)
 {
-    /* Threaded operations have their own RNG information, otherwise we use the default. */
-    if (rnd == NULL)
-        rnd = &g.rnd;
-
+    testutil_assert(rnd != NULL);
     return (__wt_random(rnd));
 }
 
@@ -228,12 +225,25 @@ table_sumv(u_int off)
  *     Randomly select a table.
  */
 static inline TABLE *
-table_select(TINFO *tinfo)
+table_select(TINFO *tinfo, bool modifies_data)
 {
+    WT_RAND_STATE *rnd;
+
     if (ntables == 0)
         return (tables[0]);
 
-    return (tables[mmrand(tinfo == NULL ? NULL : &tinfo->rnd, 1, ntables)]);
+    if (tinfo == NULL) {
+        if (modifies_data)
+            rnd = &g.data_rnd;
+        else
+            rnd = &g.extra_rnd;
+    } else {
+        if (modifies_data)
+            rnd = &tinfo->data_rnd;
+        else
+            rnd = &tinfo->extra_rnd;
+    }
+    return (tables[mmrand(rnd, 1, ntables)]);
 }
 
 /*
@@ -241,14 +251,20 @@ table_select(TINFO *tinfo)
  *     Randomly select a table of a specific type.
  */
 static inline TABLE *
-table_select_type(table_type type)
+table_select_type(table_type type, bool modifies_data)
 {
+    WT_RAND_STATE *rnd;
     u_int i;
 
     if (ntables == 0)
         return (tables[0]->type == type ? tables[0] : NULL);
 
-    for (i = mmrand(NULL, 1, ntables);; ++i) {
+    if (modifies_data)
+        rnd = &g.data_rnd;
+    else
+        rnd = &g.extra_rnd;
+
+    for (i = mmrand(rnd, 1, ntables);; ++i) {
         if (i > ntables)
             i = 1;
         if (tables[i]->type == type)

@@ -539,7 +539,7 @@ backup(void *arg)
      * larger intervals, optionally do incremental backups between full backups.
      */
     this_id = 0;
-    for (period = mmrand(NULL, 1, 10);; period = mmrand(NULL, 20, 45)) {
+    for (period = mmrand(&g.extra_rnd, 1, 10);; period = mmrand(&g.extra_rnd, 20, 45)) {
         /* Sleep for short periods so we don't make the run wait. */
         while (period > 0 && !g.workers_finished) {
             --period;
@@ -584,7 +584,7 @@ backup(void *arg)
                   src_id, g.backup_id));
                 /* Restart a full incremental every once in a while. */
                 full = false;
-                incr_full = mmrand(NULL, 1, 8) == 1;
+                incr_full = mmrand(&g.extra_rnd, 1, 8) == 1;
             }
             this_id = g.backup_id++;
             config = cfg;
@@ -600,7 +600,7 @@ backup(void *arg)
                 config = cfg;
                 full = false;
                 /* Restart a full incremental every once in a while. */
-                incr_full = mmrand(NULL, 1, 8) == 1;
+                incr_full = mmrand(&g.extra_rnd, 1, 8) == 1;
             }
         } else {
             config = NULL;
@@ -679,9 +679,9 @@ backup(void *arg)
         if (full) {
             incremental = 1;
             if (g.backup_incr_flag == INCREMENTAL_LOG)
-                incremental = GV(LOGGING_REMOVE) ? 1 : mmrand(NULL, 1, 8);
+                incremental = GV(LOGGING_REMOVE) ? 1 : mmrand(&g.extra_rnd, 1, 8);
             else if (g.backup_incr_flag == INCREMENTAL_BLOCK)
-                incremental = mmrand(NULL, 1, 8);
+                incremental = mmrand(&g.extra_rnd, 1, 8);
         }
         if (--incremental == 0) {
             check_copy();

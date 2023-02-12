@@ -103,7 +103,7 @@ import(void *arg)
         copy_file_into_directory(import_session, "import.wt");
 
         /* Perform import with either repair or file metadata. */
-        import_value = mmrand(NULL, 0, 1);
+        import_value = mmrand(&g.extra_rnd, 0, 1);
         if (import_value == 0)
             testutil_check(__wt_snprintf(buf, sizeof(buf), "import=(enabled,repair=true)"));
         else
@@ -116,7 +116,7 @@ import(void *arg)
         /* Drop import table, so we can import the table again */
         testutil_drop(session, IMPORT_URI, NULL);
 
-        period = mmrand(NULL, 1, 10);
+        period = mmrand(&g.extra_rnd, 1, 10);
         while (period > 0 && !g.workers_finished) {
             --period;
             __wt_sleep(1, 0);

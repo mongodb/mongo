@@ -53,6 +53,63 @@ static void config_off_all(const char *);
 static void config_pct(TABLE *);
 static void config_statistics(void);
 static void config_transaction(void);
+static bool config_var(TABLE *);
+
+/*
+ * config_random_generator --
+ *     For a given seed/RNG combination, generate a seed if not given, and initialize the RNG.
+ */
+static void
+config_random_generator(
+  const char *config_name, uint64_t seed, uint32_t rand_count, WT_RAND_STATE *rnd)
+{
+    char buf[128];
+    bool seed_set;
+
+    /* See if the seed is already present in the configuration. */
+    seed_set = (seed != 0);
+
+    /* Initialize the RNG, and potentially the seed. */
+    testutil_random_init(rnd, &seed, rand_count);
+
+    /* If we generated a seed just now, put it into the configuration file. */
+    if (!seed_set) {
+        testutil_assert(seed != 0);
+        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s=%" PRIu64, config_name, seed));
+        config_single(NULL, buf, true);
+    }
+
+    /* Make sure the generator is ready. */
+    testutil_assert(rnd->v != 0);
+}
+
+/*
+ * config_random_generators --
+ *     Initialize our global random generators using provided seeds.
+ */
+static void
+config_random_generators(void)
+{
+    config_random_generator("random.data_seed", GV(RANDOM_DATA_SEED), 0, &g.data_rnd);
+    config_random_generator("random.extra_seed", GV(RANDOM_EXTRA_SEED), 1, &g.extra_rnd);
+}
+
+/*
+ * config_random_generators_before_run --
+ *     One use case for predictable replay is to run test/format once with little or no
+ *     configuration values set. test/format rolls the dice and picks the configuration, recording
+ *     it along with the random seeds. If we want to rerun it predictably, we can use the same
+ *     seeds. However, the second run will not need to roll the dice during configuration, so the
+ *     state of the RNG after configuration would be different than after configuration during the
+ *     first run. To make everything line up, we re-seed the generator after the configuration, and
+ *     before execution begins.
+ */
+static void
+config_random_generators_before_run(void)
+{
+    testutil_random_from_seed(&g.data_rnd, GV(RANDOM_DATA_SEED));
+    testutil_random_from_seed(&g.extra_rnd, GV(RANDOM_EXTRA_SEED));
+}
 
 /*
  * config_random --
@@ -85,7 +142,7 @@ config_random(TABLE *table, bool table_only)
             continue;
 
         /* Configure key prefixes only rarely, 5% if the length isn't set explicitly. */
-        if (cp->off == V_TABLE_BTREE_PREFIX_LEN && mmrand(NULL, 1, 100) > 5)
+        if (cp->off == V_TABLE_BTREE_PREFIX_LEN && mmrand(&g.extra_rnd, 1, 100) > 5)
             continue;
 
         /*
@@ -93,11 +150,11 @@ config_random(TABLE *table, bool table_only)
          * is "on" (so "on" if random rolled <= N, otherwise "off").
          */
         if (F_ISSET(cp, C_BOOL))
-            testutil_check(__wt_snprintf(
-              buf, sizeof(buf), "%s=%s", cp->name, mmrand(NULL, 1, 100) <= cp->min ? "on" : "off"));
+            testutil_check(__wt_snprintf(buf, sizeof(buf), "%s=%s", cp->name,
+              mmrand(&g.data_rnd, 1, 100) <= cp->min ? "on" : "off"));
         else
-            testutil_check(__wt_snprintf(
-              buf, sizeof(buf), "%s=%" PRIu32, cp->name, mmrand(NULL, cp->min, cp->maxrand)));
+            testutil_check(__wt_snprintf(buf, sizeof(buf), "%s=%" PRIu32, cp->name,
+              mmrand(&g.data_rnd, cp->min, cp->maxrand)));
         config_single(table, buf, false);
     }
 }
@@ -141,12 +198,15 @@ config_table_am(TABLE *table)
         if (config_explicit(table, "runs.source") && DATASOURCE(table, "lsm"))
             config_single(table, "runs.type=row", false);
         else
-            switch (mmrand(NULL, 1, 10)) {
+            switch (mmrand(&g.data_rnd, 1, 10)) {
             case 1:
             case 2:
             case 3: /* 30% */
-                config_single(table, "runs.type=var", false);
-                break;
+                if (config_var(table)) {
+                    config_single(table, "runs.type=var", false);
+                    break;
+                }
+                /* FALLTHROUGH */
             case 4: /* 10% */
                 if (config_fix(table)) {
                     config_single(table, "runs.type=fix", false);
@@ -165,7 +225,7 @@ config_table_am(TABLE *table)
     }
 
     if (!config_explicit(table, "runs.source"))
-        switch (mmrand(NULL, 1, 5)) {
+        switch (mmrand(&g.data_rnd, 1, 5)) {
         case 1: /* 20% */
             config_single(table, "runs.source=file", false);
             break;
@@ -335,6 +395,31 @@ config_table(TABLE *table, void *arg)
     if (TV(BTREE_VALUE_MIN) > TV(BTREE_VALUE_MAX))
         testutil_die(EINVAL, "btree.value_min may not be larger than btree.value_max");
 
+    if (GV(RUNS_PREDICTABLE_REPLAY)) {
+        /*
+         * In predictable replay, force the number of rows in a table to be a manageable size so we
+         * can modify key numbers without problems.
+         */
+        TV(RUNS_ROWS) = WT_MAX(TV(RUNS_ROWS), 2 * LANE_COUNT);
+
+        /*
+         * We don't support some operations in predictable replay.
+         */
+        if (!replay_operation_enabled(MODIFY)) {
+            if (config_explicit(table, "ops.pct.modify") && TV(OPS_PCT_MODIFY))
+                WARN("turning off modify operations for table%" PRIu32
+                     " to work with predictable replay",
+                  table->id);
+            config_single(table, "ops.pct.modify=0", false);
+        }
+        if (!replay_operation_enabled(TRUNCATE)) {
+            if (config_explicit(table, "ops.truncate") && TV(OPS_TRUNCATE))
+                WARN("turning off truncate for table%" PRIu32 " to work with predictable replay",
+                  table->id);
+            config_single(table, "ops.truncate=0", false);
+        }
+    }
+
     /*
      * If common key prefixes are configured, add prefix compression if no explicit choice was made
      * and track the largest common key prefix in the run.
@@ -372,6 +457,8 @@ config_table(TABLE *table, void *arg)
 void
 config_run(void)
 {
+    config_random_generators(); /* Configure the random number generators. */
+
     config_random(tables[0], false); /* Configure the remaining global name space. */
 
     /*
@@ -433,6 +520,8 @@ config_run(void)
         else
             config_single(NULL, "runs.timer=360", false);
     }
+
+    config_random_generators_before_run();
 }
 
 /*
@@ -463,7 +552,7 @@ config_backup_incr(void)
      * Choose a type of incremental backup, where the log remove setting can eliminate incremental
      * backup based on log files.
      */
-    switch (mmrand(NULL, 1, 10)) {
+    switch (mmrand(&g.extra_rnd, 1, 10)) {
     case 1: /* 30% full backup only */
     case 2:
     case 3:
@@ -508,7 +597,7 @@ config_backup_incr_granularity(void)
      * granularity is in units of KB.
      */
     granularity = 0;
-    i = mmrand(NULL, 1, 10);
+    i = mmrand(&g.extra_rnd, 1, 10);
     switch (i) {
     case 1: /* 50% small size for stress testing */
     case 2:
@@ -669,7 +758,7 @@ config_checkpoint(void)
 {
     /* Choose a checkpoint mode if nothing was specified. */
     if (!config_explicit(NULL, "checkpoint"))
-        switch (mmrand(NULL, 1, 20)) {
+        switch (mmrand(&g.extra_rnd, 1, 20)) {
         case 1:
         case 2:
         case 3:
@@ -694,7 +783,7 @@ config_checksum(TABLE *table)
 {
     /* Choose a checksum mode if nothing was specified. */
     if (!config_explicit(table, "disk.checksum"))
-        switch (mmrand(NULL, 1, 10)) {
+        switch (mmrand(&g.extra_rnd, 1, 10)) {
         case 1:
         case 2:
         case 3:
@@ -746,7 +835,7 @@ config_compression(TABLE *table, const char *conf_name)
      * correct if all of the possible engines are compiled in.
      */
     cstr = "off";
-    switch (mmrand(NULL, 1, 20)) {
+    switch (mmrand(&g.extra_rnd, 1, 20)) {
 #ifdef HAVE_BUILTIN_EXTENSION_LZ4
     case 1:
     case 2:
@@ -858,7 +947,7 @@ config_encryption(void)
         return;
 
     /* 70% no encryption, 30% rotn */
-    if (mmrand(NULL, 1, 10) < 8)
+    if (mmrand(&g.data_rnd, 1, 10) < 8)
         config_off(NULL, "disk.encryption");
     else
         config_single(NULL, "disk.encryption=rotn-7", false);
@@ -871,8 +960,24 @@ config_encryption(void)
 static bool
 config_fix(TABLE *table)
 {
-    /* Fixed-length column stores don't support modify operations. */
-    return (!config_explicit(table, "ops.pct.modify"));
+    /*
+     * Fixed-length column stores don't support modify operations, and can't be used with
+     * predictable replay.
+     */
+    return (!GV(RUNS_PREDICTABLE_REPLAY) && !config_explicit(table, "ops.pct.modify"));
+}
+
+/*
+ * config_var --
+ *     Variable-length column-store configuration.
+ */
+static bool
+config_var(TABLE *table)
+{
+    /*
+     * Variable-length column store insertions can't be used with predictable replay.
+     */
+    return (!GV(RUNS_PREDICTABLE_REPLAY) || !config_explicit(table, "ops.pct.insert"));
 }
 
 /*
@@ -918,8 +1023,10 @@ config_in_memory(void)
         return;
     if (config_explicit(NULL, "runs.mirror"))
         return;
+    if (config_explicit(NULL, "runs.predictable_replay"))
+        return;
 
-    if (!config_explicit(NULL, "runs.in_memory") && mmrand(NULL, 1, 20) == 1) {
+    if (!config_explicit(NULL, "runs.in_memory") && mmrand(&g.extra_rnd, 1, 20) == 1) {
         config_single(NULL, "runs.in_memory=1", false);
         /* Use table[0] to access the global value (RUN_ROWS is a table value). */
         if (NTV(tables[0], RUNS_ROWS) > WT_MILLION) {
@@ -1064,7 +1171,18 @@ config_mirrors(void)
      * tables.
      */
     explicit_mirror = config_explicit(NULL, "runs.mirror");
-    if (!explicit_mirror && mmrand(NULL, 1, 10) < 9) {
+    if (!explicit_mirror && mmrand(&g.data_rnd, 1, 10) < 9) {
+        config_off_all("runs.mirror");
+        return;
+    }
+
+    /*
+     * In theory, mirroring should work with predictable replay, although there's some overlap in
+     * functionality. That is, we usually do multiple runs with the same key with predictable replay
+     * and would notice if data was different or missing. We disable it to keep runs simple.
+     */
+    if (GV(RUNS_PREDICTABLE_REPLAY)) {
+        WARN("%s", "turning off mirroring for predictable replay");
         config_off_all("runs.mirror");
         return;
     }
@@ -1122,7 +1240,7 @@ config_mirrors(void)
      * Pick some number of tables to mirror, then turn on mirroring the next (n-1) tables, where
      * allowed.
      */
-    for (mirrors = mmrand(NULL, 2, ntables) - 1, i = 1; i <= ntables; ++i) {
+    for (mirrors = mmrand(&g.data_rnd, 2, ntables) - 1, i = 1; i <= ntables; ++i) {
         if (NT_EXPLICIT_OFF(tables[i], RUNS_MIRROR))
             continue;
         if (tables[i] != g.base_mirror) {
@@ -1155,25 +1273,32 @@ config_pct(TABLE *table)
         const char *name; /* Operation */
         uint32_t *vp;     /* Value store */
         u_int order;      /* Order of assignment */
+        bool enabled;     /* Enabled for this configuration */
     } list[5];
     u_int i, max_order, max_slot, n, pct;
     bool slot_available;
 
+    /* We explicitly disable modify operations for predictable replay. */
     list[0].name = "ops.pct.delete";
     list[0].vp = &TV(OPS_PCT_DELETE);
     list[0].order = 0;
+    list[0].enabled = replay_operation_enabled(REMOVE);
     list[1].name = "ops.pct.insert";
     list[1].vp = &TV(OPS_PCT_INSERT);
     list[1].order = 0;
+    list[1].enabled = replay_operation_enabled(INSERT);
     list[2].name = "ops.pct.modify";
     list[2].vp = &TV(OPS_PCT_MODIFY);
     list[2].order = 0;
+    list[2].enabled = replay_operation_enabled(MODIFY);
     list[3].name = "ops.pct.read";
     list[3].vp = &TV(OPS_PCT_READ);
     list[3].order = 0;
+    list[3].enabled = replay_operation_enabled(READ);
     list[4].name = "ops.pct.write";
     list[4].vp = &TV(OPS_PCT_WRITE);
     list[4].order = 0;
+    list[4].enabled = replay_operation_enabled(UPDATE);
 
     /*
      * Walk the list of operations, checking for an illegal configuration and creating a random
@@ -1182,11 +1307,13 @@ config_pct(TABLE *table)
     pct = 0;
     slot_available = false;
     for (i = 0; i < WT_ELEMENTS(list); ++i)
-        if (config_explicit(table, list[i].name))
-            pct += *list[i].vp;
-        else {
-            list[i].order = mmrand(NULL, 1, WT_THOUSAND);
-            slot_available = true;
+        if (list[i].enabled) {
+            if (config_explicit(table, list[i].name))
+                pct += *list[i].vp;
+            else {
+                list[i].order = mmrand(&g.data_rnd, 1, WT_THOUSAND);
+                slot_available = true;
+            }
         }
 
     /*
@@ -1197,7 +1324,7 @@ config_pct(TABLE *table)
         WARN("operation percentages %s than 100, resetting to random values",
           pct > 100 ? "greater" : "less");
         for (i = 0; i < WT_ELEMENTS(list); ++i)
-            list[i].order = mmrand(NULL, 1, WT_THOUSAND);
+            list[i].order = mmrand(&g.data_rnd, 1, WT_THOUSAND);
         pct = 0;
     }
 
@@ -1210,9 +1337,9 @@ config_pct(TABLE *table)
      */
     for (pct = 100 - pct;;) {
         for (i = n = max_order = max_slot = 0; i < WT_ELEMENTS(list); ++i) {
-            if (list[i].order != 0)
+            if (list[i].order != 0 && list[i].enabled)
                 ++n;
-            if (list[i].order > max_order) {
+            if (list[i].order > max_order && list[i].enabled) {
                 max_order = list[i].order;
                 max_slot = i;
             }
@@ -1223,7 +1350,7 @@ config_pct(TABLE *table)
             *list[max_slot].vp = pct;
             break;
         }
-        *list[max_slot].vp = mmrand(NULL, 0, pct);
+        *list[max_slot].vp = mmrand(&g.data_rnd, 0, pct);
         list[max_slot].order = 0;
         pct -= *list[max_slot].vp;
     }
@@ -1246,7 +1373,7 @@ config_statistics(void)
 
     if (!config_explicit(NULL, "statistics.mode")) {
         /* 70% of the time set statistics to fast. */
-        if (mmrand(NULL, 1, 10) < 8)
+        if (mmrand(&g.extra_rnd, 1, 10) < 8)
             config_single(NULL, "statistics.mode=fast", false);
         else
             config_single(NULL, "statistics.mode=all", false);
@@ -1254,7 +1381,7 @@ config_statistics(void)
 
     if (!config_explicit(NULL, "statistics_log.sources")) {
         /* 10% of the time use sources if all. */
-        if (strcmp(GVS(STATISTICS_MODE), "all") == 0 && mmrand(NULL, 1, 10) == 1)
+        if (strcmp(GVS(STATISTICS_MODE), "all") == 0 && mmrand(&g.extra_rnd, 1, 10) == 1)
             config_single(NULL, "statistics_log.sources=file:", false);
     }
 }
@@ -1266,6 +1393,12 @@ config_statistics(void)
 static void
 config_transaction(void)
 {
+    /* Predictable replay requires timestamps. */
+    if (GV(RUNS_PREDICTABLE_REPLAY)) {
+        config_single(NULL, "transaction.implicit=0", false);
+        config_single(NULL, "transaction.timestamps=on", true);
+    }
+
     /* Transaction prepare requires timestamps and is incompatible with logging. */
     if (GV(OPS_PREPARE) && config_explicit(NULL, "ops.prepare")) {
         if (!GV(TRANSACTION_TIMESTAMPS) && config_explicit(NULL, "transaction.timestamps"))
@@ -1664,6 +1797,7 @@ config_table_extend(u_int ntable)
 void
 config_single(TABLE *table, const char *s, bool explicit)
 {
+    WT_RAND_STATE *rnd;
     enum { RANGE_FIXED, RANGE_NONE, RANGE_WEIGHTED } range;
     CONFIG *cp;
     CONFIGV *v;
@@ -1725,6 +1859,11 @@ config_single(TABLE *table, const char *s, bool explicit)
 
     ++equalp;
     v = &table->v[cp->off];
+
+    /*
+     * Use the data RNG for these options, that's conservative.
+     */
+    rnd = &g.data_rnd;
 
     if (F_ISSET(cp, C_STRING)) {
         /*
@@ -1822,7 +1961,7 @@ config_single(TABLE *table, const char *s, bool explicit)
             testutil_die(EINVAL, "%s: %s: illegal numeric range", progname, s);
 
         if (range == RANGE_FIXED)
-            v1 = mmrand(NULL, (u_int)v1, (u_int)v2);
+            v1 = mmrand(rnd, (u_int)v1, (u_int)v2);
         else {
             /*
              * Roll dice, 50% chance of proceeding to the next larger value, and 5 steps to the
@@ -1832,7 +1971,7 @@ config_single(TABLE *table, const char *s, bool explicit)
             if (steps == 0)
                 steps = 1;
             for (i = 0; i < 5; ++i, v1 += steps)
-                if (mmrand(NULL, 0, 1) == 0)
+                if (mmrand(rnd, 0, 1) == 0)
                     break;
             v1 = WT_MIN(v1, v2);
         }
@@ -1897,7 +2036,7 @@ config_map_file_type(const char *s, u_int *vp)
      *
      * Variable-length column-store is 90% vs. fixed, 30% vs. fixed and row, and 40% vs row.
      */
-    v = mmrand(NULL, 1, 10);
+    v = mmrand(&g.data_rnd, 1, 10);
     if (fix && v == 1)
         *vp = FIX;
     else if (var && (v < 5 || !row))

@@ -473,6 +473,53 @@ functions:
         for i in $(seq ${times|1}); do
           ./t -c ${config|../../../test/format/CONFIG.stress} ${trace_args|-T bulk,txn,retain=100} ${extra_args|} || ( [ -f RUNDIR/CONFIG ] && cat RUNDIR/CONFIG ) 2>&1
         done
+  "format test predictable":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build/test/format"
+      script: |
+        # To test predictable replay, we run test/format three times with the same data seed
+        # each time, and compare the keys and values found in the WT home directories.
+        # The first run is a timed one. When it's completed, we get the run's stable timestamp,
+        # and do the subsequent runs up to that stable timestamp.  This, along with predictable
+        # replay using the same data seed, should guarantee we have equivalent data created.
+        set -o errexit
+        set -o verbose
+        fail() {
+          echo "======= FAILURE =========="
+          for file; do
+            if [ -f "$file" ]; then
+              echo Contents of "$file":
+              cat "$file"
+              echo "================"
+            fi
+          done
+          exit 1
+        }
+        runtime=3  # minutes
+        config=../../../test/format/CONFIG.replay
+        for i in $(seq ${times}); do
+          echo Iteration $i/${times}
+          x2=$RANDOM$RANDOM
+          x3=$RANDOM$RANDOM
+          rm -rf RUNDIR_{1,2,3}
+
+          first_run_args="-c $config runs.timer=$runtime"
+          ./t -h RUNDIR_1 $first_run_args ${extra_args} || fail RUNDIR_1/CONFIG 2>&1
+          stable_hex=$(../../../tools/wt_timestamps RUNDIR_1 | sed -e '/stable=/!d' -e 's/.*=//')
+          ops=$(echo $((0x$stable_hex)))
+
+          # Do the second run up to the stable timestamp, using the same data seed,
+          # but with a different extra seed.  Compare it when done.
+          common_args="-c RUNDIR_1/CONFIG runs.timer=0 runs.ops=$ops"
+          ./t -h RUNDIR_2 $common_args random.extra_seed=$x2 || fail RUNDIR_2/CONFIG 2>&1
+          ../../../tools/wt_cmp_dir RUNDIR_1 RUNDIR_2 || fail RUNDIR_1/CONFIG RUNDIR_2/CONFIG 2>&1
+
+          # Do the third run up to the stable timestamp, using the same data seed,
+          # but with a different extra seed.  Compare it to the second run when done.
+          ./t -h RUNDIR_3 $common_args random.extra_seed=$x3 || fail RUNDIR_3/CONFIG 2>&1
+          ../../../tools/wt_cmp_dir RUNDIR_2 RUNDIR_3 || fail RUNDIR_2/CONFIG RUNDIR_3/CONFIG 2>&1
+        done
   "format test script":
     command: shell.exec
     params:
@@ -3727,6 +3774,19 @@ tasks:
         vars:
           format_test_script_args: -a -t 30
 
+  - name: format-predictable-test
+    # Set 2.5 hour timeout (60 * 60 * 2.5)
+    exec_timeout_secs: 9000
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          <<: *configure_flags_with_builtins
+          CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake
+      - func: "format test predictable"
+        vars:
+          times: 5
+
   - name: many-collection-test
     commands:
       - command: timeout.update
@@ -4918,6 +4978,7 @@ buildvariants:
     - name: ".stress-test-4-nonstandalone"
     - name: ".stress-test-no-barrier-nonstandalone"
     - name: format-abort-recovery-stress-test-nonstandalone
+    - name: format-predictable-test
 
 # When running the Python tests on this variant tcmalloc must be preloaded otherwise the wiredtiger library
 # fails to load and resolve its dependency.

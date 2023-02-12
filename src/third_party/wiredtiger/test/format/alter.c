@@ -60,14 +60,14 @@ alter(void *arg)
     counter = 0;
 
     while (!g.workers_finished) {
-        period = mmrand(NULL, 1, 10);
+        period = mmrand(&g.extra_rnd, 1, 10);
 
         testutil_check(__wt_snprintf(
           buf, sizeof(buf), "access_pattern_hint=%s", access_value ? "random" : "none"));
         access_value = !access_value;
 
         /* Alter can return EBUSY if concurrent with other operations. */
-        table = table_select(NULL);
+        table = table_select(NULL, false);
         trace_msg(session, "Alter #%u URI %s start %s", ++counter, table->uri, buf);
 
         while ((ret = session->alter(session, table->uri, buf)) != 0 && ret != EBUSY)

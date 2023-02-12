@@ -121,7 +121,7 @@ table_load(TABLE *base, TABLE *table)
         if (table->type == ROW)
             key_gen(table, &key, keyno);
         if (base == NULL)
-            val_gen(table, NULL, &value, &bitv, keyno);
+            val_gen(table, &g.data_rnd, &value, &bitv, keyno);
         else {
             testutil_check(read_op(base_cursor, NEXT, NULL));
             testutil_check(base_cursor->get_value(base_cursor, &value));
@@ -167,6 +167,12 @@ table_load(TABLE *base, TABLE *table)
              */
             testutil_assertfmt(base == NULL && (ret == WT_CACHE_FULL || ret == WT_ROLLBACK),
               "WT_CURSOR.insert failed: %d", ret);
+
+            /*
+             * If this occurs with predictable replay, we may need to redo the bulk load with fewer
+             * keys in each batch. For now, we just don't handle it.
+             */
+            testutil_assert(!GV(RUNS_PREDICTABLE_REPLAY));
 
             if (g.transaction_timestamps_config) {
                 bulk_rollback_transaction(session);

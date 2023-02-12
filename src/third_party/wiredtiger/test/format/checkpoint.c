@@ -79,7 +79,7 @@ checkpoint(void *arg)
     wt_wrap_open_session(conn, &sap, NULL, &session);
 
     named_checkpoints = !g.lsm_config;
-    for (secs = mmrand(NULL, 1, 10); !g.workers_finished;) {
+    for (secs = mmrand(&g.extra_rnd, 1, 10); !g.workers_finished;) {
         if (secs > 0) {
             __wt_sleep(1, 0);
             --secs;
@@ -96,7 +96,7 @@ checkpoint(void *arg)
         ckpt_vrfy_name = "WiredTigerCheckpoint";
         backup_locked = false;
         if (named_checkpoints)
-            switch (mmrand(NULL, 1, 20)) {
+            switch (mmrand(&g.extra_rnd, 1, 20)) {
             case 1:
                 /*
                  * 5% create a named snapshot. Rotate between a few names to test multiple named
@@ -105,8 +105,8 @@ checkpoint(void *arg)
                 ret = lock_try_writelock(session, &g.backup_lock);
                 if (ret == 0) {
                     backup_locked = true;
-                    testutil_check(__wt_snprintf(
-                      config_buf, sizeof(config_buf), "name=mine.%" PRIu32, mmrand(NULL, 1, 4)));
+                    testutil_check(__wt_snprintf(config_buf, sizeof(config_buf),
+                      "name=mine.%" PRIu32, mmrand(&g.extra_rnd, 1, 4)));
                     ckpt_config = config_buf;
                     ckpt_vrfy_name = config_buf + strlen("name=");
                 } else if (ret != EBUSY)
@@ -143,7 +143,7 @@ checkpoint(void *arg)
         /* Verify the checkpoints. */
         wts_verify_checkpoint(conn, ckpt_vrfy_name);
 
-        secs = mmrand(NULL, 5, 40);
+        secs = mmrand(&g.extra_rnd, 5, 40);
     }
 
     wt_wrap_open_session(conn, &sap, NULL, &session);

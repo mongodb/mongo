@@ -54,7 +54,7 @@ compact(void *arg)
      * Perform compaction at somewhere under 15 seconds (so we get at least one done), and then at
      * 23 second intervals.
      */
-    for (period = mmrand(NULL, 1, 15);; period = 23) {
+    for (period = mmrand(&g.extra_rnd, 1, 15);; period = 23) {
         /* Sleep for short periods so we don't make the run wait. */
         while (period > 0 && !g.workers_finished) {
             --period;
@@ -70,7 +70,7 @@ compact(void *arg)
          * Compact returns ETIMEDOUT if the compaction doesn't finish in some number of seconds. We
          * don't configure a timeout and occasionally exceed the default of 1200 seconds.
          */
-        table = table_select(NULL);
+        table = table_select(NULL, false);
         ret = session->compact(session, table->uri, NULL);
         testutil_assertfmt(ret == 0 || ret == EBUSY || ret == ETIMEDOUT || ret == WT_CACHE_FULL ||
             ret == WT_ROLLBACK,

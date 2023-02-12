@@ -387,10 +387,10 @@ create_object(TABLE *table, void *arg)
      * Configure the maximum key/value sizes, but leave it as the default if we come up with
      * something crazy.
      */
-    maxleafkey = mmrand(NULL, table->max_leaf_page / 50, table->max_leaf_page / 40);
+    maxleafkey = mmrand(&g.extra_rnd, table->max_leaf_page / 50, table->max_leaf_page / 40);
     if (maxleafkey > 20)
         CONFIG_APPEND(p, ",leaf_key_max=%" PRIu32, maxleafkey);
-    maxleafvalue = mmrand(NULL, table->max_leaf_page * 10, table->max_leaf_page / 40);
+    maxleafvalue = mmrand(&g.extra_rnd, table->max_leaf_page * 10, table->max_leaf_page / 40);
     if (maxleafvalue > 40 && maxleafvalue < 100 * 1024)
         CONFIG_APPEND(p, ",leaf_value_max=%" PRIu32, maxleafvalue);
 
@@ -408,7 +408,7 @@ create_object(TABLE *table, void *arg)
         if (TV(BTREE_HUFFMAN_VALUE))
             CONFIG_APPEND(p, ",huffman_value=english");
         if (TV(BTREE_DICTIONARY))
-            CONFIG_APPEND(p, ",dictionary=%" PRIu32, mmrand(NULL, 123, 517));
+            CONFIG_APPEND(p, ",dictionary=%" PRIu32, mmrand(&g.extra_rnd, 123, 517));
         break;
     }
 

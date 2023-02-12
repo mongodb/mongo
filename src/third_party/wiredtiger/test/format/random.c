@@ -72,11 +72,11 @@ random_kv(void *arg)
         simple = !simple;
 
         /* Select a table and open a cursor. */
-        table = table_select_type(ROW);
+        table = table_select_type(ROW, false);
         wt_wrap_open_cursor(session, table->uri, config, &cursor);
 
         /* This is just a smoke-test, get some key/value pairs. */
-        for (i = mmrand(NULL, 0, WT_THOUSAND); i > 0; --i) {
+        for (i = mmrand(&g.extra_rnd, 0, WT_THOUSAND); i > 0; --i) {
             switch (ret = cursor->next(cursor)) {
             case 0:
                 break;
@@ -95,7 +95,7 @@ random_kv(void *arg)
         testutil_check(cursor->close(cursor));
 
         /* Sleep for some number of seconds. */
-        period = mmrand(NULL, 1, 10);
+        period = mmrand(&g.extra_rnd, 1, 10);
 
         /* Sleep for short periods so we don't make the run wait. */
         while (period > 0 && !g.workers_finished) {

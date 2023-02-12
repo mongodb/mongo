@@ -47,7 +47,7 @@ key_init_random(TABLE *table)
         max = TV(BTREE_KEY_MAX);
         if (i % 20 != 0 && max > TV(BTREE_KEY_MIN) + 20)
             max = TV(BTREE_KEY_MIN) + 20;
-        table->key_rand_len[i] = mmrand(NULL, TV(BTREE_KEY_MIN), max);
+        table->key_rand_len[i] = mmrand(&g.data_rnd, TV(BTREE_KEY_MIN), max);
     }
 }
 
@@ -241,6 +241,7 @@ val_len(WT_RAND_STATE *rnd, uint64_t keyno, uint32_t min, uint32_t max)
 void
 val_init(TABLE *table, void *arg)
 {
+    WT_RAND_STATE *rnd;
     size_t i;
     uint32_t len;
 
@@ -263,8 +264,9 @@ val_init(TABLE *table, void *arg)
     for (i = 0; i < len; ++i)
         table->val_base[i] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
 
+    rnd = &g.data_rnd;
     table->val_dup_data_len =
-      val_len(NULL, (uint64_t)mmrand(NULL, 1, 20), TV(BTREE_VALUE_MIN), TV(BTREE_VALUE_MAX));
+      val_len(rnd, (uint64_t)mmrand(rnd, 1, 20), TV(BTREE_VALUE_MIN), TV(BTREE_VALUE_MAX));
 }
 
 /*

@@ -84,7 +84,7 @@ corrupt(TABLE *table)
      * exceeding a megabyte (so we aren't just corrupting the whole file).
      */
     testutil_check(fstat(fd, &sb));
-    offset = mmrand(NULL, 0, (u_int)sb.st_size - 1024);
+    offset = mmrand(&g.data_rnd, 0, (u_int)sb.st_size - 1024);
     len = (size_t)(sb.st_size * 2) / 100;
     len += 4 * 1024;
     len = WT_MIN(len, WT_MEGABYTE);

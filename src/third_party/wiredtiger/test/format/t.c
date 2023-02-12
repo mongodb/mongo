@@ -179,14 +179,15 @@ static bool syntax_check; /* Only checking configuration syntax. */
 
 /*
  * main --
- *     TODO: Add a comment describing this function.
+ *     Run a variety of multithreaded WiredTiger operations based on a set of configurations.
  */
 int
 main(int argc, char *argv[])
 {
+    READ_SCAN_ARGS scan_args;
     uint64_t now, start;
-    u_int ops_seconds;
-    int ch, reps;
+    u_int ops_seconds, reps;
+    int ch;
     const char *config, *home;
     bool is_backup, quiet_flag, verify_only;
 
@@ -252,10 +253,19 @@ main(int argc, char *argv[])
         fflush(stdout);
     }
 
-    __wt_random_init_seed(NULL, &g.rnd); /* Initialize the RNG. */
+    /*
+     * Initialize the RNGs. This is needed early because some random decisions are made while
+     * reading configuration. There may be random seeds in the configuration, however, so we will
+     * reinitialize the RNGs later.
+     */
+    __wt_random_init_seed(NULL, &g.data_rnd);
+    __wt_random_init_seed(NULL, &g.extra_rnd);
 
-    /* Initialize lock to ensure single threading during failure handling */
+    /* Initialize lock to ensure single threading during failure handling. */
     testutil_check(pthread_rwlock_init(&g.death_lock, NULL));
+
+    /* Initialize lock to ensure single threading for lane operations in predictable replay. */
+    testutil_check(pthread_rwlock_init(&g.lane_lock, NULL));
 
     /*
      * Initialize the tables array and default to multi-table testing if not in backward-compatible
@@ -357,7 +367,9 @@ main(int argc, char *argv[])
     TIMED_MAJOR_OP(wts_verify(g.wts_conn, true));
     if (verify_only)
         goto skip_operations;
-    TIMED_MAJOR_OP(tables_apply(wts_read_scan, g.wts_conn));
+    scan_args.conn = g.wts_conn;
+    scan_args.rnd = &g.extra_rnd;
+    TIMED_MAJOR_OP(tables_apply(wts_read_scan, &scan_args));
 
     /* Optionally start checkpoints. */
     wts_checkpoints();
@@ -373,7 +385,7 @@ main(int argc, char *argv[])
      */
     ops_seconds = GV(RUNS_TIMER) == 0 ? 0 : ((GV(RUNS_TIMER) * 60) - 15) / FORMAT_OPERATION_REPS;
     for (reps = 1; reps <= FORMAT_OPERATION_REPS; ++reps)
-        operations(ops_seconds, reps == FORMAT_OPERATION_REPS);
+        operations(ops_seconds, reps, FORMAT_OPERATION_REPS);
 
     /* Copy out the run's statistics. */
     TIMED_MAJOR_OP(wts_stats());
