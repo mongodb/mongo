@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "boost/optional/optional.hpp"
+#include <boost/optional/optional.hpp>
 
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/operation_context.h"

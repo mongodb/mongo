@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/shell/program_runner.h"
 
-#include "boost/filesystem/operations.hpp"
+#include <boost/filesystem/operations.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
 #include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/stream_buffer.hpp>

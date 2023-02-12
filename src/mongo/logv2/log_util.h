@@ -32,8 +32,9 @@
 #include <functional>
 
 #include <boost/optional.hpp>
-#include <mongo/base/status.h>
-#include <mongo/base/string_data.h>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 
 namespace mongo::logv2 {
 

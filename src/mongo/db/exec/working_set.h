@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "boost/optional.hpp"
+#include <boost/optional.hpp>
 #include <vector>
 
 #include "mongo/db/exec/document_value/document.h"

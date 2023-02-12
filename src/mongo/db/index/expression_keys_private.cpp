@@ -30,6 +30,8 @@
 
 #include "mongo/db/index/expression_keys_private.h"
 
+#include <third_party/s2/s2cell.h>
+#include <third_party/s2/s2regioncoverer.h>
 #include <utility>
 
 #include "mongo/bson/bsonelement_comparator_interface.h"
@@ -52,9 +54,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-
-#include "third_party/s2/s2cell.h"
-#include "third_party/s2/s2regioncoverer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 

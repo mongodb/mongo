@@ -33,7 +33,7 @@ Checks:          '-*,
                   modernize-replace-random-shuffle,
                   modernize-shrink-to-fit,
                   modernize-unary-static-assert,
-                  mongo-uninterruptible-lock-guard-check,
+                  mongo-header-bracket-check,
                   performance-faster-string-find,
                   performance-implicit-conversion-in-loop,
                   performance-inefficient-algorithm,
@@ -116,6 +116,8 @@ HeaderFilterRegex: '(mongo/.*|@MONGO_BUILD_DIR@/.*)'
 CheckOptions:
   - key:             bugprone-assert-side-effect.AssertMacros
     value:           assert
+  - key:             mongo-header-bracket-check.mongoSourceDirs
+    value:           'src/mongo;@MONGO_BUILD_DIR@'
   - key:             bugprone-assert-side-effect.CheckFunctionCalls
     value:           '0'
   - key:             bugprone-dangling-handle.HandleClasses

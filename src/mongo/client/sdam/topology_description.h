@@ -28,11 +28,11 @@
  */
 
 #pragma once
+
+#include <boost/optional/optional.hpp>
 #include <memory>
 #include <string>
 #include <unordered_set>
-
-#include "boost/optional/optional.hpp"
 
 #include "mongo/bson/oid.h"
 #include "mongo/client/read_preference.h"

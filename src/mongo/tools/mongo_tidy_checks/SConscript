@@ -122,6 +122,7 @@ mongo_custom_check = env.SharedLibrary(
     target="mongo_tidy_checks",
     source=[
         "MongoTestCheck.cpp",
+        "MongoHeaderBracketCheck.cpp",
         "MongoUninterruptibleLockGuardCheck.cpp",
         "MongoTidyModule.cpp",
     ],

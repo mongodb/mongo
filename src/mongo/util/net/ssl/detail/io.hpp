@@ -15,14 +15,14 @@
 #pragma once
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include "asio/detail/config.hpp"
+#include <asio/detail/config.hpp>
 
-#include "asio/write.hpp"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/ssl/detail/engine.hpp"
 #include "mongo/util/net/ssl/detail/stream_core.hpp"
+#include <asio/write.hpp>
 
-#include "asio/detail/push_options.hpp"
+#include <asio/detail/push_options.hpp>
 
 namespace asio {
 namespace ssl {
@@ -340,6 +340,6 @@ struct associated_executor<ssl::detail::io_op<Stream, Operation, Handler>, Execu
 
 }  // namespace asio
 
-#include "asio/detail/pop_options.hpp"
+#include <asio/detail/pop_options.hpp>
 
 #endif  // ASIO_SSL_DETAIL_IO_HPP

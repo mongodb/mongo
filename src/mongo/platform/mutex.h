@@ -29,11 +29,10 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 #include <type_traits>
 #include <vector>
-
-#include "boost/optional.hpp"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"

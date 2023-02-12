@@ -29,15 +29,15 @@
 
 #pragma once
 
+#include <third_party/s2/s2cap.h>
+#include <third_party/s2/s2cell.h>
+#include <third_party/s2/s2loop.h>
+#include <third_party/s2/s2polygon.h>
+#include <third_party/s2/s2polyline.h>
+#include <third_party/s2/s2region.h>
 #include <vector>
 
 #include "mongo/db/geo/s2.h"
-#include "third_party/s2/s2cap.h"
-#include "third_party/s2/s2cell.h"
-#include "third_party/s2/s2loop.h"
-#include "third_party/s2/s2polygon.h"
-#include "third_party/s2/s2polyline.h"
-#include "third_party/s2/s2region.h"
 
 namespace mongo {
 

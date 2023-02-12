@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
+#include <third_party/wiredtiger/wiredtiger.h>
 #include <type_traits>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/rpc/op_msg.h"
-#include "third_party/wiredtiger/wiredtiger.h"
+
 
 namespace mongo {
 namespace rpc {

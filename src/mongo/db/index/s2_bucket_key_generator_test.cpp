@@ -28,17 +28,13 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/index/expression_keys_private.h"
-
 #include <algorithm>
-
-#include "third_party/s2/s2cell.h"
-#include "third_party/s2/s2latlng.h"
+#include <third_party/s2/s2cell.h>
+#include <third_party/s2/s2latlng.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/json.h"

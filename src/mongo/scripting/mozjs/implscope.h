@@ -31,6 +31,7 @@
 
 #include <jsapi.h>
 #include <jsfriendapi.h>
+#include <mongo/scripting/mozjs/freeOpToJSContext.h>
 #include <vm/PosixNSPR.h>
 
 #include "mongo/client/dbclient_cursor.h"
@@ -47,7 +48,6 @@
 #include "mongo/scripting/mozjs/dbref.h"
 #include "mongo/scripting/mozjs/engine.h"
 #include "mongo/scripting/mozjs/error.h"
-#include "mongo/scripting/mozjs/freeOpToJSContext.h"
 #include "mongo/scripting/mozjs/global.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/jsthread.h"

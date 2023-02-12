@@ -29,8 +29,9 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/string_data.h"
-#include "third_party/boost/boost/optional.hpp"
 
 namespace mongo {
 

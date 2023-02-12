@@ -27,7 +27,10 @@
  *    it in the license file.
  */
 
-#include "boost/optional/optional.hpp"
+#pragma once
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -46,8 +49,6 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/uuid.h"
-
-#pragma once
 
 namespace mongo {
 

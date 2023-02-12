@@ -26,38 +26,27 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-
-#include "MongoHeaderBracketCheck.h"
-#include "MongoTestCheck.h"
-#include "MongoUninterruptibleLockGuardCheck.h"
+#pragma once
 
 #include <clang-tidy/ClangTidy.h>
 #include <clang-tidy/ClangTidyCheck.h>
-#include <clang-tidy/ClangTidyModule.h>
-#include <clang-tidy/ClangTidyModuleRegistry.h>
 
-namespace mongo {
-namespace tidy {
+namespace mongo::tidy {
 
-class MongoTidyModule : public clang::tidy::ClangTidyModule {
+/**
+    Overrides the default PPCallback class to primarly override
+    the InclusionDirective call which is called for each include included. This
+    allows the chance to evaluate specifically the include and determine whether
+    it is considered a "mongo" include or not and if it is using the appropriate include style.
+*/
+class MongoHeaderBracketCheck : public clang::tidy::ClangTidyCheck {
 public:
-    void addCheckFactories(clang::tidy::ClangTidyCheckFactories& CheckFactories) override {
-        CheckFactories.registerCheck<MongoUninterruptibleLockGuardCheck>(
-            "mongo-uninterruptible-lock-guard-check");
-        CheckFactories.registerCheck<MongoHeaderBracketCheck>("mongo-header-bracket-check");
-        CheckFactories.registerCheck<MongoTestCheck>("mongo-test-check");
-    }
+    MongoHeaderBracketCheck(clang::StringRef Name, clang::tidy::ClangTidyContext* Context);
+    void storeOptions(clang::tidy::ClangTidyOptions::OptionMap& Opts) override;
+    void registerPPCallbacks(const clang::SourceManager& SM,
+                             clang::Preprocessor* PP,
+                             clang::Preprocessor* ModuleExpanderPP) override;
+    std::vector<std::string> mongoSourceDirs;
 };
 
-// Register the MongoTidyModule using this statically initialized variable.
-static clang::tidy::ClangTidyModuleRegistry::Add<MongoTidyModule> X("mongo-tidy-module",
-                                                                    "MongoDB custom checks.");
-
-}  // namespace tidy
-
-// This anchor is used to force the linker to link in the generated object file
-// and thus register the MongoTidyModule.
-volatile int MongoTidyModuleAnchorSource = 0;
-
-}  // namespace mongo
+}  // namespace mongo::tidy

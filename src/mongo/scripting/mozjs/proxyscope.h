@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "vm/PosixNSPR.h"
+#include <vm/PosixNSPR.h>
 
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/platform/mutex.h"

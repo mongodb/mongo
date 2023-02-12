@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "third_party/benchmark/dist/include/benchmark/benchmark.h"
 #include <benchmark/benchmark.h>
 
 #include "mongo/bson/util/simple8b.h"

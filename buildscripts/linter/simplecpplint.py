@@ -388,8 +388,9 @@ class Linter:
             return
 
         norm_file_name = self.file_name.replace('\\', '/')
+
         # Custom clang-tidy check tests purposefully produce errors for
-        # tests to find, they should be ignored.
+        # tests to find. They should be ignored.
         if "mongo_tidy_checks/tests/" in norm_file_name:
             return
 

@@ -28,11 +28,9 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "boost/optional.hpp"
 #include <algorithm>
 #include <asio.hpp>
+#include <boost/optional.hpp>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"

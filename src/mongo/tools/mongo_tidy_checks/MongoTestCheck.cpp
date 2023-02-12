@@ -26,16 +26,14 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+
 #include "MongoTestCheck.h"
 
-#include "clang-tidy/ClangTidy.h"
-#include "clang-tidy/ClangTidyCheck.h"
-#include "clang/AST/ASTContext.h"
-#include "clang/ASTMatchers/ASTMatchFinder.h"
-
-using namespace clang;
-using namespace clang::tidy;
-using namespace clang::ast_matchers;
+#include <clang-tidy/ClangTidy.h>
+#include <clang-tidy/ClangTidyCheck.h>
+#include <clang/AST/ASTContext.h>
+#include <clang/ASTMatchers/ASTMatchFinder.h>
 
 // TODO SERVER-72150
 // This is a dummy reference check to give example for writing new checks.
@@ -44,15 +42,15 @@ using namespace clang::ast_matchers;
 namespace mongo {
 namespace tidy {
 
-MongoTestCheck::MongoTestCheck(StringRef Name, ClangTidyContext* Context)
+MongoTestCheck::MongoTestCheck(clang::StringRef Name, clang::tidy::ClangTidyContext* Context)
     : ClangTidyCheck(Name, Context) {}
 
-void MongoTestCheck::registerMatchers(ast_matchers::MatchFinder* Finder) {
-    Finder->addMatcher(translationUnitDecl().bind("tu"), this);
+void MongoTestCheck::registerMatchers(clang::ast_matchers::MatchFinder* Finder) {
+    Finder->addMatcher(clang::ast_matchers::translationUnitDecl().bind("tu"), this);
 }
 
-void MongoTestCheck::check(const ast_matchers::MatchFinder::MatchResult& Result) {
-    auto S = Result.Nodes.getNodeAs<TranslationUnitDecl>("tu");
+void MongoTestCheck::check(const clang::ast_matchers::MatchFinder::MatchResult& Result) {
+    auto S = Result.Nodes.getNodeAs<clang::TranslationUnitDecl>("tu");
     if (S)
         diag("ran mongo-test-check!");
 }

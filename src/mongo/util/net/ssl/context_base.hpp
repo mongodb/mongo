@@ -15,13 +15,13 @@
 #pragma once
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include "asio/detail/config.hpp"
+#include <asio/detail/config.hpp>
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #include "mongo/util/net/ssl/detail/openssl_types.hpp"
 #endif
 
-#include "asio/detail/push_options.hpp"
+#include <asio/detail/push_options.hpp>
 
 namespace asio {
 namespace ssl {
@@ -107,6 +107,6 @@ protected:
 }  // namespace ssl
 }  // namespace asio
 
-#include "asio/detail/pop_options.hpp"
+#include <asio/detail/pop_options.hpp>
 
 #endif  // ASIO_SSL_CONTEXT_BASE_HPP

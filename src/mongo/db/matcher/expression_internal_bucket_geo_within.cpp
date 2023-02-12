@@ -29,8 +29,9 @@
 
 
 #include <boost/optional.hpp>
-
-#include "mongo/platform/basic.h"
+#include <third_party/s2/s2cellid.h>
+#include <third_party/s2/s2cellunion.h>
+#include <third_party/s2/s2regioncoverer.h>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/bson/dotted_path_support.h"
@@ -39,9 +40,6 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 
-#include "third_party/s2/s2cellid.h"
-#include "third_party/s2/s2cellunion.h"
-#include "third_party/s2/s2regioncoverer.h"
 
 namespace mongo {
 constexpr StringData InternalBucketGeoWithinMatchExpression::kName;

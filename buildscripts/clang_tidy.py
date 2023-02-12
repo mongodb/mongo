@@ -182,10 +182,10 @@ def main():
     files_to_parse = list()
     for file_doc in compile_commands:
         # A few special cases of files to ignore
-        if not "src/mongo" in file_doc["file"]:
+        if not file_doc["file"].startswith("src/mongo/"):
             continue
         # TODO SERVER-49884 Remove this when we no longer check in generated Bison.
-        if "parser_gen.cpp" in file_doc["file"]:
+        if file_doc["file"].endswith("/parser_gen.cpp"):
             continue
         files_to_tidy.append(Path(file_doc["file"]))
 

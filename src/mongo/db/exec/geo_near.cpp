@@ -30,12 +30,10 @@
 
 #include "mongo/db/exec/geo_near.h"
 
-#include "mongo/logv2/log.h"
+#include <algorithm>
 #include <memory>
+#include <third_party/s2/s2regionintersection.h>  // For s2 search
 #include <vector>
-
-// For s2 search
-#include "third_party/s2/s2regionintersection.h"
 
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -47,8 +45,8 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/expression_index.h"
 #include "mongo/db/query/expression_index_knobs_gen.h"
+#include "mongo/logv2/log.h"
 
-#include <algorithm>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

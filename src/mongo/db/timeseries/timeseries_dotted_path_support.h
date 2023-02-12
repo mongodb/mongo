@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "boost/any.hpp"
+#include <boost/any.hpp>
 #include <cstddef>
 
 #include "mongo/bson/bsonelement_comparator_interface.h"

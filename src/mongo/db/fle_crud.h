@@ -29,9 +29,8 @@
 
 #pragma once
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstdint>
-
-#include "boost/smart_ptr/intrusive_ptr.hpp"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"

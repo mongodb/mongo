@@ -27,19 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/scripting/mozjs/exception.h"
 
 #include <js/friend/ErrorMessages.h>
 #include <jsfriendapi.h>
 #include <limits>
-
+#include <mongo/scripting/mozjs/mongoErrorReportToString.h>
 
 #include "mongo/base/static_assert.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
-#include "mongo/scripting/mozjs/mongoErrorReportToString.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/util/assert_util.h"

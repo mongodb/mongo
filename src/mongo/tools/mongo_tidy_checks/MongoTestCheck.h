@@ -26,28 +26,24 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+
 #pragma once
 
-#include "clang-tidy/ClangTidy.h"
-#include "clang-tidy/ClangTidyCheck.h"
-#include "clang/AST/ASTContext.h"
-#include "clang/ASTMatchers/ASTMatchFinder.h"
-
-using namespace clang;
-using namespace clang::tidy;
-using namespace clang::ast_matchers;
+#include <clang-tidy/ClangTidy.h>
+#include <clang-tidy/ClangTidyCheck.h>
+#include <clang/AST/ASTContext.h>
+#include <clang/ASTMatchers/ASTMatchFinder.h>
 
 namespace mongo {
 namespace tidy {
 
-class MongoTestCheck : public ClangTidyCheck {
+class MongoTestCheck : public clang::tidy::ClangTidyCheck {
 
 public:
-    MongoTestCheck(StringRef Name, ClangTidyContext* Context);
-
-    void registerMatchers(ast_matchers::MatchFinder* Finder) override;
-
-    void check(const ast_matchers::MatchFinder::MatchResult& Result) override;
+    MongoTestCheck(clang::StringRef Name, clang::tidy::ClangTidyContext* Context);
+    void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
+    void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
 
 private:
 };

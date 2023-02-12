@@ -21,7 +21,12 @@ class MongoTidyTests(unittest.TestCase):
 
     def run_clang_tidy(self):
         p = subprocess.run(self.cmd, capture_output=True, text=True)
-        passed = self.expected_output is not None and self.expected_output in p.stdout
+
+        if isinstance(self.expected_output, list):
+            passed = all([expected_output in p.stdout for expected_output in self.expected_output])
+        else:
+            passed = self.expected_output is not None and self.expected_output in p.stdout
+
         with open(self.config_file.name) as f:
             msg = '\n'.join([
                 '>' * 80,
@@ -87,6 +92,21 @@ class MongoTidyTests(unittest.TestCase):
                 """))
 
         self.expected_output = "ran mongo-test-check!"
+
+        self.run_clang_tidy()
+
+    def test_MongoHeaderBracketCheck(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-header-bracket-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = [
+            "non-mongo include 'cctype' should use angle brackets",
+            "mongo include 'test_MongoHeaderBracketCheck.h' should use double quotes",
+        ]
 
         self.run_clang_tidy()
 

@@ -13,7 +13,7 @@
 
 #define ASIO_SOURCE
 
-#include "asio/detail/config.hpp"
+#include <asio/detail/config.hpp>
 
 #if defined(ASIO_HEADER_ONLY)
 #error Do not compile Asio library source with ASIO_HEADER_ONLY defined

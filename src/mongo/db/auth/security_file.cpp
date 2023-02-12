@@ -27,19 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/security_key.h"
 
 #include <algorithm>
 #include <string>
 #include <sys/stat.h>
 #include <vector>
+#include <yaml-cpp/yaml.h>
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/auth/security_key.h"
 #include "mongo/util/str.h"
-
-#include "yaml-cpp/yaml.h"
 
 namespace mongo {
 namespace {

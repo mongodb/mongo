@@ -38,7 +38,7 @@
 #pragma GCC diagnostic ignored "-Wmismatched-tags"
 #endif
 
-#include "third_party/s2/s2.h"
+#include <third_party/s2/s2.h>
 
 #ifdef __clang__
 #pragma GCC diagnostic pop

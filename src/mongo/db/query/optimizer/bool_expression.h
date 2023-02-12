@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "boost/optional.hpp"
+#include <boost/optional.hpp>
 #include <vector>
 
 #include "mongo/db/query/optimizer/algebra/operator.h"

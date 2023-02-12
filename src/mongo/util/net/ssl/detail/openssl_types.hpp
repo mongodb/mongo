@@ -15,8 +15,8 @@
 #pragma once
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include "asio/detail/config.hpp"
-#include "asio/detail/socket_types.hpp"
+#include <asio/detail/config.hpp>
+#include <asio/detail/socket_types.hpp>
 #include <openssl/conf.h>
 #include <openssl/ssl.h>
 #if !defined(OPENSSL_NO_ENGINE)

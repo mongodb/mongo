@@ -15,14 +15,14 @@
 #pragma once
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include "asio/detail/config.hpp"
+#include <asio/detail/config.hpp>
 
-#include "asio/buffer.hpp"
-#include "asio/detail/static_mutex.hpp"
 #include "mongo/util/net/ssl/detail/openssl_types.hpp"
 #include "mongo/util/net/ssl/stream_base.hpp"
+#include <asio/buffer.hpp>
+#include <asio/detail/static_mutex.hpp>
 
-#include "asio/detail/push_options.hpp"
+#include <asio/detail/push_options.hpp>
 
 namespace asio {
 namespace ssl {
@@ -141,7 +141,7 @@ private:
 }  // namespace ssl
 }  // namespace asio
 
-#include "asio/detail/pop_options.hpp"
+#include <asio/detail/pop_options.hpp>
 
 #if defined(ASIO_HEADER_ONLY)
 #include "mongo/util/net/ssl/detail/impl/engine_openssl.ipp"

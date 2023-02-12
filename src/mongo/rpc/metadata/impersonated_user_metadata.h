@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "boost/optional.hpp"
+#include <boost/optional.hpp>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"

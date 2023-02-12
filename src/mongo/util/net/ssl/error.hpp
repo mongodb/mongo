@@ -15,14 +15,14 @@
 #pragma once
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include "asio/detail/config.hpp"
-#include "asio/error_code.hpp"
+#include <asio/detail/config.hpp>
+#include <asio/error_code.hpp>
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #include "mongo/util/net/ssl/detail/openssl_types.hpp"
 #endif
 
-#include "asio/detail/push_options.hpp"
+#include <asio/detail/push_options.hpp>
 
 namespace asio {
 namespace error {
@@ -98,7 +98,7 @@ inline asio::error_code make_error_code(stream_errors e) {
 }  // namespace ssl
 }  // namespace asio
 
-#include "asio/detail/pop_options.hpp"
+#include <asio/detail/pop_options.hpp>
 
 #if defined(ASIO_HEADER_ONLY)
 #include "mongo/util/net/ssl/impl/error.ipp"

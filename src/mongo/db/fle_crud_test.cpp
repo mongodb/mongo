@@ -27,16 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include <algorithm>
 #include <array>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <string>
 #include <third_party/murmurhash3/MurmurHash3.h>
 #include <unordered_map>
 #include <vector>
-
-#include "boost/smart_ptr/intrusive_ptr.hpp"
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"

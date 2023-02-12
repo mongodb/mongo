@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <memory>
 
 #include "mongo/client/async_client.h"
@@ -47,7 +45,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 
-#include "asio.hpp"
+#include <asio.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
