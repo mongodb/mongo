@@ -144,12 +144,15 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
                 session, bad_bucket, None, self.get_fs_config(prefix_1)), err_msg)
 
         # Test the customize file system function works when there is a valid bucket.
-        azure_fs_1 = ss.ss_customize_file_system(
+        azure_fs = ss.ss_customize_file_system(
             session, self.bucket, None, self.get_fs_config(prefix_1))
 
         # Create another file systems to make sure that terminate works.
         ss.ss_customize_file_system(
             session, self.bucket, None, self.get_fs_config(prefix_2))
+
+        # Check fs exist for non-existing object.
+        self.assertFalse(azure_fs.fs_exist(session, 'foobar'))
 
         # We cannot use the file system to create files, it is readonly.
         # So use python I/O to build up the file.
@@ -158,19 +161,61 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
             f.write(outbytes)
 
         # Flush valid file into Azure.
-        self.assertEqual(ss.ss_flush(session, azure_fs_1, 'foobar', 'foobar', None), 0)
+        self.assertEqual(ss.ss_flush(session, azure_fs, 'foobar', 'foobar', None), 0)
         # Check that file exists in Azure.
-        self.assertEqual(ss.ss_flush_finish(session, azure_fs_1, 'foobar', 'foobar', None), 0)
+        self.assertEqual(ss.ss_flush_finish(session, azure_fs, 'foobar', 'foobar', None), 0)
+        # Check file system exists for an existing object.
+        self.assertTrue(azure_fs.fs_exist(session, 'foobar'))
 
+        # Open existing file in the cloud. Only one active file handle exists for each open file.
+        # A reference count keeps track of open file instances so we can get a pointer to the same
+        # file handle as long as there are more open file calls than close file calls (i.e. reference
+        # count is greater than 0).
+        fh_1 = azure_fs.fs_open_file(session, 'foobar', file_system.open_file_type_data, file_system.open_readonly)
+        assert(fh_1 != None)
+        fh_2 = azure_fs.fs_open_file(session, 'foobar', file_system.open_file_type_data, file_system.open_readonly)
+        assert(fh_2 != None)
+
+        # File handle lock call not used in Azure implementation.
+        self.assertEqual(fh_1.fh_lock(session, True), 0)
+        self.assertEqual(fh_1.fh_lock(session, False), 0)
+
+        # Read using a valid file handle.
+        inbytes_1 = bytes(1000000)
+        self.assertEqual(fh_1.fh_read(session, 0, inbytes_1), 0)
+        self.assertEquals(outbytes[0:1000000], inbytes_1)
+
+        # Close a valid file handle.
+        self.assertEqual(fh_1.close(session), 0)
+
+        # Read using a valid file handle.
+        inbytes_2 = bytes(1000000)
+        self.assertEqual(fh_2.fh_read(session, 0, inbytes_2), 0)
+        self.assertEquals(outbytes[0:1000000], inbytes_2)
+
+        # File size succeeds.
+        self.assertEqual(fh_1.fh_size(session), 2200000)
+
+        # Close a valid file handle.
+        self.assertEquals(fh_2.close(session), 0)
+
+        # Test that opening invalid file fails.
+        bad_file = 'bad_file'
+        err_msg = '/Exception: Invalid argument/'
+        self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
+            lambda: azure_fs.fs_open_file(session, bad_file,
+                file_system.open_file_type_data,file_system.open_readonly), err_msg)
+
+        err_msg = '/Exception: No such file or directory/'
         # Flush non valid file into Azure will result in an exception.
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
-            lambda: ss.ss_flush(session, azure_fs_1, 'non_existing_file', 'non_existing_file', None), err_msg)
-        # Check that file does not exist in Azure. 
+            lambda: ss.ss_flush(session, azure_fs, 'non_existing_file', 'non_existing_file', None), err_msg)
+        # Check that file does not exist in Azure.
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
-            lambda: ss.ss_flush_finish(session, azure_fs_1, 'non_existing_file', 'non_existing_file', None), err_msg)
-        
+            lambda: ss.ss_flush_finish(session, azure_fs, 'non_existing_file', 'non_existing_file', None), err_msg)
+
         # Test that azure file system terminate succeeds.
-        self.assertEqual(azure_fs_1.terminate(session), 0)
+        self.assertEqual(azure_fs.terminate(session), 0)
 
         # Test that azure storage source terminate succeeds.
         self.assertEqual(ss.terminate(session), 0)

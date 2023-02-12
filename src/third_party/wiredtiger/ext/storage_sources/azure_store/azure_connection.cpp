@@ -162,10 +162,13 @@ azure_connection::read_object(
     return 0;
 }
 
+// Check if an object exists in the bucket and find the object size.
 int
-azure_connection::object_exists(const std::string &object_key, bool &exists) const
+azure_connection::object_exists(
+  const std::string &object_key, bool &exists, size_t &object_size) const
 {
     exists = false;
+    object_size = 0;
     std::string obj = _object_prefix + object_key;
 
     auto list_blob_response = _azure_client.ListBlobs();
@@ -177,6 +180,7 @@ azure_connection::object_exists(const std::string &object_key, bool &exists) con
             if (blob_item.IsDeleted) {
                 return -1;
             }
+            object_size = blob_item.BlobSize;
             exists = true;
             break;
         }
@@ -184,6 +188,7 @@ azure_connection::object_exists(const std::string &object_key, bool &exists) con
     return 0;
 }
 
+// Check if a bucket exists in the Azure storage source.
 int
 azure_connection::bucket_exists(bool &exists) const
 {
