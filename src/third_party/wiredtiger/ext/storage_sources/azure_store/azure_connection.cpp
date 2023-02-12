@@ -34,10 +34,10 @@
 #include <filesystem>
 #include <iostream>
 
-azure_connection::azure_connection(const std::string &bucket_name, const std::string &obj_prefix)
+azure_connection::azure_connection(const std::string &bucket_name, const std::string &bucket_prefix)
     : _azure_client(Azure::Storage::Blobs::BlobContainerClient::CreateFromConnectionString(
         std::getenv("AZURE_STORAGE_CONNECTION_STRING"), bucket_name)),
-      _bucket_name(bucket_name), _object_prefix(obj_prefix)
+      _bucket_name(bucket_name), _bucket_prefix(bucket_prefix)
 {
     // Confirm that we can access the bucket, else fail.
     bool exists;
@@ -51,10 +51,10 @@ azure_connection::azure_connection(const std::string &bucket_name, const std::st
 // Build a list of all of the objects in the bucket.
 int
 azure_connection::list_objects(
-  const std::string &prefix, std::vector<std::string> &objects, bool list_single) const
+  const std::string &search_prefix, std::vector<std::string> &objects, bool list_single) const
 {
     Azure::Storage::Blobs::ListBlobsOptions blob_parameters;
-    blob_parameters.Prefix = prefix;
+    blob_parameters.Prefix = _bucket_prefix + search_prefix;
     // If list_single is true, set the maximum number of returned blobs in the list_blob_response to
     // one.
     if (list_single)
@@ -81,7 +81,7 @@ azure_connection::list_objects(
 int
 azure_connection::put_object(const std::string &object_key, const std::string &file_path) const
 {
-    auto blob_client = _azure_client.GetBlockBlobClient(_object_prefix + object_key);
+    auto blob_client = _azure_client.GetBlockBlobClient(_bucket_prefix + object_key);
     // UploadFrom returns a UploadBlockBlobFromResult object describing the state of the updated
     // block blob on success and throws an exception on failure.
     try {
@@ -99,7 +99,7 @@ azure_connection::put_object(const std::string &object_key, const std::string &f
 int
 azure_connection::delete_object(const std::string &object_key) const
 {
-    std::string obj = _object_prefix + object_key;
+    std::string obj = _bucket_prefix + object_key;
 
     auto object_client = _azure_client.GetBlobClient(obj);
 
@@ -120,7 +120,7 @@ int
 azure_connection::read_object(
   const std::string &object_key, int64_t offset, size_t len, void *buf) const
 {
-    auto blob_client = _azure_client.GetBlockBlobClient(_object_prefix + object_key);
+    auto blob_client = _azure_client.GetBlockBlobClient(_bucket_prefix + object_key);
 
     // GetProperties returns a BlobProperties object containing the blob size on success
     // and throws an exception on failure.
@@ -168,6 +168,7 @@ azure_connection::object_exists(
   const std::string &object_key, bool &exists, size_t &object_size) const
 {
     exists = false;
+    std::string obj = _bucket_prefix + object_key;
     object_size = 0;
     std::string obj = _object_prefix + object_key;
 

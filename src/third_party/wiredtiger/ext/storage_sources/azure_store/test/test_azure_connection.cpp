@@ -52,19 +52,19 @@ randomize_test_prefix()
 
     REQUIRE(std::strftime(time_str, sizeof(time_str), "%F-%H-%M-%S", std::localtime(&t)) != 0);
 
-    std::string obj_prefix("azuretest/unit/"); // To be concatenated with a random string.
+    std::string bucket_prefix("azuretest/unit/"); // To be concatenated with a random string.
 
-    obj_prefix += time_str;
+    bucket_prefix += time_str;
 
     // Create a random device and use it to generate a random seed to initialize the generator.
     std::random_device my_random_device;
     unsigned seed = my_random_device();
     std::default_random_engine my_random_engine(seed);
 
-    obj_prefix += '/' + std::to_string(my_random_engine());
-    obj_prefix += "--";
+    bucket_prefix += '/' + std::to_string(my_random_engine());
+    bucket_prefix += "--";
 
-    return obj_prefix;
+    return bucket_prefix;
 }
 
 TEST_CASE("Testing Azure Connection Class", "azure-connection")
@@ -74,9 +74,9 @@ TEST_CASE("Testing Azure Connection Class", "azure-connection")
     bool exists = false;
     size_t object_size = 0;
 
-    std::string obj_prefix = randomize_test_prefix();
+    std::string bucket_prefix = randomize_test_prefix();
 
-    azure_connection conn = azure_connection("myblobcontainer1", obj_prefix);
+    azure_connection conn = azure_connection("myblobcontainer1", bucket_prefix);
     azure_connection conn_bad = azure_connection("myblobcontainer1", "bad_prefix_");
 
     std::vector<std::pair<std::string, std::string>> blob_objects;
@@ -93,7 +93,7 @@ TEST_CASE("Testing Azure Connection Class", "azure-connection")
 
     // Add objects into the container.
     for (auto pair : blob_objects) {
-        auto blob_client = azure_client.GetBlockBlobClient(obj_prefix + pair.first);
+        auto blob_client = azure_client.GetBlockBlobClient(bucket_prefix + pair.first);
         blob_client.UploadFrom(create_file(pair.first, pair.second));
     }
 
@@ -122,20 +122,20 @@ TEST_CASE("Testing Azure Connection Class", "azure-connection")
         std::vector<std::string> objects;
 
         // No matching objects. Object size should be 0.
-        REQUIRE(conn.list_objects(obj_prefix + non_exist_object_key, objects, false) == 0);
+        REQUIRE(conn.list_objects(non_exist_object_key, objects, false) == 0);
         REQUIRE(objects.size() == 0);
 
         // No matching objects with list single functionality. Object size should be 0.
-        REQUIRE(conn.list_objects(obj_prefix + non_exist_object_key, objects, true) == 0);
+        REQUIRE(conn.list_objects(non_exist_object_key, objects, true) == 0);
         REQUIRE(objects.size() == 0);
 
         // List all objects. Object size should be 2.
-        REQUIRE(conn.list_objects(obj_prefix + object_name, objects, false) == 0);
+        REQUIRE(conn.list_objects(object_name, objects, false) == 0);
         REQUIRE(objects.size() == blob_objects.size());
         objects.clear();
 
         // List single. Object size should be 1.
-        REQUIRE(conn.list_objects(obj_prefix + object_name, objects, true) == 0);
+        REQUIRE(conn.list_objects(object_name, objects, true) == 0);
         REQUIRE(objects.size() == 1);
 
         objects.clear();
@@ -143,7 +143,7 @@ TEST_CASE("Testing Azure Connection Class", "azure-connection")
 
     SECTION("Test delete functionality for Azure.", "[azure-connection]")
     {
-        auto blob_client = azure_client.GetBlockBlobClient(obj_prefix + object_name + "1");
+        auto blob_client = azure_client.GetBlockBlobClient(bucket_prefix + object_name + "1");
         std::vector<std::string> container;
 
         blob_client.UploadFrom(create_file(object_name + "1", payload));
@@ -160,7 +160,7 @@ TEST_CASE("Testing Azure Connection Class", "azure-connection")
         }
 
         // Check that the object does not exist in the container.
-        REQUIRE(std::find(container.begin(), container.end(), obj_prefix + object_name + "1") ==
+        REQUIRE(std::find(container.begin(), container.end(), bucket_prefix + object_name + "1") ==
           std::end(container));
     }
 
@@ -171,7 +171,7 @@ TEST_CASE("Testing Azure Connection Class", "azure-connection")
 
         REQUIRE(conn.put_object(object_name + "1", path) == 0);
 
-        auto blob_client = azure_client.GetBlockBlobClient(obj_prefix + object_name + "1");
+        auto blob_client = azure_client.GetBlockBlobClient(bucket_prefix + object_name + "1");
 
         // Test that putting an object that doesn't exist locally returns -1.
         REQUIRE(conn.put_object(non_exist_object_key, non_exist_object_key + ".txt") == -1);
@@ -182,11 +182,11 @@ TEST_CASE("Testing Azure Connection Class", "azure-connection")
         }
 
         // Check that the object exists in the container.
-        REQUIRE(std::find(container.begin(), container.end(), obj_prefix + object_name + "1") !=
+        REQUIRE(std::find(container.begin(), container.end(), bucket_prefix + object_name + "1") !=
           std::end(container));
         // Check that when putting an object fails that object is not in the container.
-        REQUIRE(std::find(container.begin(), container.end(), obj_prefix + non_exist_object_key) ==
-          std::end(container));
+        REQUIRE(std::find(container.begin(), container.end(),
+                  bucket_prefix + non_exist_object_key) == std::end(container));
 
         blob_client.Delete();
     }
@@ -224,12 +224,12 @@ TEST_CASE("Testing Azure Connection Class", "azure-connection")
 
     // Delete the objects we added earlier so we have no objects in the container.
     for (auto pair : blob_objects) {
-        auto blob_client = azure_client.GetBlockBlobClient(obj_prefix + pair.first);
+        auto blob_client = azure_client.GetBlockBlobClient(bucket_prefix + pair.first);
         blob_client.Delete();
     }
 
     // Sanity check that nothing exists.
     Azure::Storage::Blobs::ListBlobsOptions blob_parameters;
-    blob_parameters.Prefix = obj_prefix;
+    blob_parameters.Prefix = bucket_prefix;
     REQUIRE(azure_client.ListBlobs(blob_parameters).Blobs.size() == 0);
 }

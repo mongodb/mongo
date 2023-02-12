@@ -54,9 +54,9 @@ static const std::map<Azure::Core::Http::HttpStatusCode, int32_t> to_errno = {
  */
 class azure_connection {
     public:
-    azure_connection(const std::string &bucket_name, const std::string &obj_prefix = "");
+    azure_connection(const std::string &bucket_name, const std::string &bucket_prefix = "");
     int list_objects(
-      const std::string &prefix, std::vector<std::string> &objects, bool list_single) const;
+      const std::string &search_prefix, std::vector<std::string> &objects, bool list_single) const;
     int put_object(const std::string &object_key, const std::string &file_path) const;
     int delete_object(const std::string &object_key) const;
     int read_object(const std::string &object_key, int64_t offset, size_t len, void *buf) const;
@@ -64,7 +64,7 @@ class azure_connection {
 
     private:
     const std::string _bucket_name;
-    const std::string _object_prefix;
+    const std::string _bucket_prefix;
     const Azure::Storage::Blobs::BlobContainerClient _azure_client;
 
     const int http_to_errno(const Azure::Core::RequestFailedException &e) const;
