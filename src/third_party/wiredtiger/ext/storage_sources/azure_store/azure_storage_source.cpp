@@ -30,6 +30,7 @@
 #include <algorithm>
 #include <fstream>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -78,20 +79,17 @@ static int azure_flush_finish(
   WT_STORAGE_SOURCE *, WT_SESSION *, WT_FILE_SYSTEM *, const char *, const char *, const char *);
 
 // WT_FILE_SYSTEM Interface
-static int azure_object_list(WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, char ***,
-  uint32_t *) __attribute__((__unused__));
-static int azure_object_list_single(WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *,
-  char ***, uint32_t *) __attribute__((__unused__));
-static int azure_object_list_free(WT_FILE_SYSTEM *, WT_SESSION *, char **, uint32_t)
-  __attribute__((__unused__));
+static int azure_object_list(
+  WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, char ***, uint32_t *);
+static int azure_object_list_single(
+  WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, char ***, uint32_t *);
+static int azure_object_list_free(WT_FILE_SYSTEM *, WT_SESSION *, char **, uint32_t);
+static int azure_object_list_add(char ***, const std::vector<std::string> &, const uint32_t);
 static int azure_file_system_terminate(WT_FILE_SYSTEM *, WT_SESSION *);
-static int azure_file_exists(WT_FILE_SYSTEM *, WT_SESSION *, const char *, bool *);
-static int azure_remove(WT_FILE_SYSTEM *, WT_SESSION *, const char *, uint32_t)
-  __attribute__((__unused__));
-static int azure_rename(WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, uint32_t)
-  __attribute__((__unused__));
-static int azure_object_size(WT_FILE_SYSTEM *, WT_SESSION *, const char *, wt_off_t *)
-  __attribute__((__unused__));
+static int azure_file_system_exists(WT_FILE_SYSTEM *, WT_SESSION *, const char *, bool *);
+static int azure_remove(WT_FILE_SYSTEM *, WT_SESSION *, const char *, uint32_t);
+static int azure_rename(WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, uint32_t);
+static int azure_object_size(WT_FILE_SYSTEM *, WT_SESSION *, const char *, wt_off_t *);
 static int azure_file_open(
   WT_FILE_SYSTEM *, WT_SESSION *, const char *, WT_FS_OPEN_FILE_TYPE, uint32_t, WT_FILE_HANDLE **);
 
@@ -157,7 +155,7 @@ azure_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sessi
     azure_fs->fs.fs_directory_list_single = azure_object_list_single;
     azure_fs->fs.fs_directory_list_free = azure_object_list_free;
     azure_fs->fs.terminate = azure_file_system_terminate;
-    azure_fs->fs.fs_exist = azure_file_exists;
+    azure_fs->fs.fs_exist = azure_file_system_exists;
     azure_fs->fs.fs_open_file = azure_file_open;
     azure_fs->fs.fs_remove = azure_remove;
     azure_fs->fs.fs_rename = azure_rename;
@@ -234,30 +232,17 @@ static int
 azure_flush_finish(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
   WT_FILE_SYSTEM *file_system, const char *source, const char *object, const char *config)
 {
-    azure_file_system *azure_fs = reinterpret_cast<azure_file_system *>(file_system);
+    size_t size = 0;
 
     WT_UNUSED(storage_source);
-    WT_UNUSED(session);
     WT_UNUSED(config);
     WT_UNUSED(source);
-
-    std::cout << "azure_flush_finish: Checking object: " << object << " exists in Azure."
-              << std::endl;
-
-    // Check whether the object exists in the cloud.
-    bool exists_cloud = false;
-    size_t size = 0;
-    azure_fs->azure_conn->object_exists(object, exists_cloud, size);
-    if (!exists_cloud) {
-        std::cerr << "azure_flush_finish: Object: " << object << " does not exist in Azure."
-                  << std::endl;
-        return ENOENT;
-    }
-    std::cout << "azure_flush_finish: Object: " << object << " exists in Azure." << std::endl;
-
     WT_UNUSED(size);
 
-    return 0;
+    bool existp = false;
+    std::cout << "azure_flush_finish: Checking object: " << object << " exists in Azure."
+              << std::endl;
+    return azure_file_system_exists(file_system, session, object, &existp);
 }
 
 // Discard any resources on termination.
@@ -284,41 +269,102 @@ azure_terminate(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session)
     return 0;
 }
 
+// Helper to return a list of object names for the given location.
+static int
+azure_object_list_helper(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *directory,
+  const char *search_prefix, char ***dirlistp, uint32_t *countp, bool list_single)
+{
+    azure_file_system *azure_fs = reinterpret_cast<azure_file_system *>(file_system);
+    std::vector<std::string> objects;
+    std::string complete_prefix;
+
+    *countp = 0;
+
+    if (directory != nullptr) {
+        complete_prefix.append(directory);
+        // Add a terminating '/' if one doesn't exist.
+        if (complete_prefix.length() > 1 && complete_prefix.back() != '/')
+            complete_prefix.push_back('/');
+    }
+    if (search_prefix != nullptr)
+        complete_prefix.append(search_prefix);
+
+    int ret;
+
+    ret = list_single ? azure_fs->azure_conn->list_objects(complete_prefix, objects, true) :
+                        azure_fs->azure_conn->list_objects(complete_prefix, objects, false);
+
+    if (ret != 0) {
+        std::cerr << "azure_object_list: list_objects request to Azure failed." << std::endl;
+        return ret;
+    }
+    *countp = objects.size();
+
+    std::cerr << "azure_object_list: list_objects request to Azure succeeded. Received " << *countp
+              << " objects." << std::endl;
+    azure_object_list_add(dirlistp, objects, *countp);
+
+    return ret;
+}
+
+// Return a list of object names for the given location.
 static int
 azure_object_list(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *directory,
   const char *prefix, char ***dirlistp, uint32_t *countp)
 {
-    WT_UNUSED(file_system);
-    WT_UNUSED(session);
-    WT_UNUSED(directory);
-    WT_UNUSED(prefix);
-    WT_UNUSED(dirlistp);
-    WT_UNUSED(countp);
-
-    return 0;
+    return azure_object_list_helper(
+      file_system, session, directory, prefix, dirlistp, countp, false);
 }
 
+// Return a single object name for the given location.
 static int
 azure_object_list_single(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *directory,
   const char *prefix, char ***dirlistp, uint32_t *countp)
 {
-    WT_UNUSED(file_system);
-    WT_UNUSED(session);
-    WT_UNUSED(directory);
-    WT_UNUSED(prefix);
-    WT_UNUSED(dirlistp);
-    WT_UNUSED(countp);
-
-    return 0;
+    return azure_object_list_helper(
+      file_system, session, directory, prefix, dirlistp, countp, true);
 }
 
+// Free memory allocated by azure_object_list.
 static int
 azure_object_list_free(
   WT_FILE_SYSTEM *file_system, WT_SESSION *session, char **dirlist, uint32_t count)
 {
     WT_UNUSED(file_system);
     WT_UNUSED(session);
-    WT_UNUSED(dirlist);
+
+    if (dirlist != nullptr) {
+        while (count > 0)
+            free(dirlist[--count]);
+        free(dirlist);
+    }
+
+    return 0;
+}
+
+// Add objects retrieved from Azure bucket into the object list, and allocate the memory needed.
+static int
+azure_object_list_add(
+  char ***dirlistp, const std::vector<std::string> &objects, const uint32_t count)
+{
+
+    char **entries;
+    if ((entries = reinterpret_cast<char **>(malloc(sizeof(char *) * count))) == nullptr) {
+        std::cerr << "azure_object_list_add: Unable to allocate memory for object list."
+                  << std::endl;
+        return ENOMEM;
+    }
+
+    // Populate entries with the object string.
+    for (int i = 0; i < count; i++) {
+        if ((entries[i] = strdup(objects[i].c_str())) == nullptr) {
+            std::cerr << "azure_object_list_add: Unable to allocate memory for object string."
+                      << std::endl;
+            return ENOMEM;
+        }
+    }
+
+    *dirlistp = entries;
 
     return 0;
 }
@@ -346,25 +392,37 @@ azure_file_system_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *session)
     return 0;
 }
 
-// Check if the object (file) exists in the Azure storage source.
+// Check if the object exists in the Azure storage source.
 static int
-azure_file_exists(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, bool *existp)
+azure_file_system_exists(
+  WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, bool *existp)
 {
     azure_file_system *azure_fs = reinterpret_cast<azure_file_system *>(file_system);
-    int ret;
     size_t size = 0;
 
     WT_UNUSED(session);
     WT_UNUSED(size);
+    WT_DECL_RET;
 
-    if ((ret = azure_fs->azure_conn->object_exists(std::string(name), *existp, size)) != 0) {
-        std::cerr << "azure_file_open: object_exists request to Azure failed." << std::endl;
-        return ret;
-    }
+    std::cout << "azure_file_system_exists: Checking object: " << name << " exists in Azure."
+              << std::endl;
 
+    // Check whether the object exists in the cloud.
+    WT_ERR(azure_fs->azure_conn->object_exists(name, *existp, size));
+    if (!*existp) {
+        std::cout << "azure_file_system_exists: Object: " << name << " does not exist in Azure."
+                  << std::endl;
+    } else
+        std::cout << "azure_file_system_exists: Object: " << name << " exists in Azure."
+                  << std::endl;
     return 0;
+
+err:
+    std::cerr << "azure_file_system_exists: Error with searching for object: " << name << std::endl;
+    return ret;
 }
 
+// POSIX remove, not supported for cloud objects.
 static int
 azure_remove(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, uint32_t flags)
 {
@@ -373,9 +431,11 @@ azure_remove(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
     WT_UNUSED(name);
     WT_UNUSED(flags);
 
-    return 0;
+    std::cerr << "azure_remove: Object: " << name << ": remove of file not supported." << std::endl;
+    return ENOTSUP;
 }
 
+// POSIX rename, not supported for cloud objects.
 static int
 azure_rename(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *from, const char *to,
   uint32_t flags)
@@ -386,9 +446,11 @@ azure_rename(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *from,
     WT_UNUSED(to);
     WT_UNUSED(flags);
 
-    return 0;
+    std::cerr << "azure_rename: Object: " << from << ": rename of file not supported." << std::endl;
+    return ENOTSUP;
 }
 
+// Get the size of a file in bytes, by file name.
 static int
 azure_object_size(
   WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, wt_off_t *sizep)
