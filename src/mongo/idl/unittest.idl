@@ -770,6 +770,13 @@ structs:
                     variant: [int, string]
                 optional: true
 
+    one_array_variant:
+        description: UnitTest for an array of variant
+        strict: false
+        fields:
+            value:
+                type: array<variant<update_variant_struct, insert_variant_struct>>
+
     two_variants:
         description: UnitTest for a struct with two variant fields
         strict: false
@@ -1028,6 +1035,16 @@ commands:
                 type: array<object_basic_type>
                 supports_doc_sequence: true
                 optional: true
+
+    DocSequenceCommandArrayVariant:
+        description: UnitTest for a basic command with a array<variant> field marked with supports_doc_sequence
+        command_name: DocSequenceCommandArrayVariant
+        namespace: concatenate_with_db
+        api_version: ""
+        fields:
+            structs:
+                type: array<variant<update_variant_struct, insert_variant_struct>>
+                supports_doc_sequence: true
 
     DocSequenceCommandNonStrict:
         description: UnitTest for a basic command with fields marked with supports_doc_sequence and non-strict parsing

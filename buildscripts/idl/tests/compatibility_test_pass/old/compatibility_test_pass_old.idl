@@ -281,6 +281,16 @@ structs:
                     variant: [int, string, intStringBoolToIntString, 
                               StructFieldTypeRecursiveReplyTwo]
 
+    NewArrayVariantSubsetReply:
+        description: "This reply contains a field whose new array<variant> types are a subset
+                      of the old array<variant> types"
+        is_command_reply: true
+        fields:
+            variantSubsetReplyFieldThree:
+                stability: stable
+                type:
+                    array<variant<int, string, intStringBoolToIntString, StructFieldTypeRecursiveReplyTwo>>
+
     VariantRecursiveReply:
         description: "This reply contains a field that has a new variant type that is compatible
                       with the old variant type"
@@ -350,6 +360,14 @@ structs:
                      old command parameter's type are both structs"
         fields:
             insert:
+                type: int
+                stability: stable
+
+    UpdateParameterStruct:
+        description: "The new command parameter's type and the
+                     old command parameter's type are both structs"
+        fields:
+            update:
                 type: int
                 stability: stable
 
@@ -513,6 +531,15 @@ structs:
                 stability: stable
                 type:
                     variant: [int, string, InsertParameterStruct]
+
+    ArrayVariantStructSupersetTwoStruct:
+        description: "This struct contains a field where the new array<variant> types contains two structs
+                      while the old one contains one"
+        fields:
+            variantStructSupersetField:
+                stability: stable
+                type:
+                    array<variant<int, string, InsertParameterStruct>>
 
     VariantStructRecursiveStruct:
         description: "This struct contains a field where the old variant struct and the new
@@ -1719,6 +1746,17 @@ commands:
         namespace: type
         type: VariantStructSupersetTwoStruct
         cpp_name: newCommandTypeVariantStructTwoSuperset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newCommandTypeArrayVariantStructSuperset:
+        description: "new command passes because its type is a array<variant> type that is
+                      a superset of the old command type array<variant> types"
+        command_name: newCommandTypeArrayVariantStructSuperset
+        namespace: type
+        type: ArrayVariantStructSupersetTwoStruct
+        cpp_name: newCommandTypeArrayVariantStructSuperset
         strict: true
         api_version: "1"
         reply_type: OkReply

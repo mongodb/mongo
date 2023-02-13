@@ -246,6 +246,14 @@ structs:
                 type: int
                 stability: stable
 
+    DeleteParameterStruct:
+        description: "The new command parameter's type and the
+                     old command parameter's type are both structs"
+        fields:
+            delete:
+                type: int
+                stability: stable
+
     EnumOrStructFieldReply:
         description: "This reply contains a field that is a non-enum or struct type in the old
                       command but is an enum or struct in the new command"
@@ -619,6 +627,16 @@ structs:
                 stability: stable
                 type:
                     variant: [int, string, InsertParameterStruct]
+
+    NewArrayVariantStructNotSubsetReply:
+        description: "This reply contains a field whose new array<variant> types are not a subset
+                      of the old array<variant> types"
+        is_command_reply: true
+        fields:
+            variantStructNotSubsetReplyField:
+                stability: stable
+                type:
+                    array<variant<InsertParameterStruct, UpdateParameterStruct>>
 
     NewVariantStructNotSubsetReplyWithArray:
         description: "This reply contains a field whose new variant types are not a subset
@@ -2217,6 +2235,16 @@ commands:
         api_version: "1"
         reply_type: NewVariantStructNotSubsetReplyTwo
 
+    newReplyFieldArrayVariantStructNotSubset:
+        description: "new command fails because its reply field type is a array<variant> type that is not
+                      a subset of the old reply field array<variant> types"
+        command_name: newReplyFieldArrayVariantStructNotSubset
+        namespace: ignored
+        cpp_name: newReplyFieldArrayVariantStructNotSubset
+        strict: true
+        api_version: "1"
+        reply_type: NewArrayVariantStructNotSubsetReply
+
     newReplyFieldVariantStructNotSubsetWithArray:
         description: "new command fails because its reply field type is a variant type that is not
                       a subset of the old reply field variant types"
@@ -2312,6 +2340,20 @@ commands:
                 stability: stable
                 type:
                     variant: [int, bool, InsertParameterStruct, UpdateParameterStruct]
+
+    newParamArrayVariantNotSuperset:
+        description: "new command fails because its parameter type is a array<variant> type that is not
+                      a superset of the old parameter array<variant> types"
+        command_name: newParamArrayVariantNotSuperset
+        namespace: ignored
+        cpp_name: newParamArrayVariantNotSuperset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            arrayVariantNotSupersetParam:
+                stability: stable
+                type: array<variant<InsertParameterStruct, UpdateParameterStruct, DeleteParameterStruct>>
 
     newParamVariantNotSupersetWithArray:
         description: "new command fails because its parameter type is a variant type that is not

@@ -1656,6 +1656,26 @@ TEST(IDLArrayTests, TestSimpleArrays) {
     }
 }
 
+// Positive: Array of variant
+TEST(IDLArrayTests, TestArrayOfVariant) {
+    IDLParserContext ctxt("root");
+    auto testDoc = BSON("value" << BSON_ARRAY(BSON("insert" << 13) << BSON("update"
+                                                                           << "some word")));
+    auto parsed = One_array_variant::parse(ctxt, testDoc);
+    ASSERT_BSONOBJ_EQ(testDoc, parsed.toBSON());
+
+    ASSERT_EQ(stdx::get<Insert_variant_struct>(parsed.getValue()[0]).getInsert(), 13);
+    ASSERT_EQ(stdx::get<Update_variant_struct>(parsed.getValue()[1]).getUpdate(), "some word");
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        parsed.serialize(&builder);
+        auto loopbackDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+}
+
 // Positive: Optional Arrays
 TEST(IDLArrayTests, TestSimpleOptionalArrays) {
     IDLParserContext ctxt("root");
@@ -3368,6 +3388,45 @@ TEST(IDLDocSequence, TestNonStrict) {
 
         auto testStruct = DocSequenceCommandNonStrict::parse(ctxt, request);
         ASSERT_EQUALS(2UL, testStruct.getStructs().size());
+    }
+}
+
+TEST(IDLDocSequence, TestArrayVariant) {
+    IDLParserContext ctxt("root");
+
+    auto testTempDoc = BSON("DocSequenceCommandArrayVariant"
+                            << "coll1"
+                            << "$db"
+                            << "db"
+                            << "structs"
+                            << BSON_ARRAY(BSON("update"
+                                               << "foo")
+                                          << BSON("insert" << 12)));
+
+    OpMsgRequest request;
+    request.body = testTempDoc;
+
+    auto testStruct = DocSequenceCommandArrayVariant::parse(ctxt, request);
+    ASSERT_EQUALS(2UL, testStruct.getStructs().size());
+    ASSERT_EQ(stdx::get<Update_variant_struct>(testStruct.getStructs()[0]).getUpdate(), "foo");
+    ASSERT_EQ(stdx::get<Insert_variant_struct>(testStruct.getStructs()[1]).getInsert(), 12);
+
+    assert_same_types<decltype(testStruct.getNamespace()), const NamespaceString&>();
+
+    // Positive: Test we can round trip to a document sequence from the just parsed document
+    {
+        OpMsgRequest loopbackRequest = testStruct.serialize(BSONObj());
+
+        assertOpMsgEquals(request, loopbackRequest);
+        ASSERT_EQUALS(loopbackRequest.sequences.size(), 1UL);  // just "structs"
+        ASSERT_EQUALS(loopbackRequest.sequences[0].name, "structs");
+        ASSERT_EQUALS(loopbackRequest.sequences[0].objs.size(), 2);
+
+        // Verify doc sequence part of DocSequenceCommandArrayVariant::parseProtected too.
+        testStruct = DocSequenceCommandArrayVariant::parse(ctxt, loopbackRequest);
+        ASSERT_EQUALS(2UL, testStruct.getStructs().size());
+        ASSERT_EQ(stdx::get<Update_variant_struct>(testStruct.getStructs()[0]).getUpdate(), "foo");
+        ASSERT_EQ(stdx::get<Insert_variant_struct>(testStruct.getStructs()[1]).getInsert(), 12);
     }
 }
 

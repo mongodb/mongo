@@ -129,6 +129,7 @@ ERROR_ID_EMPTY_ACCESS_CHECK = "ID0089"
 ERROR_ID_MISSING_ACCESS_CHECK = "ID0090"
 ERROR_ID_STABILITY_UNKNOWN_VALUE = "ID0091"
 ERROR_ID_DUPLICATE_UNSTABLE_STABILITY = "ID0092"
+ERROR_ID_INVALID_ARRAY_VARIANT = "ID0093"
 
 
 class IDLError(Exception):
@@ -701,6 +702,13 @@ class ParserContext(object):
             location, ERROR_ID_NO_VARIANT_ENUM,
             "Field '%s' cannot be a variant with an enum alternative type '%s'" % (field_name,
                                                                                    type_name))
+
+    def add_bad_array_variant_types_error(self, location, type_name):
+        # type: (common.SourceLocation, str) -> None
+        """Add an error about a field type having a malformed type name."""
+        self._add_error(location, ERROR_ID_INVALID_ARRAY_VARIANT,
+                        ("'%s' is not a valid array variant type. A valid array variant type" +
+                         " is in the form 'array<variant<type_name1, ...>>'.") % (type_name))
 
     def is_scalar_non_negative_int_node(self, node, node_name):
         # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode], str) -> bool

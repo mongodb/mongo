@@ -1311,8 +1311,19 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_empty_line()
 
                 with self._predicate(_get_bson_type_check('arrayElement', 'arrayCtxt', ast_type)):
-                    array_value = self._gen_field_deserializer_expression(
-                        'arrayElement', field, ast_type, tenant)
+                    if ast_type.is_variant:
+                        # _gen_variant_deserializer generates code to parse the variant into the variable "_" + field.cpp_name,
+                        # so we create a local variable '_tmp'
+                        # and change cpp_name (for the duration of the _gen_variant_deserializer call) to 'tmp' so we can pass '_tmp'
+                        # to values.emplace_back below.
+                        self._writer.write_line('%s _tmp;' % ast_type.cpp_type)
+                        cpp_name = field.cpp_name
+                        field.cpp_name = 'tmp'
+                        array_value = self._gen_variant_deserializer(field, 'arrayElement', tenant)
+                        field.cpp_name = cpp_name
+                    else:
+                        array_value = self._gen_field_deserializer_expression(
+                            'arrayElement', field, ast_type, tenant)
                     self._writer.write_line('values.emplace_back(%s);' % (array_value))
 
             with self._block('else {', '}'):
@@ -1335,7 +1346,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line('%s = std::move(values);' % (_get_field_member_name(field)))
 
     def _gen_variant_deserializer(self, field, bson_element, tenant):
-        # type: (ast.Field, str, str) -> None
+        # type: (ast.Field, str, str) -> str
         """Generate the C++ deserializer piece for a variant field."""
         self._writer.write_empty_line()
         self._writer.write_line('const BSONType variantType = %s.type();' % (bson_element, ))
@@ -1397,34 +1408,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if is_multiple_structs:
                 self._writer.write_line('{')
                 self._writer.indent()
-                self._writer.write_line('auto firstElement = element.Obj().firstElement();')
-                beginning_str = ''
-
-            for variant_type in field.type.variant_struct_types:
-                if is_multiple_structs:
-                    struct_type = variant_type.first_element_field_name
-                    self._writer.write_line('%sif (firstElement.fieldNameStringData() == "%s") {' %
-                                            (beginning_str, struct_type))
-                    beginning_str = '} else '
-                    self._writer.indent()
-                object_value = '%s::parse(ctxt, %s.Obj())' % (variant_type.cpp_type, bson_element)
-
-                if field.chained_struct_field:
-                    self._writer.write_line(
-                        '%s.%s(%s);' % (_get_field_member_name(field.chained_struct_field),
-                                        _get_field_member_setter_name(field), object_value))
-                else:
-                    self._writer.write_line(
-                        '%s = %s;' % (_get_field_member_name(field), object_value))
-                if is_multiple_structs:
-                    self._writer.unindent()
-            if is_multiple_structs:
-                self._writer.write_line('} else {')
-                self._writer.indent()
                 self._writer.write_line(
-                    'ctxt.throwUnknownField(firstElement.fieldNameStringData());')
-                self._writer.unindent()
-                self._writer.write_line('}')
+                    'auto firstElement = %s.Obj().firstElement();' % bson_element)
+            self._gen_variant_deserializer_helper(field, field_name=_get_field_member_name(field),
+                                                  bson_element='%s.Obj()' % bson_element)
             self._writer.write_line('break;')
             if is_multiple_structs:
                 self._writer.unindent()
@@ -1442,6 +1429,37 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         # End of outer switch statement.
         self._writer.write_line('}')
+
+        # Used by _gen_array_deserializer for arrays of variant.
+        return _get_field_member_name(field)
+
+    def _gen_variant_deserializer_helper(self, field, field_name, bson_element):
+        beginning_str = ''
+        is_multiple_structs = len(field.type.variant_struct_types) > 1
+
+        for variant_type in field.type.variant_struct_types:
+            if is_multiple_structs:
+                struct_type = variant_type.first_element_field_name
+                self._writer.write_line('%sif (firstElement.fieldNameStringData() == "%s") {' %
+                                        (beginning_str, struct_type))
+                beginning_str = '} else '
+                self._writer.indent()
+            object_value = '%s::parse(ctxt, %s)' % (variant_type.cpp_type, bson_element)
+
+            if field.chained_struct_field:
+                self._writer.write_line(
+                    '%s.%s(%s);' % (_get_field_member_name(field.chained_struct_field),
+                                    _get_field_member_setter_name(field), object_value))
+            else:
+                self._writer.write_line('%s = %s;' % (field_name, object_value))
+            if is_multiple_structs:
+                self._writer.unindent()
+        if is_multiple_structs:
+            self._writer.write_line('} else {')
+            self._writer.indent()
+            self._writer.write_line('ctxt.throwUnknownField(firstElement.fieldNameStringData());')
+            self._writer.unindent()
+            self._writer.write_line('}')
 
     def _gen_usage_check(self, field, bson_element, field_usage_check):
         # type: (ast.Field, str, _FieldUsageCheckerBase) -> None
@@ -1552,8 +1570,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line('IDLParserContext tempContext(%s, &ctxt, %s);' %
                                         (_get_field_constant_name(field), tenant))
                 array_value = '%s::parse(tempContext, sequenceObject)' % (field.type.cpp_type, )
+            elif field.type.is_variant:
+                self._writer.write_line('%s _tmp;' % field.type.cpp_type)
+                self._writer.write_line('auto firstElement = sequenceObject.firstElement();')
+                self._gen_variant_deserializer_helper(field, field_name='_tmp',
+                                                      bson_element='sequenceObject')
+                array_value = '_tmp'
             else:
-                assert field.type.bson_serialization_type == ['object']
+                for serialization_type in field.type.bson_serialization_type:
+                    assert serialization_type == 'object'
                 if field.type.deserializer:
                     array_value = '%s(sequenceObject)' % (field.type.deserializer)
                 else:
@@ -2072,6 +2097,20 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     'BSONObjBuilder subObjBuilder(builder->subobjStart(${field_name}));')
                 self._writer.write_template('${access_member}.serialize(&subObjBuilder);')
 
+    def _gen_serializer_method_array_variant(self, field):
+        template_params = {
+            'field_name': _get_field_constant_name(field),
+            'access_member': 'item',
+        }
+
+        with self._with_template(template_params):
+            self._writer.write_template(
+                'BSONArrayBuilder arrayBuilder(builder->subarrayStart(${field_name}));')
+            with self._block('for (const auto& item : %s) {' % _access_member(field), '}'):
+                self._writer.write_line('BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());')
+                self._gen_serializer_method_variant_helper(field, template_params,
+                                                           builder='&subObjBuilder')
+
     def _gen_serializer_method_variant(self, field):
         # type: (ast.Field) -> None
         """Generate the serialize method definition for a variant type."""
@@ -2081,26 +2120,32 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         }
 
         with self._with_template(template_params):
-            with self._block('stdx::visit(OverloadedVisitor{', '}, ${access_member});'):
-                for variant_type in itertools.chain(
-                        field.type.variant_types,
-                        field.type.variant_struct_types if field.type.variant_struct_types else []):
+            self._gen_serializer_method_variant_helper(field, template_params)
 
-                    template_params[
-                        'cpp_type'] = 'std::vector<' + variant_type.cpp_type + '>' if variant_type.is_array else variant_type.cpp_type
+    def _gen_serializer_method_variant_helper(self, field, template_params, builder='builder'):
+        # type: (ast.Field, Dict[str, str], str) -> None
 
-                    with self._block('[builder](const ${cpp_type}& value) {', '},'):
-                        bson_cpp_type = cpp_types.get_bson_cpp_type(variant_type)
-                        if bson_cpp_type and bson_cpp_type.has_serializer():
-                            assert not field.type.is_array
-                            expression = bson_cpp_type.gen_serializer_expression(
-                                self._writer, 'value')
-                            template_params['expression'] = expression
-                            self._writer.write_template(
-                                'builder->append(${field_name}, ${expression});')
-                        else:
-                            self._writer.write_template(
-                                'idl::idlSerialize(builder, ${field_name}, value);')
+        with self._block('stdx::visit(OverloadedVisitor{', '}, ${access_member});'):
+            for variant_type in itertools.chain(
+                    field.type.variant_types,
+                    field.type.variant_struct_types if field.type.variant_struct_types else []):
+
+                template_params[
+                    'cpp_type'] = 'std::vector<' + variant_type.cpp_type + '>' if variant_type.is_array else variant_type.cpp_type
+
+                with self._block('[%s](const ${cpp_type}& value) {' % builder, '},'):
+                    bson_cpp_type = cpp_types.get_bson_cpp_type(variant_type)
+                    if field.type.is_variant and field.type.is_array:
+                        self._writer.write_template('value.serialize(%s);' % builder)
+                    elif bson_cpp_type and bson_cpp_type.has_serializer():
+                        assert not field.type.is_array
+                        expression = bson_cpp_type.gen_serializer_expression(self._writer, 'value')
+                        template_params['expression'] = expression
+                        self._writer.write_template(
+                            'builder->append(${field_name}, ${expression});')
+                    else:
+                        self._writer.write_template(
+                            'idl::idlSerialize(builder, ${field_name}, value);')
 
     def _gen_serializer_method_common(self, field):
         # type: (ast.Field) -> None
@@ -2121,12 +2166,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             optional_block_start = '{'
 
         with self._block(optional_block_start, '}'):
-
             if not field.type.is_struct:
                 if needs_custom_serializer:
                     self._gen_serializer_method_custom(field)
                 elif field.type.is_variant:
-                    self._gen_serializer_method_variant(field)
+                    if field.type.is_array:
+                        # For array of variants, is_variant == is_array == True.
+                        self._gen_serializer_method_array_variant(field)
+                    else:
+                        self._gen_serializer_method_variant(field)
                 else:
                     # Generate default serialization using BSONObjBuilder::append
                     # Note: BSONObjBuilder::append has overrides for std::vector also
@@ -2240,9 +2288,23 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     'documentSequence.name = %s.toString();' % (_get_field_constant_name(field)))
 
                 with self._block('for (const auto& item : %s) {' % (_access_member(field)), '}'):
-
                     if not field.type.is_struct:
-                        if field.type.serializer:
+                        if field.type.is_variant:
+                            # _gen_serializer_method_variant expects builder to be a pointer.
+                            self._writer.write_line('BSONObjBuilder objBuilder;')
+                            self._writer.write_line('BSONObjBuilder* builder = &objBuilder;')
+
+                            template_params = {
+                                'field_name': _get_field_constant_name(field),
+                                'access_member': 'item',
+                            }
+
+                            with self._with_template(template_params):
+                                self._gen_serializer_method_variant_helper(field, template_params)
+
+                            self._writer.write_line(
+                                'documentSequence.objs.push_back(builder->obj());')
+                        elif field.type.serializer:
                             self._writer.write_line('documentSequence.objs.push_back(item.%s());' %
                                                     (writer.get_method_name(field.type.serializer)))
                         else:

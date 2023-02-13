@@ -331,6 +331,23 @@ def _parse_field_type(ctxt, node):
         return variant
     else:
         assert node.id == "scalar"
+        if node.value.startswith('array<variant<'):
+            variant_types = syntax.parse_array_variant_types(node.value)
+            variant = syntax.FieldTypeVariant(ctxt.file_name, node.start_mark.line,
+                                              node.start_mark.column)
+            if variant_types is None:
+                location = common.SourceLocation(ctxt.file_name, node.start_mark.line,
+                                                 node.start_mark.column)
+                ctxt.add_bad_array_variant_types_error(location, node.value)
+            else:
+                for variant_type in variant_types:
+                    single = syntax.FieldTypeSingle(ctxt.file_name, node.start_mark.line,
+                                                    node.start_mark.column)
+                    single.type_name = variant_type
+                    variant.variant.append(single)
+
+            return syntax.FieldTypeArray(variant)
+
         single = syntax.FieldTypeSingle(ctxt.file_name, node.start_mark.line,
                                         node.start_mark.column)
 

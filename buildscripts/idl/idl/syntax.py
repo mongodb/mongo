@@ -70,6 +70,26 @@ class IDLSpec(object):
         self.feature_flags = []  # type: List[FeatureFlag]
 
 
+def parse_array_variant_types(name):
+    # type: (str) -> List[str]
+    """Parse a type name of the form 'array<variant<type1, type2, ...>>' and extract types."""
+    if not name.startswith("array<variant<") and not name.endswith(">>"):
+        return None
+
+    name = name[len("array<variant<"):]
+    name = name[:-2]
+
+    variant_types = []
+    for variant_type in name.split(','):
+        variant_type = variant_type.strip()
+        # Ban array<variant<..., array<...>, ...>> types.
+        if variant_type.startswith("array<") and variant_type.endswith(">"):
+            return None
+        variant_types.append(variant_type)
+
+    return variant_types
+
+
 def parse_array_type(name):
     # type: (str) -> str
     """Parse a type name of the form 'array<type>' and extract type."""
@@ -276,7 +296,8 @@ class SymbolTable(object):
             element_type = self.resolve_field_type(ctxt, location, field_name,
                                                    field_type.element_type)
             if not element_type:
-                ctxt.add_unknown_type_error(location, field_name, field_type.element_type.type_name)
+                ctxt.add_unknown_type_error(location, field_name,
+                                            field_type.element_type.debug_string())
                 return None
 
             if isinstance(element_type, Enum):
@@ -385,8 +406,11 @@ class ArrayType(Type):
         self.name = f'array<{element_type.name}>'
         self.element_type = element_type
         if isinstance(element_type, Type):
-            assert element_type.cpp_type
-            self.cpp_type = f'std::vector<{element_type.cpp_type}>'
+            if element_type.cpp_type:
+                self.cpp_type = f'std::vector<{element_type.cpp_type}>'
+            else:
+                assert isinstance(element_type, VariantType)
+                # cpp_type can't be set here for array of variants as element_type.cpp_type is not set yet.
 
 
 class VariantType(Type):
@@ -748,9 +772,9 @@ class FieldTypeArray(FieldType):
     """An array field's type, before it is resolved to a Type instance."""
 
     def __init__(self, element_type):
-        # type: (FieldTypeSingle) -> None
+        # type: (Union[FieldTypeSingle, FieldTypeVariant]) -> None
         """Construct a FieldTypeArray."""
-        self.element_type = element_type  # type: FieldTypeSingle
+        self.element_type = element_type  # type: Union[FieldTypeSingle, FieldTypeVariant]
 
         super(FieldTypeArray, self).__init__(element_type.file_name, element_type.line,
                                              element_type.column)

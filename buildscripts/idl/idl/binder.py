@@ -424,9 +424,13 @@ def _bind_struct_field(ctxt, ast_field, idl_type):
 
 
 def _bind_variant_field(ctxt, ast_field, idl_type):
-    # type: (errors.ParserContext, ast.Field, syntax.VariantType) -> None
+    # type: (errors.ParserContext, ast.Field, Union[syntax.VariantType, syntax.ArrayType]) -> None
     ast_field.type = _bind_type(idl_type)
     ast_field.type.is_variant = True
+
+    if isinstance(idl_type, syntax.ArrayType):
+        assert isinstance(idl_type.element_type, syntax.VariantType)
+        idl_type = idl_type.element_type
 
     _validate_bson_types_list(ctxt, idl_type, "field")
 
@@ -493,7 +497,6 @@ def _bind_command_type(ctxt, parsed_spec, command):
     if isinstance(base_type, syntax.Struct):
         _bind_struct_field(ctxt, ast_field, syntax_symbol)
     elif isinstance(base_type, syntax.VariantType):
-        # Arrays of variants aren't supported for now.
         assert isinstance(syntax_symbol, syntax.VariantType)
         _bind_variant_field(ctxt, ast_field, cast(syntax.VariantType, syntax_symbol))
     else:
@@ -816,8 +819,9 @@ def _validate_doc_sequence_field(ctxt, ast_field):
     assert ast_field.type.is_array
 
     # The only allowed BSON type for a doc_sequence field is "object"
-    if ast_field.type.bson_serialization_type != ['object']:
-        ctxt.add_bad_non_object_as_doc_sequence_error(ast_field, ast_field.name)
+    for serialization_type in ast_field.type.bson_serialization_type:
+        if serialization_type != 'object':
+            ctxt.add_bad_non_object_as_doc_sequence_error(ast_field, ast_field.name)
 
 
 def _normalize_method_name(cpp_type_name, cpp_method_name):
@@ -1038,9 +1042,9 @@ def _bind_field(ctxt, parsed_spec, field):
         ast_field.type.serializer = enum_type_info.get_enum_serializer_name()
         ast_field.type.deserializer = enum_type_info.get_enum_deserializer_name()
     elif isinstance(base_type, syntax.VariantType):
-        # Arrays of variants aren't supported for now.
-        assert isinstance(syntax_symbol, syntax.VariantType)
-        _bind_variant_field(ctxt, ast_field, cast(syntax.VariantType, syntax_symbol))
+        # syntax_symbol is an Array for arrays of variant.
+        assert isinstance(syntax_symbol, (syntax.ArrayType, syntax.VariantType))
+        _bind_variant_field(ctxt, ast_field, syntax_symbol)
     else:
         assert isinstance(base_type, syntax.Type)
 
