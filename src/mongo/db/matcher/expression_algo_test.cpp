@@ -178,6 +178,14 @@ TEST(ExpressionAlgoIsSubsetOf, CompareAnd_GT) {
     ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
 }
 
+TEST(ExpressionAlgoIsSubsetOf, CompareAnd_SingleField) {
+    ParsedMatchExpression filter("{a: {$gt: 5, $lt: 7}}");
+    ParsedMatchExpression query("{a: {$gt: 5, $lt: 6}}");
+
+    ASSERT_TRUE(expression::isSubsetOf(query.get(), filter.get()));
+    ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
+}
+
 TEST(ExpressionAlgoIsSubsetOf, CompareOr_LT) {
     ParsedMatchExpression lt5("{a: {$lt: 5}}");
     ParsedMatchExpression eq2OrEq3("{$or: [{a: 2}, {a: 3}]}");
