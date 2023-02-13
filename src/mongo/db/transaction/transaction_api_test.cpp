@@ -2332,6 +2332,10 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnNonTransientErrorIfNotCancelled) {
 
     // After the abort finishes, the API should not have retried.
     expectSentAbort(1 /* txnNumber */, WriteConcernOptions().toBSON());
+
+    // Wait for tasks so destructors run on the main test thread.
+    executor->shutdown();
+    executor->join();
 }
 
 TEST_F(TxnAPITest, WaitsForBestEffortAbortOnTransientError) {
@@ -2399,6 +2403,10 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnTransientError) {
                       boost::none /* readConcern */,
                       WriteConcernOptions().toBSON() /* writeConcern */);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+
+    // Wait for tasks so destructors run on the main test thread.
+    executor->shutdown();
+    executor->join();
 }
 
 }  // namespace
