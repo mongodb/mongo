@@ -50,7 +50,8 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
@@ -171,7 +172,8 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion
+  - name: .sharding .common !.csrs !.multiversion !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -341,7 +343,8 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion
+  - name: .sharding .common !.csrs !.multiversion !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -505,7 +508,8 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion
+  - name: .sharding .common !.csrs !.multiversion !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -678,7 +682,8 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -797,7 +802,8 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -913,7 +919,8 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -1015,7 +1022,8 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -1192,7 +1200,8 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion
+  - name: .sharding .common !.csrs !.multiversion !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -1310,7 +1319,8 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion
+  - name: .sharding .common !.csrs !.multiversion !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -1433,7 +1443,8 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion
+  - name: .sharding .common !.csrs !.multiversion !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -1564,7 +1575,8 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -1735,7 +1747,8 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion
+  - name: .sharding .common !.csrs !.multiversion !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
   - name: .publish
@@ -2489,7 +2502,8 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
   - name: .updatefuzzer
@@ -2567,7 +2581,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.gcm
   - name: .ssl
   - name: .stitch
   - name: .updatefuzzer
