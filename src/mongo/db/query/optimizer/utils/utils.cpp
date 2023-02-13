@@ -248,11 +248,7 @@ public:
         auto& leftReqMap = leftResult->_reqMap;
         auto& rightReqMap = rightResult->_reqMap;
         if constexpr (isMultiplicative) {
-            ProjectionRenames projectionRenames;
-            if (!intersectPartialSchemaReq(leftReqMap, rightReqMap, projectionRenames)) {
-                return {};
-            }
-            if (!projectionRenames.empty()) {
+            if (!intersectPartialSchemaReq(leftReqMap, rightReqMap)) {
                 return {};
             }
 
@@ -688,6 +684,7 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
 bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
                                    const MultikeynessTrie& multikeynessTrie,
                                    PartialSchemaRequirements& reqMap,
+                                   ProjectionRenames& projectionRenames,
                                    const ConstFoldFn& constFold) {
     PartialSchemaRequirements result;
     boost::optional<std::pair<PartialSchemaKey, PartialSchemaRequirement>> prevEntry;
@@ -704,26 +701,30 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
     // Simplify paths by eliminating unnecessary Traverse elements.
     for (const auto& [key, req] : reqMap.conjuncts()) {
         PartialSchemaKey newKey = key;
+
         bool simplified = false;
-        if (key._projectionName == scanProjName && checkPathContainsTraverse(newKey._path)) {
+        const bool containedTraverse = checkPathContainsTraverse(newKey._path);
+        if (key._projectionName == scanProjName && containedTraverse) {
             simplified |= simplifyTraverseNonArray(newKey._path, multikeynessTrie);
         }
 
-        // Maintain the invariant that Traverse-less keys appear only once:
-        // we can move the conjunction into the intervals and simplify.
+        // Ensure that Traverse-less keys appear only once: we can move the conjunction into the
+        // intervals and simplify.
         if (prevEntry) {
-            if (simplified && prevEntry->first == newKey) {
+            if ((!containedTraverse || simplified) && prevEntry->first == newKey) {
                 auto& prevReq = prevEntry->second;
 
-                boost::optional<ProjectionName> resultBoundProjName;
+                boost::optional<ProjectionName> resultBoundProjName =
+                    prevReq.getBoundProjectionName();
                 auto resultIntervals = prevReq.getIntervals();
                 if (const auto& boundProjName = req.getBoundProjectionName()) {
-                    tassert(6624168,
-                            "Should not be seeing more than one bound projection per key",
-                            !prevReq.getBoundProjectionName());
-                    resultBoundProjName = boundProjName;
-                } else {
-                    resultBoundProjName = prevReq.getBoundProjectionName();
+                    if (resultBoundProjName) {
+                        // The existing name wins (stays in 'reqMap'). We tell the caller that the
+                        // name "boundProjName" is available under "resultBoundProjName".
+                        projectionRenames.emplace(*boundProjName, *resultBoundProjName);
+                    } else {
+                        resultBoundProjName = boundProjName;
+                    }
                 }
 
                 combineIntervalsDNF(true /*intersect*/, resultIntervals, req.getIntervals());
@@ -793,8 +794,7 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
  */
 static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
                                       PartialSchemaKey key,
-                                      PartialSchemaRequirement req,
-                                      ProjectionRenames& projectionRenames) {
+                                      PartialSchemaRequirement req) {
     for (;;) {
         bool merged = false;
 
@@ -802,6 +802,8 @@ static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
         const bool pathHasTraverse = !pathIsId && checkPathContainsTraverse(key._path);
         {
             bool success = false;
+            bool addNewKey = false;
+
             // Look for exact match on the path, and if found combine intervals.
             for (auto& [existingKey, existingReq] : reqMap.conjuncts()) {
                 if (existingKey != key) {
@@ -811,8 +813,9 @@ static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
                 auto resultIntervals = existingReq.getIntervals();
                 if (pathHasTraverse) {
                     combineIntervalsDNF(true /*intersect*/, resultIntervals, req.getIntervals());
-                    if (resultIntervals == existingReq.getIntervals()) {
-                        // Existing interval subsumes the new one.
+                    if (resultIntervals == existingReq.getIntervals() ||
+                        resultIntervals == req.getIntervals()) {
+                        // Existing interval subsumes the new one or vice versa.
                         success = true;
                     }
                 } else {
@@ -826,11 +829,9 @@ static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
                         existingReq.getBoundProjectionName();
                     if (const auto& boundProjName = req.getBoundProjectionName()) {
                         if (resultBoundProjName) {
-                            // The new and existing projections both bind a name, so:
-                            // - The existing name wins (stays in 'reqMap').
-                            // - We tell the caller that the name bound is 'req' is now
-                            //   available by the name in 'existingReq'.
-                            projectionRenames.emplace(*boundProjName, *resultBoundProjName);
+                            // The new and existing projections both bind a name. Add an entry with
+                            // the new name. We will attempt to simplify later.
+                            addNewKey = true;
                         } else {
                             // Only the new projection binds a name, so we'll update 'reqMap' to
                             // include it.
@@ -849,6 +850,9 @@ static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
             }
 
             if (success) {
+                if (addNewKey) {
+                    reqMap.add(std::move(key), std::move(req));
+                }
                 return true;
             }
         }
@@ -900,9 +904,8 @@ bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
                 !req.getBoundProjectionName());
     }
 
-    ProjectionRenames projectionRenames_unused;
     PartialSchemaRequirements intersection = lhs;
-    if (intersectPartialSchemaReq(intersection, rhs, projectionRenames_unused)) {
+    if (intersectPartialSchemaReq(intersection, rhs)) {
         return intersection == lhs;
     }
     // Intersection was empty-set, and we assume neither input is empty-set.
@@ -911,10 +914,9 @@ bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
 }
 
 bool intersectPartialSchemaReq(PartialSchemaRequirements& target,
-                               const PartialSchemaRequirements& source,
-                               ProjectionRenames& projectionRenames) {
+                               const PartialSchemaRequirements& source) {
     for (const auto& [key, req] : source.conjuncts()) {
-        if (!intersectPartialSchemaReq(target, key, req, projectionRenames)) {
+        if (!intersectPartialSchemaReq(target, key, req)) {
             return false;
         }
     }
@@ -1582,13 +1584,10 @@ void sortResidualRequirements(ResidualRequirementsWithCE& residualReq) {
     }
 }
 
-void applyProjectionRenames(ProjectionRenames projectionRenames,
-                            ABT& node,
-                            const std::function<void(const ABT& node)>& visitor) {
+void applyProjectionRenames(ProjectionRenames projectionRenames, ABT& node) {
     for (auto&& [targetProjName, sourceProjName] : projectionRenames) {
         node = make<EvaluationNode>(
             std::move(targetProjName), make<Variable>(std::move(sourceProjName)), std::move(node));
-        visitor(node);
     }
 }
 

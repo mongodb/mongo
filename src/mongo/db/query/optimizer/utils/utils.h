@@ -241,11 +241,15 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
 
 /**
  * Given a set of non-multikey paths, remove redundant Traverse elements from paths in a Partial
- * Schema Requirement structure. Returns true if we have an empty result after simplification.
+ * Schema Requirement structure. Following that the intervals of any remaining non-multikey paths
+ * (following simplification) on the same key are intersected. Returns true if we have an empty
+ * result after simplification. Each redundant binding gets an entry in 'projectionRenames', which
+ * maps redundant name to the de-duplicated name.
  */
 bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
                                    const MultikeynessTrie& multikeynessTrie,
                                    PartialSchemaRequirements& reqMap,
+                                   ProjectionRenames& projectionRenames,
                                    const ConstFoldFn& constFold);
 
 /**
@@ -272,9 +276,7 @@ bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
  * The intersection:
  * - is a predicate that matches iff both original predicates match.
  * - has all the bindings from 'target' and 'source', but excluding
- *   bindings that would be redundant (have the same key). Each
- *   redundant binding gets an entry in 'projectionRenames', which maps
- *   the redundant name to the de-duplicated name.
+ *   bindings that would be redundant (have the same key).
  *
  * "Failure" means we are unable to represent the result as a PartialSchemaRequirements.
  * This can happen when:
@@ -282,8 +284,7 @@ bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
  * - 'source' reads from a projection bound by 'target'.
  */
 bool intersectPartialSchemaReq(PartialSchemaRequirements& target,
-                               const PartialSchemaRequirements& source,
-                               ProjectionRenames& projectionRenames);
+                               const PartialSchemaRequirements& source);
 
 
 /**
@@ -343,10 +344,7 @@ void lowerPartialSchemaRequirements(CEType scanGroupCE,
 
 void sortResidualRequirements(ResidualRequirementsWithCE& residualReq);
 
-void applyProjectionRenames(
-    ProjectionRenames projectionRenames,
-    ABT& node,
-    const std::function<void(const ABT& node)>& visitor = [](const ABT&) {});
+void applyProjectionRenames(ProjectionRenames projectionRenames, ABT& node);
 
 void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& requiredProjections,
                                        ResidualRequirements& residualReqs,

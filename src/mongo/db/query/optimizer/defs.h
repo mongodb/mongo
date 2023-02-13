@@ -68,6 +68,8 @@ using ProjectionNameVector = std::vector<ProjectionName>;
 
 template <typename T>
 using ProjectionNameMap = opt::unordered_map<ProjectionName, T, ProjectionName::Hasher>;
+
+// Key: new/target projection, value: existing/source projection.
 using ProjectionRenames = ProjectionNameMap<ProjectionName>;
 
 // Map from scanDefName to rid projection name.

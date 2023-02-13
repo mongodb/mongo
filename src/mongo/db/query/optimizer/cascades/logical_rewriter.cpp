@@ -554,14 +554,14 @@ static boost::optional<ABT> mergeSargableNodes(
     }
 
     PartialSchemaRequirements mergedReqs = belowNode.getReqMap();
-    ProjectionRenames projectionRenames;
-    if (!intersectPartialSchemaReq(mergedReqs, aboveNode.getReqMap(), projectionRenames)) {
+    if (!intersectPartialSchemaReq(mergedReqs, aboveNode.getReqMap())) {
         return {};
     }
 
     const ProjectionName& scanProjName = indexingAvailability.getScanProjection();
+    ProjectionRenames projectionRenames;
     bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
-        scanProjName, multikeynessTrie, mergedReqs, ctx.getConstFold());
+        scanProjName, multikeynessTrie, mergedReqs, projectionRenames, ctx.getConstFold());
     if (hasEmptyInterval) {
         return createEmptyValueScanNode(ctx);
     }
@@ -682,8 +682,16 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         return;
     }
 
-    bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
-        scanProjName, scanDef.getMultikeynessTrie(), conversion->_reqMap, ctx.getConstFold());
+    ProjectionRenames projectionRenames_unused;
+    bool hasEmptyInterval = simplifyPartialSchemaReqPaths(scanProjName,
+                                                          scanDef.getMultikeynessTrie(),
+                                                          conversion->_reqMap,
+                                                          projectionRenames_unused,
+                                                          ctx.getConstFold());
+    tassert(6624156,
+            "We should not be seeing renames from a converted Filter",
+            projectionRenames_unused.empty());
+
     if (hasEmptyInterval) {
         addEmptyValueScanNode(ctx);
         return;
