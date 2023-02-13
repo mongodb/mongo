@@ -77,6 +77,9 @@
         # Exclude last-continuous specific tests
         - jstests/multiVersion/targetedTestsLastContinuousFeatures/*.js
 
+        # Exclude last-lts specific tests
+        - jstests/multiVersion/targetedTestsLastLtsFeatures/*.js
+
         # TODO: SERVER-21578
         - jstests/multiVersion/genericSetFCVUsage/balancer_multiVersion_detect.js
 
