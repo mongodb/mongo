@@ -34,6 +34,8 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/multitenancy.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/durable_catalog_impl.h"
@@ -206,7 +208,10 @@ public:
 class StorageEngineRepairTest : public StorageEngineTest {
 public:
     StorageEngineRepairTest()
-        : StorageEngineTest(Options{}.repair(RepairAction::kRepair).ephemeral(false)) {}
+        : StorageEngineTest(Options{}.repair(RepairAction::kRepair).ephemeral(false)) {
+        repl::StorageInterface::set(getServiceContext(),
+                                    std::make_unique<repl::StorageInterfaceImpl>());
+    }
 
     void tearDown() {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());

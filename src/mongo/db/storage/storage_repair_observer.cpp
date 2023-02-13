@@ -43,9 +43,9 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
 
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_file_util.h"
@@ -157,16 +157,18 @@ void StorageRepairObserver::_invalidateReplConfigIfNeeded(OperationContext* opCt
     // a replica set but lost its config due to a repair, it would automatically perform a resync.
     // If this node is a standalone, this would lead to a confusing error message if it were
     // added to a replica set later on.
-    BSONObj config;
-    if (!Helpers::getSingleton(opCtx, kConfigNss, config)) {
+    auto storage = repl::StorageInterface::get(opCtx);
+    auto swConfig = storage->findSingleton(opCtx, kConfigNss);
+    if (!swConfig.isOK()) {
         return;
     }
+    auto config = swConfig.getValue();
     if (config.hasField(repl::ReplSetConfig::kRepairedFieldName)) {
         return;
     }
     BSONObjBuilder configBuilder(config);
     configBuilder.append(repl::ReplSetConfig::kRepairedFieldName, true);
-    Helpers::putSingleton(opCtx, kConfigNss, configBuilder.obj());
+    fassert(7101800, storage->putSingleton(opCtx, kConfigNss, {configBuilder.obj(), Timestamp{}}));
 
     JournalFlusher::get(opCtx)->waitForJournalFlush();
 }

@@ -36,6 +36,8 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/logv2/log.h"
@@ -60,6 +62,8 @@ public:
         repl::ReplicationCoordinator::set(
             getServiceContext(),
             std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));
+        repl::StorageInterface::set(getServiceContext(),
+                                    std::make_unique<repl::StorageInterfaceImpl>());
     }
 
     void assertRepairIncompleteOnTearDown() {
