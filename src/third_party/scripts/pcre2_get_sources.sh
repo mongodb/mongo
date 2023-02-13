@@ -29,7 +29,7 @@ if [ "$#" -ne 0 ]; then
 fi
 
 NAME=pcre2
-SUFFIX=10.40
+SUFFIX=10.42
 GIT_SSH=git@github.com:PCRE2Project/pcre2.git
 THIRD_PARTY_DIR=$(git rev-parse --show-toplevel)/src/third_party
 DEST_DIR=$THIRD_PARTY_DIR/$NAME
