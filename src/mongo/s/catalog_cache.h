@@ -446,7 +446,7 @@ private:
     CatalogCacheLoader& _cacheLoader;
 
     // Executor on which the caches below will execute their blocking work
-    std::shared_ptr<ThreadPool> _executor;
+    ThreadPool _executor;
 
     DatabaseCache _databaseCache;
 

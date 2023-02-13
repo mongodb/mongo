@@ -249,25 +249,24 @@ bool ComparableDatabaseVersion::operator<(const ComparableDatabaseVersion& other
 
 CatalogCache::CatalogCache(ServiceContext* const service, CatalogCacheLoader& cacheLoader)
     : _cacheLoader(cacheLoader),
-      _executor(std::make_shared<ThreadPool>([] {
+      _executor([] {
           ThreadPool::Options options;
           options.poolName = "CatalogCache";
           options.minThreads = 0;
           options.maxThreads = 6;
           return options;
-      }())),
-      _databaseCache(service, *_executor, _cacheLoader),
-      _collectionCache(service, *_executor, _cacheLoader),
-      _indexCache(service, *_executor) {
-    _executor->startup();
+      }()),
+      _databaseCache(service, _executor, _cacheLoader),
+      _collectionCache(service, _executor, _cacheLoader),
+      _indexCache(service, _executor) {
+    _executor.startup();
 }
 
 CatalogCache::~CatalogCache() {
-    // The executor is used by the Database and Collection caches,
-    // so it must be joined, before these caches are destroyed,
-    // per the contract of ReadThroughCache.
-    _executor->shutdown();
-    _executor->join();
+    // The executor is used by all the caches that correspond to the router role, so it must be
+    // joined before these caches are destroyed, per the contract of ReadThroughCache.
+    _executor.shutdown();
+    _executor.join();
 }
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
@@ -505,8 +504,7 @@ boost::optional<GlobalIndexesCache> CatalogCache::_getCollectionIndexInfoAt(
         } catch (const DBException& ex) {
             bool isCatalogCacheRetriableError = ex.isA<ErrorCategory::SnapshotError>() ||
                 ex.code() == ErrorCodes::ConflictingOperationInProgress ||
-                ex.code() == ErrorCodes::QueryPlanKilled ||
-                ex.code() == ErrorCodes::ReadThroughCacheLookupCanceled;
+                ex.code() == ErrorCodes::QueryPlanKilled;
             if (!isCatalogCacheRetriableError) {
                 throw;
             }
