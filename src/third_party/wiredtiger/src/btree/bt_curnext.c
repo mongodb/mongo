@@ -581,6 +581,9 @@ __cursor_key_order_check_col(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, boo
 
     if (cbt->lastrecno == WT_RECNO_OOB || (next && cmp < 0) || (!next && cmp > 0)) {
         cbt->lastrecno = cbt->recno;
+        cbt->lastref = cbt->ref;
+        cbt->lastslot = cbt->slot;
+        cbt->lastins = cbt->ins;
         return (0);
     }
 
@@ -616,8 +619,12 @@ __cursor_key_order_check_row(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, boo
     if (cbt->lastkey->size != 0)
         WT_RET(__wt_compare(session, btree->collator, cbt->lastkey, key, &cmp));
 
-    if (cbt->lastkey->size == 0 || (next && cmp < 0) || (!next && cmp > 0))
+    if (cbt->lastkey->size == 0 || (next && cmp < 0) || (!next && cmp > 0)) {
+        cbt->lastref = cbt->ref;
+        cbt->lastslot = cbt->slot;
+        cbt->lastins = cbt->ins;
         return (__wt_buf_set(session, cbt->lastkey, cbt->iface.key.data, cbt->iface.key.size));
+    }
 
     WT_ERR(__wt_scr_alloc(session, 512, &a));
     WT_ERR(__wt_scr_alloc(session, 512, &b));
@@ -669,6 +676,10 @@ __wt_cursor_key_order_init(WT_CURSOR_BTREE *cbt)
 
     session = CUR2S(cbt);
 
+    cbt->lastref = cbt->ref;
+    cbt->lastslot = cbt->slot;
+    cbt->lastins = cbt->ins;
+
     /*
      * Cursor searches set the position for cursor movements, set the last-key value for diagnostic
      * checking.
@@ -699,6 +710,10 @@ __wt_cursor_key_order_reset(WT_CURSOR_BTREE *cbt)
     if (cbt->lastkey != NULL)
         cbt->lastkey->size = 0;
     cbt->lastrecno = WT_RECNO_OOB;
+
+    cbt->lastref = NULL;
+    cbt->lastslot = UINT32_MAX;
+    cbt->lastins = NULL;
 }
 #endif
 

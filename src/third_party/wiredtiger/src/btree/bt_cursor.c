@@ -2265,6 +2265,9 @@ __wt_btcur_open(WT_CURSOR_BTREE *cbt)
 #ifdef HAVE_DIAGNOSTIC
     cbt->lastkey = &cbt->_lastkey;
     cbt->lastrecno = WT_RECNO_OOB;
+    cbt->lastref = NULL;
+    cbt->lastslot = UINT32_MAX;
+    cbt->lastins = NULL;
 #endif
 }
 
