@@ -871,38 +871,38 @@ buildvariants:
     tasks:
       - name: compile
 
-  - name: linux-standalone
-    display_name: Linux Standalone Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: standalone
-      infrastructure_provisioning: single
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-single"
-    depends_on: *_compile_amazon2
-    tasks: &standalonetasks
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: dsi_integ_test_run_command_simple
-      - name: smoke_test
-      - name: industry_benchmarks
-      - name: ycsb_60GB
-      - name: crud_workloads
-      - name: genny_canaries
-      - name: cursor_manager
-      - name: mixed_workloads
-      - name: misc_workloads
-      - name: map_reduce_workloads
-      - name: non_sharded_workloads
-      - name: bestbuy_agg
-      - name: bestbuy_agg_merge_different_db
-      - name: bestbuy_agg_merge_same_db
-      - name: bestbuy_agg_merge_wordcount
-      - name: bestbuy_query
+  # - name: linux-standalone
+  #   display_name: Linux Standalone Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: standalone
+  #     infrastructure_provisioning: single
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-single"
+  #   depends_on: *_compile_amazon2
+  #   tasks: &standalonetasks
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: dsi_integ_test_run_command_simple
+  #     - name: smoke_test
+  #     - name: industry_benchmarks
+  #     - name: ycsb_60GB
+  #     - name: crud_workloads
+  #     - name: genny_canaries
+  #     - name: cursor_manager
+  #     - name: mixed_workloads
+  #     - name: misc_workloads
+  #     - name: map_reduce_workloads
+  #     - name: non_sharded_workloads
+  #     - name: bestbuy_agg
+  #     - name: bestbuy_agg_merge_different_db
+  #     - name: bestbuy_agg_merge_same_db
+  #     - name: bestbuy_agg_merge_wordcount
+  #     - name: bestbuy_query
 
   - name: compile-rhel70
     display_name: Compile for Atlas-like
@@ -922,451 +922,451 @@ buildvariants:
     tasks:
     - name: compile
 
-  - name: linux-1-node-replSet
-    display_name: Linux 1-Node ReplSet Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: single-replica
-      infrastructure_provisioning: single
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-single"
-    depends_on: *_compile_amazon2
-    tasks: &1nodetasks
-      - name: industry_benchmarks
-      - name: ycsb_60GB
-      - name: crud_workloads
-      - name: mixed_workloads
-      - name: misc_workloads
-      - name: map_reduce_workloads
-      - name: smoke_test
-      - name: retryable_writes_workloads
-      - name: non_sharded_workloads
-      - name: bestbuy_agg
-      - name: bestbuy_agg_merge_different_db
-      - name: bestbuy_agg_merge_same_db
-      - name: bestbuy_agg_merge_wordcount
-      - name: bestbuy_query
-      - name: change_streams_throughput
-      - name: change_streams_latency
-      - name: snapshot_reads
-      - name: linkbench
-      - name: linkbench2
-      - name: tpcc
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks_wmajority
+  # - name: linux-1-node-replSet
+  #   display_name: Linux 1-Node ReplSet Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: single-replica
+  #     infrastructure_provisioning: single
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-single"
+  #   depends_on: *_compile_amazon2
+  #   tasks: &1nodetasks
+  #     - name: industry_benchmarks
+  #     - name: ycsb_60GB
+  #     - name: crud_workloads
+  #     - name: mixed_workloads
+  #     - name: misc_workloads
+  #     - name: map_reduce_workloads
+  #     - name: smoke_test
+  #     - name: retryable_writes_workloads
+  #     - name: non_sharded_workloads
+  #     - name: bestbuy_agg
+  #     - name: bestbuy_agg_merge_different_db
+  #     - name: bestbuy_agg_merge_same_db
+  #     - name: bestbuy_agg_merge_wordcount
+  #     - name: bestbuy_query
+  #     - name: change_streams_throughput
+  #     - name: change_streams_latency
+  #     - name: snapshot_reads
+  #     - name: linkbench
+  #     - name: linkbench2
+  #     - name: tpcc
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: industry_benchmarks_wmajority
 
-  - name: linux-standalone-audit
-    display_name: Linux Standalone Audit Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: standalone-audit
-      infrastructure_provisioning: single
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-single"
-    depends_on: *_compile_amazon2
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: crud_workloads
-      - name: smoke_test
+  # - name: linux-standalone-audit
+  #   display_name: Linux Standalone Audit Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: standalone-audit
+  #     infrastructure_provisioning: single
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-single"
+  #   depends_on: *_compile_amazon2
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: industry_benchmarks
+  #     - name: crud_workloads
+  #     - name: smoke_test
 
-  - name: linux-1-node-replSet-fle
-    display_name: Linux 1-Node ReplSet FLE Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: single-replica-fle
-      infrastructure_provisioning: single
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      fle: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-single"
-    depends_on: *_compile_amazon2
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: linkbench
+  # - name: linux-1-node-replSet-fle
+  #   display_name: Linux 1-Node ReplSet FLE Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: single-replica-fle
+  #     infrastructure_provisioning: single
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     fle: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-single"
+  #   depends_on: *_compile_amazon2
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: industry_benchmarks
+  #     - name: linkbench
 
-  - name: linux-1-node-replSet-cwrwc
-    display_name: Linux 1-Node ReplSet CWRWC Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: single-replica-cwrwc
-      infrastructure_provisioning: single
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-single"
-    depends_on: *_compile_amazon2
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: linkbench
+  # - name: linux-1-node-replSet-cwrwc
+  #   display_name: Linux 1-Node ReplSet CWRWC Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: single-replica-cwrwc
+  #     infrastructure_provisioning: single
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-single"
+  #   depends_on: *_compile_amazon2
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: industry_benchmarks
+  #     - name: linkbench
 
-  - name: linux-1-node-replSet-ese-cbc
-    display_name: Linux 1-Node ReplSet ESE CBC Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: single-replica-ese-cbc
-      infrastructure_provisioning: single
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-single"
-    depends_on: *_compile_amazon2
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: smoke_test
-      - name: ycsb_60GB
+  # - name: linux-1-node-replSet-ese-cbc
+  #   display_name: Linux 1-Node ReplSet ESE CBC Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: single-replica-ese-cbc
+  #     infrastructure_provisioning: single
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-single"
+  #   depends_on: *_compile_amazon2
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: industry_benchmarks
+  #     - name: smoke_test
+  #     - name: ycsb_60GB
 
-  - name: linux-1-node-replSet-ese-gcm
-    display_name: Linux 1-Node ReplSet ESE GCM Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: single-replica-ese-gcm
-      infrastructure_provisioning: single
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-single"
-    depends_on: *_compile_amazon2
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: smoke_test
-      - name: ycsb_60GB
+  # - name: linux-1-node-replSet-ese-gcm
+  #   display_name: Linux 1-Node ReplSet ESE GCM Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: single-replica-ese-gcm
+  #     infrastructure_provisioning: single
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-single"
+  #   depends_on: *_compile_amazon2
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: industry_benchmarks
+  #     - name: smoke_test
+  #     - name: ycsb_60GB
 
-  - name: linux-1-node-15gbwtcache
-    display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: single-replica-15gbwtcache
-      infrastructure_provisioning: single
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-single"
-    depends_on: *_compile_amazon2
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: smoke_test
+  # - name: linux-1-node-15gbwtcache
+  #   display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: single-replica-15gbwtcache
+  #     infrastructure_provisioning: single
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-single"
+  #   depends_on: *_compile_amazon2
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: industry_benchmarks
+  #     - name: smoke_test
 
-  - name: linux-3-shard
-    display_name: Linux 3-Shard Cluster Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: shard
-      infrastructure_provisioning: shard
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-shard"
-    depends_on: *_compile_amazon2
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: crud_workloads
-      - name: mixed_workloads
-      - name: misc_workloads
-      - name: map_reduce_workloads
-      - name: smoke_test
-      - name: industry_benchmarks_wmajority
-      - name: mongos_workloads
-      - name: mongos_large_catalog_workloads
-      - name: change_streams_throughput
-      - name: change_streams_latency
-      - name: change_streams_multi_mongos
+  # - name: linux-3-shard
+  #   display_name: Linux 3-Shard Cluster Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: shard
+  #     infrastructure_provisioning: shard
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-shard"
+  #   depends_on: *_compile_amazon2
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: industry_benchmarks
+  #     - name: crud_workloads
+  #     - name: mixed_workloads
+  #     - name: misc_workloads
+  #     - name: map_reduce_workloads
+  #     - name: smoke_test
+  #     - name: industry_benchmarks_wmajority
+  #     - name: mongos_workloads
+  #     - name: mongos_large_catalog_workloads
+  #     - name: change_streams_throughput
+  #     - name: change_streams_latency
+  #     - name: change_streams_multi_mongos
 
-  - name: linux-shard-lite
-    display_name: Linux Shard Lite Cluster Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: shard-lite
-      infrastructure_provisioning: shard-lite
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-shard-lite"
-    depends_on: *_compile_amazon2
-    tasks: &shardlitetasks
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: bestbuy_agg
-      - name: bestbuy_agg_merge_different_db
-      - name: bestbuy_agg_merge_same_db
-      - name: bestbuy_agg_merge_target_hashed
-      - name: bestbuy_agg_merge_wordcount
-      - name: bestbuy_query
-      - name: change_streams_latency
-      - name: change_streams_throughput
-      - name: industry_benchmarks
-      - name: industry_benchmarks_wmajority
-      - name: linkbench
-      - name: mixed_workloads
-      - name: mongos_workloads
-      - name: mongos_large_catalog_workloads
-      # - name: move_chunk_large_chunk_map_workloads
-      - name: move_chunk_workloads
-      - name: move_chunk_waiting_workloads
-      - name: retryable_writes_workloads
-      - name: smoke_test
+  # - name: linux-shard-lite
+  #   display_name: Linux Shard Lite Cluster Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: shard-lite
+  #     infrastructure_provisioning: shard-lite
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-shard-lite"
+  #   depends_on: *_compile_amazon2
+  #   tasks: &shardlitetasks
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: bestbuy_agg
+  #     - name: bestbuy_agg_merge_different_db
+  #     - name: bestbuy_agg_merge_same_db
+  #     - name: bestbuy_agg_merge_target_hashed
+  #     - name: bestbuy_agg_merge_wordcount
+  #     - name: bestbuy_query
+  #     - name: change_streams_latency
+  #     - name: change_streams_throughput
+  #     - name: industry_benchmarks
+  #     - name: industry_benchmarks_wmajority
+  #     - name: linkbench
+  #     - name: mixed_workloads
+  #     - name: mongos_workloads
+  #     - name: mongos_large_catalog_workloads
+  #     # - name: move_chunk_large_chunk_map_workloads
+  #     - name: move_chunk_workloads
+  #     - name: move_chunk_waiting_workloads
+  #     - name: retryable_writes_workloads
+  #     - name: smoke_test
 
-  - name: linux-shard-lite-cwrwc
-    display_name: Linux Shard Lite Cluster CWRWC Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: shard-lite-cwrwc
-      infrastructure_provisioning: shard-lite
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-shard-lite"
-    depends_on: *_compile_amazon2
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: linkbench
+  # - name: linux-shard-lite-cwrwc
+  #   display_name: Linux Shard Lite Cluster CWRWC Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: shard-lite-cwrwc
+  #     infrastructure_provisioning: shard-lite
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-shard-lite"
+  #   depends_on: *_compile_amazon2
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: industry_benchmarks
+  #     - name: linkbench
 
-  - name: linux-shard-single
-    display_name: Linux Shard Single Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: shard-single
-      infrastructure_provisioning: shard-single
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-shard-lite"
-    depends_on: *_compile_amazon2
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+  # - name: linux-shard-single
+  #   display_name: Linux Shard Single Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: shard-single
+  #     infrastructure_provisioning: shard-single
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-shard-lite"
+  #   depends_on: *_compile_amazon2
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
 
-  - name: linux-3-node-replSet
-    display_name: Linux 3-Node ReplSet Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: replica
-      infrastructure_provisioning: replica
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-replset"
-    depends_on: *_compile_amazon2
-    tasks: &3nodetasks
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: ycsb_60GB
-      - name: industry_benchmarks_secondary_reads
-      - name: crud_workloads
-      - name: crud_workloads_majority
-      - name: mixed_workloads
-      - name: misc_workloads
-      - name: map_reduce_workloads
-      - name: refine_shard_key_transaction_stress
-      - name: smoke_test
-      - name: retryable_writes_workloads
-      - name: industry_benchmarks_wmajority
-      - name: secondary_performance # Uses a special 2 node mongodb setup
-      - name: non_sharded_workloads
-      - name: bestbuy_agg
-      - name: bestbuy_agg_merge_different_db
-      - name: bestbuy_agg_merge_same_db
-      - name: bestbuy_agg_merge_wordcount
-      - name: bestbuy_query
-      - name: change_streams_throughput
-      - name: change_streams_latency
-      - name: snapshot_reads
-      - name: secondary_reads
-      - name: tpcc
-      - name: linkbench
-      - name: linkbench2
+  # - name: linux-3-node-replSet
+  #   display_name: Linux 3-Node ReplSet Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: replica
+  #     infrastructure_provisioning: replica
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-replset"
+  #   depends_on: *_compile_amazon2
+  #   tasks: &3nodetasks
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: industry_benchmarks
+  #     - name: ycsb_60GB
+  #     - name: industry_benchmarks_secondary_reads
+  #     - name: crud_workloads
+  #     - name: crud_workloads_majority
+  #     - name: mixed_workloads
+  #     - name: misc_workloads
+  #     - name: map_reduce_workloads
+  #     - name: refine_shard_key_transaction_stress
+  #     - name: smoke_test
+  #     - name: retryable_writes_workloads
+  #     - name: industry_benchmarks_wmajority
+  #     - name: secondary_performance # Uses a special 2 node mongodb setup
+  #     - name: non_sharded_workloads
+  #     - name: bestbuy_agg
+  #     - name: bestbuy_agg_merge_different_db
+  #     - name: bestbuy_agg_merge_same_db
+  #     - name: bestbuy_agg_merge_wordcount
+  #     - name: bestbuy_query
+  #     - name: change_streams_throughput
+  #     - name: change_streams_latency
+  #     - name: snapshot_reads
+  #     - name: secondary_reads
+  #     - name: tpcc
+  #     - name: linkbench
+  #     - name: linkbench2
 
-  - name: linux-3-node-replSet-noflowcontrol
-    display_name: Linux 3-Node ReplSet (Flow Control off) Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: replica-noflowcontrol
-      infrastructure_provisioning: replica
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-replset"
-    depends_on: *_compile_amazon2
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: industry_benchmarks_secondary_reads
-      - name: crud_workloads
-      - name: crud_workloads_majority
-      - name: mixed_workloads
-      - name: smoke_test
-      - name: industry_benchmarks_wmajority
-      - name: change_streams_throughput
-      - name: change_streams_latency
-      - name: tpcc
-      - name: linkbench
-      - name: linkbench2
+  # - name: linux-3-node-replSet-noflowcontrol
+  #   display_name: Linux 3-Node ReplSet (Flow Control off) Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: replica-noflowcontrol
+  #     infrastructure_provisioning: replica
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-replset"
+  #   depends_on: *_compile_amazon2
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: industry_benchmarks
+  #     - name: industry_benchmarks_secondary_reads
+  #     - name: crud_workloads
+  #     - name: crud_workloads_majority
+  #     - name: mixed_workloads
+  #     - name: smoke_test
+  #     - name: industry_benchmarks_wmajority
+  #     - name: change_streams_throughput
+  #     - name: change_streams_latency
+  #     - name: tpcc
+  #     - name: linkbench
+  #     - name: linkbench2
 
-  - name: linux-3-node-replSet-ssl
-    display_name: Linux 3-Node ReplSet (SSL) Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: replica-ssl
-      infrastructure_provisioning: replica
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-        - "rhel70-perf-replset"
-    depends_on: *_compile_amazon2
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: mixed_workloads
+  # - name: linux-3-node-replSet-ssl
+  #   display_name: Linux 3-Node ReplSet (SSL) Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: replica-ssl
+  #     infrastructure_provisioning: replica
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #   run_on:
+  #       - "rhel70-perf-replset"
+  #   depends_on: *_compile_amazon2
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: industry_benchmarks
+  #     - name: mixed_workloads
 
-  - name: linux-3-node-replSet-initialsync
-    display_name: Linux 3-Node ReplSet Initial Sync Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: replica-2node
-      infrastructure_provisioning: replica
-      platform: linux
-      authentication: disabled
-      storageEngine: wiredTiger
-      project_dir: *project_dir
-    depends_on: *_compile_amazon2
-    run_on:
-        - "rhel70-perf-replset"
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: initialsync-large
+  # - name: linux-3-node-replSet-initialsync
+  #   display_name: Linux 3-Node ReplSet Initial Sync Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: replica-2node
+  #     infrastructure_provisioning: replica
+  #     platform: linux
+  #     authentication: disabled
+  #     storageEngine: wiredTiger
+  #     project_dir: *project_dir
+  #   depends_on: *_compile_amazon2
+  #   run_on:
+  #       - "rhel70-perf-replset"
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: initialsync-large
 
-  - name: linux-replSet-initialsync-logkeeper
-    display_name: Linux ReplSet Initial Sync LogKeeper Legacy
-    modules: *modules
-    expansions:
-      mongodb_setup: initialsync-logkeeper
-      infrastructure_provisioning: initialsync-logkeeper
-      # EBS logkeeper snapshot with FCV set to 4.4
-      snapshotId: snap-0390038d5022d13fd
-      platform: linux
-      authentication: disabled
-      storageEngine: wiredTiger
-      project_dir: *project_dir
-    run_on:
-        - "rhel70-perf-initialsync-logkeeper"
-    depends_on: *_compile_amazon2
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: initialsync-logkeeper
+  # - name: linux-replSet-initialsync-logkeeper
+  #   display_name: Linux ReplSet Initial Sync LogKeeper Legacy
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: initialsync-logkeeper
+  #     infrastructure_provisioning: initialsync-logkeeper
+  #     # EBS logkeeper snapshot with FCV set to 4.4
+  #     snapshotId: snap-0390038d5022d13fd
+  #     platform: linux
+  #     authentication: disabled
+  #     storageEngine: wiredTiger
+  #     project_dir: *project_dir
+  #   run_on:
+  #       - "rhel70-perf-initialsync-logkeeper"
+  #   depends_on: *_compile_amazon2
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: initialsync-logkeeper
 
-  # Uncomment this to run logkeeper FCV updates automatically. This is only intended to be run in
-  # patch builds.
-  #- name: linux-replSet-initialsync-logkeeper-snapshot-update
-  #  display_name: Linux ReplSet Initial Sync LogKeeper Snapshot Update
-  #  modules: *modules
-  #  expansions:
-  #    mongodb_setup: initialsync-logkeeper
-  #    infrastructure_provisioning: initialsync-logkeeper-snapshot-update
-  #    # Update this to latest snapshot after each LTS release.
-  #    snapshotId: snap-0b0b8b2ad16e8f14e
-  #    platform: linux
-  #    authentication: disabled
-  #    storageEngine: wiredTiger
-  #    project_dir: *project_dir
-  #  run_on:
-  #    - "rhel70-perf-initialsync-logkeeper"
-  #  depends_on: *_compile_amazon2
-  #  tasks:
-  #    - name: initialsync-logkeeper-snapshot-update
-  #    - name: initialsync-logkeeper-short-s3-update
+  # # Uncomment this to run logkeeper FCV updates automatically. This is only intended to be run in
+  # # patch builds.
+  # #- name: linux-replSet-initialsync-logkeeper-snapshot-update
+  # #  display_name: Linux ReplSet Initial Sync LogKeeper Snapshot Update
+  # #  modules: *modules
+  # #  expansions:
+  # #    mongodb_setup: initialsync-logkeeper
+  # #    infrastructure_provisioning: initialsync-logkeeper-snapshot-update
+  # #    # Update this to latest snapshot after each LTS release.
+  # #    snapshotId: snap-0b0b8b2ad16e8f14e
+  # #    platform: linux
+  # #    authentication: disabled
+  # #    storageEngine: wiredTiger
+  # #    project_dir: *project_dir
+  # #  run_on:
+  # #    - "rhel70-perf-initialsync-logkeeper"
+  # #  depends_on: *_compile_amazon2
+  # #  tasks:
+  # #    - name: initialsync-logkeeper-snapshot-update
+  # #    - name: initialsync-logkeeper-short-s3-update
 
-  - name: atlas-like-M60
-    display_name: M60-Like-old 3-Node ReplSet
-    modules: *modules
-    expansions:
-      mongodb_setup: atlas-like-replica
-      infrastructure_provisioning: M60-like-replica
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-      compile_variant: -rhel70
-    run_on:
-        - "rhel70-perf-M60-like"
-    depends_on: *_compile_rhel70
-    tasks:  # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup.
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: ycsb_60GB
-      - name: industry_benchmarks_secondary_reads
-      - name: crud_workloads
-      - name: crud_workloads_majority
-      - name: mixed_workloads
-      - name: misc_workloads
-      - name: map_reduce_workloads
-      - name: smoke_test
-      - name: retryable_writes_workloads
-      - name: industry_benchmarks_wmajority
-      - name: non_sharded_workloads
-      - name: bestbuy_agg
-      - name: bestbuy_agg_merge_different_db
-      - name: bestbuy_agg_merge_same_db
-      - name: bestbuy_agg_merge_wordcount
-      - name: bestbuy_query
-      - name: change_streams_throughput
-      - name: change_streams_latency
-      - name: snapshot_reads
-      - name: secondary_reads
+  # - name: atlas-like-M60
+  #   display_name: M60-Like-old 3-Node ReplSet
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup: atlas-like-replica
+  #     infrastructure_provisioning: M60-like-replica
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #     compile_variant: -rhel70
+  #   run_on:
+  #       - "rhel70-perf-M60-like"
+  #   depends_on: *_compile_rhel70
+  #   tasks:  # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup.
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: industry_benchmarks
+  #     - name: ycsb_60GB
+  #     - name: industry_benchmarks_secondary_reads
+  #     - name: crud_workloads
+  #     - name: crud_workloads_majority
+  #     - name: mixed_workloads
+  #     - name: misc_workloads
+  #     - name: map_reduce_workloads
+  #     - name: smoke_test
+  #     - name: retryable_writes_workloads
+  #     - name: industry_benchmarks_wmajority
+  #     - name: non_sharded_workloads
+  #     - name: bestbuy_agg
+  #     - name: bestbuy_agg_merge_different_db
+  #     - name: bestbuy_agg_merge_same_db
+  #     - name: bestbuy_agg_merge_wordcount
+  #     - name: bestbuy_query
+  #     - name: change_streams_throughput
+  #     - name: change_streams_latency
+  #     - name: snapshot_reads
+  #     - name: secondary_reads
 
   - name: atlas-like-replica.2022-10
     display_name: M60-like-replica.2022-10 3-Node ReplSet
