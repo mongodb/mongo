@@ -95,6 +95,70 @@ std::unique_ptr<BatchedDeleteStageParams> getBatchedDeleteStageParams(bool batch
     return batchedDeleteParams;
 }
 
+AdmissionContext::Priority computeTTLPriority(
+    const UUID& uuid, const stdx::unordered_map<UUID, long long, UUID::Hash>& collSubpassHistory) {
+    if (auto it = collSubpassHistory.find(uuid); it != collSubpassHistory.end()) {
+        if (it->second >= ttlCollLowPrioritySubpassLimit.load()) {
+            return AdmissionContext::Priority::kNormal;
+        }
+    }
+    return AdmissionContext::Priority::kLow;
+}
+
+// Given the set of current TTL collections via 'ttlCollectionInfo', populates the 'ttlPriorityMap'
+// with TTL delete priority for each collection based on the 'collSubpassHistory'.
+//
+// Returns the number of collections whose TTL deletes should be executed with non-default priority
+// 'AdmissionContext::Priority::kNormal'.
+long long populateTTLPriorityMap(
+    const TTLCollectionCache::InfoMap& ttlCollectionInfo,
+    const stdx::unordered_map<UUID, long long, UUID::Hash>& collSubpassHistory,
+    stdx::unordered_map<UUID, AdmissionContext::Priority, UUID::Hash>& ttlPriorityMap) {
+    long long normalPriorityCount = 0;
+    for (const auto& [uuid, _] : ttlCollectionInfo) {
+        auto priority = computeTTLPriority(uuid, collSubpassHistory);
+        ttlPriorityMap[uuid] = priority;
+
+        if (priority == AdmissionContext::Priority::kNormal) {
+            normalPriorityCount++;
+        }
+    }
+    return normalPriorityCount;
+}
+
+AdmissionContext::Priority getTTLPriority(
+    const UUID& uuid,
+    const stdx::unordered_map<UUID, AdmissionContext::Priority, UUID::Hash>& ttlPriorityMap) {
+    auto it = ttlPriorityMap.find(uuid);
+
+    // The 'ttlPriorityMap' should contain entries for every collection in the TTLCollectionCache at
+    // the start of a subpass. If not, something went wrong during the population of the map.
+    invariant(it != ttlPriorityMap.end());
+
+    return it->second;
+}
+
+// Given 'remainingWorkAfterSubpass', updates the 'collSubpassHistory' count for each collection
+// with more work. Removes collections from 'collSubpassHistory' with no work left after the
+// subpass.
+void updateCollSubpassHistory(stdx::unordered_map<UUID, long long, UUID::Hash>& collSubpassHistory,
+                              const TTLCollectionCache::InfoMap& remainingWorkAfterSubpass) {
+    // Remove history for collections that are caught up on TTL deletes.
+    stdx::erase_if(collSubpassHistory, [&](auto&& it) {
+        auto uuid = it.first;
+        return remainingWorkAfterSubpass.find(uuid) == remainingWorkAfterSubpass.end();
+    });
+
+    // Increment the subpass count for the unexhausted collections.
+    for (const auto& [uuid, _] : remainingWorkAfterSubpass) {
+        if (auto it = collSubpassHistory.find(uuid); it != collSubpassHistory.end()) {
+            it->second++;
+        } else {
+            collSubpassHistory[uuid] = 1;
+        }
+    }
+}
+
 // Generates an expiration date based on the user-configured expireAfterSeconds. Includes special
 // 'safe' handling for time-series collections.
 Date_t safeExpirationDate(OperationContext* opCtx,
@@ -238,6 +302,10 @@ CounterMetric ttlPasses("ttl.passes");
 CounterMetric ttlSubPasses("ttl.subPasses");
 CounterMetric ttlDeletedDocuments("ttl.deletedDocuments");
 
+// Counts the subpasses over TTL collections where the deletes on a collection are increased from
+// 'low' to 'normal' priority.
+CounterMetric ttlCollSubpassesIncreasedPriority("ttl.collSubpassesIncreasedPriority");
+
 using MtabType = TenantMigrationAccessBlocker::BlockerType;
 
 TTLMonitor* TTLMonitor::get(ServiceContext* serviceCtx) {
@@ -320,12 +388,17 @@ void TTLMonitor::shutdown() {
 void TTLMonitor::_doTTLPass() {
     const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
     OperationContext* opCtx = opCtxPtr.get();
-    SetAdmissionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
 
     hangTTLMonitorBetweenPasses.pauseWhileSet(opCtx);
 
     // Increment the metric after the TTL work has been finished.
     ON_BLOCK_EXIT([&] { ttlPasses.increment(); });
+
+    // Tracks the number of consecutive subpasses that have failed to exhaust a collection of TTL
+    // deletes. If a collection incurs 'ttlCollLowPrioritySubpassLimit', then all TTL deletes on the
+    // collection are executed at 'normal' priority until there are no TTL deletes remaining on the
+    // collection.
+    stdx::unordered_map<UUID, long long, UUID::Hash> collSubpassHistory;
 
     bool moreToDelete = true;
     while (moreToDelete) {
@@ -333,11 +406,12 @@ void TTLMonitor::_doTTLPass() {
         // indicates that it did not delete everything possible, we continue performing sub-passes.
         // This maintains the semantic that a full TTL pass deletes everything it possibly can
         // before sleeping periodically.
-        moreToDelete = _doTTLSubPass(opCtx);
+        moreToDelete = _doTTLSubPass(opCtx, collSubpassHistory);
     }
 }
 
-bool TTLMonitor::_doTTLSubPass(OperationContext* opCtx) {
+bool TTLMonitor::_doTTLSubPass(
+    OperationContext* opCtx, stdx::unordered_map<UUID, long long, UUID::Hash>& collSubpassHistory) {
     // If part of replSet but not in a readable state (e.g. during initial sync), skip.
     if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
             repl::ReplicationCoordinator::modeReplSet &&
@@ -352,6 +426,16 @@ bool TTLMonitor::_doTTLSubPass(OperationContext* opCtx) {
     // during a long running pass.
     TTLCollectionCache::InfoMap work = ttlCollectionCache.getTTLInfos();
 
+    // Before the subpass begins work, compute the priority at which TTL deletes should be executed
+    // on each collection. By default, TTL deletes are 'low' priority. Only collections where TTL
+    // deletes have fallen behind over several subpasses are promoted to 'normal' priority TTL
+    // deletes.
+    stdx::unordered_map<UUID, AdmissionContext::Priority, UUID::Hash> ttlPriorityMap;
+    auto numNormalPriorityCollections =
+        populateTTLPriorityMap(work, collSubpassHistory, ttlPriorityMap);
+
+    ttlCollSubpassesIncreasedPriority.increment(numNormalPriorityCollections);
+
     // When batching is enabled, _doTTLIndexDelete will limit the amount of work it
     // performs in both time and the number of documents it deletes. If it reaches one
     // of these limits on an index, it will return moreToDelete as true, and we will
@@ -364,6 +448,13 @@ bool TTLMonitor::_doTTLSubPass(OperationContext* opCtx) {
     do {
         TTLCollectionCache::InfoMap moreWork;
         for (const auto& [uuid, infos] : work) {
+            // If there are multiple TTL indexes on a TTL collection, and any of those have fallen
+            // behind TTL inserts over consecutive subpasses, raising the priority to
+            // 'AdmissionContext::Priority::kNormal' for one index means the priority will be
+            // 'normal' for all indexes.
+            AdmissionContext::Priority priority = getTTLPriority(uuid, ttlPriorityMap);
+            SetAdmissionPriorityForLock priorityGuard(opCtx, priority);
+
             for (const auto& info : infos) {
                 bool moreToDelete = _doTTLIndexDelete(opCtx, &ttlCollectionCache, uuid, info);
                 if (moreToDelete) {
@@ -375,6 +466,8 @@ bool TTLMonitor::_doTTLSubPass(OperationContext* opCtx) {
         work = moreWork;
     } while (!work.empty() &&
              Seconds(timer.seconds()) < Seconds(ttlMonitorSubPassTargetSecs.load()));
+
+    updateCollSubpassHistory(collSubpassHistory, work);
 
     // More work signals there may more expired documents to visit.
     return !work.empty();

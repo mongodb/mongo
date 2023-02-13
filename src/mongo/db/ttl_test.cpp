@@ -86,7 +86,8 @@ protected:
 
     bool doTTLSubPassForTest(OperationContext* opCtx) {
         TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
-        return ttlMonitor->_doTTLSubPass(opCtx);
+
+        return ttlMonitor->_doTTLSubPass(opCtx, _collSubpassHistoryPlaceHolder);
     }
 
     long long getTTLPasses() {
@@ -122,6 +123,13 @@ protected:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
+
+    // In a given TTL Pass, there may be multiple subpasses. Between subpasses, collection delete
+    // history is tracked for collections who have remaining TTL deletes a subpass. The
+    // history is strictly for TTL delete priority purposes in a contended system. It does not
+    // impact behavior in an uncontended, isolated system such as this test suite. This is used
+    // strictly as a placeholder in order to test subpass behavior.
+    stdx::unordered_map<UUID, long long, UUID::Hash> _collSubpassHistoryPlaceHolder;
 };
 
 namespace {

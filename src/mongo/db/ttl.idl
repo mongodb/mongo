@@ -93,3 +93,15 @@ server_parameters:
         validator:
             gte: 0
 
+    ttlCollLowPrioritySubpassLimit:
+        description:
+            "By default, TTL deletes are 'low' priority. Limits the number of consecutive subpasses
+            completed without exhausting TTL deletes on a collection before the TTL deletes on the
+            collection are raised to 'normal' priority."
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: ttlCollLowPrioritySubpassLimit
+        default: 10
+        validator:
+            gt: 0
+
