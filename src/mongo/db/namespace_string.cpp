@@ -435,20 +435,4 @@ void NamespaceStringOrUUID::serialize(BSONObjBuilder* builder, StringData fieldN
     }
 }
 
-std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss) {
-    return stream << nss.toString();
-}
-
-std::ostream& operator<<(std::ostream& stream, const NamespaceStringOrUUID& nsOrUUID) {
-    return stream << nsOrUUID.toString();
-}
-
-StringBuilder& operator<<(StringBuilder& builder, const NamespaceString& nss) {
-    return builder << nss.toString();
-}
-
-StringBuilder& operator<<(StringBuilder& builder, const NamespaceStringOrUUID& nsOrUUID) {
-    return builder << nsOrUUID.toString();
-}
-
 }  // namespace mongo

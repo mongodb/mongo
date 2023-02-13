@@ -703,30 +703,36 @@ public:
      */
     static bool validCollectionName(StringData coll);
 
-    // Relops among `NamespaceString`.
+    friend std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss) {
+        return stream << nss.toString();
+    }
+
+    friend StringBuilder& operator<<(StringBuilder& builder, const NamespaceString& nss) {
+        return builder << nss.toString();
+    }
+
     friend bool operator==(const NamespaceString& a, const NamespaceString& b) {
-        return (a.tenantId() == b.tenantId()) && (a.ns() == b.ns());
+        return a._lens() == b._lens();
     }
+
     friend bool operator!=(const NamespaceString& a, const NamespaceString& b) {
-        return !(a == b);
+        return a._lens() != b._lens();
     }
+
     friend bool operator<(const NamespaceString& a, const NamespaceString& b) {
-        if (a.tenantId() != b.tenantId()) {
-            return a.tenantId() < b.tenantId();
-        }
-        return a.ns() < b.ns();
+        return a._lens() < b._lens();
     }
+
     friend bool operator>(const NamespaceString& a, const NamespaceString& b) {
-        if (a.tenantId() != b.tenantId()) {
-            return a.tenantId() > b.tenantId();
-        }
-        return a.ns() > b.ns();
+        return a._lens() > b._lens();
     }
+
     friend bool operator<=(const NamespaceString& a, const NamespaceString& b) {
-        return !(a > b);
+        return a._lens() <= b._lens();
     }
+
     friend bool operator>=(const NamespaceString& a, const NamespaceString& b) {
-        return !(a < b);
+        return a._lens() >= b._lens();
     }
 
     template <typename H>
@@ -742,6 +748,10 @@ public:
     }
 
 private:
+    std::tuple<const boost::optional<TenantId>&, const std::string&> _lens() const {
+        return std::tie(tenantId(), ns());
+    }
+
     DatabaseName _dbName;
     std::string _ns;
     size_t _dotIndex = std::string::npos;
@@ -813,6 +823,14 @@ public:
 
     void serialize(BSONObjBuilder* builder, StringData fieldName) const;
 
+    friend std::ostream& operator<<(std::ostream& stream, const NamespaceStringOrUUID& o) {
+        return stream << o.toString();
+    }
+
+    friend StringBuilder& operator<<(StringBuilder& builder, const NamespaceStringOrUUID& o) {
+        return builder << o.toString();
+    }
+
 private:
     // At any given time exactly one of these optionals will be initialized.
     boost::optional<NamespaceString> _nss;
@@ -826,11 +844,6 @@ private:
     // collection belongs to the database named here.
     boost::optional<DatabaseName> _dbname;
 };
-
-std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss);
-std::ostream& operator<<(std::ostream& stream, const NamespaceStringOrUUID& nsOrUUID);
-StringBuilder& operator<<(StringBuilder& builder, const NamespaceString& nss);
-StringBuilder& operator<<(StringBuilder& builder, const NamespaceStringOrUUID& nsOrUUID);
 
 /**
  * "database.a.b.c" -> "database"

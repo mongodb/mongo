@@ -157,6 +157,38 @@ public:
         return (_tenantId == other._tenantId) && boost::iequals(toString(), other.toString());
     }
 
+    friend std::ostream& operator<<(std::ostream& stream, const DatabaseName& tdb) {
+        return stream << tdb.toString();
+    }
+
+    friend StringBuilder& operator<<(StringBuilder& builder, const DatabaseName& tdb) {
+        return builder << tdb.toString();
+    }
+
+    friend bool operator==(const DatabaseName& a, const DatabaseName& b) {
+        return a._lens() == b._lens();
+    }
+
+    friend bool operator!=(const DatabaseName& a, const DatabaseName& b) {
+        return a._lens() != b._lens();
+    }
+
+    friend bool operator<(const DatabaseName& a, const DatabaseName& b) {
+        return a._lens() < b._lens();
+    }
+
+    friend bool operator>(const DatabaseName& a, const DatabaseName& b) {
+        return a._lens() > b._lens();
+    }
+
+    friend bool operator<=(const DatabaseName& a, const DatabaseName& b) {
+        return a._lens() <= b._lens();
+    }
+
+    friend bool operator>=(const DatabaseName& a, const DatabaseName& b) {
+        return a._lens() >= b._lens();
+    }
+
     template <typename H>
     friend H AbslHashValue(H h, const DatabaseName& obj) {
         if (obj._tenantId) {
@@ -170,47 +202,13 @@ public:
     }
 
 private:
+    std::tuple<const boost::optional<TenantId>&, const std::string&> _lens() const {
+        return std::tie(_tenantId, _dbString);
+    }
+
     boost::optional<TenantId> _tenantId = boost::none;
     std::string _dbString;
 };
-
-inline std::ostream& operator<<(std::ostream& stream, const DatabaseName& tdb) {
-    return stream << tdb.toString();
-}
-
-inline StringBuilder& operator<<(StringBuilder& builder, const DatabaseName& tdb) {
-    return builder << tdb.toString();
-}
-
-inline bool operator==(const DatabaseName& lhs, const DatabaseName& rhs) {
-    return (lhs.tenantId() == rhs.tenantId()) && (lhs.db() == rhs.db());
-}
-
-inline bool operator!=(const DatabaseName& lhs, const DatabaseName& rhs) {
-    return !(lhs == rhs);
-}
-
-inline bool operator<(const DatabaseName& lhs, const DatabaseName& rhs) {
-    if (lhs.tenantId() != rhs.tenantId()) {
-        return lhs.tenantId() < rhs.tenantId();
-    }
-    return lhs.db() < rhs.db();
-}
-
-inline bool operator>(const DatabaseName& lhs, const DatabaseName& rhs) {
-    if (lhs.tenantId() != rhs.tenantId()) {
-        return lhs.tenantId() > rhs.tenantId();
-    }
-    return lhs.db() > rhs.db();
-}
-
-inline bool operator<=(const DatabaseName& lhs, const DatabaseName& rhs) {
-    return !(lhs > rhs);
-}
-
-inline bool operator>=(const DatabaseName& lhs, const DatabaseName& rhs) {
-    return !(lhs < rhs);
-}
 
 // The `constexpr` definitions for `DatabaseName::ConstantProxy` static data members are below. See
 // `constexpr` definitions for the `NamespaceString::ConstantProxy` static data members of NSS in
