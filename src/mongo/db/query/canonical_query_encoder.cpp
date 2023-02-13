@@ -66,16 +66,6 @@ bool isQueryNegatingEqualToNull(const mongo::MatchExpression* tree) {
 
 namespace {
 
-// Delimiters for cache key encoding.
-const char kEncodeChildrenBegin = '[';
-const char kEncodeChildrenEnd = ']';
-const char kEncodeChildrenSeparator = ',';
-const char kEncodeCollationSection = '#';
-const char kEncodeProjectionSection = '|';
-const char kEncodeProjectionRequirementSeparator = '-';
-const char kEncodeRegexFlagsSeparator = '/';
-const char kEncodeSortSection = '~';
-
 /**
  * Encode user-provided string. Cache key delimiters seen in the
  * user string are escaped with a backslash.

@@ -419,3 +419,60 @@ function assertStagesForExplainOfCommand({coll, cmdObj, expectedStages, stagesNo
     }
     return plan;
 }
+
+/**
+ * Get the "planCacheKey" from the explain result.
+ */
+function getPlanCacheKeyFromExplain(explainRes, db) {
+    const hash = FixtureHelpers.isMongos(db) &&
+            explainRes.queryPlanner.hasOwnProperty("winningPlan") &&
+            explainRes.queryPlanner.winningPlan.hasOwnProperty("shards")
+        ? explainRes.queryPlanner.winningPlan.shards[0].planCacheKey
+        : explainRes.queryPlanner.planCacheKey;
+    assert.eq(typeof hash, "string");
+
+    return hash;
+}
+
+/**
+ * Helper to run a explain on the given query shape and get the "planCacheKey" from the explain
+ * result.
+ */
+function getPlanCacheKeyFromShape({
+    query = {},
+    projection = {},
+    sort = {},
+    collation = {
+        locale: "simple"
+    },
+    collection,
+    db
+}) {
+    const explainRes = assert.commandWorked(
+        collection.explain().find(query, projection).collation(collation).sort(sort).finish());
+
+    return getPlanCacheKeyFromExplain(explainRes, db);
+}
+
+/**
+ * Helper to run a explain on the given pipeline and get the "planCacheKey" from the explain
+ * result.
+ */
+function getPlanCacheKeyFromPipeline(pipeline, collection, db) {
+    const explainRes = assert.commandWorked(collection.explain().aggregate(pipeline));
+
+    return getPlanCacheKeyFromExplain(explainRes, db);
+}
+
+/**
+ * Given the winning query plan, flatten query plan tree into a list of plan stage names.
+ */
+function flattenQueryPlanTree(winningPlan) {
+    let stages = [];
+    while (winningPlan) {
+        stages.push(winningPlan.stage);
+        winningPlan = winningPlan.inputStage;
+    }
+    stages.reverse();
+    return stages;
+}

@@ -149,6 +149,8 @@ all:
   ticket: SERVER-67532
 - test_file: jstests/sharding/prepare_transaction_then_migrate.js
   ticket: SERVER-71219
+- test_file: jstests/core/partial_index_logical.js
+  ticket: SERVER-68434
 suites:
   change_streams_multiversion: null
   concurrency_replication_multiversion: null

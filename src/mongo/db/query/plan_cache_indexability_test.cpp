@@ -102,7 +102,7 @@ TEST(PlanCacheIndexabilityTest, SparseIndexSimple) {
                     nullptr,
                     nullptr)});
 
-    auto discriminators = state.getDiscriminators("a");
+    auto discriminators = state.getPathDiscriminators("a");
     ASSERT_EQ(1U, discriminators.size());
     ASSERT(discriminators.find("a_1") != discriminators.end());
 
@@ -143,7 +143,7 @@ TEST(PlanCacheIndexabilityTest, SparseIndexCompound) {
                     nullptr)});
 
     {
-        auto discriminators = state.getDiscriminators("a");
+        auto discriminators = state.getPathDiscriminators("a");
         ASSERT_EQ(1U, discriminators.size());
         ASSERT(discriminators.find("a_1_b_1") != discriminators.end());
 
@@ -156,7 +156,7 @@ TEST(PlanCacheIndexabilityTest, SparseIndexCompound) {
     }
 
     {
-        auto discriminators = state.getDiscriminators("b");
+        auto discriminators = state.getPathDiscriminators("b");
         ASSERT_EQ(1U, discriminators.size());
         ASSERT(discriminators.find("a_1_b_1") != discriminators.end());
 
@@ -189,12 +189,17 @@ TEST(PlanCacheIndexabilityTest, PartialIndexSimple) {
                     nullptr,
                     nullptr)});
 
+    // The partial index is represented as a global discriminator that applies to the entire
+    // incoming MatchExpression.
     {
-        auto discriminators = state.getDiscriminators("f");
-        ASSERT_EQ(1U, discriminators.size());
-        ASSERT(discriminators.find("a_1") != discriminators.end());
+        auto discriminators = state.getPathDiscriminators("f");
+        ASSERT_EQ(0U, discriminators.size());
 
-        auto disc = discriminators["a_1"];
+        auto globalDiscriminators = state.getGlobalDiscriminators();
+        ASSERT_EQ(1U, globalDiscriminators.size());
+        ASSERT(globalDiscriminators.find("a_1") != globalDiscriminators.end());
+
+        auto disc = globalDiscriminators["a_1"];
         ASSERT_EQ(false,
                   disc.isMatchCompatibleWithIndex(
                       parseMatchExpression(BSON("f" << BSON("$gt" << -5))).get()));
@@ -204,7 +209,7 @@ TEST(PlanCacheIndexabilityTest, PartialIndexSimple) {
     }
 
     {
-        auto discriminators = state.getDiscriminators("a");
+        auto discriminators = state.getPathDiscriminators("a");
         ASSERT_EQ(1U, discriminators.size());
         ASSERT(discriminators.find("a_1") != discriminators.end());
 
@@ -238,32 +243,52 @@ TEST(PlanCacheIndexabilityTest, PartialIndexAnd) {
                     nullptr,
                     nullptr)});
 
-    {
-        auto discriminators = state.getDiscriminators("f");
-        ASSERT_EQ(1U, discriminators.size());
-        ASSERT(discriminators.find("a_1") != discriminators.end());
+    // partial index discriminators are global to the entire query, so an individual path should not
+    // have any discriminators. Also the entire query must be a subset of the partial filter
+    // expression, not just the leaves.
+    auto globalDiscriminators = state.getGlobalDiscriminators();
+    ASSERT(globalDiscriminators.find("a_1") != globalDiscriminators.end());
+    auto globalDisc = globalDiscriminators["a_1"];
 
-        auto disc = discriminators["a_1"];
-        ASSERT_EQ(false,
-                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 0)).get()));
-        ASSERT_EQ(true,
-                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 1)).get()));
+    {
+        auto discriminators = state.getPathDiscriminators("f");
+        ASSERT_EQ(0U, discriminators.size());
+
+        ASSERT_EQ(
+            false,
+            globalDisc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 0)).get()));
+        ASSERT_EQ(
+            false,
+            globalDisc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 1)).get()));
     }
 
     {
-        auto discriminators = state.getDiscriminators("g");
-        ASSERT_EQ(1U, discriminators.size());
-        ASSERT(discriminators.find("a_1") != discriminators.end());
+        auto discriminators = state.getPathDiscriminators("g");
+        ASSERT_EQ(0U, discriminators.size());
 
-        auto disc = discriminators["a_1"];
-        ASSERT_EQ(false,
-                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("g" << 0)).get()));
-        ASSERT_EQ(true,
-                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("g" << 1)).get()));
+        ASSERT_EQ(
+            false,
+            globalDisc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("g" << 0)).get()));
+        ASSERT_EQ(
+            false,
+            globalDisc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("g" << 1)).get()));
     }
 
     {
-        auto discriminators = state.getDiscriminators("a");
+        // A match expression which is covered entirely by the partial filter should pass the global
+        // discriminator.
+        ASSERT_EQ(false,
+                  globalDisc.isMatchCompatibleWithIndex(
+                      parseMatchExpression(BSON("g" << 1 << "f" << 0)).get()));
+        ASSERT_EQ(true,
+                  globalDisc.isMatchCompatibleWithIndex(
+                      parseMatchExpression(BSON("g" << 1 << "f" << 1)).get()));
+    }
+
+    {
+        // The path 'a' will still have a discriminator for the collation (even though it's
+        // defaulted).
+        auto discriminators = state.getPathDiscriminators("a");
         ASSERT_EQ(1U, discriminators.size());
         ASSERT(discriminators.find("a_1") != discriminators.end());
 
@@ -312,33 +337,44 @@ TEST(PlanCacheIndexabilityTest, MultiplePartialIndexes) {
                     nullptr,
                     nullptr)});
 
+    // partial index discriminators are global to the entire query, so an individual path within the
+    // partial filter should not have any discriminators. Also the entire query must be a subset of
+    // the partial filter expression, not just the leaves.
+    auto globalDiscriminators = state.getGlobalDiscriminators();
+    ASSERT(globalDiscriminators.find("a_1") != globalDiscriminators.end());
+    ASSERT(globalDiscriminators.find("b_1") != globalDiscriminators.end());
+    auto globalDiscA = globalDiscriminators["a_1"];
+    auto globalDiscB = globalDiscriminators["b_1"];
+
     {
-        auto discriminators = state.getDiscriminators("f");
-        ASSERT_EQ(2U, discriminators.size());
-        ASSERT(discriminators.find("a_1") != discriminators.end());
-        ASSERT(discriminators.find("b_1") != discriminators.end());
+        auto discriminators = state.getPathDiscriminators("f");
+        ASSERT_EQ(0U, discriminators.size());
 
-        auto discA = discriminators["a_1"];
-        auto discB = discriminators["b_1"];
+        ASSERT_EQ(
+            false,
+            globalDiscA.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 0)).get()));
+        ASSERT_EQ(
+            false,
+            globalDiscB.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 0)).get()));
 
-        ASSERT_EQ(false,
-                  discA.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 0)).get()));
-        ASSERT_EQ(false,
-                  discB.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 0)).get()));
+        ASSERT_EQ(
+            true,
+            globalDiscA.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 1)).get()));
+        ASSERT_EQ(
+            false,
+            globalDiscB.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 1)).get()));
 
-        ASSERT_EQ(true,
-                  discA.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 1)).get()));
-        ASSERT_EQ(false,
-                  discB.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 1)).get()));
-
-        ASSERT_EQ(false,
-                  discA.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 2)).get()));
-        ASSERT_EQ(true,
-                  discB.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 2)).get()));
+        ASSERT_EQ(
+            false,
+            globalDiscA.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 2)).get()));
+        ASSERT_EQ(
+            true,
+            globalDiscB.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 2)).get()));
     }
 
+    // The paths 'a' and 'b' will have one discriminator each to capture the collation of the index.
     {
-        auto discriminators = state.getDiscriminators("a");
+        auto discriminators = state.getPathDiscriminators("a");
         ASSERT_EQ(1U, discriminators.size());
         ASSERT(discriminators.find("a_1") != discriminators.end());
 
@@ -352,7 +388,7 @@ TEST(PlanCacheIndexabilityTest, MultiplePartialIndexes) {
     }
 
     {
-        auto discriminators = state.getDiscriminators("b");
+        auto discriminators = state.getPathDiscriminators("b");
         ASSERT_EQ(1U, discriminators.size());
         ASSERT(discriminators.find("b_1") != discriminators.end());
 
@@ -384,7 +420,7 @@ TEST(PlanCacheIndexabilityTest, IndexNeitherSparseNorPartial) {
                     BSONObj(),
                     nullptr,
                     nullptr)});
-    auto discriminators = state.getDiscriminators("a");
+    auto discriminators = state.getPathDiscriminators("a");
     ASSERT_EQ(1U, discriminators.size());
     ASSERT(discriminators.find("a_1") != discriminators.end());
 }
@@ -412,7 +448,7 @@ TEST(PlanCacheIndexabilityTest, DiscriminatorForCollationIndicatesWhenCollations
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     expCtx->setCollator(collator.clone());
 
-    auto discriminators = state.getDiscriminators("a");
+    auto discriminators = state.getPathDiscriminators("a");
     ASSERT_EQ(1U, discriminators.size());
     ASSERT(discriminators.find("a_1") != discriminators.end());
 
@@ -496,11 +532,11 @@ TEST(PlanCacheIndexabilityTest, CompoundIndexCollationDiscriminator) {
                     nullptr,
                     nullptr)});
 
-    auto discriminatorsA = state.getDiscriminators("a");
+    auto discriminatorsA = state.getPathDiscriminators("a");
     ASSERT_EQ(1U, discriminatorsA.size());
     ASSERT(discriminatorsA.find("a_1_b_1") != discriminatorsA.end());
 
-    auto discriminatorsB = state.getDiscriminators("b");
+    auto discriminatorsB = state.getPathDiscriminators("b");
     ASSERT_EQ(1U, discriminatorsB.size());
     ASSERT(discriminatorsB.find("a_1_b_1") != discriminatorsB.end());
 }
@@ -609,13 +645,15 @@ TEST(PlanCacheIndexabilityTest, WildcardPartialIndexDiscriminator) {
     ASSERT_TRUE(wildcardDiscriminators.isMatchCompatibleWithIndex(
         parseMatchExpression(fromjson("{b: 6}")).get()));
 
-    // The regular (non-wildcard) set of discriminators for the path "a" should reflect whether a
-    // predicate on "a" is compatible with the partial filter expression.
+    // The global discriminator for the index "indexName" should reflect whether a MatchExpression
+    // is compatible with the partial filter expression.
     {
-        discriminatorsA = state.getDiscriminators("a");
-        auto discriminatorsIt = discriminatorsA.find("indexName");
-        ASSERT(discriminatorsIt != discriminatorsA.end());
-        auto disc = discriminatorsIt->second;
+        discriminatorsA = state.getPathDiscriminators("a");
+        ASSERT(discriminatorsA.find("indexName") == discriminatorsA.end());
+
+        auto globalDisc = state.getGlobalDiscriminators();
+        ASSERT(globalDisc.find("indexName") != globalDisc.end());
+        auto disc = globalDisc["indexName"];
 
         ASSERT_FALSE(
             disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: 0}")).get()));
@@ -630,7 +668,7 @@ TEST(PlanCacheIndexabilityTest, WildcardPartialIndexDiscriminator) {
 
     // There shouldn't be any regular discriminators associated with path "b".
     {
-        auto&& discriminatorsB = state.getDiscriminators("b");
+        auto&& discriminatorsB = state.getPathDiscriminators("b");
         ASSERT_FALSE(discriminatorsB.count("indexName"));
     }
 }

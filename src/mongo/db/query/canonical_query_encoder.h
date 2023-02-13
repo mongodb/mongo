@@ -33,6 +33,22 @@
 
 namespace mongo {
 
+// Delimiters for canonical query portion of cache key encoding.
+inline constexpr char kEncodeChildrenBegin = '[';
+inline constexpr char kEncodeChildrenEnd = ']';
+inline constexpr char kEncodeChildrenSeparator = ',';
+inline constexpr char kEncodeCollationSection = '#';
+inline constexpr char kEncodeProjectionSection = '|';
+inline constexpr char kEncodeProjectionRequirementSeparator = '-';
+inline constexpr char kEncodeRegexFlagsSeparator = '/';
+inline constexpr char kEncodeSortSection = '~';
+
+// Delimiters for the discriminator portion of the cache key encoding.
+inline constexpr char kEncodeDiscriminatorsBegin = '<';
+inline constexpr char kEncodeDiscriminatorsEnd = '>';
+inline constexpr char kEncodeGlobalDiscriminatorsBegin = '(';
+inline constexpr char kEncodeGlobalDiscriminatorsEnd = ')';
+
 /**
  * Returns true if the query predicate involves a negation of an EQ, LTE, or GTE comparison to
  * 'null'.
