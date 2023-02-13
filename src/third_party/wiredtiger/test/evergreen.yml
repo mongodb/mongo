@@ -1000,7 +1000,10 @@ tasks:
           DGNU_CXX_VERSION: -DDGNU_CXX_VERSION=9
 
   - name: compile-clang
-    tags: ["pull_request", "pull_request_compilers"]
+    # FIXME: WT-10595
+    # The task is disabled as a package is missed on the ubuntu2004-wt-large distro.
+    # We can re-enable the task once the missing package is added.
+    # tags: ["pull_request", "pull_request_compilers"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
