@@ -104,7 +104,6 @@ TEST_CASE("Testing class gcpConnection", "gcp-connection")
     const std::string file_name = object_name + ".txt";
     const std::string non_existant_object_name = "test_non_exist";
     const std::string non_existant_file_name = non_existant_object_name + ".txt";
-    const bool list_single = true;
     std::vector<std::string> objects;
 
     gcs::Client client = gcs::Client();
@@ -114,12 +113,15 @@ TEST_CASE("Testing class gcpConnection", "gcp-connection")
 
     SECTION("Simple list test", "[gcp-connection]")
     {
+        // Search prefix is not used in this unit test, empty string is provided.
+        const std::string search_prefix = "";
+
         // No matching objects. Objects list should be empty.
-        REQUIRE(conn.list_objects(objects, false) == 0);
+        REQUIRE(conn.list_objects(search_prefix, objects, false) == 0);
         REQUIRE(objects.empty());
 
         // No matching objects with list_single. Objects list should be empty.
-        REQUIRE(conn.list_objects(objects, list_single) == 0);
+        REQUIRE(conn.list_objects(search_prefix, objects, true) == 0);
         REQUIRE(objects.empty());
 
         // Upload 1 file to the bucket and test list_objects function.
@@ -127,14 +129,14 @@ TEST_CASE("Testing class gcpConnection", "gcp-connection")
         REQUIRE(
           upload_file(client, test_bucket_name, test_bucket_prefix, file_name, object_name).ok());
         REQUIRE(file_exists_in_bucket(client, test_bucket_name, test_bucket_prefix, object_name));
-        REQUIRE(conn.list_objects(objects, false) == 0);
+        REQUIRE(conn.list_objects(search_prefix, objects, false) == 0);
         REQUIRE(objects.size() == 1);
         objects.clear();
 
         // Delete the object we uploaded and test list_objects function.
         // List_objects should return an empty objects list.
         client.DeleteObject(test_bucket_name, test_bucket_prefix + object_name);
-        REQUIRE(conn.list_objects(objects, false) == 0);
+        REQUIRE(conn.list_objects(search_prefix, objects, false) == 0);
         REQUIRE(objects.empty());
         objects.clear();
 
@@ -148,12 +150,12 @@ TEST_CASE("Testing class gcpConnection", "gcp-connection")
         }
 
         // List objects should return a list with size total_objects.
-        REQUIRE(conn.list_objects(objects, false) == 0);
+        REQUIRE(conn.list_objects(search_prefix, objects, false) == 0);
         REQUIRE(objects.size() == total_objects);
         objects.clear();
 
         // Test if list single correctly returns one object.
-        REQUIRE(conn.list_objects(objects, list_single) == 0);
+        REQUIRE(conn.list_objects(search_prefix, objects, true) == 0);
         REQUIRE(objects.size() == 1);
         objects.clear();
 
@@ -164,7 +166,7 @@ TEST_CASE("Testing class gcpConnection", "gcp-connection")
         }
 
         // Bucket should be cleared.
-        REQUIRE(conn.list_objects(objects, false) == 0);
+        REQUIRE(conn.list_objects(search_prefix, objects, false) == 0);
         REQUIRE(objects.empty());
     }
 
