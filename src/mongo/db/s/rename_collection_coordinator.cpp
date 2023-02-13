@@ -203,7 +203,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         checkCollectionUUIDMismatch(
                             opCtx, fromNss, *coll, _doc.getExpectedSourceUUID());
 
-
                         uassert(ErrorCodes::NamespaceNotFound,
                                 str::stream() << "Collection " << fromNss << " doesn't exist.",
                                 coll.getCollection());
@@ -236,10 +235,13 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     _doc.setTargetUUID(getCollectionUUID(
                         opCtx, toNss, optTargetCollType, /*throwNotFound*/ false));
 
-                    auto criticalSection = ShardingRecoveryService::get(opCtx);
                     if (!targetIsSharded) {
                         // (SERVER-67325) Acquire critical section on the target collection in order
-                        // to disallow concurrent `createCollection`
+                        // to disallow concurrent `createCollection`. In case the collection does
+                        // not exist, it will be later released by the rename participant. In case
+                        // the collection exists and is unsharded, the critical section can be
+                        // released right away as the participant will re-acquire it when needed.
+                        auto criticalSection = ShardingRecoveryService::get(opCtx);
                         criticalSection->acquireRecoverableCriticalSectionBlockWrites(
                             opCtx,
                             toNss,
@@ -255,23 +257,17 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         uassert(ErrorCodes::NamespaceExists,
                                 str::stream() << "a view already exists with that name: " << toNss,
                                 !CollectionCatalog::get(opCtx)->lookupView(opCtx, toNss));
-                    }
 
-                    const bool targetExists = [&]() {
-                        if (targetIsSharded) {
-                            return true;
+                        if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
+                                                                                       toNss)) {
+                            // Release the critical section because the unsharded target collection
+                            // already exists, hence no risk of concurrent `createCollection`
+                            criticalSection->releaseRecoverableCriticalSection(
+                                opCtx,
+                                toNss,
+                                criticalSectionReason,
+                                WriteConcerns::kLocalWriteConcern);
                         }
-                        auto collectionCatalog = CollectionCatalog::get(opCtx);
-                        auto targetColl =
-                            collectionCatalog->lookupCollectionByNamespace(opCtx, toNss);
-                        return (bool)targetColl;  // true if exists and is unsharded
-                    }();
-
-                    if (targetExists) {
-                        // Release the critical section because the target collection
-                        // already exists, hence no risk of concurrent `createCollection`
-                        criticalSection->releaseRecoverableCriticalSection(
-                            opCtx, toNss, criticalSectionReason, WriteConcerns::kLocalWriteConcern);
                     }
 
                     sharding_ddl_util::checkRenamePreconditions(
@@ -295,7 +291,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 } catch (const DBException&) {
                     auto criticalSection = ShardingRecoveryService::get(opCtx);
                     criticalSection->releaseRecoverableCriticalSection(
-                        opCtx, toNss, criticalSectionReason, WriteConcerns::kLocalWriteConcern);
+                        opCtx,
+                        toNss,
+                        criticalSectionReason,
+                        WriteConcerns::kLocalWriteConcern,
+                        false /* throwIfReasonDiffers */);
                     _completeOnError = true;
                     throw;
                 }
