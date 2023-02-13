@@ -214,7 +214,7 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                                  bool isLogged)
     : SortedDataInterface(ident,
                           _handleVersionInfo(ctx, uri, ident, desc, isLogged),
-                          Ordering::make(desc->keyPattern()),
+                          desc->ordering(),
                           rsKeyFormat),
       _uri(uri),
       _tableId(WiredTigerSession::genTableId()),

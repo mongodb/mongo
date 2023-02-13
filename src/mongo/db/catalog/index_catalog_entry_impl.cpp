@@ -72,7 +72,6 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
     : _ident(ident),
       _descriptor(std::move(descriptor)),
       _catalogId(collection->getCatalogId()),
-      _ordering(Ordering::make(_descriptor->keyPattern())),
       _isReady(false),
       _isFrozen(isFrozen),
       _shouldValidateDocument(false),
@@ -377,6 +376,10 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
 
 std::shared_ptr<Ident> IndexCatalogEntryImpl::getSharedIdent() const {
     return _accessMethod ? _accessMethod->getSharedIdent() : nullptr;
+}
+
+const Ordering& IndexCatalogEntryImpl::ordering() const {
+    return _descriptor->ordering();
 }
 
 void IndexCatalogEntryImpl::setIdent(std::shared_ptr<Ident> newIdent) {

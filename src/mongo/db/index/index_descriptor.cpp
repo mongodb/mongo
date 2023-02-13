@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/index/column_key_generator.h"
+#include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -134,7 +135,10 @@ IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj in
       _sparse(infoObj[IndexDescriptor::kSparseFieldName].trueValue()),
       _unique(_isIdIndex || infoObj[kUniqueFieldName].trueValue()),
       _hidden(infoObj[kHiddenFieldName].trueValue()),
-      _partial(!infoObj[kPartialFilterExprFieldName].eoo()) {
+      _partial(!infoObj[kPartialFilterExprFieldName].eoo()),
+      _ordering(_indexType == IndexType::INDEX_WILDCARD
+                    ? WildcardAccessMethod::makeOrdering(_keyPattern)
+                    : Ordering::make(_keyPattern)) {
     BSONElement e = _infoObj[IndexDescriptor::kIndexVersionFieldName];
     fassert(50942, e.isNumber());
     _version = static_cast<IndexVersion>(e.numberInt());

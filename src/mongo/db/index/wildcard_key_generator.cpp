@@ -87,22 +87,6 @@ void appendToMultiKeyString(const std::vector<BSONElement>& elems,
     }
 }
 
-// We should make a new Ordering for wildcard key generator because the index keys generated for
-// wildcard indexes include a "$_path" field prior to the wildcard field and the Ordering passed in
-// does not account for the "$_path" field.
-Ordering makeOrdering(const BSONObj& pattern) {
-    BSONObjBuilder newPattern;
-    for (auto elem : pattern) {
-        const auto fieldName = elem.fieldNameStringData();
-        if (WildcardNames::isWildcardFieldName(fieldName)) {
-            newPattern.append("$_path", 1);  // "$_path" should always be in ascending order.
-        }
-        newPattern.append(elem);
-    }
-
-    return Ordering::make(newPattern.obj());
-}
-
 /**
  * A helper class for generating all the various types of keys for a wildcard index.
  *
@@ -329,7 +313,7 @@ WildcardKeyGenerator::WildcardKeyGenerator(BSONObj keyPattern,
       _collator(collator),
       _keyPattern(keyPattern),
       _keyStringVersion(keyStringVersion),
-      _ordering(makeOrdering(keyPattern)),
+      _ordering(ordering),
       _rsKeyFormat(rsKeyFormat) {
     std::vector<const char*> preFields;
     std::vector<const char*> postFields;

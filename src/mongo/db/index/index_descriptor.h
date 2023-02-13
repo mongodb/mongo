@@ -34,6 +34,7 @@
 #include <set>
 #include <string>
 
+#include "mongo/bson/ordering.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
@@ -201,6 +202,11 @@ public:
         return _version;
     }
 
+    // Return the 'Ordering' of the index keys.
+    const Ordering& ordering() const {
+        return _ordering;
+    }
+
     // May each key only occur once?
     bool unique() const {
         return _unique;
@@ -332,6 +338,9 @@ private:
     bool _hidden;
     bool _partial;
     IndexVersion _version;
+    // '_ordering' should be initialized after '_indexType' because different index types may
+    // require different handling of the Ordering.
+    Ordering _ordering;
     BSONObj _collation;
     BSONObj _partialFilterExpression;
     bool _prepareUnique = false;

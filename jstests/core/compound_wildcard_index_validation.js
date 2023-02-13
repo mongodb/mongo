@@ -1,6 +1,8 @@
 /**
  * Tests that compound wildcard indexes can be created. The specification of a compound wildcard
- * index should be validated correctly.
+ * index should be validated correctly. This test also tests that CWI can be validated by validate
+ * command.
+ *
  */
 
 (function() {
@@ -54,4 +56,20 @@ assert.commandFailedWithCode(coll.createIndex({"a.$**": 1, b: 1}, {expireAfterSe
 // Tests that createIndex creating a compound wildcard index on all fields failed if
 // 'wildcardProjection' is not specified.
 assert.commandFailedWithCode(coll.createIndex({a: 1, "$**": 1}), 67);
+
+// Tests that all compound wildcard indexes in the catalog can be validated by running validate()
+// command.
+
+// Create more wildcard indexes with various forms.
+assert.commandWorked(coll.createIndex({a: 1, "b.$**": 1, str: 1}));
+assert.commandWorked(coll.createIndex({"b.$**": 1, str: 1}));
+assert.commandWorked(coll.createIndex({a: 1, "b.$**": 1}));
+assert.commandWorked(coll.createIndex({"$**": 1}));
+
+// Insert documents to index.
+for (let i = 0; i < 10; i++) {
+    coll.insert({a: i, b: {a: i * 2, c: i * i}, str: 'aa'});
+}
+
+assert.commandWorked(coll.validate({full: true}));
 })();

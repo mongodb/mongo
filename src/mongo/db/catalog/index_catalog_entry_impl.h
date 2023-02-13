@@ -95,9 +95,7 @@ public:
         _indexBuildInterceptor = interceptor;
     }
 
-    const Ordering& ordering() const final {
-        return _ordering;
-    }
+    const Ordering& ordering() const final;
 
     const MatchExpression* getFilterExpression() const final {
         return _filterExpression.get();
@@ -239,7 +237,6 @@ private:
 
     const RecordId _catalogId;  // Location in the durable catalog of the collection entry
                                 // containing this index entry.
-    Ordering _ordering;         // TODO: this might be b-tree specific
     bool _isReady;              // cache of NamespaceDetails info
     bool _isFrozen;
     bool _shouldValidateDocument;
