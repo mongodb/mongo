@@ -28,36 +28,51 @@
  */
 
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/query_test_service_context.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
+class CanonicalQueryTest : public unittest::Test {
+public:
+    CanonicalQueryTest() : _opCtx(_serviceContext.makeOperationContext()) {}
 
-const NamespaceString nss("test.collection");
+protected:
+    OperationContext* opCtx() const {
+        return _opCtx.get();
+    }
 
-std::unique_ptr<CanonicalQuery> canonicalize(const BSONObj& queryObj);
-std::unique_ptr<CanonicalQuery> canonicalize(StringData queryStr);
-std::unique_ptr<CanonicalQuery> canonicalize(BSONObj query,
-                                             BSONObj sort,
-                                             BSONObj proj,
-                                             BSONObj collation);
-std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
-                                             const char* sortStr,
-                                             const char* projStr,
-                                             const char* collationStr);
-std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
-                                             const char* sortStr,
-                                             const char* projStr,
-                                             long long skip,
-                                             long long limit,
-                                             const char* hintStr,
-                                             const char* minStr,
-                                             const char* maxStr);
-std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
-                                             const char* sortStr,
-                                             const char* projStr,
-                                             long long skip,
-                                             long long limit,
-                                             const char* hintStr,
-                                             const char* minStr,
-                                             const char* maxStr,
-                                             bool explain);
+    std::unique_ptr<CanonicalQuery> canonicalize(const BSONObj& queryObj);
+    std::unique_ptr<CanonicalQuery> canonicalize(StringData queryStr);
+    std::unique_ptr<CanonicalQuery> canonicalize(BSONObj query,
+                                                 BSONObj sort,
+                                                 BSONObj proj,
+                                                 BSONObj collation);
+    std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
+                                                 const char* sortStr,
+                                                 const char* projStr,
+                                                 const char* collationStr);
+    std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
+                                                 const char* sortStr,
+                                                 const char* projStr,
+                                                 long long skip,
+                                                 long long limit,
+                                                 const char* hintStr,
+                                                 const char* minStr,
+                                                 const char* maxStr);
+    std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
+                                                 const char* sortStr,
+                                                 const char* projStr,
+                                                 long long skip,
+                                                 long long limit,
+                                                 const char* hintStr,
+                                                 const char* minStr,
+                                                 const char* maxStr,
+                                                 bool explain);
+
+    static const NamespaceString nss;
+
+private:
+    QueryTestServiceContext _serviceContext;
+    ServiceContext::UniqueOperationContext _opCtx;
+};
 }  // namespace mongo
