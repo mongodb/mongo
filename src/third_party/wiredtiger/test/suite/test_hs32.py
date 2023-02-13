@@ -33,7 +33,7 @@ from wiredtiger import stat
 # test_hs32.py
 # Ensure that updates without timestamps clear the history store records.
 class test_hs32(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,statistics=(all)'
+    conn_config = 'cache_size=500MB,statistics=(all)'
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column-fix', dict(key_format='r', value_format='8t')),
@@ -152,5 +152,5 @@ class test_hs32(wttest.WiredTigerTestCase):
                         self.assertEqual(cursor[self.create_key(i)], value1)
 
         if self.update_type == 'deletion':
-            hs_truncate = self.get_stat(stat.conn.cache_hs_key_truncate_onpage_removal)
-            self.assertGreater(hs_truncate, 0)
+            cache_hs_key_truncate = self.get_stat(stat.conn.cache_hs_key_truncate)
+            self.assertGreater(cache_hs_key_truncate, 0)
