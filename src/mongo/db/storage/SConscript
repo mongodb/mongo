@@ -526,6 +526,7 @@ env.CppUnitTest(
     target='db_storage_test',
     source=[
         'external_record_store_test.cpp',
+        'disk_space_monitor_test.cpp',
         'flow_control_test.cpp',
         'historical_ident_tracker_test.cpp',
         'index_entry_comparison_test.cpp',
@@ -560,6 +561,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/network_interface_mock',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
+        'disk_space_monitor',
         'flow_control',
         'flow_control_parameters',
         'historical_ident_tracker',
@@ -602,6 +604,18 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'durable_catalog_impl',
         'kv/kv_drop_pending_ident_reaper',
+    ],
+)
+
+env.Library(
+    target='disk_space_monitor',
+    source=[
+        'disk_space_monitor.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
+        'storage_options',
     ],
 )
 

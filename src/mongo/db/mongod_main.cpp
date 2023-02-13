@@ -169,6 +169,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/control/storage_control.h"
+#include "mongo/db/storage/disk_space_monitor.h"
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/flow_control.h"
@@ -807,6 +808,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         storageEngine->startTimestampMonitor();
 
         startFLECrud(serviceContext);
+
+        DiskSpaceMonitor::start(serviceContext);
     }
 
     startClientCursorMonitor();
@@ -1344,6 +1347,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         opCtx->sleepFor(shutdownTimeout);
         LOGV2_OPTIONS(4695103, {LogComponent::kReplication}, "Exiting quiesce mode for shutdown");
     }
+
+    DiskSpaceMonitor::stop(serviceContext);
 
     LOGV2_OPTIONS(6371601, {LogComponent::kDefault}, "Shutting down the FLE Crud thread pool");
     stopFLECrud();

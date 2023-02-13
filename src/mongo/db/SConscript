@@ -2361,6 +2361,7 @@ env.Library(
         'startup_recovery',
         'startup_warnings_mongod',
         'storage/backup_cursor_hooks',
+        'storage/disk_space_monitor',
         'storage/flow_control',
         'storage/flow_control_parameters',
         'storage/storage_control',
