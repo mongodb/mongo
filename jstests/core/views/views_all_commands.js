@@ -308,6 +308,7 @@ let viewsCommandTests = {
             assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
         }
     },
+    createSearchIndex: {skip: "present in v6.3 but renamed to createSearchIndexes in v7.0"},
     createSearchIndexes: {skip: isUnrelated},
     createUser: {
         command: {createUser: "testuser", pwd: "testpass", roles: []},
@@ -525,6 +526,7 @@ let viewsCommandTests = {
         expectFailure: true,
         expectedErrorCode: ErrorCodes.NamespaceNotSharded,
     },
+    modifySearchIndex: {skip: "present in v6.3 but renamed to updateSearchIndex in v7.0"},
     moveChunk: {
         command: {moveChunk: "test.view", find: {}, to: "a"},
         skipStandalone: true,
