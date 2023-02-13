@@ -42,8 +42,11 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/idl/command_generic_argument.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
 namespace {
@@ -51,15 +54,25 @@ long long adjustCappedSize(long long cappedSize) {
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         !feature_flags::gfeatureFlagCappedCollectionsRelaxedSize.isEnabled(
             serverGlobalParams.featureCompatibility)) {
+        auto originalCappedSize = cappedSize;
         cappedSize += 0xff;
         cappedSize &= 0xffffffffffffff00LL;
+        LOGV2(7386100,
+              "Capped collection maxSize being rounded up to nearest 256-byte size.",
+              "originalSize"_attr = originalCappedSize,
+              "adjustedSize"_attr = cappedSize);
     }
     return cappedSize;
 }
 
 long long adjustCappedMaxDocs(long long cappedMaxDocs) {
     if (cappedMaxDocs <= 0 || cappedMaxDocs == std::numeric_limits<long long>::max()) {
+        auto originalCappedMaxDocs = cappedMaxDocs;
         cappedMaxDocs = 0x7fffffff;
+        LOGV2(7386101,
+              "Capped collection maxDocs being rounded off.",
+              "originalMaxDocs"_attr = originalCappedMaxDocs,
+              "adjustedMaxDocs"_attr = cappedMaxDocs);
     }
     return cappedMaxDocs;
 }
