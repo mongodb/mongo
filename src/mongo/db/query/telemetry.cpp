@@ -60,7 +60,11 @@ namespace telemetry {
 static const std::string kTelemetryKeyInShardedCommand = "hashedTelemetryKey";
 
 bool isTelemetryEnabled() {
-    return feature_flags::gFeatureFlagTelemetry.isEnabledAndIgnoreFCV();
+    // During initialization FCV may not yet be setup but queries could be run. We can't
+    // check whether telemetry should be enabled without FCV, so default to not recording
+    // those queries.
+    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        feature_flags::gFeatureFlagTelemetry.isEnabled(serverGlobalParams.featureCompatibility);
 }
 
 ShardedTelemetryStoreKey telemetryKeyToShardedStoreId(const BSONObj& key, std::string hostAndPort) {
@@ -78,6 +82,9 @@ BSONObj getTelemetryKeyFromOpCtx(OperationContext* opCtx) {
 void appendShardedTelemetryKeyIfApplicable(MutableDocument& objToModify,
                                            std::string hostAndPort,
                                            OperationContext* opCtx) {
+    if (!isTelemetryEnabled()) {
+        return;
+    }
     auto telemetryKey = getTelemetryKeyFromOpCtx(opCtx);
     if (telemetryKey.isEmpty()) {
         return;
@@ -90,6 +97,9 @@ void appendShardedTelemetryKeyIfApplicable(MutableDocument& objToModify,
 void appendShardedTelemetryKeyIfApplicable(BSONObjBuilder& objToModify,
                                            std::string hostAndPort,
                                            OperationContext* opCtx) {
+    if (!isTelemetryEnabled()) {
+        return;
+    }
     auto telemetryKey = getTelemetryKeyFromOpCtx(opCtx);
     if (telemetryKey.isEmpty()) {
         return;
@@ -179,7 +189,12 @@ public:
 
 ServiceContext::ConstructorActionRegisterer telemetryStoreManagerRegisterer{
     "TelemetryStoreManagerRegisterer", [](ServiceContext* serviceCtx) {
-        if (!isTelemetryEnabled()) {
+        // It is possible that this is called before FCV is properly set up. Setting up the store if
+        // the flag is enabled but FCV is incorrect is safe, and guards against the FCV being
+        // changed to a supported version later.
+        // TODO SERVER-73907. Move this to run after FCV is initialized. It could be we'd have to
+        // re-run this function if FCV changes later during the life of the process.
+        if (!feature_flags::gFeatureFlagTelemetry.isEnabledAndIgnoreFCV()) {
             // featureFlags are not allowed to be changed at runtime. Therefore it's not an issue
             // to not create a telemetry store in ConstructorActionRegisterer at start up with the
             // flag off - because the flag can not be turned on at any point afterwards.

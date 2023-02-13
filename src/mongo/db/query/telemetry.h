@@ -53,6 +53,9 @@ using BSONNumeric = long long;
 }  // namespace
 
 namespace telemetry {
+
+bool isTelemetryEnabled();
+
 /**
  * Generate a Telemetry Store key to be used on a shard from a Telemetry Store key that is being
  * used on mongos.

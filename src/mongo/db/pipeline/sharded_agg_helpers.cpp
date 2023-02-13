@@ -741,6 +741,9 @@ void abandonCacheIfSentToShards(Pipeline* shardsPipeline) {
 }
 
 void setTelemetryKeyOnAggRequest(AggregateCommandRequest& request, ExpressionContext* expCtx) {
+    if (!telemetry::isTelemetryEnabled()) {
+        return;
+    }
     request.setHashedTelemetryKey(telemetry::telemetryKeyToShardedStoreId(
         telemetry::getTelemetryKeyFromOpCtx(expCtx->opCtx), getHostNameCachedAndPort()));
 }
