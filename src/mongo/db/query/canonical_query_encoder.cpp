@@ -107,7 +107,7 @@ void encodeUserString(StringData s, BuilderType* builder) {
             case kEncodeProjectionRequirementSeparator:
             case kEncodeRegexFlagsSeparator:
             case kEncodeSortSection:
-            case kEncodeEngineSection:
+            case kEncodeFlagsSection:
             case kEncodeParamMarker:
             case kEncodeConstantLiteralMarker:
             case kEncodePipelineSection:
@@ -676,7 +676,13 @@ CanonicalQuery::QueryShapeString encode(const CanonicalQuery& cq) {
 
     // This encoding can be removed once the classic query engine reaches EOL and SBE is used
     // exclusively for all query execution.
-    keyBuilder << kEncodeEngineSection << (cq.getForceClassicEngine() ? "f" : "t");
+    keyBuilder << kEncodeFlagsSection << (cq.getForceClassicEngine() ? "f" : "t");
+
+    // The apiStrict flag can cause the query to see different set of indexes. For example, all
+    // sparse indexes will be ignored with apiStrict is used.
+    const bool apiStrict =
+        cq.getOpCtx() && APIParameters::get(cq.getOpCtx()).getAPIStrict().value_or(false);
+    keyBuilder << (apiStrict ? "t" : "f");
 
     return keyBuilder.str();
 }
@@ -1089,6 +1095,11 @@ std::string encodeSBE(const CanonicalQuery& cq) {
     bufBuilder.appendStr(strBuilderEncoded, false /* includeEndingNull */);
     bufBuilder.appendChar(cq.getForceGenerateRecordId() ? 1 : 0);
     bufBuilder.appendChar(cq.isCountLike() ? 1 : 0);
+    // The apiStrict flag can cause the query to see different set of indexes. For example, all
+    // sparse indexes will be ignored with apiStrict is used.
+    const bool apiStrict =
+        cq.getOpCtx() && APIParameters::get(cq.getOpCtx()).getAPIStrict().value_or(false);
+    bufBuilder.appendChar(apiStrict ? 1 : 0);
 
     encodeFindCommandRequest(cq.getFindCommandRequest(), &bufBuilder);
 

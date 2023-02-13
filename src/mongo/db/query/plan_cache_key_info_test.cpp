@@ -50,6 +50,8 @@ std::ostream& operator<<(std::ostream& stream, const PlanCacheKeyInfo& key) {
 }
 
 namespace {
+using PlanCacheKeyInfoTest = CanonicalQueryTest;
+
 PlanCacheKeyInfo makeKey(const CanonicalQuery& cq,
                          const std::vector<CoreIndexInfo>& indexCores = {}) {
     PlanCacheIndexabilityState indexabilityState;
@@ -108,20 +110,25 @@ void assertPlanCacheKeysUnequalDueToForceClassicEngineValue(const PlanCacheKeyIn
     auto bStablePart = b.getQueryShape();
 
     ASSERT_EQ(aUnstablePart, bUnstablePart);
-    // The last character of the stable part encodes the engine that uses this PlanCacheKey. So the
-    // stable parts except for the last character should be identical.
-    ASSERT_EQ(aStablePart.substr(0, aStablePart.size() - 1),
-              bStablePart.substr(0, bStablePart.size() - 1));
+    // The last 2 characters (plus separator) of the stable part encodes the engine that uses this
+    // PlanCacheKey and if apiStrict was used. So the stable parts except for the last two
+    // characters should be identical.
+    ASSERT_EQ(aStablePart.substr(0, aStablePart.size() - 2),
+              bStablePart.substr(0, bStablePart.size() - 2));
 
-    // Should have at least 1 byte to represent whether we must use the classic engine.
-    ASSERT_GTE(aStablePart.size(), 1);
+    // Should have at least 2 byte to represent whether we must use the classic engine and stable
+    // API.
+    ASSERT_GTE(aStablePart.size(), 2);
 
     // The indexability discriminators should match.
     ASSERT_EQ(a.getIndexabilityDiscriminators(), b.getIndexabilityDiscriminators());
 
-    // The stable parts should not match because of the last character.
+    // The stable parts should not match because of the second character from the back, encoding the
+    // engine type.
     ASSERT_NE(aStablePart, bStablePart);
-    ASSERT_NE(aStablePart.back(), bStablePart.back());
+    ASSERT_NE(aStablePart[aStablePart.size() - 2], bStablePart[bStablePart.size() - 2]);
+    // Ensure that the the apiStrict values are equal.
+    ASSERT_EQ(aStablePart.back(), bStablePart.back());
 }
 
 /**
@@ -141,7 +148,7 @@ void assertPlanCacheKeysUnequalDueToDiscriminators(const PlanCacheKeyInfo& a,
 
 // When a sparse index is present, computeKey() should generate different keys depending on
 // whether or not the predicates in the given query can use the index.
-TEST(PlanCacheKeyInfoTest, ComputeKeySparseIndex) {
+TEST_F(PlanCacheKeyInfoTest, ComputeKeySparseIndex) {
     const auto keyPattern = BSON("a" << 1);
     const std::vector<CoreIndexInfo> indexCores = {
         CoreIndexInfo(keyPattern,
@@ -170,7 +177,7 @@ TEST(PlanCacheKeyInfoTest, ComputeKeySparseIndex) {
 // When a partial index is present, computeKey() should generate different keys depending on
 // whether or not the predicates in the given query "match" the predicates in the partial index
 // filter.
-TEST(PlanCacheKeyInfoTest, ComputeKeyPartialIndex) {
+TEST_F(PlanCacheKeyInfoTest, ComputeKeyPartialIndex) {
     BSONObj filterObj = BSON("f" << BSON("$gt" << 0));
     unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
@@ -194,7 +201,7 @@ TEST(PlanCacheKeyInfoTest, ComputeKeyPartialIndex) {
                                                   makeKey(*cqGtZero, indexCores));
 }
 
-TEST(PlanCacheKeyInfoTest, ComputeKeyPartialIndexConjunction) {
+TEST_F(PlanCacheKeyInfoTest, ComputeKeyPartialIndexConjunction) {
     BSONObj filterObj = fromjson("{f: {$gt: 0, $lt: 10}}");
     unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
@@ -230,7 +237,7 @@ TEST(PlanCacheKeyInfoTest, ComputeKeyPartialIndexConjunction) {
               "(0)");
 }
 
-TEST(PlanCacheKeyInfoTest, ComputeKeyPartialIndexDisjunction) {
+TEST_F(PlanCacheKeyInfoTest, ComputeKeyPartialIndexDisjunction) {
     BSONObj filterObj = fromjson("{$or: [{f: {$gt: 10}}, {f: {$lt: 0}}]}");
     unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
@@ -271,7 +278,7 @@ TEST(PlanCacheKeyInfoTest, ComputeKeyPartialIndexDisjunction) {
               "(0)");
 }
 
-TEST(PlanCacheKeyInfoTest, ComputeKeyPartialIndexNestedDisjunction) {
+TEST_F(PlanCacheKeyInfoTest, ComputeKeyPartialIndexNestedDisjunction) {
     BSONObj filterObj = fromjson(R"(
         {$and: [
             {$or: [{f: {$gt: 10}}, {f: {$lt: 0}}]}, 
@@ -296,7 +303,7 @@ TEST(PlanCacheKeyInfoTest, ComputeKeyPartialIndexNestedDisjunction) {
 }
 
 // Query shapes should get the same plan cache key if they have the same collation indexability.
-TEST(PlanCacheKeyInfoTest, ComputeKeyCollationIndex) {
+TEST_F(PlanCacheKeyInfoTest, ComputeKeyCollationIndex) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
 
     const auto keyPattern = BSON("a" << 1);
@@ -363,7 +370,7 @@ TEST(PlanCacheKeyInfoTest, ComputeKeyCollationIndex) {
               makeKey(*inContainsStringHasCollation, indexCores).getIndexabilityDiscriminators());
 }
 
-TEST(PlanCacheKeyInfoTest, ComputeKeyWildcardIndex) {
+TEST_F(PlanCacheKeyInfoTest, ComputeKeyWildcardIndex) {
     auto entryProjUpdatePair = makeWildcardUpdate(BSON("a.$**" << 1));
 
     const std::vector<CoreIndexInfo> indexCores = {entryProjUpdatePair.first};
@@ -423,7 +430,7 @@ TEST(PlanCacheKeyInfoTest, ComputeKeyWildcardIndex) {
               "<0><0>");
 }
 
-TEST(PlanCacheKeyInfoTest, ComputeKeyWildcardIndexDiscriminatesEqualityToEmptyObj) {
+TEST_F(PlanCacheKeyInfoTest, ComputeKeyWildcardIndexDiscriminatesEqualityToEmptyObj) {
     auto entryProjUpdatePair = makeWildcardUpdate(BSON("a.$**" << 1));
 
     const std::vector<CoreIndexInfo> indexCores = {entryProjUpdatePair.first};
@@ -445,7 +452,8 @@ TEST(PlanCacheKeyInfoTest, ComputeKeyWildcardIndexDiscriminatesEqualityToEmptyOb
     ASSERT_EQ(makeKey(*inWithEmptyObj, indexCores).getIndexabilityDiscriminators(), "<1>");
 }
 
-TEST(PlanCacheKeyInfoTest, ComputeKeyWildcardDiscriminatesCorrectlyBasedOnPartialFilterExpression) {
+TEST_F(PlanCacheKeyInfoTest,
+       ComputeKeyWildcardDiscriminatesCorrectlyBasedOnPartialFilterExpression) {
     BSONObj filterObj = BSON("x" << BSON("$gt" << 0));
     std::unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
@@ -513,7 +521,7 @@ TEST(PlanCacheKeyInfoTest, ComputeKeyWildcardDiscriminatesCorrectlyBasedOnPartia
     }
 }
 
-TEST(PlanCacheKeyInfoTest, DifferentQueryEngines) {
+TEST_F(PlanCacheKeyInfoTest, DifferentQueryEngines) {
     const auto keyPattern = BSON("a" << 1);
     const std::vector<CoreIndexInfo> indexCores = {
         CoreIndexInfo(keyPattern,
@@ -539,7 +547,8 @@ TEST(PlanCacheKeyInfoTest, DifferentQueryEngines) {
     assertPlanCacheKeysUnequalDueToForceClassicEngineValue(classicEngineKey, noClassicEngineKey);
 }
 
-TEST(PlanCacheKeyInfoTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFilterAndExpression) {
+TEST_F(PlanCacheKeyInfoTest,
+       ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFilterAndExpression) {
     // Partial filter is an AND of multiple conditions.
     BSONObj filterObj = BSON("x" << BSON("$gt" << 0) << "y" << BSON("$gt" << 0));
     std::unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
@@ -567,7 +576,8 @@ TEST(PlanCacheKeyInfoTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFi
     }
 }
 
-TEST(PlanCacheKeyInfoTest, ComputeKeyDiscriminatesCorrectlyWithPartialFilterAndWildcardProjection) {
+TEST_F(PlanCacheKeyInfoTest,
+       ComputeKeyDiscriminatesCorrectlyWithPartialFilterAndWildcardProjection) {
     BSONObj filterObj = BSON("x" << BSON("$gt" << 0));
     std::unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
@@ -599,7 +609,8 @@ TEST(PlanCacheKeyInfoTest, ComputeKeyDiscriminatesCorrectlyWithPartialFilterAndW
     }
 }
 
-TEST(PlanCacheKeyInfoTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFilterOnNestedField) {
+TEST_F(PlanCacheKeyInfoTest,
+       ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFilterOnNestedField) {
     BSONObj filterObj = BSON("x.y" << BSON("$gt" << 0));
     std::unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
@@ -624,7 +635,7 @@ TEST(PlanCacheKeyInfoTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFi
     }
 }
 
-TEST(PlanCacheKeyInfoTest, StableKeyDoesNotChangeAcrossIndexCreation) {
+TEST_F(PlanCacheKeyInfoTest, StableKeyDoesNotChangeAcrossIndexCreation) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 0}}"));
     const auto preIndexKey = makeKey(*cq);
     const auto preIndexStableKey = preIndexKey.getQueryShape();
@@ -645,7 +656,7 @@ TEST(PlanCacheKeyInfoTest, StableKeyDoesNotChangeAcrossIndexCreation) {
     ASSERT_EQ(postIndexKey.getIndexabilityDiscriminators(), "<1>");
 }
 
-TEST(PlanCacheKeyInfoTest, ComputeKeyNotEqualsArray) {
+TEST_F(PlanCacheKeyInfoTest, ComputeKeyNotEqualsArray) {
     unique_ptr<CanonicalQuery> cqNeArray(canonicalize("{a: {$ne: [1]}}"));
     unique_ptr<CanonicalQuery> cqNeScalar(canonicalize("{a: {$ne: 123}}"));
 
@@ -678,7 +689,7 @@ TEST(PlanCacheKeyInfoTest, ComputeKeyNotEqualsArray) {
     ASSERT_EQ(withIndexNeArrayKey.getIndexabilityDiscriminators(), "<0><1>");
 }
 
-TEST(PlanCacheKeyInfoTest, ComputeKeyNinArray) {
+TEST_F(PlanCacheKeyInfoTest, ComputeKeyNinArray) {
     unique_ptr<CanonicalQuery> cqNinArray(canonicalize("{a: {$nin: [123, [1]]}}"));
     unique_ptr<CanonicalQuery> cqNinScalar(canonicalize("{a: {$nin: [123, 456]}}"));
 
@@ -719,7 +730,7 @@ TEST(PlanCacheKeyInfoTest, ComputeKeyNinArray) {
 // Whether the discriminator referred to the first not-eq node or the second would be
 // ambiguous. This would make it possible for two queries with different shapes (and different
 // plans) to get the same plan cache key. We test that this does not happen for a simple example.
-TEST(PlanCacheKeyInfoTest, PlanCacheKeyCollision) {
+TEST_F(PlanCacheKeyInfoTest, PlanCacheKeyCollision) {
     unique_ptr<CanonicalQuery> cqNeA(canonicalize("{$or: [{a: {$ne: 5}}, {a: {$ne: [12]}}]}"));
     unique_ptr<CanonicalQuery> cqNeB(canonicalize("{$or: [{a: {$ne: [12]}}, {a: {$ne: 5}}]}"));
 

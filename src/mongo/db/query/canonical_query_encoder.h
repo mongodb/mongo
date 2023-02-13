@@ -42,7 +42,8 @@ inline constexpr char kEncodeProjectionSection = '|';
 inline constexpr char kEncodeProjectionRequirementSeparator = '-';
 inline constexpr char kEncodeRegexFlagsSeparator = '/';
 inline constexpr char kEncodeSortSection = '~';
-inline constexpr char kEncodeEngineSection = '@';
+inline constexpr char kEncodeFlagsSection = '@';
+
 inline constexpr char kEncodePipelineSection = '^';
 
 // These special bytes are used in the encoding of auto-parameterized match expressions in the SBE
