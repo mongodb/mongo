@@ -165,12 +165,7 @@ const $config = (function() {
                     // Due to a stepdown of the donor during the cloning phase, the movePrimary
                     // operation failed. It is not automatically recovered, but any orphaned data on
                     // the recipient has been deleted.
-                    7120202,
-                    // Due to a stepdown of the recipient during the cloning phase, the
-                    // _shardsvrCloneCatalogData command is retried by the donor, finding orphaned
-                    // documents. The movePrimary operation fails and is not automatically
-                    // recovered, but orphaned data on the recipient has been deleted.
-                    ErrorCodes.NamespaceExists
+                    7120202
                 ]);
         },
         verifyDocuments: function(db, collName, connCache) {
