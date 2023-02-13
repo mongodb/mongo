@@ -69,6 +69,8 @@ all:
   ticket: SERVER-63159
 - test_file: jstests/core/internal_apply_oplog_update.js
   ticket: SERVER-63159
+- test_file: jstests/core/partial_index_logical.js
+  ticket: SERVER-68434
 suites:
   change_streams_multiversion: null
   change_streams_sharded_collections_multiversion_passthrough: null

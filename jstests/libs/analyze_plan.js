@@ -380,3 +380,37 @@ function assertCoveredQueryAndCount({collection, query, project, count}) {
            "Winning plan for count was not covered: " + tojson(explain.queryPlanner.winningPlan));
     assertExplainCount({explainResults: explain, expectedCount: count});
 }
+
+/**
+ * Get the "planCacheKey" from the explain result.
+ */
+function getPlanCacheKeyFromExplain(explainRes, db) {
+    const hash = FixtureHelpers.isMongos(db) &&
+            explainRes.queryPlanner.hasOwnProperty("winningPlan") &&
+            explainRes.queryPlanner.winningPlan.hasOwnProperty("shards")
+        ? explainRes.queryPlanner.winningPlan.shards[0].planCacheKey
+        : explainRes.queryPlanner.planCacheKey;
+    assert.eq(typeof hash, "string");
+
+    return hash;
+}
+
+/**
+ * Helper to run a explain on the given query shape and get the "planCacheKey" from the explain
+ * result.
+ */
+function getPlanCacheKeyFromShape({
+    query = {},
+    projection = {},
+    sort = {},
+    collation = {
+        locale: "simple"
+    },
+    collection,
+    db
+}) {
+    const explainRes = assert.commandWorked(
+        collection.explain().find(query, projection).collation(collation).sort(sort).finish());
+
+    return getPlanCacheKeyFromExplain(explainRes, db);
+}

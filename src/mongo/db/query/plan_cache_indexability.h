@@ -46,6 +46,7 @@ struct CoreIndexInfo;
 using IndexabilityDiscriminator = stdx::function<bool(const MatchExpression* me)>;
 using IndexabilityDiscriminators = std::vector<IndexabilityDiscriminator>;
 using IndexToDiscriminatorMap = StringMap<CompositeIndexabilityDiscriminator>;
+using PathDiscriminatorsMap = StringMap<IndexToDiscriminatorMap>;
 
 /**
  * CompositeIndexabilityDiscriminator holds all indexability discriminators for a particular path,
@@ -76,9 +77,14 @@ private:
 };
 
 /**
- * PlanCacheIndexabilityState holds a set of "indexability discriminators" for certain paths.
- * An indexability discriminator is a binary predicate function, used to classify match
- * expressions based on the data values in the expression.
+ * PlanCacheIndexabilityState holds a set of "indexability discriminators. An indexability
+ * discriminator is a binary predicate function, used to classify match expressions based on the
+ * data values in the expression.
+ *
+ * These discriminators are used to distinguish between queries of a similar shape but not the same
+ * candidate indexes. So each discriminator typically represents a decision like "is this index
+ * valid?" or "does this piece of the query disqualify it from using this index?". The output of
+ * these decisions is included in the plan cache key.
  */
 class PlanCacheIndexabilityState {
     PlanCacheIndexabilityState(const PlanCacheIndexabilityState&) = delete;
@@ -94,7 +100,15 @@ public:
      * The object returned by reference is valid until the next call to updateDiscriminators() or
      * until destruction of 'this', whichever is first.
      */
-    const IndexToDiscriminatorMap& getDiscriminators(StringData path) const;
+    const IndexToDiscriminatorMap& getPathDiscriminators(StringData path) const;
+
+    /**
+     * Returns a map of index name to discriminator set. These discriminators are not
+     * associated with a particular path of a query and apply to the entire MatchExpression.
+     */
+    const IndexToDiscriminatorMap& getGlobalDiscriminators() const {
+        return _globalDiscriminatorMap;
+    }
 
     /**
      * Construct an IndexToDiscriminator map for the given path, only for the wildcard indexes
@@ -108,8 +122,6 @@ public:
     void updateDiscriminators(const std::vector<CoreIndexInfo>& indexCores);
 
 private:
-    using PathDiscriminatorsMap = StringMap<IndexToDiscriminatorMap>;
-
     /**
      * A $** index may index an infinite number of fields. We cannot just store a discriminator for
      * every possible field that it indexes, so we have to maintain some special context about the
@@ -141,8 +153,8 @@ private:
     void processSparseIndex(const std::string& indexName, const BSONObj& keyPattern);
 
     /**
-     * Adds partial index discriminators for the partial index with the given filter expression
-     * to the discriminators for that index in '_pathDiscriminatorsMap'.
+     * Adds a global discriminator for the partial index with the given filter expression
+     * to the discriminators for that index in '_globalDiscriminatorMap'.
      *
      * A partial index discriminator distinguishes expressions that match a given partial index
      * predicate from expressions that don't match the partial index predicate.  For example,
@@ -172,6 +184,10 @@ private:
 
     // PathDiscriminatorsMap is a map from field path to index name to IndexabilityDiscriminator.
     PathDiscriminatorsMap _pathDiscriminatorsMap;
+
+    // Map from index name to global discriminators. These are discriminators which do not apply to
+    // a single path but the entire MatchExpression.
+    IndexToDiscriminatorMap _globalDiscriminatorMap;
 
     std::vector<WildcardIndexDiscriminatorContext> _wildcardIndexDiscriminators;
 };

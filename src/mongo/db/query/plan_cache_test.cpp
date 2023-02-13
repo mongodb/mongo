@@ -1858,6 +1858,41 @@ TEST(PlanCacheTest, ComputeKeyPartialIndex) {
                                                   planCache.computeKey(*cqGtZero));
 }
 
+TEST(PlanCacheTest, ComputeKeyPartialIndexConjunction) {
+    BSONObj filterObj = fromjson("{f: {$gt: 0, $lt: 10}}");
+    unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
+
+    PlanCache planCache;
+    const auto keyPattern = BSON("a" << 1);
+    planCache.notifyOfIndexUpdates(
+        {CoreIndexInfo(keyPattern,
+                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                       false,                       // sparse
+                       IndexEntry::Identifier{""},  // name
+                       filterExpr.get())});         // filterExpr
+
+    unique_ptr<CanonicalQuery> satisfySinglePredicate(canonicalize("{f: {$gt: 0}}"));
+    ASSERT_EQ(planCache.computeKey(*satisfySinglePredicate).getUnstablePart(), "(0)");
+
+    unique_ptr<CanonicalQuery> satisfyBothPredicates(canonicalize("{f: {$eq: 5}}"));
+    ASSERT_EQ(planCache.computeKey(*satisfyBothPredicates).getUnstablePart(), "(1)");
+
+    unique_ptr<CanonicalQuery> conjSingleField(canonicalize("{f: {$gt: 2, $lt: 9}}"));
+    ASSERT_EQ(planCache.computeKey(*conjSingleField).getUnstablePart(), "(1)");
+
+    unique_ptr<CanonicalQuery> conjSingleFieldNoMatch(canonicalize("{f: {$gt: 2, $lt: 11}}"));
+    ASSERT_EQ(planCache.computeKey(*conjSingleFieldNoMatch).getUnstablePart(), "(0)");
+
+    // Note that these queries get optimized to a single $in over 'f'.
+    unique_ptr<CanonicalQuery> disjSingleFieldBothSatisfy(
+        canonicalize("{$or: [{f: {$eq: 2}}, {f: {$eq: 3}}]}"));
+    ASSERT_EQ(planCache.computeKey(*disjSingleFieldBothSatisfy).getUnstablePart(), "(1)");
+
+    unique_ptr<CanonicalQuery> disjSingleFieldNotSubset(
+        canonicalize("{$or: [{f: {$eq: 2}}, {f: {$eq: 11}}]}"));
+    ASSERT_EQ(planCache.computeKey(*disjSingleFieldNotSubset).getUnstablePart(), "(0)");
+}
+
 // Query shapes should get the same plan cache key if they have the same collation indexability.
 TEST(PlanCacheTest, ComputeKeyCollationIndex) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
@@ -2035,8 +2070,8 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyBasedOnPartialFilter
         // The discriminator strings have the format "<xx>". That is, there are two discriminator
         // bits for the "x" predicate, the first pertaining to the partialFilterExpression and the
         // second around applicability to the wildcard index.
-        ASSERT_EQ(compatibleKey.getUnstablePart(), "<11>");
-        ASSERT_EQ(incompatibleKey.getUnstablePart(), "<01>");
+        ASSERT_EQ(compatibleKey.getUnstablePart(), "(1)<1>");
+        ASSERT_EQ(incompatibleKey.getUnstablePart(), "(0)<1>");
     }
 
     // The partialFilterExpression should lead to a discriminator over field 'x', but not over 'y'.
@@ -2051,8 +2086,8 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyBasedOnPartialFilter
         // The discriminator strings have the format "<xx><y>". That is, there are two discriminator
         // bits for the "x" predicate (the first pertaining to the partialFilterExpression, the
         // second around applicability to the wildcard index) and one discriminator bit for "y".
-        ASSERT_EQ(compatibleKey.getUnstablePart(), "<11><1>");
-        ASSERT_EQ(incompatibleKey.getUnstablePart(), "<01><1>");
+        ASSERT_EQ(compatibleKey.getUnstablePart(), "(1)<1><1>");
+        ASSERT_EQ(incompatibleKey.getUnstablePart(), "(0)<1><1>");
     }
 
     // $eq:null predicates cannot be assigned to a wildcard index. Make sure that this is
@@ -2067,8 +2102,8 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyBasedOnPartialFilter
         // The discriminator strings have the format "<xx><y>". That is, there are two discriminator
         // bits for the "x" predicate (the first pertaining to the partialFilterExpression, the
         // second around applicability to the wildcard index) and one discriminator bit for "y".
-        ASSERT_EQ(compatibleKey.getUnstablePart(), "<11><1>");
-        ASSERT_EQ(incompatibleKey.getUnstablePart(), "<11><0>");
+        ASSERT_EQ(compatibleKey.getUnstablePart(), "(1)<1><1>");
+        ASSERT_EQ(incompatibleKey.getUnstablePart(), "(1)<1><0>");
     }
 
     // Test that the discriminators are correct for an $eq:null predicate on 'x'. This predicate is
@@ -2077,7 +2112,7 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyBasedOnPartialFilter
     // result in two "0" bits inside the discriminator string.
     {
         auto key = planCache.computeKey(*canonicalize("{x: {$eq: null}}"));
-        ASSERT_EQ(key.getUnstablePart(), "<00>");
+        ASSERT_EQ(key.getUnstablePart(), "(0)<0>");
     }
 }
 
@@ -2098,7 +2133,7 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFilterAnd
         // discriminator because it is not referenced in the partial filter expression.  All
         // predicates are compatible.
         auto key = planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, z: {$eq: 3}}"));
-        ASSERT_EQ(key.getUnstablePart(), "<11><11><1>");
+        ASSERT_EQ(key.getUnstablePart(), "(1)<1><1><1>");
     }
 
     {
@@ -2106,7 +2141,7 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFilterAnd
         // compatible with the partial filter expression, leading to one of the 'y' bits being set
         // to zero.
         auto key = planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: -2}, z: {$eq: 3}}"));
-        ASSERT_EQ(key.getUnstablePart(), "<11><01><1>");
+        ASSERT_EQ(key.getUnstablePart(), "(0)<1><1><1>");
     }
 }
 
@@ -2125,14 +2160,14 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFilterOnN
         // The discriminators have the format <x><(x.y)(x.y)<y>. All predicates are compatible
         auto key =
             planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, 'x.y': {$eq: 3}}"));
-        ASSERT_EQ(key.getUnstablePart(), "<1><11><1>");
+        ASSERT_EQ(key.getUnstablePart(), "(1)<1><1><1>");
     }
 
     {
         // Here, the predicate on "x.y" is not compatible with the partial filter expression.
         auto key =
             planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, 'x.y': {$eq: -3}}"));
-        ASSERT_EQ(key.getUnstablePart(), "<1><01><1>");
+        ASSERT_EQ(key.getUnstablePart(), "(0)<1><1><1>");
     }
 }
 
@@ -2152,21 +2187,21 @@ TEST(PlanCacheTest, ComputeKeyDiscriminatesCorrectlyWithPartialFilterAndWildcard
         // the predicate is compatible with the partial filter expression, whereas the disciminator
         // for 'y' is about compatibility with the wildcard index.
         auto key = planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, z: {$eq: 3}}"));
-        ASSERT_EQ(key.getUnstablePart(), "<1><1>");
+        ASSERT_EQ(key.getUnstablePart(), "(1)<1>");
     }
 
     {
         // Similar to the previous case, except with an 'x' predicate that is incompatible with the
         // partial filter expression.
         auto key = planCache.computeKey(*canonicalize("{x: {$eq: -1}, y: {$eq: 2}, z: {$eq: 3}}"));
-        ASSERT_EQ(key.getUnstablePart(), "<0><1>");
+        ASSERT_EQ(key.getUnstablePart(), "(0)<1>");
     }
 
     {
         // Case where the 'y' predicate is not compatible with the wildcard index.
         auto key =
             planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: null}, z: {$eq: 3}}"));
-        ASSERT_EQ(key.getUnstablePart(), "<1><0>");
+        ASSERT_EQ(key.getUnstablePart(), "(1)<0>");
     }
 }
 
