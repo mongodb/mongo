@@ -35,6 +35,7 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
@@ -355,6 +356,7 @@ public:
             coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
             wuow.commit();
         }
+        coll.makeYieldable(&_opCtx, LockedCollectionYieldRestore(&_opCtx, coll));
 
         fillData();
 
@@ -484,6 +486,7 @@ public:
             coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
             wuow.commit();
         }
+        coll.makeYieldable(&_opCtx, LockedCollectionYieldRestore(&_opCtx, coll));
 
         fillData();
 
@@ -590,6 +593,7 @@ public:
             coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
             wuow.commit();
         }
+        coll.makeYieldable(&_opCtx, LockedCollectionYieldRestore(&_opCtx, coll));
 
         auto ws = std::make_unique<WorkingSet>();
         auto queuedDataStage = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());

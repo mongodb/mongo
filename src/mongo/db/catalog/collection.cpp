@@ -45,22 +45,22 @@ CollectionPtr::CollectionPtr(CollectionPtr&&) = default;
 CollectionPtr::~CollectionPtr() {}
 CollectionPtr& CollectionPtr::operator=(CollectionPtr&&) = default;
 
-bool CollectionPtr::_canYield() const {
+bool CollectionPtr::yieldable() const {
     // We only set the opCtx when this CollectionPtr is yieldable.
-    return _opCtx;
+    return _opCtx || !_collection;
 }
 
 void CollectionPtr::yield() const {
     // Yield if we are yieldable and have a valid collection
-    invariant(_canYield());
     if (_collection) {
+        invariant(_opCtx);
         _yieldedUUID = _collection->uuid();
         _collection = nullptr;
     }
 }
 void CollectionPtr::restore() const {
     // Restore from yield if we are yieldable and if uuid was set in a previous yield.
-    invariant(_canYield());
+    invariant(_opCtx);
     if (_yieldedUUID) {
         // We may only do yield restore when we were holding locks that was yielded so we need to
         // refresh from the catalog to make sure we have a valid collection pointer.

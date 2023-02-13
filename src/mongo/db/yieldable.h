@@ -33,6 +33,7 @@ namespace mongo {
 class Yieldable {
 public:
     virtual ~Yieldable() {}
+    virtual bool yieldable() const = 0;
     virtual void yield() const = 0;
     virtual void restore() const = 0;
 };

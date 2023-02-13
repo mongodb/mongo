@@ -268,6 +268,9 @@ protected:
 
 private:
     class MockYieldable : public Yieldable {
+        bool yieldable() const override {
+            return true;
+        }
         void yield() const override {}
         void restore() const override {}
     };

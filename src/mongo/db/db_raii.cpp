@@ -1321,6 +1321,13 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
             _lockFreeReadsBlock.reset();
         }
         _collectionPtr = std::move(collection);
+        // Nested operations should never yield as we don't yield when the global lock is held
+        // recursively. But this is not known when we create the Query plan for this sub operation.
+        // Pretend that we are yieldable but don't allow yield to actually be called.
+        _collectionPtr.makeYieldable(opCtx, [](OperationContext*, UUID) {
+            MONGO_UNREACHABLE;
+            return nullptr;
+        });
     } else {
         auto catalogStateForNamespace =
             acquireCatalogStateForNamespace(opCtx,

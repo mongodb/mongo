@@ -766,6 +766,7 @@ public:
         *this = CollectionPtr();
     }
 
+    bool yieldable() const override;
     void yield() const override;
     void restore() const override;
 
@@ -779,8 +780,6 @@ public:
     }
 
 private:
-    bool _canYield() const;
-
     // These members needs to be mutable so the yield/restore interface can be const. We don't want
     // yield/restore to require a non-const instance when it otherwise could be const.
     mutable const Collection* _collection = nullptr;

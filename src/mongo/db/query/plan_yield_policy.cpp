@@ -49,7 +49,12 @@ PlanYieldPolicy::PlanYieldPolicy(YieldPolicy policy,
     : _policy(policy),
       _yieldable(yieldable),
       _callbacks(std::move(callbacks)),
-      _elapsedTracker(cs, yieldIterations, yieldPeriod) {}
+      _elapsedTracker(cs, yieldIterations, yieldPeriod) {
+    invariant(!_yieldable || _yieldable->yieldable() ||
+              policy == YieldPolicy::WRITE_CONFLICT_RETRY_ONLY || policy == YieldPolicy::NO_YIELD ||
+              policy == YieldPolicy::INTERRUPT_ONLY || policy == YieldPolicy::ALWAYS_TIME_OUT ||
+              policy == YieldPolicy::ALWAYS_MARK_KILLED);
+}
 
 bool PlanYieldPolicy::shouldYieldOrInterrupt(OperationContext* opCtx) {
     if (_policy == YieldPolicy::INTERRUPT_ONLY) {
