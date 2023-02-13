@@ -184,5 +184,28 @@ TEST_F(HedgeOptionsUtilTestFixture, MaxTimeMSForHedgedReads) {
     checkHedgeOptions(parameters, cmdObj, rspObj, true, 100);
 }
 
+TEST(HedgeOptionsUtilTest, HostAndPortSorting) {
+    struct Spec {
+        HostAndPort a;
+        HostAndPort b;
+        bool out;
+    };
+    static const Spec specs[]{
+        {HostAndPort("ABC"), HostAndPort("abb"), false},
+        {HostAndPort("abc"), HostAndPort("abcd"), true},
+        {HostAndPort("abc", 1), HostAndPort("abc", 2), true},
+        {HostAndPort("de:35"), HostAndPort("de:32"), false},
+        {HostAndPort("def:34"), HostAndPort("dEF:39"), true},
+        {HostAndPort("[0:0:0]"), HostAndPort("abc"), true},
+        {HostAndPort("[0:0:0]"), HostAndPort("ABC"), true},
+    };
+    for (const auto& [a, b, out] : specs) {
+        ASSERT_EQ(compareByLowerHostThenPort(a, b), out) << ", a:" << a << ", b:" << b;
+        if (out) {
+            ASSERT_EQ(compareByLowerHostThenPort(b, a), !out) << ", a:" << a << ", b:" << b;
+        }
+    }
+}
+
 }  // namespace
 }  // namespace mongo

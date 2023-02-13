@@ -40,6 +40,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_tl.h"
+#include "mongo/executor/hedge_options_util.h"
 #include "mongo/executor/hedging_metrics.h"
 #include "mongo/executor/network_interface_tl_gen.h"
 #include "mongo/logv2/log.h"
@@ -605,12 +606,12 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     }
 
     bool targetHostsInAlphabeticalOrder =
-        MONGO_unlikely(networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder.shouldFail(
+        MONGO_unlikely(hedgedReadsSendRequestsToTargetHostsInAlphabeticalOrder.shouldFail(
             [&](const BSONObj&) { return request.options.hedgeOptions.isHedgeEnabled; }));
 
     if (targetHostsInAlphabeticalOrder) {
         std::sort(request.target.begin(), request.target.end(), [](auto&& a, auto&& b) {
-            return detail::orderByLowerHostThenPort(a, b);
+            return compareByLowerHostThenPort(a, b);
         });
     }
 
@@ -1464,18 +1465,5 @@ bool NetworkInterfaceTL::onNetworkThread() {
 void NetworkInterfaceTL::dropConnections(const HostAndPort& hostAndPort) {
     _pool->dropConnections(hostAndPort);
 }
-
-namespace detail {
-
-bool orderByLowerHostThenPort(const HostAndPort& a, const HostAndPort& b) {
-    const auto& ah = a.host();
-    const auto& bh = b.host();
-    if (int r = compareTransformed(
-            ah.begin(), ah.end(), bh.begin(), bh.end(), [](auto&& c) { return ctype::toLower(c); }))
-        return r < 0;
-    return a.port() < b.port();
-}
-
-}  // namespace detail
 }  // namespace executor
 }  // namespace mongo

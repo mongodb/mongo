@@ -156,6 +156,16 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                 // We'll send 1 authoritative command + however many hedges we can.
                 size_t hostsToTarget = std::min(opts.hedgeCount + 1, targets.size());
 
+                bool targetHostsInAlphabeticalOrder = MONGO_unlikely(
+                    hedgedReadsSendRequestsToTargetHostsInAlphabeticalOrder.shouldFail(
+                        [&](const BSONObj&) { return opts.isHedgeEnabled; }));
+
+                if (targetHostsInAlphabeticalOrder) {
+                    std::sort(targets.begin(), targets.end(), [](auto&& a, auto&& b) {
+                        return compareByLowerHostThenPort(a, b);
+                    });
+                }
+
                 for (size_t i = 0; i < hostsToTarget; i++) {
                     std::unique_ptr<Targeter> t = std::make_unique<FixedTargeter>(targets[i]);
                     // We explicitly pass "NeverRetryPolicy" here because the retry mechanism

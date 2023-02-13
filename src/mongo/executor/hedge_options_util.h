@@ -33,6 +33,9 @@
 #include "mongo/client/read_preference.h"
 
 namespace mongo {
+/** Failpoint used to test hedged reads. */
+extern FailPoint hedgedReadsSendRequestsToTargetHostsInAlphabeticalOrder;
+
 /**
  * HedgeOptions contains the information necessary for a particular command invocation to execute as
  * a hedged read. Specifically, it contains:
@@ -75,4 +78,12 @@ inline bool isIgnorableAsHedgeResult(const Status& status) {
     return status == ErrorCodes::MaxTimeMSExpired || status == ErrorCodes::StaleDbVersion ||
         ErrorCodes::isNetworkTimeoutError(status) || ErrorCodes::isStaleShardVersionError(status);
 }
+
+/**
+ * Orders HostAndPorts alphabetically; can be used by std::sort to order
+ * a range of HostAndPorts. We sort HostAndPorts alphabetically under
+ * test when targeting a set of HostAndPorts to hedge an operation, so tests
+ * can make assertions about which hosts receive authoritative vs. hedged requests.
+ */
+bool compareByLowerHostThenPort(const HostAndPort& a, const HostAndPort& b);
 }  // namespace mongo

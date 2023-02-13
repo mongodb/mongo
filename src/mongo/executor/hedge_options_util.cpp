@@ -35,6 +35,7 @@
 #include "mongo/util/optional_util.h"
 
 namespace mongo {
+MONGO_FAIL_POINT_DEFINE(hedgedReadsSendRequestsToTargetHostsInAlphabeticalOrder);
 namespace {
 // Only do hedging for commands that cannot trigger writes.
 constexpr std::array hedgeCommands{
@@ -66,7 +67,27 @@ bool commandShouldHedge(StringData command, const ReadPreferenceSetting& readPre
     }
     return commandCanHedge(command);
 }
+
+template <typename IA, typename IB, typename F>
+int compareTransformed(IA a1, IA a2, IB b1, IB b2, F&& f) {
+    for (;; ++a1, ++b1)
+        if (a1 == a2)
+            return b1 == b2 ? 0 : -1;
+        else if (b1 == b2)
+            return 1;
+        else if (int r = f(*a1) - f(*b1))
+            return r;
+}
 }  // namespace
+
+bool compareByLowerHostThenPort(const HostAndPort& a, const HostAndPort& b) {
+    const auto& ah = a.host();
+    const auto& bh = b.host();
+    if (int r = compareTransformed(
+            ah.begin(), ah.end(), bh.begin(), bh.end(), [](auto&& c) { return ctype::toLower(c); }))
+        return r < 0;
+    return a.port() < b.port();
+}
 
 HedgeOptions getHedgeOptions(StringData command, const ReadPreferenceSetting& readPref) {
     bool shouldHedge = commandShouldHedge(command, readPref);

@@ -1,6 +1,6 @@
 /**
  * Tests hedging metrics in the serverStatus output.
- * @tags: [requires_fcv_62]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";
@@ -103,7 +103,7 @@ const st = new ShardingTest({
             // Force the mongos's replica set monitors to always include all the eligible nodes.
             "failpoint.sdamServerSelectorIgnoreLatencyWindow": tojson({mode: "alwaysOn"}),
             // Force the mongos to send requests to hosts in alphabetical order of host names.
-            "failpoint.networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder":
+            "failpoint.hedgedReadsSendRequestsToTargetHostsInAlphabeticalOrder":
                 tojson({mode: "alwaysOn"}),
             maxTimeMSForHedgedReads: 10
         }
