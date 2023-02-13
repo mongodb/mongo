@@ -28,7 +28,7 @@ const coll = db[jsTestName() + "_coll"];
 jsTest.log("Drop Unexistent collection.");
 {
     // Drop the collection
-    // NamespaceNotFound will be returned by mongod versions earlier than 7.0.
+    // TODO (SERVER-73934): NamespaceNotFound will be returned by mongod versions earlier than 7.0.
     assert.commandWorkedOrFailedWithCode(db.runCommand({drop: coll.getName()}),
                                          ErrorCodes.NamespaceNotFound);
     assertCollectionDropped(coll.getFullName());
@@ -45,8 +45,9 @@ jsTest.log("Drop existing collection.");
     assertCollectionDropped(coll.getFullName());
 
     // Test idempotency
-    // NamespaceNotFound will be returned by mongod versions earlier than 7.0.
-    assert.commandWorkedOrFailedWithCode(db.runCommand({drop: coll.getName()}));
+    // TODO (SERVER-73934): NamespaceNotFound will be returned by mongod versions earlier than 7.0.
+    assert.commandWorkedOrFailedWithCode(db.runCommand({drop: coll.getName()}),
+                                         ErrorCodes.NamespaceNotFound);
     assertCollectionDropped(coll.getFullName());
 }
 
