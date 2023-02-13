@@ -114,7 +114,6 @@ public:
     using CollectionTypeBase::getUuid;
     using CollectionTypeBase::setDefragmentationPhase;
     using CollectionTypeBase::setDefragmentCollection;
-    using CollectionTypeBase::setIndexVersion;
     using CollectionTypeBase::setKeyPattern;
     using CollectionTypeBase::setNss;
     using CollectionTypeBase::setReshardingFields;
@@ -183,6 +182,10 @@ public:
     }
 
     void setIndexVersion(CollectionIndexes indexVersion) {
+        tassert(7000500,
+                str::stream() << "Cannot set collection indexes to " << indexVersion
+                              << " since collection uuid is " << getUuid(),
+                indexVersion.uuid() == getUuid());
         CollectionTypeBase::setIndexVersion(indexVersion.indexVersion());
     }
 

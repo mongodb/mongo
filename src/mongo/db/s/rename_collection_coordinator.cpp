@@ -107,7 +107,7 @@ void renameIndexMetadataInShards(OperationContext* opCtx,
     if (optShardedCollInfo && optShardedCollInfo->getIndexVersion()) {
         // Bump sharding catalog's index version on the config server if the source
         // collection is sharded. It will be updated later on.
-        optShardedCollInfo->setIndexVersion(newIndexVersion);
+        optShardedCollInfo->setIndexVersion({optShardedCollInfo->getUuid(), newIndexVersion});
         doc->setOptShardedCollInfo(optShardedCollInfo);
     }
 

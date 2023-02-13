@@ -260,7 +260,9 @@ void CatalogCacheTestFixture::expectCollectionAndIndexesAggregation(
             ASSERT_EQ(request.dbname, "config");
             CollectionType collType(
                 nss, epoch, timestamp, Date_t::now(), uuid, shardKeyPattern.toBSON());
-            collType.setIndexVersion(indexVersion);
+            if (indexVersion) {
+                collType.setIndexVersion({uuid, *indexVersion});
+            }
             return makeCollectionAndIndexesAggregationResponse(collType, globalIndexes);
         });
     }
