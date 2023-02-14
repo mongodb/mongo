@@ -193,7 +193,7 @@ function movePrimaryWithFailpoint(sharded) {
                                      ErrorCodes.InvalidOptions);
     } else {
         // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
-        if (!FeatureFlagUtil.isEnabled(db, 'ResilientMovePrimary')) {
+        if (!FeatureFlagUtil.isPresentAndEnabled(db, 'ResilientMovePrimary')) {
             // If the collections are unsharded, we should fail when any collections being copied
             // exist on the target shard.
             assert.commandFailed(st.s0.adminCommand({movePrimary: "test1", to: toShard.name}));

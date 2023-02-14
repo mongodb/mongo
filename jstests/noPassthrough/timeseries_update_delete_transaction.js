@@ -15,12 +15,6 @@ rst.startSet();
 rst.initiate();
 const testDB = rst.getPrimary().getDB(jsTestName());
 
-if (!TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(testDB.getMongo())) {
-    jsTestLog("Skipping test because the time-series updates and deletes feature flag is disabled");
-    rst.stopSet();
-    return;
-}
-
 const metaFieldName = "meta";
 const timeFieldName = "time";
 const collectionName = "t";

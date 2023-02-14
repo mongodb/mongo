@@ -39,7 +39,6 @@ var $config = extendWorkload($config, function($config, $super) {
         $super.states.init.call(this, db, collName, connCache);
 
         this.featureFlagDisabled = this.featureFlagDisabled ||
-            !TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(db) ||
             !TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(db);
         if (this.featureFlagDisabled) {
             jsTestLog(

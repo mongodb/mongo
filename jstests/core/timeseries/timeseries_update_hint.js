@@ -26,11 +26,6 @@ load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/libs/curop_helpers.js");
 load('jstests/libs/parallel_shell_helpers.js');
 
-if (!TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(db.getMongo())) {
-    jsTestLog("Skipping test because the time-series updates and deletes feature flag is disabled");
-    return;
-}
-
 const timeFieldName = "time";
 const metaFieldName = "tag";
 const dateTime = ISODate("2021-01-01T18:00:00Z");

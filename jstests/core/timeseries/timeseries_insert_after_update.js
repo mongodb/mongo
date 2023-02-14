@@ -20,11 +20,6 @@
 load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/libs/fixture_helpers.js");
 
-if (!TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(db.getMongo())) {
-    jsTestLog("Skipping test because the time-series updates and deletes feature flag is disabled");
-    return;
-}
-
 if (FixtureHelpers.isMongos(db) &&
     !TimeseriesTest.shardedtimeseriesCollectionsEnabled(db.getMongo())) {
     jsTestLog("Skipping test because the time-series updates and deletes feature flag is disabled");

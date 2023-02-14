@@ -33,13 +33,6 @@ if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
     return;
 }
 
-if (!TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(st.shard0)) {
-    jsTestLog(
-        "Skipping test because the updates and deletes on time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
 if (!TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(st.shard0)) {
     jsTestLog(
         "Skipping test because the updates and deletes on sharded time-series collection feature flag is disabled");

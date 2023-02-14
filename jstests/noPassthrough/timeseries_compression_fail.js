@@ -13,12 +13,6 @@ const dbName = jsTestName();
 const db = conn.getDB(dbName);
 const coll = db.getCollection('t');
 
-// Only run test when bucket compression is enabled
-if (!FeatureFlagUtil.isEnabled(db, "TimeseriesBucketCompression")) {
-    MongoRunner.stopMongod(conn);
-    return;
-}
-
 // Assumes each bucket has a limit of 1000 measurements.
 const bucketMaxCount = 1000;
 const numDocs = bucketMaxCount + 100;

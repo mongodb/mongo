@@ -49,7 +49,7 @@ function checkConfigVersionDoc() {
     // TODO: SERVER-68889 remove this function once 7.0 becomes last LTS
     const versionDoc = st.s.getCollection('config.version').findOne();
 
-    if (FeatureFlagUtil.isEnabled(st.s, "StopUsingConfigVersion")) {
+    if (FeatureFlagUtil.isPresentAndEnabled(st.s, "StopUsingConfigVersion")) {
         // Check that the version doc doesn't contain any of the deprecatedFields
         const deprecatedFields = [
             "excluding",

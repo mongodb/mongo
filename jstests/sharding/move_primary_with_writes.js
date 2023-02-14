@@ -289,7 +289,8 @@ st.forEachConnection(shard => {
 let cloningDataFPName = "hangBeforeCloningData";
 
 // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
-if (!FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'), "ResilientMovePrimary")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary().getDB('admin'),
+                                         "ResilientMovePrimary")) {
     cloningDataFPName = "hangInCloneStage";
 }
 

@@ -24,11 +24,6 @@ load("jstests/libs/analyze_plan.js");
 const testDB = TimeseriesAggTests.getTestDb();
 assert.commandWorked(testDB.dropDatabase());
 
-// Do not run the rest of the tests if the lastpoint optimization is disabled.
-if (!FeatureFlagUtil.isEnabled(db, "LastPointQuery")) {
-    return;
-}
-
 /**
  * Returns a lastpoint $group stage of the form:
  *  {$group: {

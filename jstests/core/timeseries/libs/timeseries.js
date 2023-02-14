@@ -34,39 +34,33 @@ var TimeseriesTest = class {
 
     /**
      * Returns whether time-series scalability improvements (like bucket reopening) are enabled.
+     * TODO SERVER-66438 remove this helper.
      */
     static timeseriesScalabilityImprovementsEnabled(conn) {
-        return FeatureFlagUtil.isEnabled(conn, "TimeseriesScalabilityImprovements");
-    }
-
-    /**
-     * Returns whether time-series updates and deletes are supported.
-     */
-    static timeseriesUpdatesAndDeletesEnabled(conn) {
-        return FeatureFlagUtil.isEnabled(conn, "TimeseriesUpdatesAndDeletes");
+        return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesScalabilityImprovements");
     }
 
     /**
      * Returns whether sharded time-series updates and deletes are supported.
+     * TODO SERVER-69320 remove this helper.
      */
     static shardedTimeseriesUpdatesAndDeletesEnabled(conn) {
-        return FeatureFlagUtil.isEnabled(conn, "ShardedTimeSeriesUpdateDelete");
+        return FeatureFlagUtil.isPresentAndEnabled(conn, "ShardedTimeSeriesUpdateDelete");
     }
 
+    // TODO SERVER-69320 remove this helper.
     static shardedtimeseriesCollectionsEnabled(conn) {
-        return FeatureFlagUtil.isEnabled(conn, "ShardedTimeSeries");
+        return FeatureFlagUtil.isPresentAndEnabled(conn, "ShardedTimeSeries");
     }
 
-    static shardedTimeseriesUpdatesAndDeletesEnabled(conn) {
-        return FeatureFlagUtil.isEnabled(conn, "ShardedTimeSeriesUpdateDelete");
-    }
-
+    // TODO SERVER-65082 remove this helper.
     static timeseriesMetricIndexesEnabled(conn) {
-        return FeatureFlagUtil.isEnabled(conn, "TimeseriesMetricIndexes");
+        return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesMetricIndexes");
     }
 
+    // TODO SERVER-69324 remove this helper.
     static bucketUnpackWithSortEnabled(conn) {
-        return FeatureFlagUtil.isEnabled(conn, "BucketUnpackWithSort");
+        return FeatureFlagUtil.isPresentAndEnabled(conn, "BucketUnpackWithSort");
     }
 
     /**

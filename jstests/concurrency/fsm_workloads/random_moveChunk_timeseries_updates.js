@@ -21,7 +21,6 @@ load('jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_inserts.js')
 var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function(db, collName, connCache) {
         if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(db) &&
-            TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(db) &&
             TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(db)) {
             this.featureFlagDisabled = false;
         } else {

@@ -35,13 +35,6 @@ if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
     return;
 }
 
-if (!TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(st.shard0)) {
-    jsTestLog(
-        "Skipping test because the updates and deletes on time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
 const testDB = mongos.getDB(dbName);
 testDB.dropDatabase();
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));

@@ -290,8 +290,7 @@ runTest({
     numProfilerEntries: {sharded: 1, unsharded: 1},
 });
 
-if (TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(st.shard0) &&
-    TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(st.shard0)) {
+if (TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(st.shard0)) {
     // Tests for updates.
     runTest({
         shardKey: {[metaField + ".a"]: 1},
