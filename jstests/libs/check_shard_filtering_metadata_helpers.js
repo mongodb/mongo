@@ -87,12 +87,10 @@ var CheckShardFilteringMetadataHelpers = (function() {
         const configDB = mongosConn.getDB('config');
 
         // Check shards know correct database versions.
-        // Note: We can only check the dbVersion on the primary shards because non-primary shards
-        // can have stale dbVersions cached (for versions on which they were not primary.). TODO:
-        // Once shards became authoritative for their dbVersions, we can check all shards.
-        configDB.databases.find({primary: shardId}).forEach(configDatabasesEntry => {
-            checkDatabase(configDatabasesEntry);
-        });
+        // TODO: SERVER-73991 Reenable this check.
+        // configDB.databases.find({primary: shardId}).forEach(configDatabasesEntry => {
+        //     checkDatabase(configDatabasesEntry);
+        // });
 
         // Check that shards have correct filtering metadata for sharded collections.
         if (!skipCheckShardedCollections) {
