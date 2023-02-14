@@ -35,6 +35,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/s/shard_authoritative_catalog_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_index_catalog.h"
@@ -78,29 +79,31 @@ void renameGlobalIndexesMetadata(OperationContext* opCtx,
                                             {NamespaceString::kShardIndexCatalogNamespace}));
             {
                 // First get the document to check the index version if the document already exists
-                const auto queryTo = BSON(CollectionType::kNssFieldName << toNss.ns());
-                BSONObj collectionDoc;
+                const auto queryTo =
+                    BSON(ShardAuthoritativeCollectionType::kNssFieldName << toNss.ns());
+                BSONObj collectionToDoc;
                 bool docExists =
-                    Helpers::findOne(opCtx, collsColl.getCollection(), queryTo, collectionDoc);
-                if (docExists &&
-                    indexVersion <=
-                        collectionDoc[CollectionType::kIndexVersionFieldName].timestamp()) {
-                    LOGV2_DEBUG(
-                        7079500,
-                        1,
-                        "renameGlobalIndexesMetadata has index version older than current "
-                        "collection index version",
-                        "collectionIndexVersion"_attr =
-                            collectionDoc[CollectionType::kIndexVersionFieldName].timestamp(),
-                        "expectedIndexVersion"_attr = indexVersion);
-                    return;
+                    Helpers::findOne(opCtx, collsColl.getCollection(), queryTo, collectionToDoc);
+                if (docExists) {
+                    auto collectionTo = ShardAuthoritativeCollectionType::parse(
+                        IDLParserContext("renameGlobalIndexesMetadata"), collectionToDoc);
+                    auto toIndexVersion =
+                        collectionTo.getIndexVersion().get_value_or(Timestamp(0, 0));
+                    if (indexVersion <= toIndexVersion) {
+                        LOGV2_DEBUG(7079500,
+                                    1,
+                                    "renameGlobalIndexesMetadata has index version older than "
+                                    "current collection index version",
+                                    "collectionIndexVersion"_attr = toIndexVersion,
+                                    "expectedIndexVersion"_attr = indexVersion);
+                        return;
+                    }
+                    toUuid.emplace(collectionTo.getUuid());
                 }
                 // Update the document (or create it) with the new index version
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 // Save uuid to remove the 'to' indexes later on.
                 if (docExists) {
-                    toUuid =
-                        uassertStatusOK(UUID::parse(collectionDoc[CollectionType::kUuidFieldName]));
                     // Remove the 'to' entry.
                     mongo::deleteObjects(opCtx,
                                          collsColl.getCollection(),
@@ -114,16 +117,20 @@ void renameGlobalIndexesMetadata(OperationContext* opCtx,
                 fassert(7082801,
                         Helpers::findOne(
                             opCtx, collsColl.getCollection(), queryFrom, collectionFromDoc));
-                auto finalDoc = collectionFromDoc.addField(
-                    BSON(CollectionType::kNssFieldName << toNss.ns()).firstElement());
+                auto collectionFrom = ShardAuthoritativeCollectionType::parse(
+                    IDLParserContext("renameGlobalIndexesMetadata"), collectionFromDoc);
+                collectionFrom.setNss(toNss);
 
                 mongo::deleteObjects(opCtx,
                                      collsColl.getCollection(),
                                      NamespaceString::kShardCollectionCatalogNamespace,
                                      queryFrom,
                                      true);
-                uassertStatusOK(collection_internal::insertDocument(
-                    opCtx, collsColl.getCollection(), InsertStatement(finalDoc), nullptr));
+                uassertStatusOK(
+                    collection_internal::insertDocument(opCtx,
+                                                        collsColl.getCollection(),
+                                                        InsertStatement(collectionFrom.toBSON()),
+                                                        nullptr));
             }
             AutoGetCollection idxColl(opCtx, NamespaceString::kShardIndexCatalogNamespace, MODE_IX);
 
@@ -172,24 +179,25 @@ void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
 
             {
                 // First get the document to check the index version if the document already exists
-                const auto query = BSON(CollectionType::kNssFieldName
-                                        << userCollectionNss.ns() << CollectionType::kUuidFieldName
-                                        << collectionUUID);
+                const auto query =
+                    BSON(ShardAuthoritativeCollectionType::kNssFieldName
+                         << userCollectionNss.ns()
+                         << ShardAuthoritativeCollectionType::kUuidFieldName << collectionUUID);
                 BSONObj collectionDoc;
                 bool docExists =
                     Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc);
-                if (docExists && !collectionDoc[CollectionType::kIndexVersionFieldName].eoo() &&
-                    lastmod <= collectionDoc[CollectionType::kIndexVersionFieldName].timestamp()) {
-                    LOGV2_DEBUG(
-                        6712300,
-                        1,
-                        "addGlobalIndexCatalogEntryToCollection has index version older than "
-                        "current "
-                        "collection index version",
-                        "collectionIndexVersion"_attr =
-                            collectionDoc[CollectionType::kIndexVersionFieldName].timestamp(),
-                        "expectedIndexVersion"_attr = lastmod);
-                    return;
+                if (docExists) {
+                    auto collection = ShardAuthoritativeCollectionType::parse(
+                        IDLParserContext("AddIndexCatalogEntry"), collectionDoc);
+                    if (collection.getIndexVersion() && lastmod <= *collection.getIndexVersion()) {
+                        LOGV2_DEBUG(6712300,
+                                    1,
+                                    "addGlobalIndexCatalogEntryToCollection has index version "
+                                    "older than current collection index version",
+                                    "collectionIndexVersion"_attr = *collection.getIndexVersion(),
+                                    "expectedIndexVersion"_attr = lastmod);
+                        return;
+                    }
                 }
                 // Update the document (or create it) with the new index version
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
@@ -197,9 +205,10 @@ void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
                 request.setNamespaceString(NamespaceString::kShardCollectionCatalogNamespace);
                 request.setQuery(query);
                 request.setUpdateModification(
-                    BSON(CollectionType::kNssFieldName
-                         << userCollectionNss.ns() << CollectionType::kUuidFieldName
-                         << collectionUUID << CollectionType::kIndexVersionFieldName << lastmod));
+                    BSON(ShardAuthoritativeCollectionType::kNssFieldName
+                         << userCollectionNss.ns()
+                         << ShardAuthoritativeCollectionType::kUuidFieldName << collectionUUID
+                         << ShardAuthoritativeCollectionType::kIndexVersionFieldName << lastmod));
                 request.setUpsert(true);
                 request.setFromOplogApplication(true);
                 mongo::update(opCtx, collsColl.getDb(), request);
@@ -246,33 +255,34 @@ void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
                                             {NamespaceString::kShardIndexCatalogNamespace}));
             {
                 // First get the document to check the index version if the document already exists
-                const auto query = BSON(CollectionType::kNssFieldName
-                                        << nss.ns() << CollectionType::kUuidFieldName << uuid);
+                const auto query =
+                    BSON(ShardAuthoritativeCollectionType::kNssFieldName
+                         << nss.ns() << ShardAuthoritativeCollectionType::kUuidFieldName << uuid);
                 BSONObj collectionDoc;
                 bool docExists =
                     Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc);
-                if (docExists && !collectionDoc[CollectionType::kIndexVersionFieldName].eoo() &&
-                    lastmod <= collectionDoc[CollectionType::kIndexVersionFieldName].timestamp()) {
-                    LOGV2_DEBUG(
-                        6712301,
-                        1,
-                        "removeGlobalIndexCatalogEntryFromCollection has index version older than "
-                        "current "
-                        "collection index version",
-                        "collectionIndexVersion"_attr =
-                            collectionDoc[CollectionType::kIndexVersionFieldName].timestamp(),
-                        "expectedIndexVersion"_attr = lastmod);
-                    return;
+                if (docExists) {
+                    auto collection = ShardAuthoritativeCollectionType::parse(
+                        IDLParserContext("RemoveIndexCatalogEntry"), collectionDoc);
+                    if (collection.getIndexVersion() && lastmod <= *collection.getIndexVersion()) {
+                        LOGV2_DEBUG(6712301,
+                                    1,
+                                    "removeGlobalIndexCatalogEntryFromCollection has index version "
+                                    "older than current collection index version",
+                                    "collectionIndexVersion"_attr = *collection.getIndexVersion(),
+                                    "expectedIndexVersion"_attr = lastmod);
+                        return;
+                    }
                 }
                 // Update the document (or create it) with the new index version
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 auto request = UpdateRequest();
                 request.setNamespaceString(NamespaceString::kShardCollectionCatalogNamespace);
                 request.setQuery(query);
-                request.setUpdateModification(BSON(CollectionType::kNssFieldName
-                                                   << nss.ns() << CollectionType::kUuidFieldName
-                                                   << uuid << CollectionType::kIndexVersionFieldName
-                                                   << lastmod));
+                request.setUpdateModification(
+                    BSON(ShardAuthoritativeCollectionType::kNssFieldName
+                         << nss.ns() << ShardAuthoritativeCollectionType::kUuidFieldName << uuid
+                         << ShardAuthoritativeCollectionType::kIndexVersionFieldName << lastmod));
                 request.setUpsert(true);
                 request.setFromOplogApplication(true);
                 mongo::update(opCtx, collsColl.getDb(), request);
@@ -317,18 +327,19 @@ void replaceCollectionGlobalIndexes(OperationContext* opCtx,
                                             {NamespaceString::kShardIndexCatalogNamespace}));
             {
                 // Set final indexVersion
-                const auto query = BSON(CollectionType::kNssFieldName
-                                        << nss.ns() << CollectionType::kUuidFieldName << uuid);
+                const auto query =
+                    BSON(ShardAuthoritativeCollectionType::kNssFieldName
+                         << nss.ns() << ShardAuthoritativeCollectionType::kUuidFieldName << uuid);
 
                 // Update the document (or create it) with the new index version
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 auto request = UpdateRequest();
                 request.setNamespaceString(NamespaceString::kShardCollectionCatalogNamespace);
                 request.setQuery(query);
-                request.setUpdateModification(BSON(CollectionType::kNssFieldName
-                                                   << nss.ns() << CollectionType::kUuidFieldName
-                                                   << uuid << CollectionType::kIndexVersionFieldName
-                                                   << indexVersion));
+                request.setUpdateModification(BSON(
+                    ShardAuthoritativeCollectionType::kNssFieldName
+                    << nss.ns() << ShardAuthoritativeCollectionType::kUuidFieldName << uuid
+                    << ShardAuthoritativeCollectionType::kIndexVersionFieldName << indexVersion));
                 request.setUpsert(true);
                 request.setFromOplogApplication(true);
                 mongo::update(opCtx, collsColl.getDb(), request);
@@ -381,14 +392,16 @@ void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx, const Namespac
                                         AutoGetCollection::Options{}.secondaryNssOrUUIDs(
                                             {NamespaceString::kShardIndexCatalogNamespace}));
             {
-                const auto query = BSON(CollectionType::kNssFieldName << nss.ns());
+                const auto query =
+                    BSON(ShardAuthoritativeCollectionType::kNssFieldName << nss.ns());
                 BSONObj collectionDoc;
                 // Return if there is nothing to clear.
                 if (!Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc)) {
                     return;
                 }
-                collectionUUID.emplace(
-                    uassertStatusOK(UUID::parse(collectionDoc[CollectionType::kUuidFieldName])));
+                auto collection = ShardAuthoritativeCollectionType::parse(
+                    IDLParserContext("DropIndexCatalogEntry"), collectionDoc);
+                collectionUUID.emplace(collection.getUuid());
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 mongo::deleteObjects(opCtx,
                                      collsColl.getCollection(),
@@ -429,25 +442,37 @@ void clearCollectionGlobalIndexes(OperationContext* opCtx,
                                             {NamespaceString::kShardIndexCatalogNamespace}));
             {
                 // First unset the index version.
-                const auto query = BSON(CollectionType::kNssFieldName
-                                        << nss.ns() << CollectionType::kUuidFieldName << uuid);
+                const auto query =
+                    BSON(ShardAuthoritativeCollectionType::kNssFieldName
+                         << nss.ns() << ShardAuthoritativeCollectionType::kUuidFieldName << uuid);
                 BSONObj collectionDoc;
                 bool docExists =
                     Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc);
+
                 // Return if there is nothing to clear.
-                if (!docExists || collectionDoc[CollectionType::kIndexVersionFieldName].eoo()) {
+                if (!docExists) {
                     return;
                 }
+
+                auto collection = ShardAuthoritativeCollectionType::parse(
+                    IDLParserContext("ClearIndexCatalogEntry"), collectionDoc);
+
+                if (!collection.getIndexVersion()) {
+                    return;
+                }
+
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 mongo::deleteObjects(opCtx,
                                      collsColl.getCollection(),
                                      NamespaceString::kShardCollectionCatalogNamespace,
                                      query,
                                      true);
-                auto finalDoc = collectionDoc.filterFieldsUndotted(
-                    BSON(CollectionType::kIndexVersionFieldName << 1), false);
-                uassertStatusOK(collection_internal::insertDocument(
-                    opCtx, collsColl.getCollection(), InsertStatement(finalDoc), nullptr));
+                collection.setIndexVersion(boost::none);
+                uassertStatusOK(
+                    collection_internal::insertDocument(opCtx,
+                                                        collsColl.getCollection(),
+                                                        InsertStatement(collection.toBSON()),
+                                                        nullptr));
             }
 
             AutoGetCollection idxColl(opCtx, NamespaceString::kShardIndexCatalogNamespace, MODE_IX);

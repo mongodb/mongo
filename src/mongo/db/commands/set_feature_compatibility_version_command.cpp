@@ -73,6 +73,7 @@
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/shard_authoritative_catalog_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -988,16 +989,14 @@ private:
                 LOGV2(7013200, "Clearing global indexes for all collections");
                 DBDirectClient client(opCtx);
                 FindCommandRequest findCmd{NamespaceString::kShardCollectionCatalogNamespace};
-                findCmd.setFilter(
-                    BSON(CollectionType::kIndexVersionFieldName << BSON("$exists" << true)));
+                findCmd.setFilter(BSON(ShardAuthoritativeCollectionType::kIndexVersionFieldName
+                                       << BSON("$exists" << true)));
                 auto cursor = client.find(std::move(findCmd));
                 while (cursor->more()) {
                     const auto collectionDoc = cursor->next();
-                    auto collUUID =
-                        uassertStatusOK(UUID::parse(collectionDoc[CollectionType::kUuidFieldName]));
-                    auto collNss =
-                        NamespaceString(collectionDoc[CollectionType::kNssFieldName].String());
-                    clearCollectionGlobalIndexes(opCtx, collNss, collUUID);
+                    auto collection = ShardAuthoritativeCollectionType::parse(
+                        IDLParserContext("FCVDropIndexCatalog"), collectionDoc);
+                    clearCollectionGlobalIndexes(opCtx, collection.getNss(), collection.getUuid());
                 }
 
                 LOGV2(6711905,
@@ -1022,10 +1021,11 @@ private:
                 write_ops::UpdateCommandRequest update(CollectionType::ConfigNS);
                 update.setUpdates({[&]() {
                     write_ops::UpdateOpEntry entry;
-                    entry.setQ(
-                        BSON(CollectionType::kIndexVersionFieldName << BSON("$exists" << true)));
-                    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                        BSON("$unset" << BSON(CollectionType::kIndexVersionFieldName << true))));
+                    entry.setQ(BSON(ShardAuthoritativeCollectionType::kIndexVersionFieldName
+                                    << BSON("$exists" << true)));
+                    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
+                        "$unset" << BSON(ShardAuthoritativeCollectionType::kIndexVersionFieldName
+                                         << true))));
                     entry.setMulti(true);
                     return entry;
                 }()});

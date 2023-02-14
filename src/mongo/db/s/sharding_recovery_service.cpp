@@ -42,6 +42,7 @@
 #include "mongo/db/s/collection_critical_section_document_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/shard_authoritative_catalog_gen.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -94,7 +95,9 @@ AggregateCommandRequest makeCollectionsAndIndexesAggregation(OperationContext* o
     //      }
     // }
     stages.emplace_back(DocumentSourceMatch::create(
-        Doc{{CollectionType::kIndexVersionFieldName, Doc{{"$exists", true}}}}.toBson(), expCtx));
+        Doc{{ShardAuthoritativeCollectionType::kIndexVersionFieldName, Doc{{"$exists", true}}}}
+            .toBson(),
+        expCtx));
 
     // 2. Retrieve config.shard.indexes entries with the same uuid as the one from the
     // config.shard.collections document.
@@ -112,7 +115,7 @@ AggregateCommandRequest makeCollectionsAndIndexesAggregation(OperationContext* o
     // }
     const Doc lookupPipeline{{"from", NamespaceString::kShardIndexCatalogNamespace.coll()},
                              {"as", kGlobalIndexesFieldName},
-                             {"localField", CollectionType::kUuidFieldName},
+                             {"localField", ShardAuthoritativeCollectionType::kUuidFieldName},
                              {"foreignField", IndexCatalogType::kCollectionUUIDFieldName}};
 
     stages.emplace_back(DocumentSourceLookUp::createFromBson(

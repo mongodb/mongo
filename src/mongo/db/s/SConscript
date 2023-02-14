@@ -43,6 +43,7 @@ env.Library(
     target='sharding_catalog',
     source=[
         'global_index_ddl_util.cpp',
+        'shard_authoritative_catalog.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
