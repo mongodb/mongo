@@ -170,7 +170,6 @@ azure_connection::object_exists(
     exists = false;
     std::string obj = _bucket_prefix + object_key;
     object_size = 0;
-    std::string obj = _object_prefix + object_key;
 
     auto list_blob_response = _azure_client.ListBlobs();
 

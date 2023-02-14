@@ -402,7 +402,8 @@ azure_file_system_exists(
 
     WT_UNUSED(session);
     WT_UNUSED(size);
-    WT_DECL_RET;
+
+    int ret;
 
     std::cout << "azure_file_system_exists: Checking object: " << name << " exists in Azure."
               << std::endl;
@@ -455,10 +456,21 @@ static int
 azure_object_size(
   WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, wt_off_t *sizep)
 {
-    WT_UNUSED(file_system);
+    azure_file_system *azure_fs = reinterpret_cast<azure_file_system *>(file_system);
+
     WT_UNUSED(session);
-    WT_UNUSED(name);
-    WT_UNUSED(sizep);
+
+    int ret;
+    bool exists;
+    size_t size = 0;
+    *sizep = 0;
+
+    if ((ret = azure_fs->azure_conn->object_exists(name, exists, size)) != 0) {
+        std::cerr << "azure_object_size: object_exists request to Azure failed." << std::endl;
+        return ret;
+    }
+
+    *sizep = size;
 
     return 0;
 }
@@ -613,15 +625,13 @@ static int
 azure_file_size(WT_FILE_HANDLE *file_handle, WT_SESSION *session, wt_off_t *sizep)
 {
     azure_file_handle *azure_fh = reinterpret_cast<azure_file_handle *>(file_handle);
-    int ret;
+    WT_DECL_RET;
     bool exists;
     size_t size = 0;
     *sizep = 0;
 
-    WT_UNUSED(exists);
-
     if ((ret = azure_fh->fs->azure_conn->object_exists(azure_fh->name, exists, size)) != 0) {
-        std::cerr << "azure_file_open: object_exists request to Azure failed." << std::endl;
+        std::cerr << "azure_file_size: object_exists request to Azure failed." << std::endl;
         return ret;
     }
 

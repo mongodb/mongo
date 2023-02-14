@@ -107,7 +107,7 @@ TEST_CASE("Testing Azure Connection Class", "azure-connection")
         // Object exists so there should be 1 object.
         REQUIRE(conn.object_exists(object_name, exists, object_size) == 0);
         REQUIRE(exists == true);
-        auto blob_client = azure_client.GetBlockBlobClient(obj_prefix + object_name);
+        auto blob_client = azure_client.GetBlockBlobClient(bucket_prefix + object_name);
         auto blob_properties = blob_client.GetProperties();
         size_t blob_size = blob_properties.Value.BlobSize;
         REQUIRE(object_size == blob_size);
