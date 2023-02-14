@@ -14,15 +14,14 @@
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 if (!checkSBEEnabled(db)) {
     jsTest.log("Skip running the test because SBE is not enabled");
     return;
 }
-var testDB = db.getSiblingDB("from_plan_cache_flag");
+const testDB = db.getSiblingDB("from_plan_cache_flag");
 assert.commandWorked(testDB.dropDatabase());
-var coll = testDB.getCollection("test");
+const coll = testDB.getCollection("test");
 assert.commandWorked(testDB.setProfilingLevel(2));
 coll.drop();
 coll.getPlanCache().clear();
@@ -30,18 +29,17 @@ coll.getPlanCache().clear();
 assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.insert({a: 2}));
 assert.commandWorked(coll.insert({a: 3}));
-assert.commandWorked(coll.insert({a: 2}));
 
-let pipeline = {$match: {a: 1}};
-coll.aggregate([pipeline]).toArray();
-let profileObj = getLatestProfilerEntry(testDB);
-assert.eq(!!profileObj.fromPlanCache, false);
+const comment = "from_plan_cache_flag";
+coll.aggregate([{$match: {a: 1}}], {comment}).toArray();
+let profileObj = getLatestProfilerEntry(testDB, {"command.comment": comment});
+assert.eq(!!profileObj.fromPlanCache, false, profileObj);
 
-coll.aggregate({$match: {a: 2}}).toArray();
-profileObj = getLatestProfilerEntry(testDB);
-assert.eq(!!profileObj.fromPlanCache, true);
+coll.aggregate([{$match: {a: 2}}], {comment}).toArray();
+profileObj = getLatestProfilerEntry(testDB, {"command.comment": comment});
+assert.eq(!!profileObj.fromPlanCache, true, profileObj);
 
-coll.aggregate({$match: {a: 3}}).toArray();
-profileObj = getLatestProfilerEntry(testDB);
-assert.eq(!!profileObj.fromPlanCache, true);
+coll.aggregate([{$match: {a: 3}}], {comment}).toArray();
+profileObj = getLatestProfilerEntry(testDB, {"command.comment": comment});
+assert.eq(!!profileObj.fromPlanCache, true, profileObj);
 }());
