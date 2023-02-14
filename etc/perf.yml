@@ -770,7 +770,7 @@ microbenchmark-buildvariants:
     display_name: Standalone Linux inMemory
     batchtime: 240  # 4 hours
     modules: *modules
-    expansions:
+    expansions: &linux-standalone-expansions
       # We are explicitly tracking the rhel62 variant compile options from evergreen.yml for
       # microbenchmarks, since they run on the centos6 boxes.  If we can get proper artifacts directly
       # from that project, we should do that and remove the compile tasks.
@@ -821,7 +821,7 @@ microbenchmark-buildvariants:
     display_name: 1-Node ReplSet Linux inMemory
     batchtime: 240  # 4 hours
     modules: *modules
-    expansions:
+    expansions: &linux-repl-expansions
       mongod_exec_wrapper: *exec_wrapper
       perf_exec_wrapper: *perf_wrapper
       platform: linux
@@ -851,6 +851,7 @@ buildvariants:
     display_name: Standalone Linux inMemory (all feature flags)
     batchtime: 1440  # 24 hours
     expansions:
+      <<: *linux-standalone-expansions
       mongodb_setup: microbenchmarks_standalone-all-feature-flags
 
   - <<: *linux-wt-repl
@@ -858,4 +859,5 @@ buildvariants:
     display_name: 1-Node ReplSet Linux inMemory (all feature flags)
     batchtime: 1440  # 24 hours
     expansions:
+      <<: *linux-repl-expansions
       mongodb_setup: microbenchmarks_replica-all-feature-flags
