@@ -646,6 +646,7 @@ void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
             serverGlobalParams.featureCompatibility) &&
         sentShardVersion && !ShardVersion::isIgnoredVersion(*sentShardVersion);
 
+    // TODO: SERVER-73689 Fix shard key update check in update_stage.cpp to exclude _id queries.
     uassert(31025,
             "Shard key update is not allowed without specifying the full shard key in the "
             "query",

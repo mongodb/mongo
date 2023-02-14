@@ -57,15 +57,21 @@ assert.commandWorked(testColl.update({x: 1}, {x: 1, a: 1}));
 // Sharded deleteOnes that do not directly target a shard can now use the two phase write
 // protocol to execute.
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-    // TODO: SERVER-70581 Handle WCOS for update and findAndModify if replacement document changes
-    // data placement
+    const testColl2 = testDB.testColl2;
 
-    // Could match a different document on retry.
-    // assert.commandWorked(testColl.update({}, {$set: {x: 2}}, {multi: false}));
+    // Shard testColl2 on {x:1}, split it at {x:0}, and move chunk {x:1} to shard1. This collection
+    // is used to for the update below which would use the write without shard key protocol, but
+    // since the query is unspecified, any 1 random document could be modified. In order to not
+    // break the state of the original test 'testColl', 'testColl2' is used specifically for the
+    // single update below.
+    st.shardColl(testColl2, {x: 1}, {x: 0}, {x: 1});
 
-    // TODO: SERVER-69918 Implement upsert behavior for _clusterQueryWithoutShardKey
-    // assert.commandWorked(testColl.update({_id: 1}, {$set: {x: 2}}, {upsert: true}),
-    //                      ErrorCodes.ShardKeyNotFound);
+    assert.commandWorked(testColl2.insert({x: 1, _id: 1}));
+    assert.commandWorked(testColl2.insert({x: -1, _id: 0}));
+    let updateRes = assert.commandWorked(testColl2.update({}, {$set: {x: 2}}, {multi: false}));
+    assert.eq(1, updateRes.nMatched);
+    assert.eq(1, updateRes.nModified);
+    assert.eq(testColl2.find({x: 2}).itcount(), 1);
 
     // Shouldn't increment the metrics for unsharded collection.
     assert.commandWorked(unshardedColl.update({_id: "missing"}, {$set: {a: 1}}, {multi: false}));
@@ -78,8 +84,9 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
 
     mongosServerStatus = testDB.adminCommand({serverStatus: 1});
 
-    // Verify that only the first four upserts incremented the metric counter.
-    assert.eq(4, mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount);
+    // TODO: SERVER-69810 ServerStatus metrics for tracking number of
+    // updateOnes/deleteOnes/findAndModifies
+    assert.eq(5, mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount);
 } else {
     // Shouldn't increment the metric when routing fails.
     assert.commandFailedWithCode(testColl.update({}, {$set: {x: 2}}, {multi: false}),

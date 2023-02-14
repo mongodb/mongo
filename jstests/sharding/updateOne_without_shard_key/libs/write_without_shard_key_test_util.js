@@ -92,7 +92,7 @@ var WriteWithoutShardKeyTestUtil = (function() {
                                      cmdObj,
                                      operationType,
                                      expectedResponse,
-                                     expectedRetryResponse) {
+                                     expectedRetryResponse = {}) {
         assert.commandWorked(conn.getCollection(collName).insert(docsToInsert));
         let res = assert.commandWorked(conn.runCommand(cmdObj));
         if (operationType === OperationType.updateOne) {

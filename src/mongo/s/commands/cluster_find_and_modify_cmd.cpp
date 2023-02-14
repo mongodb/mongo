@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/s/commands/cluster_find_and_modify_cmd.h"
+
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_set.h"
@@ -346,467 +348,410 @@ BSONObj prepareCmdObjForPassthrough(OperationContext* opCtx,
     return newCmdObj;
 }
 
-class FindAndModifyCmd : public BasicCommand {
-public:
-    FindAndModifyCmd()
-        : BasicCommand("findAndModify", "findandmodify"), _updateMetrics{"findAndModify"} {}
+FindAndModifyCmd findAndModifyCmd;
 
-    const std::set<std::string>& apiVersions() const override {
-        return kApiVersions1;
+}  // namespace
+
+Status FindAndModifyCmd::checkAuthForOperation(OperationContext* opCtx,
+                                               const DatabaseName& dbName,
+                                               const BSONObj& cmdObj) const {
+    const bool update = cmdObj["update"].trueValue();
+    const bool upsert = cmdObj["upsert"].trueValue();
+    const bool remove = cmdObj["remove"].trueValue();
+
+    ActionSet actions;
+    actions.addAction(ActionType::find);
+    if (update) {
+        actions.addAction(ActionType::update);
+    }
+    if (upsert) {
+        actions.addAction(ActionType::insert);
+    }
+    if (remove) {
+        actions.addAction(ActionType::remove);
+    }
+    if (shouldBypassDocumentValidationForCommand(cmdObj)) {
+        actions.addAction(ActionType::bypassDocumentValidation);
     }
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+    auto nss = CommandHelpers::parseNsFromCommand(dbName, cmdObj);
+    ResourcePattern resource(CommandHelpers::resourcePatternForNamespace(nss.ns()));
+    uassert(17137,
+            "Invalid target namespace " + resource.toString(),
+            resource.isExactNamespacePattern());
+
+    auto* as = AuthorizationSession::get(opCtx->getClient());
+    if (!as->isAuthorizedForActionsOnResource(resource, actions)) {
+        return {ErrorCodes::Unauthorized, "unauthorized"};
     }
 
-    ReadWriteType getReadWriteType() const override {
-        return ReadWriteType::kWrite;
+    return Status::OK();
+}
+
+Status FindAndModifyCmd::explain(OperationContext* opCtx,
+                                 const OpMsgRequest& request,
+                                 ExplainOptions::Verbosity verbosity,
+                                 rpc::ReplyBuilderInterface* result) const {
+    const DatabaseName dbName(request.getValidatedTenantId(), request.getDatabase());
+    const BSONObj& cmdObj = [&]() {
+        // Check whether the query portion needs to be rewritten for FLE.
+        auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
+            IDLParserContext("ClusterFindAndModify"), request.body);
+        if (shouldDoFLERewrite(findAndModifyRequest)) {
+            auto newRequest = processFLEFindAndModifyExplainMongos(opCtx, findAndModifyRequest);
+            return newRequest.first.toBSON(request.body);
+        } else {
+            return request.body;
+        }
+    }();
+    const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+
+    const auto cri =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+    const auto& cm = cri.cm;
+
+    std::shared_ptr<Shard> shard;
+    if (cm.isSharded()) {
+        const BSONObj query = cmdObj.getObjectField("query");
+        const BSONObj collation = getCollation(cmdObj);
+        const auto let = getLet(cmdObj);
+        const auto rc = getLegacyRuntimeConstants(cmdObj);
+        const BSONObj shardKey = getShardKey(opCtx, cm, nss, query, collation, verbosity, let, rc);
+        const auto chunk = cm.findIntersectingChunk(shardKey, collation);
+
+        shard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk.getShardId()));
+    } else {
+        shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cm.dbPrimary()));
     }
 
-    bool adminOnly() const override {
-        return false;
+    const auto explainCmd = ClusterExplain::wrapAsExplain(
+        appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj), verbosity);
+
+    // Time how long it takes to run the explain command on the shard.
+    Timer timer;
+    BSONObjBuilder bob;
+
+    if (cm.isSharded()) {
+        _runCommand(opCtx,
+                    shard->getId(),
+                    cri.getShardVersion(shard->getId()),
+                    boost::none,
+                    nss,
+                    applyReadWriteConcern(opCtx, false, false, explainCmd),
+                    true /* isExplain */,
+                    &bob);
+    } else {
+        _runCommand(opCtx,
+                    shard->getId(),
+                    boost::make_optional(!cm.dbVersion().isFixed(), ShardVersion::UNSHARDED()),
+                    cm.dbVersion(),
+                    nss,
+                    applyReadWriteConcern(opCtx, false, false, explainCmd),
+                    true /* isExplain */,
+                    &bob);
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
+    const auto millisElapsed = timer.millis();
+
+    executor::RemoteCommandResponse response(bob.obj(), Milliseconds(millisElapsed));
+
+    // We fetch an arbitrary host from the ConnectionString, since
+    // ClusterExplain::buildExplainResult() doesn't use the given HostAndPort.
+    AsyncRequestsSender::Response arsResponse{
+        shard->getId(), response, shard->getConnString().getServers().front()};
+
+    auto bodyBuilder = result->getBodyBuilder();
+    return ClusterExplain::buildExplainResult(
+        opCtx, {arsResponse}, ClusterExplain::kSingleShard, millisElapsed, cmdObj, &bodyBuilder);
+}
+
+bool FindAndModifyCmd::run(OperationContext* opCtx,
+                           const DatabaseName& dbName,
+                           const BSONObj& cmdObj,
+                           BSONObjBuilder& result) {
+    const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+
+    if (processFLEFindAndModify(opCtx, cmdObj, result) == FLEBatchResult::kProcessed) {
         return true;
     }
 
-    ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
-                                                 repl::ReadConcernLevel level,
-                                                 bool isImplicitDefault) const override {
-        return {{level != repl::ReadConcernLevel::kLocalReadConcern &&
-                     level != repl::ReadConcernLevel::kSnapshotReadConcern,
-                 {ErrorCodes::InvalidOptions, "read concern not supported"}},
-                {{ErrorCodes::InvalidOptions, "default read concern not permitted"}}};
-    }
+    // Collect metrics.
+    _updateMetrics.collectMetrics(cmdObj);
 
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj& cmdObj) const override {
-        const bool update = cmdObj["update"].trueValue();
-        const bool upsert = cmdObj["upsert"].trueValue();
-        const bool remove = cmdObj["remove"].trueValue();
+    // Technically, findAndModify should only be creating database if upsert is true, but this
+    // would require that the parsing be pulled into this function.
+    cluster::createDatabase(opCtx, nss.db());
 
-        ActionSet actions;
-        actions.addAction(ActionType::find);
-        if (update) {
-            actions.addAction(ActionType::update);
-        }
-        if (upsert) {
-            actions.addAction(ActionType::insert);
-        }
-        if (remove) {
-            actions.addAction(ActionType::remove);
-        }
-        if (shouldBypassDocumentValidationForCommand(cmdObj)) {
-            actions.addAction(ActionType::bypassDocumentValidation);
-        }
+    // Append mongoS' runtime constants to the command object before forwarding it to the shard.
+    auto cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj);
 
-        auto nss = CommandHelpers::parseNsFromCommand(dbName, cmdObj);
-        ResourcePattern resource(CommandHelpers::resourcePatternForNamespace(nss.ns()));
-        uassert(17137,
-                "Invalid target namespace " + resource.toString(),
-                resource.isExactNamespacePattern());
-
-        auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(resource, actions)) {
-            return {ErrorCodes::Unauthorized, "unauthorized"};
-        }
-
-        return Status::OK();
-    }
-
-    Status explain(OperationContext* opCtx,
-                   const OpMsgRequest& request,
-                   ExplainOptions::Verbosity verbosity,
-                   rpc::ReplyBuilderInterface* result) const override {
-        const DatabaseName dbName(request.getValidatedTenantId(), request.getDatabase());
-        const BSONObj& cmdObj = [&]() {
-            // Check whether the query portion needs to be rewritten for FLE.
-            auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
-                IDLParserContext("ClusterFindAndModify"), request.body);
-            if (shouldDoFLERewrite(findAndModifyRequest)) {
-                auto newRequest = processFLEFindAndModifyExplainMongos(opCtx, findAndModifyRequest);
-                return newRequest.first.toBSON(request.body);
-            } else {
-                return request.body;
-            }
-        }();
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
-
-        const auto cri =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-        const auto& cm = cri.cm;
-
-        std::shared_ptr<Shard> shard;
-        if (cm.isSharded()) {
-            const BSONObj query = cmdObj.getObjectField("query");
-            const BSONObj collation = getCollation(cmdObj);
-            const auto let = getLet(cmdObj);
-            const auto rc = getLegacyRuntimeConstants(cmdObj);
+    const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+    const auto& cm = cri.cm;
+    if (cm.isSharded()) {
+        const BSONObj query = cmdObjForShard.getObjectField("query");
+        if (write_without_shard_key::useTwoPhaseProtocol(
+                opCtx, nss, false /* isUpdateOrDelete */, query, getCollation(cmdObjForShard))) {
+            _runCommandWithoutShardKey(opCtx,
+                                       nss,
+                                       applyReadWriteConcern(opCtx, this, cmdObjForShard),
+                                       false /* isExplain */,
+                                       &result);
+        } else {
+            const BSONObj collation = getCollation(cmdObjForShard);
+            const auto let = getLet(cmdObjForShard);
+            const auto rc = getLegacyRuntimeConstants(cmdObjForShard);
             const BSONObj shardKey =
-                getShardKey(opCtx, cm, nss, query, collation, verbosity, let, rc);
-            const auto chunk = cm.findIntersectingChunk(shardKey, collation);
+                getShardKey(opCtx, cm, nss, query, collation, boost::none, let, rc);
 
-            shard = uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk.getShardId()));
-        } else {
-            shard =
-                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cm.dbPrimary()));
-        }
-
-        const auto explainCmd = ClusterExplain::wrapAsExplain(
-            appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj), verbosity);
-
-        // Time how long it takes to run the explain command on the shard.
-        Timer timer;
-        BSONObjBuilder bob;
-
-        if (cm.isSharded()) {
+            // For now, set bypassIsFieldHashedCheck to be true in order to skip the
+            // isFieldHashedCheck in the special case where _id is hashed and used as the shard
+            // key. This means that we always assume that a findAndModify request using _id is
+            // targetable to a single shard.
+            auto chunk = cm.findIntersectingChunk(shardKey, collation, true);
             _runCommand(opCtx,
-                        shard->getId(),
-                        cri.getShardVersion(shard->getId()),
+                        chunk.getShardId(),
+                        cri.getShardVersion(chunk.getShardId()),
                         boost::none,
-                        nss,
-                        applyReadWriteConcern(opCtx, false, false, explainCmd),
-                        true /* isExplain */,
-                        &bob);
-        } else {
-            _runCommand(opCtx,
-                        shard->getId(),
-                        boost::make_optional(!cm.dbVersion().isFixed(), ShardVersion::UNSHARDED()),
-                        cm.dbVersion(),
-                        nss,
-                        applyReadWriteConcern(opCtx, false, false, explainCmd),
-                        true /* isExplain */,
-                        &bob);
-        }
-
-        const auto millisElapsed = timer.millis();
-
-        executor::RemoteCommandResponse response(bob.obj(), Milliseconds(millisElapsed));
-
-        // We fetch an arbitrary host from the ConnectionString, since
-        // ClusterExplain::buildExplainResult() doesn't use the given HostAndPort.
-        AsyncRequestsSender::Response arsResponse{
-            shard->getId(), response, shard->getConnString().getServers().front()};
-
-        auto bodyBuilder = result->getBodyBuilder();
-        return ClusterExplain::buildExplainResult(opCtx,
-                                                  {arsResponse},
-                                                  ClusterExplain::kSingleShard,
-                                                  millisElapsed,
-                                                  cmdObj,
-                                                  &bodyBuilder);
-    }
-
-    bool allowedInTransactions() const final {
-        return true;
-    }
-
-    bool supportsRetryableWrite() const final {
-        return true;
-    }
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
-
-        if (processFLEFindAndModify(opCtx, cmdObj, result) == FLEBatchResult::kProcessed) {
-            return true;
-        }
-
-        // Collect metrics.
-        _updateMetrics.collectMetrics(cmdObj);
-
-        // Technically, findAndModify should only be creating database if upsert is true, but this
-        // would require that the parsing be pulled into this function.
-        cluster::createDatabase(opCtx, nss.db());
-
-        // Append mongoS' runtime constants to the command object before forwarding it to the shard.
-        auto cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj);
-
-        const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
-        const auto& cm = cri.cm;
-        if (cm.isSharded()) {
-            const BSONObj query = cmdObjForShard.getObjectField("query");
-            if (write_without_shard_key::useTwoPhaseProtocol(opCtx,
-                                                             nss,
-                                                             false /* isUpdateOrDelete */,
-                                                             query,
-                                                             getCollation(cmdObjForShard))) {
-                _runCommandWithoutShardKey(opCtx,
-                                           nss,
-                                           applyReadWriteConcern(opCtx, this, cmdObjForShard),
-                                           false /* isExplain */,
-                                           &result);
-            } else {
-                const BSONObj collation = getCollation(cmdObjForShard);
-                const auto let = getLet(cmdObjForShard);
-                const auto rc = getLegacyRuntimeConstants(cmdObjForShard);
-                const BSONObj shardKey =
-                    getShardKey(opCtx, cm, nss, query, collation, boost::none, let, rc);
-
-                // For now, set bypassIsFieldHashedCheck to be true in order to skip the
-                // isFieldHashedCheck in the special case where _id is hashed and used as the shard
-                // key. This means that we always assume that a findAndModify request using _id is
-                // targetable to a single shard.
-                auto chunk = cm.findIntersectingChunk(shardKey, collation, true);
-                _runCommand(opCtx,
-                            chunk.getShardId(),
-                            cri.getShardVersion(chunk.getShardId()),
-                            boost::none,
-                            nss,
-                            applyReadWriteConcern(opCtx, this, cmdObjForShard),
-                            false /* isExplain */,
-                            &result);
-            }
-        } else {
-            _runCommand(opCtx,
-                        cm.dbPrimary(),
-                        boost::make_optional(!cm.dbVersion().isFixed(), ShardVersion::UNSHARDED()),
-                        cm.dbVersion(),
                         nss,
                         applyReadWriteConcern(opCtx, this, cmdObjForShard),
                         false /* isExplain */,
                         &result);
         }
-
-        return true;
+    } else {
+        _runCommand(opCtx,
+                    cm.dbPrimary(),
+                    boost::make_optional(!cm.dbVersion().isFixed(), ShardVersion::UNSHARDED()),
+                    cm.dbVersion(),
+                    nss,
+                    applyReadWriteConcern(opCtx, this, cmdObjForShard),
+                    false /* isExplain */,
+                    &result);
     }
 
-private:
-    static bool getCrudProcessedFromCmd(const BSONObj& cmdObj) {
-        // We could have wrapped the FindAndModify command in an explain object
-        const BSONObj& realCmdObj =
-            cmdObj.getField("explain").ok() ? cmdObj.getObjectField("explain") : cmdObj;
-        auto req = write_ops::FindAndModifyCommandRequest::parse(
-            IDLParserContext("ClusterFindAndModify"), realCmdObj);
+    return true;
+}
 
-        return req.getEncryptionInformation().has_value() &&
-            req.getEncryptionInformation()->getCrudProcessed().get_value_or(false);
+bool FindAndModifyCmd::getCrudProcessedFromCmd(const BSONObj& cmdObj) {
+    // We could have wrapped the FindAndModify command in an explain object
+    const BSONObj& realCmdObj =
+        cmdObj.getField("explain").ok() ? cmdObj.getObjectField("explain") : cmdObj;
+    auto req = write_ops::FindAndModifyCommandRequest::parse(
+        IDLParserContext("ClusterFindAndModify"), realCmdObj);
+
+    return req.getEncryptionInformation().has_value() &&
+        req.getEncryptionInformation()->getCrudProcessed().get_value_or(false);
+}
+
+// Catches errors in the given response, and reruns the command if necessary. Uses the given
+// response to construct the findAndModify command result passed to the client.
+void FindAndModifyCmd::_constructResult(OperationContext* opCtx,
+                                        const ShardId& shardId,
+                                        const boost::optional<ShardVersion>& shardVersion,
+                                        const boost::optional<DatabaseVersion>& dbVersion,
+                                        const NamespaceString& nss,
+                                        const BSONObj& cmdObj,
+                                        const BSONObj& response,
+                                        BSONObjBuilder* result) {
+    auto txnRouter = TransactionRouter::get(opCtx);
+    bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
+
+    const auto responseStatus = getStatusFromCommandResult(response);
+    if (ErrorCodes::isNeedRetargettingError(responseStatus.code()) ||
+        ErrorCodes::isSnapshotError(responseStatus.code()) ||
+        responseStatus.code() == ErrorCodes::StaleDbVersion) {
+        // Command code traps this exception and re-runs
+        uassertStatusOK(responseStatus.withContext("findAndModify"));
     }
 
-    // Catches errors in the given response, and reruns the command if necessary. Uses the given
-    // response to construct the findAndModify command result passed to the client.
-    static void _constructResult(OperationContext* opCtx,
-                                 const ShardId& shardId,
-                                 const boost::optional<ShardVersion>& shardVersion,
-                                 const boost::optional<DatabaseVersion>& dbVersion,
-                                 const NamespaceString& nss,
-                                 const BSONObj& cmdObj,
-                                 const BSONObj& response,
-                                 BSONObjBuilder* result) {
-        auto txnRouter = TransactionRouter::get(opCtx);
-        bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
+    if (responseStatus.code() == ErrorCodes::TenantMigrationAborted) {
+        uassertStatusOK(responseStatus.withContext("findAndModify"));
+    }
 
-        const auto responseStatus = getStatusFromCommandResult(response);
-        if (ErrorCodes::isNeedRetargettingError(responseStatus.code()) ||
-            ErrorCodes::isSnapshotError(responseStatus.code()) ||
-            responseStatus.code() == ErrorCodes::StaleDbVersion) {
-            // Command code traps this exception and re-runs
-            uassertStatusOK(responseStatus.withContext("findAndModify"));
-        }
-
-        if (responseStatus.code() == ErrorCodes::TenantMigrationAborted) {
-            uassertStatusOK(responseStatus.withContext("findAndModify"));
-        }
-
-        if (responseStatus.code() == ErrorCodes::WouldChangeOwningShard) {
-            if (feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-
-                auto parsedRequest = write_ops::FindAndModifyCommandRequest::parse(
-                    IDLParserContext("ClusterFindAndModify"), cmdObj);
-                // Strip write concern because this command will be sent as part of a
-                // transaction and the write concern has already been loaded onto the opCtx and
-                // will be picked up by the transaction API.
-                parsedRequest.setWriteConcern(boost::none);
-
-                // Strip runtime constants because they will be added again when this command is
-                // recursively sent through the service entry point.
-                parsedRequest.setLegacyRuntimeConstants(boost::none);
-                if (txnRouter) {
-                    handleWouldChangeOwningShardErrorTransaction(opCtx,
-                                                                 nss,
-                                                                 responseStatus,
-                                                                 parsedRequest,
-                                                                 result,
-                                                                 getCrudProcessedFromCmd(cmdObj));
-                } else {
-                    if (isRetryableWrite) {
-                        parsedRequest.setStmtId(0);
-                    }
-                    handleWouldChangeOwningShardErrorNonTransaction(
-                        opCtx, shardId, nss, parsedRequest, result);
-                }
+    if (responseStatus.code() == ErrorCodes::WouldChangeOwningShard) {
+        if (feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            handleWouldChangeOwningShardError(opCtx, shardId, nss, cmdObj, responseStatus, result);
+        } else {
+            // TODO SERVER-67429: Remove this branch.
+            if (isRetryableWrite) {
+                _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
+                    opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, result);
             } else {
-                // TODO SERVER-67429: Remove this branch.
-                if (isRetryableWrite) {
-                    _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
-                        opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, result);
-                } else {
-                    handleWouldChangeOwningShardErrorTransactionLegacy(
-                        opCtx,
-                        nss,
-                        responseStatus,
-                        cmdObj,
-                        result,
-                        getCrudProcessedFromCmd(cmdObj));
-                }
+                handleWouldChangeOwningShardErrorTransactionLegacy(
+                    opCtx, nss, responseStatus, cmdObj, result, getCrudProcessedFromCmd(cmdObj));
             }
-
-            return;
         }
 
-        // First append the properly constructed writeConcernError. It will then be skipped in
-        // appendElementsUnique.
-        if (auto wcErrorElem = response["writeConcernError"]) {
+        return;
+    }
+
+    // First append the properly constructed writeConcernError. It will then be skipped in
+    // appendElementsUnique.
+    if (auto wcErrorElem = response["writeConcernError"]) {
+        appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
+    }
+
+    result->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(response));
+}
+
+// Two-phase protocol to run a findAndModify command without a shard key or _id.
+void FindAndModifyCmd::_runCommandWithoutShardKey(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const BSONObj& cmdObj,
+                                                  bool isExplain,
+                                                  BSONObjBuilder* result) {
+
+    auto cmdObjForPassthrough = prepareCmdObjForPassthrough(
+        opCtx, cmdObj, nss, isExplain, boost::none /* dbVersion */, boost::none /* shardVersion */);
+
+    auto swRes =
+        write_without_shard_key::runTwoPhaseWriteProtocol(opCtx, nss, cmdObjForPassthrough);
+    uassertStatusOK(swRes.getStatus());
+
+    // runTwoPhaseWriteProtocol returns an empty response when there are not matching documents
+    // and {upsert: false}.
+    BSONObj response;
+    if (swRes.getValue().getResponse().isEmpty()) {
+        write_ops::FindAndModifyLastError lastError(0 /* n */);
+        lastError.setUpdatedExisting(false);
+
+        write_ops::FindAndModifyCommandReply findAndModifyResponse;
+        findAndModifyResponse.setLastErrorObject(std::move(lastError));
+        findAndModifyResponse.setValue(boost::none);
+        response = findAndModifyResponse.toBSON();
+    } else {
+        response = swRes.getValue().getResponse();
+    }
+
+    // Extract findAndModify command result from the result of the two phase write protocol.
+    _constructResult(opCtx,
+                     ShardId(swRes.getValue().getShardId().toString()),
+                     boost::none /* shardVersion */,
+                     boost::none /* dbVersion */,
+                     nss,
+                     cmdObj,
+                     response,
+                     result);
+}
+
+// Command invocation to be used if a shard key is specified or the collection is unsharded.
+void FindAndModifyCmd::_runCommand(OperationContext* opCtx,
+                                   const ShardId& shardId,
+                                   const boost::optional<ShardVersion>& shardVersion,
+                                   const boost::optional<DatabaseVersion>& dbVersion,
+                                   const NamespaceString& nss,
+                                   const BSONObj& cmdObj,
+                                   bool isExplain,
+                                   BSONObjBuilder* result) {
+    auto txnRouter = TransactionRouter::get(opCtx);
+    bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
+
+    const auto response = [&] {
+        std::vector<AsyncRequestsSender::Request> requests;
+        auto cmdObjForPassthrough =
+            prepareCmdObjForPassthrough(opCtx, cmdObj, nss, isExplain, dbVersion, shardVersion);
+        requests.emplace_back(shardId, cmdObjForPassthrough);
+
+        MultiStatementTransactionRequestsSender ars(
+            opCtx,
+            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+            nss.db().toString(),
+            requests,
+            kPrimaryOnlyReadPreference,
+            isRetryableWrite ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
+
+        auto response = ars.next();
+        invariant(ars.done());
+
+        return uassertStatusOK(std::move(response.swResponse));
+    }();
+
+    uassertStatusOK(response.status);
+    _constructResult(opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, response.data, result);
+}
+
+// TODO SERVER-67429: Remove this function.
+void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    const boost::optional<ShardVersion>& shardVersion,
+    const boost::optional<DatabaseVersion>& dbVersion,
+    const NamespaceString& nss,
+    const BSONObj& cmdObj,
+    BSONObjBuilder* result) {
+    RouterOperationContextSession routerSession(opCtx);
+    try {
+        auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+        // Re-run the findAndModify command that will change the shard key value in a
+        // transaction. We call _runCommand recursively, and this second time through
+        // since it will be run as a transaction it will take the other code path to
+        // handleWouldChangeOwningShardErrorTransactionLegacy.  We ensure the retried
+        // operation does not include WC inside the transaction by stripping it from the
+        // cmdObj.  The transaction commit will still use the WC, because it uses the WC
+        // from the opCtx (which has been set previously in Strategy).
+        documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
+        _runCommand(opCtx,
+                    shardId,
+                    shardVersion,
+                    dbVersion,
+                    nss,
+                    stripWriteConcern(cmdObj),
+                    false /* isExplain */,
+                    result);
+        uassertStatusOK(getStatusFromCommandResult(result->asTempObj()));
+        auto commitResponse = documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
+
+        uassertStatusOK(getStatusFromCommandResult(commitResponse));
+        if (auto wcErrorElem = commitResponse["writeConcernError"]) {
             appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
         }
-
-        result->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(response));
-    }
-
-    // Two-phase protocol to run a findAndModify command without a shard key or _id.
-    static void _runCommandWithoutShardKey(OperationContext* opCtx,
-                                           const NamespaceString& nss,
-                                           const BSONObj& cmdObj,
-                                           bool isExplain,
-                                           BSONObjBuilder* result) {
-
-        auto cmdObjForPassthrough = prepareCmdObjForPassthrough(opCtx,
-                                                                cmdObj,
-                                                                nss,
-                                                                isExplain,
-                                                                boost::none /* dbVersion */,
-                                                                boost::none /* shardVersion */);
-
-        auto swRes =
-            write_without_shard_key::runTwoPhaseWriteProtocol(opCtx, nss, cmdObjForPassthrough);
-        uassertStatusOK(swRes.getStatus());
-
-        // runTwoPhaseWriteProtocol returns an empty response when there are not matching documents
-        // and {upsert: false}.
-        BSONObj response;
-        if (swRes.getValue().getResponse().isEmpty()) {
-            write_ops::FindAndModifyLastError lastError(0 /* n */);
-            lastError.setUpdatedExisting(false);
-
-            write_ops::FindAndModifyCommandReply findAndModifyResponse;
-            findAndModifyResponse.setLastErrorObject(std::move(lastError));
-            findAndModifyResponse.setValue(boost::none);
-            response = findAndModifyResponse.toBSON();
-        } else {
-            response = swRes.getValue().getResponse();
+    } catch (DBException& e) {
+        if (e.code() != ErrorCodes::DuplicateKey ||
+            (e.code() == ErrorCodes::DuplicateKey &&
+             !e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id"))) {
+            e.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
         }
 
-        // Extract findAndModify command result from the result of the two phase write protocol.
-        _constructResult(opCtx,
-                         ShardId(swRes.getValue().getShardId().toString()),
-                         boost::none /* shardVersion */,
-                         boost::none /* dbVersion */,
-                         nss,
-                         cmdObj,
-                         response,
-                         result);
+        auto txnRouterForAbort = TransactionRouter::get(opCtx);
+        if (txnRouterForAbort)
+            txnRouterForAbort.implicitlyAbortTransaction(opCtx, e.toStatus());
+
+        throw;
     }
+}
 
-    // Command invocation to be used if a shard key is specified or the collection is unsharded.
-    static void _runCommand(OperationContext* opCtx,
-                            const ShardId& shardId,
-                            const boost::optional<ShardVersion>& shardVersion,
-                            const boost::optional<DatabaseVersion>& dbVersion,
-                            const NamespaceString& nss,
-                            const BSONObj& cmdObj,
-                            bool isExplain,
-                            BSONObjBuilder* result) {
-        auto txnRouter = TransactionRouter::get(opCtx);
-        bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
+void FindAndModifyCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
+                                                         const ShardId& shardId,
+                                                         const NamespaceString& nss,
+                                                         const BSONObj& cmdObj,
+                                                         Status responseStatus,
+                                                         BSONObjBuilder* result) {
+    auto txnRouter = TransactionRouter::get(opCtx);
+    bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
 
-        const auto response = [&] {
-            std::vector<AsyncRequestsSender::Request> requests;
-            auto cmdObjForPassthrough =
-                prepareCmdObjForPassthrough(opCtx, cmdObj, nss, isExplain, dbVersion, shardVersion);
-            requests.emplace_back(shardId, cmdObjForPassthrough);
+    auto parsedRequest = write_ops::FindAndModifyCommandRequest::parse(
+        IDLParserContext("ClusterFindAndModify"), cmdObj);
 
-            MultiStatementTransactionRequestsSender ars(
-                opCtx,
-                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                nss.db().toString(),
-                requests,
-                kPrimaryOnlyReadPreference,
-                isRetryableWrite ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
+    // Strip write concern because this command will be sent as part of a
+    // transaction and the write concern has already been loaded onto the opCtx and
+    // will be picked up by the transaction API.
+    parsedRequest.setWriteConcern(boost::none);
 
-            auto response = ars.next();
-            invariant(ars.done());
-
-            return uassertStatusOK(std::move(response.swResponse));
-        }();
-
-        uassertStatusOK(response.status);
-        _constructResult(
-            opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, response.data, result);
-    }
-
-    // TODO SERVER-67429: Remove this function.
-    static void _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
-        OperationContext* opCtx,
-        const ShardId& shardId,
-        const boost::optional<ShardVersion>& shardVersion,
-        const boost::optional<DatabaseVersion>& dbVersion,
-        const NamespaceString& nss,
-        const BSONObj& cmdObj,
-        BSONObjBuilder* result) {
-        RouterOperationContextSession routerSession(opCtx);
-        try {
-            auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-            readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-
-            // Re-run the findAndModify command that will change the shard key value in a
-            // transaction. We call _runCommand recursively, and this second time through
-            // since it will be run as a transaction it will take the other code path to
-            // handleWouldChangeOwningShardErrorTransactionLegacy.  We ensure the retried
-            // operation does not include WC inside the transaction by stripping it from the
-            // cmdObj.  The transaction commit will still use the WC, because it uses the WC
-            // from the opCtx (which has been set previously in Strategy).
-            documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
-            _runCommand(opCtx,
-                        shardId,
-                        shardVersion,
-                        dbVersion,
-                        nss,
-                        stripWriteConcern(cmdObj),
-                        false /* isExplain */,
-                        result);
-            uassertStatusOK(getStatusFromCommandResult(result->asTempObj()));
-            auto commitResponse =
-                documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
-
-            uassertStatusOK(getStatusFromCommandResult(commitResponse));
-            if (auto wcErrorElem = commitResponse["writeConcernError"]) {
-                appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
-            }
-        } catch (DBException& e) {
-            if (e.code() != ErrorCodes::DuplicateKey ||
-                (e.code() == ErrorCodes::DuplicateKey &&
-                 !e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id"))) {
-                e.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
-            }
-
-            auto txnRouterForAbort = TransactionRouter::get(opCtx);
-            if (txnRouterForAbort)
-                txnRouterForAbort.implicitlyAbortTransaction(opCtx, e.toStatus());
-
-            throw;
+    // Strip runtime constants because they will be added again when this command is
+    // recursively sent through the service entry point.
+    parsedRequest.setLegacyRuntimeConstants(boost::none);
+    if (txnRouter) {
+        handleWouldChangeOwningShardErrorTransaction(
+            opCtx, nss, responseStatus, parsedRequest, result, getCrudProcessedFromCmd(cmdObj));
+    } else {
+        if (isRetryableWrite) {
+            parsedRequest.setStmtId(0);
         }
+        handleWouldChangeOwningShardErrorNonTransaction(opCtx, shardId, nss, parsedRequest, result);
     }
+}
 
-    // Update related command execution metrics.
-    UpdateMetrics _updateMetrics;
-} findAndModifyCmd;
-
-}  // namespace
 }  // namespace mongo

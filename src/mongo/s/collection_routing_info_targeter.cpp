@@ -478,14 +478,22 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         return endPoints;
     }
 
-    // Replacement-style updates must always target a single shard. If we were unable to do so using
-    // the query, we attempt to extract the shard key from the replacement and target based on it.
-    if (updateOp.getU().type() == write_ops::UpdateModification::Type::kReplacement) {
-        if (chunkRanges) {
-            chunkRanges->clear();
+    // Targeting by replacement document is no longer necessary when an updateOne without shard key
+    // is allowed, since we're able to decisively select a document to modify with the two phase
+    // write without shard key protocol.
+    if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
+            serverGlobalParams.featureCompatibility) ||
+        isExactIdQuery(opCtx, _nss, query, collation, _cri.cm)) {
+        // Replacement-style updates must always target a single shard. If we were unable to do so
+        // using the query, we attempt to extract the shard key from the replacement and target
+        // based on it.
+        if (updateOp.getU().type() == write_ops::UpdateModification::Type::kReplacement) {
+            if (chunkRanges) {
+                chunkRanges->clear();
+            }
+            return targetByShardKey(shardKeyPattern.extractShardKeyFromDoc(updateExpr),
+                                    "Failed to target update by replacement document");
         }
-        return targetByShardKey(shardKeyPattern.extractShardKeyFromDoc(updateExpr),
-                                "Failed to target update by replacement document");
     }
 
     // If we are here then this is an op-style update and we were not able to target a single shard.

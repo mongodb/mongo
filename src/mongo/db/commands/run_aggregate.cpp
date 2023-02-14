@@ -677,10 +677,14 @@ Status runAggregate(OperationContext* opCtx,
 
     // If we are running a retryable write without shard key, check if the write was applied on this
     // shard, and if so, return early with an empty cursor with $_wasStatementExecuted
-    // set to true.
+    // set to true. The isRetryableWrite() check here is to check that the client executed write was
+    // a retryable write (which would've spawned an internal session for a retryable write to
+    // execute the two phase write without shard key protocol), otherwise we skip the retryable
+    // write check.
     auto isClusterQueryWithoutShardKeyCmd = request.getIsClusterQueryWithoutShardKeyCmd();
-    auto stmtId = request.getStmtId();
-    if (isClusterQueryWithoutShardKeyCmd && stmtId) {
+    if (opCtx->isRetryableWrite() && isClusterQueryWithoutShardKeyCmd) {
+        auto stmtId = request.getStmtId();
+        tassert(7058100, "StmtId must be set for a retryable write without shard key", stmtId);
         if (TransactionParticipant::get(opCtx).checkStatementExecuted(opCtx, *stmtId)) {
             CursorResponseBuilder::Options options;
             options.isInitialResponse = true;

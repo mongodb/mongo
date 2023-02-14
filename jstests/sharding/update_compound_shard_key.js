@@ -168,10 +168,24 @@ assertUpdateWorked({_id: 0}, {z: 3, x: 4, y: 3, replStyle: 2}, false, 0);
 
 // Shard key field modifications do not have to specify full shard key.
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-    // TODO: SERVER-70581 Handle WCOS for update and findAndModify if replacement document changes
-    // data placement
-    // assert.commandWorked(st.s.getDB(kDbName).coll.update({}, {x: 110, y: 55, z: 3, a: 110},
-    // false));
+    const testDB = st.s.getDB("test");
+    const testColl = testDB.coll;
+
+    // Shard testColl on {x:1}, split it at {x:0}, and move chunk {x:1} to shard1. This collection
+    // is used to for the update below which would use the write without shard key protocol, but
+    // since the query is unspecified, any 1 random document could be modified. In order to not
+    // break the state of the original test collection, 'testColl' is used specifically for the
+    // single update below.
+    st.shardColl(testColl, {x: 1}, {x: 0}, {x: 1});
+
+    assert.commandWorked(testColl.insert({x: 1, _id: 1}));
+    assert.commandWorked(testColl.insert({x: -1, _id: 0}));
+    let updateRes = assert.commandWorked(testColl.update({}, {x: 110, y: 55, z: 3, a: 110}, false));
+    assert.eq(1, updateRes.nMatched);
+    assert.eq(1, updateRes.nModified);
+    assert.eq(testColl.find({x: 110, y: 55, z: 3, a: 110}).itcount(), 1);
+
+    // TODO: SERVER-73689 Fix shard key update check in update_stage.cpp to exclude _id queries.
     assert.commandWorked(
         st.s.getDB(kDbName).coll.update({_id: 2}, {x: 110, y: 55, z: 3, a: 110}, false));
 } else {

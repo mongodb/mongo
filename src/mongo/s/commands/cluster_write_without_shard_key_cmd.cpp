@@ -34,6 +34,8 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/commands/cluster_find_and_modify_cmd.h"
+#include "mongo/s/commands/cluster_write_cmd.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
@@ -173,6 +175,45 @@ public:
                 Shard::RetryPolicy::kNoRetry);
 
             auto response = uassertStatusOK(ars.next().swResponse);
+            if (getStatusFromCommandResult(response.data) == ErrorCodes::WouldChangeOwningShard) {
+                if (commandName == "update") {
+                    auto request = BatchedCommandRequest::parseUpdate(
+                        OpMsgRequest::fromDBAndBody(ns().db(), cmdObj));
+
+                    write_ops::WriteError error(0, getStatusFromCommandResult(response.data));
+                    error.setIndex(0);
+                    BatchedCommandResponse emulatedResponse;
+                    emulatedResponse.setStatus(Status::OK());
+                    emulatedResponse.setN(0);
+                    emulatedResponse.addToErrDetails(std::move(error));
+
+                    auto wouldChangeOwningShardSucceeded =
+                        ClusterWriteCmd::handleWouldChangeOwningShardError(
+                            opCtx, &request, &emulatedResponse, {});
+
+                    if (wouldChangeOwningShardSucceeded) {
+                        BSONObjBuilder bob(emulatedResponse.toBSON());
+                        bob.append("ok", 1);
+                        auto res = bob.obj();
+                        return Response(res, shardId.toString());
+                    }
+                } else {
+                    // Append the $db field to satisfy findAndModify command object parser.
+                    BSONObjBuilder bob(cmdObj);
+                    bob.append("$db", nss.dbName().toString());
+                    auto writeCmdObjWithDb = bob.obj();
+
+                    BSONObjBuilder res;
+                    FindAndModifyCmd::handleWouldChangeOwningShardError(
+                        opCtx,
+                        shardId,
+                        nss,
+                        writeCmdObjWithDb,
+                        getStatusFromCommandResult(response.data),
+                        &res);
+                    return Response(res.obj(), shardId.toString());
+                }
+            }
             return Response(response.data, shardId.toString());
         }
 
