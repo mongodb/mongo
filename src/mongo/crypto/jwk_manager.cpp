@@ -56,12 +56,18 @@ StringData reduceInt(StringData value) {
 
 }  // namespace
 
-JWKManager::JWKManager(StringData source) : _keyURI(source), _isKeyModified(false) {
-    _loadKeysFromUri(true /* isInitialLoad */);
+JWKManager::JWKManager(StringData source, bool loadAtStartup)
+    : _keyURI(source), _isKeyModified(false) {
+    if (loadAtStartup) {
+        _loadKeysFromUri();
+    } else {
+        _keyMaterial = std::make_shared<KeyMap>();
+        _validators = std::make_shared<SharedValidatorMap>();
+    }
 }
 
 JWKManager::JWKManager(BSONObj keys) : _isKeyModified(false) {
-    _setAndValidateKeys(keys, true /* isInitialLoad */);
+    _setAndValidateKeys(keys);
 }
 
 StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
@@ -70,7 +76,7 @@ StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
     if (it == currentValidators->end()) {
         // If the JWKManager has been initialized with an URI, try refreshing.
         if (_keyURI) {
-            _loadKeysFromUri(false /* isInitialLoad */);
+            _loadKeysFromUri();
             currentValidators = _validators;
             it = currentValidators->find(keyId.toString());
         }
@@ -83,7 +89,7 @@ StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
     return it->second;
 }
 
-void JWKManager::_setAndValidateKeys(const BSONObj& keys, bool isInitialLoad) {
+void JWKManager::_setAndValidateKeys(const BSONObj& keys) {
     auto newValidators = std::make_shared<SharedValidatorMap>();
     auto newKeyMaterial = std::make_shared<KeyMap>();
 
@@ -138,7 +144,7 @@ void JWKManager::_setAndValidateKeys(const BSONObj& keys, bool isInitialLoad) {
     std::atomic_exchange(&_keyMaterial, std::move(newKeyMaterial));  // NOLINT
 }
 
-void JWKManager::_loadKeysFromUri(bool isInitialLoad) {
+void JWKManager::_loadKeysFromUri() {
     try {
         auto httpClient = HttpClient::createWithoutConnectionPool();
         httpClient->setHeaders({"Accept: */*"});
@@ -152,7 +158,7 @@ void JWKManager::_loadKeysFromUri(bool isInitialLoad) {
         cdr.readInto<StringData>(&str);
 
         BSONObj data = fromjson(str);
-        _setAndValidateKeys(data, isInitialLoad);
+        _setAndValidateKeys(data);
     } catch (const DBException& ex) {
         // throws
         uassertStatusOK(ex.toStatus().withContext(str::stream() << "Failed loading keys from "

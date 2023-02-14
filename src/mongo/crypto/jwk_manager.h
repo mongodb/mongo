@@ -45,10 +45,11 @@ public:
     using KeyMap = std::map<std::string, BSONObj>;
 
     /**
-     * Fetch a JWKS file from the specified URL, parse them as keys,
-     * and instantiate JWSValidator instances.
+     * Fetch a JWKS file from the specified URL, parse them as keys, and instantiate JWSValidator
+     * instances if loadAtStartup is set as true. Otherwise the keys will be fetched from the source
+     * and JWSValidators initiated during the next JIT refresh.
      */
-    explicit JWKManager(StringData source);
+    explicit JWKManager(StringData source, bool loadAtStartup);
 
     /**
      * Parse a BSONObj array of keys, and instantiate JWSValidator instances.
@@ -84,9 +85,9 @@ public:
     void serialize(BSONObjBuilder* bob) const;
 
 private:
-    void _setAndValidateKeys(const BSONObj& keys, bool isInitialLoad);
+    void _setAndValidateKeys(const BSONObj& keys);
 
-    void _loadKeysFromUri(bool isInitialLoad);
+    void _loadKeysFromUri();
 
     bool _haveKeysBeenModified(const KeyMap& newKeyMaterial) const;
 

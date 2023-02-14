@@ -51,7 +51,7 @@ TEST(JWKManager, parseJWKSetBasicFromSource) {
     cdr.readInto<StringData>(&str);
 
     BSONObj data = fromjson(str);
-    JWKManager manager(source);
+    JWKManager manager(source, true /* loadAtStartup */);
 
     BSONObjBuilder bob;
     manager.serialize(&bob);
