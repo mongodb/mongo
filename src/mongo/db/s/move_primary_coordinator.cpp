@@ -196,7 +196,6 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      }
 
                                      blockReads(opCtx);
-
                                      enterCriticalSectionOnRecipient(opCtx);
                                  }))
         .then(_buildPhaseHandler(
@@ -230,13 +229,6 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      getForwardableOpMetadata().setOn(opCtx);
 
                                      dropStaleDataOnDonor(opCtx);
-
-                                     LOGV2(7120206,
-                                           "Completed movePrimary operation",
-                                           "db"_attr = _dbName,
-                                           "to"_attr = _doc.getToShardId());
-
-                                     logChange(opCtx, "end");
                                  }))
         .then(_buildPhaseHandler(Phase::kExitCriticalSection,
                                  [this, executor = executor, anchor = shared_from_this()] {
@@ -251,8 +243,14 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      }
 
                                      unblockReadsAndWrites(opCtx);
-
                                      exitCriticalSectionOnRecipient(opCtx);
+
+                                     LOGV2(7120206,
+                                           "Completed movePrimary operation",
+                                           "db"_attr = _dbName,
+                                           "to"_attr = _doc.getToShardId());
+
+                                     logChange(opCtx, "end");
                                  }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             const auto opCtxHolder = cc().makeOperationContext();
