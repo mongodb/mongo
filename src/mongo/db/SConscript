@@ -1421,6 +1421,7 @@ env.Library(
         'query/sbe_stage_builder_index_scan.cpp',
         'query/sbe_stage_builder_lookup.cpp',
         'query/sbe_stage_builder_projection.cpp',
+        'query/sbe_stage_builder_type_checker.cpp',
         'query/sbe_sub_planner.cpp',
         'query/shard_filterer_factory_impl.cpp',
         'query/stage_builder_util.cpp',

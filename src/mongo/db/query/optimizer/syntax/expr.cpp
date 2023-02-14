@@ -123,6 +123,8 @@ Constant::~Constant() {
 }
 
 bool Constant::operator==(const Constant& other) const {
+    // Handle the cases when only one of the compared values is Nothing; in this scenario,
+    // compareValue returns Nothing instead of the answer we want.
     if (_tag == sbe::value::TypeTags::Nothing || other._tag == sbe::value::TypeTags::Nothing) {
         return _tag == other._tag;
     }

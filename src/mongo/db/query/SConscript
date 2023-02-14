@@ -473,6 +473,7 @@ env.CppUnitTest(
         "sbe_stage_builder_lookup_test.cpp",
         "sbe_stage_builder_test.cpp",
         "sbe_stage_builder_test_fixture.cpp",
+        "sbe_stage_builder_type_checker_test.cpp",
         "shard_filterer_factory_mock.cpp",
         "telemetry_store_test.cpp",
         "util/memory_util_test.cpp",

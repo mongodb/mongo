@@ -68,6 +68,7 @@ public:
     void prepare(optimizer::ABT&, const optimizer::LambdaAbstraction&);
     void transport(optimizer::ABT&, const optimizer::LambdaAbstraction&, optimizer::ABT&);
 
+    void transport(optimizer::ABT& n, const optimizer::UnaryOp& op, optimizer::ABT& child);
     void transport(optimizer::ABT& n,
                    const optimizer::BinaryOp& op,
                    optimizer::ABT& lhs,

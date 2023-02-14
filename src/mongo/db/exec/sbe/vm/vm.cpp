@@ -3377,37 +3377,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinToLower(ArityTyp
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToBool(ArityType arity) {
     auto [operandOwned, operandTag, operandVal] = getFromStack(0);
 
-    switch (operandTag) {
-        case value::TypeTags::Nothing: {
-            return {false, value::TypeTags::Nothing, 0};
-        }
-        case value::TypeTags::Null:
-        case value::TypeTags::bsonUndefined: {
-            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
-        }
-        case value::TypeTags::Boolean: {
-            return {false, operandTag, operandVal};
-        }
-        case value::TypeTags::NumberInt32: {
-            bool isNotZero = (value::bitcastTo<int32_t>(operandVal) != 0);
-            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(isNotZero)};
-        }
-        case value::TypeTags::NumberInt64: {
-            bool isNotZero = (value::bitcastTo<int64_t>(operandVal) != 0);
-            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(isNotZero)};
-        }
-        case value::TypeTags::NumberDouble: {
-            bool isNotZero = (value::bitcastTo<double>(operandVal) != 0.0);
-            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(isNotZero)};
-        }
-        case value::TypeTags::NumberDecimal: {
-            bool isNotZero = !value::bitcastTo<Decimal128>(operandVal).isZero();
-            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(isNotZero)};
-        }
-        default: {
-            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
-        }
-    }
+    auto [tag, val] = value::coerceToBool(operandTag, operandVal);
+
+    return {false, tag, val};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToString(ArityType arity) {

@@ -29,12 +29,12 @@
 
 #include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
 
-#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
 #include "mongo/db/query/sbe_stage_builder_const_eval.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/sbe_stage_builder_type_checker.h"
 
 namespace mongo::stage_builder {
 
@@ -112,11 +112,19 @@ std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt,
         collator = sbe::value::bitcastTo<const CollatorInterface*>(collatorValue);
     }
 
-    // Run the constant folding to eliminate lambda applications as they are not directly
-    // supported by the SBE VM.
-    ExpressionConstEval constEval{env, collator};
+    bool modified = false;
+    do {
+        // Run the constant folding to eliminate lambda applications as they are not directly
+        // supported by the SBE VM.
+        ExpressionConstEval constEval{env, collator};
 
-    constEval.optimize(abt);
+        constEval.optimize(abt);
+
+        TypeChecker typeChecker;
+        typeChecker.typeCheck(abt);
+
+        modified = typeChecker.modified();
+    } while (modified);
 
     // And finally convert to the SBE expression.
     optimizer::SBEExpressionLowering exprLower{env, slotMap, runtimeEnv};

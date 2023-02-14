@@ -147,6 +147,23 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
     }
 }
 
+void ExpressionConstEval::transport(optimizer::ABT& n,
+                                    const optimizer::UnaryOp& op,
+                                    optimizer::ABT& child) {
+    switch (op.op()) {
+        case optimizer::Operations::Not: {
+            if (const auto childConst = child.cast<optimizer::Constant>();
+                childConst && childConst->isValueBool()) {
+                swapAndUpdate(n, optimizer::Constant::boolean(!childConst->getValueBool()));
+            }
+            break;
+        }
+
+        default:
+            break;
+    }
+}
+
 // Specific transport for binary operation
 // The const correctness is probably wrong (as const optimizer::ABT& lhs, const optimizer::ABT& rhs
 // does not work for some reason but we can fix it later).
@@ -205,7 +222,7 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
 
         case optimizer::Operations::Or: {
             // Nothing and short-circuiting semantics of the 'or' operation in SBE allow us to
-            // interrogate 'lhs' only.
+            // interrogate 'lhs' only. The 'rhs' can be removed only if it is 'false'.
             if (auto lhsConst = lhs.cast<optimizer::Constant>(); lhsConst) {
                 auto [lhsTag, lhsValue] = lhsConst->get();
                 if (lhsTag == sbe::value::TypeTags::Boolean &&
@@ -217,13 +234,20 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
                     // true || rhs -> true
                     swapAndUpdate(n, optimizer::Constant::boolean(true));
                 }
+            } else if (auto rhsConst = rhs.cast<optimizer::Constant>(); rhsConst) {
+                auto [rhsTag, rhsValue] = rhsConst->get();
+                if (rhsTag == sbe::value::TypeTags::Boolean &&
+                    !sbe::value::bitcastTo<bool>(rhsValue)) {
+                    // lhs || false -> lhs
+                    swapAndUpdate(n, std::exchange(lhs, optimizer::make<optimizer::Blackhole>()));
+                }
             }
             break;
         }
 
         case optimizer::Operations::And: {
             // Nothing and short-circuiting semantics of the 'and' operation in SBE allow us to
-            // interrogate 'lhs' only.
+            // interrogate 'lhs' only. The 'rhs' can be removed only if it is 'true'.
             if (auto lhsConst = lhs.cast<optimizer::Constant>(); lhsConst) {
                 auto [lhsTag, lhsValue] = lhsConst->get();
                 if (lhsTag == sbe::value::TypeTags::Boolean &&
@@ -234,6 +258,13 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
                            sbe::value::bitcastTo<bool>(lhsValue)) {
                     // true && rhs -> rhs
                     swapAndUpdate(n, std::exchange(rhs, optimizer::make<optimizer::Blackhole>()));
+                }
+            } else if (auto rhsConst = rhs.cast<optimizer::Constant>(); rhsConst) {
+                auto [rhsTag, rhsValue] = rhsConst->get();
+                if (rhsTag == sbe::value::TypeTags::Boolean &&
+                    sbe::value::bitcastTo<bool>(rhsValue)) {
+                    // lhs && true -> lhs
+                    swapAndUpdate(n, std::exchange(lhs, optimizer::make<optimizer::Blackhole>()));
                 }
             }
             break;
@@ -382,8 +413,47 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
     // We can simplify exists(constant) to true if the said constant is not Nothing.
     if (op.name() == "exists" && args.size() == 1 && args[0].is<optimizer::Constant>()) {
         auto [tag, val] = args[0].cast<optimizer::Constant>()->get();
-        if (tag != sbe::value::TypeTags::Nothing) {
-            swapAndUpdate(n, optimizer::Constant::boolean(true));
+        swapAndUpdate(n, optimizer::Constant::boolean(tag != sbe::value::TypeTags::Nothing));
+    }
+
+    // We can simplify coerceToBool(constant).
+    if (op.name() == "coerceToBool" && args.size() == 1 && args[0].is<optimizer::Constant>()) {
+        auto [tag, val] = args[0].cast<optimizer::Constant>()->get();
+        auto [resultTag, resultVal] = sbe::value::coerceToBool(tag, val);
+        swapAndUpdate(n, optimizer::make<optimizer::Constant>(resultTag, resultVal));
+    }
+
+    // We can simplify typeMatch(constant, constantMask).
+    if (op.name() == "typeMatch" && args.size() == 2 && args[0].is<optimizer::Constant>() &&
+        args[1].is<optimizer::Constant>()) {
+        auto [tag, val] = args[0].cast<optimizer::Constant>()->get();
+        if (tag == sbe::value::TypeTags::Nothing) {
+            swapAndUpdate(n, optimizer::Constant::nothing());
+        } else {
+            auto [tagMask, valMask] = args[1].cast<optimizer::Constant>()->get();
+            if (tagMask == sbe::value::TypeTags::NumberInt32) {
+                int32_t bsonMask = sbe::value::bitcastTo<int32_t>(valMask);
+                swapAndUpdate(n,
+                              optimizer::Constant::boolean((getBSONTypeMask(tag) & bsonMask) != 0));
+            }
+        }
+    }
+
+    // We can simplify convert(constant).
+    if (op.name() == "convert" && args.size() == 2 && args[0].is<optimizer::Constant>() &&
+        args[1].is<optimizer::Constant>()) {
+        auto [tag, val] = args[0].cast<optimizer::Constant>()->get();
+        if (tag == sbe::value::TypeTags::Nothing) {
+            swapAndUpdate(n, optimizer::Constant::nothing());
+        } else {
+            auto [tagRhs, valRhs] = args[1].cast<optimizer::Constant>()->get();
+            if (tagRhs == sbe::value::TypeTags::NumberInt32) {
+                sbe::value::TypeTags targetTypeTag =
+                    (sbe::value::TypeTags)sbe::value::bitcastTo<int32_t>(valRhs);
+                auto [_, convertedTag, convertedVal] =
+                    sbe::value::genericNumConvert(tag, val, targetTypeTag);
+                swapAndUpdate(n, optimizer::make<optimizer::Constant>(convertedTag, convertedVal));
+            }
         }
     }
 
@@ -429,6 +499,12 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
             // if false -> elseBranch
             swapAndUpdate(n, std::exchange(elseBranch, optimizer::make<optimizer::Blackhole>()));
         }
+    } else if (auto condNot = cond.cast<optimizer::UnaryOp>();
+               condNot && condNot->op() == optimizer::Operations::Not) {
+        // If the condition is a Not we can remove it and swap the branches.
+        swapAndUpdate(cond,
+                      std::exchange(condNot->get<0>(), optimizer::make<optimizer::Blackhole>()));
+        std::swap(thenBranch, elseBranch);
     }
 }
 
