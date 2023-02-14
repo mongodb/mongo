@@ -34,6 +34,9 @@ ShardingTest.prototype.checkShardFilteringMetadata = function() {
     }
 
     executeAuthenticatedIfNeeded(mongosConn, () => {
+        // Stop the balancer so as not to affect the shard filtering metadata checks.
+        assert.commandWorked(mongosConn.adminCommand({balancerStop: 1}));
+
         // For each shard
         mongosConn.getDB('config').shards.find().forEach(shardDoc => {
             const shardName = shardDoc._id;
