@@ -105,13 +105,25 @@ static std::vector<std::string> formatStr(const std::string& str, const bool nee
             // up and make sure to insert '\n' only at the end of the last segment.
             const bool breakupLine = needsEscaping && escaped.size() > kEscapedLength;
 
+            size_t lineLength = kEscapedLength;
+            if (breakupLine) {
+                // Attempt to break the line at the last space.
+                lineLength = escaped.find_last_of(' ', lineLength);
+                if (lineLength == std::string::npos) {
+                    // Line does not have any spaces.
+                    lineLength = kEscapedLength;
+                } else {
+                    lineLength++;
+                }
+            }
+
             std::ostringstream os;
             os << "        ";
             if (needsEscaping) {
                 os << "\"";
             }
 
-            os << escaped.substr(0, kEscapedLength);
+            os << escaped.substr(0, lineLength);
 
             if (needsEscaping) {
                 if (!breakupLine) {
@@ -124,7 +136,7 @@ static std::vector<std::string> formatStr(const std::string& str, const bool nee
             replacementLines.push_back(os.str());
 
             if (breakupLine) {
-                escaped = escaped.substr(kEscapedLength);
+                escaped = escaped.substr(lineLength);
             } else {
                 break;
             }

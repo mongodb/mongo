@@ -1035,7 +1035,7 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
                                        const size_t maxIndexEqPrefixes,
                                        PartialSchemaKeySet unsatisfiedKeys,
                                        const ProjectionName& scanProjName,
-                                       const bool fastNullHandling,
+                                       const QueryHints& hints,
                                        const ConstFoldFn& constFold,
                                        const IndexCollationSpec& indexCollationSpec,
                                        CandidateIndexEntry& entry) {
@@ -1060,8 +1060,8 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
 
         PartialSchemaKey indexKey{scanProjName, indexCollationEntry._path};
         if (auto result = reqMap.findFirstConjunct(indexKey)) {
-            if (const auto& [queryPredPos, req] = *result;
-                fastNullHandling || !req.getIsPerfOnly() || !req.mayReturnNull(constFold)) {
+            if (const auto& [queryPredPos, req] = *result; hints._fastIndexNullHandling ||
+                !req.getIsPerfOnly() || !req.mayReturnNull(constFold)) {
                 const auto& requiredInterval = req.getIntervals();
                 const bool success = extendCompoundInterval(prefixId,
                                                             indexCollationSpec,
@@ -1135,6 +1135,12 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
                 auto result = reqMap.findFirstConjunct(queryKey);
                 tassert(6624158, "QueryKey must exist in the requirements map", result);
                 const auto& [index, req] = *result;
+
+                if (hints._forceIndexScanForPredicates &&
+                    !isIntervalReqFullyOpenDNF(req.getIntervals())) {
+                    // We need to cover all predicates with index scans.
+                    break;
+                }
 
                 if (!req.getIsPerfOnly()) {
                     // Only regular requirements are added to residual predicates.
@@ -1211,7 +1217,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                                             i,
                                                             unsatisfiedKeysInitial,
                                                             scanProjectionName,
-                                                            hints._fastIndexNullHandling,
+                                                            hints,
                                                             constFold,
                                                             indexDef.getCollationSpec(),
                                                             entry);

@@ -1353,10 +1353,15 @@ struct ExploreConvert<SargableNode> {
                 continue;
             }
 
-            // Reject. Must have at least one proper interval on either side.
-            if (isIndex &&
-                (!hasProperIntervals(splitResult._leftReqs) ||
-                 !hasProperIntervals(splitResult._rightReqs))) {
+            const bool hasLeftintervals = hasProperIntervals(splitResult._leftReqs);
+            const bool hasRightIntervals = hasProperIntervals(splitResult._rightReqs);
+            if (isIndex) {
+                if (!hasLeftintervals || !hasRightIntervals) {
+                    // Reject. Must have at least one proper interval on either side.
+                    continue;
+                }
+            } else if (hints._forceIndexScanForPredicates && hasRightIntervals) {
+                // Reject. We must satisfy all intervals via indexes.
                 continue;
             }
 

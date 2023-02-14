@@ -297,6 +297,9 @@ struct QueryHints {
     // Disable placing a group-by and union based RIDIntersect implementation.
     bool _disableGroupByAndUnionRIDIntersect = false;
 
+    // Force an index scan for eligible sargable predicate. Prevent their execution as residual.
+    bool _forceIndexScanForPredicates = false;
+
     // If set keep track of rejected plans in the memo.
     bool _keepRejectedPlans = false;
 

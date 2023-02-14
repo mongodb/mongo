@@ -3042,6 +3042,100 @@ TEST(PhysRewriter, IndexBoundsIntersect3) {
         optimized);
 }
 
+TEST(PhysRewriter, IndexBoundsIntersect4) {
+    using namespace properties;
+    using namespace unit_test_abt_literals;
+
+    auto prefixId = PrefixId::createForTests();
+
+    ABT rootNode = NodeBuilder{}
+                       .root("root")
+                       .filter(_evalf(_composem(_get("a", _traverse1(_cmp("Gt", "70"_cint64))),
+                                                _get("a", _traverse1(_cmp("Lt", "90"_cint64)))),
+                                      "root"_var))
+                       .finish(_scan("root", "c1"));
+
+    const auto makePhaseManagerFn = [&prefixId]() {
+        // Make filter and scan costs zero. This should make residual predicates very appealing.
+        auto costModel = getTestCostModel();
+        costModel.setFilterIncrementalCost(0.0);
+        costModel.setScanIncrementalCost(0.0);
+
+        return makePhaseManager(
+            {OptPhase::MemoSubstitutionPhase,
+             OptPhase::MemoExplorationPhase,
+             OptPhase::MemoImplementationPhase},
+            prefixId,
+            {{{"c1",
+               createScanDef({},
+                             {{"index1",
+                               IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending}},
+                                               true /*isMultiKey*/}}})}}},
+            std::move(costModel),
+            {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+    };
+
+    ABT optimized = rootNode;
+    auto phaseManager = makePhaseManagerFn();
+    phaseManager.getHints()._forceIndexScanForPredicates = true;
+    phaseManager.optimize(optimized);
+    ASSERT_BETWEEN_AUTO(  // NOLINT (test auto-update)
+        6,
+        10,
+        phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // Demonstrate that we get an index intersection plan even though from costing perspective a
+    // collection scan with residual predicates should have been preferable.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT (test auto-update)
+        "Root [{root}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
+        "HashJoin [joinType: Inner]\n"
+        "|   |   Condition\n"
+        "|   |       rid_0 = rid_1\n"
+        "|   Union [{rid_1}]\n"
+        "|   Evaluation [{rid_1} = Variable [rid_0]]\n"
+        "|   Unique []\n"
+        "|   |   projections: \n"
+        "|   |       rid_0\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {>Const "
+        "[70]}]\n"
+        "Unique []\n"
+        "|   projections: \n"
+        "|       rid_0\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {<Const "
+        "[90]}]\n",
+        optimized);
+
+    ABT optimized1 = rootNode;
+    auto phaseManager1 = makePhaseManagerFn();
+    phaseManager1.optimize(optimized1);
+    ASSERT_BETWEEN_AUTO(  // NOLINT (test auto-update)
+        1,
+        2,
+        phaseManager1.getMemo().getStats()._physPlanExplorationCount);
+
+    // Demonstrate that without the hint we get residual predicates.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT (test auto-update)
+        "Root [{root}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_6]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Gt]\n"
+        "|   Const [70]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_6]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Lt]\n"
+        "|   Const [90]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_6}, c1]\n",
+        optimized1);
+}
+
 TEST(PhysRewriter, IndexResidualReq) {
     using namespace properties;
     auto prefixId = PrefixId::createForTests();

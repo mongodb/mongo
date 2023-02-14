@@ -381,9 +381,14 @@ public:
         const IndexingRequirement& requirements = getPropertyConst<IndexingRequirement>(_physProps);
         const CandidateIndexes& candidateIndexes = node.getCandidateIndexes();
         const IndexReqTarget indexReqTarget = requirements.getIndexReqTarget();
+        const PartialSchemaRequirements& reqMap = node.getReqMap();
+
         switch (indexReqTarget) {
             case IndexReqTarget::Complete:
                 if (_hints._disableScan) {
+                    return;
+                }
+                if (_hints._forceIndexScanForPredicates && hasProperIntervals(reqMap)) {
                     return;
                 }
                 break;
@@ -412,7 +417,6 @@ public:
         }
 
         const ProjectionName& scanProjectionName = indexingAvailability.getScanProjection();
-        const PartialSchemaRequirements& reqMap = node.getReqMap();
         for (const auto& [key, req] : reqMap.conjuncts()) {
             if (key._projectionName != scanProjectionName) {
                 // We can only satisfy partial schema requirements using our root projection.
