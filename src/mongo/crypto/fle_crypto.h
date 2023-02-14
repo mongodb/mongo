@@ -1190,10 +1190,71 @@ struct FLE2IndexedRangeEncryptedValueV2 {
     std::vector<FLE2TagAndEncryptedMetadataBlock> metadataBlocks;
 };
 
+// TODO: SERVER-73303 delete when v2 is enabled by default
+/*
+ * Shim layer for EdgeTokenSet types with different protocol versions.
+ */
+class VersionedEdgeTokenSet {
+public:
+    VersionedEdgeTokenSet() = default;
+    VersionedEdgeTokenSet(EdgeTokenSet ets);
+    VersionedEdgeTokenSet(EdgeTokenSetV2 ets);
+
+    ConstDataRange getEscDerivedToken() const;
+    ConstDataRange getEncryptedTokens() const;
+
+private:
+    stdx::variant<EdgeTokenSet, EdgeTokenSetV2> edgeTokenSet;
+};
+
+// TODO: SERVER-73303 delete when v2 is enabled by default
+/*
+ * Shim layer for FLE2InsertUpdatePayload types with different protocol versions.
+ */
+class VersionedInsertUpdatePayload {
+public:
+    VersionedInsertUpdatePayload() = default;
+    VersionedInsertUpdatePayload(FLE2InsertUpdatePayload iup);
+    VersionedInsertUpdatePayload(FLE2InsertUpdatePayloadV2 iup);
+
+    const FLE2InsertUpdatePayload& getInsertUpdatePayloadVersion1() const;
+    const FLE2InsertUpdatePayloadV2& getInsertUpdatePayloadVersion2() const;
+
+    const mongo::UUID& getIndexKeyId() const;
+    int getType() const;
+    ConstDataRange getEncryptedTokens() const;
+    ConstDataRange getEscDerivedToken() const;
+    ConstDataRange getEdcDerivedToken() const;
+    ConstDataRange getServerEncryptionToken() const;
+    const boost::optional<std::vector<VersionedEdgeTokenSet>>& getEdgeTokenSet() const;
+
+private:
+    template <class Payload>
+    boost::optional<std::vector<VersionedEdgeTokenSet>> convertPayloadEdgeTokenSet() {
+        boost::optional<std::vector<VersionedEdgeTokenSet>> converted;
+        auto& payload = stdx::get<Payload>(iupayload);
+        if (payload.getEdgeTokenSet().has_value()) {
+            auto& etsList = payload.getEdgeTokenSet().value();
+            converted = std::vector<VersionedEdgeTokenSet>(etsList.size());
+            std::transform(etsList.begin(), etsList.end(), edgeTokenSet->begin(), [](auto& ets) {
+                return VersionedEdgeTokenSet(ets);
+            });
+        }
+        return converted;
+    }
+    stdx::variant<FLE2InsertUpdatePayload, FLE2InsertUpdatePayloadV2> iupayload;
+    boost::optional<std::vector<VersionedEdgeTokenSet>> edgeTokenSet;
+};
+
 struct EDCServerPayloadInfo {
     static ESCDerivedFromDataTokenAndContentionFactorToken getESCToken(ConstDataRange cdr);
 
-    FLE2InsertUpdatePayload payload;
+    bool isRangePayload() const {
+        return payload.getEdgeTokenSet().has_value();
+    }
+
+    // TODO: SERVER-73303 change type to FLE2InsertUpdatePayloadV2 when v2 is enabled by default
+    VersionedInsertUpdatePayload payload;
     std::string fieldPathName;
     std::vector<uint64_t> counts;
 };
@@ -1266,6 +1327,7 @@ public:
     static PrfBlock generateTag(const FLE2IndexedEqualityEncryptedValue& indexedValue);
     static PrfBlock generateTag(const FLEEdgeToken& token, FLECounter count);
     static std::vector<PrfBlock> generateTags(const FLE2IndexedRangeEncryptedValue& indexedValue);
+    static std::vector<PrfBlock> generateTags(const EDCServerPayloadInfo& rangePayload);
 
     /**
      * Generate all the EDC tokens

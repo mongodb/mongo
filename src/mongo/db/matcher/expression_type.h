@@ -418,6 +418,8 @@ public:
         switch (subTypeByte) {
             case EncryptedBinDataType::kFLE2EqualityIndexedValue:
             case EncryptedBinDataType::kFLE2RangeIndexedValue:
+            case EncryptedBinDataType::kFLE2EqualityIndexedValueV2:
+            case EncryptedBinDataType::kFLE2RangeIndexedValueV2:
             case EncryptedBinDataType::kFLE2UnindexedEncryptedValue: {
                 // Verify the type of the encrypted data.
                 if (typeSet().isEmpty()) {

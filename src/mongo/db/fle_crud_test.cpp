@@ -207,8 +207,6 @@ protected:
                         bool bypassDocumentValidation = false);
     void doSingleInsert(int id, BSONObj obj, bool bypassDocumentValidation = false);
 
-    void doSingleRangeInsert(int id, BSONElement element);
-
     void doSingleInsertWithContention(
         int id, BSONElement element, int64_t cm, uint64_t cf, EncryptedFieldConfig efc);
     void doSingleInsertWithContention(
@@ -779,6 +777,32 @@ TEST_F(FleCrudTest, InsertOne) {
                      .isEmpty());
 }
 
+TEST_F(FleCrudTest, InsertOneV2) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    auto doc = BSON("encrypted"
+                    << "secret");
+    auto element = doc.firstElement();
+
+    doSingleInsert(1, element, Fle2AlgorithmInt::kEquality);
+
+    assertDocumentCounts(1, 1, 0, 1);
+    assertECOCDocumentCountByField("encrypted", 1);
+
+    ASSERT_FALSE(
+        _queryImpl->getById(_escNs, ESCCollection::generateNonAnchorId(getTestESCToken(element), 1))
+            .isEmpty());
+}
+
+TEST_F(FleCrudTest, InsertOneRangeV2) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    auto doc = BSON("encrypted" << 5);
+    auto element = doc.firstElement();
+
+    doSingleInsert(1, element, Fle2AlgorithmInt::kRange);
+    assertDocumentCounts(1, 5, 0, 5);
+    assertECOCDocumentCountByField("encrypted", 5);
+}
+
 // Insert two documents with same values
 TEST_F(FleCrudTest, InsertTwoSame) {
 
@@ -795,6 +819,25 @@ TEST_F(FleCrudTest, InsertTwoSame) {
                      .isEmpty());
     ASSERT_FALSE(_queryImpl->getById(_escNs, ESCCollection::generateId(getTestESCToken(element), 2))
                      .isEmpty());
+}
+
+// Insert two documents with same values
+TEST_F(FleCrudTest, InsertTwoSameV2) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    auto doc = BSON("encrypted"
+                    << "secret");
+    auto element = doc.firstElement();
+    doSingleInsert(1, element, Fle2AlgorithmInt::kEquality);
+    doSingleInsert(2, element, Fle2AlgorithmInt::kEquality);
+
+    assertDocumentCounts(2, 2, 0, 2);
+    assertECOCDocumentCountByField("encrypted", 2);
+
+    auto escTagToken = getTestESCToken(element);
+    ASSERT_FALSE(
+        _queryImpl->getById(_escNs, ESCCollection::generateNonAnchorId(escTagToken, 1)).isEmpty());
+    ASSERT_FALSE(
+        _queryImpl->getById(_escNs, ESCCollection::generateNonAnchorId(escTagToken, 2)).isEmpty());
 }
 
 // Insert two documents with different values
@@ -824,6 +867,34 @@ TEST_F(FleCrudTest, InsertTwoDifferent) {
                      .isEmpty());
 }
 
+TEST_F(FleCrudTest, InsertTwoDifferentV2) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+    doSingleInsert(2,
+                   BSON("encrypted"
+                        << "topsecret"));
+
+    assertDocumentCounts(2, 2, 0, 2);
+    assertECOCDocumentCountByField("encrypted", 2);
+
+    ASSERT_FALSE(
+        _queryImpl
+            ->getById(_escNs,
+                      ESCCollection::generateNonAnchorId(getTestESCToken(BSON("encrypted"
+                                                                              << "secret")),
+                                                         1))
+            .isEmpty());
+    ASSERT_FALSE(
+        _queryImpl
+            ->getById(_escNs,
+                      ESCCollection::generateNonAnchorId(getTestESCToken(BSON("encrypted"
+                                                                              << "topsecret")),
+                                                         1))
+            .isEmpty());
+}
+
 // Insert 1 document with 100 fields
 TEST_F(FleCrudTest, Insert100Fields) {
 
@@ -845,6 +916,33 @@ TEST_F(FleCrudTest, Insert100Fields) {
                 ->getById(
                     _escNs,
                     ESCCollection::generateId(
+                        getTestESCToken(fieldName, valueGenerator(fieldNameFromInt(field), 0)), 1))
+                .isEmpty());
+    }
+}
+
+// Insert 1 document with 100 fields
+TEST_F(FleCrudTest, Insert100FieldsV2) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+
+    uint64_t fieldCount = 100;
+    ValueGenerator valueGenerator = [](StringData fieldName, uint64_t row) {
+        return fieldName.toString();
+    };
+    doSingleWideInsert(1, fieldCount, valueGenerator);
+
+    assertDocumentCounts(1, fieldCount, 0, fieldCount);
+
+    for (uint64_t field = 0; field < fieldCount; field++) {
+        auto fieldName = fieldNameFromInt(field);
+
+        assertECOCDocumentCountByField(fieldName, 1);
+
+        ASSERT_FALSE(
+            _queryImpl
+                ->getById(
+                    _escNs,
+                    ESCCollection::generateNonAnchorId(
                         getTestESCToken(fieldName, valueGenerator(fieldNameFromInt(field), 0)), 1))
                 .isEmpty());
     }
@@ -884,6 +982,83 @@ TEST_F(FleCrudTest, Insert20Fields50Rows) {
                     .isEmpty());
         }
     }
+}
+
+// Insert 100 documents each with 20 fields with 7 distinct values per field
+TEST_F(FleCrudTest, Insert20Fields50RowsV2) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    uint64_t fieldCount = 20;
+    uint64_t rowCount = 50;
+
+    ValueGenerator valueGenerator = [](StringData fieldName, uint64_t row) {
+        return fieldName.toString() + std::to_string(row % 7);
+    };
+
+
+    for (uint64_t row = 0; row < rowCount; row++) {
+        doSingleWideInsert(row, fieldCount, valueGenerator);
+    }
+
+    assertDocumentCounts(rowCount, rowCount * fieldCount, 0, rowCount * fieldCount);
+
+    for (uint64_t row = 0; row < rowCount; row++) {
+        for (uint64_t field = 0; field < fieldCount; field++) {
+            auto fieldName = fieldNameFromInt(field);
+
+            int count = (row / 7) + 1;
+
+            assertECOCDocumentCountByField(fieldName, rowCount);
+            ASSERT_FALSE(
+                _queryImpl
+                    ->getById(_escNs,
+                              ESCCollection::generateNonAnchorId(
+                                  getTestESCToken(fieldName,
+                                                  valueGenerator(fieldNameFromInt(field), row)),
+                                  count))
+                    .isEmpty());
+        }
+    }
+}
+
+// Test v1 FLE2InsertUpdatePayload is rejected if v2 is enabled.
+// There are 2 places where the payload version compatibility is checked:
+// 1. When parsing the InsertUpdatePayload in EDCServerCollection::getEncryptedFieldInfo()
+// 2. When transforming the InsertUpdatePayload to the on-disk format in processInsert()
+TEST_F(FleCrudTest, InsertV1PayloadAgainstV2Protocol) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+
+    std::vector<uint8_t> buf(64);
+    buf[0] = static_cast<uint8_t>(EncryptedBinDataType::kFLE2InsertUpdatePayload);
+
+    BSONObjBuilder builder;
+    builder.append("_id", 1);
+    builder.append("counter", 1);
+    builder.append("plainText", "sample");
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+
+    BSONObj document = builder.obj();
+    ASSERT_THROWS_CODE(EDCServerCollection::getEncryptedFieldInfo(document), DBException, 7291901);
+
+    FLE2InsertUpdatePayloadV2 payload;
+    PrfBlock dummyToken;
+    payload.setEdcDerivedToken(dummyToken);
+    payload.setEscDerivedToken(dummyToken);
+    payload.setServerDerivedFromDataToken(dummyToken);
+    payload.setServerEncryptionToken(dummyToken);
+    payload.setEncryptedTokens(buf);
+    payload.setValue(buf);
+    payload.setType(BSONType::String);
+
+    std::vector<EDCServerPayloadInfo> serverPayload(1);
+    serverPayload.front().fieldPathName = "encrypted";
+    serverPayload.front().counts = {1};
+    serverPayload.front().payload = std::move(payload);
+
+    auto efc = getTestEncryptedFieldConfig();
+    ASSERT_THROWS_CODE(
+        processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, document, false),
+        DBException,
+        7291907);
 }
 
 #define ASSERT_ECC_DOC(assertElement, assertPosition, assertStart, assertEnd)            \

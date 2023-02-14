@@ -202,12 +202,12 @@ void validateInsertUpdatePayloads(const std::vector<EncryptedField>& fields,
     }
 
     for (const auto& field : payload) {
-        auto fieldPath = field.fieldPathName;
+        auto& fieldPath = field.fieldPathName;
         auto expect = pathToKeyIdMap.find(fieldPath);
         uassert(6726300,
                 str::stream() << "Field '" << fieldPath << "' is unexpectedly encrypted",
                 expect != pathToKeyIdMap.end());
-        auto indexKeyId = field.payload.getIndexKeyId();
+        auto& indexKeyId = field.payload.getIndexKeyId();
         uassert(6726301,
                 str::stream() << "Mismatched keyId for field '" << fieldPath << "' expected "
                               << expect->second << ", found " << indexKeyId,
@@ -532,12 +532,14 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
 
 namespace {
 
-void processFieldsForInsert(FLEQueryInterface* queryImpl,
-                            const NamespaceString& edcNss,
-                            std::vector<EDCServerPayloadInfo>& serverPayload,
-                            const EncryptedFieldConfig& efc,
-                            int32_t* pStmtId,
-                            bool bypassDocumentValidation) {
+// TODO: SERVER-73303 delete when v2 is enabled by default
+void processFieldsForInsertV1(FLEQueryInterface* queryImpl,
+                              const NamespaceString& edcNss,
+                              std::vector<EDCServerPayloadInfo>& serverPayload,
+                              const EncryptedFieldConfig& efc,
+                              int32_t* pStmtId,
+                              bool bypassDocumentValidation) {
+
     const NamespaceString nssEsc(edcNss.dbName(), efc.getEscCollection().value());
 
     auto docCount = queryImpl->countDocuments(nssEsc);
@@ -623,6 +625,105 @@ void processFieldsForInsert(FLEQueryInterface* queryImpl,
             insertTokens(payload.payload.getEncryptedTokens(),
                          payload.payload.getEscDerivedToken());
         }
+    }
+}
+
+void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
+                              const NamespaceString& edcNss,
+                              std::vector<EDCServerPayloadInfo>& serverPayload,
+                              const EncryptedFieldConfig& efc,
+                              int32_t* pStmtId,
+                              bool bypassDocumentValidation) {
+
+    const NamespaceString nssEsc(edcNss.dbName(), efc.getEscCollection().value());
+
+    auto docCount = queryImpl->countDocuments(nssEsc);
+
+    TxnCollectionReader reader(docCount, queryImpl, nssEsc);
+
+    for (auto& payload : serverPayload) {
+
+        const auto insertTokens = [&](ConstDataRange encryptedTokens,
+                                      ConstDataRange escDerivedToken) {
+            uint64_t count;
+
+            auto escToken = EDCServerPayloadInfo::getESCToken(escDerivedToken);
+            auto tagToken =
+                FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escToken);
+            auto valueToken =
+                FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escToken);
+
+            auto positions = ESCCollection::emuBinaryV2(reader, tagToken, valueToken);
+
+            if (positions.cpos.has_value()) {
+                // Either no ESC documents exist yet (cpos == 0), OR new non-anchors
+                // have been inserted since the last compact/cleanup (cpos > 0).
+                count = positions.cpos.value() + 1;
+            } else {
+                // No new non-anchors since the last compact/cleanup.
+                // There must be at least one anchor.
+                uassert(7291902,
+                        "An ESC anchor document is expected but none is found",
+                        !positions.apos.has_value() || positions.apos.value() > 0);
+
+                PrfBlock anchorId;
+                if (!positions.apos.has_value()) {
+                    anchorId = ESCCollection::generateNullAnchorId(tagToken);
+                } else {
+                    anchorId = ESCCollection::generateAnchorId(tagToken, positions.apos.value());
+                }
+
+                BSONObj anchorDoc = reader.getById(anchorId);
+                uassert(7291903, "ESC anchor document not found", !anchorDoc.isEmpty());
+
+                auto escAnchor =
+                    uassertStatusOK(ESCCollection::decryptAnchorDocument(valueToken, anchorDoc));
+                count = escAnchor.count + 1;
+            }
+
+            payload.counts.push_back(count);
+
+            auto escInsertReply = uassertStatusOK(queryImpl->insertDocument(
+                nssEsc, ESCCollection::generateNonAnchorDocument(tagToken, count), pStmtId, true));
+            checkWriteErrors(escInsertReply);
+
+            const NamespaceString nssEcoc(edcNss.dbName(), efc.getEcocCollection().value());
+
+            // TODO - should we make this a batch of ECOC updates?
+            auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocument(
+                nssEcoc,
+                ECOCCollection::generateDocument(payload.fieldPathName, encryptedTokens),
+                pStmtId,
+                false,
+                bypassDocumentValidation));
+            checkWriteErrors(ecocInsertReply);
+        };
+
+        payload.counts.clear();
+        if (payload.payload.getEdgeTokenSet().has_value()) {
+            const auto& ets = payload.payload.getEdgeTokenSet().get();
+            for (size_t i = 0; i < ets.size(); ++i) {
+                insertTokens(ets[i].getEncryptedTokens(), ets[i].getEscDerivedToken());
+            }
+        } else {
+            insertTokens(payload.payload.getEncryptedTokens(),
+                         payload.payload.getEscDerivedToken());
+        }
+    }
+}
+
+void processFieldsForInsert(FLEQueryInterface* queryImpl,
+                            const NamespaceString& edcNss,
+                            std::vector<EDCServerPayloadInfo>& serverPayload,
+                            const EncryptedFieldConfig& efc,
+                            int32_t* pStmtId,
+                            bool bypassDocumentValidation) {
+    if (gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        processFieldsForInsertV2(
+            queryImpl, edcNss, serverPayload, efc, pStmtId, bypassDocumentValidation);
+    } else {
+        processFieldsForInsertV1(
+            queryImpl, edcNss, serverPayload, efc, pStmtId, bypassDocumentValidation);
     }
 }
 

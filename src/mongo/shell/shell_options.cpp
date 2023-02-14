@@ -68,6 +68,7 @@ const std::set<std::string> kSetShellParameterAllowlist = {
     "awsECSInstanceMetadataUrl",
     "disabledSecureAllocatorDomains",
     "featureFlagFLE2Range",
+    "featureFlagFLE2ProtocolVersion2",
     "newLineAfterPasswordPromptForTest",
     "ocspClientHttpTimeoutSecs",
     "ocspEnabled",
