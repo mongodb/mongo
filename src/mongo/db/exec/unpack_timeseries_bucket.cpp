@@ -32,11 +32,18 @@
 namespace mongo {
 namespace {
 
-void transitionToOwnedObj(Document&& doc, WorkingSetMember* member) {
+void setUpWorkingSetMember(Document&& doc,
+                           WorkingSetMember* member,
+                           boost::optional<RecordId> bucketRecordId) {
     member->keyData.clear();
-    member->recordId = {};
     member->doc = {{}, std::move(doc)};
-    member->transitionToOwnedObj();
+    if (bucketRecordId) {
+        member->recordId = *bucketRecordId;
+        member->transitionToRecordIdAndObj();
+    } else {
+        member->recordId = {};
+        member->transitionToOwnedObj();
+    }
 }
 }  // namespace
 
@@ -45,8 +52,12 @@ const char* UnpackTimeseriesBucket::kStageType = "UNPACK_BUCKET";
 UnpackTimeseriesBucket::UnpackTimeseriesBucket(ExpressionContext* expCtx,
                                                WorkingSet* ws,
                                                std::unique_ptr<PlanStage> child,
-                                               BucketUnpacker bucketUnpacker)
-    : PlanStage{kStageType, expCtx}, _ws{*ws}, _bucketUnpacker{std::move(bucketUnpacker)} {
+                                               BucketUnpacker bucketUnpacker,
+                                               bool isUnpackingForTsWrite)
+    : PlanStage{kStageType, expCtx},
+      _ws{*ws},
+      _bucketUnpacker{std::move(bucketUnpacker)},
+      _isUnpackingForTsWrite(isUnpackingForTsWrite) {
     _children.emplace_back(std::move(child));
 }
 
@@ -63,12 +74,16 @@ PlanStage::StageState UnpackTimeseriesBucket::doWork(WorkingSetID* out) {
         return PlanStage::IS_EOF;
     }
 
+    // The current bucket is exhausted. Move on to the next.
     if (!_bucketUnpacker.hasNext()) {
         auto id = WorkingSet::INVALID_ID;
         auto status = child()->work(&id);
 
         if (PlanStage::ADVANCED == status) {
             auto member = _ws.get(id);
+            if (_isUnpackingForTsWrite) {
+                _currentRid = member->recordId;
+            }
 
             // Make an owned copy of the bucket document if necessary. The bucket will be unwound
             // across multiple calls to 'doWork()', so we need to hold our own copy in the query
@@ -78,7 +93,8 @@ PlanStage::StageState UnpackTimeseriesBucket::doWork(WorkingSetID* out) {
             _bucketUnpacker.reset(std::move(ownedBucket));
 
             auto measurement = _bucketUnpacker.getNext();
-            transitionToOwnedObj(std::move(measurement), member);
+            setUpWorkingSetMember(
+                std::move(measurement), member, _isUnpackingForTsWrite ? _currentRid : boost::none);
             ++_specificStats.nBucketsUnpacked;
 
             *out = id;
@@ -92,7 +108,8 @@ PlanStage::StageState UnpackTimeseriesBucket::doWork(WorkingSetID* out) {
     *out = _ws.allocate();
     auto member = _ws.get(*out);
 
-    transitionToOwnedObj(std::move(measurement), member);
+    setUpWorkingSetMember(
+        std::move(measurement), member, _isUnpackingForTsWrite ? _currentRid : boost::none);
 
     return PlanStage::ADVANCED;
 }
