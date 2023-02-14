@@ -64,6 +64,7 @@ const allCommands = {
     _configsvrSetClusterParameter: {skip: isPrimaryOnly},
     _configsvrSetUserWriteBlockMode: {skip: isPrimaryOnly},
     _configsvrTransitionToCatalogShard: {skip: isPrimaryOnly},
+    _configsvrTransitionToDedicatedConfigServer: {skip: isPrimaryOnly},
     _configsvrUpdateZoneKeyRange: {skip: isPrimaryOnly},
     _flushDatabaseCacheUpdates: {skip: isPrimaryOnly},
     _flushDatabaseCacheUpdatesWithWriteConcern: {skip: isPrimaryOnly},

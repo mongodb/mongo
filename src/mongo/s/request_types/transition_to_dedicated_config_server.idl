@@ -26,8 +26,6 @@
 # it in the license file.
 #
 
-# transitionToCatalogShard IDL file
-
 global:
     cpp_namespace: "mongo"
 
@@ -35,17 +33,18 @@ imports:
     - "mongo/db/basic_types.idl"
 
 commands:
-  transitionToCatalogShard:
-    description: "The public transitionToCatalogShard command on mongos."
-    command_name: transitionToCatalogShard
-    strict: true
-    namespace: ignored
-    api_version: ""
+    transitionToDedicatedConfigServer:
+        command_name: transitionToDedicatedConfigServer
+        cpp_name: TransitionToDedicatedConfigServer
+        strict: true
+        description: "mongos command for transitioning to dedicated config server"
+        namespace: ignored
+        api_version: ""
 
-  _configsvrTransitionToCatalogShard:
-    description: "The transitionToCatalogShard command for config server."
-    command_name: _configsvrTransitionToCatalogShard
-    cpp_name: ConfigsvrTransitionToCatalogShard
-    strict: false
-    namespace: ignored
-    api_version: ""
+    _configsvrTransitionToDedicatedConfigServer:
+        command_name: _configsvrTransitionToDedicatedConfigServer
+        cpp_name: ConfigsvrTransitionToDedicatedConfig
+        strict: false
+        description: "mongos command for transitioning to dedicated config server"
+        namespace: ignored
+        api_version: ""

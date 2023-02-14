@@ -49,5 +49,6 @@ const commandsAddedToMongosSinceLastLTS = [
     "testVersions1And2",
     "testVersion2",
     "transitionToCatalogShard",
+    "transitionToDedicatedConfigServer",
     "updateSearchIndex",
 ];

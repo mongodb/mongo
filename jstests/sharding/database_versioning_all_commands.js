@@ -709,6 +709,7 @@ let testCases = {
     testVersion2: {skip: "executes locally on mongos (not sent to any remote node)"},
     testVersions1And2: {skip: "executes locally on mongos (not sent to any remote node)"},
     transitionToCatalogShard: {skip: "not on a user database"},
+    transitionToDedicatedConfigServer: {skip: "not on a user database"},
     update: {
         run: {
             sendsDbVersion: true,

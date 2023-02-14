@@ -11,7 +11,6 @@
 
 load("jstests/libs/fail_point_util.js");
 
-const kCatalogShardId = "catalogShard";
 const dbName = "foo";
 const collName = "bar";
 const ns = dbName + "." + collName;
@@ -146,11 +145,12 @@ const newShardName =
     // Remove the catalog shard.
     //
 
-    let removeRes = assert.commandWorked(st.s0.adminCommand({removeShard: kCatalogShardId}));
+    let removeRes =
+        assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
     assert.eq("started", removeRes.state);
 
     // The removal won't complete until all chunks and dbs are moved off the catalog shard.
-    removeRes = assert.commandWorked(st.s0.adminCommand({removeShard: kCatalogShardId}));
+    removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
     assert.eq("ongoing", removeRes.state);
 
     assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: -1}, to: newShardName}));
@@ -158,12 +158,12 @@ const newShardName =
         st.s.adminCommand({moveChunk: "config.system.sessions", find: {_id: 0}, to: newShardName}));
 
     // Still blocked until the db has been moved away.
-    removeRes = assert.commandWorked(st.s0.adminCommand({removeShard: kCatalogShardId}));
+    removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
     assert.eq("ongoing", removeRes.state);
 
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: newShardName}));
 
-    removeRes = assert.commandWorked(st.s0.adminCommand({removeShard: kCatalogShardId}));
+    removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
     assert.eq("completed", removeRes.state);
 
     // Basic CRUD and sharded DDL work.
