@@ -75,3 +75,7 @@ feature_flags:
         description: "Enable use of new auditConfig cluster server parameter"
         cpp_varname: feature_flags::gFeatureFlagAuditConfigClusterParameter
         default: false
+    featureFlagStreams:
+        description: "Enable support for streams"
+        cpp_varname: gFeatureFlagStreams
+        default: false

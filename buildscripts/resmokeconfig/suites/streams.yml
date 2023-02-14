@@ -1,0 +1,15 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - src/mongo/db/modules/*/jstests/stream/*.js
+
+executor:
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ''
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagStreams: true
+    num_nodes: 1
