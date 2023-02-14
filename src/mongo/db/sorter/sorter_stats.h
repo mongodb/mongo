@@ -59,13 +59,13 @@ public:
     AtomicWord<long long> closed;
 
     long long bytesSpilled() const {
-        return _bytesSpilled;
+        return _bytesSpilled.load();
     }
 
 private:
     SorterTracker* _sorterTracker;
 
-    long long _bytesSpilled = 0;
+    AtomicWord<long long> _bytesSpilled;
 };
 
 /**
