@@ -239,13 +239,14 @@ std::vector<Interval> getMultikeyPathIndexIntervalsForField(FieldRef field) {
 }
 
 /**
- * Returns the postion of the wildcard field inside the Wildcard Index's keyPattern.
+ * Returns the postion of the wildcard field inside the Wildcard Index's keyPattern and the
+ * direction of 'IndexBounds' generated for querying multikey paths.
  */
-static size_t getWildcardFieldPosition(const BSONObj& keyPattern) {
+static std::pair<size_t, bool> getWildcardFieldPosition(const BSONObj& keyPattern) {
     size_t pos = 0;
     for (const auto& field : keyPattern) {
         if (WildcardNames::isWildcardFieldName(field.fieldNameStringData())) {
-            return pos;
+            return {pos, field.numberInt() < 0};
         }
         ++pos;
     }
@@ -275,7 +276,7 @@ static IndexBounds buildMetadataKeysIndexBounds(const BSONObj& keyPattern,
     // 3. Add the multikey path.
     // 4. Add the number of suffixed MinKey values, which is 0 or more.
 
-    const size_t wildcardPosition = getWildcardFieldPosition(keyPattern);
+    const auto [wildcardPosition, shouldReverse] = getWildcardFieldPosition(keyPattern);
 
     // Step 1. Add the number of prefixed MinKey values, which is 0 or more.
     for (size_t i = 0; i < wildcardPosition; ++i) {
@@ -301,6 +302,9 @@ static IndexBounds buildMetadataKeysIndexBounds(const BSONObj& keyPattern,
     // IndexBoundsBuilder::unionize() sorts the OrderedIntervalList allowing for in order index
     // traversal.
     IndexBoundsBuilder::unionize(&fieldNameOil);
+    if (shouldReverse) {
+        fieldNameOil.reverse();
+    }
     indexBounds.fields.push_back(std::move(fieldNameOil));
 
     // Step 4. Add the number of suffixed MinKey values, which is 0 or more.
