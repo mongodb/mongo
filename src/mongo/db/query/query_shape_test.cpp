@@ -98,6 +98,30 @@ TEST(QueryPredicateShape, BitTestOperators) {
     assertShapeIs("{a: {$bitsAnyClear: 50}}", "{a: {$bitsAnyClear: '?'}}");
 }
 
+TEST(QueryPredicateShape, AlwaysBoolean) {
+    assertShapeIs("{$alwaysTrue: 1}", "{$alwaysTrue: '?'}");
+    assertShapeIs("{$alwaysFalse: 1}", "{$alwaysFalse: '?'}");
+}
+
+TEST(QueryPredicateShape, And) {
+    assertShapeIs("{$and: [{a: {$lt: 5}}, {b: {$gte: 3}}, {c: {$lte: 10}}]}",
+                  "{$and: [{a: {$lt: '?'}}, {b: {$gte: '?'}}, {c: {$lte: '?'}}]}");
+}
+
+TEST(QueryPredicateShape, Or) {
+    assertShapeIs("{$or: [{a: 5}, {b: {$in: [1,2,3]}}, {c: {$gt: 10}}]}",
+                  "{$or: [{a: {$eq: '?'}}, {b: {$in: ['?']}}, {c: {$gt: '?'}}]}");
+}
+
+TEST(QueryPredicateShape, ElemMatch) {
+    // ElemMatchObjectMatchExpression
+    assertShapeIs("{a: {$elemMatch: {b: 5, c: {$exists: true}}}}",
+                  "{a: {$elemMatch: {$and: [{b: {$eq: '?'}}, {c: {$exists: '?'}}]}}}");
+
+    // ElemMatchValueMatchExpression
+    assertShapeIs("{a: {$elemMatch: {$gt: 5, $lt: 10}}}", "{a: {$elemMatch: {$gt: '?', $lt:'?'}}}");
+}
+
 BSONObj queryShapeForOptimizedExprExpression(std::string exprPredicateJson) {
     ParsedMatchExpressionForTest expr(exprPredicateJson);
     // We need to optimize an $expr expression in order to generate an $_internalExprEq. It's not

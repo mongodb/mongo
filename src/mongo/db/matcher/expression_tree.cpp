@@ -350,7 +350,6 @@ void AndMatchExpression::serialize(BSONObjBuilder* out, SerializationOptions opt
         return;
     }
 
-    // TODO SERVER-73673 this looks correct - just need to test.
     BSONArrayBuilder arrBob(out->subarrayStart("$and"));
     _listToBSON(&arrBob, opts);
     arrBob.doneFast();

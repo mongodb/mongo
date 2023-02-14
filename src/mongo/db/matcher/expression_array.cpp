@@ -105,8 +105,9 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int inden
 
 BSONObj ElemMatchObjectMatchExpression::getSerializedRightHandSide(
     boost::optional<StringData> replacementForLiteralArgs) const {
-    // TODO SERVER-73673 respect and test 'replacementForLiteralArgs'.
-    return BSON("$elemMatch" << _sub->serialize());
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = replacementForLiteralArgs;
+    return BSON("$elemMatch" << _sub->serialize(opts));
 }
 
 MatchExpression::ExpressionOptimizerFunc ElemMatchObjectMatchExpression::getOptimizer() const {
@@ -178,10 +179,10 @@ BSONObj ElemMatchValueMatchExpression::getSerializedRightHandSide(
     boost::optional<StringData> replacementForLiteralArgs) const {
     BSONObjBuilder emBob;
 
-    // TODO SERVER-73673 respect and test 'replacementForLiteralArgs'.
     for (auto&& child : _subs) {
         SerializationOptions opts;
         opts.includePath = false;
+        opts.replacementForLiteralArgs = replacementForLiteralArgs;
         child->serialize(&emBob, opts);
     }
 

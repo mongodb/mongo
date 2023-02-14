@@ -63,8 +63,11 @@ public:
     }
 
     void serialize(BSONObjBuilder* out, SerializationOptions opts) const final {
-        // TODO support 'opts.redactFieldNames.'
-        out->append(name(), 1);
+        if (opts.replacementForLiteralArgs) {
+            out->append(name(), *opts.replacementForLiteralArgs);
+        } else {
+            out->append(name(), 1);
+        }
     }
 
     bool equivalent(const MatchExpression* other) const final {
