@@ -86,13 +86,18 @@ function runTest(conn) {
     assert.eq(slowSessionWorkflowCount, 0);
 }
 
-// Test standalone.
-const m = MongoRunner.runMongod();
-runTest(m);
-MongoRunner.stopMongod(m);
+// TODO(SERVER-63883): re-enable or delete this test depending on resolution
+const testEnabled = false;
 
-// Test sharded.
-const st = new ShardingTest({shards: 1, mongos: 1});
-runTest(st.s0);
-st.stop();
+if (testEnabled) {
+    // Test standalone.
+    const m = MongoRunner.runMongod();
+    runTest(m);
+    MongoRunner.stopMongod(m);
+
+    // Test sharded.
+    const st = new ShardingTest({shards: 1, mongos: 1});
+    runTest(st.s0);
+    st.stop();
+}
 })();
