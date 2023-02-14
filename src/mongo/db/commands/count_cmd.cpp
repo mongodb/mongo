@@ -329,7 +329,7 @@ public:
         }
         curOp->debug().setPlanSummaryMetrics(summaryStats);
 
-        if (curOp->shouldDBProfile(opCtx)) {
+        if (curOp->shouldDBProfile()) {
             auto&& explainer = exec->getPlanExplainer();
             auto&& [stats, _] =
                 explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);

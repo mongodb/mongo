@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/util/duration.h"
 #include <memory>
 
 #include "mongo/config.h"
@@ -48,7 +47,9 @@
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/progress_meter.h"
+#include "mongo/util/system_tick_source.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 
@@ -408,9 +409,19 @@ public:
                                                      boost::optional<size_t> maxQuerySize);
 
     /**
-     * Constructs a nested CurOp at the top of the given "opCtx"'s CurOp stack.
+     * Pushes this CurOp to the top of the given "opCtx"'s CurOp stack.
      */
-    explicit CurOp(OperationContext* opCtx);
+    void push(OperationContext* opCtx);
+
+    CurOp() = default;
+
+    /**
+     * This allows the caller to set the command on the CurOp without using setCommand_inlock and
+     * having to acquire the Client lock or having to leave a comment indicating why the
+     * client lock isn't necessary.
+     */
+    explicit CurOp(const Command* command) : _command{command} {}
+
     ~CurOp();
 
     /**
@@ -419,8 +430,7 @@ public:
      * is set early in the request processing backend and does not typically need to be called
      * thereafter. Locks the client as needed to apply the specified settings.
      */
-    void setGenericOpRequestDetails(OperationContext* opCtx,
-                                    NamespaceString nss,
+    void setGenericOpRequestDetails(NamespaceString nss,
                                     const Command* command,
                                     BSONObj cmdObj,
                                     NetworkOp op);
@@ -431,8 +441,7 @@ public:
      * to file under the given LogComponent. Returns 'true' if, in addition to being logged, this
      * operation should also be profiled.
      */
-    bool completeAndLogOperation(OperationContext* opCtx,
-                                 logv2::LogComponent logComponent,
+    bool completeAndLogOperation(logv2::LogComponent logComponent,
                                  std::shared_ptr<const ProfileFilter> filter,
                                  boost::optional<size_t> responseLength = boost::none,
                                  boost::optional<long long> slowMsOverride = boost::none,
@@ -458,8 +467,8 @@ public:
         return _originatingCommand;
     }
 
-    void enter_inlock(OperationContext* opCtx, NamespaceString nss, int dbProfileLevel);
-    void enter_inlock(OperationContext* opCtx, const DatabaseName& dbName, int dbProfileLevel);
+    void enter_inlock(NamespaceString nss, int dbProfileLevel);
+    void enter_inlock(const DatabaseName& dbName, int dbProfileLevel);
 
     /**
      * Sets the type of the current network operation.
@@ -526,7 +535,7 @@ public:
      *
      * When a custom filter is set, we conservatively assume it would match this operation.
      */
-    bool shouldDBProfile(OperationContext* opCtx) {
+    bool shouldDBProfile() {
         // Profile level 2 should override any sample rate or slowms settings.
         if (_dbprofile >= 2)
             return true;
@@ -534,7 +543,7 @@ public:
         if (_dbprofile <= 0)
             return false;
 
-        if (CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(getNSS().db()).filter)
+        if (CollectionCatalog::get(opCtx())->getDatabaseProfileSettings(getNSS().db()).filter)
             return true;
 
         return elapsedTimeExcludingPauses() >= Milliseconds{serverGlobalParams.slowMS.load()};
@@ -580,8 +589,8 @@ public:
     // negative, if the system time has been reset during the course of this operation.
     //
 
-    void ensureStarted(OperationContext* opCtx) {
-        static_cast<void>(startTime(opCtx));
+    void ensureStarted() {
+        (void)startTime();
     }
     bool isStarted() const {
         return _start.load() != 0;
@@ -784,7 +793,7 @@ public:
      * If called from a thread other than the one executing the operation associated with this
      * CurOp, it is necessary to lock the associated Client object before executing this method.
      */
-    void reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool truncateOps = false);
+    void reportState(BSONObjBuilder* builder, bool truncateOps = false);
 
     /**
      * Sets the message for FailPoints used.
@@ -886,14 +895,15 @@ public:
 private:
     class CurOpStack;
 
-    TickSource::Tick startTime(OperationContext* opCtx);
+    /**
+     * Gets the OperationContext associated with this CurOp.
+     * This must only be called after the CurOp has been pushed to an OperationContext's CurOpStack.
+     */
+    OperationContext* opCtx();
+
+    TickSource::Tick startTime();
     Microseconds computeElapsedTimeTotal(TickSource::Tick startTime,
                                          TickSource::Tick endTime) const;
-
-    /**
-     * Adds 'this' to the stack of active CurOp objects.
-     */
-    void _finishInit(OperationContext* opCtx, CurOpStack* stack);
 
     /**
      * Handles failpoints that check whether a command has completed or not.
@@ -903,10 +913,14 @@ private:
 
     static const OperationContext::Decoration<CurOpStack> _curopStack;
 
-    CurOp(OperationContext*, CurOpStack*);
+    // The stack containing this CurOp instance.
+    // This is set when this instance is pushed to the stack.
+    CurOpStack* _stack{nullptr};
 
-    CurOpStack* _stack;
+    // The CurOp beneath this CurOp instance in its stack, if any.
+    // This is set when this instance is pushed to a non-empty stack.
     CurOp* _parent{nullptr};
+
     const Command* _command{nullptr};
 
     // The time at which this CurOp instance was marked as started.
@@ -951,12 +965,14 @@ private:
     boost::optional<GenericCursor> _genericCursor;
 
     std::string _planSummary;
-    boost::optional<SingleThreadedLockStats>
-        _lockStatsBase;  // This is the snapshot of lock stats taken when curOp is constructed.
+
+    // The snapshot of lock stats taken when this CurOp instance is pushed to a
+    // CurOpStack.
+    boost::optional<SingleThreadedLockStats> _lockStatsBase;
 
     UserAcquisitionStats _userAcquisitionStats;
 
-    TickSource* _tickSource = nullptr;
+    TickSource* _tickSource = globalSystemTickSource();
     // These values are used to calculate the amount of time spent planning a query.
     std::atomic<TickSource::Tick> _queryPlanningStart{0};  // NOLINT
     std::atomic<TickSource::Tick> _queryPlanningEnd{0};    // NOLINT

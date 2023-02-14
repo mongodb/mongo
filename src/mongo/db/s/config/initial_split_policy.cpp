@@ -705,7 +705,7 @@ BSONObjSet SamplingBasedSplitPolicy::createFirstSplitPoints(OperationContext* op
         // The BlockingResultsMerger underlying the $mergeCursors stage records how long was
         // spent waiting for samples from the donor shards. It doing so requires the CurOp
         // to be marked as having started.
-        CurOp::get(opCtx)->ensureStarted(opCtx);
+        CurOp::get(opCtx)->ensureStarted();
 
         _appendSplitPointsFromSample(
             &splitPoints, shardKey, _numInitialChunks - splitPoints.size() - 1);

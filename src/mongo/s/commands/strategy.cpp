@@ -586,7 +586,7 @@ void ParseAndRunCommand::_parseCommand() {
         (request.getDatabase() == *_ns ? NamespaceString(*_ns, "$cmd") : NamespaceString(*_ns));
 
     // Fill out all currentOp details.
-    CurOp::get(opCtx)->setGenericOpRequestDetails(opCtx, nss, command, request.body, _opType);
+    CurOp::get(opCtx)->setGenericOpRequestDetails(nss, command, request.body, _opType);
 
     _osi.emplace(initializeOperationSessionInfo(opCtx,
                                                 request.body,

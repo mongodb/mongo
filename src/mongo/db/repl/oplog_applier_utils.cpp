@@ -320,7 +320,8 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
 
     auto op = entryOrGroupedInserts.getOp();
     // Count each log op application as a separate operation, for reporting purposes
-    CurOp individualOp(opCtx);
+    CurOp individualOp;
+    individualOp.push(opCtx);
     const NamespaceString nss(op.getNss());
     auto opType = op.getOpType();
 

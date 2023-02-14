@@ -243,7 +243,6 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
         // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
         // this op should be sampled for profiling.
         const bool shouldProfile = curOp->completeAndLogOperation(
-            opCtx,
             MONGO_LOGV2_DEFAULT_COMPONENT,
             CollectionCatalog::get(opCtx)
                 ->getDatabaseProfileSettings(curOp->getNSS().dbName())
@@ -743,7 +742,7 @@ WriteResult performInserts(OperationContext* opCtx,
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setNS_inlock(wholeOp.getNamespace());
         curOp.setLogicalOp_inlock(LogicalOp::opInsert);
-        curOp.ensureStarted(opCtx);
+        curOp.ensureStarted();
         curOp.debug().additiveMetrics.ninserted = 0;
     }
 
@@ -995,7 +994,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
     }
 
-    if (curOp.shouldDBProfile(opCtx)) {
+    if (curOp.shouldDBProfile()) {
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
         curOp.debug().execStats = std::move(stats);
     }
@@ -1046,7 +1045,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
         curOp.setNetworkOp_inlock(dbUpdate);
         curOp.setLogicalOp_inlock(LogicalOp::opUpdate);
         curOp.setOpDescription_inlock(op.toBSON());
-        curOp.ensureStarted(opCtx);
+        curOp.ensureStarted();
     }
 
     uassert(ErrorCodes::InvalidOptions,
@@ -1173,10 +1172,8 @@ WriteResult performUpdates(OperationContext* opCtx,
         const Command* cmd = parentCurOp.getCommand();
         boost::optional<CurOp> curOp;
         if (source != OperationSource::kTimeseriesInsert) {
-            curOp.emplace(opCtx);
-
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            curOp->setCommand_inlock(cmd);
+            curOp.emplace(cmd);
+            curOp->push(opCtx);
         }
         ON_BLOCK_EXIT([&] {
             if (curOp) {
@@ -1271,7 +1268,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         curOp.setNetworkOp_inlock(dbDelete);
         curOp.setLogicalOp_inlock(LogicalOp::opDelete);
         curOp.setOpDescription_inlock(op.toBSON());
-        curOp.ensureStarted(opCtx);
+        curOp.ensureStarted();
     }
 
     auto request = DeleteRequest{};
@@ -1372,7 +1369,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     }
     curOp.debug().setPlanSummaryMetrics(summary);
 
-    if (curOp.shouldDBProfile(opCtx)) {
+    if (curOp.shouldDBProfile()) {
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
         curOp.debug().execStats = std::move(stats);
     }
@@ -1436,11 +1433,8 @@ WriteResult performDeletes(OperationContext* opCtx,
         // Add Command pointer to the nested CurOp.
         auto& parentCurOp = *CurOp::get(opCtx);
         const Command* cmd = parentCurOp.getCommand();
-        CurOp curOp(opCtx);
-        {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            curOp.setCommand_inlock(cmd);
-        }
+        CurOp curOp(cmd);
+        curOp.push(opCtx);
         ON_BLOCK_EXIT([&] {
             if (MONGO_unlikely(hangBeforeChildRemoveOpFinishes.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -2816,7 +2810,7 @@ write_ops::InsertCommandReply performTimeseriesWrites(
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setNS_inlock(ns(request));
         curOp.setLogicalOp_inlock(LogicalOp::opInsert);
-        curOp.ensureStarted(opCtx);
+        curOp.ensureStarted();
         curOp.debug().additiveMetrics.ninserted = 0;
     }
 
