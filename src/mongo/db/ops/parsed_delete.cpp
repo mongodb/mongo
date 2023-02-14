@@ -90,23 +90,14 @@ Status ParsedDelete::parseRequest() {
                                                 _request->getLegacyRuntimeConstants(),
                                                 _request->getLet());
 
-    if (CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
+    // The '_id' field of a time-series collection needs to be handled as other fields.
+    if (CanonicalQuery::isSimpleIdQuery(_request->getQuery()) && !_timeseriesDeleteDetails) {
         return Status::OK();
     }
 
     _expCtx->startExpressionCounters();
     return parseQueryToCQ();
 }
-
-namespace {
-void assertQueryFieldIsMetaField(bool isMetaField, StringData metaField) {
-    uassert(ErrorCodes::InvalidOptions,
-            fmt::format("Cannot perform an update or delete on a time-series collection "
-                        "when querying on a field that is not the metaField '{}'",
-                        metaField),
-            isMetaField);
-}
-}  // namespace
 
 Status ParsedDelete::splitOutBucketMatchExpression(const ExtensionsCallback& extensionsCallback) {
     tassert(7307300,
@@ -116,24 +107,20 @@ Status ParsedDelete::splitOutBucketMatchExpression(const ExtensionsCallback& ext
     auto& details = _timeseriesDeleteDetails;
     const auto& timeseriesOptions = details->_timeseriesOptions;
 
-    uassert(ErrorCodes::InvalidOptions,
-            "Cannot perform a delete with a non-empty query on a time-series collection that "
-            "does not have a metaField",
-            timeseriesOptions.getMetaField() || _request->getQuery().isEmpty());
     uassert(ErrorCodes::IllegalOperation,
             "Cannot perform a non-multi delete on a time-series collection",
             _request->getMulti());
 
-    if (auto optMetaField = timeseriesOptions.getMetaField(); optMetaField) {
-        auto swMatchExpr =
-            MatchExpressionParser::parse(_request->getQuery(),
-                                         _expCtx,
-                                         extensionsCallback,
-                                         MatchExpressionParser::kAllowAllSpecialFeatures);
-        if (!swMatchExpr.isOK()) {
-            return swMatchExpr.getStatus();
-        }
+    auto swMatchExpr =
+        MatchExpressionParser::parse(_request->getQuery(),
+                                     _expCtx,
+                                     extensionsCallback,
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    if (!swMatchExpr.isOK()) {
+        return swMatchExpr.getStatus();
+    }
 
+    if (auto optMetaField = timeseriesOptions.getMetaField()) {
         auto metaField = optMetaField->toString();
         std::tie(details->_bucketMatchExpr, details->_residualExpr) =
             expression::splitMatchExpressionBy(
@@ -141,8 +128,10 @@ Status ParsedDelete::splitOutBucketMatchExpression(const ExtensionsCallback& ext
                 {metaField},
                 {{metaField, timeseries::kBucketMetaFieldName.toString()}},
                 expression::isOnlyDependentOn);
-
-        assertQueryFieldIsMetaField(details->_residualExpr.get() == nullptr, metaField);
+    } else {
+        // The '_residualExpr' becomes the same as the original query predicate because nothing is
+        // to be split out if there is no meta field in the timeseries collection.
+        details->_residualExpr = swMatchExpr.getValue()->shallowClone();
     }
 
     return Status::OK();
@@ -165,8 +154,12 @@ Status ParsedDelete::parseQueryToCQ() {
     // The projection needs to be applied after the delete operation, so we do not specify a
     // projection during canonicalization.
     auto findCommand = std::make_unique<FindCommandRequest>(_request->getNsString());
-    if (auto& details = _timeseriesDeleteDetails; details && details->_bucketMatchExpr) {
-        findCommand->setFilter(details->_bucketMatchExpr->serialize().getOwned());
+    if (_timeseriesDeleteDetails) {
+        // Only sets the filter if the query predicate has bucket match components.
+        if (_timeseriesDeleteDetails->_bucketMatchExpr) {
+            findCommand->setFilter(
+                _timeseriesDeleteDetails->_bucketMatchExpr->serialize().getOwned());
+        }
     } else {
         findCommand->setFilter(_request->getQuery().getOwned());
     }

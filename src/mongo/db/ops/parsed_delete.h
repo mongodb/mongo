@@ -177,9 +177,8 @@ private:
         // The bucket-level match expressions.
         std::unique_ptr<MatchExpression> _bucketMatchExpr = nullptr;
 
-        // The residual expression after splitting out metaField-dependent match expressions.
-        // TODO SERVER-73077: Currently, _residualExpr is not being used but the '_residualExpr' is
-        // supposed to be passed to the TS_WRITE stage.
+        // The residual expression after splitting out metaField-dependent splittable match
+        // expressions.
         std::unique_ptr<MatchExpression> _residualExpr = nullptr;
     };
 

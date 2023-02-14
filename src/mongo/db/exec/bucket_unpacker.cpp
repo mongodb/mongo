@@ -1353,6 +1353,12 @@ BucketSpec::BucketSpec(BucketSpec&& other)
     }
 }
 
+BucketSpec::BucketSpec(const TimeseriesOptions& tsOptions)
+    : BucketSpec(tsOptions.getTimeField().toString(),
+                 tsOptions.getMetaField()
+                     ? boost::optional<string>(tsOptions.getMetaField()->toString())
+                     : boost::none) {}
+
 BucketSpec& BucketSpec::operator=(const BucketSpec& other) {
     if (&other != this) {
         _fieldSet = other._fieldSet;

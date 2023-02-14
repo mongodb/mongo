@@ -54,7 +54,7 @@ namespace mongo {
  */
 class BucketSpec {
 public:
-    // When unpackin buckets with kInclude we must produce measurements that contain the
+    // When unpacking buckets with kInclude we must produce measurements that contain the
     // set of fields. Otherwise, if the kExclude option is used, the measurements will include the
     // set difference between all fields in the bucket and the provided fields.
     enum class Behavior { kInclude, kExclude };
@@ -68,6 +68,7 @@ public:
                bool usesExtendedRange = false);
     BucketSpec(const BucketSpec&);
     BucketSpec(BucketSpec&&);
+    BucketSpec(const TimeseriesOptions& tsOptions);
 
     BucketSpec& operator=(const BucketSpec&);
 

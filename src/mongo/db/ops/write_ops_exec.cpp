@@ -1318,7 +1318,6 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                     *timeseriesOptions, request.getHint())));
         }
 
-        // TODO SERVER-73077 Remove this if block entirely.
         if (!feature_flags::gTimeseriesUpdatesDeletesSupport.isEnabled(
                 serverGlobalParams.featureCompatibility)) {
             uassert(

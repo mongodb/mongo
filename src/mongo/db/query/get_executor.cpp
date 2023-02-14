@@ -36,6 +36,7 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/bucket_unpacker.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/count.h"
@@ -52,6 +53,8 @@
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/subplan.h"
+#include "mongo/db/exec/timeseries_write.h"
+#include "mongo/db/exec/unpack_timeseries_bucket.h"
 #include "mongo/db/exec/upsert_stage.h"
 #include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -102,6 +105,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/scripting/engine.h"
@@ -1943,8 +1947,20 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         !deleteStageParams->returnDeleted && deleteStageParams->sort.isEmpty() &&
         !deleteStageParams->numStatsForDoc;
 
-    if (batchDelete) {
-        root = std::make_unique<BatchedDeleteStage>(cq->getExpCtxRaw(),
+    auto expCtxRaw = cq->getExpCtxRaw();
+    if (parsedDelete->getResidualExpr()) {
+        // Checks if the delete is on a time-series collection and cannot run on bucket documents
+        // directly.
+        root = std::make_unique<UnpackTimeseriesBucket>(
+            expCtxRaw,
+            ws.get(),
+            std::move(root),
+            BucketUnpacker(*collection->getTimeseriesOptions()),
+            /*isUnpackingForTsWrite=*/true);
+        root = std::make_unique<TimeseriesWriteStage>(
+            expCtxRaw, ws.get(), std::move(root), collection, parsedDelete->releaseResidualExpr());
+    } else if (batchDelete) {
+        root = std::make_unique<BatchedDeleteStage>(expCtxRaw,
                                                     std::move(deleteStageParams),
                                                     std::make_unique<BatchedDeleteStageParams>(),
                                                     ws.get(),
@@ -1952,7 +1968,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                                                     root.release());
     } else {
         root = std::make_unique<DeleteStage>(
-            cq->getExpCtxRaw(), std::move(deleteStageParams), ws.get(), collection, root.release());
+            expCtxRaw, std::move(deleteStageParams), ws.get(), collection, root.release());
     }
 
     if (projection) {
