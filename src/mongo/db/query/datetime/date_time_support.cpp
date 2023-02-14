@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <absl/container/flat_hash_map.h>
 #include <limits>
 #include <memory>
 #include <timelib.h>
@@ -97,6 +98,8 @@ const std::vector<timelib_format_specifier> kDateFromStringFormatMap = {
 // Format specifier map when converting a date to a string.
 //
 const std::vector<timelib_format_specifier> kDateToStringFormatMap = {
+    {'b', TIMELIB_FORMAT_TEXTUAL_MONTH_3_LETTER},
+    {'B', TIMELIB_FORMAT_TEXTUAL_MONTH_FULL},
     {'d', TIMELIB_FORMAT_DAY_TWO_DIGIT},
     {'G', TIMELIB_FORMAT_YEAR_ISO},
     {'H', TIMELIB_FORMAT_HOUR_TWO_DIGIT_24_MAX},
@@ -592,6 +595,55 @@ Seconds TimeZone::utcOffset(Date_t date) const {
         return _utcOffset;
     }
 }
+
+// A mapping from months to full string representations of the month.
+static const absl::flat_hash_map<int, std::string> monthToFullMonthNameMap{
+    {1, "January"},
+    {2, "February"},
+    {3, "March"},
+    {4, "April"},
+    {5, "May"},
+    {6, "June"},
+    {7, "July"},
+    {8, "August"},
+    {9, "September"},
+    {10, "October"},
+    {11, "November"},
+    {12, "December"},
+};
+
+// A mapping from months to three letter string representations of the month.
+static const absl::flat_hash_map<int, std::string> monthToThreeLetterMonthNameMap{
+    {1, "Jan"},
+    {2, "Feb"},
+    {3, "Mar"},
+    {4, "Apr"},
+    {5, "May"},
+    {6, "Jun"},
+    {7, "Jul"},
+    {8, "Aug"},
+    {9, "Sep"},
+    {10, "Oct"},
+    {11, "Nov"},
+    {12, "Dec"},
+};
+
+std::string TimeZone::fullMonthName(int monthNum) const {
+    auto iterator = monthToFullMonthNameMap.find(monthNum);
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "unknown month value: " << monthNum,
+            iterator != monthToFullMonthNameMap.end());
+    return iterator->second;
+}
+
+std::string TimeZone::threeLetterMonthName(int monthNum) const {
+    auto iterator = monthToThreeLetterMonthNameMap.find(monthNum);
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "unknown month value: " << monthNum,
+            iterator != monthToThreeLetterMonthNameMap.end());
+    return iterator->second;
+}
+
 
 void TimeZone::validateToStringFormat(StringData format) {
     return validateFormat(format, kDateToStringFormatMap);

@@ -130,6 +130,26 @@ assert.eq(
         .toArray());
 
 /* --------------------------------------------------------------------------------------- */
+coll.drop();
+
+assert.commandWorked(coll.insert([
+    {_id: 0, date: new ISODate("2017-01-01T15:08:51.911Z")},
+    {_id: 1, date: new ISODate("2017-07-04T15:09:12.911Z")},
+    {_id: 2, date: new ISODate("2017-12-04T15:09:14.911Z")},
+]));
+
+assert.eq(
+    [
+        {_id: 0, date: "Jan (January) 01, 2017"},
+        {_id: 1, date: "Jul (July) 04, 2017"},
+        {_id: 2, date: "Dec (December) 04, 2017"},
+    ],
+    coll.aggregate([
+            {$project: {date: {$dateToString: {format: "%b (%B) %d, %Y", date: "$date"}}}},
+            {$sort: {_id: 1}}
+        ])
+        .toArray());
+/* --------------------------------------------------------------------------------------- */
 /* Test that missing expressions, turn into BSON null values */
 coll.drop();
 

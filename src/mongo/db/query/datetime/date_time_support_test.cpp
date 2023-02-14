@@ -963,14 +963,16 @@ TEST(NewYorkTimeAfterEpoch, DoesOutputFormatDate) {
     auto date = Date_t::fromMillisSinceEpoch(1496777923234LL);
     std::ostringstream os;
     auto newYorkZone = kDefaultTimeZoneDatabase.getTimeZone("America/New_York");
-    ASSERT_OK(newYorkZone.outputDateWithFormat(os,
-                                               "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
-                                               "dayOfWeek: %w, week: %U, isoYear: %G, "
-                                               "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
-                                               date));
-    ASSERT_EQ(os.str(),
-              "2017/06/06 15:38:43:234, dayOfYear: 157, dayOfWeek: 3, week: 23, isoYear: 2017, "
-              "isoWeek: 23, isoDayOfWeek: 2, percent: %");
+    ASSERT_OK(newYorkZone.outputDateWithFormat(
+        os,
+        "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+        "dayOfWeek: %w, week: %U, isoYear: %G, "
+        "isoWeek: %V, isoDayOfWeek: %u, monthName: %B, monthNameThreeLetter: %b, percent: %%",
+        date));
+    ASSERT_EQ(
+        os.str(),
+        "2017/06/06 15:38:43:234, dayOfYear: 157, dayOfWeek: 3, week: 23, isoYear: 2017, "
+        "isoWeek: 23, isoDayOfWeek: 2, monthName: June, monthNameThreeLetter: Jun, percent: %");
 }
 
 TEST(DateFormat, ThrowsUserExceptionIfGivenUnrecognizedFormatter) {

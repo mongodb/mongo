@@ -225,6 +225,16 @@ public:
     Seconds utcOffset(Date_t) const;
 
     /**
+     * Returns the full textual name of the month.
+     */
+    std::string fullMonthName(int) const;
+
+    /**
+     * Returns the full textual name of the month.
+     */
+    std::string threeLetterMonthName(int) const;
+
+    /**
      * Adjusts 'timelibTime' according to this time zone definition.
      */
     void adjustTimeZone(_timelib_time* timelibTime) const;
@@ -284,6 +294,16 @@ public:
                     break;
                 case 'L':  // Millisecond
                     if (auto status = insertPadded(os, parts.millisecond, 3);
+                        status != Status::OK())
+                        return status;
+                    break;
+                case 'B':  // Full name of month
+                    if (auto status = insertString(os, fullMonthName(parts.month));
+                        status != Status::OK())
+                        return status;
+                    break;
+                case 'b':  // Three letter name of month
+                    if (auto status = insertString(os, threeLetterMonthName(parts.month));
                         status != Status::OK())
                         return status;
                     break;
@@ -385,6 +405,15 @@ private:
             os.write("0000", width - digits);
         }
         os << number;
+        return Status::OK();
+    }
+
+    template <typename OutputStream>
+    static auto insertString(OutputStream& os, std::string str) {
+        if (str.length() == 0) {
+            return Status{ErrorCodes::Error{7340200}, "Cannot append empty string"};
+        }
+        os << str;
         return Status::OK();
     }
 
