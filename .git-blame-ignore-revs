@@ -1,6 +1,9 @@
 # SERVER-72197 Clang format v12.0.1
 f63255ee677ecae5896d6f35dd712ed60ae8c39a
 
+# SERVER-66490 Apply pylinters to build system code
+9ea1d6f0419938770eea612479c75838f75752b7
+
 # SERVER-41772 Clang format v7.0.1
 134a4083953270e8a11430395357fb70a29047ad
 
