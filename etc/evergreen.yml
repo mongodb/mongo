@@ -2740,6 +2740,8 @@ buildvariants:
     scons_cache_scope: shared
     separate_debug: off
     large_distro_name: rhel80-medium
+    multiversion_platform: rhel80
+    multiversion_edition: enterprise
   tasks:
   - name: compile_test_and_package_serial_TG
   # - name: test_api_version_compatibility # Not relevant for TSAN
