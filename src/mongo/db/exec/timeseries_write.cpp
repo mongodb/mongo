@@ -29,12 +29,25 @@
 
 #include "mongo/db/exec/timeseries_write.h"
 
+#include "mongo/db/timeseries/timeseries_write_util.h"
+
 namespace mongo {
 
 const char* TimeseriesWriteStage::kStageType = "TS_WRITE";
 
+TimeseriesWriteStage::TimeseriesWriteStage(ExpressionContext* expCtx,
+                                           WorkingSet* ws,
+                                           std::unique_ptr<PlanStage> child,
+                                           const CollectionPtr& coll,
+                                           std::unique_ptr<MatchExpression> residualPredicate)
+    : RequiresCollectionStage(kStageType, expCtx, coll),
+      _ws(ws),
+      _residualPredicate(std::move(residualPredicate)) {
+    _children.emplace_back(std::move(child));
+}
+
 bool TimeseriesWriteStage::isEOF() {
-    return true;
+    return child()->isEOF();
 }
 
 std::unique_ptr<PlanStageStats> TimeseriesWriteStage::getStats() {
@@ -47,7 +60,89 @@ std::unique_ptr<PlanStageStats> TimeseriesWriteStage::getStats() {
     return ret;
 }
 
+void TimeseriesWriteStage::_writeToTimeseriesBuckets() {
+    ON_BLOCK_EXIT([&] {
+        _specificStats.measurementsDeleted += _deletedMeasurements.size();
+        _deletedMeasurements.clear();
+        _unchangedMeasurements.clear();
+    });
+
+    // No measurements needed to be deleted from the bucket document.
+    if (_deletedMeasurements.empty()) {
+        return;
+    }
+
+    OID bucketId = record_id_helpers::toBSONAs(_currentBucketRid, "_id")["_id"].OID();
+    if (_unchangedMeasurements.empty()) {
+        write_ops::DeleteOpEntry deleteEntry(BSON("_id" << bucketId), false);
+        write_ops::DeleteCommandRequest op(collection()->ns(), {deleteEntry});
+        // TODO (SERVER-73093): Handles the write failures through retry.
+        auto result = timeseries::performAtomicWrites(opCtx(), collection(), _currentBucketRid, op);
+    } else {
+        auto timeseriesOptions = collection()->getTimeseriesOptions();
+        auto metaFieldName = timeseriesOptions->getMetaField();
+        auto metadata =
+            metaFieldName ? _unchangedMeasurements[0].getField(*metaFieldName).wrap() : BSONObj();
+        auto replaceBucket =
+            timeseries::makeNewDocumentForWrite(bucketId,
+                                                _unchangedMeasurements,
+                                                metadata,
+                                                timeseriesOptions,
+                                                collection()->getDefaultCollator());
+
+        write_ops::UpdateModification u(replaceBucket);
+        write_ops::UpdateOpEntry updateEntry(BSON("_id" << bucketId), std::move(u));
+        write_ops::UpdateCommandRequest op(collection()->ns(), {updateEntry});
+        // TODO (SERVER-73093): Handles the write failures through retry.
+        auto result = timeseries::performAtomicWrites(opCtx(), collection(), _currentBucketRid, op);
+    }
+}
+
 PlanStage::StageState TimeseriesWriteStage::doWork(WorkingSetID* out) {
-    return PlanStage::IS_EOF;
+    if (isEOF()) {
+        return PlanStage::IS_EOF;
+    }
+
+    WorkingSetID id;
+    auto status = child()->work(&id);
+
+    switch (status) {
+        case PlanStage::ADVANCED:
+            break;
+        case PlanStage::IS_EOF:
+            // Perform writes for the last bucket document.
+            _writeToTimeseriesBuckets();
+            return PlanStage::NEED_TIME;
+        case PlanStage::NEED_YIELD:
+            *out = id;
+            return status;
+        case PlanStage::NEED_TIME:
+            return status;
+    }
+
+    auto member = _ws->get(id);
+    invariant(member->hasRecordId());
+    auto bucketRid = member->recordId;
+
+    // Set to the first bucket's RecordId.
+    if (_currentBucketRid.isNull()) {
+        _currentBucketRid = bucketRid;
+    }
+
+    // The current bucket is exhausted and we will need to perform an atomic write to modify the
+    // bucket.
+    if (_currentBucketRid != bucketRid) {
+        _writeToTimeseriesBuckets();
+        _currentBucketRid = bucketRid;
+    }
+
+    auto measurement = member->doc.value().toBson().getOwned();
+    if (_residualPredicate->matchesBSON(measurement)) {
+        _deletedMeasurements.push_back(measurement);
+    } else {
+        _unchangedMeasurements.push_back(measurement);
+    }
+
+    return PlanStage::NEED_TIME;
 }
 }  // namespace mongo

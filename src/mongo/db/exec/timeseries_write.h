@@ -42,8 +42,7 @@ public:
                          WorkingSet* ws,
                          std::unique_ptr<PlanStage> child,
                          const CollectionPtr& coll,
-                         std::unique_ptr<MatchExpression> residualPredicate,
-                         const MatchExpression* originalBucketPredicate);
+                         std::unique_ptr<MatchExpression> residualPredicate);
 
     StageType stageType() const {
         return STAGE_TIMESERIES_WRITE;
@@ -65,6 +64,11 @@ protected:
     void doRestoreStateRequiresCollection() final {}
 
 private:
+    /**
+     * Writes the modifications to a bucket when the end of the bucket is detected.
+     */
+    void _writeToTimeseriesBuckets();
+
     WorkingSet* _ws;
 
     //
@@ -75,8 +79,11 @@ private:
     // unmodified.
     std::unique_ptr<MatchExpression> _residualPredicate;
 
-    std::vector<WorkingSetID> _unchangedMeasurements;
-    std::vector<WorkingSetID> _deletedMeasurements;
+    // The RecordId (also "_id" for the clustered collection) value of the current bucket.
+    RecordId _currentBucketRid = RecordId{};
+
+    std::vector<BSONObj> _unchangedMeasurements;
+    std::vector<BSONObj> _deletedMeasurements;
 
     TimeseriesWriteStats _specificStats{};
 };
