@@ -251,6 +251,20 @@ private:
     ServiceEntryPoint* _sep;
     boost::optional<SplitTimer<SplitTimerPolicy>> _t;
 };
+
+// TODO(SERVER-63883): Remove when re-introducing real metrics.
+class NoopSessionWorkflowMetrics {
+public:
+    explicit NoopSessionWorkflowMetrics(ServiceEntryPoint*) {}
+    void start() {}
+    void received() {}
+    void processed() {}
+    void sent(Session&) {}
+    void yielded() {}
+    void finish() {}
+};
+
+using Metrics = NoopSessionWorkflowMetrics;
 }  // namespace metrics_detail
 
 /**
@@ -415,7 +429,7 @@ private:
             metrics.finish();
         }
 
-        metrics_detail::SessionWorkflowMetrics metrics;
+        metrics_detail::Metrics metrics;
     };
 
     /** Alias: refers to this Impl, but holds a ref to the enclosing workflow. */
