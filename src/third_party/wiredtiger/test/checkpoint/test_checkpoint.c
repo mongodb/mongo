@@ -28,6 +28,8 @@
 
 #include "test_checkpoint.h"
 
+#define SHARED_PARSE_OPTIONS "b:P:h:"
+
 GLOBAL g;
 
 static int handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
@@ -35,7 +37,7 @@ static int handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
 static void onint(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void cleanup(bool);
 static int usage(void);
-static int wt_connect(const char *);
+static void wt_connect(const char *);
 static int wt_shutdown(void);
 
 extern int __wt_optind;
@@ -50,7 +52,6 @@ main(int argc, char *argv[])
 {
     table_type ttype;
     int ch, cnt, i, ret, runs;
-    char *working_dir;
     const char *config_open;
     bool verify_only;
 
@@ -58,7 +59,6 @@ main(int argc, char *argv[])
 
     config_open = NULL;
     ret = 0;
-    working_dir = NULL;
     ttype = MIX;
     g.checkpoint_name = "WiredTigerCheckpoint";
     g.debug_mode = false;
@@ -77,15 +77,11 @@ main(int argc, char *argv[])
     runs = 1;
     verify_only = false;
 
-    while ((ch = __wt_getopt(progname, argc, argv, "BC:c:Dh:k:l:mn:pr:s:T:t:vW:xX")) != EOF)
+    testutil_parse_begin_opt(argc, argv, SHARED_PARSE_OPTIONS, &g.opts);
+
+    while ((ch = __wt_getopt(
+              progname, argc, argv, "C:c:Dk:l:mn:pr:s:T:t:vW:xX" SHARED_PARSE_OPTIONS)) != EOF)
         switch (ch) {
-        case 'B':
-            /*
-             * WT-FIXME-9961: The parsing of this and other common options should be done within
-             * test utility code.
-             */
-            g.opts.tiered_storage = true;
-            break;
         case 'c':
             g.checkpoint_name = __wt_optarg;
             break;
@@ -94,9 +90,6 @@ main(int argc, char *argv[])
             break;
         case 'D':
             g.debug_mode = true;
-            break;
-        case 'h': /* wiredtiger_open config */
-            working_dir = __wt_optarg;
             break;
         case 'k': /* rows */
             g.nkeys = (u_int)atoi(__wt_optarg);
@@ -180,17 +173,20 @@ main(int argc, char *argv[])
             g.use_timestamps = g.race_timestamps = true;
             break;
         default:
-            return (usage());
+            /* The option is either one that we're asking testutil to support, or illegal. */
+            if (testutil_parse_single_opt(&g.opts, ch) != 0)
+                return (usage());
         }
 
     argc -= __wt_optind;
     if (argc != 0)
         return (usage());
 
+    testutil_parse_end_opt(&g.opts);
     /* Clean up on signal. */
     (void)signal(SIGINT, onint);
 
-    testutil_work_dir_from_path(g.home, 512, working_dir);
+    testutil_work_dir_from_path(g.home, 512, (&g.opts)->home);
 
     /* Start time at 1 since 0 is not a valid timestamp. */
     g.ts_stable = 1;
@@ -223,10 +219,7 @@ main(int argc, char *argv[])
 
         g.opts.running = true;
 
-        if ((ret = wt_connect(config_open)) != 0) {
-            (void)log_print_err("Connection failed", ret, 1);
-            break;
-        }
+        wt_connect(config_open);
 
         if (verify_only) {
             WT_SESSION *session;
@@ -269,20 +262,16 @@ run_complete:
 
 #define DEBUG_MODE_CFG ",debug_mode=(eviction=true,table_logging=true),verbose=(recovery)"
 #define SWEEP_CFG ",file_manager=(close_handle_minimum=1,close_idle_time=1,close_scan_interval=1)"
-#define TIER_CFG                                                    \
-    ",extensions=(../../ext/storage_sources/dir_store/"             \
-    "libwiredtiger_dir_store.so=(early_load=true)),tiered_storage=" \
-    "(bucket=bucket,bucket_prefix=ckpt-,local_retention=2,name=dir_store)"
+
 /*
  * wt_connect --
  *     Configure the WiredTiger connection.
  */
-static int
+static void
 wt_connect(const char *config_open)
 {
     static WT_EVENT_HANDLER event_handler = {handle_error, handle_message, NULL, NULL, NULL};
     WT_RAND_STATE rnd;
-    int ret;
     char buf[512], config[1024];
     bool fast_eviction;
 
@@ -331,13 +320,11 @@ wt_connect(const char *config_open)
     if (g.opts.tiered_storage) {
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/bucket", g.home));
         testutil_make_work_dir(buf);
-        strcat(config, TIER_CFG);
     }
 
     printf("WT open config: %s\n", config);
     fflush(stdout);
-    if ((ret = wiredtiger_open(g.home, &event_handler, config, &g.conn)) != 0)
-        return (log_print_err("wiredtiger_open", ret, 1));
+    testutil_wiredtiger_open(&g.opts, g.home, config, &event_handler, &g.conn, false, false);
 
     if (g.opts.tiered_storage) {
         /* testutil_tiered_begin needs the connection. */
@@ -347,8 +334,6 @@ wt_connect(const char *config_open)
         set_flush_tier_delay(&rnd);
         testutil_tiered_begin(&g.opts);
     }
-
-    return (0);
 }
 
 /*
@@ -616,11 +601,10 @@ usage(void)
 {
     fprintf(stderr,
       "usage: %s\n"
-      "    [-BDmpvXx] [-C wiredtiger-config] [-c checkpoint] [-h home] [-k keys] [-l log]\n"
+      "    [-DmpvXx] [-C wiredtiger-config] [-c checkpoint] [-h home] [-k keys] [-l log]\n"
       "    [-n ops] [-r runs] [-s 1|2|3|4|5] [-T table-config] [-t f|r|v] [-W workers]\n",
       progname);
     fprintf(stderr, "%s",
-      "\t-B use tiered storage\n"
       "\t-C specify wiredtiger_open configuration arguments\n"
       "\t-c checkpoint name to used named checkpoints\n"
       "\t-D debug mode\n"

@@ -129,6 +129,8 @@ Decrypt
 DeleteFileW
 Destructor
 Deterministically
+Dk
+DmpvXx
 Dxxx
 EACCES
 EAGAIN
@@ -1198,6 +1200,7 @@ mips
 mkdir
 mmap
 mmrand
+mn
 mnt
 mongod
 movemask
@@ -1695,6 +1698,7 @@ wtperf's
 wts
 wtstats
 xF
+xX
 xdeadbeef
 xff
 xfff
