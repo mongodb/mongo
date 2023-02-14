@@ -29,17 +29,24 @@
 
 #pragma once
 
+namespace mongo {
+namespace {
+// Should never be called, throw to ensure we catch this in tests.
+std::string defaultRedactionStrategy(StringData s) {
+    MONGO_UNREACHABLE_TASSERT(7332410);
+}
+}  // namespace
+
 #include <boost/optional.hpp>
 
 #include "mongo/base/string_data.h"
 
-namespace mongo {
-
 /**
- * A struct with options for how you want to serialize a match expression.
+ * A struct with options for how you want to serialize a match or aggregation expression.
  */
 struct SerializationOptions {
     SerializationOptions() {}
+    SerializationOptions(bool explain_) : explain(explain_) {}
 
     // 'replacementForLiteralArgs' is an independent option to serialize in a genericized format
     // with the aim of similar "shaped" queries serializing to the same object. For example, if
@@ -51,7 +58,11 @@ struct SerializationOptions {
     // 4, so the serialization expected would be {$and: [{a: {$gt: '?'}}, {b: {$lt: '?'}}]}.
     boost::optional<StringData> replacementForLiteralArgs = boost::none;
 
-    // TODO SERVER-73663 'redactFieldNames' could be here - a callback function?
+    // If true the caller must set redactFieldNamesStrategy. 'redactFieldNames' if set along with
+    // a strategy the redaction strategy will be called on any field paths/names encountered
+    // before serializing them.
+    bool redactFieldNames = false;
+    std::function<std::string(StringData)> redactFieldNamesStrategy = defaultRedactionStrategy;
 
     // If set, serializes without including the path. For example {a: {$gt: 2}} would serialize
     // as just {$gt: 2}.
@@ -66,6 +77,9 @@ struct SerializationOptions {
     // The $elemMatch will serialize {a: {$elemMatch: <recurse>}} and the EQ will serialize just
     // {$eq: 2} instead of its usual {a: {$eq: 2}}.
     bool includePath = true;
+
+    // For aggregation indicate whether we should use the more verbose serialization format.
+    bool explain = false;
 };
 
 }  // namespace mongo

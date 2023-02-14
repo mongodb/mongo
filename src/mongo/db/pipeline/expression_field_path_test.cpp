@@ -61,6 +61,10 @@ Document fromBson(BSONObj obj) {
     return Document(obj);
 }
 
+std::string redactFieldNameForTest(StringData s) {
+    return str::stream() << "HASH(" << s << ")";
+}
+
 namespace FieldPath {
 
 /** The provided field path does not pass validation. */
@@ -198,6 +202,67 @@ TEST(FieldPath, ScalarVariableWithDottedFieldPathOptimizesToConstantMissingValue
     auto constantExpr = dynamic_cast<ExpressionConstant*>(optimizedExpr.get());
     ASSERT_TRUE(constantExpr);
     ASSERT_VALUE_EQ(Value(), constantExpr->getValue());
+}
+
+TEST(FieldPath, SerializeWithRedaction) {
+    SerializationOptions options;
+    options.redactFieldNamesStrategy = redactFieldNameForTest;
+    options.redactFieldNames = true;
+
+    auto expCtx = ExpressionContextForTest{};
+    intrusive_ptr<Expression> expression =
+        ExpressionFieldPath::createPathFromString(&expCtx, "bar", expCtx.variablesParseState);
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("foo"
+                                  << "$HASH(bar)"),
+                             BSON("foo" << expression->serialize(options)));
+    // Repeat with a dotted path.
+    expression =
+        ExpressionFieldPath::createPathFromString(&expCtx, "a.b.c", expCtx.variablesParseState);
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("foo"
+                                  << "$HASH(a).HASH(b).HASH(c)"),
+                             BSON("foo" << expression->serialize(options)));
+
+    // Expression with multiple field paths.
+    // {$and: [{$gt: ["$foo", 5]}, {$lt: [$foo, 10]}]} => {$and: [{$gt: ["$HASH(foo)", 5]}, {$lt:
+    // [$HASH(foo), 10]}]}
+    auto expressionBSON = BSON("$and" << BSON_ARRAY(BSON("$gt" << BSON_ARRAY("$foo" << 5))
+                                                    << BSON("$lt" << BSON_ARRAY("$foo" << 10))));
+    expression = Expression::parseExpression(&expCtx, expressionBSON, expCtx.variablesParseState);
+    auto redactedBSON = BSON(
+        "$and" << BSON_ARRAY(BSON("$gt" << BSON_ARRAY("$HASH(foo)" << BSON("$const" << 5)))
+                             << BSON("$lt" << BSON_ARRAY("$HASH(foo)" << BSON("$const" << 10)))));
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("field" << redactedBSON),
+                             BSON("field" << expression->serialize(options)));
+
+    // Test that a variable followed by user fields is properly hashed.
+    std::string replacementChar = "?";
+    options.replacementForLiteralArgs = replacementChar;
+    expressionBSON = BSON("$gt" << BSON_ARRAY("$$ROOT.a.b"
+                                              << "5"));
+    expression = Expression::parseExpression(&expCtx, expressionBSON, expCtx.variablesParseState);
+    redactedBSON = BSON("$gt" << BSON_ARRAY("$$ROOT.HASH(a).HASH(b)" << BSON("$const"
+                                                                             << "?")));
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("field" << redactedBSON),
+                             BSON("field" << expression->serialize(options)));
+
+    // Test that a system variable is preserved.
+    expressionBSON = BSON("$gt" << BSON_ARRAY("$foo"
+                                              << "$$NOW"));
+    expression = Expression::parseExpression(&expCtx, expressionBSON, expCtx.variablesParseState);
+    redactedBSON = BSON("$gt" << BSON_ARRAY("$HASH(foo)"
+                                            << "$$NOW"));
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("field" << redactedBSON),
+                             BSON("field" << expression->serialize(options)));
+
+
+    expressionBSON = BSON("$gt" << BSON_ARRAY("$foo.a.b"
+                                              << "$$NOW"));
+    // Repeat the above test with a dotted path.
+    expression = Expression::parseExpression(&expCtx, expressionBSON, expCtx.variablesParseState);
+    redactedBSON = BSON("$gt" << BSON_ARRAY("$HASH(foo).HASH(a).HASH(b)"
+                                            << "$$NOW"));
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("field" << redactedBSON),
+                             BSON("field" << expression->serialize(options)));
 }
 
 /** The field path itself is a dependency. */

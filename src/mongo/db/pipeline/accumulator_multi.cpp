@@ -158,10 +158,10 @@ void AccumulatorN::updateAndCheckMemUsage(size_t memAdded) {
 
 void AccumulatorN::serializeHelper(const boost::intrusive_ptr<Expression>& initializer,
                                    const boost::intrusive_ptr<Expression>& argument,
-                                   bool explain,
+                                   SerializationOptions options,
                                    MutableDocument& md) {
-    md.addField(kFieldNameN, Value(initializer->serialize(explain)));
-    md.addField(kFieldNameInput, Value(argument->serialize(explain)));
+    md.addField(kFieldNameN, Value(initializer->serialize(options)));
+    md.addField(kFieldNameInput, Value(argument->serialize(options)));
 }
 
 template <MinMaxSense s>

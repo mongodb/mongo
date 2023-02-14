@@ -46,10 +46,10 @@ ExpressionFunction::ExpressionFunction(ExpressionContext* const expCtx,
     expCtx->sbeCompatible = false;
 }
 
-Value ExpressionFunction::serialize(bool explain) const {
+Value ExpressionFunction::serialize(SerializationOptions options) const {
     MutableDocument d;
     d["body"] = Value(_funcSource);
-    d["args"] = Value(_passedArgs->serialize(explain));
+    d["args"] = Value(_passedArgs->serialize(options));
     d["lang"] = Value(_lang);
     // This field will only be seralized when desugaring $where in $expr + $_internalJs
     if (_assignFirstArgToThis) {

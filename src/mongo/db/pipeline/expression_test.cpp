@@ -813,6 +813,31 @@ TEST(ExpressionConstantTest, ConstantOfValueMissingSerializesToRemoveSystemVar) 
                              BSON("field" << expression->serialize(false)));
 }
 
+TEST(ExpressionConstantTest, ConstantRedaction) {
+    SerializationOptions options;
+    std::string replacementChar = "?";
+    options.replacementForLiteralArgs = replacementChar;
+
+    // Test that a constant is replaced.
+    auto expCtx = ExpressionContextForTest{};
+    intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value("my_ssn"_sd));
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("field" << BSON("$const" << replacementChar)),
+                             BSON("field" << expression->serialize(options)));
+
+    // Test an expression with multiple ExpressionConst children.
+    // {$and: [{$gt: ["$foo", 5]}, {$lt: [$foo, 10]}]} => {$and: [{$gt: ["$foo", "?"]}, {$lt: [$foo,
+    // "?"]}]}
+    auto expressionBSON = BSON("$and" << BSON_ARRAY(BSON("$gt" << BSON_ARRAY("$foo" << 5))
+                                                    << BSON("$lt" << BSON_ARRAY("$foo" << 10))));
+    expression = Expression::parseExpression(&expCtx, expressionBSON, expCtx.variablesParseState);
+    auto redactedBSON =
+        BSON("$and" << BSON_ARRAY(
+                 BSON("$gt" << BSON_ARRAY("$foo" << BSON("$const" << replacementChar)))
+                 << BSON("$lt" << BSON_ARRAY("$foo" << BSON("$const" << replacementChar)))));
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("field" << redactedBSON),
+                             BSON("field" << expression->serialize(options)));
+}
+
 }  // namespace Constant
 
 TEST(ExpressionFromAccumulators, Avg) {

@@ -78,7 +78,7 @@ public:
         return visitor->visit(this);
     }
 
-    Value serialize(bool explain) const final {
+    Value serialize(SerializationOptions options) const final {
         MONGO_UNREACHABLE;
     }
 
@@ -148,7 +148,7 @@ public:
         return visitor->visit(this);
     }
 
-    Value serialize(bool explain) const final {
+    Value serialize(SerializationOptions options) const final {
         MONGO_UNREACHABLE;
     }
 
@@ -201,7 +201,7 @@ public:
         return visitor->visit(this);
     }
 
-    Value serialize(bool explain) const final {
+    Value serialize(SerializationOptions options) const final {
         MONGO_UNREACHABLE;
     }
 

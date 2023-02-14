@@ -85,7 +85,7 @@ public:
      */
     static void serializeHelper(const boost::intrusive_ptr<Expression>& initializer,
                                 const boost::intrusive_ptr<Expression>& argument,
-                                bool explain,
+                                SerializationOptions options,
                                 MutableDocument& md);
 
 protected:

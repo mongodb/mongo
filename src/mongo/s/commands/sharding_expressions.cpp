@@ -463,7 +463,7 @@ boost::intrusive_ptr<Expression> ExpressionInternalIndexKey::optimize() {
     return this;
 }
 
-Value ExpressionInternalIndexKey::serialize(bool explain) const {
+Value ExpressionInternalIndexKey::serialize(SerializationOptions options) const {
     invariant(_doc);
     invariant(_spec);
 
@@ -472,7 +472,7 @@ Value ExpressionInternalIndexKey::serialize(bool explain) const {
 
     // The 'spec' is always treated as a constant so do not call '_spec->serialize()' which would
     // wrap the value in an unnecessary '$const' object.
-    return Value(DOC(opName << DOC(kDocField << _doc->serialize(explain) << kSpecField
+    return Value(DOC(opName << DOC(kDocField << _doc->serialize(options) << kSpecField
                                              << specExprConstant->getValue())));
 }
 

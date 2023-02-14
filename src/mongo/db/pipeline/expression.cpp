@@ -639,11 +639,11 @@ Value ExpressionArray::evaluate(const Document& root, Variables* variables) cons
     return Value(std::move(values));
 }
 
-Value ExpressionArray::serialize(bool explain) const {
+Value ExpressionArray::serialize(SerializationOptions options) const {
     vector<Value> expressions;
     expressions.reserve(_children.size());
     for (auto&& expr : _children) {
-        expressions.push_back(expr->serialize(explain));
+        expressions.push_back(expr->serialize(options));
     }
     return Value(std::move(expressions));
 }
@@ -962,11 +962,11 @@ Value ExpressionCoerceToBool::evaluate(const Document& root, Variables* variable
     return Value(false);
 }
 
-Value ExpressionCoerceToBool::serialize(bool explain) const {
+Value ExpressionCoerceToBool::serialize(SerializationOptions options) const {
     // When not explaining, serialize to an $and expression. When parsed, the $and expression
     // will be optimized back into a ExpressionCoerceToBool.
-    const char* name = explain ? "$coerceToBool" : "$and";
-    return Value(DOC(name << DOC_ARRAY(_children[_kExpression]->serialize(explain))));
+    const char* name = options.explain ? "$coerceToBool" : "$and";
+    return Value(DOC(name << DOC_ARRAY(_children[_kExpression]->serialize(options))));
 }
 
 /* ----------------------- ExpressionCompare --------------------------- */
@@ -1211,7 +1211,10 @@ Value ExpressionConstant::evaluate(const Document& root, Variables* variables) c
     return _value;
 }
 
-Value ExpressionConstant::serialize(bool explain) const {
+Value ExpressionConstant::serialize(SerializationOptions options) const {
+    if (options.replacementForLiteralArgs) {
+        return Value(DOC("$const" << *options.replacementForLiteralArgs));
+    }
     return serializeConstant(_value);
 }
 
@@ -1424,25 +1427,25 @@ intrusive_ptr<Expression> ExpressionDateFromParts::optimize() {
     return this;
 }
 
-Value ExpressionDateFromParts::serialize(bool explain) const {
+Value ExpressionDateFromParts::serialize(SerializationOptions options) const {
     return Value(Document{
         {"$dateFromParts",
          Document{
-             {"year", _children[_kYear] ? _children[_kYear]->serialize(explain) : Value()},
-             {"month", _children[_kMonth] ? _children[_kMonth]->serialize(explain) : Value()},
-             {"day", _children[_kDay] ? _children[_kDay]->serialize(explain) : Value()},
-             {"hour", _children[_kHour] ? _children[_kHour]->serialize(explain) : Value()},
-             {"minute", _children[_kMinute] ? _children[_kMinute]->serialize(explain) : Value()},
-             {"second", _children[_kSecond] ? _children[_kSecond]->serialize(explain) : Value()},
+             {"year", _children[_kYear] ? _children[_kYear]->serialize(options) : Value()},
+             {"month", _children[_kMonth] ? _children[_kMonth]->serialize(options) : Value()},
+             {"day", _children[_kDay] ? _children[_kDay]->serialize(options) : Value()},
+             {"hour", _children[_kHour] ? _children[_kHour]->serialize(options) : Value()},
+             {"minute", _children[_kMinute] ? _children[_kMinute]->serialize(options) : Value()},
+             {"second", _children[_kSecond] ? _children[_kSecond]->serialize(options) : Value()},
              {"millisecond",
-              _children[_kMillisecond] ? _children[_kMillisecond]->serialize(explain) : Value()},
+              _children[_kMillisecond] ? _children[_kMillisecond]->serialize(options) : Value()},
              {"isoWeekYear",
-              _children[_kIsoWeekYear] ? _children[_kIsoWeekYear]->serialize(explain) : Value()},
-             {"isoWeek", _children[_kIsoWeek] ? _children[_kIsoWeek]->serialize(explain) : Value()},
+              _children[_kIsoWeekYear] ? _children[_kIsoWeekYear]->serialize(options) : Value()},
+             {"isoWeek", _children[_kIsoWeek] ? _children[_kIsoWeek]->serialize(options) : Value()},
              {"isoDayOfWeek",
-              _children[_kIsoDayOfWeek] ? _children[_kIsoDayOfWeek]->serialize(explain) : Value()},
+              _children[_kIsoDayOfWeek] ? _children[_kIsoDayOfWeek]->serialize(options) : Value()},
              {"timezone",
-              _children[_kTimeZone] ? _children[_kTimeZone]->serialize(explain) : Value()}}}});
+              _children[_kTimeZone] ? _children[_kTimeZone]->serialize(options) : Value()}}}});
 }
 
 bool ExpressionDateFromParts::evaluateNumberWithDefault(const Document& root,
@@ -1668,17 +1671,17 @@ intrusive_ptr<Expression> ExpressionDateFromString::optimize() {
     return this;
 }
 
-Value ExpressionDateFromString::serialize(bool explain) const {
+Value ExpressionDateFromString::serialize(SerializationOptions options) const {
     return Value(Document{
         {"$dateFromString",
          Document{
-             {"dateString", _children[_kDateString]->serialize(explain)},
+             {"dateString", _children[_kDateString]->serialize(options)},
              {"timezone",
-              _children[_kTimeZone] ? _children[_kTimeZone]->serialize(explain) : Value()},
-             {"format", _children[_kFormat] ? _children[_kFormat]->serialize(explain) : Value()},
-             {"onNull", _children[_kOnNull] ? _children[_kOnNull]->serialize(explain) : Value()},
+              _children[_kTimeZone] ? _children[_kTimeZone]->serialize(options) : Value()},
+             {"format", _children[_kFormat] ? _children[_kFormat]->serialize(options) : Value()},
+             {"onNull", _children[_kOnNull] ? _children[_kOnNull]->serialize(options) : Value()},
              {"onError",
-              _children[_kOnError] ? _children[_kOnError]->serialize(explain) : Value()}}}});
+              _children[_kOnError] ? _children[_kOnError]->serialize(options) : Value()}}}});
 }
 
 Value ExpressionDateFromString::evaluate(const Document& root, Variables* variables) const {
@@ -1821,14 +1824,14 @@ intrusive_ptr<Expression> ExpressionDateToParts::optimize() {
     return this;
 }
 
-Value ExpressionDateToParts::serialize(bool explain) const {
+Value ExpressionDateToParts::serialize(SerializationOptions options) const {
     return Value(Document{
         {"$dateToParts",
-         Document{{"date", _children[_kDate]->serialize(explain)},
+         Document{{"date", _children[_kDate]->serialize(options)},
                   {"timezone",
-                   _children[_kTimeZone] ? _children[_kTimeZone]->serialize(explain) : Value()},
+                   _children[_kTimeZone] ? _children[_kTimeZone]->serialize(options) : Value()},
                   {"iso8601",
-                   _children[_kIso8601] ? _children[_kIso8601]->serialize(explain) : Value()}}}});
+                   _children[_kIso8601] ? _children[_kIso8601]->serialize(options) : Value()}}}});
 }
 
 boost::optional<int> ExpressionDateToParts::evaluateIso8601Flag(const Document& root,
@@ -1976,16 +1979,16 @@ intrusive_ptr<Expression> ExpressionDateToString::optimize() {
     return this;
 }
 
-Value ExpressionDateToString::serialize(bool explain) const {
+Value ExpressionDateToString::serialize(SerializationOptions options) const {
     return Value(Document{
         {"$dateToString",
          Document{
-             {"date", _children[_kDate]->serialize(explain)},
-             {"format", _children[_kFormat] ? _children[_kFormat]->serialize(explain) : Value()},
+             {"date", _children[_kDate]->serialize(options)},
+             {"format", _children[_kFormat] ? _children[_kFormat]->serialize(options) : Value()},
              {"timezone",
-              _children[_kTimeZone] ? _children[_kTimeZone]->serialize(explain) : Value()},
+              _children[_kTimeZone] ? _children[_kTimeZone]->serialize(options) : Value()},
              {"onNull",
-              _children[_kOnNull] ? _children[_kOnNull]->serialize(explain) : Value()}}}});
+              _children[_kOnNull] ? _children[_kOnNull]->serialize(options) : Value()}}}});
 }
 
 Value ExpressionDateToString::evaluate(const Document& root, Variables* variables) const {
@@ -2142,16 +2145,16 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::optimize() {
     return this;
 };
 
-Value ExpressionDateDiff::serialize(bool explain) const {
+Value ExpressionDateDiff::serialize(SerializationOptions options) const {
     return Value{Document{
         {"$dateDiff"_sd,
-         Document{{"startDate"_sd, _children[_kStartDate]->serialize(explain)},
-                  {"endDate"_sd, _children[_kEndDate]->serialize(explain)},
-                  {"unit"_sd, _children[_kUnit]->serialize(explain)},
+         Document{{"startDate"_sd, _children[_kStartDate]->serialize(options)},
+                  {"endDate"_sd, _children[_kEndDate]->serialize(options)},
+                  {"unit"_sd, _children[_kUnit]->serialize(options)},
                   {"timezone"_sd,
-                   _children[_kTimeZone] ? _children[_kTimeZone]->serialize(explain) : Value{}},
+                   _children[_kTimeZone] ? _children[_kTimeZone]->serialize(options) : Value{}},
                   {"startOfWeek"_sd,
-                   _children[_kStartOfWeek] ? _children[_kStartOfWeek]->serialize(explain)
+                   _children[_kStartOfWeek] ? _children[_kStartOfWeek]->serialize(options)
                                             : Value{}}}}}};
 };
 
@@ -2365,10 +2368,10 @@ Value ExpressionObject::evaluate(const Document& root, Variables* variables) con
     return outputDoc.freezeToValue();
 }
 
-Value ExpressionObject::serialize(bool explain) const {
+Value ExpressionObject::serialize(SerializationOptions options) const {
     MutableDocument outputDoc;
     for (auto&& pair : _expressions) {
-        outputDoc.addField(pair.first, pair.second->serialize(explain));
+        outputDoc.addField(pair.first, pair.second->serialize(options));
     }
     return outputDoc.freezeToValue();
 }
@@ -2531,12 +2534,34 @@ Value ExpressionFieldPath::evaluate(const Document& root, Variables* variables) 
     }
 }
 
-Value ExpressionFieldPath::serialize(bool explain) const {
-    if (_fieldPath.getFieldName(0) == "CURRENT" && _fieldPath.getPathLength() > 1) {
-        // use short form for "$$CURRENT.foo" but not just "$$CURRENT"
-        return Value("$" + _fieldPath.tail().fullPath());
+Value ExpressionFieldPath::serialize(SerializationOptions options) const {
+    auto&& [prefix, path] = [&]() {
+        if (_fieldPath.getFieldName(0) == "CURRENT" && _fieldPath.getPathLength() > 1) {
+            // use short form for "$$CURRENT.foo" but not just "$$CURRENT"
+            return std::make_pair(std::string("$"), _fieldPath.tail());
+        } else {
+            return std::make_pair(std::string("$$"), _fieldPath);
+        }
+    }();
+    if (options.redactFieldNames) {
+        std::stringstream redacted;
+        redacted << prefix;
+        size_t startPos = 0;
+        // Check if our prefix indicates this path begins with a system variable.
+        if (prefix.length() == 2) {
+            // Don't redact a variable reference.
+            redacted << path.getFieldName(0);
+            ++startPos;
+        }
+        for (size_t i = startPos; i < path.getPathLength(); ++i) {
+            if (i > 0) {
+                redacted << ".";
+            }
+            redacted << options.redactFieldNamesStrategy(path.getFieldName(i));
+        }
+        return Value(redacted.str());
     } else {
-        return Value("$$" + _fieldPath.fullPath());
+        return Value(prefix + path.fullPath());
     }
 }
 
@@ -2677,16 +2702,16 @@ intrusive_ptr<Expression> ExpressionFilter::optimize() {
     return this;
 }
 
-Value ExpressionFilter::serialize(bool explain) const {
+Value ExpressionFilter::serialize(SerializationOptions options) const {
     if (_limit) {
         return Value(DOC(
-            "$filter" << DOC("input" << _children[_kInput]->serialize(explain) << "as" << _varName
-                                     << "cond" << _children[_kCond]->serialize(explain) << "limit"
-                                     << (_children[*_limit])->serialize(explain))));
+            "$filter" << DOC("input" << _children[_kInput]->serialize(options) << "as" << _varName
+                                     << "cond" << _children[_kCond]->serialize(options) << "limit"
+                                     << (_children[*_limit])->serialize(options))));
     }
     return Value(
-        DOC("$filter" << DOC("input" << _children[_kInput]->serialize(explain) << "as" << _varName
-                                     << "cond" << _children[_kCond]->serialize(explain))));
+        DOC("$filter" << DOC("input" << _children[_kInput]->serialize(options) << "as" << _varName
+                                     << "cond" << _children[_kCond]->serialize(options))));
 }
 
 Value ExpressionFilter::evaluate(const Document& root, Variables* variables) const {
@@ -2870,15 +2895,15 @@ intrusive_ptr<Expression> ExpressionLet::optimize() {
     return this;
 }
 
-Value ExpressionLet::serialize(bool explain) const {
+Value ExpressionLet::serialize(SerializationOptions options) const {
     MutableDocument vars;
     for (VariableMap::const_iterator it = _variables.begin(), end = _variables.end(); it != end;
          ++it) {
-        vars[it->second.name] = it->second.expression->serialize(explain);
+        vars[it->second.name] = it->second.expression->serialize(options);
     }
 
     return Value(DOC("$let" << DOC("vars" << vars.freeze() << "in"
-                                          << _children[_kSubExpression]->serialize(explain))));
+                                          << _children[_kSubExpression]->serialize(options))));
 }
 
 Value ExpressionLet::evaluate(const Document& root, Variables* variables) const {
@@ -2958,10 +2983,10 @@ intrusive_ptr<Expression> ExpressionMap::optimize() {
     return this;
 }
 
-Value ExpressionMap::serialize(bool explain) const {
+Value ExpressionMap::serialize(SerializationOptions options) const {
     return Value(
-        DOC("$map" << DOC("input" << _children[_kInput]->serialize(explain) << "as" << _varName
-                                  << "in" << _children[_kEach]->serialize(explain))));
+        DOC("$map" << DOC("input" << _children[_kInput]->serialize(options) << "as" << _varName
+                                  << "in" << _children[_kEach]->serialize(options))));
 }
 
 Value ExpressionMap::evaluate(const Document& root, Variables* variables) const {
@@ -3109,7 +3134,7 @@ ExpressionMeta::ExpressionMeta(ExpressionContext* const expCtx, MetaType metaTyp
     expCtx->sbeCompatible = false;
 }
 
-Value ExpressionMeta::serialize(bool explain) const {
+Value ExpressionMeta::serialize(SerializationOptions options) const {
     const auto nameIter = kMetaTypeToMetaName.find(_metaType);
     invariant(nameIter != kMetaTypeToMetaName.end());
     return Value(DOC("$meta" << nameIter->second));
@@ -3859,10 +3884,10 @@ Value toValue(const std::array<std::uint8_t, 32>& buf) {
     return Value(BSONBinData(vec.data(), vec.size(), BinDataType::Encrypt));
 }
 
-Value ExpressionInternalFLEEqual::serialize(bool explain) const {
+Value ExpressionInternalFLEEqual::serialize(SerializationOptions options) const {
     return Value(Document{
         {kInternalFleEq,
-         Document{{"field", _children[0]->serialize(explain)},
+         Document{{"field", _children[0]->serialize(options)},
                   {"edc", toValue(_evaluator.edcTokens()[0])},
                   {"counter", Value(static_cast<long long>(_evaluator.contentionFactor()))},
                   {"server", toValue(_evaluator.serverToken())}}}});
@@ -3935,7 +3960,7 @@ intrusive_ptr<Expression> ExpressionInternalFLEBetween::parse(ExpressionContext*
         expCtx, std::move(fieldExpr), serverTokenPair.second, cf, edcTokens);
 }
 
-Value ExpressionInternalFLEBetween::serialize(bool explain) const {
+Value ExpressionInternalFLEBetween::serialize(SerializationOptions options) const {
     std::vector<Value> edcValues;
     edcValues.reserve(_evaluator.edcTokens().size());
     for (auto& token : _evaluator.edcTokens()) {
@@ -3943,7 +3968,7 @@ Value ExpressionInternalFLEBetween::serialize(bool explain) const {
     }
     return Value(Document{
         {kInternalFleBetween,
-         Document{{"field", _children[0]->serialize(explain)},
+         Document{{"field", _children[0]->serialize(options)},
                   {"edc", Value(edcValues)},
                   {"counter", Value(static_cast<long long>(_evaluator.contentionFactor()))},
                   {"server", toValue(_evaluator.serverToken())}}}});
@@ -4097,12 +4122,12 @@ void ExpressionNary::addOperand(const intrusive_ptr<Expression>& pExpression) {
     _children.push_back(pExpression);
 }
 
-Value ExpressionNary::serialize(bool explain) const {
+Value ExpressionNary::serialize(SerializationOptions options) const {
     const size_t nOperand = _children.size();
     vector<Value> array;
     /* build up the array */
     for (size_t i = 0; i < nOperand; i++)
-        array.push_back(_children[i]->serialize(explain));
+        array.push_back(_children[i]->serialize(options));
 
     return Value(DOC(getOpName() << array));
 }
@@ -4562,21 +4587,21 @@ intrusive_ptr<Expression> ExpressionReduce::optimize() {
     return this;
 }
 
-Value ExpressionReduce::serialize(bool explain) const {
+Value ExpressionReduce::serialize(SerializationOptions options) const {
     return Value(Document{{"$reduce",
-                           Document{{"input", _children[_kInput]->serialize(explain)},
-                                    {"initialValue", _children[_kInitial]->serialize(explain)},
-                                    {"in", _children[_kIn]->serialize(explain)}}}});
+                           Document{{"input", _children[_kInput]->serialize(options)},
+                                    {"initialValue", _children[_kInitial]->serialize(options)},
+                                    {"in", _children[_kIn]->serialize(options)}}}});
 }
 
 /* ------------------------ ExpressionReplaceBase ------------------------ */
 
-Value ExpressionReplaceBase::serialize(bool explain) const {
+Value ExpressionReplaceBase::serialize(SerializationOptions options) const {
     return Value(
         Document{{getOpName(),
-                  Document{{"input", _children[_kInput]->serialize(explain)},
-                           {"find", _children[_kFind]->serialize(explain)},
-                           {"replacement", _children[_kReplacement]->serialize(explain)}}}});
+                  Document{{"input", _children[_kInput]->serialize(options)},
+                           {"find", _children[_kFind]->serialize(options)},
+                           {"replacement", _children[_kReplacement]->serialize(options)}}}});
 }
 
 namespace {
@@ -4860,9 +4885,9 @@ intrusive_ptr<Expression> ExpressionSortArray::optimize() {
     return this;
 }
 
-Value ExpressionSortArray::serialize(bool explain) const {
+Value ExpressionSortArray::serialize(SerializationOptions options) const {
     return Value(Document{{kName,
-                           Document{{"input", _children[_kInput]->serialize(explain)},
+                           Document{{"input", _children[_kInput]->serialize(options)},
                                     {"sortBy", _sortBy.getOriginalElement()}}}});
 }
 
@@ -5807,20 +5832,20 @@ boost::intrusive_ptr<Expression> ExpressionSwitch::optimize() {
     return this;
 }
 
-Value ExpressionSwitch::serialize(bool explain) const {
+Value ExpressionSwitch::serialize(SerializationOptions options) const {
     std::vector<Value> serializedBranches;
     serializedBranches.reserve(numBranches());
 
     for (int i = 0; i < numBranches(); ++i) {
         auto [caseExpr, thenExpr] = getBranch(i);
-        serializedBranches.push_back(Value(Document{{"case", caseExpr->serialize(explain)},
-                                                    {"then", thenExpr->serialize(explain)}}));
+        serializedBranches.push_back(Value(Document{{"case", caseExpr->serialize(options)},
+                                                    {"then", thenExpr->serialize(options)}}));
     }
 
     if (defaultExpr()) {
         return Value(Document{{"$switch",
                                Document{{"branches", Value(serializedBranches)},
-                                        {"default", defaultExpr()->serialize(explain)}}}});
+                                        {"default", defaultExpr()->serialize(options)}}}});
     }
 
     return Value(Document{{"$switch", Document{{"branches", Value(serializedBranches)}}}});
@@ -6062,12 +6087,12 @@ boost::intrusive_ptr<Expression> ExpressionTrim::optimize() {
     return this;
 }
 
-Value ExpressionTrim::serialize(bool explain) const {
+Value ExpressionTrim::serialize(SerializationOptions options) const {
     return Value(
         Document{{_name,
-                  Document{{"input", _children[_kInput]->serialize(explain)},
+                  Document{{"input", _children[_kInput]->serialize(options)},
                            {"chars",
-                            _children[_kCharacters] ? _children[_kCharacters]->serialize(explain)
+                            _children[_kCharacters] ? _children[_kCharacters]->serialize(options)
                                                     : Value()}}}});
 }
 
@@ -6359,17 +6384,17 @@ boost::intrusive_ptr<Expression> ExpressionZip::optimize() {
     return this;
 }
 
-Value ExpressionZip::serialize(bool explain) const {
+Value ExpressionZip::serialize(SerializationOptions options) const {
     vector<Value> serializedInput;
     vector<Value> serializedDefaults;
     Value serializedUseLongestLength = Value(_useLongestLength);
 
     for (auto&& expr : _inputs) {
-        serializedInput.push_back(expr.get()->serialize(explain));
+        serializedInput.push_back(expr.get()->serialize(options));
     }
 
     for (auto&& expr : _defaults) {
-        serializedDefaults.push_back(expr.get()->serialize(explain));
+        serializedDefaults.push_back(expr.get()->serialize(options));
     }
 
     return Value(DOC("$zip" << DOC("inputs" << Value(serializedInput) << "defaults"
@@ -6938,15 +6963,15 @@ boost::intrusive_ptr<Expression> ExpressionConvert::optimize() {
     return this;
 }
 
-Value ExpressionConvert::serialize(bool explain) const {
+Value ExpressionConvert::serialize(SerializationOptions options) const {
     return Value(Document{
         {"$convert",
          Document{
-             {"input", _children[_kInput]->serialize(explain)},
-             {"to", _children[_kTo]->serialize(explain)},
-             {"onError", _children[_kOnError] ? _children[_kOnError]->serialize(explain) : Value()},
+             {"input", _children[_kInput]->serialize(options)},
+             {"to", _children[_kTo]->serialize(options)},
+             {"onError", _children[_kOnError] ? _children[_kOnError]->serialize(options) : Value()},
              {"onNull",
-              _children[_kOnNull] ? _children[_kOnNull]->serialize(explain) : Value()}}}});
+              _children[_kOnNull] ? _children[_kOnNull]->serialize(options) : Value()}}}});
 }
 
 BSONType ExpressionConvert::computeTargetType(Value targetTypeName) const {
@@ -7134,13 +7159,13 @@ void ExpressionRegex::_compile(RegexExecutionState* executionState) const {
     executionState->numCaptures = executionState->pcrePtr->captureCount();
 }
 
-Value ExpressionRegex::serialize(bool explain) const {
+Value ExpressionRegex::serialize(SerializationOptions options) const {
     return Value(Document{
         {_opName,
-         Document{{"input", _children[_kInput]->serialize(explain)},
-                  {"regex", _children[_kRegex]->serialize(explain)},
+         Document{{"input", _children[_kInput]->serialize(options)},
+                  {"regex", _children[_kRegex]->serialize(options)},
                   {"options",
-                   _children[_kOptions] ? _children[_kOptions]->serialize(explain) : Value()}}}});
+                   _children[_kOptions] ? _children[_kOptions]->serialize(options) : Value()}}}});
 }
 
 void ExpressionRegex::_extractInputField(RegexExecutionState* executionState,
@@ -7394,7 +7419,7 @@ intrusive_ptr<Expression> ExpressionRandom::optimize() {
     return intrusive_ptr<Expression>(this);
 }
 
-Value ExpressionRandom::serialize(const bool explain) const {
+Value ExpressionRandom::serialize(SerializationOptions options) const {
     return Value(DOC(getOpName() << Document()));
 }
 
@@ -7417,8 +7442,8 @@ Value ExpressionToHashedIndexKey::evaluate(const Document& root, Variables* vari
                                            BSONElementHasher::DEFAULT_HASH_SEED));
 }
 
-Value ExpressionToHashedIndexKey::serialize(bool explain) const {
-    return Value(DOC("$toHashedIndexKey" << _children[0]->serialize(explain)));
+Value ExpressionToHashedIndexKey::serialize(SerializationOptions options) const {
+    return Value(DOC("$toHashedIndexKey" << _children[0]->serialize(options)));
 }
 
 /* ------------------------- ExpressionDateArithmetics -------------------------- */
@@ -7501,14 +7526,14 @@ boost::intrusive_ptr<Expression> ExpressionDateArithmetics::optimize() {
     return intrusive_ptr<Expression>(this);
 }
 
-Value ExpressionDateArithmetics::serialize(bool explain) const {
+Value ExpressionDateArithmetics::serialize(SerializationOptions options) const {
     return Value(Document{
         {_opName,
-         Document{{"startDate", _children[_kStartDate]->serialize(explain)},
-                  {"unit", _children[_kUnit]->serialize(explain)},
-                  {"amount", _children[_kAmount]->serialize(explain)},
+         Document{{"startDate", _children[_kStartDate]->serialize(options)},
+                  {"unit", _children[_kUnit]->serialize(options)},
+                  {"amount", _children[_kAmount]->serialize(options)},
                   {"timezone",
-                   _children[_kTimeZone] ? _children[_kTimeZone]->serialize(explain) : Value()}}}});
+                   _children[_kTimeZone] ? _children[_kTimeZone]->serialize(options) : Value()}}}});
 }
 
 Value ExpressionDateArithmetics::evaluate(const Document& root, Variables* variables) const {
@@ -7744,17 +7769,17 @@ boost::intrusive_ptr<Expression> ExpressionDateTrunc::optimize() {
     return this;
 };
 
-Value ExpressionDateTrunc::serialize(bool explain) const {
+Value ExpressionDateTrunc::serialize(SerializationOptions options) const {
     return Value{Document{
         {"$dateTrunc"_sd,
-         Document{{"date"_sd, _children[_kDate]->serialize(explain)},
-                  {"unit"_sd, _children[_kUnit]->serialize(explain)},
+         Document{{"date"_sd, _children[_kDate]->serialize(options)},
+                  {"unit"_sd, _children[_kUnit]->serialize(options)},
                   {"binSize"_sd,
-                   _children[_kBinSize] ? _children[_kBinSize]->serialize(explain) : Value{}},
+                   _children[_kBinSize] ? _children[_kBinSize]->serialize(options) : Value{}},
                   {"timezone"_sd,
-                   _children[_kTimeZone] ? _children[_kTimeZone]->serialize(explain) : Value{}},
+                   _children[_kTimeZone] ? _children[_kTimeZone]->serialize(options) : Value{}},
                   {"startOfWeek"_sd,
-                   _children[_kStartOfWeek] ? _children[_kStartOfWeek]->serialize(explain)
+                   _children[_kStartOfWeek] ? _children[_kStartOfWeek]->serialize(options)
                                             : Value{}}}}}};
 };
 
@@ -7948,10 +7973,10 @@ intrusive_ptr<Expression> ExpressionGetField::optimize() {
     return intrusive_ptr<Expression>(this);
 }
 
-Value ExpressionGetField::serialize(const bool explain) const {
+Value ExpressionGetField::serialize(SerializationOptions options) const {
     return Value(Document{{"$getField"_sd,
-                           Document{{"field"_sd, _children[_kField]->serialize(explain)},
-                                    {"input"_sd, _children[_kInput]->serialize(explain)}}}});
+                           Document{{"field"_sd, _children[_kField]->serialize(options)},
+                                    {"input"_sd, _children[_kInput]->serialize(options)}}}});
 }
 
 /* -------------------------- ExpressionSetField ------------------------------ */
@@ -8061,11 +8086,11 @@ intrusive_ptr<Expression> ExpressionSetField::optimize() {
     return intrusive_ptr<Expression>(this);
 }
 
-Value ExpressionSetField::serialize(const bool explain) const {
+Value ExpressionSetField::serialize(SerializationOptions options) const {
     return Value(Document{{"$setField"_sd,
-                           Document{{"field"_sd, _children[_kField]->serialize(explain)},
-                                    {"input"_sd, _children[_kInput]->serialize(explain)},
-                                    {"value"_sd, _children[_kValue]->serialize(explain)}}}});
+                           Document{{"field"_sd, _children[_kField]->serialize(options)},
+                                    {"input"_sd, _children[_kInput]->serialize(options)},
+                                    {"value"_sd, _children[_kValue]->serialize(options)}}}});
 }
 
 /* ------------------------- ExpressionTsSecond ----------------------------- */
