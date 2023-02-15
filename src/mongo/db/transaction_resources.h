@@ -76,7 +76,7 @@ namespace shard_role_details {
 struct AcquiredCollection {
     AcquisitionPrerequisites prerequisites;
 
-    boost::optional<Lock::DBLock> dbLock;
+    std::shared_ptr<Lock::DBLock> dbLock;
     boost::optional<Lock::CollectionLock> collectionLock;
     ScopedCollectionDescription collectionDescription;
     boost::optional<ScopedCollectionFilter> ownershipFilter;

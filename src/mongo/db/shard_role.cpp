@@ -76,7 +76,7 @@ struct ResolvedNamespaceOrViewAcquisitionRequest {
     AcquisitionPrerequisites prerequisites;
 
     // Populated optionally in the second phase of collection(s) acquisition
-    boost::optional<Lock::DBLock> dbLock;
+    std::shared_ptr<Lock::DBLock> dbLock;
     boost::optional<Lock::CollectionLock> collLock;
 };
 
@@ -101,7 +101,7 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
                 *ar.nss, ar.uuid, ar.placementConcern, ar.operationType, ar.viewMode);
 
             ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
-                prerequisites, boost::none, boost::none};
+                prerequisites, nullptr, boost::none};
             sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, *ar.nss),
                                               std::move(resolvedAcquisitionRequest));
         } else if (ar.dbname) {
@@ -123,7 +123,7 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
                 coll->ns(), coll->uuid(), ar.placementConcern, ar.operationType, ar.viewMode);
 
             ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
-                prerequisites, boost::none, boost::none};
+                prerequisites, nullptr, boost::none};
 
             sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, coll->ns()),
                                               std::move(resolvedAcquisitionRequest));
@@ -339,6 +339,10 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
     OperationContext* opCtx,
     std::initializer_list<NamespaceOrViewAcquisitionRequest> acquisitionRequests,
     LockMode mode) {
+    if (acquisitionRequests.size() == 0) {
+        return {};
+    }
+
     // Optimistically populate the nss and uuid parts of the resolved acquisition requests and sort
     // them
     while (true) {
@@ -352,12 +356,19 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
         // Lock the collection locks in the sorted order and pass the resolved namespaces to
         // acquireCollectionsOrViewsWithoutTakingLocks. If it throws CollectionUUIDMismatch, we
         // need to start over.
+        const auto& dbName = sortedAcquisitionRequests.begin()->second.prerequisites.nss.dbName();
+        const auto dbLock = std::make_shared<Lock::DBLock>(
+            opCtx, dbName, isSharedLockMode(mode) ? MODE_IS : MODE_IX);
+
         for (auto& ar : sortedAcquisitionRequests) {
-            // TODO: SERVER-73004 When acquiring multiple collections, avoid recursively locking the
-            // dbLock because that causes recursive locking of the globalLock which prevents
-            // yielding.
             const auto& nss = ar.second.prerequisites.nss;
-            ar.second.dbLock.emplace(opCtx, nss.db(), isSharedLockMode(mode) ? MODE_IS : MODE_IX);
+            tassert(7300400,
+                    str::stream()
+                        << "Cannot acquire locks for collections across different databases ('"
+                        << dbName << "' vs '" << nss.dbName() << "'",
+                    dbName == nss.dbName());
+
+            ar.second.dbLock = dbLock;
             ar.second.collLock.emplace(opCtx, nss, mode);
         }
 

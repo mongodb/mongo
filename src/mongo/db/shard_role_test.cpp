@@ -38,6 +38,8 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
@@ -599,6 +601,14 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsAllWithCorrectPlacementConcern) 
     ASSERT_FALSE(acquisitionShardedColl->isView());
     ASSERT_TRUE(acquisitionShardedColl->getShardingDescription().isSharded());
     ASSERT_TRUE(acquisitionShardedColl->getCollectionFilter().has_value());
+
+    // Assert the DB lock is held, but not recursively (i.e. only once).
+    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IX));
+    ASSERT_FALSE(opCtx()->lockState()->isGlobalLockedRecursively());
+
+    // Assert both collections are locked.
+    ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nssUnshardedCollection1, MODE_IX));
+    ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nssShardedCollection1, MODE_IX));
 }
 
 TEST_F(ShardRoleTest, AcquireMultipleCollectionsWithIncorrectPlacementConcernThrows) {
@@ -626,6 +636,27 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsWithIncorrectPlacementConcernThr
             ASSERT_EQ(ShardId("this"), exInfo->getShardId());
             ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
         });
+}
+
+DEATH_TEST_REGEX_F(ShardRoleTest,
+                   ForbiddenToAcquireMultipleCollectionsOnDifferentDatabases,
+                   "Tripwire assertion") {
+    ASSERT_THROWS_CODE(
+        acquireCollectionsOrViews(
+            opCtx(),
+            {{nssUnshardedCollection1,
+              NamespaceOrViewAcquisitionRequest::kPretendUnshardedDueToDirectConnection,
+              repl::ReadConcernArgs(),
+              AcquisitionPrerequisites::kWrite,
+              AcquisitionPrerequisites::kMustBeCollection},
+             {NamespaceString::createNamespaceString_forTest("anotherDb", "foo"),
+              NamespaceOrViewAcquisitionRequest::kPretendUnshardedDueToDirectConnection,
+              repl::ReadConcernArgs(),
+              AcquisitionPrerequisites::kWrite,
+              AcquisitionPrerequisites::kMustBeCollection}},
+            MODE_IX),
+        DBException,
+        7300400);
 }
 
 // ---------------------------------------------------------------------------
@@ -732,14 +763,17 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithLocks) {
                                     AcquisitionPrerequisites::kMustBeCollection}},
                                   MODE_IX);
 
+    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
     ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
     ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 
     // Restore the resources
     restoreTransactionResourcesToOperationContext(opCtx(), std::move(yieldedTransactionResources));
+    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
     ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 }
 
@@ -791,6 +825,7 @@ TEST_F(ShardRoleTest, RestoreForWriteFailsIfPlacementConcernNoLongerMet) {
                                  ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
                              });
 
+    ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
     ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 }
 
