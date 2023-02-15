@@ -36,7 +36,7 @@ if env.GetOption('ninja') == 'disabled':
     for test in tests:
         test_env = mongo_tidy_test_env.Clone()
         compilation_dbs += test_env.CompilationDatabase(
-            os.path.splitext(os.path.basename(test))[0] + ".json")
+            os.path.splitext(os.path.basename(test))[0] + "/compile_commands.json")
         test_objs += test_env.Object(test)
 
     # Building a program binary may not be necessary but it does validate the code and tie it together.

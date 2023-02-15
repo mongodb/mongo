@@ -64,7 +64,7 @@ class MongoTidyTests(unittest.TestCase):
         self.config_file = None
         self.expected_output = None
         for compiledb in self.COMPILE_COMMANDS_FILES:
-            if compiledb.endswith("/" + self._testMethodName + ".json"):
+            if compiledb.endswith("/" + self._testMethodName + "/compile_commands.json"):
                 self.compile_db = compiledb
         if self.compile_db:
             self.cmd = [

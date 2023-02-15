@@ -20,9 +20,10 @@ import yaml
 from clang_tidy_vscode import CHECKS_SO
 
 
-def _clang_tidy_executor(clang_tidy_filename: Path, clang_tidy_binary: str,
-                         clang_tidy_cfg: Dict[str, Any], output_dir: str, show_stdout: bool,
-                         mongo_check_module: str = '') -> Tuple[str, Optional[str]]:
+def _clang_tidy_executor(
+        clang_tidy_filename: Path, clang_tidy_binary: str, clang_tidy_cfg: Dict[str, Any],
+        output_dir: str, show_stdout: bool, mongo_check_module: str = '',
+        compile_commands: str = 'compile_commands.json') -> Tuple[str, Optional[str]]:
 
     clang_tidy_parent_dir = output_dir / clang_tidy_filename.parent
     os.makedirs(clang_tidy_parent_dir, exist_ok=True)
@@ -36,7 +37,8 @@ def _clang_tidy_executor(clang_tidy_filename: Path, clang_tidy_binary: str,
         load_module_option = []
 
     clang_tidy_command = [
-        clang_tidy_binary, *load_module_option, clang_tidy_filename,
+        clang_tidy_binary, *load_module_option, '-p',
+        os.path.dirname(compile_commands), clang_tidy_filename,
         f"-export-fixes={output_filename_fixes}", f"-config={json.dumps(clang_tidy_cfg)}"
     ]
     proc = subprocess.run(clang_tidy_command, capture_output=True, check=False)
@@ -206,7 +208,7 @@ def main():
             clang_tidy_executor_futures.append(
                 executor.submit(_clang_tidy_executor, clang_tidy_filename, clang_tidy_binary,
                                 clang_tidy_cfg, args.output_dir, args.show_stdout,
-                                mongo_tidy_check_module))
+                                mongo_tidy_check_module, compile_commands=args.compile_commands))
 
         for future in futures.as_completed(clang_tidy_executor_futures):
             clang_tidy_errors_futures.append(future.result()[0])
