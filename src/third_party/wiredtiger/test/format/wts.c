@@ -197,6 +197,23 @@ configure_timing_stress(char **p, size_t max)
 }
 
 /*
+ * configure_file_manager --
+ *     Configure file manager settings.
+ */
+static void
+configure_file_manager(char **p, size_t max)
+{
+    CONFIG_APPEND(*p, ",file_manager=[");
+    if (GV(FILE_MANAGER_CLOSE_HANDLE_MINIMUM) != 0)
+        CONFIG_APPEND(*p, ",close_handle_minimum=%" PRIu32, GV(FILE_MANAGER_CLOSE_HANDLE_MINIMUM));
+    if (GV(FILE_MANAGER_CLOSE_IDLE_TIME) != 0)
+        CONFIG_APPEND(*p, ",close_idle_time=%" PRIu32, GV(FILE_MANAGER_CLOSE_IDLE_TIME));
+    if (GV(FILE_MANAGER_CLOSE_SCAN_INTERVAL) != 0)
+        CONFIG_APPEND(*p, ",close_scan_interval=%" PRIu32, GV(FILE_MANAGER_CLOSE_SCAN_INTERVAL));
+    CONFIG_APPEND(*p, "]");
+}
+
+/*
  * configure_debug_mode --
  *     Configure debug settings.
  */
@@ -323,6 +340,9 @@ create_database(const char *home, WT_CONNECTION **connp)
 
     /* Optional timing stress. */
     configure_timing_stress(&p, max);
+
+    /* Optional file manager. */
+    configure_file_manager(&p, max);
 
     /* Optional debug mode. */
     configure_debug_mode(&p, max);
@@ -525,6 +545,9 @@ wts_open(const char *home, WT_CONNECTION **connp, bool verify_metadata)
 
     /* Optional timing stress. */
     configure_timing_stress(&p, max);
+
+    /* Optional file manager. */
+    configure_file_manager(&p, max);
 
     /* Optional debug mode. */
     configure_debug_mode(&p, max);
