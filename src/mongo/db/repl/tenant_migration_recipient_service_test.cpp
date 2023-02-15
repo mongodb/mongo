@@ -336,7 +336,7 @@ protected:
         ASSERT_BSONOBJ_EQ(memoryStateDoc.toBSON(), persistedStateDocWithStatus.getValue().toBSON());
     }
     void insertToNodes(MockReplicaSet* replSet,
-                       const std::string& nss,
+                       const NamespaceString& nss,
                        BSONObj obj,
                        const std::vector<HostAndPort>& hosts) {
         for (const auto& host : hosts) {
@@ -344,12 +344,12 @@ protected:
         }
     }
 
-    void insertToAllNodes(MockReplicaSet* replSet, const std::string& nss, BSONObj obj) {
+    void insertToAllNodes(MockReplicaSet* replSet, const NamespaceString& nss, BSONObj obj) {
         insertToNodes(replSet, nss, obj, replSet->getHosts());
     }
 
     void clearCollection(MockReplicaSet* replSet,
-                         const std::string& nss,
+                         const NamespaceString& nss,
                          const std::vector<HostAndPort>& hosts) {
         for (const auto& host : hosts) {
             replSet->getNode(host.toString())->remove(nss, BSONObj{} /*filter*/);
@@ -362,9 +362,9 @@ protected:
         const auto targetHosts = hosts.empty() ? replSet->getHosts() : hosts;
         // The MockRemoteDBService does not actually implement the database, so to make our
         // find work correctly we must make sure there's only one document to find.
-        clearCollection(replSet, NamespaceString::kRsOplogNamespace.ns(), targetHosts);
+        clearCollection(replSet, NamespaceString::kRsOplogNamespace, targetHosts);
         insertToNodes(replSet,
-                      NamespaceString::kRsOplogNamespace.ns(),
+                      NamespaceString::kRsOplogNamespace,
                       makeOplogEntry(topOfOplogOpTime,
                                      OpTypeEnum::kNoop,
                                      {} /* namespace */,
@@ -450,7 +450,7 @@ protected:
         multiversion::FeatureCompatibilityVersion version = multiversion::GenericFCV::kLatest) {
         auto fcvDoc = FeatureCompatibilityVersionDocument(version);
         auto client = getClient(instance);
-        client->insert(NamespaceString::kServerConfigurationNamespace.ns(), fcvDoc.toBSON());
+        client->insert(NamespaceString::kServerConfigurationNamespace, fcvDoc.toBSON());
     }
 
     ClockSource* clock() {
@@ -1395,7 +1395,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
     lastTxn.setStartOpTime(txnStartOpTime);
     lastTxn.setState(DurableTxnStateEnum::kInProgress);
     insertToAllNodes(
-        &replSet, NamespaceString::kSessionTransactionsTableNamespace.ns(), lastTxn.toBSON());
+        &replSet, NamespaceString::kSessionTransactionsTableNamespace, lastTxn.toBSON());
 
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,

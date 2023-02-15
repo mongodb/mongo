@@ -173,7 +173,7 @@ TEST_F(ShardKeyIndexUtilTest, ExcludesMultiKeyIfRequiresSingleKey) {
                            << "v" << kIndexVersion));
 
     DBDirectClient client(opCtx());
-    client.insert(nss().ns(), BSON("x" << BSON_ARRAY(1 << 2)));
+    client.insert(nss(), BSON("x" << BSON_ARRAY(1 << 2)));
 
     auto index = findShardKeyPrefixedIndex(
         opCtx(), coll(), coll()->getIndexCatalog(), BSON("x" << 1), true /* requireSingleKey */);
@@ -187,7 +187,7 @@ TEST_F(ShardKeyIndexUtilTest, IncludesMultiKeyIfSingleKeyNotRequired) {
                            << "v" << kIndexVersion));
 
     DBDirectClient client(opCtx());
-    client.insert(nss().ns(), BSON("x" << BSON_ARRAY(1 << 2)));
+    client.insert(nss(), BSON("x" << BSON_ARRAY(1 << 2)));
 
     auto index = findShardKeyPrefixedIndex(
         opCtx(), coll(), coll()->getIndexCatalog(), BSON("x" << 1), false /* requireSingleKey */);

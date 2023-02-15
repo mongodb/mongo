@@ -1441,7 +1441,7 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
     imageEntry.setImage(preImage);
 
     DBDirectClient client(opCtx());
-    client.insert(NamespaceString::kConfigImagesNamespace.ns(), imageEntry.toBSON());
+    client.insert(NamespaceString::kConfigImagesNamespace, imageEntry.toBSON());
 
     repl::DurableOplogEntry oplog(opTime,
                                   repl::OpTypeEnum::kUpdate,
@@ -1557,7 +1557,7 @@ TEST_F(ReshardingAggWithStorageTest,
     imageEntry.setImage(preImage);
 
     DBDirectClient client(opCtx());
-    client.insert(NamespaceString::kConfigImagesNamespace.ns(), imageEntry.toBSON());
+    client.insert(NamespaceString::kConfigImagesNamespace, imageEntry.toBSON());
 
     auto createPipeline = [&](ReshardingDonorOplogId startAt) {
         std::deque<DocumentSource::GetNextResult> pipelineSource{

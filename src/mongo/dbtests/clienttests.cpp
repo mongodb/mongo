@@ -85,7 +85,7 @@ public:
         const bool includeBuildUUIDs = false;
         const int options = 0;
 
-        db.insert(ns(), BSON("x" << 2));
+        db.insert(nss(), BSON("x" << 2));
         ASSERT_EQUALS(1u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1)));
@@ -116,8 +116,8 @@ public:
         dbtests::WriteContextForTests ctx(&opCtx, ns());
         DBDirectClient db(&opCtx);
 
-        db.insert(ns(), BSON("x" << 1 << "y" << 2));
-        db.insert(ns(), BSON("x" << 2 << "y" << 2));
+        db.insert(nss(), BSON("x" << 1 << "y" << 2));
+        db.insert(nss(), BSON("x" << 2 << "y" << 2));
 
         ASSERT(ctx.getCollection());
         // Helper to refetch the IndexCatalog from the catalog in order to see any changes made to
@@ -156,7 +156,7 @@ public:
 
         const string longs(770, 'c');
         for (int i = 0; i < 1111; ++i) {
-            db.insert(ns(), BSON("a" << i << "b" << longs));
+            db.insert(nss(), BSON("a" << i << "b" << longs));
         }
 
         ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("a" << 1 << "b" << 1)));
@@ -177,7 +177,7 @@ public:
         DBDirectClient db(&opCtx);
 
         for (int i = 0; i < 10; ++i) {
-            db.insert(ns(), BSON("i" << i));
+            db.insert(nss(), BSON("i" << i));
         }
 
         FindCommandRequest findRequest{NamespaceString{ns()}};

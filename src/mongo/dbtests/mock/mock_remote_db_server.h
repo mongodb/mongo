@@ -44,7 +44,7 @@ namespace projection_executor {
 class ProjectionExecutor;
 }  // namespace projection_executor
 
-const std::string IdentityNS("local.me");
+const NamespaceString IdentityNS = NamespaceString::createNamespaceString_forTest("local.me");
 const BSONField<std::string> HostField("host");
 
 /**
@@ -136,18 +136,18 @@ public:
     /**
      * Inserts a single document to this server.
      *
-     * @param ns the namespace to insert the document to.
+     * @param nss the namespace to insert the document to.
      * @param obj the document to insert.
      */
-    void insert(const std::string& ns, BSONObj obj);
+    void insert(const NamespaceString& nss, BSONObj obj);
 
     /**
      * Removes documents from this server.
      *
-     * @param ns the namespace to remove documents from.
+     * @param nss the namespace to remove documents from.
      * @param filter ignored.
      */
-    void remove(const std::string& ns, const BSONObj& filter);
+    void remove(const NamespaceString& nss, const BSONObj& filter);
 
     /**
      * Assign a UUID to a collection

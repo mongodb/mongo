@@ -124,20 +124,20 @@ void MockRemoteDBServer::setCommandReply(const string& cmdName,
     _cmdMap[cmdName].reset(new CircularBSONIterator(replySequence));
 }
 
-void MockRemoteDBServer::insert(const string& ns, BSONObj obj) {
+void MockRemoteDBServer::insert(const NamespaceString& nss, BSONObj obj) {
     scoped_spinlock sLock(_lock);
 
-    vector<BSONObj>& mockCollection = _dataMgr[ns];
+    vector<BSONObj>& mockCollection = _dataMgr[nss.ns()];
     mockCollection.push_back(obj.copy());
 }
 
-void MockRemoteDBServer::remove(const string& ns, const BSONObj&) {
+void MockRemoteDBServer::remove(const NamespaceString& nss, const BSONObj&) {
     scoped_spinlock sLock(_lock);
-    if (_dataMgr.count(ns) == 0) {
+    if (_dataMgr.count(nss.ns()) == 0) {
         return;
     }
 
-    _dataMgr.erase(ns);
+    _dataMgr.erase(nss.ns());
 }
 
 void MockRemoteDBServer::assignCollectionUuid(const std::string& ns, const mongo::UUID& uuid) {

@@ -124,7 +124,7 @@ struct Type0 : Base {
             b.append("files_id", 0);
             b.append("n", 0);
             b.appendBinData("data", 6, BinDataGeneral, "hello ");
-            db.insert(nss().ns(), b.obj());
+            db.insert(nss(), b.obj());
         }
         {
             BSONObjBuilder b;
@@ -132,7 +132,7 @@ struct Type0 : Base {
             b.append("files_id", 0);
             b.append("n", 1);
             b.appendBinData("data", 5, BinDataGeneral, "world");
-            db.insert(nss().ns(), b.obj());
+            db.insert(nss(), b.obj());
         }
 
         BSONObj result;
@@ -148,7 +148,7 @@ struct Type2 : Base {
             b.append("files_id", 0);
             b.append("n", 0);
             b.appendBinDataArrayDeprecated("data", "hello ", 6);
-            db.insert(nss().ns(), b.obj());
+            db.insert(nss(), b.obj());
         }
         {
             BSONObjBuilder b;
@@ -156,7 +156,7 @@ struct Type2 : Base {
             b.append("files_id", 0);
             b.append("n", 1);
             b.appendBinDataArrayDeprecated("data", "world", 5);
-            db.insert(nss().ns(), b.obj());
+            db.insert(nss(), b.obj());
         }
 
         BSONObj result;
@@ -281,7 +281,7 @@ public:
             b.genOID();
             b.append("name", "Tom");
             b.append("rating", 0);
-            db.insert(nss().ns(), b.obj());
+            db.insert(nss(), b.obj());
         }
 
         BSONObjBuilder cmd;

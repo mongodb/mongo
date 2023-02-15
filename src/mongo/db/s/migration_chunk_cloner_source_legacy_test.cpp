@@ -568,20 +568,20 @@ protected:
                 docsToInsert.pop_front();
             }
 
-            auto response = client()->insertAcknowledged(kNss.ns(), batchToInsert);
+            auto response = client()->insertAcknowledged(kNss, batchToInsert);
             ASSERT_OK(getStatusFromWriteCommandReply(response));
             ASSERT_GT(response["n"].Int(), 0);
         }
     }
 
     void deleteDocsInShardedCollection(BSONObj query) {
-        auto response = client()->removeAcknowledged(kNss.ns(), query);
+        auto response = client()->removeAcknowledged(kNss, query);
         ASSERT_OK(getStatusFromWriteCommandReply(response));
         ASSERT_GT(response["n"].Int(), 0);
     }
 
     void updateDocsInShardedCollection(BSONObj filter, BSONObj updated) {
-        auto response = client()->updateAcknowledged(kNss.ns(), filter, updated);
+        auto response = client()->updateAcknowledged(kNss, filter, updated);
         ASSERT_OK(getStatusFromWriteCommandReply(response));
         ASSERT_GT(response["n"].Int(), 0);
     }

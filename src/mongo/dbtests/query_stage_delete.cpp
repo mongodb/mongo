@@ -59,7 +59,7 @@ public:
             BSONObjBuilder bob;
             bob.append("_id", static_cast<long long int>(i));
             bob.append("foo", static_cast<long long int>(i));
-            _client.insert(nss.ns(), bob.obj());
+            _client.insert(nss, bob.obj());
         }
     }
 
@@ -69,7 +69,7 @@ public:
     }
 
     void remove(const BSONObj& obj) {
-        _client.remove(nss.ns(), obj);
+        _client.remove(nss, obj);
     }
 
     void getRecordIds(const CollectionPtr& collection,

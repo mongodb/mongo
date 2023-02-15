@@ -98,7 +98,7 @@ Status persistRecoveryInfo(OperationContext* opCtx, const CommandInfo& command) 
     recoveryDocument.emplace_back(migrationType.toBSON());
 
     auto reply = dbClient.insertAcknowledged(
-        MigrationType::ConfigNS.ns(), recoveryDocument, true, WriteConcernOptions::Majority);
+        MigrationType::ConfigNS, recoveryDocument, true, WriteConcernOptions::Majority);
     auto insertStatus = getStatusFromWriteCommandReply(reply);
     if (insertStatus != ErrorCodes::DuplicateKey) {
         return insertStatus;
@@ -165,7 +165,7 @@ void deletePersistedRecoveryInfo(DBDirectClient& dbClient, const CommandInfo& co
     const auto& migrationCommand = checked_cast<const MoveChunkCommandInfo&>(command);
     auto recoveryDocId = migrationCommand.getRecoveryDocumentIdentifier();
     try {
-        dbClient.remove(MigrationType::ConfigNS.ns(), recoveryDocId, false /*removeMany*/);
+        dbClient.remove(MigrationType::ConfigNS, recoveryDocId, false /*removeMany*/);
     } catch (const DBException& e) {
         LOGV2_ERROR(5847214, "Failed to remove recovery info", "error"_attr = redact(e));
     }

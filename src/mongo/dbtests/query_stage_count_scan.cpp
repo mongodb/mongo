@@ -63,11 +63,11 @@ public:
     }
 
     void insert(const BSONObj& obj) {
-        _client.insert(ns().ns(), obj);
+        _client.insert(ns(), obj);
     }
 
     void remove(const BSONObj& obj) {
-        _client.remove(ns().ns(), obj);
+        _client.remove(ns(), obj);
     }
 
     /*

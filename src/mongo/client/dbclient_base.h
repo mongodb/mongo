@@ -614,7 +614,7 @@ public:
     /**
      * Executes an acknowledged command to insert a vector of documents.
      */
-    virtual BSONObj insertAcknowledged(const std::string& ns,
+    virtual BSONObj insertAcknowledged(const NamespaceString& nss,
                                        const std::vector<BSONObj>& v,
                                        bool ordered = true,
                                        boost::optional<BSONObj> writeConcernObj = boost::none);
@@ -622,7 +622,7 @@ public:
     /**
      * Executes a fire-and-forget command to insert a single document.
      */
-    virtual void insert(const std::string& ns,
+    virtual void insert(const NamespaceString& nss,
                         BSONObj obj,
                         bool ordered = true,
                         boost::optional<BSONObj> writeConcernObj = boost::none);
@@ -630,7 +630,7 @@ public:
     /**
      * Executes a fire-and-forget command to insert a vector of documents.
      */
-    virtual void insert(const std::string& ns,
+    virtual void insert(const NamespaceString& nss,
                         const std::vector<BSONObj>& v,
                         bool ordered = true,
                         boost::optional<BSONObj> writeConcernObj = boost::none);
@@ -638,7 +638,7 @@ public:
     /**
      * Executes an acknowledged command to update the objects that match the query.
      */
-    virtual BSONObj updateAcknowledged(const std::string& ns,
+    virtual BSONObj updateAcknowledged(const NamespaceString& nss,
                                        const BSONObj& filter,
                                        BSONObj updateSpec,
                                        bool upsert = false,
@@ -648,7 +648,7 @@ public:
     /**
      * Executes a fire-and-forget command to update the objects that match the query.
      */
-    virtual void update(const std::string& ns,
+    virtual void update(const NamespaceString& nss,
                         const BSONObj& filter,
                         BSONObj updateSpec,
                         bool upsert = false,
@@ -658,7 +658,7 @@ public:
     /**
      * Executes an acknowledged command to remove the objects that match the query.
      */
-    virtual BSONObj removeAcknowledged(const std::string& ns,
+    virtual BSONObj removeAcknowledged(const NamespaceString& nss,
                                        const BSONObj& filter,
                                        bool removeMany = true,
                                        boost::optional<BSONObj> writeConcernObj = boost::none);
@@ -666,12 +666,12 @@ public:
     /**
      * Executes a fire-and-forget command to remove the objects that match the query.
      */
-    virtual void remove(const std::string& ns,
+    virtual void remove(const NamespaceString& nss,
                         const BSONObj& filter,
                         bool removeMany = true,
                         boost::optional<BSONObj> writeConcernObj = boost::none);
 
-    virtual void killCursor(const NamespaceString& ns, long long cursorID);
+    virtual void killCursor(const NamespaceString& nss, long long cursorID);
 
     // This is only for DBClientCursor.
     static void (*withConnection_do_not_use)(std::string host, std::function<void(DBClientBase*)>);

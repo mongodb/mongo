@@ -112,7 +112,7 @@ int insertDocsWithinRange(
         if (nextI == max) {
             return i;
         }
-        dbclient.insert(nss.toString(), BSON(RangeDeleterServiceTest::kShardKey << nextI));
+        dbclient.insert(nss, BSON(RangeDeleterServiceTest::kShardKey << nextI));
     }
     return maxCount;
 }

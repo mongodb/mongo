@@ -43,7 +43,7 @@
 namespace mongo {
 namespace {
 
-constexpr StringData kTestNS = "config.system.sessions"_sd;
+const NamespaceString kTestNS("config.system.sessions");
 
 LogicalSessionRecord makeRecord(Date_t time = Date_t::now()) {
     auto record = makeLogicalSessionRecordForTest();
@@ -53,14 +53,14 @@ LogicalSessionRecord makeRecord(Date_t time = Date_t::now()) {
 
 Status insertRecord(OperationContext* opCtx, LogicalSessionRecord record) {
     DBDirectClient client(opCtx);
-    auto response = client.insertAcknowledged(kTestNS.toString(), {record.toBSON()});
+    auto response = client.insertAcknowledged(kTestNS, {record.toBSON()});
     return getStatusFromWriteCommandReply(response);
 }
 
 StatusWith<LogicalSessionRecord> fetchRecord(OperationContext* opCtx,
                                              const LogicalSessionId& lsid) {
     DBDirectClient client(opCtx);
-    FindCommandRequest findRequest{NamespaceString{kTestNS}};
+    FindCommandRequest findRequest{kTestNS};
     findRequest.setFilter(BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON()));
     findRequest.setLimit(1);
     auto cursor = client.find(std::move(findRequest));
@@ -82,12 +82,12 @@ public:
         : _collection(std::make_unique<SessionsCollectionStandalone>()) {
         _opCtx = cc().makeOperationContext();
         DBDirectClient db(opCtx());
-        db.remove(ns(), BSONObj());
+        db.remove(nss(), BSONObj());
     }
 
     virtual ~SessionsCollectionStandaloneTest() {
         DBDirectClient db(opCtx());
-        db.remove(ns(), BSONObj());
+        db.remove(nss(), BSONObj());
         _opCtx.reset();
     }
 
@@ -99,8 +99,8 @@ public:
         return _opCtx.get();
     }
 
-    const std::string& ns() const {
-        return NamespaceString::kLogicalSessionsNamespace.ns();
+    const NamespaceString& nss() const {
+        return NamespaceString::kLogicalSessionsNamespace;
     }
 
 private:
@@ -155,7 +155,7 @@ public:
         ASSERT_GTE(swRecord.getValue().getLastUse(), now);
 
         // Clear the collection.
-        db.remove(ns(), BSONObj());
+        db.remove(nss(), BSONObj());
 
         // Attempt to refresh a record that is not present, should upsert it.
         auto record2 = makeRecord(thePast);
@@ -165,7 +165,7 @@ public:
         ASSERT(swRecord.isOK());
 
         // Clear the collection.
-        db.remove(ns(), BSONObj());
+        db.remove(nss(), BSONObj());
 
         // Attempt a refresh of many records, split into batches.
         LogicalSessionRecordSet toRefresh;
@@ -187,7 +187,7 @@ public:
         collection()->refreshSessions(opCtx(), toRefresh);
 
         // Ensure that the right number of timestamps were updated.
-        auto n = db.count(NamespaceString(ns()), BSON("lastUse" << now));
+        auto n = db.count(nss(), BSON("lastUse" << now));
         ASSERT_EQ(n, notRefreshed);
     }
 };

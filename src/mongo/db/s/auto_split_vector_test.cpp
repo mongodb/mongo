@@ -100,7 +100,7 @@ public:
             builder.append("str", s);
             BSONObj obj = builder.obj();
             ASSERT(obj.objsize() == 1024 * 1024);  // 1 MB document
-            client.insert(kNss.toString(), obj);
+            client.insert(kNss, obj);
         }
     }
 

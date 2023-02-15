@@ -73,7 +73,7 @@ public:
             BSONObjBuilder builder;
             builder.append(kPattern, i);
             BSONObj obj = builder.obj();
-            client.insert(kNss.toString(), obj);
+            client.insert(kNss, obj);
         }
         ASSERT_EQUALS(100ULL, client.count(kNss));
     }
@@ -317,7 +317,7 @@ public:
         builder.append(kJumboPattern, 1);
         BSONObj obj = builder.obj();
         for (int i = 0; i < 1000; i++) {
-            client.insert(kJumboNss.toString(), obj);
+            client.insert(kJumboNss, obj);
         }
         ASSERT_EQUALS(1000ULL, client.count(kJumboNss));
     }
@@ -383,7 +383,7 @@ public:
             // ensure that our documents are unique.
             builder.append("a", createUniqueHalfMegabyteString(i));
             BSONObj obj = builder.obj();
-            client.insert(kMaxResponseNss.toString(), obj);
+            client.insert(kMaxResponseNss, obj);
         }
         ASSERT_EQUALS(numDocs, (int)client.count(kMaxResponseNss));
     }

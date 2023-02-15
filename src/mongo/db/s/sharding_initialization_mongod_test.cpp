@@ -498,7 +498,7 @@ TEST_F(
                                             << ShardIdentity::kConfigsvrConnectionStringFieldName
                                             << "invalid");
 
-        _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),
+        _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace,
                                 invalidShardIdentity);
     }
 
@@ -527,8 +527,7 @@ TEST_F(
             return shardIdentity.toShardIdentityDocument();
         }();
 
-        _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),
-                                validShardIdentity);
+        _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace, validShardIdentity);
     }
 
     ASSERT(shardingInitialization()->initializeShardingAwarenessIfNeeded(operationContext()));
@@ -553,8 +552,7 @@ TEST_F(
     }();
 
     // An OpObserver will react to this insertion and initialize the ShardingState.
-    _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),
-                            validShardIdentity);
+    _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace, validShardIdentity);
     ASSERT(shardingState()->enabled());
 
     // This call represents the one done by the onInitialDataAvailable. It should be a no-op.
@@ -582,8 +580,7 @@ TEST_F(ShardingInitializationMongoDTest,
             return shardIdentity.toShardIdentityDocument();
         }();
 
-        _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),
-                                validShardIdentity);
+        _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace, validShardIdentity);
     }
 
     ASSERT(!shardingState()->enabled());
@@ -608,7 +605,7 @@ TEST_F(
     InitializeShardingAwarenessIfNeededNotQueryableBackupModeAndNotShardServerAndInvalidShardIdentity) {
     ScopedSetStandaloneMode standalone(getServiceContext());
 
-    _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),
+    _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace,
                             BSON("_id"
                                  << "shardIdentity"
                                  << "configsvrConnectionString"
@@ -634,8 +631,7 @@ TEST_F(
         return shardIdentity.toShardIdentityDocument();
     }();
 
-    _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),
-                            validShardIdentity);
+    _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace, validShardIdentity);
 
     // The shardIdentity doc on disk, even if invalid, is ignored if the ClusterRole is None. This
     // is to allow fixing the shardIdentity doc by starting without --shardsvr.

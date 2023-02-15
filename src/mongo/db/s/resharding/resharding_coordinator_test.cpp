@@ -204,7 +204,7 @@ protected:
         DBDirectClient client(opCtx);
 
         auto coordinatorDoc = makeCoordinatorDoc(state, fetchTimestamp);
-        client.insert(NamespaceString::kConfigReshardingOperationsNamespace.ns(),
+        client.insert(NamespaceString::kConfigReshardingOperationsNamespace,
                       coordinatorDoc.toBSON());
 
         TypeCollectionReshardingFields reshardingFields(coordinatorDoc.getReshardingUUID());
@@ -219,7 +219,7 @@ protected:
             reshardingFields,
             std::move(epoch),
             opCtx->getServiceContext()->getPreciseClockSource()->now());
-        client.insert(CollectionType::ConfigNS.ns(), originalNssCatalogEntry.toBSON());
+        client.insert(CollectionType::ConfigNS, originalNssCatalogEntry.toBSON());
 
         auto tempNssCatalogEntry =
             createTempReshardingCollectionType(opCtx,
@@ -227,7 +227,7 @@ protected:
                                                ChunkVersion({OID::gen(), Timestamp(1, 2)}, {1, 1}),
                                                BSONObj(),
                                                boost::none);
-        client.insert(CollectionType::ConfigNS.ns(), tempNssCatalogEntry.toBSON());
+        client.insert(CollectionType::ConfigNS, tempNssCatalogEntry.toBSON());
 
         return coordinatorDoc;
     }
@@ -237,11 +237,11 @@ protected:
         DBDirectClient client(opCtx);
 
         for (const auto& chunk : chunks) {
-            client.insert(ChunkType::ConfigNS.ns(), chunk.toConfigBSON());
+            client.insert(ChunkType::ConfigNS, chunk.toConfigBSON());
         }
 
         for (const auto& zone : zones) {
-            client.insert(TagsType::ConfigNS.ns(), zone.toBSON());
+            client.insert(TagsType::ConfigNS, zone.toBSON());
         }
     }
 
@@ -567,7 +567,7 @@ protected:
                 reshardingFields,
                 _originalEpoch,
                 opCtx->getServiceContext()->getPreciseClockSource()->now());
-            client.insert(CollectionType::ConfigNS.ns(), originalNssCatalogEntry.toBSON());
+            client.insert(CollectionType::ConfigNS, originalNssCatalogEntry.toBSON());
 
             client.createCollection(ChunkType::ConfigNS);
             client.createCollection(TagsType::ConfigNS);

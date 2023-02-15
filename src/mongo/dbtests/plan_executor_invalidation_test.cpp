@@ -68,7 +68,7 @@ public:
         _client.dropCollection(nss);
 
         for (int i = 0; i < N(); ++i) {
-            _client.insert(nss.ns(), BSON("foo" << i));
+            _client.insert(nss, BSON("foo" << i));
         }
 
         _refreshCollection();
@@ -215,8 +215,8 @@ TEST_F(PlanExecutorInvalidationTest, ExecutorToleratesDeletedDocumentsDuringYiel
     exec->saveState();
 
     // Delete some data, namely the next 2 things we'd expect.
-    _client.remove(nss.ns(), BSON("foo" << 10));
-    _client.remove(nss.ns(), BSON("foo" << 11));
+    _client.remove(nss, BSON("foo" << 10));
+    _client.remove(nss, BSON("foo" << 11));
 
     exec->restoreState(&collection());
 

@@ -93,15 +93,15 @@ public:
     }
 
     void insert(const BSONObj& obj) {
-        _client.insert(ns(), obj);
+        _client.insert(nss(), obj);
     }
 
     void remove(const BSONObj& obj) {
-        _client.remove(ns(), obj);
+        _client.remove(nss(), obj);
     }
 
     void update(const BSONObj& predicate, const BSONObj& update) {
-        _client.update(ns(), predicate, update);
+        _client.update(nss(), predicate, update);
     }
 
     void getRecordIds(set<RecordId>* out, const CollectionPtr& coll) {

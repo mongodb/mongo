@@ -92,19 +92,19 @@ public:
                                          const ReadPreferenceSetting& readPref,
                                          ExhaustMode exhaustMode) override;
 
-    void insert(const std::string& ns,
+    void insert(const NamespaceString& nss,
                 BSONObj obj,
                 bool ordered = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
     /** insert multiple objects.  Note that single object insert is asynchronous, so this version
         is only nominally faster and not worth a special effort to try to use.  */
-    void insert(const std::string& ns,
+    void insert(const NamespaceString& nss,
                 const std::vector<BSONObj>& v,
                 bool ordered = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
-    void remove(const std::string& ns,
+    void remove(const NamespaceString& nss,
                 const BSONObj& filter,
                 bool removeMany = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;

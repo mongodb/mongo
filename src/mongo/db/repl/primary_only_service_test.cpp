@@ -258,9 +258,14 @@ public:
 
                 DBDirectClient client(opCtx.get());
                 if (targetState == State::kDone) {
-                    client.remove("admin.test_service", _id);
+                    client.remove(
+                        NamespaceString::createNamespaceString_forTest("admin.test_service"), _id);
                 } else {
-                    client.update("admin.test_service", _id, newStateDoc, true /*upsert*/);
+                    client.update(
+                        NamespaceString::createNamespaceString_forTest("admin.test_service"),
+                        _id,
+                        newStateDoc,
+                        true /*upsert*/);
                 }
             } catch (const DBException& e) {
                 _documentWriteException.setError(e.toStatus());

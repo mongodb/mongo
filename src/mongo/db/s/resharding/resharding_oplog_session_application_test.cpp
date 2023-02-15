@@ -143,7 +143,7 @@ public:
 
     void insertOp(OperationContext* opCtx, const BSONObj& oplogBson) {
         DBDirectClient client(opCtx);
-        client.insert(_oplogBufferNss.toString(), oplogBson);
+        client.insert(_oplogBufferNss, oplogBson);
     }
 
     void makeInProgressTxn(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {

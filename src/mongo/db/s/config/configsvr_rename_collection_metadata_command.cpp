@@ -126,7 +126,7 @@ public:
             // Such write will also guarantee that the lastOpTime of opCtx will be inclusive of any
             // write executed under the AlternativeClientRegion.
             DBDirectClient client(opCtx);
-            client.update(NamespaceString::kServerConfigurationNamespace.ns(),
+            client.update(NamespaceString::kServerConfigurationNamespace,
                           BSON("_id"
                                << "RenameCollectionMetadataStats"),
                           BSON("$inc" << BSON("count" << 1)),

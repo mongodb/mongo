@@ -66,7 +66,7 @@ public:
     }
 
     void insert(const BSONObj& obj) {
-        _client.insert(nss.ns(), obj);
+        _client.insert(nss, obj);
     }
 
     /**

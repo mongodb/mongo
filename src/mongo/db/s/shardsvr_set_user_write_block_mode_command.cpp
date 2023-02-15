@@ -74,7 +74,7 @@ public:
             // Since it is possible that no actual write happened with this txnNumber, we need to
             // make a dummy write so that secondaries can be aware of this txn.
             DBDirectClient client(opCtx);
-            client.update(NamespaceString::kServerConfigurationNamespace.ns(),
+            client.update(NamespaceString::kServerConfigurationNamespace,
                           BSON("_id"
                                << "SetUseWriteBlockModeStats"),
                           BSON("$inc" << BSON("count" << 1)),

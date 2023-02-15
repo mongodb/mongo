@@ -353,7 +353,7 @@ class LogBasic : public Base {
 public:
     void run() {
         ASSERT_EQUALS(0, opCount());
-        _client.insert(ns(), fromjson("{\"a\":\"b\"}"));
+        _client.insert(nss(), fromjson("{\"a\":\"b\"}"));
         ASSERT_EQUALS(1, opCount());
     }
 };
@@ -402,7 +402,7 @@ public:
         BSONObjBuilder b;
         b.append("a", 1);
         b.appendTimestamp("t");
-        _client.insert(ns(), b.done());
+        _client.insert(nss(), b.done());
         date_ = _client.findOne(nss(), BSON("a" << 1)).getField("t").date();
     }
     void check() const {
@@ -422,7 +422,7 @@ class InsertAutoId : public Recovering {
 public:
     InsertAutoId() : o_(fromjson("{\"a\":\"b\"}")) {}
     void doIt() const {
-        _client.insert(ns(), o_);
+        _client.insert(nss(), o_);
     }
     void check() const {
         ASSERT_EQUALS(1, count());
@@ -453,7 +453,7 @@ public:
         std::vector<BSONObj> v;
         v.push_back(o_);
         v.push_back(t_);
-        _client.insert(ns(), v);
+        _client.insert(nss(), v);
     }
     void check() const {
         ASSERT_EQUALS(2, count());
@@ -473,8 +473,8 @@ class InsertTwoIdentical : public Recovering {
 public:
     InsertTwoIdentical() : o_(fromjson("{\"a\":\"b\"}")) {}
     void doIt() const {
-        _client.insert(ns(), o_);
-        _client.insert(ns(), o_);
+        _client.insert(nss(), o_);
+        _client.insert(nss(), o_);
     }
     void check() const {
         ASSERT_EQUALS(2, count());
@@ -493,7 +493,7 @@ public:
         BSONObjBuilder b;
         b.append("_id", 1);
         b.appendTimestamp("t");
-        _client.update(ns(), BSON("_id" << 1), b.done());
+        _client.update(nss(), BSON("_id" << 1), b.done());
         date_ = _client.findOne(nss(), BSON("_id" << 1)).getField("t").date();
     }
     void check() const {
@@ -518,7 +518,7 @@ public:
           o2_(wid("{a:'b'}")),
           u_(fromjson("{a:'c'}")) {}
     void doIt() const {
-        _client.update(ns(), q_, u_);
+        _client.update(nss(), q_, u_);
     }
     void check() const {
         ASSERT_EQUALS(2, count());
@@ -542,7 +542,7 @@ public:
           q_(fromjson("{a:'b'}")),
           u_(fromjson("{'_id':1,a:'c'}")) {}
     void doIt() const {
-        _client.update(ns(), q_, u_);
+        _client.update(nss(), q_, u_);
     }
     void check() const {
         ASSERT_EQUALS(2, count());
@@ -564,7 +564,7 @@ public:
     UpdateSameFieldExplicitId()
         : o_(fromjson("{'_id':1,a:'b'}")), u_(fromjson("{'_id':1,a:'c'}")) {}
     void doIt() const {
-        _client.update(ns(), o_, u_);
+        _client.update(nss(), o_, u_);
     }
     void check() const {
         ASSERT_EQUALS(1, count());
@@ -586,7 +586,7 @@ public:
           q_(fromjson("{'_id':1}")),
           u_(fromjson("{'_id':1,a:'c'}")) {}
     void doIt() const {
-        _client.update(ns(), q_, u_);
+        _client.update(nss(), q_, u_);
     }
     void check() const {
         ASSERT_EQUALS(1, count());
@@ -603,13 +603,13 @@ protected:
 
 class UpsertUpdateNoMods : public UpdateDifferentFieldExplicitId {
     void doIt() const {
-        _client.update(ns(), q_, u_, true);
+        _client.update(nss(), q_, u_, true);
     }
 };
 
 class UpsertInsertNoMods : public InsertAutoId {
     void doIt() const {
-        _client.update(ns(), fromjson("{a:'c'}"), o_, true);
+        _client.update(nss(), fromjson("{a:'c'}"), o_, true);
     }
 };
 
@@ -621,7 +621,7 @@ public:
           u_(fromjson("{$set:{a:7}}")),
           ou_(fromjson("{'_id':1,a:7}")) {}
     void doIt() const {
-        _client.update(ns(), q_, u_);
+        _client.update(nss(), q_, u_);
     }
     void check() const {
         ASSERT_EQUALS(1, count());
@@ -644,7 +644,7 @@ public:
           u_(fromjson("{$inc:{a:3}}")),
           ou_(fromjson("{'_id':1,a:8}")) {}
     void doIt() const {
-        _client.update(ns(), q_, u_);
+        _client.update(nss(), q_, u_);
     }
     void check() const {
         ASSERT_EQUALS(1, count());
@@ -667,7 +667,7 @@ public:
           u_(fromjson("{$inc:{a:3},$set:{x:5}}")),
           ou_(fromjson("{'_id':1,a:8,x:5}")) {}
     void doIt() const {
-        _client.update(ns(), q_, u_);
+        _client.update(nss(), q_, u_);
     }
     void check() const {
         ASSERT_EQUALS(1, count());
@@ -690,7 +690,7 @@ public:
           u_(fromjson("{$inc:{'a.b':1,'b.b':1}}")),
           ou_(fromjson("{'_id':1,a:{b:4},b:{b:2}}")) {}
     void doIt() const {
-        _client.update(ns(), q_, u_);
+        _client.update(nss(), q_, u_);
     }
     void check() const {
         ASSERT_EQUALS(1, count());
@@ -713,7 +713,7 @@ public:
           u_(fromjson("{$inc:{'a':1}}")),
           ou_(fromjson("{'_id':1,a:1}")) {}
     void doIt() const {
-        _client.update(ns(), q_, u_);
+        _client.update(nss(), q_, u_);
     }
     void check() const {
         ASSERT_EQUALS(1, count());
@@ -736,7 +736,7 @@ public:
           u_(fromjson("{$inc:{a:3}}")),
           ou_(fromjson("{'_id':5,a:7}")) {}
     void doIt() const {
-        _client.update(ns(), q_, u_, true);
+        _client.update(nss(), q_, u_, true);
     }
     void check() const {
         ASSERT_EQUALS(1, count());
@@ -755,7 +755,7 @@ public:
     UpsertInsertSet()
         : q_(fromjson("{a:5}")), u_(fromjson("{$set:{a:7}}")), ou_(fromjson("{a:7}")) {}
     void doIt() const {
-        _client.update(ns(), q_, u_, true);
+        _client.update(nss(), q_, u_, true);
     }
     void check() const {
         ASSERT_EQUALS(2, count());
@@ -775,7 +775,7 @@ public:
     UpsertInsertInc()
         : q_(fromjson("{a:5}")), u_(fromjson("{$inc:{a:3}}")), ou_(fromjson("{a:8}")) {}
     void doIt() const {
-        _client.update(ns(), q_, u_, true);
+        _client.update(nss(), q_, u_, true);
     }
     void check() const {
         ASSERT_EQUALS(1, count());
@@ -810,18 +810,18 @@ public:
     }
 
     void doIt() const {
-        _client.insert(ns(), BSON("_id" << 1 << "x" << 1));
-        _client.insert(ns(), BSON("_id" << 2 << "x" << 5));
+        _client.insert(nss(), BSON("_id" << 1 << "x" << 1));
+        _client.insert(nss(), BSON("_id" << 2 << "x" << 5));
 
         ASSERT_EQUALS("1,5", s());
 
-        _client.update(ns(), BSON("_id" << 1), BSON("$inc" << BSON("x" << 1)));
+        _client.update(nss(), BSON("_id" << 1), BSON("$inc" << BSON("x" << 1)));
         ASSERT_EQUALS("2,5", s());
 
-        _client.update(ns(), BSONObj(), BSON("$inc" << BSON("x" << 1)));
+        _client.update(nss(), BSONObj(), BSON("$inc" << BSON("x" << 1)));
         ASSERT_EQUALS("3,5", s());
 
-        _client.update(ns(), BSONObj(), BSON("$inc" << BSON("x" << 1)), false, true);
+        _client.update(nss(), BSONObj(), BSON("$inc" << BSON("x" << 1)), false, true);
         check();
     }
 
@@ -839,7 +839,7 @@ public:
     UpdateWithoutPreexistingId()
         : o_(fromjson("{a:5}")), u_(fromjson("{a:5}")), ot_(fromjson("{b:4}")) {}
     void doIt() const {
-        _client.update(ns(), o_, u_);
+        _client.update(nss(), o_, u_);
     }
     void check() const {
         ASSERT_EQUALS(2, count());
@@ -863,7 +863,7 @@ public:
           o2_(f("{\"_id\":\"010101010101010101010102\",\"a\":\"b\"}")),
           q_(f("{\"a\":\"b\"}")) {}
     void doIt() const {
-        _client.remove(ns(), q_);
+        _client.remove(nss(), q_);
     }
     void check() const {
         ASSERT_EQUALS(0, count());
@@ -880,7 +880,7 @@ protected:
 
 class RemoveOne : public Remove {
     void doIt() const {
-        _client.remove(ns(), q_, false /*removeMany*/);
+        _client.remove(nss(), q_, false /*removeMany*/);
     }
     void check() const {
         ASSERT_EQUALS(1, count());
@@ -891,8 +891,8 @@ class FailingUpdate : public Recovering {
 public:
     FailingUpdate() : o_(fromjson("{'_id':1,a:'b'}")), u_(fromjson("{'_id':1,c:'d'}")) {}
     void doIt() const {
-        _client.update(ns(), o_, u_);
-        _client.insert(ns(), o_);
+        _client.update(nss(), o_, u_);
+        _client.insert(nss(), o_);
     }
     void check() const {
         ASSERT_EQUALS(1, count());
@@ -909,7 +909,7 @@ protected:
 class SetNumToStr : public Base {
 public:
     void doIt() const {
-        _client.update(ns(),
+        _client.update(nss(),
                        BSON("_id" << 0),
                        BSON("$set" << BSON("a"
                                            << "bcd")));
@@ -928,7 +928,7 @@ public:
 class Push : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), BSON("$push" << BSON("a" << 5.0)));
+        _client.update(nss(), BSON("_id" << 0), BSON("$push" << BSON("a" << 5.0)));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -944,7 +944,7 @@ public:
 class PushUpsert : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), BSON("$push" << BSON("a" << 5.0)), true);
+        _client.update(nss(), BSON("_id" << 0), BSON("$push" << BSON("a" << 5.0)), true);
     }
     using ReplTests::Base::check;
     void check() const {
@@ -960,7 +960,7 @@ public:
 class MultiPush : public Base {
 public:
     void doIt() const {
-        _client.update(ns(),
+        _client.update(nss(),
                        BSON("_id" << 0),
                        BSON("$push" << BSON("a" << 5.0) << "$push" << BSON("b.c" << 6.0)));
     }
@@ -978,7 +978,7 @@ public:
 class EmptyPush : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), BSON("$push" << BSON("a" << 5.0)));
+        _client.update(nss(), BSON("_id" << 0), BSON("$push" << BSON("a" << 5.0)));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -994,7 +994,7 @@ public:
 class PushSlice : public Base {
     void doIt() const {
         _client.update(
-            ns(),
+            nss(),
             BSON("_id" << 0),
             BSON("$push" << BSON("a" << BSON("$each" << BSON_ARRAY(3) << "$slice" << -2))));
     }
@@ -1012,7 +1012,7 @@ class PushSlice : public Base {
 class PushSliceInitiallyInexistent : public Base {
     void doIt() const {
         _client.update(
-            ns(),
+            nss(),
             BSON("_id" << 0),
             BSON("$push" << BSON("a" << BSON("$each" << BSON_ARRAY(1 << 2) << "$slice" << -2))));
     }
@@ -1030,7 +1030,7 @@ class PushSliceInitiallyInexistent : public Base {
 class PushSliceToZero : public Base {
     void doIt() const {
         _client.update(
-            ns(),
+            nss(),
             BSON("_id" << 0),
             BSON("$push" << BSON("a" << BSON("$each" << BSON_ARRAY(3) << "$slice" << 0))));
     }
@@ -1048,7 +1048,7 @@ class PushSliceToZero : public Base {
 class Pull : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), BSON("$pull" << BSON("a" << 4.0)));
+        _client.update(nss(), BSON("_id" << 0), BSON("$pull" << BSON("a" << 4.0)));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1064,7 +1064,7 @@ public:
 class PullNothing : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), BSON("$pull" << BSON("a" << 6.0)));
+        _client.update(nss(), BSON("_id" << 0), BSON("$pull" << BSON("a" << 6.0)));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1080,7 +1080,7 @@ public:
 class PullAll : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$pullAll:{a:[4,5]}}"));
+        _client.update(nss(), BSON("_id" << 0), fromjson("{$pullAll:{a:[4,5]}}"));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1096,7 +1096,7 @@ public:
 class Pop : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$pop:{a:1}}"));
+        _client.update(nss(), BSON("_id" << 0), fromjson("{$pop:{a:1}}"));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1112,7 +1112,7 @@ public:
 class PopReverse : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$pop:{a:-1}}"));
+        _client.update(nss(), BSON("_id" << 0), fromjson("{$pop:{a:-1}}"));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1128,7 +1128,7 @@ public:
 class BitOp : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$bit:{a:{and:2,or:8}}}"));
+        _client.update(nss(), BSON("_id" << 0), fromjson("{$bit:{a:{and:2,or:8}}}"));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1144,8 +1144,8 @@ public:
 class Rename : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$rename:{a:'b'}}"));
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$set:{a:50}}"));
+        _client.update(nss(), BSON("_id" << 0), fromjson("{$rename:{a:'b'}}"));
+        _client.update(nss(), BSON("_id" << 0), fromjson("{$set:{a:50}}"));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1162,8 +1162,8 @@ public:
 class RenameReplace : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$rename:{a:'b'}}"));
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$set:{a:50}}"));
+        _client.update(nss(), BSON("_id" << 0), fromjson("{$rename:{a:'b'}}"));
+        _client.update(nss(), BSON("_id" << 0), fromjson("{$set:{a:50}}"));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1180,7 +1180,7 @@ public:
 class RenameOverwrite : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$rename:{a:'b'}}"));
+        _client.update(nss(), BSON("_id" << 0), fromjson("{$rename:{a:'b'}}"));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1197,7 +1197,7 @@ public:
 class NoRename : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$rename:{c:'b'},$set:{z:1}}"));
+        _client.update(nss(), BSON("_id" << 0), fromjson("{$rename:{c:'b'},$set:{z:1}}"));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1213,7 +1213,7 @@ public:
 class NestedNoRename : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$rename:{'a.b':'c.d'},$set:{z:1}}"));
+        _client.update(nss(), BSON("_id" << 0), fromjson("{$rename:{'a.b':'c.d'},$set:{z:1}}"));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1229,7 +1229,7 @@ public:
 class SingletonNoRename : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSONObj(), fromjson("{$rename:{a:'b'}}"));
+        _client.update(nss(), BSONObj(), fromjson("{$rename:{a:'b'}}"));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1245,7 +1245,7 @@ public:
 class IndexedSingletonNoRename : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSONObj(), fromjson("{$rename:{a:'b'}}"));
+        _client.update(nss(), BSONObj(), fromjson("{$rename:{a:'b'}}"));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1263,7 +1263,7 @@ public:
 class AddToSetEmptyMissing : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$addToSet:{a:{$each:[]}}}"));
+        _client.update(nss(), BSON("_id" << 0), fromjson("{$addToSet:{a:{$each:[]}}}"));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1283,15 +1283,15 @@ public:
 class ReplaySetPreexistingNoOpPull : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSONObj(), fromjson("{$unset:{z:1}}"));
+        _client.update(nss(), BSONObj(), fromjson("{$unset:{z:1}}"));
 
         // This is logged as {$set:{'a.b':[]},$set:{z:1}}, which might not be
         // replayable against future versions of a document (here {_id:0,a:1,z:1}) due
         // to SERVER-4781. As a result the $set:{z:1} will not be replayed in such
         // cases (and also an exception may abort replication). If this were instead
         // logged as {$set:{z:1}}, SERVER-4781 would not be triggered.
-        _client.update(ns(), BSONObj(), fromjson("{$pull:{'a.b':1}, $set:{z:1}}"));
-        _client.update(ns(), BSONObj(), fromjson("{$set:{a:1}}"));
+        _client.update(nss(), BSONObj(), fromjson("{$pull:{'a.b':1}, $set:{z:1}}"));
+        _client.update(nss(), BSONObj(), fromjson("{$set:{a:1}}"));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1307,8 +1307,8 @@ public:
 class ReplayArrayFieldNotAppended : public Base {
 public:
     void doIt() const {
-        _client.update(ns(), BSONObj(), fromjson("{$push:{'a.0.b':2}}"));
-        _client.update(ns(), BSONObj(), fromjson("{$set:{'a.0':1}}"));
+        _client.update(nss(), BSONObj(), fromjson("{$push:{'a.0.b':2}}"));
+        _client.update(nss(), BSONObj(), fromjson("{$set:{'a.0':1}}"));
     }
     using ReplTests::Base::check;
     void check() const {
@@ -1330,7 +1330,7 @@ public:
         insert(BSON("_id" << 0 << "a" << 10));
         insert(BSON("_id" << 1 << "a" << 11));
         insert(BSON("_id" << 3 << "a" << 10));
-        _client.remove(ns(), BSON("a" << 10));
+        _client.remove(nss(), BSON("a" << 10));
         ASSERT_EQUALS(1U, _client.count(nss(), BSONObj()));
         insert(BSON("_id" << 0 << "a" << 11));
         insert(BSON("_id" << 2 << "a" << 10));

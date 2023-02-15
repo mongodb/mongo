@@ -79,11 +79,11 @@ public:
     }
 
     void insert(const BSONObj& obj) {
-        _client.insert(nss.ns(), obj);
+        _client.insert(nss, obj);
     }
 
     void remove(const BSONObj& obj) {
-        _client.remove(nss.ns(), obj);
+        _client.remove(nss, obj);
     }
 
     void dropCollection() {
@@ -91,7 +91,7 @@ public:
     }
 
     void update(BSONObj& query, BSONObj& updateSpec) {
-        _client.update(nss.ns(), query, updateSpec);
+        _client.update(nss, query, updateSpec);
     }
 
     /**

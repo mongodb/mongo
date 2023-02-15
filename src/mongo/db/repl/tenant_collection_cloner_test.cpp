@@ -391,8 +391,8 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsSingleBatch) {
     _mockServer->setCommandReply("find", createFindResponse());
 
     // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
+    _mockServer->insert(_nss, BSON("_id" << 1));
+    _mockServer->insert(_nss, BSON("_id" << 2));
 
     auto cloner = makeCollectionCloner();
     ASSERT_OK(cloner->run());
@@ -418,13 +418,13 @@ TEST_F(TenantCollectionClonerTest, BatchSizeStoredInConstructor) {
 
     // Set up documents to be returned from upstream node. It should take 3 batches to clone the
     // documents.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 4));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 5));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 6));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 7));
+    _mockServer->insert(_nss, BSON("_id" << 1));
+    _mockServer->insert(_nss, BSON("_id" << 2));
+    _mockServer->insert(_nss, BSON("_id" << 3));
+    _mockServer->insert(_nss, BSON("_id" << 4));
+    _mockServer->insert(_nss, BSON("_id" << 5));
+    _mockServer->insert(_nss, BSON("_id" << 6));
+    _mockServer->insert(_nss, BSON("_id" << 7));
 
     auto cloner = makeCollectionCloner();
     ASSERT_OK(cloner->run());
@@ -445,11 +445,11 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsMultipleBatches) {
     _mockServer->setCommandReply("find", createFindResponse());
 
     // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 4));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 5));
+    _mockServer->insert(_nss, BSON("_id" << 1));
+    _mockServer->insert(_nss, BSON("_id" << 2));
+    _mockServer->insert(_nss, BSON("_id" << 3));
+    _mockServer->insert(_nss, BSON("_id" << 4));
+    _mockServer->insert(_nss, BSON("_id" << 5));
 
     auto cloner = makeCollectionCloner();
     cloner->setBatchSize_forTest(2);
@@ -471,9 +471,9 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsFailed) {
     _mockServer->setCommandReply("find", createFindResponse());
 
     // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
+    _mockServer->insert(_nss, BSON("_id" << 1));
+    _mockServer->insert(_nss, BSON("_id" << 2));
+    _mockServer->insert(_nss, BSON("_id" << 3));
 
     auto cloner = makeCollectionCloner();
 
@@ -503,9 +503,9 @@ TEST_F(TenantCollectionClonerTest, QueryFailure) {
         FailPoint::alwaysOn, 0, fromjson("{cloner: 'TenantCollectionCloner', stage: 'query'}"));
 
     // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
+    _mockServer->insert(_nss, BSON("_id" << 1));
+    _mockServer->insert(_nss, BSON("_id" << 2));
+    _mockServer->insert(_nss, BSON("_id" << 3));
 
     auto cloner = makeCollectionCloner();
 
@@ -566,9 +566,9 @@ TEST_F(TenantCollectionClonerTest, QueryStageNamespaceNotFoundOnFirstBatch) {
         FailPoint::alwaysOn, 0, fromjson("{cloner: 'TenantCollectionCloner', stage: 'query'}"));
 
     // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
+    _mockServer->insert(_nss, BSON("_id" << 1));
+    _mockServer->insert(_nss, BSON("_id" << 2));
+    _mockServer->insert(_nss, BSON("_id" << 3));
 
     auto cloner = makeCollectionCloner();
 
@@ -610,11 +610,11 @@ TEST_F(TenantCollectionClonerTest, QueryStageNamespaceNotFoundOnSubsequentBatch)
     auto timesEnteredAfterBatch = afterBatchFailpoint->setMode(FailPoint::alwaysOn, 0);
 
     // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 4));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 5));
+    _mockServer->insert(_nss, BSON("_id" << 1));
+    _mockServer->insert(_nss, BSON("_id" << 2));
+    _mockServer->insert(_nss, BSON("_id" << 3));
+    _mockServer->insert(_nss, BSON("_id" << 4));
+    _mockServer->insert(_nss, BSON("_id" << 5));
 
     auto cloner = makeCollectionCloner();
     cloner->setBatchSize_forTest(2);
@@ -710,9 +710,9 @@ TEST_F(TenantCollectionClonerTest, QueryPlanKilledThenNamespaceNotFoundFirstBatc
         FailPoint::alwaysOn, 0, fromjson("{cloner: 'TenantCollectionCloner', stage: 'query'}"));
 
     // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
+    _mockServer->insert(_nss, BSON("_id" << 1));
+    _mockServer->insert(_nss, BSON("_id" << 2));
+    _mockServer->insert(_nss, BSON("_id" << 3));
 
     auto cloner = makeCollectionCloner();
     cloner->setBatchSize_forTest(2);
@@ -767,9 +767,9 @@ TEST_F(TenantCollectionClonerTest, QueryPlanKilledThenNamespaceNotFoundSubsequen
     auto timesEnteredAfterBatch = afterBatchFailpoint->setMode(FailPoint::alwaysOn, 0);
 
     // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
+    _mockServer->insert(_nss, BSON("_id" << 1));
+    _mockServer->insert(_nss, BSON("_id" << 2));
+    _mockServer->insert(_nss, BSON("_id" << 3));
 
     auto cloner = makeCollectionCloner();
     cloner->setBatchSize_forTest(2);
@@ -944,9 +944,9 @@ TEST_F(TenantCollectionClonerTest, ResumeFromRecreatedCollection) {
                                  createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());  // majority read after listIndexes
 
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
+    _mockServer->insert(_nss, BSON("_id" << 1));
+    _mockServer->insert(_nss, BSON("_id" << 2));
+    _mockServer->insert(_nss, BSON("_id" << 3));
 
     ASSERT_EQUALS(Status::OK(), cloner->run());
 
@@ -979,8 +979,8 @@ TEST_F(TenantCollectionClonerTest, ResumeFromRenamedCollection) {
     _mockServer->setCommandReply("find", createFindResponse());
 
     // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
+    _mockServer->insert(_nss, BSON("_id" << 1));
+    _mockServer->insert(_nss, BSON("_id" << 2));
 
     auto opObserver = std::make_unique<TenantCollectionClonerTestOpObserver>(oldNss);
     auto oldNssOpObserver = opObserver.get();
@@ -1026,8 +1026,8 @@ TEST_F(TenantCollectionClonerTest, NoDocumentsIfInsertedAfterListIndexes) {
 
     collClonerAfterFailPoint->waitForTimesEntered(timesEntered + 1);
     // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
+    _mockServer->insert(_nss, BSON("_id" << 1));
+    _mockServer->insert(_nss, BSON("_id" << 2));
 
     // Continue and finish. Final status is checked in the thread.
     collClonerAfterFailPoint->setMode(FailPoint::off, 0);

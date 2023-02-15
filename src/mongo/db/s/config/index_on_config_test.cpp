@@ -117,7 +117,7 @@ TEST_F(ConfigIndexTest, CreateIndexNonEmptyCollection) {
 
     // Inserting the document should implicitly create the collection
     DBDirectClient dbDirectClient(operationContext());
-    dbDirectClient.insert(nss.toString(), BSON("_id" << 1 << "a" << 1));
+    dbDirectClient.insert(nss, BSON("_id" << 1 << "a" << 1));
 
     auto status = createIndexOnConfigCollection(operationContext(), nss, BSON("a" << 1), false);
     ASSERT_OK(status);

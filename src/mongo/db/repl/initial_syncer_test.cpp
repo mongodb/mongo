@@ -392,9 +392,9 @@ protected:
         _mockServer->setCommandReply("listDatabases", makeListDatabasesResponse({}));
         _options1.uuid = UUID::gen();
 
-        _mockServer->insert(
-            ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace.toString(),
-            BSON("_id" << UUID::gen()));
+        _mockServer->insert(NamespaceString::createNamespaceString_forTest(
+                                ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace),
+                            BSON("_id" << UUID::gen()));
 
         reset();
 
@@ -3605,7 +3605,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
 
         // Set up data for "a"
         _mockServer->assignCollectionUuid(nss.ns(), *_options1.uuid);
-        _mockServer->insert(nss.ns(), BSON("_id" << 1 << "a" << 1));
+        _mockServer->insert(nss, BSON("_id" << 1 << "a" << 1));
 
         // listCollections for "a"
         _mockServer->setCommandReply(
@@ -4296,7 +4296,7 @@ TEST_F(InitialSyncerTest,
 
         // Set up data for "a"
         _mockServer->assignCollectionUuid(nss.ns(), *_options1.uuid);
-        _mockServer->insert(nss.ns(), BSON("_id" << 1 << "a" << 1));
+        _mockServer->insert(nss, BSON("_id" << 1 << "a" << 1));
 
         // listCollections for "a"
         _mockServer->setCommandReply(
@@ -4504,7 +4504,7 @@ TEST_F(InitialSyncerTest, TestRemainingInitialSyncEstimatedMillisMetric) {
         // Set up data for "a"
         _mockServer->assignCollectionUuid(nss.ns(), *_options1.uuid);
         for (int i = 1; i <= 5; ++i) {
-            _mockServer->insert(nss.ns(), BSON("_id" << i << "a" << i));
+            _mockServer->insert(nss, BSON("_id" << i << "a" << i));
         }
 
         // listCollections for "a"
@@ -4750,7 +4750,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         // Set up data for "a"
         _mockServer->assignCollectionUuid(nss.ns(), *_options1.uuid);
         for (int i = 1; i <= 5; ++i) {
-            _mockServer->insert(nss.ns(), BSON("_id" << i << "a" << i));
+            _mockServer->insert(nss, BSON("_id" << i << "a" << i));
         }
 
         // listCollections for "a"

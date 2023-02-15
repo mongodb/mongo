@@ -155,7 +155,7 @@ TEST_F(DocumentSourceCursorTest, Empty) {
 
 /** Iterate a DocumentSourceCursor. */
 TEST_F(DocumentSourceCursorTest, Iterate) {
-    client.insert(nss.ns(), BSON("a" << 1));
+    client.insert(nss, BSON("a" << 1));
     createSource();
     // The DocumentSourceCursor doesn't hold a read lock.
     ASSERT(!opCtx()->lockState()->isReadLocked());
@@ -183,9 +183,9 @@ TEST_F(DocumentSourceCursorTest, Dispose) {
 
 /** Iterate a DocumentSourceCursor and then dispose of it. */
 TEST_F(DocumentSourceCursorTest, IterateDispose) {
-    client.insert(nss.ns(), BSON("a" << 1));
-    client.insert(nss.ns(), BSON("a" << 2));
-    client.insert(nss.ns(), BSON("a" << 3));
+    client.insert(nss, BSON("a" << 1));
+    client.insert(nss, BSON("a" << 2));
+    client.insert(nss, BSON("a" << 3));
     createSource();
     // The result is as expected.
     auto next = source()->getNext();
@@ -301,7 +301,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
     const bool capped = true;
     const long long cappedSize = 1024;
     ASSERT_TRUE(client.createCollection(nss, cappedSize, capped));
-    client.insert(nss.ns(), BSON("a" << 1));
+    client.insert(nss, BSON("a" << 1));
 
     // Make a tailable collection scan wrapped up in a PlanExecutor.
     AutoGetCollectionForRead readLock(opCtx(), nss);
@@ -346,7 +346,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
 TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
     // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
     ASSERT_TRUE(client.createCollection(nss));
-    client.insert(nss.ns(), BSON("a" << 1));
+    client.insert(nss, BSON("a" << 1));
 
     // Make a tailable collection scan wrapped up in a PlanExecutor.
     AutoGetCollectionForRead readLock(opCtx(), nss);
@@ -397,7 +397,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
     const bool capped = true;
     const long long cappedSize = 1024;
     ASSERT_TRUE(client.createCollection(nss, cappedSize, capped));
-    client.insert(nss.ns(), BSON("a" << 1));
+    client.insert(nss, BSON("a" << 1));
 
     // Make a tailable collection scan wrapped up in a PlanExecutor.
     AutoGetCollectionForRead readLock(opCtx(), nss);
@@ -441,7 +441,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
 TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
     // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
     ASSERT_TRUE(client.createCollection(nss));
-    client.insert(nss.ns(), BSON("a" << 1));
+    client.insert(nss, BSON("a" << 1));
 
     // Make a tailable collection scan wrapped up in a PlanExecutor.
     AutoGetCollectionForRead readLock(opCtx(), nss);

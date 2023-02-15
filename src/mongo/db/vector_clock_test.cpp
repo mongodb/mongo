@@ -147,7 +147,7 @@ TEST_F(VectorClockTest, WritesToOplogAdvanceClusterTime) {
     VectorClockMutable::get(getServiceContext())->tickClusterTimeTo(initialTime);
     ASSERT_EQ(getClusterTime(), initialTime);
 
-    getDBClient()->insert(kDummyNamespaceString.ns(), BSON("x" << 1));
+    getDBClient()->insert(kDummyNamespaceString, BSON("x" << 1));
     ASSERT_GT(getClusterTime(), initialTime);
     ASSERT_EQ(getClusterTime().asTimestamp(),
               replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp());
@@ -172,7 +172,7 @@ TEST_F(VectorClockTest, WallClockSetTooFarInPast) {
 
     // If cluster time is either uninitialized or even farther in the past, a write would set
     // cluster time more than maxAcceptableLogicalClockDriftSecs in the past.
-    getDBClient()->insert(kDummyNamespaceString.ns(), BSON("x" << 1));
+    getDBClient()->insert(kDummyNamespaceString, BSON("x" << 1));
     ASSERT_LT(getClusterTime(),
               LogicalTime(
                   Timestamp(currentSecs - Seconds(kMaxAcceptableLogicalClockDriftSecsDefault), 0)));
@@ -203,7 +203,7 @@ TEST_F(VectorClockTest, WallClockSetTooFarInFuture) {
 
     // A write gets through and advances cluster time more than maxAcceptableLogicalClockDriftSecs
     // in the future.
-    getDBClient()->insert(kDummyNamespaceString.ns(), BSON("x" << 1));
+    getDBClient()->insert(kDummyNamespaceString, BSON("x" << 1));
     ASSERT_GT(getClusterTime(),
               LogicalTime(
                   Timestamp(currentSecs + Seconds(kMaxAcceptableLogicalClockDriftSecsDefault), 0)));

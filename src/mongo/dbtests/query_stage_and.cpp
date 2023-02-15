@@ -102,11 +102,11 @@ public:
     }
 
     void insert(const BSONObj& obj) {
-        _client.insert(ns(), obj);
+        _client.insert(nss(), obj);
     }
 
     void remove(const BSONObj& obj) {
-        _client.remove(ns(), obj);
+        _client.remove(nss(), obj);
     }
 
     /**
@@ -149,11 +149,11 @@ public:
         return BSONObj();
     }
 
-    static const char* ns() {
-        return "unittests.QueryStageAnd";
+    const char* ns() {
+        return _nss.ns().c_str();
     }
-    NamespaceString nss() {
-        return NamespaceString(ns());
+    const NamespaceString& nss() {
+        return _nss;
     }
 
 protected:
@@ -165,6 +165,8 @@ protected:
 
 private:
     DBDirectClient _client;
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.QueryStageAnd");
 };
 
 //

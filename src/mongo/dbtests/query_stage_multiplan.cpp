@@ -100,12 +100,12 @@ public:
 
     void insert(const BSONObj& obj) {
         dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns());
-        _client.insert(nss.ns(), obj);
+        _client.insert(nss, obj);
     }
 
     void remove(const BSONObj& obj) {
         dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns());
-        _client.remove(nss.ns(), obj);
+        _client.remove(nss, obj);
     }
 
     OperationContext* opCtx() {

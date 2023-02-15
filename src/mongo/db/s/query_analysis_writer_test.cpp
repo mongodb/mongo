@@ -355,7 +355,7 @@ protected:
 
     void deleteSampledQueryDocuments() const {
         DBDirectClient client(operationContext());
-        client.remove(NamespaceString::kConfigSampledQueriesNamespace.toString(), BSONObj());
+        client.remove(NamespaceString::kConfigSampledQueriesNamespace, BSONObj());
     }
 
     /**

@@ -168,27 +168,27 @@ uint64_t MockDBClientConnection::getSockCreationMicroSec() const {
     return _sockCreationTime;
 }
 
-void MockDBClientConnection::insert(const string& ns,
+void MockDBClientConnection::insert(const NamespaceString& nss,
                                     BSONObj obj,
                                     bool ordered,
                                     boost::optional<BSONObj> writeConcernObj) {
-    _remoteServer->insert(ns, obj);
+    _remoteServer->insert(nss, obj);
 }
 
-void MockDBClientConnection::insert(const string& ns,
+void MockDBClientConnection::insert(const NamespaceString& nss,
                                     const vector<BSONObj>& objList,
                                     bool ordered,
                                     boost::optional<BSONObj> writeConcernObj) {
     for (vector<BSONObj>::const_iterator iter = objList.begin(); iter != objList.end(); ++iter) {
-        insert(ns, *iter, ordered);
+        insert(nss, *iter, ordered);
     }
 }
 
-void MockDBClientConnection::remove(const string& ns,
+void MockDBClientConnection::remove(const NamespaceString& nss,
                                     const BSONObj& filter,
                                     bool removeMany,
                                     boost::optional<BSONObj> writeConcernObj) {
-    _remoteServer->remove(ns, filter);
+    _remoteServer->remove(nss, filter);
 }
 
 void MockDBClientConnection::killCursor(const NamespaceString& ns, long long cursorID) {

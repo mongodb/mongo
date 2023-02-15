@@ -107,9 +107,11 @@ size_t createTestData(std::string ns, size_t numDocs) {
     for (size_t i = 0; i < numDocs; ++i) {
         docs.emplace_back(BSON("x" << int(i)));
     }
-    dbclient->dropCollection(NamespaceString(ns));
-    dbclient->insert(ns, docs);
-    return dbclient->count(NamespaceString::createNamespaceString_forTest(ns));
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
+
+    dbclient->dropCollection(nss);
+    dbclient->insert(nss, docs);
+    return dbclient->count(nss);
 }
 
 // Test that we can actually use a TaskExecutorCursor to read multiple batches from a remote host

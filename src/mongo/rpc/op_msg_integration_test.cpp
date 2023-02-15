@@ -338,7 +338,7 @@ void exhaustGetMoreTest(bool enableChecksum) {
 
     // Insert a few documents.
     for (int i = 0; i < 5; i++) {
-        conn->insert(nss.toString(), BSON("_id" << i));
+        conn->insert(nss, BSON("_id" << i));
     }
 
     // Issue a find request to open a cursor but return 0 documents. Specify a sort in order to
@@ -425,7 +425,7 @@ TEST(OpMsg, FindIgnoresExhaust) {
 
     // Insert a few documents.
     for (int i = 0; i < 5; i++) {
-        conn->insert(nss.toString(), BSON("_id" << i));
+        conn->insert(nss, BSON("_id" << i));
     }
 
     // Issue a find request with exhaust flag. Returns 0 documents.
@@ -457,7 +457,7 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
 
     // Insert a few documents.
     for (int i = 0; i < 5; i++) {
-        conn->insert(nss.toString(), BSON("_id" << i));
+        conn->insert(nss, BSON("_id" << i));
     }
 
     // Issue a find request to open a cursor but return 0 documents.
@@ -504,7 +504,7 @@ TEST(OpMsg, MongosIgnoresExhaustForGetMore) {
 
     // Insert a few documents.
     for (int i = 0; i < 5; i++) {
-        conn->insert(nss.toString(), BSON("_id" << i));
+        conn->insert(nss, BSON("_id" << i));
     }
 
     // Issue a find request to open a cursor but return 0 documents. Specify a sort in order to
@@ -556,7 +556,7 @@ TEST(OpMsg, ExhaustWorksForAggCursor) {
     // Insert 5 documents so that a cursor using a batchSize of 2 requires three batches to get all
     // the results.
     for (int i = 0; i < 5; i++) {
-        conn->insert(nss.toString(), BSON("_id" << i));
+        conn->insert(nss, BSON("_id" << i));
     }
 
     // Issue an agg request to open a cursor but return 0 documents. Specify a sort in order to
@@ -1234,7 +1234,7 @@ TEST(OpMsg, ExhaustWithDBClientCursorBehavesCorrectly) {
     LOGV2(22634, "Inserting {nDocs} documents.", "nDocs"_attr = nDocs);
     for (int i = 0; i < nDocs; i++) {
         auto doc = BSON("_id" << i);
-        conn->insert(nss.toString(), doc);
+        conn->insert(nss, doc);
     }
 
     ASSERT_EQ(conn->count(nss), size_t(nDocs));

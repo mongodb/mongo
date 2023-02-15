@@ -102,11 +102,8 @@ public:
     }
 
 protected:
-    static const char* ns() {
-        return "unittests.querytests";
-    }
-    static NamespaceString nss() {
-        return NamespaceString(ns());
+    const NamespaceString& nss() {
+        return _nss;
     }
 
     void addIndex(const IndexSpec& spec) {
@@ -167,7 +164,8 @@ protected:
         wunit.commit();
     }
 
-
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests");
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_opCtxPtr;
     Lock::GlobalWrite _lk;
@@ -203,7 +201,7 @@ public:
         // We don't normally allow empty objects in the database, but test that we can find
         // an empty object (one might be allowed inside a reserved namespace at some point).
         Lock::GlobalWrite lk(&_opCtx);
-        OldClientContext ctx(&_opCtx, NamespaceString(boost::none, "unittests.querytests"));
+        OldClientContext ctx(&_opCtx, nss());
 
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -220,7 +218,7 @@ public:
 
         DBDirectClient cl(&_opCtx);
         BSONObj info;
-        bool ok = cl.runCommand({boost::none, "unittests"},
+        bool ok = cl.runCommand(nss().dbName(),
                                 BSON("godinsert"
                                      << "querytests"
                                      << "obj" << BSONObj()),
@@ -243,8 +241,8 @@ public:
     ClientBase() : _client(&_opCtx) {}
 
 protected:
-    void insert(const char* ns, BSONObj o) {
-        _client.insert(ns, o);
+    void insert(const NamespaceString& nss, BSONObj o) {
+        _client.insert(nss, o);
     }
 
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
@@ -258,13 +256,12 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        insert(ns, BSON("a" << 1));
+        insert(_nss, BSON("a" << 1));
         BSONObjBuilder a;
         a.appendMaxKey("$lt");
         BSONObj limit = a.done();
         ASSERT(!_client.findOne(_nss, BSON("a" << limit)).isEmpty());
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("a" << 1)));
         FindCommandRequest findCmd{_nss};
         findCmd.setFilter(BSON("a" << limit));
         findCmd.setHint(BSON("a" << 1));
@@ -272,7 +269,8 @@ public:
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.BoundedKey");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.BoundedKey");
 };
 
 class GetMore : public ClientBase {
@@ -281,10 +279,9 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        insert(ns, BSON("a" << 1));
-        insert(ns, BSON("a" << 2));
-        insert(ns, BSON("a" << 3));
+        insert(_nss, BSON("a" << 1));
+        insert(_nss, BSON("a" << 2));
+        insert(_nss, BSON("a" << 3));
         FindCommandRequest findRequest{_nss};
         findRequest.setBatchSize(2);
         std::unique_ptr<DBClientCursor> cursor = _client.find(findRequest);
@@ -306,7 +303,8 @@ public:
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.GetMore");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.GetMore");
 };
 
 /**
@@ -320,9 +318,8 @@ public:
     }
     void run() {
         // Create a collection with some data.
-        const char* ns = _nss.ns().c_str();
         for (int i = 0; i < 1000; ++i) {
-            insert(ns, BSON("a" << i));
+            insert(_nss, BSON("a" << i));
         }
 
         // Create a cursor on the collection, with a batch size of 200.
@@ -352,7 +349,8 @@ public:
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.GetMoreKillOp");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.GetMoreKillOp");
 };
 
 /**
@@ -370,9 +368,8 @@ public:
         auto startNumCursors = CursorManager::get(&_opCtx)->numCursors();
 
         // Create a collection with some data.
-        const char* ns = _nss.ns().c_str();
         for (int i = 0; i < 1000; ++i) {
-            insert(ns, BSON("a" << i));
+            insert(_nss, BSON("a" << i));
         }
 
         // Create a cursor on the collection, with a batch size of 200.
@@ -392,8 +389,7 @@ public:
         // Send a getMore with a namespace that is incorrect ('spoofed') for this cursor id.
         ASSERT_THROWS(
             _client.getMore(
-                NamespaceString(
-                    boost::none,
+                NamespaceString::createNamespaceString_forTest(
                     "unittests.querytests.GetMoreInvalidRequest_WRONG_NAMESPACE_FOR_CURSOR"),
                 cursor->getCursorId()),
             AssertionException);
@@ -414,19 +410,19 @@ public:
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.GetMoreInvalidRequest");
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.querytests.GetMoreInvalidRequest");
 };
 
 class PositiveLimit : public ClientBase {
 public:
-    const char* ns;
-    PositiveLimit() : ns("unittests.querytests.PositiveLimit") {}
+    PositiveLimit() {}
     ~PositiveLimit() {
-        _client.dropCollection(NamespaceString(ns));
+        _client.dropCollection(_nss);
     }
 
     void testLimit(int limit, int expectedCount) {
-        FindCommandRequest findRequest{NamespaceString{ns}};
+        FindCommandRequest findRequest{_nss};
         findRequest.setLimit(limit);
         ASSERT_EQUALS(_client.find(std::move(findRequest))->itcount(), expectedCount);
     }
@@ -434,7 +430,7 @@ public:
     void run() {
         const int collSize = 1000;
         for (int i = 0; i < collSize; i++)
-            insert(ns, BSON(GENOID << "i" << i));
+            insert(_nss, BSON(GENOID << "i" << i));
 
         testLimit(1, 1);
         testLimit(10, 10);
@@ -444,6 +440,10 @@ public:
         testLimit(collSize + 1, collSize);
         testLimit(collSize + 10, collSize);
     }
+
+private:
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.PositiveLimit");
 };
 
 class TailNotAtEnd : public ClientBase {
@@ -458,11 +458,10 @@ public:
             return;
         }
 
-        const char* ns = _nss.ns().c_str();
         _client.createCollection(_nss, 2047, true);
-        insert(ns, BSON("a" << 0));
-        insert(ns, BSON("a" << 1));
-        insert(ns, BSON("a" << 2));
+        insert(_nss, BSON("a" << 0));
+        insert(_nss, BSON("a" << 1));
+        insert(_nss, BSON("a" << 2));
 
         FindCommandRequest findRequest{_nss};
         findRequest.setHint(BSON("$natural" << 1));
@@ -474,16 +473,17 @@ public:
         while (c->more())
             c->next();
         ASSERT(0 != c->getCursorId());
-        insert(ns, BSON("a" << 3));
-        insert(ns, BSON("a" << 4));
-        insert(ns, BSON("a" << 5));
-        insert(ns, BSON("a" << 6));
+        insert(_nss, BSON("a" << 3));
+        insert(_nss, BSON("a" << 4));
+        insert(_nss, BSON("a" << 5));
+        insert(_nss, BSON("a" << 6));
         ASSERT(c->more());
         ASSERT_EQUALS(3, c->next().getIntField("a"));
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.TailNotAtEnd");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.TailNotAtEnd");
 };
 
 class EmptyTail : public ClientBase {
@@ -497,7 +497,6 @@ public:
             return;
         }
 
-        const char* ns = _nss.ns().c_str();
         _client.createCollection(_nss, 1900, true);
 
         FindCommandRequest findRequest{_nss};
@@ -509,7 +508,7 @@ public:
         ASSERT_EQUALS(0, c->getCursorId());
         ASSERT(c->isDead());
 
-        insert(ns, BSON("a" << 0));
+        insert(_nss, BSON("a" << 0));
         findRequest.setFilter(BSON("a" << 1));
         c = _client.find(findRequest);
         ASSERT(0 != c->getCursorId());
@@ -517,7 +516,8 @@ public:
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.EmptyTail");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.EmptyTail");
 };
 
 class TailableDelete : public ClientBase {
@@ -531,10 +531,9 @@ public:
             return;
         }
 
-        const char* ns = _nss.ns().c_str();
         _client.createCollection(_nss, 8192, true, 2);
-        insert(ns, BSON("a" << 0));
-        insert(ns, BSON("a" << 1));
+        insert(_nss, BSON("a" << 0));
+        insert(_nss, BSON("a" << 1));
 
         FindCommandRequest findRequest{_nss};
         findRequest.setHint(BSON("$natural" << 1));
@@ -544,15 +543,16 @@ public:
         c->next();
         c->next();
         ASSERT(!c->more());
-        insert(ns, BSON("a" << 2));
-        insert(ns, BSON("a" << 3));
+        insert(_nss, BSON("a" << 2));
+        insert(_nss, BSON("a" << 3));
 
         // We have overwritten the previous cursor position and should encounter a dead cursor.
         ASSERT_THROWS(c->more() ? c->nextSafe() : BSONObj(), AssertionException);
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.TailableDelete");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.TailableDelete");
 };
 
 class TailableDelete2 : public ClientBase {
@@ -566,10 +566,9 @@ public:
             return;
         }
 
-        const char* ns = _nss.ns().c_str();
         _client.createCollection(_nss, 8192, true, 2);
-        insert(ns, BSON("a" << 0));
-        insert(ns, BSON("a" << 1));
+        insert(_nss, BSON("a" << 0));
+        insert(_nss, BSON("a" << 1));
 
         FindCommandRequest findRequest{_nss};
         findRequest.setHint(BSON("$natural" << 1));
@@ -579,16 +578,17 @@ public:
         c->next();
         c->next();
         ASSERT(!c->more());
-        insert(ns, BSON("a" << 2));
-        insert(ns, BSON("a" << 3));
-        insert(ns, BSON("a" << 4));
+        insert(_nss, BSON("a" << 2));
+        insert(_nss, BSON("a" << 3));
+        insert(_nss, BSON("a" << 4));
 
         // We have overwritten the previous cursor position and should encounter a dead cursor.
         ASSERT_THROWS(c->more() ? c->nextSafe() : BSONObj(), AssertionException);
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.TailableDelete");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.TailableDelete");
 };
 
 
@@ -604,10 +604,9 @@ public:
             return;
         }
 
-        const char* ns = _nss.ns().c_str();
         _client.createCollection(_nss, 1330, true);
-        insert(ns, BSON("a" << 0));
-        insert(ns, BSON("a" << 1));
+        insert(_nss, BSON("a" << 0));
+        insert(_nss, BSON("a" << 1));
 
         FindCommandRequest findRequest{_nss};
         findRequest.setHint(BSON("$natural" << 1));
@@ -618,14 +617,15 @@ public:
         c->next();
         c->next();
         ASSERT(!c->more());
-        insert(ns, BSON("a" << 2));
+        insert(_nss, BSON("a" << 2));
         ASSERT(c->more());
         ASSERT_EQUALS(2, c->next().getIntField("a"));
         ASSERT(!c->more());
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.TailableInsertDelete");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.TailableInsertDelete");
 };
 
 class TailCappedOnly : public ClientBase {
@@ -634,15 +634,15 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        _client.insert(ns, BSONObj());
+        _client.insert(_nss, BSONObj());
         FindCommandRequest findRequest{_nss};
         findRequest.setTailable(true);
         ASSERT_THROWS(_client.find(std::move(findRequest)), AssertionException);
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittest.querytests.TailCappedOnly");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittest.querytests.TailCappedOnly");
 };
 
 class TailableQueryOnId : public ClientBase {
@@ -651,12 +651,12 @@ public:
         _client.dropCollection(_nss);
     }
 
-    void insertA(const char* ns, int a) {
+    void insertA(const NamespaceString& nss, int a) {
         BSONObjBuilder b;
         b.appendOID("_id", nullptr, true);
         b.appendOID("value", nullptr, true);
         b.append("a", a);
-        insert(ns, b.obj());
+        insert(nss, b.obj());
     }
 
     void run() {
@@ -665,15 +665,14 @@ public:
             return;
         }
 
-        const char* ns = _nss.ns().c_str();
         BSONObj info;
         _client.runCommand(_nss.dbName(),
                            BSON("create"
                                 << "querytests.TailableQueryOnId"
                                 << "capped" << true << "size" << 8192 << "autoIndexId" << true),
                            info);
-        insertA(ns, 0);
-        insertA(ns, 1);
+        insertA(_nss, 0);
+        insertA(_nss, 1);
         FindCommandRequest findRequest{_nss};
         findRequest.setFilter(BSON("a" << GT << -1));
         findRequest.setTailable(true);
@@ -688,7 +687,7 @@ public:
         c2->next();
         c2->next();
         ASSERT(!c2->more());
-        insertA(ns, 2);
+        insertA(_nss, 2);
         ASSERT(c1->more());
         ASSERT_EQUALS(2, c1->next().getIntField("a"));
         ASSERT(!c1->more());
@@ -699,7 +698,8 @@ public:
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.TailableQueryOnId");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.TailableQueryOnId");
 };
 
 class OplogScanWithGtTimstampPred : public ClientBase {
@@ -730,12 +730,11 @@ public:
                                     << "oplog.querytests.OplogScanWithGtTimstampPred"),
                                info);
         }
-
         const char* ns = _nss.ns().c_str();
         insertOplogDocument(&_opCtx, Timestamp(1000, 0), ns);
         insertOplogDocument(&_opCtx, Timestamp(1000, 1), ns);
         insertOplogDocument(&_opCtx, Timestamp(1000, 2), ns);
-        FindCommandRequest findRequest{NamespaceString{ns}};
+        FindCommandRequest findRequest{_nss};
         findRequest.setFilter(BSON("ts" << GT << Timestamp(1000, 1)));
         findRequest.setHint(BSON("$natural" << 1));
         std::unique_ptr<DBClientCursor> c = _client.find(findRequest);
@@ -743,7 +742,7 @@ public:
         ASSERT_EQUALS(2u, c->next()["ts"].timestamp().getInc());
         ASSERT(!c->more());
 
-        insert(ns, BSON("ts" << Timestamp(1000, 3)));
+        insert(_nss, BSON("ts" << Timestamp(1000, 3)));
         c = _client.find(findRequest);
         ASSERT(c->more());
         ASSERT_EQUALS(2u, c->next()["ts"].timestamp().getInc());
@@ -751,8 +750,8 @@ public:
     }
 
 private:
-    const NamespaceString _nss =
-        NamespaceString("local.oplog.querytests.OplogScanWithGtTimstampPred");
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest(
+        "local.oplog.querytests.OplogScanWithGtTimstampPred");
 };
 
 class OplogScanGtTsExplain : public ClientBase {
@@ -807,7 +806,8 @@ public:
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("local.oplog.querytests.OplogScanGtTsExplain");
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest(
+        "local.oplog.querytests.OplogScanGtTsExplain");
 };
 
 class BasicCount : public ClientBase {
@@ -816,16 +816,15 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("a" << 1)));
         count(0);
-        insert(ns, BSON("a" << 3));
+        insert(_nss, BSON("a" << 3));
         count(0);
-        insert(ns, BSON("a" << 4));
+        insert(_nss, BSON("a" << 4));
         count(1);
-        insert(ns, BSON("a" << 5));
+        insert(_nss, BSON("a" << 5));
         count(1);
-        insert(ns, BSON("a" << 4));
+        insert(_nss, BSON("a" << 4));
         count(2);
     }
 
@@ -834,7 +833,8 @@ private:
         ASSERT_EQUALS(c, _client.count(_nss, BSON("a" << 4)));
     }
 
-    const NamespaceString _nss = NamespaceString("unittests.querytests.BasicCount");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.BasicCount");
 };
 
 class ArrayId : public ClientBase {
@@ -843,15 +843,15 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("_id" << 1)));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("_id" << 1)));
 
-        auto response = _client.insertAcknowledged(ns, {fromjson("{'_id':[1,2]}")});
+        auto response = _client.insertAcknowledged(_nss, {fromjson("{'_id':[1,2]}")});
         ASSERT_NOT_OK(getStatusFromWriteCommandReply(response));
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.ArrayId");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.ArrayId");
 };
 
 class UnderscoreNs : public ClientBase {
@@ -860,16 +860,16 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
         ASSERT(_client.findOne(_nss, BSONObj{}).isEmpty());
-        auto response = _client.insertAcknowledged(ns, {BSON("a" << 1)});
+        auto response = _client.insertAcknowledged(_nss, {BSON("a" << 1)});
         ASSERT_OK(getStatusFromWriteCommandReply(response));
         ASSERT_EQ(1, response["n"].Int());
         ASSERT_EQUALS(1, _client.findOne(_nss, BSONObj{}).getIntField("a"));
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests._UnderscoreNs");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests._UnderscoreNs");
 };
 
 class EmptyFieldSpec : public ClientBase {
@@ -878,8 +878,7 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        _client.insert(ns, BSON("a" << 1));
+        _client.insert(_nss, BSON("a" << 1));
         ASSERT(!_client.findOne(_nss, BSONObj{}).isEmpty());
         FindCommandRequest findCmd{_nss};
         findCmd.setProjection(BSONObj{});
@@ -887,7 +886,8 @@ public:
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.EmptyFieldSpec");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.EmptyFieldSpec");
 };
 
 class MultiNe : public ClientBase {
@@ -896,15 +896,15 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        _client.insert(ns, fromjson("{a:[1,2]}"));
+        _client.insert(_nss, fromjson("{a:[1,2]}"));
         ASSERT(_client.findOne(_nss, fromjson("{a:{$ne:1}}")).isEmpty());
         BSONObj spec = fromjson("{a:{$ne:1,$ne:2}}");
         ASSERT(_client.findOne(_nss, spec).isEmpty());
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.Ne");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.Ne");
 };
 
 class EmbeddedNe : public ClientBase {
@@ -913,13 +913,13 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        _client.insert(ns, fromjson("{a:[{b:1},{b:2}]}"));
+        _client.insert(_nss, fromjson("{a:[{b:1},{b:2}]}"));
         ASSERT(_client.findOne(_nss, fromjson("{'a.b':{$ne:1}}")).isEmpty());
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.NestedNe");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.NestedNe");
 };
 
 class EmbeddedNumericTypes : public ClientBase {
@@ -928,15 +928,15 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        _client.insert(ns, BSON("a" << BSON("b" << 1)));
+        _client.insert(_nss, BSON("a" << BSON("b" << 1)));
         ASSERT(!_client.findOne(_nss, BSON("a" << BSON("b" << 1.0))).isEmpty());
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("a" << 1)));
         ASSERT(!_client.findOne(_nss, BSON("a" << BSON("b" << 1.0))).isEmpty());
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.NumericEmbedded");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.NumericEmbedded");
 };
 
 class AutoResetIndexCache : public ClientBase {
@@ -972,7 +972,8 @@ public:
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.AutoResetIndexCache");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.AutoResetIndexCache");
 };
 
 class UniqueIndex : public ClientBase {
@@ -981,20 +982,20 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1), true));
-        _client.insert(ns, BSON("a" << 4 << "b" << 2));
-        _client.insert(ns, BSON("a" << 4 << "b" << 3));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("a" << 1), true));
+        _client.insert(_nss, BSON("a" << 4 << "b" << 2));
+        _client.insert(_nss, BSON("a" << 4 << "b" << 3));
         ASSERT_EQUALS(1U, _client.count(_nss, BSONObj()));
         _client.dropCollection(_nss);
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("b" << 1), true));
-        _client.insert(ns, BSON("a" << 4 << "b" << 2));
-        _client.insert(ns, BSON("a" << 4 << "b" << 3));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("b" << 1), true));
+        _client.insert(_nss, BSON("a" << 4 << "b" << 2));
+        _client.insert(_nss, BSON("a" << 4 << "b" << 3));
         ASSERT_EQUALS(2U, _client.count(_nss, BSONObj()));
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.UniqueIndex");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.UniqueIndex");
 };
 
 class UniqueIndexPreexistingData : public ClientBase {
@@ -1003,15 +1004,15 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        _client.insert(ns, BSON("a" << 4 << "b" << 2));
-        _client.insert(ns, BSON("a" << 4 << "b" << 3));
+        _client.insert(_nss, BSON("a" << 4 << "b" << 2));
+        _client.insert(_nss, BSON("a" << 4 << "b" << 3));
         ASSERT_EQUALS(ErrorCodes::DuplicateKey,
-                      dbtests::createIndex(&_opCtx, ns, BSON("a" << 1), true));
+                      dbtests::createIndex(&_opCtx, _nss.ns(), BSON("a" << 1), true));
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.UniqueIndexPreexistingData");
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.querytests.UniqueIndexPreexistingData");
 };
 
 class SubobjectInArray : public ClientBase {
@@ -1020,14 +1021,14 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        _client.insert(ns, fromjson("{a:[{b:{c:1}}]}"));
+        _client.insert(_nss, fromjson("{a:[{b:{c:1}}]}"));
         ASSERT(!_client.findOne(_nss, BSON("a.b.c" << 1)).isEmpty());
         ASSERT(!_client.findOne(_nss, fromjson("{'a.c':null}")).isEmpty());
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.SubobjectInArray");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.SubobjectInArray");
 };
 
 class Size : public ClientBase {
@@ -1036,9 +1037,8 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        _client.insert(ns, fromjson("{a:[1,2,3]}"));
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
+        _client.insert(_nss, fromjson("{a:[1,2,3]}"));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("a" << 1)));
         FindCommandRequest findRequest{_nss};
         findRequest.setFilter(BSON("a" << mongo::BSIZE << 3));
         findRequest.setHint(BSON("a" << 1));
@@ -1046,7 +1046,8 @@ public:
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.Size");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.Size");
 };
 
 class FullArray : public ClientBase {
@@ -1055,12 +1056,11 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        _client.insert(ns, fromjson("{a:[1,2,3]}"));
+        _client.insert(_nss, fromjson("{a:[1,2,3]}"));
         FindCommandRequest findRequest{_nss};
         findRequest.setFilter(fromjson("{a:[1,2,3]}"));
         ASSERT(_client.find(findRequest)->more());
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("a" << 1)));
         findRequest.setFilter(fromjson("{a:{$in:[1,[1,2,3]]}}"));
         findRequest.setHint(BSON("a" << 1));
         ASSERT(_client.find(findRequest)->more());
@@ -1069,7 +1069,8 @@ public:
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.IndexedArray");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.IndexedArray");
 };
 
 class InsideArray : public ClientBase {
@@ -1078,10 +1079,9 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        _client.insert(ns, fromjson("{a:[[1],2]}"));
+        _client.insert(_nss, fromjson("{a:[[1],2]}"));
         check("$natural");
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("a" << 1)));
         check("a");
     }
 
@@ -1099,7 +1099,8 @@ private:
         ASSERT(!_client.find(findRequest)->more());
     }
 
-    const NamespaceString _nss = NamespaceString("unittests.querytests.InsideArray");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.InsideArray");
 };
 
 class IndexInsideArrayCorrect : public ClientBase {
@@ -1108,10 +1109,9 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        _client.insert(ns, fromjson("{'_id':1,a:[1]}"));
-        _client.insert(ns, fromjson("{'_id':2,a:[[1]]}"));
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
+        _client.insert(_nss, fromjson("{'_id':1,a:[1]}"));
+        _client.insert(_nss, fromjson("{'_id':2,a:[[1]]}"));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("a" << 1)));
         FindCommandRequest findRequest{_nss};
         findRequest.setFilter(fromjson("{a:[1]}"));
         findRequest.setHint(BSON("a" << 1));
@@ -1119,7 +1119,8 @@ public:
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.IndexInsideArrayCorrect");
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.querytests.IndexInsideArrayCorrect");
 };
 
 class SubobjArr : public ClientBase {
@@ -1128,10 +1129,9 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        _client.insert(ns, fromjson("{a:[{b:[1]}]}"));
+        _client.insert(_nss, fromjson("{a:[{b:[1]}]}"));
         check("$natural");
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("a" << 1)));
         check("a");
     }
 
@@ -1145,27 +1145,28 @@ private:
         ASSERT(_client.find(findRequest)->more());
     }
 
-    const NamespaceString _nss = NamespaceString("unittests.querytests.SubobjArr");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.SubobjArr");
 };
 
 class MatchCodeCodeWScope : public ClientBase {
 public:
-    MatchCodeCodeWScope() : _ns("unittests.querytests.MatchCodeCodeWScope"), _nss(_ns) {}
+    MatchCodeCodeWScope() {}
     ~MatchCodeCodeWScope() {
         _client.dropCollection(_nss);
     }
     void run() {
         checkMatch();
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _ns, BSON("a" << 1)));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("a" << 1)));
         checkMatch();
     }
 
 private:
     void checkMatch() {
-        _client.remove(_ns, BSONObj());
+        _client.remove(_nss, BSONObj());
 
-        _client.insert(_ns, code());
-        _client.insert(_ns, codeWScope());
+        _client.insert(_nss, code());
+        _client.insert(_nss, codeWScope());
 
         ASSERT_EQUALS(1U, _client.count(_nss, code()));
         ASSERT_EQUALS(1U, _client.count(_nss, codeWScope()));
@@ -1183,26 +1184,26 @@ private:
         codeWScopeBuilder.appendCodeWScope("a", "return 1;", BSONObj());
         return codeWScopeBuilder.obj();
     }
-    const char* _ns;
-    const NamespaceString _nss;
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.MatchCodeCodeWScope");
 };
 
 class MatchDBRefType : public ClientBase {
 public:
-    MatchDBRefType() : _ns("unittests.querytests.MatchDBRefType"), _nss(_ns) {}
+    MatchDBRefType() {}
     ~MatchDBRefType() {
         _client.dropCollection(_nss);
     }
     void run() {
         checkMatch();
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _ns, BSON("a" << 1)));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("a" << 1)));
         checkMatch();
     }
 
 private:
     void checkMatch() {
-        _client.remove(_ns, BSONObj());
-        _client.insert(_ns, dbref());
+        _client.remove(_nss, BSONObj());
+        _client.insert(_nss, dbref());
         ASSERT_EQUALS(1U, _client.count(_nss, dbref()));
         ASSERT_EQUALS(1U, _client.count(_nss, BSON("a" << BSON("$type" << (int)DBRef))));
     }
@@ -1212,16 +1213,17 @@ private:
         b.appendDBRef("a", "ns", oid);
         return b.obj();
     }
-    const char* _ns;
-    const NamespaceString _nss;
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.MatchDBRefType");
 };
 
 class DirectLocking : public ClientBase {
 public:
     void run() {
         Lock::GlobalWrite lk(&_opCtx);
-        OldClientContext ctx(&_opCtx, NamespaceString(boost::none, "unittests.DirectLocking"));
-        _client.remove("a.b", BSONObj());
+        OldClientContext ctx(
+            &_opCtx, NamespaceString::createNamespaceString_forTest("unittests.DirectLocking"));
+        _client.remove(NamespaceString::createNamespaceString_forTest("a.b"), BSONObj());
         ASSERT_EQUALS("unittests", ctx.db()->name().db());
     }
     const char* ns;
@@ -1233,16 +1235,16 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        _client.insert(ns,
+        _client.insert(_nss,
                        BSON("i"
                             << "a"));
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("i" << 1)));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("i" << 1)));
         ASSERT_EQUALS(1U, _client.count(_nss, fromjson("{i:{$in:['a']}}")));
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.FastCountIn");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.FastCountIn");
 };
 
 class EmbeddedArray : public ClientBase {
@@ -1251,11 +1253,10 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
-        _client.insert(ns, fromjson("{foo:{bar:['spam']}}"));
-        _client.insert(ns, fromjson("{foo:{bar:['spam','eggs']}}"));
-        _client.insert(ns, fromjson("{bar:['spam']}"));
-        _client.insert(ns, fromjson("{bar:['spam','eggs']}"));
+        _client.insert(_nss, fromjson("{foo:{bar:['spam']}}"));
+        _client.insert(_nss, fromjson("{foo:{bar:['spam','eggs']}}"));
+        _client.insert(_nss, fromjson("{bar:['spam']}"));
+        _client.insert(_nss, fromjson("{bar:['spam','eggs']}"));
         ASSERT_EQUALS(2U,
                       _client.count(_nss,
                                     BSON("bar"
@@ -1267,7 +1268,8 @@ public:
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.EmbeddedArray");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.EmbeddedArray");
 };
 
 class DifferentNumbers : public ClientBase {
@@ -1275,8 +1277,8 @@ public:
     ~DifferentNumbers() {
         _client.dropCollection(_nss);
     }
-    void t(const char* ns) {
-        FindCommandRequest findRequest{_nss};
+    void t(const NamespaceString& nss) {
+        FindCommandRequest findRequest{nss};
         findRequest.setSort(BSON("7" << 1));
         std::unique_ptr<DBClientCursor> cursor = _client.find(std::move(findRequest));
         while (cursor->more()) {
@@ -1285,52 +1287,51 @@ public:
         }
     }
     void run() {
-        const char* ns = _nss.ns().c_str();
         {
             BSONObjBuilder b;
             b.append("7", (int)4);
-            _client.insert(ns, b.obj());
+            _client.insert(_nss, b.obj());
         }
         {
             BSONObjBuilder b;
             b.append("7", (long long)2);
-            _client.insert(ns, b.obj());
+            _client.insert(_nss, b.obj());
         }
         {
             BSONObjBuilder b;
             b.appendNull("7");
-            _client.insert(ns, b.obj());
+            _client.insert(_nss, b.obj());
         }
         {
             BSONObjBuilder b;
             b.append("7", "b");
-            _client.insert(ns, b.obj());
+            _client.insert(_nss, b.obj());
         }
         {
             BSONObjBuilder b;
             b.appendNull("8");
-            _client.insert(ns, b.obj());
+            _client.insert(_nss, b.obj());
         }
         {
             BSONObjBuilder b;
             b.append("7", (double)3.7);
-            _client.insert(ns, b.obj());
+            _client.insert(_nss, b.obj());
         }
 
-        t(ns);
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("7" << 1)));
-        t(ns);
+        t(_nss);
+        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns(), BSON("7" << 1)));
+        t(_nss);
     }
 
 private:
-    const NamespaceString _nss = NamespaceString("unittests.querytests.DifferentNumbers");
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.querytests.DifferentNumbers");
 };
 
 class CollectionBase : public ClientBase {
 public:
-    CollectionBase(string leaf) {
-        _ns = "unittests.querytests.";
-        _ns += leaf;
+    CollectionBase(string leaf)
+        : _nss(NamespaceString::createNamespaceString_forTest("unittests.querytests." + leaf)) {
         _client.dropCollection(nss());
     }
 
@@ -1347,14 +1348,14 @@ public:
     }
 
     const char* ns() {
-        return _ns.c_str();
+        return _nss.ns().c_str();
     }
-    NamespaceString nss() {
-        return NamespaceString(ns());
+    const NamespaceString& nss() {
+        return _nss;
     }
 
 private:
-    string _ns;
+    const NamespaceString _nss;
 };
 
 class SymbolStringSame : public CollectionBase {
@@ -1366,7 +1367,7 @@ public:
             BSONObjBuilder b;
             b.appendSymbol("x", "eliot");
             b.append("z", 17);
-            _client.insert(ns(), b.obj());
+            _client.insert(nss(), b.obj());
         }
         ASSERT_EQUALS(17, _client.findOne(nss(), BSONObj{})["z"].number());
         {
@@ -1457,7 +1458,7 @@ public:
         BSONObjBuilder b;
         b.appendOID("_id", nullptr, true);
         b.append("i", _n++);
-        insert(ns(), b.obj());
+        insert(nss(), b.obj());
     }
 
     int _n;
@@ -1471,7 +1472,7 @@ public:
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         for (int i = 0; i < 50; i++) {
-            insert(ns(), BSON("_id" << i << "x" << i * 2));
+            insert(nss(), BSON("_id" << i << "x" << i * 2));
         }
 
         ASSERT_EQUALS(50, count());
@@ -1516,10 +1517,10 @@ public:
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         for (int i = 0; i < 1000; i++) {
-            insert(ns(), BSON("_id" << i << "x" << i * 2));
+            insert(nss(), BSON("_id" << i << "x" << i * 2));
         }
         for (int i = 0; i < 1000; i += 2) {
-            _client.remove(ns(), BSON("_id" << i));
+            _client.remove(nss(), BSON("_id" << i));
         }
 
         BSONObj res;
@@ -1537,7 +1538,7 @@ class ClientCursorTest : public CollectionBase {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         for (int i = 0; i < 1000; i++) {
-            insert(ns(), BSON("_id" << i << "x" << i * 2));
+            insert(nss(), BSON("_id" << i << "x" << i * 2));
         }
     }
 };
@@ -1768,9 +1769,9 @@ public:
             context.db()->createCollection(&_opCtx, nss(), coll_opts, false);
             wunit.commit();
         }
-        insert(ns(), BSON("a" << 1));
-        insert(ns(), BSON("a" << 2));
-        insert(ns(), BSON("a" << 3));
+        insert(nss(), BSON("a" << 1));
+        insert(nss(), BSON("a" << 2));
+        insert(nss(), BSON("a" << 3));
         std::unique_ptr<DBClientCursor> cursor =
             _client.find(FindCommandRequest{NamespaceStringOrUUID{"unittests", *coll_opts.uuid}});
         ASSERT_EQUALS(string(ns()), cursor->getns());
@@ -1797,13 +1798,13 @@ public:
             context.db()->createCollection(&_opCtx, nss(), coll_opts, false);
             wunit.commit();
         }
-        insert(ns(), BSON("a" << 1));
+        insert(nss(), BSON("a" << 1));
 
         auto count = _client.count(NamespaceStringOrUUID("unittests", *coll_opts.uuid), BSONObj());
         ASSERT_EQUALS(1U, count);
 
-        insert(ns(), BSON("a" << 2));
-        insert(ns(), BSON("a" << 3));
+        insert(nss(), BSON("a" << 2));
+        insert(nss(), BSON("a" << 3));
 
         count = _client.count(NamespaceStringOrUUID("unittests", *coll_opts.uuid), BSONObj());
         ASSERT_EQUALS(3U, count);
@@ -1824,9 +1825,9 @@ public:
             context.db()->createCollection(&_opCtx, nss(), coll_opts, true);
             wunit.commit();
         }
-        insert(ns(), BSON("a" << 1));
-        insert(ns(), BSON("a" << 2));
-        insert(ns(), BSON("a" << 3));
+        insert(nss(), BSON("a" << 1));
+        insert(nss(), BSON("a" << 2));
+        insert(nss(), BSON("a" << 3));
 
         const bool includeBuildUUIDs = false;
         const int options = 0;
@@ -1852,41 +1853,44 @@ public:
     GetDatabaseInfosTest() : CollectionBase("GetDatabaseInfosTest") {}
 
     void run() {
-        const char* ns1 = "unittestsdb1.querytests.coll1";
+        const auto nss1 =
+            NamespaceString::createNamespaceString_forTest("unittestsdb1.querytests.coll1");
         {
             Lock::GlobalWrite lk(&_opCtx);
-            OldClientContext context(&_opCtx, NamespaceString(boost::none, ns1));
+            OldClientContext context(&_opCtx, nss1);
             WriteUnitOfWork wunit(&_opCtx);
-            context.db()->createCollection(&_opCtx, NamespaceString(ns1));
+            context.db()->createCollection(&_opCtx, nss1);
             wunit.commit();
         }
-        insert(ns1, BSON("a" << 1));
+        insert(nss1, BSON("a" << 1));
         auto dbInfos = _client.getDatabaseInfos(BSONObj(), true /*nameOnly*/);
         checkNewDBInResults(dbInfos, 1);
 
 
-        const char* ns2 = "unittestsdb2.querytests.coll2";
+        const auto nss2 =
+            NamespaceString::createNamespaceString_forTest("unittestsdb2.querytests.coll2");
         {
             Lock::GlobalWrite lk(&_opCtx);
-            OldClientContext context(&_opCtx, NamespaceString(boost::none, ns2));
+            OldClientContext context(&_opCtx, nss2);
             WriteUnitOfWork wunit(&_opCtx);
-            context.db()->createCollection(&_opCtx, NamespaceString(boost::none, ns2));
+            context.db()->createCollection(&_opCtx, nss2);
             wunit.commit();
         }
-        insert(ns2, BSON("b" << 2));
+        insert(nss2, BSON("b" << 2));
         dbInfos = _client.getDatabaseInfos(BSONObj(), true /*nameOnly*/);
         checkNewDBInResults(dbInfos, 2);
 
 
-        const char* ns3 = "unittestsdb3.querytests.coll3";
+        const auto nss3 =
+            NamespaceString::createNamespaceString_forTest("unittestsdb3.querytests.coll3");
         {
             Lock::GlobalWrite lk(&_opCtx);
-            OldClientContext context(&_opCtx, NamespaceString(boost::none, ns3));
+            OldClientContext context(&_opCtx, nss3);
             WriteUnitOfWork wunit(&_opCtx);
-            context.db()->createCollection(&_opCtx, NamespaceString(boost::none, ns3));
+            context.db()->createCollection(&_opCtx, nss3);
             wunit.commit();
         }
-        insert(ns3, BSON("c" << 3));
+        insert(nss3, BSON("c" << 3));
         dbInfos = _client.getDatabaseInfos(BSONObj(), true /*nameOnly*/);
         checkNewDBInResults(dbInfos, 3);
     }
@@ -1919,7 +1923,7 @@ public:
     QueryReadsAll() : CollectionBase("queryreadsall") {}
     void run() {
         for (int i = 0; i < 5; ++i) {
-            insert(ns(), BSONObj());
+            insert(nss(), BSONObj());
         }
         {
             // With five results and a batch size of 5, a cursor is created since we don't know

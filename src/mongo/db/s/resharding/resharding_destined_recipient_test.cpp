@@ -376,7 +376,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdates) {
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
-    client.insert(kNss.toString(), BSON("_id" << 0 << "x" << 2 << "y" << 10 << "z" << 4));
+    client.insert(kNss, BSON("_id" << 0 << "x" << 2 << "y" << 10 << "z" << 4));
 
     auto env = setupReshardingEnv(opCtx, true);
 
@@ -394,17 +394,14 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnMultiUpdates)
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
-    client.insert(kNss.toString(), BSON("x" << 0 << "y" << 10 << "z" << 4));
-    client.insert(kNss.toString(), BSON("x" << 0 << "y" << 10 << "z" << 4));
+    client.insert(kNss, BSON("x" << 0 << "y" << 10 << "z" << 4));
+    client.insert(kNss, BSON("x" << 0 << "y" << 10 << "z" << 4));
 
     auto env = setupReshardingEnv(opCtx, true);
 
     OperationShardingState::setShardRole(opCtx, kNss, ShardVersion::IGNORED(), env.dbVersion);
-    client.update(kNss.ns(),
-                  BSON("x" << 0),
-                  BSON("$set" << BSON("z" << 5)),
-                  false /*upsert*/,
-                  true /*multi*/);
+    client.update(
+        kNss, BSON("x" << 0), BSON("$set" << BSON("z" << 5)), false /*upsert*/, true /*multi*/);
 
     auto entry = getLastOplogEntry(opCtx);
     auto recipShard = entry.getDestinedRecipient();
@@ -417,7 +414,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesOutOfP
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
-    client.insert(kNss.toString(), BSON("_id" << 0 << "x" << 2 << "y" << 10));
+    client.insert(kNss, BSON("_id" << 0 << "x" << 2 << "y" << 10));
 
     auto env = setupReshardingEnv(opCtx, true);
 
@@ -435,7 +432,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesInTran
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
-    client.insert(kNss.toString(), BSON("_id" << 0 << "x" << 2 << "y" << 10 << "z" << 4));
+    client.insert(kNss, BSON("_id" << 0 << "x" << 2 << "y" << 10 << "z" << 4));
 
     auto env = setupReshardingEnv(opCtx, true);
 
@@ -463,7 +460,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletes) {
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
-    client.insert(kNss.toString(), BSON("_id" << 0 << "x" << 2 << "y" << 10 << "z" << 4));
+    client.insert(kNss, BSON("_id" << 0 << "x" << 2 << "y" << 10 << "z" << 4));
 
     auto env = setupReshardingEnv(opCtx, true);
 
@@ -481,7 +478,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletesInTran
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
-    client.insert(kNss.toString(), BSON("_id" << 0 << "x" << 2 << "y" << 10));
+    client.insert(kNss, BSON("_id" << 0 << "x" << 2 << "y" << 10));
 
     auto env = setupReshardingEnv(opCtx, true);
 
@@ -508,7 +505,7 @@ TEST_F(DestinedRecipientTest, TestUpdateChangesOwningShardThrows) {
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
-    client.insert(kNss.toString(), BSON("_id" << 0 << "x" << 2 << "y" << 2 << "z" << 4));
+    client.insert(kNss, BSON("_id" << 0 << "x" << 2 << "y" << 2 << "z" << 4));
 
     auto env = setupReshardingEnv(opCtx, true);
 
@@ -528,7 +525,7 @@ TEST_F(DestinedRecipientTest, TestUpdateSameOwningShard) {
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
-    client.insert(kNss.toString(), BSON("_id" << 0 << "x" << 2 << "y" << 2 << "z" << 4));
+    client.insert(kNss, BSON("_id" << 0 << "x" << 2 << "y" << 2 << "z" << 4));
 
     auto env = setupReshardingEnv(opCtx, true);
 

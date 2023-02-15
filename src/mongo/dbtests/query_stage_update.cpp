@@ -77,11 +77,11 @@ public:
     }
 
     void insert(const BSONObj& doc) {
-        _client.insert(nss.ns(), doc);
+        _client.insert(nss, doc);
     }
 
     void remove(const BSONObj& obj) {
-        _client.remove(nss.ns(), obj);
+        _client.remove(nss, obj);
     }
 
     size_t count(const BSONObj& query) {

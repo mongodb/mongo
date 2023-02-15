@@ -196,10 +196,10 @@ TEST_F(ReshardingDonorOplogIterTest, BasicExhaust) {
     const auto finalOplog = makeFinalOplog(Timestamp(43, 24));
 
     DBDirectClient client(operationContext());
-    const auto ns = oplogNss().ns();
-    client.insert(ns, oplog1.toBSON());
-    client.insert(ns, oplog2.toBSON());
-    client.insert(ns, finalOplog.toBSON());
+    const auto nss = oplogNss();
+    client.insert(nss, oplog1.toBSON());
+    client.insert(nss, oplog2.toBSON());
+    client.insert(nss, finalOplog.toBSON());
 
     ReshardingDonorOplogIterator iter(oplogNss(), kResumeFromBeginning, &onInsertAlwaysReady);
     auto executor = makeTaskExecutorForIterator();
@@ -228,10 +228,10 @@ TEST_F(ReshardingDonorOplogIterTest, ResumeFromMiddle) {
     const auto finalOplog = makeFinalOplog(Timestamp(43, 24));
 
     DBDirectClient client(operationContext());
-    const auto ns = oplogNss().ns();
-    client.insert(ns, oplog1.toBSON());
-    client.insert(ns, oplog2.toBSON());
-    client.insert(ns, finalOplog.toBSON());
+    const auto nss = oplogNss();
+    client.insert(nss, oplog1.toBSON());
+    client.insert(nss, oplog2.toBSON());
+    client.insert(nss, finalOplog.toBSON());
 
     ReshardingDonorOplogId resumeToken(Timestamp(2, 4), Timestamp(2, 4));
     ReshardingDonorOplogIterator iter(oplogNss(), resumeToken, &onInsertAlwaysReady);
@@ -254,8 +254,8 @@ TEST_F(ReshardingDonorOplogIterTest, ExhaustWithIncomingInserts) {
     const auto finalOplog = makeFinalOplog(Timestamp(43, 24));
 
     DBDirectClient client(operationContext());
-    const auto ns = oplogNss().ns();
-    client.insert(ns, oplog1.toBSON());
+    const auto nss = oplogNss();
+    client.insert(nss, oplog1.toBSON());
 
     class InsertNotifier : public resharding::OnInsertAwaitable {
     public:
@@ -284,9 +284,9 @@ TEST_F(ReshardingDonorOplogIterTest, ExhaustWithIncomingInserts) {
                          DBDirectClient client(opCtx);
 
                          if (numCalls == 1) {
-                             client.insert(ns, oplog2.toBSON());
+                             client.insert(nss, oplog2.toBSON());
                          } else {
-                             client.insert(ns, finalOplog.toBSON());
+                             client.insert(nss, finalOplog.toBSON());
                          }
                      }};
 
@@ -319,10 +319,10 @@ TEST_F(ReshardingDonorOplogIterTest, BatchIncludesProgressMarkEntries) {
     const auto finalOplog = makeFinalOplog(Timestamp(43, 24));
 
     DBDirectClient client(operationContext());
-    const auto ns = oplogNss().ns();
-    client.insert(ns, oplog1.toBSON());
-    client.insert(ns, progressMarkOplog1.toBSON());
-    client.insert(ns, finalOplog.toBSON());
+    const auto nss = oplogNss();
+    client.insert(nss, oplog1.toBSON());
+    client.insert(nss, progressMarkOplog1.toBSON());
+    client.insert(nss, finalOplog.toBSON());
 
     ReshardingDonorOplogIterator iter(oplogNss(), kResumeFromBeginning, &onInsertAlwaysReady);
     auto executor = makeTaskExecutorForIterator();
@@ -356,13 +356,13 @@ DEATH_TEST_REGEX_F(ReshardingDonorOplogIterTest,
     const auto progressMarkOplog4 = makeProgressMarkOplogEntry(Timestamp(65, 4));
 
     DBDirectClient client(operationContext());
-    const auto ns = oplogNss().ns();
-    client.insert(ns, oplog1.toBSON());
-    client.insert(ns, progressMarkOplog1.toBSON());
-    client.insert(ns, finalOplog.toBSON());
-    client.insert(ns, progressMarkOplog2.toBSON());
-    client.insert(ns, progressMarkOplog3.toBSON());
-    client.insert(ns, progressMarkOplog4.toBSON());
+    const auto nss = oplogNss();
+    client.insert(nss, oplog1.toBSON());
+    client.insert(nss, progressMarkOplog1.toBSON());
+    client.insert(nss, finalOplog.toBSON());
+    client.insert(nss, progressMarkOplog2.toBSON());
+    client.insert(nss, progressMarkOplog3.toBSON());
+    client.insert(nss, progressMarkOplog4.toBSON());
 
     ReshardingDonorOplogIterator iter(oplogNss(), kResumeFromBeginning, &onInsertAlwaysReady);
     auto executor = makeTaskExecutorForIterator();

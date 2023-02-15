@@ -126,17 +126,17 @@ public:
 
     uint64_t getSockCreationMicroSec() const override;
 
-    void insert(const std::string& ns,
+    void insert(const NamespaceString& nss,
                 BSONObj obj,
                 bool ordered = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
-    void insert(const std::string& ns,
+    void insert(const NamespaceString& nss,
                 const std::vector<BSONObj>& objList,
                 bool ordered = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
-    void remove(const std::string& ns,
+    void remove(const NamespaceString& nss,
                 const BSONObj& filter,
                 bool removeMany = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;

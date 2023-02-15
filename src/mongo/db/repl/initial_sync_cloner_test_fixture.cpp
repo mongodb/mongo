@@ -42,9 +42,9 @@ void InitialSyncClonerTestFixture::setUp() {
     _sharedData = std::make_unique<InitialSyncSharedData>(kInitialRollbackId, Days(1), &_clock);
 
     // Set the initial sync ID on the mock server.
-    _mockServer->insert(
-        ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace.toString(),
-        BSON("_id" << _initialSyncId));
+    _mockServer->insert(NamespaceString::createNamespaceString_forTest(
+                            ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace),
+                        BSON("_id" << _initialSyncId));
 }
 
 InitialSyncSharedData* InitialSyncClonerTestFixture::getSharedData() {

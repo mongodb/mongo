@@ -139,11 +139,11 @@ public:
     SimpleClient(OperationContext* opCtx) : _client(opCtx), _opCtx(opCtx) {}
 
     void insert(const NamespaceString& nss, const BSONObj& obj) {
-        _client.insert(nss.ns(), obj);
+        _client.insert(nss, obj);
     }
 
-    void insert(const NamespaceString& ns, const std::vector<BSONObj>& docs, bool ordered = true) {
-        _client.insert(ns.ns(), docs, ordered);
+    void insert(const NamespaceString& nss, const std::vector<BSONObj>& docs, bool ordered = true) {
+        _client.insert(nss, docs, ordered);
     }
 
     long long count(const NamespaceString& nss) {

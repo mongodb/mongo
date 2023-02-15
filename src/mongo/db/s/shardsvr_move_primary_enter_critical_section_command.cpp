@@ -100,7 +100,7 @@ public:
             // txnNumber happened, we need to make a dummy write so that the session gets durably
             // persisted on the oplog. This must be the last operation done on this command.
             DBDirectClient dbClient(opCtx);
-            dbClient.update(NamespaceString::kServerConfigurationNamespace.ns(),
+            dbClient.update(NamespaceString::kServerConfigurationNamespace,
                             BSON("_id" << Request::kCommandName),
                             BSON("$inc" << BSON("count" << 1)),
                             true /* upsert */,

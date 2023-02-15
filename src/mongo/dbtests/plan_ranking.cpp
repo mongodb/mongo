@@ -90,7 +90,7 @@ public:
 
     void insert(const BSONObj& obj) {
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        _client.insert(nss.ns(), obj);
+        _client.insert(nss, obj);
     }
 
     void addIndex(const BSONObj& obj) {

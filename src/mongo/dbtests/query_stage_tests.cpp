@@ -65,7 +65,7 @@ public:
             bob.append("foo", i);
             bob.append("baz", i);
             bob.append("bar", numObj() - i);
-            _client.insert(ns(), bob.obj());
+            _client.insert(nss(), bob.obj());
         }
 
         addIndex(BSON("foo" << 1));

@@ -77,7 +77,7 @@ TEST_F(MongoDSessionCatalogTest, ReapSomeExpiredSomeNot) {
     SessionTxnRecord txn2(
         makeLogicalSessionIdForTest(), 200, repl::OpTime(Timestamp(200), 1), clock()->now());
 
-    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace,
                   std::vector{txn1.toBSON(), txn2.toBSON()});
 
     // Add some "new" sessions to ensure they don't get reaped

@@ -76,7 +76,7 @@ public:
     }
 
     void insert(const BSONObj& obj) {
-        _client.insert(ns(), obj);
+        _client.insert(nss(), obj);
     }
 
     void getRecordIds(set<RecordId>* out, const CollectionPtr& coll) {

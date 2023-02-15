@@ -659,37 +659,34 @@ unique_ptr<DBClientCursor> DBClientBase::getMore(const NamespaceString& nss, lon
 }
 
 namespace {
-OpMsgRequest createInsertRequest(const string& ns,
+OpMsgRequest createInsertRequest(const NamespaceString& nss,
                                  const vector<BSONObj>& v,
                                  bool ordered,
                                  boost::optional<BSONObj> writeConcernObj) {
-    auto nss = NamespaceString(ns);
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append("insert", nss.coll());
     cmdBuilder.append("ordered", ordered);
     if (writeConcernObj) {
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
-    auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdBuilder.obj());
+    auto request = OpMsgRequestBuilder::create(nss.dbName(), cmdBuilder.obj());
     request.sequences.push_back({"documents", v});
 
     return request;
 }
 
-OpMsgRequest createUpdateRequest(const string& ns,
+OpMsgRequest createUpdateRequest(const NamespaceString& nss,
                                  const BSONObj& filter,
                                  BSONObj updateSpec,
                                  bool upsert,
                                  bool multi,
                                  boost::optional<BSONObj> writeConcernObj) {
-    auto nss = NamespaceString(ns);
-
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append("update", nss.coll());
     if (writeConcernObj) {
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
-    auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdBuilder.obj());
+    auto request = OpMsgRequestBuilder::create(nss.dbName(), cmdBuilder.obj());
     request.sequences.push_back(
         {"updates",
          {BSON("q" << filter << "u" << updateSpec << "upsert" << upsert << "multi" << multi)}});
@@ -697,90 +694,89 @@ OpMsgRequest createUpdateRequest(const string& ns,
     return request;
 }
 
-OpMsgRequest createRemoveRequest(const string& ns,
+OpMsgRequest createRemoveRequest(const NamespaceString& nss,
                                  const BSONObj& filter,
                                  bool removeMany,
                                  boost::optional<BSONObj> writeConcernObj) {
     const int limit = removeMany ? 0 : 1;
-    auto nss = NamespaceString(ns);
 
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append("delete", nss.coll());
     if (writeConcernObj) {
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
-    auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdBuilder.obj());
+    auto request = OpMsgRequestBuilder::create(nss.dbName(), cmdBuilder.obj());
     request.sequences.push_back({"deletes", {BSON("q" << filter << "limit" << limit)}});
 
     return request;
 }
 }  // namespace
 
-BSONObj DBClientBase::insertAcknowledged(const string& ns,
+BSONObj DBClientBase::insertAcknowledged(const NamespaceString& nss,
                                          const vector<BSONObj>& v,
                                          bool ordered,
                                          boost::optional<BSONObj> writeConcernObj) {
-    OpMsgRequest request = createInsertRequest(ns, v, ordered, writeConcernObj);
+    OpMsgRequest request = createInsertRequest(nss, v, ordered, writeConcernObj);
     rpc::UniqueReply reply = runCommand(std::move(request));
     return reply->getCommandReply();
 }
 
-void DBClientBase::insert(const string& ns,
+void DBClientBase::insert(const NamespaceString& nss,
                           BSONObj obj,
                           bool ordered,
                           boost::optional<BSONObj> writeConcernObj) {
-    insert(ns, std::vector<BSONObj>{obj}, ordered, writeConcernObj);
+    insert(nss, std::vector<BSONObj>{obj}, ordered, writeConcernObj);
 }
 
-void DBClientBase::insert(const string& ns,
+void DBClientBase::insert(const NamespaceString& nss,
                           const vector<BSONObj>& v,
                           bool ordered,
                           boost::optional<BSONObj> writeConcernObj) {
-    auto request = createInsertRequest(ns, v, ordered, writeConcernObj);
+    auto request = createInsertRequest(nss, v, ordered, writeConcernObj);
     runFireAndForgetCommand(std::move(request));
 }
 
-BSONObj DBClientBase::removeAcknowledged(const string& ns,
+BSONObj DBClientBase::removeAcknowledged(const NamespaceString& nss,
                                          const BSONObj& filter,
                                          bool removeMany,
                                          boost::optional<BSONObj> writeConcernObj) {
-    OpMsgRequest request = createRemoveRequest(ns, filter, removeMany, writeConcernObj);
+    OpMsgRequest request = createRemoveRequest(nss, filter, removeMany, writeConcernObj);
     rpc::UniqueReply reply = runCommand(std::move(request));
     return reply->getCommandReply();
 }
 
-void DBClientBase::remove(const string& ns,
+void DBClientBase::remove(const NamespaceString& nss,
                           const BSONObj& filter,
                           bool removeMany,
                           boost::optional<BSONObj> writeConcernObj) {
-    auto request = createRemoveRequest(ns, filter, removeMany, writeConcernObj);
+    auto request = createRemoveRequest(nss, filter, removeMany, writeConcernObj);
     runFireAndForgetCommand(std::move(request));
 }
 
-BSONObj DBClientBase::updateAcknowledged(const string& ns,
+BSONObj DBClientBase::updateAcknowledged(const NamespaceString& nss,
                                          const BSONObj& filter,
                                          BSONObj updateSpec,
                                          bool upsert,
                                          bool multi,
                                          boost::optional<BSONObj> writeConcernObj) {
-    auto request = createUpdateRequest(ns, filter, updateSpec, upsert, multi, writeConcernObj);
+    auto request = createUpdateRequest(nss, filter, updateSpec, upsert, multi, writeConcernObj);
     rpc::UniqueReply reply = runCommand(std::move(request));
     return reply->getCommandReply();
 }
 
-void DBClientBase::update(const string& ns,
+void DBClientBase::update(const NamespaceString& nss,
                           const BSONObj& filter,
                           BSONObj updateSpec,
                           bool upsert,
                           bool multi,
                           boost::optional<BSONObj> writeConcernObj) {
-    auto request = createUpdateRequest(ns, filter, updateSpec, upsert, multi, writeConcernObj);
+    auto request = createUpdateRequest(nss, filter, updateSpec, upsert, multi, writeConcernObj);
     runFireAndForgetCommand(std::move(request));
 }
 
-void DBClientBase::killCursor(const NamespaceString& ns, long long cursorId) {
-    runFireAndForgetCommand(OpMsgRequest::fromDBAndBody(
-        ns.db(), KillCursorsCommandRequest(ns, {cursorId}).toBSON(BSONObj{})));
+void DBClientBase::killCursor(const NamespaceString& nss, long long cursorId) {
+    runFireAndForgetCommand(OpMsgRequestBuilder::create(
+        nss.dbName(), KillCursorsCommandRequest(nss, {cursorId}).toBSON(BSONObj{})));
 }
 
 namespace {

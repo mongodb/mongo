@@ -820,7 +820,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, IncompleteHistoryDueToOpLogTru
         insertOplogEntry(entry2);
 
         DBDirectClient client(opCtx());
-        client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), [&] {
+        client.insert(NamespaceString::kSessionTransactionsTableNamespace, [&] {
             SessionTxnRecord sessionRecord;
             sessionRecord.setSessionId(sessionId);
             sessionRecord.setTxnNum(txnNum);
@@ -889,7 +889,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
         insertOplogEntry(entry2);
 
         DBDirectClient client(opCtx());
-        client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), [&] {
+        client.insert(NamespaceString::kSessionTransactionsTableNamespace, [&] {
             SessionTxnRecord sessionRecord;
             sessionRecord.setSessionId(sessionId);
             sessionRecord.setTxnNum(txnNum);

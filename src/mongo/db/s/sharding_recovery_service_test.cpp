@@ -100,8 +100,7 @@ public:
             doc = CollectionCriticalSectionDocument(nss, reason, blockReads);
 
             DBDirectClient dbClient(opCtx());
-            dbClient.insert(NamespaceString::kCollectionCriticalSectionsNamespace.ns(),
-                            doc->toBSON());
+            dbClient.insert(NamespaceString::kCollectionCriticalSectionsNamespace, doc->toBSON());
 
             return;
         }
@@ -110,7 +109,7 @@ public:
         ASSERT_NE(doc->getBlockReads(), blockReads);
 
         DBDirectClient dbClient(opCtx());
-        dbClient.update(NamespaceString::kCollectionCriticalSectionsNamespace.ns(),
+        dbClient.update(NamespaceString::kCollectionCriticalSectionsNamespace,
                         BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()),
                         BSON("$set" << BSON(CollectionCriticalSectionDocument::kBlockReadsFieldName
                                             << blockReads)));
@@ -121,7 +120,7 @@ public:
         ASSERT(readCriticalSectionDocument(nss, reason));
 
         DBDirectClient dbClient(opCtx());
-        dbClient.remove(NamespaceString::kCollectionCriticalSectionsNamespace.ns(),
+        dbClient.remove(NamespaceString::kCollectionCriticalSectionsNamespace,
                         BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()),
                         false /* removeMany */);
     }

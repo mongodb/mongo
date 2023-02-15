@@ -363,7 +363,7 @@ TEST_F(VectorClockPersistenceTest, PrimaryRecoverWithIllegalVectorClockDocument)
     PersistentTaskStore<VectorClockDocument> store(NamespaceString::kVectorClockNamespace);
     ASSERT_EQ(store.count(opCtx, kVectorClockQuery), 0);
     DBDirectClient client(opCtx);
-    client.insert(NamespaceString::kVectorClockNamespace.ns(),
+    client.insert(NamespaceString::kVectorClockNamespace,
                   BSON("_id"
                        << "vectorClockState"
                        << "IllegalKey"

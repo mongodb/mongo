@@ -72,7 +72,7 @@ public:
     }
 
     void insert(const BSONObj& doc) {
-        _client.insert(nss.ns(), doc);
+        _client.insert(nss, doc);
     }
 
     OperationContext* opCtx() {
