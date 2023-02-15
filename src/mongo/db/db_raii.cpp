@@ -486,7 +486,7 @@ AutoStatsTracker::AutoStatsTracker(
     }
 
     stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
-    CurOp::get(_opCtx)->enter_inlock(nss, dbProfilingLevel);
+    CurOp::get(_opCtx)->enter_inlock(opCtx, nss, dbProfilingLevel);
 }
 
 AutoStatsTracker::~AutoStatsTracker() {
@@ -1513,8 +1513,8 @@ OldClientContext::OldClientContext(OperationContext* opCtx,
     }
 
     stdx::lock_guard<Client> lk(*_opCtx->getClient());
-    currentOp->enter_inlock(nss,
-                            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_db->name()));
+    currentOp->enter_inlock(
+        opCtx, nss, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_db->name()));
 }
 
 AutoGetCollectionForReadCommandMaybeLockFree::AutoGetCollectionForReadCommandMaybeLockFree(

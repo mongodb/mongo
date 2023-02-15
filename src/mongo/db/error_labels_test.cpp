@@ -126,7 +126,7 @@ public:
 
     void setCommand(BSONObj cmdObj) const {
         CurOp::get(opCtx())->setGenericOpRequestDetails(
-            _testNss, nullptr, cmdObj, NetworkOp::dbMsg);
+            opCtx(), _testNss, nullptr, cmdObj, NetworkOp::dbMsg);
     }
 
     void setGetMore(BSONObj originatingCommand) const {

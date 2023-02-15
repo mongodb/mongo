@@ -214,7 +214,7 @@ std::vector<InsertStatement> fillBatchForInsert(Pipeline& pipeline, int batchSiz
     // to be marked as having started.
     auto opCtx = pipeline.getContext()->opCtx;
     auto* curOp = CurOp::get(opCtx);
-    curOp->ensureStarted();
+    curOp->ensureStarted(opCtx);
     ON_BLOCK_EXIT([curOp] { curOp->done(); });
 
     std::vector<InsertStatement> batch;

@@ -37,7 +37,6 @@
 #include "mongo/config.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/db/concurrency/locker.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -1122,52 +1121,6 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportPendingLocks) {
     ASSERT(conflictingLocker.unlock(collectionId));
     ASSERT(conflictingLocker.unlock(dbId));
     ASSERT(conflictingLocker.unlockGlobal());
-}
-
-TEST_F(LockerImplTest, GetLockerInfoShouldSubtractBase) {
-    auto opCtx = makeOperationContext();
-    auto locker = opCtx->lockState();
-    const ResourceId dbId(RESOURCE_DATABASE, DatabaseName(boost::none, "SubtractTestDB"));
-
-    auto numAcquisitions = [&](boost::optional<SingleThreadedLockStats> baseStats) {
-        Locker::LockerInfo info;
-        locker->getLockerInfo(&info, baseStats);
-        return info.stats.get(dbId, MODE_IX).numAcquisitions;
-    };
-    auto getBaseStats = [&] {
-        return CurOp::get(opCtx.get())->getLockStatsBase();
-    };
-
-    locker->lockGlobal(opCtx.get(), MODE_IX);
-
-    // Obtain a lock before any other ops have been pushed to the stack.
-    locker->lock(dbId, MODE_IX);
-    locker->unlock(dbId);
-
-    ASSERT_EQUALS(numAcquisitions(getBaseStats()), 1) << "The acquisition should be reported";
-
-    // Push another op to the stack and obtain a lock.
-    CurOp superOp;
-    superOp.push(opCtx.get());
-    locker->lock(dbId, MODE_IX);
-    locker->unlock(dbId);
-
-    ASSERT_EQUALS(numAcquisitions(getBaseStats()), 1)
-        << "Only superOp's acquisition should be reported";
-
-    // Then push another op to the stack and obtain another lock.
-    CurOp subOp;
-    subOp.push(opCtx.get());
-    locker->lock(dbId, MODE_IX);
-    locker->unlock(dbId);
-
-    ASSERT_EQUALS(numAcquisitions(getBaseStats()), 1)
-        << "Only the latest acquisition should be reported";
-
-    ASSERT_EQUALS(numAcquisitions({}), 3)
-        << "All acquisitions should be reported when no base is subtracted out.";
-
-    ASSERT(locker->unlockGlobal());
 }
 
 TEST_F(LockerImplTest, ReaquireLockPendingUnlock) {

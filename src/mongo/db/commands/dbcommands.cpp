@@ -634,7 +634,7 @@ public:
                                                  NamespaceString::DollarInDbNameBehavior::Allow));
 
             {
-                CurOp::get(opCtx)->ensureStarted();
+                CurOp::get(opCtx)->ensureStarted(opCtx);
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->setNS_inlock(dbname);
             }
@@ -676,7 +676,9 @@ public:
                 {
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
                     CurOp::get(opCtx)->enter_inlock(
-                        dbname, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbname));
+                        opCtx,
+                        dbname,
+                        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbname));
                 }
 
                 db->getStats(opCtx, &reply, cmd.getFreeStorage(), cmd.getScale());

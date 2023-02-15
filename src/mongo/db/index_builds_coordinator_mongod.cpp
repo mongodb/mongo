@@ -423,7 +423,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             // Logs the index build statistics if it took longer than the server parameter `slowMs`
             // to complete.
             CurOp::get(opCtx.get())
-                ->completeAndLogOperation(MONGO_LOGV2_DEFAULT_COMPONENT,
+                ->completeAndLogOperation(opCtx.get(),
+                                          MONGO_LOGV2_DEFAULT_COMPONENT,
                                           CollectionCatalog::get(opCtx.get())
                                               ->getDatabaseProfileSettings(nss.dbName())
                                               .filter);

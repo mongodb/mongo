@@ -359,7 +359,7 @@ public:
         }
         curOp->debug().setPlanSummaryMetrics(stats);
 
-        if (curOp->shouldDBProfile()) {
+        if (curOp->shouldDBProfile(opCtx)) {
             auto&& [stats, _] =
                 explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
             curOp->debug().execStats = std::move(stats);

@@ -661,7 +661,7 @@ public:
             // generate the stats eagerly for all operations due to cost.
             if (cursorPin->getExecutor()->lockPolicy() !=
                     PlanExecutor::LockPolicy::kLocksInternally &&
-                curOp->shouldDBProfile()) {
+                curOp->shouldDBProfile(opCtx)) {
                 auto&& explainer = exec->getPlanExplainer();
                 auto&& [stats, _] =
                     explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);

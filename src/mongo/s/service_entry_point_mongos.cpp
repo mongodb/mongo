@@ -124,7 +124,7 @@ void HandleRequest::setupEnvironment() {
     NotPrimaryErrorTracker::get(client).startRequest();
     AuthorizationSession::get(client)->startRequest(opCtx);
 
-    CurOp::get(opCtx)->ensureStarted();
+    CurOp::get(opCtx)->ensureStarted(opCtx);
 }
 
 struct HandleRequest::CommandOpRunner {
@@ -169,6 +169,7 @@ void HandleRequest::onSuccess(const DbResponse& dbResponse) {
 
     // Mark the op as complete, populate the response length, and log it if appropriate.
     currentOp->completeAndLogOperation(
+        opCtx,
         logv2::LogComponent::kCommand,
         CollectionCatalog::get(opCtx)
             ->getDatabaseProfileSettings(currentOp->getNSS().dbName())

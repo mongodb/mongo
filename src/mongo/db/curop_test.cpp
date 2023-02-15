@@ -206,7 +206,8 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     BSONObj command = BSON("a" << 3);
 
     // Set dummy 'ns' and 'command'.
-    curop->setGenericOpRequestDetails(NamespaceString::createNamespaceString_forTest("myDb.coll"),
+    curop->setGenericOpRequestDetails(opCtx.get(),
+                                      NamespaceString::createNamespaceString_forTest("myDb.coll"),
                                       nullptr,
                                       command,
                                       NetworkOp::dbQuery);
@@ -234,7 +235,7 @@ TEST(CurOpTest, ShouldNotReportFailpointMsgIfNotSet) {
     BSONObjBuilder reportedStateWithoutFailpointMsg;
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curop->reportState(&reportedStateWithoutFailpointMsg);
+        curop->reportState(opCtx.get(), &reportedStateWithoutFailpointMsg);
     }
     auto bsonObj = reportedStateWithoutFailpointMsg.done();
 
@@ -256,7 +257,7 @@ TEST(CurOpTest, ElapsedTimeReflectsTickSource) {
 
     ASSERT_FALSE(curop->isStarted());
 
-    curop->ensureStarted();
+    curop->ensureStarted(opCtx.get());
     ASSERT_TRUE(curop->isStarted());
 
     tickSourceMock->advance(Milliseconds{20});
