@@ -31,7 +31,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Sequence
-from random_generator import RandomDistribution
+from random_generator import RandomDistribution, DataType
 
 
 @dataclass
@@ -98,17 +98,6 @@ class FieldTemplate:
     data_type: DataType
     distribution: RandomDistribution
     indexed: bool
-
-
-class DataType(Enum):
-    """Data types."""
-
-    INTEGER = 0
-    STRING = 1
-    ARRAY = 2
-
-    def __str__(self):
-        return self.name.lower()[:3]
 
 
 @dataclass

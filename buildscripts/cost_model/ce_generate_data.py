@@ -29,6 +29,7 @@
 
 import asyncio
 import dataclasses
+from datetime import datetime
 import json
 import math
 import os
@@ -38,10 +39,11 @@ from pathlib import Path
 import seaborn as sns
 import bson
 import matplotlib.pyplot as plt
-from config import CollectionTemplate, FieldTemplate, DataType
+from config import CollectionTemplate, FieldTemplate
 from data_generator import CollectionInfo, DataGenerator
 from database_instance import DatabaseInstance
 import parameters_extractor
+from random_generator import DataType
 from ce_data_settings import database_config, data_generator_config
 
 __all__ = []
@@ -73,6 +75,8 @@ class OidEncoder(json.JSONEncoder):
             # Replace the OID with a consequtive int number as needed by the query generator
             OidEncoder.cur_oid += 1
             return OidEncoder.cur_oid
+        if isinstance(o, datetime):
+            return str(o)
         return super(OidEncoder, self).default(o)
 
 
@@ -107,6 +111,8 @@ async def generate_histograms(coll_template, coll, dump_path):
     doc_count = await coll.count_documents({})
     for field in coll_template.fields:
         field_data = []
+        if re.match('^mixeddata_.*', field.name):
+            continue
         async for doc in coll.find({field.name: {"$exists": True}}, {"_id": 0, field.name: 1}):
             field_val = doc[field.name]
             if isinstance(field_val, str):

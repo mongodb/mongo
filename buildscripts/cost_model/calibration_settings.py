@@ -29,7 +29,7 @@
 
 import random
 import config
-from random_generator import RangeGenerator, DataType, RandomDistribution, ArrayRandomDistribution
+from random_generator import RangeGenerator, RandomDistribution, ArrayRandomDistribution, DataType
 
 __all__ = ['main_config', 'distributions']
 

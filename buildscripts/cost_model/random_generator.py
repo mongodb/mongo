@@ -30,23 +30,50 @@
 from __future__ import annotations
 from ctypes import Union
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from itertools import chain
 from typing import Generic, Sequence, TypeVar
 import numpy as np
+import random
 
 __all__ = ['RangeGenerator', 'DataType', 'RandomDistribution']
 
+TVar = TypeVar('TVar', str, int, float, datetime)
+
 
 class DataType(Enum):
-    """Data type enum for data generators."""
+    """MongoDB data types of collection fields. Ordered according to BSON type order."""
 
-    STRING = 0
-    INTEGER = 1
-    FLOAT = 2
+    DOUBLE = 1
+    STRING = 2
+    OBJECT = 3
+    ARRAY = 4
+    OBJECTID = 7
+    BOOLEAN = 8
+    DATE = 9
+    NULL = 10
+    INTEGER = 16  # Both 32 and 64 bit ints
+    TIMESTAMP = 17
+    DECIMAL128 = 19
+    MIXDATA = 42
 
-
-TVar = TypeVar('TVar', str, int, float)
+    def __str__(self):
+        typenames = {
+            DataType.DOUBLE: 'dbl',
+            DataType.STRING: 'str',
+            DataType.OBJECT: 'obj',
+            DataType.ARRAY: 'arr',
+            DataType.OBJECTID: 'oid',
+            DataType.BOOLEAN: 'bool',
+            DataType.DATE: 'dt',
+            DataType.NULL: 'null',
+            DataType.INTEGER: 'int',
+            DataType.TIMESTAMP: 'ts',
+            DataType.DECIMAL128: 'dec',
+            DataType.MIXDATA: 'mixdata',
+        }
+        return typenames[self]
 
 
 @dataclass
@@ -57,12 +84,33 @@ class RangeGenerator(Generic[TVar]):
     interval_begin: TVar
     interval_end: TVar
     step: int = 1
+    ndv: int = -1
+
+    def __post_init__(self):
+        assert type(self.interval_begin) == type(
+            self.interval_end), 'Interval ends must of the same type.'
+        if type(self.interval_begin) == int or type(self.interval_begin) == float:
+            self.ndv = round((self.interval_end - self.interval_begin) / self.step)
+        elif type(self.interval_begin) == datetime:
+            begin_ts = self.interval_begin.timestamp()
+            end_ts = self.interval_end.timestamp()
+            self.ndv = round((end_ts - begin_ts) / self.step)
 
     def generate(self) -> Sequence[TVar]:
         """Generate the range."""
 
         gen_range_dict = {
-            DataType.STRING: ansi_range, DataType.INTEGER: range, DataType.FLOAT: np.arange
+            DataType.STRING:
+                ansi_range,
+            DataType.INTEGER:
+                range,
+            # The arange function produces equi-distant values which is too regular for CE testing.
+            # It is left here as a possible way of generating doubles.
+            # DataType.DOUBLE: np.arange
+            DataType.DOUBLE:
+                double_range,
+            DataType.DATE:
+                datetime_range,
         }
 
         gen_range = gen_range_dict.get(self.data_type)
@@ -70,6 +118,26 @@ class RangeGenerator(Generic[TVar]):
             raise ValueError(f'Unsupported data type: {self.data_type}')
 
         return list(gen_range(self.interval_begin, self.interval_end, self.step))
+
+    def __str__(self):
+        # TODO: for now skip NDV from the name to make it shorter.
+        #ndv_str = "_" if self.ndv <= 0 else f'_{self.ndv}_'
+        begin_str = str(self.interval_begin.date()) if isinstance(
+            self.interval_begin, datetime) else str(self.interval_begin)
+        end_str = str(self.interval_end.date()) if isinstance(self.interval_end, datetime) else str(
+            self.interval_end)
+
+        str_rep = f'{str(self.data_type)}_{begin_str}-{end_str}-{self.step}'
+        # Remove dots and spaces from field names.
+        str_rep = str_rep.replace('.', ',')
+        str_rep = str_rep.replace(' ', '_')
+        return str_rep
+
+
+def double_range(begin: float, end: float, step: float = 1.0):
+    """Produce a sequence of double values within a range."""
+
+    return np.random.default_rng().uniform(begin, end, round((end - begin) / step))
 
 
 def ansi_range(begin: str, end: str, step: int = 1):
@@ -122,14 +190,29 @@ def ansi_range(begin: str, end: str, step: int = 1):
             yield f'{prefix}{int_to_ansi(number)}'
 
 
+def datetime_range(begin: datetime, end: datetime, step: int = 60):
+    begin_ts = begin.timestamp()
+    end_ts = end.timestamp()
+    num_values = round((end_ts - begin_ts) / step)
+    assert num_values >= 1, "Datetime range must be bigger than the step."
+    for _ in range(0, num_values):
+        random_ts = np.random.randint(begin_ts, end_ts)
+        yield datetime.fromtimestamp(random_ts)
+    #random_dates = [datetime.fromtimestamp(random_ts) for random_ts in random.sample(range(int(begin_ts), int(end_ts)), num_values)]
+    #return random_dates
+
+
 class DistributionType(Enum):
     """An enum of distributions supported by Random Data Generator."""
 
     CHOICE = 0
     NORMAL = 1
-    NONCENTRAL_CHISQUARE = 2
+    CHI2 = 2  # NONCENTRAL_CHISQUARE
     UNIFORM = 3
-    MIXED = 4
+    MIXDIST = 4
+
+    def __str__(self):
+        return self.name.lower()
 
 
 _rng = np.random.default_rng()
@@ -142,12 +225,42 @@ class RandomDistribution:
     distribution_type: DistributionType
     values: Union[Sequence[TVar], RangeGenerator]
     weights: Union[Sequence[float], None]
+    values_name: str = ''
+    weights_name: str = ''
+
+    def __str__(self):
+        def print_values(vals):
+            if isinstance(vals, RangeGenerator):
+                return str(vals)
+            elif isinstance(vals[0], RandomDistribution):
+                # Must be a mixed distribution
+                res = ''
+                for distr in vals:
+                    res += f'{str(distr)}_'
+                return res
+            else:
+                # All values are of the same type because of how RangeGenerator works
+                return f'{type(vals[0]).__name__}_{min(vals)}_{max(vals)}_{len(vals)}'
+
+        range_str = ''
+        if hasattr(self, 'values'):
+            range_str = print_values(self.values)
+        elif self.values_name != '':
+            range_str = f'{self.values_name}'
+            if self.weights_name != '':
+                range_str += f'_{self.weights_name}'
+
+        distr_str = f'{str(self.distribution_type)}_{range_str}'
+        if isinstance(self, ArrayRandomDistribution):
+            distr_str += f'array_{str(self.value_distr)}'
+        return distr_str
 
     @staticmethod
-    def choice(values: Sequence[TVar], weights: Union[Sequence[float], RangeGenerator]):
+    def choice(values: Sequence[TVar], weights: Union[Sequence[float], RangeGenerator],
+               v_name: str = '', w_name: str = ''):
         """Create choice distribution."""
         return RandomDistribution(distribution_type=DistributionType.CHOICE, values=values,
-                                  weights=weights)
+                                  weights=weights, values_name=v_name, weights_name=w_name)
 
     @staticmethod
     def normal(values: Union[Sequence[TVar], RangeGenerator]):
@@ -158,8 +271,8 @@ class RandomDistribution:
     @staticmethod
     def noncentral_chisquare(values: Union[Sequence[TVar], RangeGenerator]):
         """Create Non Central Chi2 distribution."""
-        return RandomDistribution(distribution_type=DistributionType.NONCENTRAL_CHISQUARE,
-                                  values=values, weights=None)
+        return RandomDistribution(distribution_type=DistributionType.CHI2, values=values,
+                                  weights=None)
 
     @staticmethod
     def uniform(values: Union[Sequence[TVar], RangeGenerator]):
@@ -171,7 +284,7 @@ class RandomDistribution:
     def mixed(children: Sequence[RandomDistribution],
               weight: Union[Sequence[float], RangeGenerator]):
         """Create mixed distribution."""
-        return RandomDistribution(distribution_type=DistributionType.MIXED, values=children,
+        return RandomDistribution(distribution_type=DistributionType.MIXDIST, values=children,
                                   weights=weight)
 
     def generate(self, size: int) -> Sequence[TVar]:
@@ -202,9 +315,9 @@ class RandomDistribution:
         generators = {
             DistributionType.CHOICE: RandomDistribution._choice,
             DistributionType.NORMAL: RandomDistribution._normal,
-            DistributionType.NONCENTRAL_CHISQUARE: RandomDistribution._noncentral_chisquare,
+            DistributionType.CHI2: RandomDistribution._noncentral_chisquare,
             DistributionType.UNIFORM: RandomDistribution._uniform,
-            DistributionType.MIXED: RandomDistribution._mixed,
+            DistributionType.MIXDIST: RandomDistribution._mixed,
         }
 
         gen = generators.get(self.distribution_type)
@@ -215,7 +328,7 @@ class RandomDistribution:
 
     def get_values(self):
         """Return a list of values used to generate a random sequence."""
-        if self.distribution_type == DistributionType.MIXED:
+        if self.distribution_type == DistributionType.MIXDIST:
             result = []
             for child in self.values:
                 result.append(child.get_values())
@@ -237,7 +350,7 @@ class RandomDistribution:
         # In according to the 68-95-99.7 rule 99.7% of values lie within three standard deviations of the mean.
         # Therefore, if we define stddev as `len(values) / 6` 99.7% of the values will lie within our `values` array bounds.
         # We define stddev as `len(values) / 6` to increase make sure that almost all values are
-        # withing the boundaries and we don't have to cut the index too often.
+        # within the boundaries and we don't have to cut the index too often.
         mean = len(values) / 2
         stddev = len(values) / 6.5
 
@@ -283,29 +396,37 @@ class RandomDistribution:
     @staticmethod
     def _mixed(size: int, children: Sequence[RandomDistribution], probs: Sequence[float]):
         if probs is None:
-            raise ValueError("props must be specified for mixed distribution")
+            raise ValueError(f'probs must be specified for mixed distributions: {str(children)}')
 
         result = []
         for child_distr, prob in zip(children, probs):
             if not isinstance(child_distr, RandomDistribution):
                 raise ValueError(
-                    "children must be of type RandomDistribution for mixed distribution")
+                    f'children must be of type RandomDistribution for mixed distribution, child_distr: {child_distr}'
+                )
             child_size = int(size * prob)
             result.append(child_distr.generate(child_size))
 
         return list(chain.from_iterable(result))
 
 
+_NO_DEFAULT = object()
+
+
 @dataclass
 class ArrayRandomDistribution(RandomDistribution):
     """Produces random array sequence of the specified values with the specified distribution."""
 
-    lengths_distr: RandomDistribution
-    value_distr: RandomDistribution
+    lengths_distr: RandomDistribution = _NO_DEFAULT
+    value_distr: RandomDistribution = _NO_DEFAULT
 
     def __init__(self, lengths_distr: RandomDistribution, value_distr: RandomDistribution):
         self.lengths_distr = lengths_distr
         self.value_distr = value_distr
+        self.distribution_type = value_distr.distribution_type
+
+    def __str__(self):
+        return f'{super().__str__()}'
 
     def generate(self, size: int):
         """Generate random array sequence of the given size."""
@@ -324,19 +445,23 @@ class ArrayRandomDistribution(RandomDistribution):
 class DocumentRandomDistribution(RandomDistribution):
     """Produces random document sequence of the specified values with the specified distribution."""
 
-    number_of_fields_distr: RandomDistribution
-    fields_distr: RandomDistribution
-    field_to_distribution: dict
+    number_of_fields_distr: RandomDistribution = _NO_DEFAULT
+    fields_distr: RandomDistribution = _NO_DEFAULT
+    field_to_distribution: dict = _NO_DEFAULT
 
     def __init__(self, number_of_fields_distr: RandomDistribution, fields_distr: RandomDistribution,
                  field_to_distribution: dict):
         self.number_of_fields_distr = number_of_fields_distr
         self.fields_distr = fields_distr
         self.field_to_distribution = field_to_distribution
+        self.distribution_type = fields_distr.distribution_type
 
         for field in self.get_fields():
             if field not in self.field_to_distribution:
                 raise ValueError("Must provide a RandomDistribution for each field")
+
+    def __str__(self):
+        return f'{super().__str__()}'
 
     def generate(self, size: int):
         """Generate random document sequence of the given size."""
@@ -373,14 +498,14 @@ if __name__ == '__main__':
 
     def print_distr(title, distr, size=10000):
         """Print distribution."""
-        print(f'\n{title}\n')
+        print(f'\n{title}: {str(distr)}\n')
         rs = distr.generate(size)
         has_arrays = any(isinstance(elem, list) for elem in rs)
         has_dict = any(isinstance(elem, dict) for elem in rs)
 
         if not has_arrays and not has_dict:
             counter = Counter(rs)
-            for value in distr.get_values():
+            for value in [*Counter(rs)]:
                 count = counter[value]
                 if isinstance(value, float):
                     print(f'{value:.2f}\t{count}\t{(count//10)*"*"}')
@@ -402,8 +527,23 @@ if __name__ == '__main__':
     int_noncentral_chisquare = RandomDistribution.noncentral_chisquare(list(range(1, 30)))
     print_distr("Noncentral Chisquare for integers", int_noncentral_chisquare)
 
-    float_uniform = RandomDistribution.uniform(RangeGenerator(DataType.FLOAT, 0.1, 10.0, 0.37))
+    float_uniform = RandomDistribution.uniform(RangeGenerator(DataType.DOUBLE, 0.1, 10.0, 0.37))
     print_distr("Uniform for floats", float_uniform)
+
+    float_normal = RandomDistribution.normal(RangeGenerator(DataType.DOUBLE, 0.1, 10.0, 0.37))
+    print_distr("Normal for floats", float_normal)
+
+    FOUR_DAYS_IN_SECONDS = 60 * 20 * 24 * 12
+
+    date_uniform = RandomDistribution.uniform(
+        RangeGenerator(DataType.DATE, datetime(2007, 1, 1), datetime(2008, 1, 1),
+                       FOUR_DAYS_IN_SECONDS))
+    print_distr("Uniform for dates", date_uniform, size=1000)
+
+    date_normal = RandomDistribution.normal(
+        RangeGenerator(DataType.DATE, datetime(2007, 1, 1), datetime(2008, 1, 1),
+                       FOUR_DAYS_IN_SECONDS))
+    print_distr("Normal for dates", date_normal, size=1000)
 
     str_chisquare2 = RandomDistribution.normal(RangeGenerator(DataType.STRING, "aa", "ba"))
     str_normal2 = RandomDistribution.normal(RangeGenerator(DataType.STRING, "ap", "bp"))

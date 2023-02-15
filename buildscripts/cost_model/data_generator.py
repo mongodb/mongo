@@ -35,8 +35,8 @@ import asyncio
 import pymongo
 from pymongo import IndexModel
 from motor.motor_asyncio import AsyncIOMotorCollection
-from random_generator import RandomDistribution
-from config import DataGeneratorConfig, DataType, WriteMode
+from random_generator import RandomDistribution, DataType
+from config import DataGeneratorConfig, WriteMode
 from database_instance import DatabaseInstance
 
 __all__ = ['DataGenerator']

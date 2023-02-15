@@ -1,857 +1,550 @@
 // This is a generated file.
 const dbMetadata = [
     {
-        "collectionName": "ce_data_100",
+        "collectionName": "ce_data_500",
         "fields": [
             {
-                "fieldName": "uniform_int_1000_1",
+                "fieldName": "uniform_int_0-1000-1",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "normal_int_1000_1",
+                "fieldName": "normal_int_0-1000-1",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "chi2_int_1000_1",
+                "fieldName": "chi2_int_0-1000-1",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "uniform_int_10000_10",
+                "fieldName": "uniform_int_0-10000-10",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "normal_int_10000_10",
+                "fieldName": "normal_int_0-10000-10",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "chi2_int_10000_10",
+                "fieldName": "chi2_int_0-10000-10",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "uniform_int_100000_100",
+                "fieldName": "uniform_int_0-100000-100",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "normal_int_100000_100",
+                "fieldName": "normal_int_0-100000-100",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "chi2_int_100000_100",
+                "fieldName": "chi2_int_0-100000-100",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "uniform_int_1000000_1000",
+                "fieldName": "uniform_int_0-10000-1",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "normal_int_1000000_1000",
+                "fieldName": "normal_int_0-10000-1",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "chi2_int_1000000_1000",
+                "fieldName": "chi2_int_0-10000-1",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "uniform_int_10000_1",
+                "fieldName": "uniform_int_0-1000000-10",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "normal_int_10000_1",
+                "fieldName": "normal_int_0-1000000-10",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "chi2_int_10000_1",
+                "fieldName": "chi2_int_0-1000000-10",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "uniform_int_100000_10",
+                "fieldName": "uniform_int_0-10000000-100",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "normal_int_100000_10",
+                "fieldName": "normal_int_0-10000000-100",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "chi2_int_100000_10",
+                "fieldName": "chi2_int_0-10000000-100",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "uniform_int_1000000_100",
+                "fieldName": "mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "normal_int_1000000_100",
+                "fieldName": "mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "chi2_int_1000000_100",
+                "fieldName": "mixdist_normal_int_0-1000-1_normal_int_7000-8000-1_uniform_int_0-10000-10_chi2_int_0-1000-1_chi2_int_7000-8000-1_",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "uniform_int_10000000_1000",
+                "fieldName": "mixdist_chi2_int_0-1000-1_uniform_int_0-10000-10_uniform_int_0-100000-100_normal_int_7000-8000-1_chi2_int_7000-8000-1_chi2_int_70000-80000-10_",
                 "dataType": "integer",
                 "indexed": false
             },
             {
-                "fieldName": "normal_int_10000000_1000",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "chi2_int_10000000_1000",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_int_uniform_1",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_int_unf_norm_1",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_int_unf_norm_chi_1",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_int_unf_norm_chi_2",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_1112_33_unif_s",
+                "fieldName": "choice_str_0000_~~~~_248",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_1112_33_unif_l",
+                "fieldName": "choice_str_0000_~~~~_248",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_1112_33_norm_s",
+                "fieldName": "choice_str_0000_~~~~_248",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_1112_33_norm_l",
+                "fieldName": "choice_str_0000_~~~~_248",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_1112_33_chi2_s",
+                "fieldName": "choice_str_0nQf_~s|{_250",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_1112_33_chi2_l",
+                "fieldName": "choice_str_0nQf_~s|{_250",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_2221_33_unif_s",
+                "fieldName": "choice_str_0nQf_~s|{_250",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_2221_33_unif_l",
+                "fieldName": "choice_str_0nQf_~s|{_250",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_2221_33_norm_s",
+                "fieldName": "choice_str_0:[y_~ds]_250",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_2221_33_norm_l",
+                "fieldName": "choice_str_0:[y_~ds]_250",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_2221_33_chi2_s",
+                "fieldName": "choice_str_0:[y_~ds]_250",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_2221_33_chi2_l",
+                "fieldName": "choice_str_0:[y_~ds]_250",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_5555_33_unif_s",
+                "fieldName": "choice_str_0006_~~~~_851",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_5555_33_unif_l",
+                "fieldName": "choice_str_0006_~~~~_851",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_5555_33_norm_s",
+                "fieldName": "choice_str_0006_~~~~_851",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_5555_33_norm_l",
+                "fieldName": "choice_str_0006_~~~~_851",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_5555_33_chi2_s",
+                "fieldName": "choice_str_0760_~hFc_1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_5555_33_chi2_l",
+                "fieldName": "choice_str_0760_~hFc_1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_1112_1000_unif_s",
+                "fieldName": "choice_str_0760_~hFc_1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_1112_1000_unif_l",
+                "fieldName": "choice_str_0760_~hFc_1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_1112_1000_norm_s",
+                "fieldName": "choice_str_04;?_~|7D_1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_1112_1000_norm_l",
+                "fieldName": "choice_str_04;?_~|7D_1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_1112_1000_chi2_s",
+                "fieldName": "choice_str_04;?_~|7D_1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_1112_1000_chi2_l",
+                "fieldName": "choice_str_04;?_~|7D_1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_2221_1000_unif_s",
+                "fieldName": "choice_str_0000_~~~~_4944",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_2221_1000_unif_l",
+                "fieldName": "choice_str_0000_~~~~_4944",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_2221_1000_norm_s",
+                "fieldName": "choice_str_0000_~~~~_4944",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_2221_1000_norm_l",
+                "fieldName": "choice_str_0000_~~~~_4944",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_2221_1000_chi2_s",
+                "fieldName": "choice_str_0107_~~:z_9993",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_2221_1000_chi2_l",
+                "fieldName": "choice_str_0107_~~:z_9993",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_5555_1000_unif_s",
+                "fieldName": "choice_str_0107_~~:z_9993",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_5555_1000_unif_l",
+                "fieldName": "choice_str_0107_~~:z_9993",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_5555_1000_norm_s",
+                "fieldName": "choice_str_01p>_~~5l_9999",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_5555_1000_norm_l",
+                "fieldName": "choice_str_01p>_~~5l_9999",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_5555_1000_chi2_s",
+                "fieldName": "choice_str_01p>_~~5l_9999",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_set_5555_1000_chi2_l",
+                "fieldName": "choice_str_01p>_~~5l_9999",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "uniform_arr_int_10000_10_s",
+                "fieldName": "uniform_array_uniform_int_0-10000-10",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "uniform_arr_int_10000_10_m",
+                "fieldName": "uniform_array_uniform_int_0-10000-10",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "uniform_arr_int_10000_10_l",
+                "fieldName": "uniform_array_uniform_int_0-10000-10",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "mixed_arr_int_s",
+                "fieldName": "mixdist_array_mixdist_chi2_int_0-1000-1_uniform_int_0-10000-10_uniform_int_0-100000-100_normal_int_7000-8000-1_chi2_int_7000-8000-1_chi2_int_70000-80000-10_",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "mixed_arr_int_m",
+                "fieldName": "mixdist_array_mixdist_chi2_int_0-1000-1_uniform_int_0-10000-10_uniform_int_0-100000-100_normal_int_7000-8000-1_chi2_int_7000-8000-1_chi2_int_70000-80000-10_",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "mixed_arr_int_l",
+                "fieldName": "mixdist_array_mixdist_chi2_int_0-1000-1_uniform_int_0-10000-10_uniform_int_0-100000-100_normal_int_7000-8000-1_chi2_int_7000-8000-1_chi2_int_70000-80000-10_",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "choice_arr_str_set_1112_33_norm_l_s",
+                "fieldName": "choice_array_choice_str_0000_~~~~_248",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "choice_arr_str_set_1112_33_norm_l_m",
+                "fieldName": "choice_array_choice_str_0000_~~~~_248",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "choice_arr_str_set_1112_33_norm_l_l",
+                "fieldName": "choice_array_choice_str_0000_~~~~_248",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "choice_arr_str_set_5555_1000_norm_l_s",
+                "fieldName": "choice_array_choice_str_01p>_~~5l_9999",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "choice_arr_str_set_5555_1000_norm_l_m",
+                "fieldName": "choice_array_choice_str_01p>_~~5l_9999",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "choice_arr_str_set_5555_1000_norm_l_l",
+                "fieldName": "choice_array_choice_str_01p>_~~5l_9999",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "mixed_arr_int_30_70_s",
+                "fieldName": "mixdist_uniform_int_0-1000-1_uniform_array_uniform_int_0-10000-10_",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "mixed_arr_int_30_70_l",
+                "fieldName": "mixdist_mixdist_chi2_int_0-1000-1_uniform_int_0-10000-10_uniform_int_0-100000-100_normal_int_7000-8000-1_chi2_int_7000-8000-1_chi2_int_70000-80000-10__mixdist_uniform_int_0-1000-1_uniform_array_uniform_int_0-10000-10__",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "mixed_arr_str_30_70",
+                "fieldName": "mixdist_uniform_int_0-1000-1_uniform_array_uniform_int_0-10000-10_",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "mixed_arr_int_70_30_s",
+                "fieldName": "mixdist_mixdist_chi2_int_0-1000-1_uniform_int_0-10000-10_uniform_int_0-100000-100_normal_int_7000-8000-1_chi2_int_7000-8000-1_chi2_int_70000-80000-10__mixdist_uniform_int_0-1000-1_uniform_array_uniform_int_0-10000-10__",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "mixed_arr_int_70_30_l",
+                "fieldName": "mixdist_uniform_array_uniform_int_0-1000-1_uniform_array_uniform_int_0-10000-10_",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "mixed_arr_str_70_30",
+                "fieldName": "mixdist_uniform_array_uniform_int_0-1000-1_uniform_array_uniform_int_0-10000-10_",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "uniform_arr_int_10000_10_s_empty_20",
-                "dataType": "array",
+                "fieldName": "uniform_dbl_0,0-100,0-0,1",
+                "dataType": "double",
                 "indexed": false
             },
             {
-                "fieldName": "uniform_arr_int_10000_10_s_empty_80",
-                "dataType": "array",
+                "fieldName": "normal_dbl_0,0-100,0-0,1",
+                "dataType": "double",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_dbl_0,0-10000,0-10",
+                "dataType": "double",
+                "indexed": false
+            },
+            {
+                "fieldName": "normal_dbl_0,0-10000,0-10",
+                "dataType": "double",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_dbl_0,0-1000000,0-1000",
+                "dataType": "double",
+                "indexed": false
+            },
+            {
+                "fieldName": "normal_dbl_0,0-1000000,0-1000",
+                "dataType": "double",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_dbl_0,0-1000,0-0,1",
+                "dataType": "double",
+                "indexed": false
+            },
+            {
+                "fieldName": "normal_dbl_0,0-1000,0-0,1",
+                "dataType": "double",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_dbl_0,0-100000,0-10",
+                "dataType": "double",
+                "indexed": false
+            },
+            {
+                "fieldName": "normal_dbl_0,0-100000,0-10",
+                "dataType": "double",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_dbl_0,0-10000000,0-1000",
+                "dataType": "double",
+                "indexed": false
+            },
+            {
+                "fieldName": "normal_dbl_0,0-10000000,0-1000",
+                "dataType": "double",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_uniform_dbl_0,0-100,0-0,1_normal_dbl_0,0-10000,0-10_uniform_dbl_0,0-10000000,0-1000_",
+                "dataType": "double",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_uniform_dbl_0,0-100,0-0,1_uniform_dbl_0,0-1000000,0-1000_normal_dbl_500,0-600,0-0,1_normal_dbl_3000200,0-5000100,0-3030_",
+                "dataType": "double",
+                "indexed": false
+            },
+            {
+                "fieldName": "uniform_dt_2007-01-01-2008-01-01-3600",
+                "dataType": "date",
+                "indexed": false
+            },
+            {
+                "fieldName": "normal_dt_2006-01-01-2016-01-01-86400",
+                "dataType": "date",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_uniform_dt_2007-01-01-2008-01-01-3600_uniform_dt_2007-02-01-2008-03-01-3600_uniform_dt_2007-06-01-2008-07-01-3600_uniform_dt_2007-10-01-2008-11-01-3600_",
+                "dataType": "date",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_uniform_dt_2006-01-01-2016-01-01-86400_uniform_dt_1995-01-01-2005-01-01-86400_uniform_dt_1997-10-01-2017-11-01-2592000_",
+                "dataType": "date",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_uniform_int_0-1000-1_choice_str_0000_~~~~_248_",
+                "dataType": "mixdata",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_normal_int_700000-800000-100_choice_str_01p>_~~5l_9999_",
+                "dataType": "mixdata",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_uniform_int_0-1000-1_choice_str_0000_~~~~_248_",
+                "dataType": "mixdata",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_uniform_int_0-1000-1_choice_str_0000_~~~~_248_",
+                "dataType": "mixdata",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_normal_int_700000-800000-100_choice_str_01p>_~~5l_9999_",
+                "dataType": "mixdata",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_normal_int_700000-800000-100_choice_str_01p>_~~5l_9999_",
+                "dataType": "mixdata",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_normal_dbl_48,0-126,0-0,01_choice_str_0000_~~~~_248_",
+                "dataType": "mixdata",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_normal_dbl_48,0-126,0-0,01_choice_str_0000_~~~~_248_",
+                "dataType": "mixdata",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_normal_dbl_48,0-126,0-0,01_choice_str_0000_~~~~_248_",
+                "dataType": "mixdata",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_normal_dbl_0,0-1000000,0-1000_choice_str_0000_~~~~_248_",
+                "dataType": "mixdata",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_normal_dbl_0,0-1000000,0-1000_choice_str_0nQf_~s|{_250_",
+                "dataType": "mixdata",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_normal_dbl_48,0-126,0-0,01_choice_str_0nQf_~s|{_250_uniform_dt_2007-01-01-2008-01-01-3600_",
+                "dataType": "mixdata",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_choice_str_0000_~~~~_248_mixdist_uniform_dt_2006-01-01-2016-01-01-86400_uniform_dt_1995-01-01-2005-01-01-86400_uniform_dt_1997-10-01-2017-11-01-2592000__",
+                "dataType": "mixdata",
+                "indexed": false
+            },
+            {
+                "fieldName": "mixdist_choice_str_01p>_~~5l_9999_uniform_dt_2007-01-01-2008-01-01-3600_",
+                "dataType": "mixdata",
                 "indexed": false
             }
         ],
         "compound_indexes": [],
-        "cardinality": 100
-    },
-    {
-        "collectionName": "ce_data_1000",
-        "fields": [
-            {
-                "fieldName": "uniform_int_1000_1",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "normal_int_1000_1",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "chi2_int_1000_1",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "uniform_int_10000_10",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "normal_int_10000_10",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "chi2_int_10000_10",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "uniform_int_100000_100",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "normal_int_100000_100",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "chi2_int_100000_100",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "uniform_int_1000000_1000",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "normal_int_1000000_1000",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "chi2_int_1000000_1000",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "uniform_int_10000_1",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "normal_int_10000_1",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "chi2_int_10000_1",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "uniform_int_100000_10",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "normal_int_100000_10",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "chi2_int_100000_10",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "uniform_int_1000000_100",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "normal_int_1000000_100",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "chi2_int_1000000_100",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "uniform_int_10000000_1000",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "normal_int_10000000_1000",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "chi2_int_10000000_1000",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_int_uniform_1",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_int_unf_norm_1",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_int_unf_norm_chi_1",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_int_unf_norm_chi_2",
-                "dataType": "integer",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_1112_33_unif_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_1112_33_unif_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_1112_33_norm_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_1112_33_norm_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_1112_33_chi2_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_1112_33_chi2_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_2221_33_unif_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_2221_33_unif_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_2221_33_norm_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_2221_33_norm_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_2221_33_chi2_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_2221_33_chi2_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_5555_33_unif_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_5555_33_unif_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_5555_33_norm_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_5555_33_norm_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_5555_33_chi2_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_5555_33_chi2_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_1112_1000_unif_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_1112_1000_unif_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_1112_1000_norm_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_1112_1000_norm_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_1112_1000_chi2_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_1112_1000_chi2_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_2221_1000_unif_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_2221_1000_unif_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_2221_1000_norm_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_2221_1000_norm_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_2221_1000_chi2_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_2221_1000_chi2_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_5555_1000_unif_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_5555_1000_unif_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_5555_1000_norm_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_5555_1000_norm_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_5555_1000_chi2_s",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_str_set_5555_1000_chi2_l",
-                "dataType": "string",
-                "indexed": false
-            },
-            {
-                "fieldName": "uniform_arr_int_10000_10_s",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "uniform_arr_int_10000_10_m",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "uniform_arr_int_10000_10_l",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_arr_int_s",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_arr_int_m",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_arr_int_l",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_arr_str_set_1112_33_norm_l_s",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_arr_str_set_1112_33_norm_l_m",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_arr_str_set_1112_33_norm_l_l",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_arr_str_set_5555_1000_norm_l_s",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_arr_str_set_5555_1000_norm_l_m",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "choice_arr_str_set_5555_1000_norm_l_l",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_arr_int_30_70_s",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_arr_int_30_70_l",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_arr_str_30_70",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_arr_int_70_30_s",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_arr_int_70_30_l",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "mixed_arr_str_70_30",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "uniform_arr_int_10000_10_s_empty_20",
-                "dataType": "array",
-                "indexed": false
-            },
-            {
-                "fieldName": "uniform_arr_int_10000_10_s_empty_80",
-                "dataType": "array",
-                "indexed": false
-            }
-        ],
-        "compound_indexes": [],
-        "cardinality": 1000
+        "cardinality": 500
     }
 ];
