@@ -208,6 +208,7 @@ env.Library(
     target='storage_engine_parameters',
     source=[
         'execution_control/throughput_probing.cpp',
+        'execution_control/throughput_probing.idl',
         'ticketholder_manager.cpp',
         'ticketholder_monitor.cpp',
         'storage_engine_parameters.idl',

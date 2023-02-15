@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/storage/execution_control/throughput_probing.h"
+#include "mongo/db/storage/execution_control/throughput_probing_gen.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -78,13 +79,16 @@ void ThroughputProbing::_probeStable(OperationContext* opCtx, double throughput)
     if (outof < kMaxConcurrency && peakUsed >= outof) {
         // At least one of the ticket pools is exhausted, so try increasing concurrency.
         _state = ProbingState::kUp;
-        _setConcurrency(opCtx, _stableConcurrency + 4);
+        _setConcurrency(
+            opCtx,
+            std::lround(_stableConcurrency * (1 + throughput_probing::gStepMultiple.load())));
     } else if (_readTicketHolder->used() > kMinConcurrency ||
                _writeTicketHolder->used() > kMinConcurrency) {
         // Neither of the ticket pools are exhausted, so try decreasing concurrency to just below
         // the current level of usage.
         _state = ProbingState::kDown;
-        _setConcurrency(opCtx, peakUsed - 4);
+        _setConcurrency(opCtx,
+                        std::lround(peakUsed * (1 - throughput_probing::gStepMultiple.load())));
     }
 }
 
@@ -103,7 +107,9 @@ void ThroughputProbing::_probeUp(OperationContext* opCtx, double throughput) {
         // Increasing concurrency did not cause throughput to increase, so try decreasing
         // concurrency instead.
         _state = ProbingState::kDown;
-        _setConcurrency(opCtx, _stableConcurrency - 4);
+        _setConcurrency(
+            opCtx,
+            std::lround(_stableConcurrency * (1 - throughput_probing::gStepMultiple.load())));
     }
 }
 
