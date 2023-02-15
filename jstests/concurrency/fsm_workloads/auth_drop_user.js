@@ -5,6 +5,7 @@
  *
  * Repeatedly creates a new user on a database, and subsequently
  * drops the user from the database.
+ * @tags: [incompatible_with_concurrency_simultaneous]
  */
 var $config = (function() {
     var data = {
