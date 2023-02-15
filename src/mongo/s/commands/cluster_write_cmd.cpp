@@ -178,7 +178,7 @@ void handleWouldChangeOwningShardErrorNonTransaction(OperationContext* opCtx,
 
     auto swCommitResult = txn.runNoThrow(
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-            return txnClient.runCommand(sharedBlock->nss.db(), sharedBlock->cmdObj)
+            return txnClient.runCommand(sharedBlock->nss.dbName(), sharedBlock->cmdObj)
                 .thenRunOn(txnExec)
                 .then([sharedBlock](auto res) {
                     uassertStatusOK(getStatusFromWriteCommandReply(res));
@@ -485,7 +485,7 @@ void ClusterWriteCmd::_commandOpWrite(OperationContext* opCtx,
     MultiStatementTransactionRequestsSender ars(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-        nss.db(),
+        nss.dbName(),
         requests,
         readPref,
         Shard::RetryPolicy::kNoRetry);

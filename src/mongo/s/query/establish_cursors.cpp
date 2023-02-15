@@ -157,8 +157,7 @@ void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
                 "opKey"_attr = _opKey);
 
     // Send the requests
-    _ars.emplace(
-        _opCtx, _executor, _nss.db().toString(), std::move(requests), readPref, retryPolicy);
+    _ars.emplace(_opCtx, _executor, _nss.dbName(), std::move(requests), readPref, retryPolicy);
 }
 
 void CursorEstablisher::waitForResponse() noexcept {

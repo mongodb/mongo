@@ -50,7 +50,7 @@ public:
     MultiStatementTransactionRequestsSender(
         OperationContext* opCtx,
         std::shared_ptr<executor::TaskExecutor> executor,
-        StringData dbName,
+        const DatabaseName& dbName,
         const std::vector<AsyncRequestsSender::Request>& requests,
         const ReadPreferenceSetting& readPreference,
         Shard::RetryPolicy retryPolicy);

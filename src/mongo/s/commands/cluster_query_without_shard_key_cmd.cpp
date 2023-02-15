@@ -201,7 +201,7 @@ public:
             MultiStatementTransactionRequestsSender ars(
                 opCtx,
                 Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                request().getDbName().toString(),
+                request().getDbName(),
                 requests,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kNoRetry);

@@ -377,7 +377,8 @@ Future<DbResponse> DefaultSEPTransactionClientBehaviors::handleRequest(
     return serviceEntryPoint->handleRequest(opCtx, request);
 }
 
-SemiFuture<BSONObj> SEPTransactionClient::runCommand(StringData dbName, BSONObj cmdObj) const {
+SemiFuture<BSONObj> SEPTransactionClient::runCommand(const DatabaseName& dbName,
+                                                     BSONObj cmdObj) const {
     invariant(_hooks, "Transaction metadata hooks must be injected before a command can be run");
 
     BSONObjBuilder cmdBuilder(_behaviors->maybeModifyCommand(std::move(cmdObj)));
@@ -395,7 +396,7 @@ SemiFuture<BSONObj> SEPTransactionClient::runCommand(StringData dbName, BSONObj 
 
     primeInternalClient(&cc());
 
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody(dbName, cmdBuilder.obj());
+    auto opMsgRequest = OpMsgRequestBuilder::create(dbName, cmdBuilder.obj());
     auto requestMessage = opMsgRequest.serialize();
     return _behaviors->handleRequest(cancellableOpCtx.get(), requestMessage)
         .then([this](DbResponse dbResponse) {
@@ -420,7 +421,7 @@ SemiFuture<BatchedCommandResponse> SEPTransactionClient::runCRUDOp(
         cmdBob.append(write_ops::WriteCommandRequestBase::kStmtIdsFieldName, stmtIds);
     }
 
-    return runCommand(cmd.getNS().db(), cmdBob.obj())
+    return runCommand(cmd.getNS().dbName(), cmdBob.obj())
         .thenRunOn(_executor)
         .then([](BSONObj reply) {
             uassertStatusOK(getStatusFromWriteCommandReply(reply));
@@ -437,7 +438,7 @@ SemiFuture<BatchedCommandResponse> SEPTransactionClient::runCRUDOp(
 
 SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
     const FindCommandRequest& cmd) const {
-    return runCommand(cmd.getDbName().db(), cmd.toBSON({}))
+    return runCommand(cmd.getDbName(), cmd.toBSON({}))
         .thenRunOn(_executor)
         .then([this, batchSize = cmd.getBatchSize(), tenantId = cmd.getDbName().tenantId()](
                   BSONObj reply) {
@@ -464,7 +465,8 @@ SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
                            cursorResponse->getNSS().coll().toString());
                        getMoreRequest.setBatchSize(batchSize);
 
-                       return runCommand(cursorResponse->getNSS().db(), getMoreRequest.toBSON({}))
+                       return runCommand(cursorResponse->getNSS().dbName(),
+                                         getMoreRequest.toBSON({}))
                            .thenRunOn(_executor)
                            .then([response, cursorResponse, tenantId](BSONObj reply) {
                                // We keep the state of cursorResponse to be able to check the
@@ -490,7 +492,8 @@ SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
 }
 
 SemiFuture<CommitResult> Transaction::commit() {
-    return _commitOrAbort(NamespaceString::kAdminDb, CommitTransaction::kCommandName)
+    return _commitOrAbort(DatabaseName(boost::none, NamespaceString::kAdminDb),
+                          CommitTransaction::kCommandName)
         .thenRunOn(_executor)
         .then([](BSONObj res) {
             auto wcErrorHolder = getWriteConcernErrorDetailFromBSONObj(res);
@@ -504,7 +507,8 @@ SemiFuture<CommitResult> Transaction::commit() {
 }
 
 SemiFuture<void> Transaction::abort() {
-    return _commitOrAbort(NamespaceString::kAdminDb, AbortTransaction::kCommandName)
+    return _commitOrAbort(DatabaseName(boost::none, NamespaceString::kAdminDb),
+                          AbortTransaction::kCommandName)
         .thenRunOn(_executor)
         .then([](BSONObj res) {
             uassertStatusOK(getStatusFromCommandResult(res));
@@ -513,7 +517,7 @@ SemiFuture<void> Transaction::abort() {
         .semi();
 }
 
-SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cmdName) {
+SemiFuture<BSONObj> Transaction::_commitOrAbort(const DatabaseName& dbName, StringData cmdName) {
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(cmdName, 1);
 

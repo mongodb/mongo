@@ -77,7 +77,7 @@ void processReplyMetadata(OperationContext* opCtx, const AsyncRequestsSender::Re
 MultiStatementTransactionRequestsSender::MultiStatementTransactionRequestsSender(
     OperationContext* opCtx,
     std::shared_ptr<executor::TaskExecutor> executor,
-    StringData dbName,
+    const DatabaseName& dbName,
     const std::vector<AsyncRequestsSender::Request>& requests,
     const ReadPreferenceSetting& readPreference,
     Shard::RetryPolicy retryPolicy)
@@ -85,7 +85,7 @@ MultiStatementTransactionRequestsSender::MultiStatementTransactionRequestsSender
       _ars(std::make_unique<AsyncRequestsSender>(
           opCtx,
           std::move(executor),
-          dbName,
+          dbName.db(),
           attachTxnDetails(opCtx, requests),
           readPreference,
           retryPolicy,

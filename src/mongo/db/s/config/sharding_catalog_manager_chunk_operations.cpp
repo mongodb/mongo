@@ -561,7 +561,7 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
         // Verify that the range matches exactly a single chunk
         auto countRequest = buildCountSingleChunkCommand(chunk);
 
-        return txnClient.runCommand(ChunkType::ConfigNS.db(), countRequest)
+        return txnClient.runCommand(ChunkType::ConfigNS.dbName(), countRequest)
             .thenRunOn(txnExec)
             .then([&txnClient, sharedBlock](auto countResponse) {
                 auto cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(countResponse));
@@ -806,7 +806,7 @@ void ShardingCatalogManager::_mergeChunksInTransaction(
             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             // Check the merge chunk precondition, chunks must not have moved.
             auto countRequest = buildCountChunksInRangeCommand(collectionUUID, shardId, chunkRange);
-            return txnClient.runCommand(ChunkType::ConfigNS.db(), countRequest)
+            return txnClient.runCommand(ChunkType::ConfigNS.dbName(), countRequest)
                 .thenRunOn(txnExec)
                 .then([&txnClient, chunksToMerge, mergeVersion, validAfter](auto commandResponse) {
                     auto countResponse =
@@ -2336,7 +2336,9 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
                 DistinctCommandRequest distinctRequest(ChunkType::ConfigNS);
                 distinctRequest.setKey(ChunkType::shard.name());
                 distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << collUuid));
-                return txnClient.runCommand(NamespaceString::kConfigDb, distinctRequest.toBSON({}))
+                return txnClient
+                    .runCommand(DatabaseName(boost::none, NamespaceString::kConfigDb),
+                                distinctRequest.toBSON({}))
                     .thenRunOn(txnExec)
                     .then([=, &txnClient](BSONObj reply) {
                         uassertStatusOK(getStatusFromWriteCommandReply(reply));

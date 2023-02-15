@@ -94,7 +94,7 @@ void GlobalIndexInserter::processDoc(OperationContext* opCtx,
                     globalIndexEntryInsert.setGlobalIndexKeyEntry(
                         GlobalIndexKeyEntry(indexKeyValues, documentKey));
 
-                    return txnClient.runCommand(_nss.db(), globalIndexEntryInsert.toBSON({}))
+                    return txnClient.runCommand(_nss.dbName(), globalIndexEntryInsert.toBSON({}))
                         .thenRunOn(txnExec)
                         .then([this, documentKey, &txnClient](const auto& commandResponse) {
                             write_ops::InsertCommandRequest skipIdInsert(_skipIdNss());

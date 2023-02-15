@@ -171,7 +171,7 @@ void handleWouldChangeOwningShardErrorNonTransaction(
         opCtx,
         [cmdObj = request.toBSON({}), sharedBlock](const txn_api::TransactionClient& txnClient,
                                                    ExecutorPtr txnExec) {
-            return txnClient.runCommand(sharedBlock->nss.db(), cmdObj)
+            return txnClient.runCommand(sharedBlock->nss.dbName(), cmdObj)
                 .thenRunOn(txnExec)
                 .then([sharedBlock](auto res) {
                     uassertStatusOK(getStatusFromCommandResult(res));
@@ -656,7 +656,7 @@ void FindAndModifyCmd::_runCommand(OperationContext* opCtx,
         MultiStatementTransactionRequestsSender ars(
             opCtx,
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-            nss.db().toString(),
+            nss.dbName(),
             requests,
             kPrimaryOnlyReadPreference,
             isRetryableWrite ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);

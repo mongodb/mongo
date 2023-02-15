@@ -305,7 +305,7 @@ void executeChildBatches(OperationContext* opCtx,
         MultiStatementTransactionRequestsSender ars(
             opCtx,
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-            clientRequest.getNS().db().toString(),
+            clientRequest.getNS().dbName(),
             requests,
             kPrimaryOnlyReadPreference,
             isRetryableWrite ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);

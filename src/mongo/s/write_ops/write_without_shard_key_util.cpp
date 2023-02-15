@@ -188,7 +188,7 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(sharedBlock->cmdObj);
             auto queryRes = txnClient
-                                .runCommand(sharedBlock->nss.db(),
+                                .runCommand(sharedBlock->nss.dbName(),
                                             clusterQueryWithoutShardKeyCommand.toBSON({}))
                                 .get();
             uassertStatusOK(getStatusFromCommandResult(queryRes));
@@ -210,7 +210,7 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
                 *queryResponse.getTargetDoc() /* targetDocId */);
 
             auto writeRes = txnClient
-                                .runCommand(sharedBlock->nss.db(),
+                                .runCommand(sharedBlock->nss.dbName(),
                                             clusterWriteWithoutShardKeyCommand.toBSON(BSONObj()))
                                 .get();
             uassertStatusOK(getStatusFromCommandResult(writeRes));

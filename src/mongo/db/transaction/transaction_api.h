@@ -96,7 +96,7 @@ public:
     /**
      * Runs the given command as part of the transaction that owns this transaction client.
      */
-    virtual SemiFuture<BSONObj> runCommand(StringData dbName, BSONObj cmd) const = 0;
+    virtual SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const = 0;
 
     /**
      * Helper method to run commands representable as a BatchedCommandRequest in the transaction
@@ -272,7 +272,7 @@ public:
         _hooks = std::move(hooks);
     }
 
-    virtual SemiFuture<BSONObj> runCommand(StringData dbName, BSONObj cmd) const override;
+    virtual SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const override;
 
     virtual SemiFuture<BatchedCommandResponse> runCRUDOp(
         const BatchedCommandRequest& cmd, std::vector<StmtId> stmtIds) const override;
@@ -473,7 +473,7 @@ private:
                          TxnNumber txnNumber,
                          boost::optional<bool> startTransaction);
 
-    SemiFuture<BSONObj> _commitOrAbort(StringData dbName, StringData cmdName);
+    SemiFuture<BSONObj> _commitOrAbort(const DatabaseName& dbName, StringData cmdName);
 
     /**
      * Extracts transaction options from Operation Context and infers the internal transaction’s

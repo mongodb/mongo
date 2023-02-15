@@ -169,7 +169,7 @@ public:
             MultiStatementTransactionRequestsSender ars(
                 opCtx,
                 Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                request().getDbName().toString(),
+                request().getDbName(),
                 std::move(arsRequestVector),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kNoRetry);
