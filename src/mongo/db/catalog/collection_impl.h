@@ -385,6 +385,11 @@ private:
     void _writeMetadata(OperationContext* opCtx, Func func);
 
     /**
+     * Helper for init() and initFromExisting() to initialize shared state.
+     */
+    void _initShared(OperationContext* opCtx, const CollectionOptions& options);
+
+    /**
      * Helper for init() and initFromExisting() to initialize common state.
      */
     void _initCommon(OperationContext* opCtx);

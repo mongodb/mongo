@@ -363,8 +363,7 @@ void CollectionImpl::init(OperationContext* opCtx) {
     _metadata = DurableCatalog::get(opCtx)->getMetaData(opCtx, getCatalogId());
     const auto& collectionOptions = _metadata->options;
 
-    _shared->_collator = parseCollation(opCtx, _ns, collectionOptions.collation);
-
+    _initShared(opCtx, collectionOptions);
     _initCommon(opCtx);
 
     if (collectionOptions.clusteredIndex) {
@@ -401,6 +400,8 @@ Status CollectionImpl::initFromExisting(OperationContext* opCtx,
         LOGV2_DEBUG(
             6825402, 1, "Initializing collection using shared state", logAttrs(collection->ns()));
         _shared = static_cast<CollectionImpl*>(collection.get())->_shared;
+    } else {
+        _initShared(opCtx, catalogEntry.metadata->options);
     }
 
     // When initializing a collection from an earlier point-in-time, we don't know when the last DDL
@@ -455,6 +456,10 @@ Status CollectionImpl::initFromExisting(OperationContext* opCtx,
 
     _initialized = true;
     return Status::OK();
+}
+
+void CollectionImpl::_initShared(OperationContext* opCtx, const CollectionOptions& options) {
+    _shared->_collator = parseCollation(opCtx, _ns, options.collation);
 }
 
 void CollectionImpl::_initCommon(OperationContext* opCtx) {
