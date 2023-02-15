@@ -227,6 +227,7 @@ testutil_parse_begin_opt(int argc, char *const *argv, const char *getopts_string
     opts->argc = 0;
     opts->argv = NULL;
     opts->do_data_ops = false;
+    opts->home = NULL;
     opts->preserve = false;
     opts->running = true;
     opts->verbose = false;
