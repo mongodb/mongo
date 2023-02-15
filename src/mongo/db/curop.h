@@ -320,6 +320,9 @@ public:
     // refreshes.
     Milliseconds catalogCacheCollectionLookupMillis{0};
 
+    // Total time spent looking up index entries in the local cache, including eventual refreshes.
+    Milliseconds catalogCacheIndexLookupMillis{0};
+
     // Stores the duration of time spent waiting for the shard to refresh the database and wait for
     // the database critical section.
     Milliseconds databaseVersionRefreshMillis{0};

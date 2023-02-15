@@ -477,6 +477,12 @@ boost::optional<GlobalIndexesCache> CatalogCache::_getCollectionIndexInfoAt(
                                 << swDbInfo.getStatus().reason());
     }
 
+    Timer curOpTimer{};
+    ScopeGuard finishTiming([&] {
+        CurOp::get(opCtx)->debug().catalogCacheIndexLookupMillis +=
+            Milliseconds(curOpTimer.millis());
+    });
+
     const auto dbInfo = std::move(swDbInfo.getValue());
 
     auto indexEntryFuture = _indexCache.acquireAsync(nss, CacheCausalConsistency::kLatestKnown);

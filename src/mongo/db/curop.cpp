@@ -860,6 +860,10 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("catalogCacheCollectionLookupDuration", catalogCacheCollectionLookupMillis);
     }
 
+    if (catalogCacheIndexLookupMillis > Milliseconds::zero()) {
+        pAttrs->add("catalogCacheIndexLookupDuration", catalogCacheIndexLookupMillis);
+    }
+
     if (databaseVersionRefreshMillis > Milliseconds::zero()) {
         pAttrs->add("databaseVersionRefreshDuration", databaseVersionRefreshMillis);
     }
