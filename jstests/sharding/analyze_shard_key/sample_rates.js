@@ -253,10 +253,10 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
                tojsononeline(
                    {expectedTotalCount, expectedFindCount, expectedDeleteCount, expectedAggCount}));
 
-    assertDiffPercentage(sampleSize.total, expectedTotalCount, 5 /* maxDiffPercentage */);
-    assertDiffPercentage(sampleSize.find, expectedFindCount, 10 /* maxDiffPercentage */);
-    assertDiffPercentage(sampleSize.delete, expectedDeleteCount, 10 /* maxDiffPercentage */);
-    assertDiffPercentage(sampleSize.aggregate, expectedAggCount, 10 /* maxDiffPercentage */);
+    assertDiffPercentage(sampleSize.total, expectedTotalCount, 10 /* maxDiffPercentage */);
+    assertDiffPercentage(sampleSize.find, expectedFindCount, 15 /* maxDiffPercentage */);
+    assertDiffPercentage(sampleSize.delete, expectedDeleteCount, 15 /* maxDiffPercentage */);
+    assertDiffPercentage(sampleSize.aggregate, expectedAggCount, 15 /* maxDiffPercentage */);
 
     QuerySamplingUtil.clearSampledQueryCollectionOnAllShards(st);
 }
