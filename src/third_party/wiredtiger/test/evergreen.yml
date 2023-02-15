@@ -3208,6 +3208,20 @@ tasks:
             cp ../../../bench/wtperf/split_heavy.wtperf .
             ./wtperf -O ./split_heavy.wtperf -o verbose=2
 
+  - name: memory-model-test
+    exec_timeout_secs: 86400
+    commands:
+      - func: "get project"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/tools/memory-model-test"
+          script: |
+            set -o errexit
+            set -o verbose
+            export "PATH=/opt/mongodbtoolchain/v4/bin:$PATH"
+            g++ -o memory_model_test -O2 memory_model_test.cpp -lpthread -std=c++20 -Wall -Werror
+            ./memory_model_test -n 100000000
+
   - name: data-validation-stress-test-checkpoint
     tags: ["data-validation-stress-test"]
     depends_on:
@@ -4820,6 +4834,8 @@ buildvariants:
       distros: ubuntu2004-large
     - name: ".data-validation-stress-test-nonstandalone"
     - name: unittest-assertions
+    - name: memory-model-test
+      batchtime: 40320 # 28 days
 
 - name: ubuntu2004-asan
   display_name: "! Ubuntu 20.04 ASAN"
@@ -5308,6 +5324,8 @@ buildvariants:
     - name: unit-test-nonstandalone
     - name: unit-test-long-nonstandalone
       distros: ubuntu2004-arm64-large
+    - name: memory-model-test
+      batchtime: 40320 # 28 days
 
 - name: amazon2-arm64
   display_name: "Amazon Linux 2 ARM64"
