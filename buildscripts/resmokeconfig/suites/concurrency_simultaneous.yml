@@ -40,6 +40,8 @@ selector:
   - requires_replication
   - requires_sharding
   - disabled_due_to_server_61671
+  - incompatible_with_concurrency_simultaneous
+
   group_size: 10
   group_count_multiplier: 2.5
 
