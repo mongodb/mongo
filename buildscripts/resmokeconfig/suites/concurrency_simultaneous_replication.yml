@@ -53,6 +53,7 @@ selector:
   exclude_with_any_tags:
   - requires_sharding
   - kills_random_sessions
+  - incompatible_with_concurrency_simultaneous
 
   group_size: 10
   group_count_multiplier: 1.0

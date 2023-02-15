@@ -5,6 +5,7 @@
  *
  * Repeatedly creates a new role on a database, and subsequently
  * drops it from the database.
+ * @tags: [incompatible_with_concurrency_simultaneous]
  */
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropRoles
 

@@ -55,15 +55,10 @@ selector:
   - jstests/concurrency/fsm_workloads/reindex_background.js
   - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
-  # These workloads depend on transactions which may be blocked by cursor sweeps.
-  - jstests/concurrency/fsm_workloads/auth_drop_role.js
-  - jstests/concurrency/fsm_workloads/auth_privilege_cache_miss.js
-  - jstests/concurrency/fsm_workloads/auth_privilege_consistency.js
-  - jstests/concurrency/fsm_workloads/auth_role_consistency.js
-
   exclude_with_any_tags:
   - requires_sharding
   - kills_random_sessions
+  - incompatible_with_concurrency_simultaneous
 
   group_size: 10
   group_count_multiplier: 1.0
