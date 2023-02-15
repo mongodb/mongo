@@ -390,6 +390,7 @@ let testCases = {
             },
         }
     },
+    createSearchIndexes: {skip: "executes locally on mongos"},
     createRole: {skip: "always targets the config server"},
     createUser: {skip: "always targets the config server"},
     currentOp: {skip: "not on a user database"},
@@ -454,6 +455,7 @@ let testCases = {
         }
     },
     dropRole: {skip: "always targets the config server"},
+    dropSearchIndex: {skip: "executes locally on mongos"},
     dropUser: {skip: "always targets the config server"},
     echo: {skip: "does not forward command to primary shard"},
     enableSharding: {skip: "does not forward command to primary shard"},
@@ -549,6 +551,7 @@ let testCases = {
             },
         }
     },
+    listSearchIndexes: {skip: "executes locally on mongos"},
     listShards: {skip: "does not forward command to primary shard"},
     logApplicationMessage: {skip: "not on a user database", conditional: true},
     logMessage: {skip: "not on a user database"},
@@ -729,6 +732,7 @@ let testCases = {
         }
     },
     updateRole: {skip: "always targets the config server"},
+    updateSearchIndex: {skip: "executes locally on mongos"},
     updateUser: {skip: "always targets the config server"},
     updateZoneKeyRange: {skip: "not on a user database"},
     usersInfo: {skip: "always targets the config server"},

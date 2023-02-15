@@ -28,7 +28,10 @@ const commandsAddedToMongosSinceLastLTS = [
     "configureCollectionBalancing",
     "configureQueryAnalyzer",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
     "coordinateCommitTransaction",
+    "createSearchIndexes",
+    "dropSearchIndex",
     "getClusterParameter",
+    "listSearchIndexes",
     "mergeAllChunksOnShard",
     "moveRange",
     "oidcListKeys",
@@ -46,4 +49,5 @@ const commandsAddedToMongosSinceLastLTS = [
     "testVersions1And2",
     "testVersion2",
     "transitionToCatalogShard",
+    "updateSearchIndex",
 ];

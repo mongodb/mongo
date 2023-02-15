@@ -3659,7 +3659,6 @@ export const authCommandsLib = {
           skipTest: (conn) => {
               return !getBuildInfo().modules.includes("enterprise");
           },
-          skipSharded: true,  // TODO (SERVER-73274): add mongos cmds
           testcases: [{
               runOnDb: firstDbName,
               roles: Object.extend({
@@ -4044,7 +4043,6 @@ export const authCommandsLib = {
           skipTest: (conn) => {
               return !getBuildInfo().modules.includes("enterprise");
           },
-          skipSharded: true,  // TODO (SERVER-73274): add mongos cmds
           testcases: [
             {
               runOnDb: firstDbName,
@@ -5157,7 +5155,6 @@ export const authCommandsLib = {
           skipTest: (conn) => {
               return !getBuildInfo().modules.includes("enterprise");
           },
-          skipSharded: true,  // TODO (SERVER-73274): add mongos cmds
           testcases: [{
               runOnDb: firstDbName,
               roles: {
@@ -5321,7 +5318,6 @@ export const authCommandsLib = {
           skipTest: (conn) => {
               return !getBuildInfo().modules.includes("enterprise");
           },
-          skipSharded: true,  // TODO (SERVER-73274): add mongos cmds
           testcases: [
               {
                 runOnDb: firstDbName,
