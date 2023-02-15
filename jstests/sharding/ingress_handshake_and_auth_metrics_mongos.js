@@ -1,7 +1,7 @@
 /**
  * Tests for the ingress handshake metrics.
  *
- * @tags: [requires_fcv_63]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";
