@@ -514,7 +514,9 @@ var ReshardingTest = class {
      * proceeding to the next stage. This helper returns after either:
      *
      * 1) The node's waitForFailPoint returns successfully or
-     * 2) The `reshardCollection` command has returned a response.
+     * 2) The `reshardCollection` command has returned a response or
+     * 3) The ReshardingCoordinator is blocked on the reshardingPauseCoordinatorBeforeCompletion
+     *    failpoint and won't ever satisfy the supplied failpoint.
      *
      * The function returns true when we returned because the server reached the failpoint. The
      * function returns false when the `reshardCollection` command is no longer running.
@@ -523,9 +525,20 @@ var ReshardingTest = class {
      * @private
      */
     _waitForFailPoint(fp) {
+        const completionFailpoint = this._pauseCoordinatorBeforeCompletionFailpoints.find(
+            completionFailpoint => completionFailpoint.conn.host === fp.conn.host);
+
         assert.soon(
             () => {
-                return this._commandDoneSignal.getCount() === 0 || fp.waitWithTimeout(1000);
+                if (this._commandDoneSignal.getCount() === 0 || fp.waitWithTimeout(1000)) {
+                    return true;
+                }
+
+                if (completionFailpoint !== fp && completionFailpoint.waitWithTimeout(1000)) {
+                    completionFailpoint.off();
+                }
+
+                return false;
             },
             "Timed out waiting for failpoint to be hit. Failpoint: " + fp.failPointName,
             undefined,
