@@ -102,8 +102,8 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
+        CollectionPtr coll(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
@@ -169,8 +169,8 @@ public:
         Lock::DBLock lk(&_opCtx, nss().dbName(), MODE_X);
         OldClientContext ctx(&_opCtx, nss());
         Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
+        CollectionPtr coll(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = CollectionPtr(db->createCollection(&_opCtx, nss()));

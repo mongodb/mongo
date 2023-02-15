@@ -37,15 +37,30 @@ namespace mongo {
 
 void checkCollectionUUIDMismatch(OperationContext* opCtx,
                                  const NamespaceString& ns,
-                                 const CollectionPtr& coll,
+                                 const Collection* coll,
                                  const boost::optional<UUID>& uuid) {
     checkCollectionUUIDMismatch(opCtx, CollectionCatalog::get(opCtx), ns, coll, uuid);
+}
+
+void checkCollectionUUIDMismatch(OperationContext* opCtx,
+                                 const NamespaceString& ns,
+                                 const CollectionPtr& coll,
+                                 const boost::optional<UUID>& uuid) {
+    checkCollectionUUIDMismatch(opCtx, CollectionCatalog::get(opCtx), ns, coll.get(), uuid);
 }
 
 void checkCollectionUUIDMismatch(OperationContext* opCtx,
                                  const std::shared_ptr<const CollectionCatalog>& catalog,
                                  const NamespaceString& ns,
                                  const CollectionPtr& coll,
+                                 const boost::optional<UUID>& uuid) {
+    checkCollectionUUIDMismatch(opCtx, catalog, ns, coll.get(), uuid);
+}
+
+void checkCollectionUUIDMismatch(OperationContext* opCtx,
+                                 const std::shared_ptr<const CollectionCatalog>& catalog,
+                                 const NamespaceString& ns,
+                                 const Collection* coll,
                                  const boost::optional<UUID>& uuid) {
     if (!uuid) {
         return;

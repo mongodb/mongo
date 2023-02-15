@@ -339,7 +339,7 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
         return renameCollectionDirectly(opCtx, db, sourceColl->uuid(), source, target, options);
     } else {
         return renameCollectionAndDropTarget(
-            opCtx, db, sourceColl->uuid(), source, target, targetColl, options, {});
+            opCtx, db, sourceColl->uuid(), source, target, CollectionPtr(targetColl), options, {});
     }
 }
 
@@ -403,7 +403,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                     opCtx, source, sourceColl->uuid(), db, target, targetColl->uuid());
                 if (!status.isOK())
                     return status;
-                targetColl = CollectionPtr();
+                targetColl = nullptr;
             }
         }
 
@@ -434,7 +434,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                                                 sourceColl->uuid(),
                                                 source,
                                                 target,
-                                                targetColl,
+                                                CollectionPtr(targetColl),
                                                 options,
                                                 renameOpTimeFromApplyOps);
         }
@@ -526,7 +526,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
     // Return a non-OK status if target exists and dropTarget is not true or if the collection
     // is sharded.
     const auto targetColl =
-        targetDB ? catalog->lookupCollectionByNamespace(opCtx, target) : CollectionPtr();
+        targetDB ? catalog->lookupCollectionByNamespace(opCtx, target) : nullptr;
     if (targetColl) {
         if (sourceColl->uuid() == targetColl->uuid()) {
             invariant(source == target);
@@ -769,7 +769,7 @@ void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
     AutoGetDb dbLock(opCtx, targetNs.dbName(), MODE_X);
     auto collection = dbLock.getDb()
         ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, targetNs)
-        : CollectionPtr();
+        : nullptr;
     BSONObj collectionOptions = {};
     if (collection) {
         // We do not include the UUID field in the options comparison. It is ok if the target

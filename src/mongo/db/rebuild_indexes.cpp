@@ -45,7 +45,7 @@
 
 namespace mongo {
 
-StatusWith<IndexNameObjs> getIndexNameObjs(const CollectionPtr& collection,
+StatusWith<IndexNameObjs> getIndexNameObjs(const Collection* collection,
                                            std::function<bool(const std::string&)> filter) {
     IndexNameObjs ret;
     std::vector<std::string>& indexNames = ret.first;
@@ -91,7 +91,7 @@ StatusWith<IndexNameObjs> getIndexNameObjs(const CollectionPtr& collection,
 }
 
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  const CollectionPtr& collection,
+                                  const Collection* collection,
                                   const std::vector<BSONObj>& indexSpecs,
                                   RepairData repair) {
     // Skip the rest if there are no indexes to rebuild.

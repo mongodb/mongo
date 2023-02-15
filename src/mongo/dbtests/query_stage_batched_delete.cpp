@@ -355,8 +355,8 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsDeletedWriteConflict
 
     auto nDocs = 11;
     prePopulateCollection(nDocs);
-    const CollectionPtr& coll = CollectionCatalog::get(batchedDeleteOpCtx.get())
-                                    ->lookupCollectionByNamespace(batchedDeleteOpCtx.get(), nss);
+    CollectionPtr coll(CollectionCatalog::get(batchedDeleteOpCtx.get())
+                           ->lookupCollectionByNamespace(batchedDeleteOpCtx.get(), nss));
 
     ASSERT(coll);
 
@@ -484,8 +484,8 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsUpdatedToNotMatchCli
 
     auto nDocs = 11;
     prePopulateCollection(nDocs);
-    const CollectionPtr& coll = CollectionCatalog::get(batchedDeleteOpCtx.get())
-                                    ->lookupCollectionByNamespace(batchedDeleteOpCtx.get(), nss);
+    CollectionPtr coll(CollectionCatalog::get(batchedDeleteOpCtx.get())
+                           ->lookupCollectionByNamespace(batchedDeleteOpCtx.get(), nss));
 
     ASSERT(coll);
 

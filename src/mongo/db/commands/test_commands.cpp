@@ -104,8 +104,8 @@ public:
 
         WriteUnitOfWork wunit(opCtx);
         UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
-        CollectionPtr collection =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        CollectionPtr collection(
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
         if (!collection) {
             collection = CollectionPtr(db->createCollection(opCtx, nss));
             uassert(ErrorCodes::CannotCreateCollection, "could not create collection", collection);

@@ -1230,8 +1230,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
     if (!db) {
         return;
     }
-    const CollectionPtr& coll =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+    const Collection* coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
 
     invariant(coll->uuid() == uuid);
 }

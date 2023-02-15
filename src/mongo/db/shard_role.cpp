@@ -193,7 +193,7 @@ CollectionPtr acquireCollectionPtr(OperationContext* opCtx,
     const auto& nss = prerequisites.nss;
 
     const auto catalog = CollectionCatalog::get(opCtx);
-    auto coll = catalog->lookupCollectionByNamespace(opCtx, nss);
+    CollectionPtr coll(catalog->lookupCollectionByNamespace(opCtx, nss));
 
     if (coll) {
         verifyDbAndCollection(opCtx, nss, coll);

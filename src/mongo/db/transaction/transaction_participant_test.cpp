@@ -430,7 +430,7 @@ void insertTxnRecord(OperationContext* opCtx, unsigned i, DurableTxnStateEnum st
     ASSERT(coll);
     OpDebug* const nullOpDebug = nullptr;
     ASSERT_OK(collection_internal::insertDocument(
-        opCtx, coll, InsertStatement(record.toBSON()), nullOpDebug, false));
+        opCtx, CollectionPtr(coll), InsertStatement(record.toBSON()), nullOpDebug, false));
     wuow.commit();
 }
 }  // namespace
@@ -4547,7 +4547,7 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
 
             if (bson["startOpTime"]["ts"].timestamp() == ts) {
                 collection_internal::deleteDocument(
-                    opCtx(), coll, kUninitializedStmtId, record->id, nullptr);
+                    opCtx(), CollectionPtr(coll), kUninitializedStmtId, record->id, nullptr);
                 wuow.commit();
                 return;
             }

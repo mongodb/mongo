@@ -122,8 +122,8 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                              const NamespaceString& toNss,
                              long long size,
                              bool temp) {
-    CollectionPtr fromCollection =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, fromNss);
+    CollectionPtr fromCollection(
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, fromNss));
     if (!fromCollection) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
                 str::stream() << "cloneCollectionAsCapped not supported for views: " << fromNss,
@@ -164,8 +164,8 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         uassertStatusOK(createCollection(opCtx, toNss.dbName(), cmd.done()));
     }
 
-    CollectionPtr toCollection =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toNss);
+    CollectionPtr toCollection(
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toNss));
     invariant(toCollection);  // we created above
 
     // how much data to ignore because it won't fit anyway

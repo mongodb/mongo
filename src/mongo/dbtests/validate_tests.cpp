@@ -118,7 +118,8 @@ public:
 
     // Helper to refetch the Collection from the catalog in order to see any changes made to it
     CollectionPtr coll() const {
-        return CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, _nss);
+        return CollectionPtr(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, _nss));
     }
 
 protected:

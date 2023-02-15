@@ -123,7 +123,7 @@ void reopenAllDatabasesAndReloadCollectionCatalog(OperationContext* opCtx,
                     extendedRangeSetting = it->second;
                 } else {
                     extendedRangeSetting =
-                        timeseries::collectionMayRequireExtendedRangeSupport(opCtx, collection);
+                        timeseries::collectionMayRequireExtendedRangeSupport(opCtx, *collection);
                 }
 
                 if (extendedRangeSetting) {
@@ -140,7 +140,7 @@ void reopenAllDatabasesAndReloadCollectionCatalog(OperationContext* opCtx,
                 // batched catalog write and continue on a new batch afterwards.
                 catalogWriter.reset();
 
-                repl::establishOplogCollectionForLogging(opCtx, collection.get());
+                repl::establishOplogCollectionForLogging(opCtx, collection);
                 catalogWriter.emplace(opCtx);
             }
         }

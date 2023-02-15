@@ -208,7 +208,7 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
     const auto maxBytesPerBatch = invocation.getMaxBytesPerBatch();
     const auto maxBatchTimeMillis = invocation.getMaxBatchTimeMillis();
     auto result = std::make_unique<DbCheckRun>();
-    auto perCollectionWork = [&](const CollectionPtr& coll) {
+    auto perCollectionWork = [&](const Collection* coll) {
         if (!coll->ns().isReplicated()) {
             return true;
         }

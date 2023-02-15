@@ -79,8 +79,8 @@ public:
     }
 
     CollectionPtr getCollection() {
-        return CollectionCatalog::get(operationContext())
-            ->lookupCollectionByUUID(operationContext(), *_collectionUUID);
+        return CollectionPtr(CollectionCatalog::get(operationContext())
+                                 ->lookupCollectionByUUID(operationContext(), *_collectionUUID));
     }
 
     CollectionWriter getCollectionWriter() {

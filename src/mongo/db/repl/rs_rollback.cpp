@@ -975,7 +975,7 @@ void rollbackDropIndexes(OperationContext* opCtx,
     invariant(nss);
     Lock::DBLock dbLock(opCtx, nss->dbName(), MODE_IX);
     Lock::CollectionLock collLock(opCtx, *nss, MODE_X);
-    CollectionPtr collection = catalog->lookupCollectionByNamespace(opCtx, *nss);
+    const Collection* collection = catalog->lookupCollectionByNamespace(opCtx, *nss);
 
     // If we cannot find the collection, we skip over dropping the index.
     if (!collection) {
@@ -1395,8 +1395,8 @@ void syncFixUp(OperationContext* opCtx,
 
             Database* db = dbLock.getDb();
             if (db) {
-                CollectionPtr collection =
-                    CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid);
+                CollectionPtr collection(
+                    CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid));
                 dropCollection(opCtx, *nss, collection, db);
                 LOGV2_DEBUG(21698,
                             1,

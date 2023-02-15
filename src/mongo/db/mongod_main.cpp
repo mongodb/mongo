@@ -288,7 +288,7 @@ void logStartup(OperationContext* opCtx) {
     Lock::GlobalWrite lk(opCtx);
     AutoGetDb autoDb(opCtx, startupLogCollectionName.dbName(), mongo::MODE_X);
     auto db = autoDb.ensureDbExists(opCtx);
-    CollectionPtr collection =
+    auto collection =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, startupLogCollectionName);
     WriteUnitOfWork wunit(opCtx);
     if (!collection) {
@@ -303,7 +303,7 @@ void logStartup(OperationContext* opCtx) {
     invariant(collection);
 
     uassertStatusOK(collection_internal::insertDocument(
-        opCtx, collection, InsertStatement(o), nullptr /* OpDebug */, false));
+        opCtx, CollectionPtr(collection), InsertStatement(o), nullptr /* OpDebug */, false));
     wunit.commit();
 }
 

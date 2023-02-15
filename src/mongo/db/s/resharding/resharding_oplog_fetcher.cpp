@@ -236,7 +236,7 @@ void ReshardingOplogFetcher::_ensureCollection(Client* client,
 
     // Create the destination collection if necessary.
     writeConflictRetry(opCtx, "createReshardingLocalOplogBuffer", nss.toString(), [&] {
-        const CollectionPtr coll =
+        const Collection* coll =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
         if (coll) {
             return;

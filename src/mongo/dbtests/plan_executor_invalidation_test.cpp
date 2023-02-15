@@ -191,7 +191,8 @@ public:
 
 private:
     void _refreshCollection() {
-        _coll = CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss);
+        _coll = CollectionPtr(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss));
     }
 
     BSONObj _makeMinimalIndexSpec(BSONObj keyPattern) {

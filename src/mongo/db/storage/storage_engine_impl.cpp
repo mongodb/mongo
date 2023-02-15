@@ -1411,7 +1411,7 @@ void StorageEngineImpl::TimestampMonitor::clearListeners() {
 int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, const DatabaseName& dbName) {
     int64_t size = 0;
 
-    auto perCollectionWork = [&](const CollectionPtr& collection) {
+    auto perCollectionWork = [&](const Collection* collection) {
         size += collection->getRecordStore()->storageSize(opCtx);
 
         auto it = collection->getIndexCatalog()->getIndexIterator(

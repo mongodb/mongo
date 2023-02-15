@@ -193,8 +193,11 @@ struct Cloner::BatchHandler {
                 WriteUnitOfWork wunit(opCtx);
 
                 BSONObj doc = tmp;
-                Status status = collection_internal::insertDocument(
-                    opCtx, collection, InsertStatement(doc), nullptr /* OpDebug */, true);
+                Status status = collection_internal::insertDocument(opCtx,
+                                                                    CollectionPtr(collection),
+                                                                    InsertStatement(doc),
+                                                                    nullptr /* OpDebug */,
+                                                                    true);
                 if (!status.isOK() && status.code() != ErrorCodes::DuplicateKey) {
                     LOGV2_ERROR(20424,
                                 "error: exception cloning object",
@@ -365,7 +368,7 @@ Status Cloner::_createCollectionsForDb(
             opCtx->checkForInterrupt();
             WriteUnitOfWork wunit(opCtx);
 
-            CollectionPtr collection = catalog->lookupCollectionByNamespace(opCtx, nss);
+            const Collection* collection = catalog->lookupCollectionByNamespace(opCtx, nss);
             if (collection) {
                 if (!params.shardedColl) {
                     // If the collection is unsharded then we want to fail when a collection

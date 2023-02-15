@@ -169,7 +169,7 @@ BSONObj buildViewBson(const ViewDefinition& view, bool nameOnly) {
     return b.obj();
 }
 
-BSONObj buildTimeseriesBson(const CollectionPtr& collection, bool nameOnly) {
+BSONObj buildTimeseriesBson(const Collection* collection, bool nameOnly) {
     invariant(collection);
 
     BSONObjBuilder builder;
@@ -207,7 +207,7 @@ BSONObj buildTimeseriesBson(StringData collName, bool nameOnly) {
  * Return an object describing the collection. Takes a collection lock if nameOnly is false.
  */
 BSONObj buildCollectionBson(OperationContext* opCtx,
-                            const CollectionPtr& collection,
+                            const Collection* collection,
                             bool includePendingDrops,
                             bool nameOnly) {
     if (!collection) {
@@ -398,7 +398,7 @@ public:
                             }
                         }
                     } else {
-                        auto perCollectionWork = [&](const CollectionPtr& collection) {
+                        auto perCollectionWork = [&](const Collection* collection) {
                             if (collection && collection->getTimeseriesOptions() &&
                                 !collection->ns().isDropPendingNamespace()) {
                                 auto viewNss = collection->ns().getTimeseriesViewNamespace();

@@ -441,8 +441,7 @@ UUID _getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
  * Get collection namespace by UUID.
  */
 NamespaceString _getCollectionNssFromUUID(OperationContext* opCtx, const UUID& uuid) {
-    const CollectionPtr& source =
-        CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid);
+    const Collection* source = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid);
     return source ? source->ns() : NamespaceString();
 }
 
@@ -511,7 +510,7 @@ CollectionPtr _getCollection_inlock(OperationContext* opCtx, const NamespaceStri
     if (!db) {
         return CollectionPtr();
     }
-    return CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+    return CollectionPtr(CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionReturnsNamespaceNotFoundIfDatabaseDoesNotExist) {

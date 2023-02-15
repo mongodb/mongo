@@ -127,8 +127,8 @@ public:
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         WriteUnitOfWork wuow(&_opCtx);
 
-        CollectionPtr c =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
+        CollectionPtr c(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
         if (!c) {
             c = CollectionPtr(ctx.db()->createCollection(&_opCtx, nss()));
         }
@@ -193,8 +193,8 @@ protected:
         Lock::GlobalWrite lk(&_opCtx);
         OldClientContext ctx(&_opCtx, nss());
         Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
+        CollectionPtr coll(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
         if (!coll) {
             WriteUnitOfWork wunit(&_opCtx);
             coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
@@ -290,8 +290,8 @@ protected:
         OldClientContext ctx(&_opCtx, nss());
         WriteUnitOfWork wunit(&_opCtx);
         Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
+        CollectionPtr coll(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
         if (!coll) {
             coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
         }

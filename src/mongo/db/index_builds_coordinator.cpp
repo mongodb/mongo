@@ -2747,8 +2747,8 @@ CollectionPtr IndexBuildsCoordinator::_setUpForScanCollectionAndInsertSortedKeys
     // storage engines if they're missing.
     invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
 
-    auto collection =
-        CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, replState->collectionUUID);
+    CollectionPtr collection(
+        CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, replState->collectionUUID));
     invariant(collection);
     collection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, collection));
 

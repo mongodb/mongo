@@ -838,8 +838,8 @@ Status MultiIndexBlock::drainBackgroundWrites(
 
     ReadSourceScope readSourceScope(opCtx, readSource);
 
-    CollectionPtr coll =
-        CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, _collectionUUID.value());
+    CollectionPtr coll(
+        CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, _collectionUUID.value()));
     coll.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, coll));
 
     // Drain side-writes table for each index. This only drains what is visible. Assuming intent

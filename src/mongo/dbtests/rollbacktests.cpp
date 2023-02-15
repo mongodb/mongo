@@ -89,7 +89,7 @@ void insertRecord(OperationContext* opCtx, const NamespaceString& nss, const BSO
     auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     OpDebug* const nullOpDebug = nullptr;
     ASSERT_OK(collection_internal::insertDocument(
-        opCtx, coll, InsertStatement(data), nullOpDebug, false));
+        opCtx, CollectionPtr(coll), InsertStatement(data), nullOpDebug, false));
 }
 
 void assertOnlyRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {

@@ -41,7 +41,7 @@ std::tuple<CollectionPtr, NamespaceString, uint64_t> acquireCollection(Operation
     // with the storage engine snapshot from which we are reading) has been stashed on the
     // 'OperationContext'. Either way, this means that the UUID must still exist in our view of the
     // collection catalog.
-    CollectionPtr collPtr = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collUuid);
+    CollectionPtr collPtr(CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collUuid));
     tassert(5071000, str::stream() << "Collection uuid " << collUuid << " does not exist", collPtr);
 
     auto nss = collPtr->ns();
@@ -57,7 +57,7 @@ CollectionPtr restoreCollection(OperationContext* opCtx,
     // lookup will result in a null pointer. If the collection has been renamed, then the resulting
     // collection object should have a different name from the original 'collName'. In either
     // scenario, we throw a 'QueryPlanKilled' error and terminate the query.
-    CollectionPtr collPtr = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collUuid);
+    CollectionPtr collPtr(CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collUuid));
     if (!collPtr) {
         PlanYieldPolicy::throwCollectionDroppedError(collUuid);
     }

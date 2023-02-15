@@ -201,7 +201,8 @@ private:
                                    .getTimestamp();
             ASSERT_OK(opCtx2->recoveryUnit()->setTimestamp(lastApplied + 1));
             BSONObj res;
-            ASSERT_TRUE(Helpers::findByIdAndNoopUpdate(opCtx2, collection2, idQuery, res));
+            ASSERT_TRUE(
+                Helpers::findByIdAndNoopUpdate(opCtx2, CollectionPtr(collection2), idQuery, res));
 
             ASSERT_THROWS(Helpers::emptyCollection(opCtx1, nss), WriteConflictException);
 
@@ -245,7 +246,8 @@ private:
                 ASSERT(collection2);
 
                 BSONObj res;
-                ASSERT_THROWS(Helpers::findByIdAndNoopUpdate(opCtx2, collection2, idQuery, res),
+                ASSERT_THROWS(Helpers::findByIdAndNoopUpdate(
+                                  opCtx2, CollectionPtr(collection2), idQuery, res),
                               WriteConflictException);
             }
 

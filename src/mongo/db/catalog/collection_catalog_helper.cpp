@@ -86,7 +86,7 @@ void forEachCollectionFromDb(OperationContext* opCtx,
 
             if (catalog->lookupNSSByUUID(opCtx, uuid) == nss) {
                 // Success: locked the namespace and the UUID still maps to it.
-                collection = catalog->lookupCollectionByUUID(opCtx, uuid);
+                collection = CollectionPtr(catalog->lookupCollectionByUUID(opCtx, uuid));
                 invariant(collection);
                 break;
             }
@@ -102,7 +102,7 @@ void forEachCollectionFromDb(OperationContext* opCtx,
         if (!collection)
             continue;
 
-        if (!callback(collection))
+        if (!callback(collection.get()))
             break;
 
         hangBeforeGettingNextCollection.pauseWhileSet();

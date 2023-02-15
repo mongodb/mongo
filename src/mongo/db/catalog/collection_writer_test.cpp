@@ -66,8 +66,8 @@ protected:
     }
 
     CollectionPtr lookupCollectionFromCatalog() {
-        return CollectionCatalog::get(operationContext())
-            ->lookupCollectionByNamespace(operationContext(), kNss);
+        return CollectionPtr(CollectionCatalog::get(operationContext())
+                                 ->lookupCollectionByNamespace(operationContext(), kNss));
     }
 
     const Collection* lookupCollectionFromCatalogForRead() {
@@ -82,8 +82,7 @@ protected:
             auto opCtx = client->makeOperationContext();
             ASSERT_EQ(expected,
                       CollectionCatalog::get(opCtx.get())
-                          ->lookupCollectionByNamespace(opCtx.get(), kNss)
-                          .get());
+                          ->lookupCollectionByNamespace(opCtx.get(), kNss));
         });
         t.join();
     }

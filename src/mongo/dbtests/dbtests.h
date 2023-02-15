@@ -75,7 +75,8 @@ public:
     }
 
     CollectionPtr getCollection() const {
-        return CollectionCatalog::get(_opCtx)->lookupCollectionByNamespace(_opCtx, _nss);
+        return CollectionPtr(
+            CollectionCatalog::get(_opCtx)->lookupCollectionByNamespace(_opCtx, _nss));
     }
 
 private:

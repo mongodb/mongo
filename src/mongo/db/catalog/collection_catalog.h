@@ -50,7 +50,7 @@ class CollectionCatalog {
     friend class iterator;
 
 public:
-    using CollectionInfoFn = std::function<bool(const CollectionPtr& collection)>;
+    using CollectionInfoFn = std::function<bool(const Collection* collection)>;
 
     // Number of how many Collection references for a single Collection that is stored in the
     // catalog. Used to determine whether there are external references (uniquely owned). Needs to
@@ -59,7 +59,7 @@ public:
 
     class iterator {
     public:
-        using value_type = CollectionPtr;
+        using value_type = const Collection*;
 
         iterator(OperationContext* opCtx,
                  const DatabaseName& dbName,
@@ -242,9 +242,9 @@ public:
      *
      * No collection level lock is required to call this function.
      */
-    CollectionPtr establishConsistentCollection(OperationContext* opCtx,
-                                                const NamespaceStringOrUUID& nssOrUUID,
-                                                boost::optional<Timestamp> readTimestamp) const;
+    const Collection* establishConsistentCollection(OperationContext* opCtx,
+                                                    const NamespaceStringOrUUID& nssOrUUID,
+                                                    boost::optional<Timestamp> readTimestamp) const;
 
     /**
      * Returns a shared_ptr to a drop pending index if it's found and not expired.
@@ -386,7 +386,7 @@ public:
      */
     Collection* lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
                                                        const UUID& uuid) const;
-    CollectionPtr lookupCollectionByUUID(OperationContext* opCtx, UUID uuid) const;
+    const Collection* lookupCollectionByUUID(OperationContext* opCtx, UUID uuid) const;
     std::shared_ptr<const Collection> lookupCollectionByUUIDForRead(OperationContext* opCtx,
                                                                     const UUID& uuid) const;
 
@@ -414,8 +414,8 @@ public:
      */
     Collection* lookupCollectionByNamespaceForMetadataWrite(OperationContext* opCtx,
                                                             const NamespaceString& nss) const;
-    CollectionPtr lookupCollectionByNamespace(OperationContext* opCtx,
-                                              const NamespaceString& nss) const;
+    const Collection* lookupCollectionByNamespace(OperationContext* opCtx,
+                                                  const NamespaceString& nss) const;
     std::shared_ptr<const Collection> lookupCollectionByNamespaceForRead(
         OperationContext* opCtx, const NamespaceString& nss) const;
 
@@ -427,8 +427,8 @@ public:
      *
      * Returns nullptr is the namespace or uuid is unknown.
      */
-    CollectionPtr lookupCollectionByNamespaceOrUUID(OperationContext* opCtx,
-                                                    const NamespaceStringOrUUID& nssOrUUID) const;
+    const Collection* lookupCollectionByNamespaceOrUUID(
+        OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) const;
 
     /**
      * This function gets the NamespaceString from the collection catalog entry that
@@ -447,7 +447,7 @@ public:
     /**
      * Returns true if this CollectionCatalog contains the provided collection instance
      */
-    bool containsCollection(OperationContext* opCtx, const CollectionPtr& collection) const;
+    bool containsCollection(OperationContext* opCtx, const Collection* collection) const;
 
     /**
      * Returns the CatalogId for a given 'nss' at timestamp 'ts'.
@@ -699,7 +699,7 @@ private:
 
     std::shared_ptr<Collection> _lookupCollectionByUUID(UUID uuid) const;
 
-    CollectionPtr _lookupSystemViews(OperationContext* opCtx, const DatabaseName& dbName) const;
+    const Collection* _lookupSystemViews(OperationContext* opCtx, const DatabaseName& dbName) const;
 
     /**
      * Searches for a catalog entry at a point-in-time.
@@ -834,17 +834,18 @@ private:
      *
      * Returns nullptr when reading from a point-in-time where the collection did not exist.
      */
-    CollectionPtr _openCollection(OperationContext* opCtx,
-                                  const NamespaceStringOrUUID& nssOrUUID,
-                                  boost::optional<Timestamp> readTimestamp) const;
+    const Collection* _openCollection(OperationContext* opCtx,
+                                      const NamespaceStringOrUUID& nssOrUUID,
+                                      boost::optional<Timestamp> readTimestamp) const;
 
     // Helpers to perform openCollection at latest or at point-in-time on Namespace/UUID.
-    CollectionPtr _openCollectionAtLatestByNamespace(OperationContext* opCtx,
-                                                     const NamespaceString& nss) const;
-    CollectionPtr _openCollectionAtLatestByUUID(OperationContext* opCtx, const UUID& uuid) const;
-    CollectionPtr _openCollectionAtPointInTimeByNamespace(OperationContext* opCtx,
-                                                          const NamespaceString& nss,
-                                                          Timestamp readTimestamp) const;
+    const Collection* _openCollectionAtLatestByNamespace(OperationContext* opCtx,
+                                                         const NamespaceString& nss) const;
+    const Collection* _openCollectionAtLatestByUUID(OperationContext* opCtx,
+                                                    const UUID& uuid) const;
+    const Collection* _openCollectionAtPointInTimeByNamespace(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              Timestamp readTimestamp) const;
 
     /**
      * When present, indicates that the catalog is in closed state, and contains a map from UUID

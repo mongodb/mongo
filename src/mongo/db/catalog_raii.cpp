@@ -58,7 +58,7 @@ void verifyDbAndCollection(OperationContext* opCtx,
                            LockMode modeColl,
                            const NamespaceStringOrUUID& nsOrUUID,
                            const NamespaceString& resolvedNss,
-                           CollectionPtr& coll,
+                           const Collection* coll,
                            Database* db,
                            bool verifyWriteEligible) {
     invariant(!nsOrUUID.uuid() || coll,
@@ -303,7 +303,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
     // Check that the collections are all safe to use.
     _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
-    _coll = catalog->lookupCollectionByNamespace(opCtx, _resolvedNss);
+    _coll = CollectionPtr(catalog->lookupCollectionByNamespace(opCtx, _resolvedNss));
     _coll.makeYieldable(opCtx, LockedCollectionYieldRestore{opCtx, _coll});
 
     if (_coll) {
@@ -317,7 +317,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
     checkCollectionUUIDMismatch(opCtx, _resolvedNss, _coll, options._expectedUUID);
     verifyDbAndCollection(
-        opCtx, modeColl, nsOrUUID, _resolvedNss, _coll, _autoDb.getDb(), verifyWriteEligible);
+        opCtx, modeColl, nsOrUUID, _resolvedNss, _coll.get(), _autoDb.getDb(), verifyWriteEligible);
     for (auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
         auto secondaryResolvedNss =
             catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID);
@@ -546,7 +546,8 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const UUID& uuid)
       _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
-    _storedCollection = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid);
+    _storedCollection =
+        CollectionPtr(CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid));
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
     _sharedImpl->_writableCollectionInitializer = [opCtx, uuid]() {
         return CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForMetadataWrite(opCtx, uuid);
@@ -557,7 +558,8 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceStrin
     : _collection(&_storedCollection),
       _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
-    _storedCollection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+    _storedCollection =
+        CollectionPtr(CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
     _sharedImpl->_writableCollectionInitializer = [opCtx, nss]() {
         return CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx,

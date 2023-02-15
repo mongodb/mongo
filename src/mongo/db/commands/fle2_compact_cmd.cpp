@@ -89,10 +89,10 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                   str::stream() << "Collection '" << edcNss << "' does not exist");
     }
 
-    validateCompactRequest(request, *edc.get());
+    validateCompactRequest(request, *edc);
 
     auto namespaces =
-        uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(*edc.get()));
+        uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(*edc));
 
     // Step 1: rename the ECOC collection if it exists
     auto ecoc = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocNss);
@@ -110,7 +110,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
         RenameCollectionOptions renameOpts;
         validateAndRunRenameCollection(
             opCtx, namespaces.ecocNss, namespaces.ecocRenameNss, renameOpts);
-        ecoc.reset();
+        ecoc = nullptr;
     }
 
     if (!ecoc) {

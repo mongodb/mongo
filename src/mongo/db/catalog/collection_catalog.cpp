@@ -401,10 +401,10 @@ CollectionCatalog::iterator::iterator(
 
 CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*() {
     if (_exhausted()) {
-        return CollectionPtr();
+        return nullptr;
     }
 
-    return {CollectionPtr(_mapIter->second.get())};
+    return _mapIter->second.get();
 }
 
 Collection* CollectionCatalog::iterator::getWritableCollection(OperationContext* opCtx) {
@@ -660,7 +660,7 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
     IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.dbName());
 
     assertViewCatalogValid(viewsForDb);
-    auto systemViews = _lookupSystemViews(opCtx, viewName.dbName());
+    CollectionPtr systemViews(_lookupSystemViews(opCtx, viewName.dbName()));
 
     ViewsForDatabase writable{viewsForDb};
     auto status = writable.insert(
@@ -709,7 +709,7 @@ Status CollectionCatalog::modifyView(
 
     ViewsForDatabase writable{viewsForDb};
     auto status = writable.update(opCtx,
-                                  systemViews,
+                                  CollectionPtr(systemViews),
                                   viewName,
                                   viewOn,
                                   pipeline,
@@ -742,7 +742,7 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
     {
         IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.dbName());
 
-        auto systemViews = _lookupSystemViews(opCtx, viewName.dbName());
+        CollectionPtr systemViews(_lookupSystemViews(opCtx, viewName.dbName()));
 
         ViewsForDatabase writable{viewsForDb};
         writable.remove(opCtx, systemViews, viewName);
@@ -778,13 +778,13 @@ void CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseName&
     LOGV2_DEBUG(22546, 1, "Reloading view catalog for database", "db"_attr = dbName.toString());
 
     ViewsForDatabase viewsForDb;
-    viewsForDb.reload(opCtx, _lookupSystemViews(opCtx, dbName)).ignore();
+    viewsForDb.reload(opCtx, CollectionPtr(_lookupSystemViews(opCtx, dbName))).ignore();
 
     uncommittedCatalogUpdates.replaceViewsForDatabase(dbName, std::move(viewsForDb));
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
 }
 
-CollectionPtr CollectionCatalog::establishConsistentCollection(
+const Collection* CollectionCatalog::establishConsistentCollection(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nssOrUUID,
     boost::optional<Timestamp> readTimestamp) const {
@@ -814,11 +814,12 @@ bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
     }
 }
 
-CollectionPtr CollectionCatalog::_openCollection(OperationContext* opCtx,
-                                                 const NamespaceStringOrUUID& nssOrUUID,
-                                                 boost::optional<Timestamp> readTimestamp) const {
+const Collection* CollectionCatalog::_openCollection(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nssOrUUID,
+    boost::optional<Timestamp> readTimestamp) const {
     if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
-        return CollectionPtr();
+        return nullptr;
     }
 
     // The implementation of openCollection() is quite different at a timestamp compared to at
@@ -843,7 +844,7 @@ CollectionPtr CollectionCatalog::_openCollection(OperationContext* opCtx,
     }
 }
 
-CollectionPtr CollectionCatalog::_openCollectionAtLatestByNamespace(
+const Collection* CollectionCatalog::_openCollectionAtLatestByNamespace(
     OperationContext* opCtx, const NamespaceString& nss) const {
     auto& openedCollections = OpenedCollections::get(opCtx);
 
@@ -876,7 +877,7 @@ CollectionPtr CollectionCatalog::_openCollectionAtLatestByNamespace(
     // find a collection.
     if (catalogEntry.isEmpty()) {
         openedCollections.store(nullptr, nss, uuid);
-        return CollectionPtr();
+        return nullptr;
     }
 
     // If the catalog entry has a different namespace in our snapshot, then there is a
@@ -903,7 +904,7 @@ CollectionPtr CollectionCatalog::_openCollectionAtLatestByNamespace(
 
         // Last, mark 'nss' as not existing
         openedCollections.store(nullptr, nss, boost::none);
-        return CollectionPtr();
+        return nullptr;
     }
 
     auto metadata = DurableCatalog::getMetadataFromCatalogEntry(catalogEntry);
@@ -918,16 +919,16 @@ CollectionPtr CollectionCatalog::_openCollectionAtLatestByNamespace(
         invariant(pendingCollection && pendingCollection->isMetadataEqual(metadata));
         // TODO(SERVER-72193): Test this code path.
         openedCollections.store(pendingCollection, nss, uuid);
-        return CollectionPtr(pendingCollection.get());
+        return pendingCollection.get();
     }
 
     invariant(latestCollection->isMetadataEqual(metadata));
     openedCollections.store(latestCollection, nss, uuid);
-    return CollectionPtr(latestCollection.get());
+    return latestCollection.get();
 }
 
-CollectionPtr CollectionCatalog::_openCollectionAtLatestByUUID(OperationContext* opCtx,
-                                                               const UUID& uuid) const {
+const Collection* CollectionCatalog::_openCollectionAtLatestByUUID(OperationContext* opCtx,
+                                                                   const UUID& uuid) const {
     auto& openedCollections = OpenedCollections::get(opCtx);
 
     // When openCollection is called with no timestamp, the namespace must be pending commit. We
@@ -961,7 +962,7 @@ CollectionPtr CollectionCatalog::_openCollectionAtLatestByUUID(OperationContext*
     if (catalogEntry.isEmpty()) {
         openedCollections.store(
             nullptr, latestCollection ? latestCollection->ns() : pendingCollection->ns(), uuid);
-        return CollectionPtr();
+        return nullptr;
     }
 
     NamespaceString nss = DurableCatalog::getNamespaceFromCatalogEntry(catalogEntry);
@@ -974,12 +975,12 @@ CollectionPtr CollectionCatalog::_openCollectionAtLatestByUUID(OperationContext*
         if (latestCollection->ns() == nss) {
             openedCollections.store(nullptr, pendingCollection->ns(), boost::none);
             openedCollections.store(latestCollection, nss, uuid);
-            return CollectionPtr(latestCollection.get());
+            return latestCollection.get();
         } else {
             invariant(pendingCollection->ns() == nss);
             openedCollections.store(nullptr, latestCollection->ns(), boost::none);
             openedCollections.store(pendingCollection, nss, uuid);
-            return CollectionPtr(pendingCollection.get());
+            return pendingCollection.get();
         }
     }
 
@@ -998,14 +999,14 @@ CollectionPtr CollectionCatalog::_openCollectionAtLatestByUUID(OperationContext*
         // operating on this snapshot.
         invariant(pendingCollection && pendingCollection->isMetadataEqual(metadata));
         openedCollections.store(pendingCollection, nss, uuid);
-        return CollectionPtr(pendingCollection.get());
+        return pendingCollection.get();
     }
 
     invariant(latestCollection->isMetadataEqual(metadata));
     openedCollections.store(latestCollection, nss, uuid);
-    return CollectionPtr(latestCollection.get());
+    return latestCollection.get();
 }
-CollectionPtr CollectionCatalog::_openCollectionAtPointInTimeByNamespace(
+const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespace(
     OperationContext* opCtx, const NamespaceString& nss, Timestamp readTimestamp) const {
     auto& openedCollections = OpenedCollections::get(opCtx);
 
@@ -1013,7 +1014,7 @@ CollectionPtr CollectionCatalog::_openCollectionAtPointInTimeByNamespace(
     auto catalogEntry = _fetchPITCatalogEntry(opCtx, nss, readTimestamp);
     if (!catalogEntry) {
         openedCollections.store(nullptr, nss, boost::none);
-        return CollectionPtr();
+        return nullptr;
     }
 
     auto latestCollection = _lookupCollectionByUUID(*catalogEntry->metadata->options.uuid);
@@ -1021,7 +1022,7 @@ CollectionPtr CollectionCatalog::_openCollectionAtPointInTimeByNamespace(
     // Return the in-memory Collection instance if it is compatible with the read timestamp.
     if (isExistingCollectionCompatible(latestCollection, readTimestamp)) {
         openedCollections.store(latestCollection, nss, latestCollection->uuid());
-        return CollectionPtr(latestCollection.get());
+        return latestCollection.get();
     }
 
     // Use the shared collection state from the latest Collection in the in-memory collection
@@ -1030,7 +1031,7 @@ CollectionPtr CollectionCatalog::_openCollectionAtPointInTimeByNamespace(
         _createCompatibleCollection(opCtx, latestCollection, readTimestamp, catalogEntry.get());
     if (compatibleCollection) {
         openedCollections.store(compatibleCollection, nss, compatibleCollection->uuid());
-        return CollectionPtr(compatibleCollection.get());
+        return compatibleCollection.get();
     }
 
     // There is no state in-memory that matches the catalog entry. Try to instantiate a new
@@ -1038,11 +1039,11 @@ CollectionPtr CollectionCatalog::_openCollectionAtPointInTimeByNamespace(
     auto newCollection = _createNewPITCollection(opCtx, readTimestamp, catalogEntry.get());
     if (newCollection) {
         openedCollections.store(newCollection, nss, newCollection->uuid());
-        return CollectionPtr(newCollection.get());
+        return newCollection.get();
     }
 
     openedCollections.store(nullptr, nss, boost::none);
-    return CollectionPtr();
+    return nullptr;
 }
 
 boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
@@ -1354,26 +1355,27 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
     return ptr;
 }
 
-CollectionPtr CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx, UUID uuid) const {
+const Collection* CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
+                                                            UUID uuid) const {
     // If UUID is managed by UncommittedCatalogUpdates (but not newly created) return the pointer
     // which will be nullptr in case of a drop.
     auto [found, uncommittedPtr, newColl] =
         UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
     if (found) {
-        return CollectionPtr(uncommittedPtr.get());
+        return uncommittedPtr.get();
     }
 
     // Return any previously instantiated collection on this namespace for this snapshot
     if (auto openedColl = OpenedCollections::get(opCtx).lookupByUUID(uuid)) {
 
-        return openedColl.value() ? CollectionPtr(openedColl->get()) : CollectionPtr();
+        return openedColl.value() ? openedColl->get() : nullptr;
     }
 
     auto coll = _lookupCollectionByUUID(uuid);
-    return (coll && coll->isCommitted()) ? CollectionPtr(coll.get()) : CollectionPtr();
+    return (coll && coll->isCommitted()) ? coll.get() : nullptr;
 }
 
-CollectionPtr CollectionCatalog::lookupCollectionByNamespaceOrUUID(
+const Collection* CollectionCatalog::lookupCollectionByNamespaceOrUUID(
     OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) const {
     if (boost::optional<UUID> uuid = nssOrUUID.uuid())
         return lookupCollectionByUUID(opCtx, *uuid);
@@ -1419,7 +1421,7 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
     // Oplog is special and can only be modified in a few contexts. It is modified inplace and care
     // need to be taken for concurrency.
     if (nss.isOplog()) {
-        return const_cast<Collection*>(lookupCollectionByNamespace(opCtx, nss).get());
+        return const_cast<Collection*>(lookupCollectionByNamespace(opCtx, nss));
     }
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
@@ -1476,28 +1478,28 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
     return ptr;
 }
 
-CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* opCtx,
-                                                             const NamespaceString& nss) const {
+const Collection* CollectionCatalog::lookupCollectionByNamespace(OperationContext* opCtx,
+                                                                 const NamespaceString& nss) const {
     // If uncommittedPtr is valid, found is always true. Return the pointer as the collection still
     // exists.
     auto [found, uncommittedPtr, newColl] = UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
     if (uncommittedPtr) {
-        return CollectionPtr(uncommittedPtr.get());
+        return uncommittedPtr.get();
     }
 
     // Report the drop or rename as nothing new was created.
     if (found) {
-        return CollectionPtr();
+        return nullptr;
     }
 
     // Return any previously instantiated collection on this namespace for this snapshot
     if (auto openedColl = OpenedCollections::get(opCtx).lookupByNamespace(nss)) {
-        return CollectionPtr(openedColl->get());
+        return openedColl->get();
     }
 
     auto it = _collections.find(nss);
     auto coll = (it == _collections.end() ? nullptr : it->second);
-    return (coll && coll->isCommitted()) ? CollectionPtr(coll.get()) : CollectionPtr();
+    return (coll && coll->isCommitted()) ? coll.get() : nullptr;
 }
 
 boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationContext* opCtx,
@@ -1568,7 +1570,7 @@ boost::optional<UUID> CollectionCatalog::lookupUUIDByNSS(OperationContext* opCtx
 }
 
 bool CollectionCatalog::containsCollection(OperationContext* opCtx,
-                                           const CollectionPtr& collection) const {
+                                           const Collection* collection) const {
     // Any writable Collection instance created under MODE_X lock is considered to belong to this
     // catalog instance
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
@@ -1576,7 +1578,7 @@ bool CollectionCatalog::containsCollection(OperationContext* opCtx,
     auto entriesIt = std::find_if(entries.begin(),
                                   entries.end(),
                                   [&collection](const UncommittedCatalogUpdates::Entry& entry) {
-                                      return entry.collection.get() == collection.get();
+                                      return entry.collection.get() == collection;
                                   });
     if (entriesIt != entries.end())
         return true;
@@ -1586,7 +1588,7 @@ bool CollectionCatalog::containsCollection(OperationContext* opCtx,
     if (it == _catalog.end())
         return false;
 
-    return it->second.get() == collection.get();
+    return it->second.get() == collection;
 }
 
 CollectionCatalog::CatalogIdLookup CollectionCatalog::lookupCatalogIdByNSS(
@@ -1711,7 +1713,7 @@ bool CollectionCatalog::checkIfCollectionSatisfiable(UUID uuid, CollectionInfoFn
         return false;
     }
 
-    return predicate(CollectionPtr(collection.get()));
+    return predicate(collection.get());
 }
 
 std::vector<UUID> CollectionCatalog::getAllCollectionUUIDsFromDb(const DatabaseName& dbName) const {
@@ -1924,7 +1926,8 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
 
     if (!storageGlobalParams.repair && coll->ns().isSystemDotViews()) {
         auto [it, emplaced] = _viewsForDatabase.try_emplace(coll->ns().dbName());
-        if (auto status = it->second.reload(opCtx, _lookupSystemViews(opCtx, coll->ns().dbName()));
+        if (auto status = it->second.reload(
+                opCtx, CollectionPtr(_lookupSystemViews(opCtx, coll->ns().dbName())));
             !status.isOK()) {
             LOGV2_WARNING_OPTIONS(20326,
                                   {logv2::LogTag::kStartupWarnings},
@@ -2461,8 +2464,8 @@ bool CollectionCatalog::hasExclusiveAccessToCollection(OperationContext* opCtx,
          opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 }
 
-CollectionPtr CollectionCatalog::_lookupSystemViews(OperationContext* opCtx,
-                                                    const DatabaseName& dbName) const {
+const Collection* CollectionCatalog::_lookupSystemViews(OperationContext* opCtx,
+                                                        const DatabaseName& dbName) const {
     return lookupCollectionByNamespace(opCtx, NamespaceString::makeSystemDotViewsNamespace(dbName));
 }
 

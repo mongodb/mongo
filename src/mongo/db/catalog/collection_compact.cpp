@@ -63,7 +63,7 @@ CollectionPtr getCollectionForCompact(OperationContext* opCtx,
     }
 
     auto collectionCatalog = CollectionCatalog::get(opCtx);
-    CollectionPtr collection = collectionCatalog->lookupCollectionByNamespace(opCtx, resolvedNs);
+    CollectionPtr collection(collectionCatalog->lookupCollectionByNamespace(opCtx, resolvedNs));
 
     if (!collection) {
         std::shared_ptr<const ViewDefinition> view =

@@ -101,8 +101,8 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
         uassertStatusOK(createCollection(opCtx, fcvNss.dbName(), BSON("create" << fcvNss.coll())));
     }
 
-    const CollectionPtr& fcvColl =
-        catalog->lookupCollectionByNamespace(opCtx, NamespaceString::kServerConfigurationNamespace);
+    const CollectionPtr fcvColl(catalog->lookupCollectionByNamespace(
+        opCtx, NamespaceString::kServerConfigurationNamespace));
     invariant(fcvColl);
 
     // Restore the featureCompatibilityVersion document if it is missing.
@@ -139,7 +139,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
  * Returns true if the collection associated with the given CollectionCatalogEntry has an index on
  * the _id field
  */
-bool checkIdIndexExists(OperationContext* opCtx, const CollectionPtr& coll) {
+bool checkIdIndexExists(OperationContext* opCtx, const Collection* coll) {
     auto indexCount = coll->getTotalIndexCount();
     auto indexNames = std::vector<std::string>(indexCount);
     coll->getAllIndexes(&indexNames);
@@ -230,14 +230,14 @@ Status ensureCollectionProperties(OperationContext* opCtx,
             LOGV2(21001,
                   "collection {coll_ns} is missing an _id index",
                   "Collection is missing an _id index",
-                  logAttrs(*coll.get()));
+                  logAttrs(*coll));
             if (EnsureIndexPolicy::kBuildMissing == ensureIndexPolicy) {
                 auto status = buildMissingIdIndex(opCtx, collIt.getWritableCollection(opCtx));
                 if (!status.isOK()) {
                     LOGV2_ERROR(21021,
                                 "could not build an _id index on collection {coll_ns}: {error}",
                                 "Could not build an _id index on collection",
-                                logAttrs(*coll.get()),
+                                logAttrs(*coll),
                                 "error"_attr = status);
                     return downgradeError;
                 }
@@ -247,7 +247,7 @@ Status ensureCollectionProperties(OperationContext* opCtx,
         }
 
         if (coll->getTimeseriesOptions() &&
-            timeseries::collectionMayRequireExtendedRangeSupport(opCtx, coll)) {
+            timeseries::collectionMayRequireExtendedRangeSupport(opCtx, *coll)) {
             coll->setRequiresTimeseriesExtendedRangeSupport(opCtx);
         }
     }
@@ -294,7 +294,7 @@ bool hasReplSetConfigDoc(OperationContext* opCtx) {
 void assertCappedOplog(OperationContext* opCtx) {
     const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
     invariant(opCtx->lockState()->isDbLockedForMode(oplogNss.dbName(), MODE_IS));
-    const CollectionPtr& oplogCollection =
+    const Collection* oplogCollection =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, oplogNss);
     if (oplogCollection && !oplogCollection->isCapped()) {
         LOGV2_FATAL_NOTRACE(
@@ -446,7 +446,7 @@ void setReplSetMemberInStandaloneMode(OperationContext* opCtx, StartupRecoveryMo
     }
 
     invariant(opCtx->lockState()->isW());
-    CollectionPtr collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+    const Collection* collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
         opCtx, NamespaceString::kSystemReplSetNamespace);
     if (collection && !collection->isEmpty(opCtx)) {
         setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), true);

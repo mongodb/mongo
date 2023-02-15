@@ -201,8 +201,8 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
     // which may have changed when we released the collection lock temporarily.
     opCtx->recoveryUnit()->abandonSnapshot();
 
-    CollectionPtr coll =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, startingNss);
+    CollectionPtr coll(
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, startingNss));
 
     // Even if the collection doesn't exist, UUID mismatches must return an error.
     Status status = _checkUUIDAndReplState(opCtx, coll, startingNss, expectedUUID);
@@ -261,7 +261,8 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
         // disk state, which may have changed when we released the collection lock temporarily.
         opCtx->recoveryUnit()->abandonSnapshot();
 
-        coll = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collectionUUID);
+        coll = CollectionPtr(
+            CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collectionUUID));
 
         // Even if the collection doesn't exist, UUID mismatches must return an error.
         status = _checkUUIDAndReplState(opCtx, coll, startingNss, expectedUUID);
@@ -313,8 +314,8 @@ Status _dropCollectionForApplyOps(OperationContext* opCtx,
                                   DropCollectionSystemCollectionMode systemCollectionMode,
                                   DropReply* reply) {
     Lock::CollectionLock collLock(opCtx, collectionName, MODE_X);
-    const CollectionPtr& coll =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName);
+    CollectionPtr coll(
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName));
 
     // Even if the collection doesn't exist, UUID mismatches must return an error.
     Status status = _checkUUIDAndReplState(opCtx, coll, collectionName);
@@ -580,8 +581,8 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
             return Status::OK();
         }
 
-        const CollectionPtr& coll =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName);
+        CollectionPtr coll(
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName));
 
         DropReply unusedReply;
         if (!coll) {
@@ -622,7 +623,7 @@ void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx,
         if (nss.isSystem())
             continue;
 
-        CollectionPtr coll = catalog->lookupCollectionByNamespace(opCtx, nss);
+        CollectionPtr coll(catalog->lookupCollectionByNamespace(opCtx, nss));
         if (!coll)
             continue;
 
@@ -649,7 +650,7 @@ void clearTempCollections(OperationContext* opCtx, const DatabaseName& dbName) {
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, dbName);
     invariant(db);
 
-    CollectionCatalog::CollectionInfoFn callback = [&](const CollectionPtr& collection) {
+    CollectionCatalog::CollectionInfoFn callback = [&](const Collection* collection) {
         try {
             WriteUnitOfWork wuow(opCtx);
             Status status = db->dropCollection(opCtx, collection->ns());
@@ -673,7 +674,7 @@ void clearTempCollections(OperationContext* opCtx, const DatabaseName& dbName) {
     };
 
     catalog::forEachCollectionFromDb(
-        opCtx, dbName, MODE_X, callback, [&](const CollectionPtr& collection) {
+        opCtx, dbName, MODE_X, callback, [&](const Collection* collection) {
             return collection->getCollectionOptions().temp;
         });
 }

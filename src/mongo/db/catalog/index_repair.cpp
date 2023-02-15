@@ -47,7 +47,7 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
     AutoGetCollection autoColl(opCtx, lostAndFoundNss, MODE_IX);
     auto catalog = CollectionCatalog::get(opCtx);
     auto originalCollection = catalog->lookupCollectionByNamespace(opCtx, nss);
-    CollectionPtr localCollection = catalog->lookupCollectionByNamespace(opCtx, lostAndFoundNss);
+    CollectionPtr localCollection(catalog->lookupCollectionByNamespace(opCtx, lostAndFoundNss));
 
     // Creates the collection if it doesn't exist.
     if (!localCollection) {
@@ -103,7 +103,7 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
             // this document matches the record id of the element it tries to unindex. This avoids
             // wrongly unindexing a document with the same _id.
             collection_internal::deleteDocument(opCtx,
-                                                originalCollection,
+                                                CollectionPtr(originalCollection),
                                                 kUninitializedStmtId,
                                                 dupRecord,
                                                 nullptr /* opDebug */,

@@ -178,8 +178,8 @@ public:
         {
             // The "local.system.collections_to_restore" collection needs to exist prior to running
             // this command.
-            CollectionPtr restoreColl = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-                opCtx, NamespaceString::kConfigsvrRestoreNamespace);
+            CollectionPtr restoreColl(CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+                opCtx, NamespaceString::kConfigsvrRestoreNamespace));
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Collection " << NamespaceString::kConfigsvrRestoreNamespace
                                   << " is missing",
@@ -193,8 +193,8 @@ public:
 
 
             LOGV2(6261300, "1st Phase - Restoring collection entries", logAttrs(nss));
-            CollectionPtr coll =
-                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+            CollectionPtr coll(
+                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
             if (!coll) {
                 LOGV2(6261301, "Collection not found, skipping", logAttrs(nss));
                 continue;
@@ -275,8 +275,8 @@ public:
             // database was restored.
             for (const NamespaceString& nss : databasesEntries) {
                 LOGV2(6261303, "2nd Phase - Restoring database entries", logAttrs(nss));
-                CollectionPtr coll =
-                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+                CollectionPtr coll(
+                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
                 if (!coll) {
                     LOGV2(6261304, "Collection not found, skipping", logAttrs(nss));
                     return true;

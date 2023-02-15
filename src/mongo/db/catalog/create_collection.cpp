@@ -713,8 +713,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
         // a random temporary name is correct: once all entries are replayed no temporary
         // names will remain.
         const bool stayTemp = true;
-        auto futureColl =
-            db ? catalog->lookupCollectionByNamespace(opCtx, newCollName) : CollectionPtr();
+        auto futureColl = db ? catalog->lookupCollectionByNamespace(opCtx, newCollName) : nullptr;
         bool needsRenaming(futureColl);
         invariant(!needsRenaming || allowRenameOutOfTheWay,
                   str::stream() << "Current collection name: " << currentName << ", UUID: " << uuid

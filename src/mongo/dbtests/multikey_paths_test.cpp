@@ -79,8 +79,8 @@ public:
 
     // Helper to refetch the Collection from the catalog in order to see any changes made to it
     CollectionPtr collection() const {
-        return CollectionCatalog::get(_opCtx.get())
-            ->lookupCollectionByNamespace(_opCtx.get(), _nss);
+        return CollectionPtr(
+            CollectionCatalog::get(_opCtx.get())->lookupCollectionByNamespace(_opCtx.get(), _nss));
     }
 
 

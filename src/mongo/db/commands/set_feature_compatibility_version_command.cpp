@@ -812,7 +812,7 @@ private:
                         opCtx,
                         dbName,
                         MODE_S,
-                        [&](const CollectionPtr& collection) {
+                        [&](const Collection* collection) {
                             auto tsOptions = collection->getTimeseriesOptions();
                             invariant(tsOptions);
 
@@ -861,7 +861,7 @@ private:
 
                             return true;
                         },
-                        [&](const CollectionPtr& collection) {
+                        [&](const Collection* collection) {
                             return collection->getTimeseriesOptions() != boost::none;
                         });
                 }
@@ -872,7 +872,7 @@ private:
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
-                    opCtx, dbName, MODE_X, [&](const CollectionPtr& collection) {
+                    opCtx, dbName, MODE_X, [&](const Collection* collection) {
                         auto& efc = collection->getCollectionOptions().encryptedFieldConfig;
 
                         uassert(ErrorCodes::CannotDowngrade,
@@ -893,7 +893,7 @@ private:
                         opCtx,
                         dbName,
                         MODE_S,
-                        [&](const CollectionPtr& collection) {
+                        [&](const Collection* collection) {
                             uasserted(
                                 ErrorCodes::CannotDowngrade,
                                 str::stream()
@@ -903,7 +903,7 @@ private:
                                     << collection->ns() << "'");
                             return true;
                         },
-                        [&](const CollectionPtr& collection) {
+                        [&](const Collection* collection) {
                             return collection->isCapped() &&
                                 collection->getCappedMaxSize() % 256 != 0;
                         });

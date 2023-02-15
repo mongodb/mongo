@@ -222,9 +222,8 @@ void createIndexForApplyOps(OperationContext* opCtx,
     // Check if collection exists.
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, indexNss.dbName());
-    auto indexCollection = db
-        ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, indexNss)
-        : CollectionPtr();
+    auto indexCollection = CollectionPtr(
+        db ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, indexNss) : nullptr);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Failed to create index due to missing collection: " << indexNss.ns(),
             indexCollection);
@@ -763,7 +762,7 @@ void createOplog(OperationContext* opCtx,
     const ReplSettings& replSettings = ReplicationCoordinator::get(opCtx)->getSettings();
 
     OldClientContext ctx(opCtx, oplogCollectionName);
-    CollectionPtr collection =
+    const Collection* collection =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, oplogCollectionName);
 
     if (collection) {
@@ -1360,7 +1359,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
     CollectionPtr collection;
     if (auto uuid = op.getUuid()) {
         auto catalog = CollectionCatalog::get(opCtx);
-        collection = catalog->lookupCollectionByUUID(opCtx, uuid.value());
+        collection = CollectionPtr(catalog->lookupCollectionByUUID(opCtx, uuid.value()));
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply operation due to missing collection ("
                               << uuid.value() << "): " << redact(opOrGroupedInserts.toBSON()),
@@ -1372,7 +1371,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
         invariant(requestNss.coll().size());
         dassert(opCtx->lockState()->isCollectionLockedForMode(requestNss, MODE_IX),
                 requestNss.ns());
-        collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, requestNss);
+        collection = CollectionPtr(
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, requestNss));
     }
 
     BSONObj o = op.getObject();

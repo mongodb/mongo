@@ -820,7 +820,7 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
     // Find an oplog entry <= truncateAfterTimestamp.
     boost::optional<BSONObj> truncateAfterOplogEntryBSON =
         _storageInterface->findOplogEntryLessThanOrEqualToTimestamp(
-            opCtx, oplogCollection, truncateAfterTimestamp);
+            opCtx, CollectionPtr(oplogCollection), truncateAfterTimestamp);
     if (!truncateAfterOplogEntryBSON) {
         LOGV2_FATAL_NOTRACE(40296,
                             "Reached end of oplog looking for an oplog entry lte to "

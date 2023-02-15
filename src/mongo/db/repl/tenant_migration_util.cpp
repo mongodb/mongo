@@ -112,11 +112,10 @@ void createOplogViewForTenantMigrations(OperationContext* opCtx, Database* db) {
             {
                 // Create 'system.views' in a separate WUOW if it does not exist.
                 WriteUnitOfWork wuow(opCtx);
-                CollectionPtr coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+                const Collection* coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                     opCtx, NamespaceString(db->getSystemViewsName()));
                 if (!coll) {
-                    coll = CollectionPtr(
-                        db->createCollection(opCtx, NamespaceString(db->getSystemViewsName())));
+                    coll = db->createCollection(opCtx, NamespaceString(db->getSystemViewsName()));
                 }
                 invariant(coll);
                 wuow.commit();

@@ -143,9 +143,8 @@ bool Helpers::findById(OperationContext* opCtx,
                        BSONObj& result,
                        bool* nsFound,
                        bool* indexFound) {
-    // TODO ForRead?
-    CollectionPtr collection =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+    auto collCatalog = CollectionCatalog::get(opCtx);
+    const Collection* collection = collCatalog->lookupCollectionByNamespace(opCtx, nss);
     if (!collection) {
         return false;
     }
@@ -181,7 +180,7 @@ bool Helpers::findById(OperationContext* opCtx,
         *indexFound = 1;
 
     auto recordId = catalog->getEntry(desc)->accessMethod()->asSortedData()->findSingle(
-        opCtx, collection, query["_id"].wrap());
+        opCtx, CollectionPtr(collection), query["_id"].wrap());
     if (recordId.isNull())
         return false;
     result = collection->docFor(opCtx, recordId).value();
@@ -355,9 +354,9 @@ BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
 void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& nss) {
     OldClientContext context(opCtx, nss);
     repl::UnreplicatedWritesBlock uwb(opCtx);
-    CollectionPtr collection = context.db()
-        ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)
-        : CollectionPtr();
+    CollectionPtr collection = CollectionPtr(
+        context.db() ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)
+                     : nullptr);
 
     deleteObjects(opCtx, collection, nss, BSONObj(), false);
 }

@@ -90,7 +90,8 @@ public:
     }
 
     CollectionPtr getCollection() {
-        return CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, ns());
+        return CollectionPtr(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, ns()));
     }
 
     const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {

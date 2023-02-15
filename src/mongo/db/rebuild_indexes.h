@@ -50,7 +50,7 @@ typedef std::pair<std::vector<std::string>, std::vector<BSONObj>> IndexNameObjs;
  *               should be included in the result.
  */
 StatusWith<IndexNameObjs> getIndexNameObjs(
-    const CollectionPtr& collection,
+    const Collection* collection,
     std::function<bool(const std::string&)> filter = [](const std::string& indexName) {
         return true;
     });
@@ -63,7 +63,7 @@ StatusWith<IndexNameObjs> getIndexNameObjs(
  */
 enum class RepairData { kYes, kNo };
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  const CollectionPtr& collection,
+                                  const Collection* collection,
                                   const std::vector<BSONObj>& indexSpecs,
                                   RepairData repair);
 
@@ -72,7 +72,7 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
  * One example usage is when a 'dropIndex' command is rolled back. The dropped index must be remade.
  */
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  const CollectionPtr& collection,
+                                  const Collection* collection,
                                   const std::vector<BSONObj>& indexSpecs);
 
 }  // namespace mongo

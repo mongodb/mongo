@@ -279,7 +279,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IS));
 
     catalog::forEachCollectionFromDb(
-        opCtx, name(), MODE_IS, [&](const CollectionPtr& collection) -> bool {
+        opCtx, name(), MODE_IS, [&](const Collection* collection) -> bool {
             nCollections += 1;
             objects += collection->numRecords(opCtx);
             size += collection->dataSize(opCtx);

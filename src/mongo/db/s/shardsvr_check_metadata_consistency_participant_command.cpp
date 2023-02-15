@@ -92,7 +92,7 @@ public:
             std::vector<CollectionPtr> localCollection;
             for (const auto& localNss : localNssCollections) {
                 localCollection.push_back(
-                    collectionCatalog->lookupCollectionByNamespace(opCtx, localNss));
+                    CollectionPtr(collectionCatalog->lookupCollectionByNamespace(opCtx, localNss)));
             }
 
             // Check consistency between local metadata and configsvr metadata

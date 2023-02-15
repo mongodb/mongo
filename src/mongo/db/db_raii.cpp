@@ -103,7 +103,7 @@ private:
  * compatible with 'readTimestamp'. Throws a SnapshotUnavailable error if the assertion fails.
  */
 void assertCollectionChangesCompatibleWithReadTimestamp(OperationContext* opCtx,
-                                                        const CollectionPtr& collection,
+                                                        const Collection* collection,
                                                         boost::optional<Timestamp> readTimestamp) {
     // Check that the collection exists.
     if (!collection) {
@@ -745,7 +745,7 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
     // Check that the collections are all safe to use. First acquire collection from our catalog
     // compatible with the specified 'readTimestamp'. Creates and places a compatible PIT collection
     // reference in the 'catalog' if needed and the collection exists at that PIT.
-    _coll = catalog->establishConsistentCollection(opCtx, nsOrUUID, readTimestamp);
+    _coll = CollectionPtr(catalog->establishConsistentCollection(opCtx, nsOrUUID, readTimestamp));
     _coll.makeYieldable(opCtx, LockedCollectionYieldRestore{opCtx, _coll});
 
     // Validate primary collection.
@@ -1155,7 +1155,7 @@ std::shared_ptr<const ViewDefinition> lookupView(
     return view;
 }
 
-std::tuple<NamespaceString, CollectionPtr, std::shared_ptr<const ViewDefinition>>
+std::tuple<NamespaceString, const Collection*, std::shared_ptr<const ViewDefinition>>
 getCollectionForLockFreeRead(OperationContext* opCtx,
                              const std::shared_ptr<const CollectionCatalog>& catalog,
                              boost::optional<Timestamp> readTimestamp,
@@ -1177,7 +1177,7 @@ getCollectionForLockFreeRead(OperationContext* opCtx,
     // Returns a collection reference compatible with the specified 'readTimestamp'. Creates and
     // places a compatible PIT collection reference in the 'catalog' if needed and the collection
     // exists at that PIT.
-    CollectionPtr coll = catalog->establishConsistentCollection(opCtx, nsOrUUID, readTimestamp);
+    const Collection* coll = catalog->establishConsistentCollection(opCtx, nsOrUUID, readTimestamp);
     // TODO (SERVER-71222): This is broken if the UUID doesn't exist in the latest catalog.
     //
     // Note: This call to resolveNamespaceStringOrUUID must happen after getCollectionFromCatalog
@@ -1188,7 +1188,7 @@ getCollectionForLockFreeRead(OperationContext* opCtx,
 
     std::shared_ptr<const ViewDefinition> viewDefinition =
         coll ? nullptr : lookupView(opCtx, catalog, nss, options._viewMode);
-    return {nss, std::move(coll), std::move(viewDefinition)};
+    return {nss, coll, std::move(viewDefinition)};
 }
 
 static const Lock::GlobalLockSkipOptions kLockFreeReadsGlobalLockOptions{[] {
@@ -1201,7 +1201,7 @@ struct CatalogStateForNamespace {
     std::shared_ptr<const CollectionCatalog> catalog;
     bool isAnySecondaryNssShardedOrAView;
     NamespaceString resolvedNss;
-    CollectionPtr collection;
+    const Collection* collection;
     std::shared_ptr<const ViewDefinition> view;
 };
 
@@ -1223,7 +1223,7 @@ CatalogStateForNamespace acquireCatalogStateForNamespace(
         getCollectionForLockFreeRead(opCtx, catalog, readTimestamp, nsOrUUID, options);
 
     return CatalogStateForNamespace{
-        catalog, isAnySecondaryNssShardedOrAView, resolvedNss, std::move(collection), view};
+        catalog, isAnySecondaryNssShardedOrAView, resolvedNss, collection, view};
 }
 
 boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
@@ -1262,7 +1262,7 @@ CollectionPtr::RestoreFn AutoGetCollectionForReadLockFreePITCatalog::_makeRestor
             _view = catalogStateForNamespace.view;
             _catalogStasher.stash(std::move(catalogStateForNamespace.catalog));
 
-            return catalogStateForNamespace.collection.get();
+            return catalogStateForNamespace.collection;
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
             // Calls to CollectionCatalog::resolveNamespaceStringOrUUID (called from
             // acquireCatalogStateForNamespace) will result in a NamespaceNotFound error if the
@@ -1320,7 +1320,7 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
         if (_view) {
             _lockFreeReadsBlock.reset();
         }
-        _collectionPtr = std::move(collection);
+        _collectionPtr = CollectionPtr(collection);
         // Nested operations should never yield as we don't yield when the global lock is held
         // recursively. But this is not known when we create the Query plan for this sub operation.
         // Pretend that we are yieldable but don't allow yield to actually be called.
@@ -1345,7 +1345,7 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
         _catalogStasher.stash(std::move(catalogStateForNamespace.catalog));
         _secondaryNssIsAViewOrSharded = catalogStateForNamespace.isAnySecondaryNssShardedOrAView;
 
-        _collectionPtr = std::move(catalogStateForNamespace.collection);
+        _collectionPtr = CollectionPtr(catalogStateForNamespace.collection);
         _collectionPtr.makeYieldable(
             opCtx,
             _makeRestoreFromYieldFn(options,

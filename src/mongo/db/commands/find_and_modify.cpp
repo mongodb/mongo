@@ -451,8 +451,8 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
     if (!*collectionPtr && request.getUpsert() && *request.getUpsert()) {
         assertCanWrite_inlock(opCtx, nsString);
 
-        createdCollection =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nsString);
+        createdCollection = CollectionPtr(
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nsString));
 
         // If someone else beat us to creating the collection, do nothing
         if (!createdCollection) {
@@ -464,8 +464,8 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
             uassertStatusOK(db->userCreateNS(opCtx, nsString, defaultCollectionOptions));
             wuow.commit();
 
-            createdCollection =
-                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nsString);
+            createdCollection = CollectionPtr(
+                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nsString));
         }
 
         invariant(createdCollection);
