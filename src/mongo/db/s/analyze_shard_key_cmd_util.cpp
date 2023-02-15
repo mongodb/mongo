@@ -35,6 +35,9 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
+#include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/s/analyze_shard_key_cmd_util.h"
 #include "mongo/db/s/analyze_shard_key_read_write_distribution.h"
@@ -50,6 +53,7 @@
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/service_entry_point_mongos.h"
+#include "mongo/s/stale_shard_version_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -69,8 +73,10 @@ constexpr StringData kNumOrphanDocsFieldName = "numOrphanDocs"_sd;
  * Returns an aggregate command request for calculating the cardinality and frequency metrics for
  * the given shard key.
  */
-AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(
-    const NamespaceString& nss, const BSONObj& shardKey, const BSONObj& hintIndexKey) {
+AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const NamespaceString& nss,
+                                                                       const BSONObj& shardKey,
+                                                                       const BSONObj& hintIndexKey,
+                                                                       int numMostCommonValues) {
     std::vector<BSONObj> pipeline;
 
     pipeline.push_back(BSON("$project" << BSON("_id" << 0 << kIndexKeyFieldName
@@ -96,16 +102,112 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(
                                             << BSON("$sum" << ("$" + kFrequencyFieldName))
                                             << kNumDistinctValuesFieldName << BSON("$sum" << 1)))));
 
-    pipeline.push_back(BSON("$limit" << gNumMostCommonValues.load()));
+    pipeline.push_back(BSON("$limit" << numMostCommonValues));
 
     AggregateCommandRequest aggRequest(nss, pipeline);
     aggRequest.setHint(hintIndexKey);
     aggRequest.setAllowDiskUse(true);
+    // (re)shardCollection by design uses simple collation for comparing shard key values.
+    aggRequest.setCollation(CollationSpec::kSimpleSpec);
     // Use readConcern "available" to avoid shard filtering since it is expensive.
     aggRequest.setReadConcern(
         BSON(repl::ReadConcernArgs::kLevelFieldName << repl::readConcernLevels::kAvailableName));
 
     return aggRequest;
+}
+
+/**
+ * Runs the aggregate command 'aggRequest' locally and getMore commands for it if needed and
+ * applies 'callbackFn' to each returned document.
+ */
+void runLocalAggregate(OperationContext* opCtx,
+                       AggregateCommandRequest aggRequest,
+                       std::function<void(const BSONObj&)> callbackFn) {
+    DBDirectClient client(opCtx);
+    auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
+        &client, aggRequest, true /* secondaryOk */, false /* useExhaust*/));
+
+    while (cursor->more()) {
+        auto doc = cursor->next();
+        callbackFn(doc);
+    }
+}
+
+/**
+ * Runs the aggregate command 'aggRequest' on the the shards that the query targets and getMore
+ * commands for it if needed, and applies 'callbackFn' to each returned document. On a sharded
+ * cluster, internally retries on shard versioning errors.
+ */
+void runClusterAggregate(OperationContext* opCtx,
+                         AggregateCommandRequest aggRequest,
+                         std::function<void(const BSONObj&)> callbackFn) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+
+    auto nss = aggRequest.getNamespace();
+    boost::optional<UUID> collUuid;
+    std::unique_ptr<CollatorInterface> collation;
+    {
+        AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, nss);
+
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Cannot run aggregation against a non-existing collection",
+                collection);
+
+        collUuid = collection->uuid();
+        collation = [&] {
+            auto collationObj = aggRequest.getCollation();
+            if (collationObj && !collationObj->isEmpty()) {
+                return uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                           ->makeFromBSON(*collationObj));
+            }
+            return CollatorInterface::cloneCollator(collection->getDefaultCollator());
+        }();
+    }
+
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    resolvedNamespaces[nss.coll()] = {nss, std::vector<BSONObj>{}};
+
+    auto pi = std::make_shared<ShardServerProcessInterface>(
+        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
+
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                    boost::none, /* explain */
+                                                    false,       /* fromMongos */
+                                                    false,       /* needsMerge */
+                                                    aggRequest.getAllowDiskUse(),
+                                                    true,  /* bypassDocumentValidation */
+                                                    false, /* isMapReduceCommand */
+                                                    nss,
+                                                    boost::none, /* runtimeConstants */
+                                                    std::move(collation),
+                                                    std::move(pi),
+                                                    std::move(resolvedNamespaces),
+                                                    collUuid);
+    expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
+
+    auto pipeline =
+        shardVersionRetry(opCtx, Grid::get(opCtx)->catalogCache(), nss, "AnalyzeShardKey"_sd, [&] {
+            // TODO (SERVER-73935): Use the new Pipeline::makePipeline() below.
+            return sharded_agg_helpers::targetShardsAndAddMergeCursors(expCtx, aggRequest);
+        });
+
+    while (auto doc = pipeline->getNext()) {
+        callbackFn(doc->toBson());
+    }
+}
+
+/**
+ * Runs the aggregate command 'aggRequest' and getMore commands for it if needed, and applies
+ * 'callbackFn' to each returned document. On a sharded cluster, internally retries on shard
+ * versioning errors.
+ */
+void runAggregate(OperationContext* opCtx,
+                  AggregateCommandRequest aggRequest,
+                  std::function<void(const BSONObj&)> callbackFn) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        return runClusterAggregate(opCtx, aggRequest, callbackFn);
+    }
+    return runLocalAggregate(opCtx, aggRequest, callbackFn);
 }
 
 struct IndexSpec {
@@ -163,6 +265,45 @@ struct CardinalityFrequencyMetrics {
     std::vector<ValueFrequencyMetrics> mostCommonValues;
 };
 
+// The size limit for the most common values. Leave some padding for other fields in the response.
+constexpr int kMaxBSONObjSizeMostCommonValues = BSONObjMaxUserSize - 1000 * 1024;
+
+/**
+ * Creates a BSONObj by appending the fields in 'obj' to it. Upon encoutering a field whose size
+ * exceeds the remaining size, truncates it by setting its value to a BSONObj with a "type" field
+ * and a "sizeBytes" field. If the field is of type of Object and the depth is 0, recurse to
+ * truncate the subfields instead.
+ */
+BSONObj truncateBSONObj(const BSONObj& obj, int maxSize, int depth = 0) {
+    BSONObjBuilder bob;
+    auto getRemainingSize = [&] {
+        auto remaining = maxSize - bob.bb().len();
+        invariant(remaining > 0);
+        return remaining;
+    };
+
+    BSONObjIterator it(obj);
+    while (it.more()) {
+        auto remainingSize = getRemainingSize();
+        auto element = it.next();
+        if (element.size() < remainingSize) {
+            bob.append(element);
+        } else {
+            auto fieldName = element.fieldName();
+            if (element.type() == BSONType::Object && depth == 0) {
+                auto fieldValue = truncateBSONObj(element.Obj(), remainingSize, depth + 1);
+                bob.append(fieldName, fieldValue);
+            } else {
+                bob.append(fieldName,
+                           BSON("type" << typeName(element.type()) << "value"
+                                       << "truncated"
+                                       << "sizeBytes" << element.valuesize()));
+            }
+        }
+    }
+    return bob.obj();
+}
+
 /**
  * Returns the cardinality and frequency metrics for a shard key given that the shard key is unique
  * and the collection has the the given number of documents.
@@ -176,13 +317,19 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(OperationCont
     metrics.numDocs = numDocs;
     metrics.numDistinctValues = numDocs;
 
+    const auto numMostCommonValues = gNumMostCommonValues.load();
+    const auto maxSizeBytesPerValue = kMaxBSONObjSizeMostCommonValues / numMostCommonValues;
+
     std::vector<BSONObj> pipeline;
     pipeline.push_back(BSON("$match" << BSONObj()));
-    pipeline.push_back(BSON("$limit" << gNumMostCommonValues.load()));
+    pipeline.push_back(BSON("$limit" << numMostCommonValues));
     AggregateCommandRequest aggRequest(nss, pipeline);
 
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         auto value = dotted_path_support::extractElementsBasedOnTemplate(doc.getOwned(), shardKey);
+        if (value.objsize() > maxSizeBytesPerValue) {
+            value = truncateBSONObj(value, maxSizeBytesPerValue);
+        }
         metrics.mostCommonValues.emplace_back(std::move(value), 1);
     });
 
@@ -200,7 +347,12 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
                                                                     const BSONObj& hintIndexKey) {
     CardinalityFrequencyMetrics metrics;
 
-    auto aggRequest = makeAggregateRequestForCardinalityAndFrequency(nss, shardKey, hintIndexKey);
+    const auto numMostCommonValues = gNumMostCommonValues.load();
+    const auto maxSizeBytesPerValue = kMaxBSONObjSizeMostCommonValues / numMostCommonValues;
+
+    auto aggRequest = makeAggregateRequestForCardinalityAndFrequency(
+        nss, shardKey, hintIndexKey, numMostCommonValues);
+
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         auto numDocs = doc.getField(kNumDocsFieldName).exactNumberLong();
         invariant(numDocs > 0);
@@ -220,6 +372,9 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
 
         auto value = dotted_path_support::extractElementsBasedOnTemplate(
             doc.getObjectField("_id").replaceFieldNames(shardKey), shardKey);
+        if (value.objsize() > maxSizeBytesPerValue) {
+            value = truncateBSONObj(value, maxSizeBytesPerValue);
+        }
         auto frequency = doc.getField(kFrequencyFieldName).exactNumberLong();
         invariant(frequency > 0);
         metrics.mostCommonValues.emplace_back(std::move(value), frequency);
@@ -464,7 +619,7 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
     auto shardKeyBson = shardKey.toBSON();
     BSONObj indexKeyBson;
     {
-        AutoGetCollectionForReadCommand collection(opCtx, nss);
+        AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, nss);
 
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Cannot analyze a shard key for a non-existing collection",
@@ -518,7 +673,8 @@ std::pair<ReadDistributionMetrics, WriteDistributionMetrics> calculateReadWriteD
     pipeline.push_back(
         BSON(DocumentSourceAnalyzeShardKeyReadWriteDistribution::kStageName << spec.toBSON()));
     AggregateCommandRequest aggRequest(nss, pipeline);
-    runAggregate(opCtx, nss, aggRequest, [&](const BSONObj& doc) {
+
+    runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         const auto response = DocumentSourceAnalyzeShardKeyReadWriteDistributionResponse::parse(
             IDLParserContext("calculateReadWriteDistributionMetrics"), doc);
         readDistributionMetrics = readDistributionMetrics + response.getReadDistribution();

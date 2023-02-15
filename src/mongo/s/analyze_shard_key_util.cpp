@@ -32,13 +32,13 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_aggregate.h"
-#include "mongo/s/stale_shard_version_helpers.h"
+#include "mongo/s/query/cluster_find.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -46,127 +46,6 @@ namespace mongo {
 namespace analyze_shard_key {
 
 namespace {
-
-/**
- * Runs the aggregate command 'aggRequest' locally and applies 'callbackFn' to each returned
- * document.
- */
-void runAggregateTargetLocal(OperationContext* opCtx,
-                             AggregateCommandRequest aggRequest,
-                             std::function<void(const BSONObj&)> callbackFn) {
-    DBDirectClient client(opCtx);
-    auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-        &client, aggRequest, true /* secondaryOk */, false /* useExhaust*/));
-
-    while (cursor->more()) {
-        auto doc = cursor->next();
-        callbackFn(doc);
-    }
-}
-
-/**
- * Runs the aggregate command 'aggRequest' and applies 'callbackFn' to each returned document.
- * Targets the shards that the query targets and automatically retries on shard versioning errors.
- * Does not support runnning getMore commands for the aggregation.
- */
-void runAggregateTargetByQuery(OperationContext* opCtx,
-                               AggregateCommandRequest aggRequest,
-                               std::function<void(const BSONObj&)> callbackFn) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-
-    auto nss = aggRequest.getNamespace();
-    bool succeeded = false;
-
-    while (true) {
-        try {
-            shardVersionRetry(
-                opCtx, Grid::get(opCtx)->catalogCache(), nss, "AnalyzeShardKey"_sd, [&] {
-                    BSONObjBuilder responseBuilder;
-                    uassertStatusOK(
-                        ClusterAggregate::runAggregate(opCtx,
-                                                       ClusterAggregate::Namespaces{nss, nss},
-                                                       aggRequest,
-                                                       LiteParsedPipeline{aggRequest},
-                                                       PrivilegeVector(),
-                                                       &responseBuilder));
-                    succeeded = true;
-                    auto response = responseBuilder.obj();
-                    auto firstBatch = response.firstElement()["firstBatch"].Obj();
-                    BSONObjIterator it(firstBatch);
-
-                    while (it.more()) {
-                        auto doc = it.next().Obj();
-                        callbackFn(doc);
-                    }
-                });
-            return;
-        } catch (const DBException& ex) {
-            if (ex.toStatus() == ErrorCodes::ShardNotFound) {
-                // 'callbackFn' should never trigger a ShardNotFound error. It is also incorrect
-                // to retry the aggregate command after some documents have already been
-                // processed.
-                invariant(!succeeded);
-
-                LOGV2(6875200,
-                      "Failed to run aggregate command to analyze shard key",
-                      "error"_attr = ex.toStatus());
-                continue;
-            }
-            throw;
-        }
-    }
-}
-
-/**
- * Runs the aggregate command 'aggRequest' and applies 'callbackFn' to each returned document.
- * Targets all shards that own data for the collection 'nss'. Does not support runnning getMore
- * commands for the aggregation.
- */
-void runAggregateTargetByNs(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            AggregateCommandRequest aggRequest,
-                            std::function<void(const BSONObj&)> callbackFn) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-
-    std::set<ShardId> shardIds;
-    auto cm =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(opCtx, nss));
-    if (cm.isSharded()) {
-        cm.getAllShardIds(&shardIds);
-    } else {
-        shardIds.insert(cm.dbPrimary());
-    }
-
-    std::vector<AsyncRequestsSender::Request> requests;
-    auto cmdObj = applyReadWriteConcern(
-        opCtx, true /* appendRC */, true /* appendWC */, aggRequest.toBSON({}));
-    for (const auto& shardId : shardIds) {
-        requests.emplace_back(shardId, cmdObj);
-    }
-
-    auto shardResults = gatherResponses(opCtx,
-                                        aggRequest.getNamespace().db(),
-                                        ReadPreferenceSetting(ReadPreference::SecondaryPreferred),
-                                        Shard::RetryPolicy::kIdempotent,
-                                        requests);
-
-    for (const auto& shardResult : shardResults) {
-        const auto shardResponse = uassertStatusOK(std::move(shardResult.swResponse));
-        uassertStatusOK(shardResponse.status);
-        const auto cmdResult = shardResponse.data;
-        uassertStatusOK(getStatusFromCommandResult(cmdResult));
-
-        auto firstBatch = cmdResult.firstElement()["firstBatch"].Obj();
-        BSONObjIterator it(firstBatch);
-
-        if (!it.more()) {
-            continue;
-        }
-
-        auto doc = it.next().Obj();
-        callbackFn(doc);
-    }
-}
 
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeyHangBeforeWritingLocally);
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeyHangBeforeWritingRemotely);
@@ -302,25 +181,6 @@ double calculatePercentage(double part, double whole) {
     invariant(whole > 0);
     invariant(part <= whole);
     return round(part / whole * 100, kMaxNumDecimalPlaces);
-}
-
-void runAggregate(OperationContext* opCtx,
-                  AggregateCommandRequest aggRequest,
-                  std::function<void(const BSONObj&)> callbackFn) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        return runAggregateTargetByQuery(opCtx, aggRequest, callbackFn);
-    }
-    return runAggregateTargetLocal(opCtx, aggRequest, callbackFn);
-}
-
-void runAggregate(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  AggregateCommandRequest aggRequest,
-                  std::function<void(const BSONObj&)> callbackFn) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        return runAggregateTargetByNs(opCtx, nss, aggRequest, callbackFn);
-    }
-    return runAggregateTargetLocal(opCtx, aggRequest, callbackFn);
 }
 
 void insertDocuments(OperationContext* opCtx,

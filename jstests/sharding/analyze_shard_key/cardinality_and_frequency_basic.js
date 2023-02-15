@@ -128,7 +128,15 @@ for (let testCaseBase of noIndexTestCases) {
     candidateKeyTestCases.push(testCase);
 }
 
+const numNodesPerRS = 2;
 const numMostCommonValues = 5;
+
+// The write concern to use when inserting documents into test collections. Waiting for the
+// documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
+// command with readPreference "secondaryPreferred".
+const writeConcern = {
+    w: numNodesPerRS
+};
 
 /**
  * Finds the profiler entries for all aggregate and count commands with the given comment on the
@@ -257,7 +265,7 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     // Analyze the shard key while the collection has less than 'numMostCommonValues' distinct shard
     // key values.
     const [docs0, metrics0] = makeSubTestCase(numMostCommonValues - 1);
-    assert.commandWorked(db.runCommand({insert: collName, documents: docs0, ordered: false}));
+    assert.commandWorked(coll.insert(docs0, {writeConcern}));
     const res0 = assert.commandWorked(conn.adminCommand(
         {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
     if (testCase.expectMetrics) {
@@ -270,7 +278,7 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     // Analyze the shard key while the collection has exactly 'numMostCommonValues' distinct shard
     // key values.
     const [docs1, metrics1] = makeSubTestCase(numMostCommonValues);
-    assert.commandWorked(db.runCommand({insert: collName, documents: docs1, ordered: false}));
+    assert.commandWorked(coll.insert(docs1, {writeConcern}));
     const res1 = assert.commandWorked(conn.adminCommand(
         {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
     if (testCase.expectMetrics) {
@@ -283,7 +291,7 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     // Analyze the shard key while the collection has more than 'numMostCommonValues' distinct shard
     // key values.
     const [docs2, metrics2] = makeSubTestCase(numMostCommonValues * 25);
-    assert.commandWorked(db.runCommand({insert: collName, documents: docs2, ordered: false}));
+    assert.commandWorked(coll.insert(docs2, {writeConcern}));
     const res2 = assert.commandWorked(conn.adminCommand(
         {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
     if (testCase.expectMetrics) {
@@ -341,8 +349,7 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
     // Analyze the shard key while the collection has less than 'numMostCommonValues' distinct shard
     // key values.
     const [docs0, metrics0] = makeSubTestCase(numMostCommonValues - 1);
-
-    assert.commandWorked(db.runCommand({insert: collName, documents: docs0, ordered: false}));
+    assert.commandWorked(coll.insert(docs0, {writeConcern}));
     const res0 = assert.commandWorked(conn.adminCommand(
         {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0, metrics0);
@@ -351,7 +358,7 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
     // Analyze the shard key while the collection has exactly 'numMostCommonValues' distinct shard
     // key values.
     const [docs1, metrics1] = makeSubTestCase(numMostCommonValues);
-    assert.commandWorked(db.runCommand({insert: collName, documents: docs1, ordered: false}));
+    assert.commandWorked(coll.insert(docs1, {writeConcern}));
     const res1 = assert.commandWorked(conn.adminCommand(
         {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res1, metrics1);
@@ -360,7 +367,7 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
     // Analyze the shard key while the collection has more than 'numMostCommonValues' distinct shard
     // key values.
     const [docs2, metrics2] = makeSubTestCase(numMostCommonValues * 25);
-    assert.commandWorked(db.runCommand({insert: collName, documents: docs2, ordered: false}));
+    assert.commandWorked(coll.insert(docs2, {writeConcern}));
     const res2 = assert.commandWorked(conn.adminCommand(
         {analyzeShardKey: ns, key: testCase.shardKey, comment: testCase.comment}));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res2, metrics2);
@@ -518,7 +525,7 @@ function testAnalyzeCurrentShardKeys(st, mongodConns) {
 
 {
     const st = new ShardingTest({
-        shards: 2,
+        shards: numNodesPerRS,
         rs: {
             nodes: 2,
             setParameter: {
@@ -541,7 +548,7 @@ function testAnalyzeCurrentShardKeys(st, mongodConns) {
 
 {
     const rst = new ReplSetTest({
-        nodes: 2,
+        nodes: numNodesPerRS,
         nodeOptions: {setParameter: {analyzeShardKeyNumMostCommonValues: numMostCommonValues}}
     });
     rst.startSet();

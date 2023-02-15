@@ -10,8 +10,17 @@
 load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 
 const kSize100kB = 100 * 1024;
-const internalDocumentSourceGroupMaxMemoryBytes = 1024 * 1024;
+
+const numNodesPerRS = 2;
 const numMostCommonValues = 5;
+const internalDocumentSourceGroupMaxMemoryBytes = 1024 * 1024;
+
+// The write concern to use when inserting documents into test collections. Waiting for the
+// documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
+// command with readPreference "secondaryPreferred".
+const writeConcern = {
+    w: numNodesPerRS
+};
 
 /**
  * Finds the profiler entries for all aggregate and count commands with the given comment on the
@@ -74,18 +83,20 @@ function testAnalyzeShardKeysUnshardedCollection(conn, mongodConns) {
 
     assert.commandWorked(coll.createIndex(candidateShardKey));
 
+    const docs = [];
     const mostCommonValues = [];
     for (let i = 1; i <= numDocs; i++) {
         const chars = i.toString();
         const doc = {a: new Array(kSize100kB / chars.length).join(chars)};
 
-        assert.commandWorked(db.runCommand({insert: collName, documents: [doc]}));
+        docs.push(doc);
         mostCommonValues.push({
             value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(
                 doc, candidateShardKey, candidateShardKey),
             frequency: 1
         });
     }
+    assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     AnalyzeShardKeyUtil.enableProfiler(mongodConns, dbName);
 
@@ -130,13 +141,14 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
         {moveChunk: ns, find: currentShardKeySplitPoint, to: st.shard1.shardName}));
     assert.commandWorked(coll.createIndex(candidateShardKey));
 
+    const docs = [];
     const mostCommonValues = [];
     let sign = 1;
     for (let i = 1; i <= numDocs; i++) {
         const chars = i.toString();
         const doc = {a: new Array(kSize100kB / chars.length).join(chars), skey: sign};
 
-        assert.commandWorked(db.runCommand({insert: collName, documents: [doc]}));
+        docs.push(doc);
         mostCommonValues.push({
             value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(
                 doc, candidateShardKey, candidateShardKey),
@@ -145,6 +157,7 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
 
         sign *= -1;
     }
+    assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     AnalyzeShardKeyUtil.enableProfiler(mongodConns, dbName);
 
@@ -166,7 +179,7 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
 
 {
     const st = new ShardingTest({
-        shards: 2,
+        shards: numNodesPerRS,
         rs: {nodes: 2},
         other: {
             rsOptions: {
@@ -191,7 +204,7 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
 
 {
     const rst = new ReplSetTest({
-        nodes: 2,
+        nodes: numNodesPerRS,
         nodeOptions: {
             setParameter: {
                 internalDocumentSourceGroupMaxMemoryBytes,

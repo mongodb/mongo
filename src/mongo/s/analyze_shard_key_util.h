@@ -56,24 +56,6 @@ double round(double val, int n);
  */
 double calculatePercentage(double part, double whole);
 
-/**
- * Runs the aggregate command 'aggRequest' and applies 'callbackFn' to each returned document. On a
- * sharded cluster, automatically retries on shard versioning errors. Does not support runnning
- * getMore commands for the aggregation.
- */
-void runAggregate(OperationContext* opCtx,
-                  AggregateCommandRequest aggRequest,
-                  std::function<void(const BSONObj&)> callbackFn);
-
-/**
- * Same as above, but on a sharded cluster, targets all the shards that owns the collection 'nss'
- * instead.
- */
-void runAggregate(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  AggregateCommandRequest aggRequest,
-                  std::function<void(const BSONObj&)> callbackFn);
-
 /*
  * Inserts the documents 'docs' into the collection 'nss'. If this mongod is currently the primary,
  * runs the insert command locally. Otherwise, runs the command on the remote primary. Internally

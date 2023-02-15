@@ -10,7 +10,15 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 
+const numNodesPerRS = 2;
 const numMostCommonValues = 5;
+
+// The write concern to use when inserting documents into test collections. Waiting for the
+// documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
+// command with readPreference "secondaryPreferred".
+const writeConcern = {
+    w: numNodesPerRS
+};
 
 function testAnalyzeShardKeyUnshardedCollection(conn) {
     const dbName = "testDb";
@@ -20,7 +28,8 @@ function testAnalyzeShardKeyUnshardedCollection(conn) {
 
     const candidateKey = {candidateKey: 1};
     assert.commandWorked(coll.createIndex(candidateKey));
-    assert.commandWorked(coll.insert([{candidateKey: 1}]));
+    const docs = [{candidateKey: 1}];
+    assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     const res = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: candidateKey}));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
@@ -43,16 +52,17 @@ function testAnalyzeShardKeyShardedCollection(st) {
     const coll = st.s.getCollection(ns);
     const currentKey = {currentKey: 1};
     const candidateKey = {candidateKey: 1};
-
-    assert.commandWorked(coll.createIndex(currentKey));
-    assert.commandWorked(coll.createIndex(candidateKey));
-    assert.commandWorked(coll.insert([
+    const docs = [
         {currentKey: -10, candidateKey: -100},
         {currentKey: -5, candidateKey: -50},
         {currentKey: 0, candidateKey: 0},
         {currentKey: 5, candidateKey: 50},
         {currentKey: 10, candidateKey: 100}
-    ]));
+    ];
+
+    assert.commandWorked(coll.createIndex(currentKey));
+    assert.commandWorked(coll.createIndex(candidateKey));
+    assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
     st.ensurePrimaryShard(dbName, st.shard0.shardName);
@@ -141,7 +151,7 @@ function testAnalyzeShardKeyShardedCollection(st) {
     const st = new ShardingTest({
         shards: 2,
         rs: {
-            nodes: 2,
+            nodes: numNodesPerRS,
             setParameter: {
                 "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
                     tojson({mode: "alwaysOn"}),
@@ -158,7 +168,7 @@ function testAnalyzeShardKeyShardedCollection(st) {
 
 {
     const rst = new ReplSetTest({
-        nodes: 2,
+        nodes: numNodesPerRS,
         nodeOptions: {setParameter: {analyzeShardKeyNumMostCommonValues: numMostCommonValues}}
     });
     rst.startSet();

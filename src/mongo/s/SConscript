@@ -187,7 +187,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/shard_role',
-        '$BUILD_DIR/mongo/s/query/cluster_aggregate',
     ],
 )
 
