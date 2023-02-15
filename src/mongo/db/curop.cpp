@@ -35,6 +35,7 @@
 
 #include "mongo/db/curop.h"
 
+#include "mongo/util/duration.h"
 #include <iomanip>
 
 #include "mongo/bson/mutable/document.h"
@@ -796,6 +797,15 @@ void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool t
     if (_debug.dataThroughputAverage) {
         builder->append("dataThroughputAverage", *_debug.dataThroughputAverage);
     }
+
+    if (auto start = _waitForWriteConcernStart.load(); start > 0) {
+        auto end = _waitForWriteConcernEnd.load();
+        auto elapsedTimeTotal =
+            duration_cast<Microseconds>(debug().waitForWriteConcernDurationMillis);
+        elapsedTimeTotal += computeElapsedTimeTotal(start, end);
+        builder->append("waitForWriteConcernDurationMillis",
+                        durationCount<Milliseconds>(elapsedTimeTotal));
+    }
 }
 
 namespace {
@@ -1156,6 +1166,10 @@ void OpDebug::report(OperationContext* opCtx,
 
     if (writeConcern && !writeConcern->usedDefaultConstructedWC) {
         pAttrs->add("writeConcern", writeConcern->toBSON());
+    }
+
+    if (waitForWriteConcernDurationMillis > Milliseconds::zero()) {
+        pAttrs->add("waitForWriteConcernDuration", waitForWriteConcernDurationMillis);
     }
 
     if (storageStats) {

@@ -277,6 +277,10 @@ public:
     // unusual amounts of time.
     Microseconds totalOplogSlotDurationMicros{0};
 
+    // Stores the duration of time spent waiting for the specified user write concern to
+    // be fulfilled.
+    Milliseconds waitForWriteConcernDurationMillis{0};
+
     // Stores the amount of the data processed by the throttle cursors in MB/sec.
     boost::optional<float> dataThroughputLastSecond;
     boost::optional<float> dataThroughputAverage;
@@ -670,6 +674,32 @@ public:
     }
 
     /**
+     * Starts the waitForWriteConcern timer.
+     *
+     * The timer must be ended before it can be started again.
+     */
+    void beginWaitForWriteConcernTimer() {
+        invariant(_waitForWriteConcernStart.load() == 0);
+        _waitForWriteConcernStart = _tickSource->getTicks();
+        _waitForWriteConcernEnd = 0;
+    }
+
+    /**
+     * Stops the waitForWriteConcern timer.
+     *
+     * Does nothing if the timer has not been started.
+     */
+    void stopWaitForWriteConcernTimer() {
+        auto start = _waitForWriteConcernStart.load();
+        if (start != 0) {
+            _waitForWriteConcernEnd = _tickSource->getTicks();
+            debug().waitForWriteConcernDurationMillis += duration_cast<Milliseconds>(
+                computeElapsedTimeTotal(start, _waitForWriteConcernEnd.load()));
+            _waitForWriteConcernStart = 0;
+        }
+    }
+
+    /**
      * 'opDescription' must be either an owned BSONObj or guaranteed to outlive the OperationContext
      * it is associated with.
      */
@@ -873,6 +903,10 @@ private:
     UserCacheAcquisitionStats _userCacheAcquisitionStats;
 
     TickSource* _tickSource = nullptr;
+
+    // These values are used to calculate the amount of time spent waiting for write concern.
+    std::atomic<TickSource::Tick> _waitForWriteConcernStart{0};  // NOLINT
+    std::atomic<TickSource::Tick> _waitForWriteConcernEnd{0};    // NOLINT
 };
 
 /**
