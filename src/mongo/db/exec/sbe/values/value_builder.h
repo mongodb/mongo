@@ -295,11 +295,11 @@ public:
 /**
  * A ValueBuilder that supports reading of sbe tag/values into a MaterializedRow.
  */
-class MaterializedRowValueBuilder : public ValueBuilder {
+template <typename RowType>
+class RowValueBuilder : public ValueBuilder {
 public:
-    MaterializedRowValueBuilder(BufBuilder* valueBufferBuilder)
-        : ValueBuilder(valueBufferBuilder) {}
-    MaterializedRowValueBuilder(MaterializedRowValueBuilder& other) = delete;
+    RowValueBuilder(BufBuilder* valueBufferBuilder) : ValueBuilder(valueBufferBuilder) {}
+    RowValueBuilder(RowValueBuilder<RowType>& other) = delete;
 
     size_t numValues() const override {
         size_t nVals = 0;
@@ -319,7 +319,7 @@ public:
         return nVals;
     }
 
-    void readValues(MaterializedRow& row) {
+    void readValues(RowType& row) {
         auto bufferLen = _valueBufferBuilder->len();
         size_t bufIdx = 0;
         size_t rowIdx = 0;

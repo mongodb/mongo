@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,20 +29,19 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/exec/sbe/values/slot.h"
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/makeobj_spec.h"
+#include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/bufreader.h"
-
 namespace mongo::sbe::value {
+
 static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {
     auto tag = static_cast<TypeTags>(buf.read<uint8_t>());
     Value val;
@@ -211,19 +210,6 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {
     }
 
     return {tag, val};
-}
-
-MaterializedRow MaterializedRow::deserializeForSorter(BufReader& buf,
-                                                      const SorterDeserializeSettings&) {
-    auto cnt = buf.read<LittleEndian<size_t>>();
-    MaterializedRow result{cnt};
-
-    for (size_t idx = 0; idx < cnt; ++idx) {
-        auto [tag, val] = deserializeValue(buf);
-        result.reset(idx, true, tag, val);
-    }
-
-    return result;
 }
 
 static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
@@ -549,31 +535,49 @@ static void serializeValueIntoKeyString(KeyString::Builder& buf, TypeTags tag, V
     }
 }
 
-void MaterializedRow::serializeForSorter(BufBuilder& buf) const {
-    buf.appendNum(size());
+template <typename RowType>
+RowType RowBase<RowType>::deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
+    auto cnt = buf.read<LittleEndian<size_t>>();
+    RowType result{cnt};
 
-    for (size_t idx = 0; idx < size(); ++idx) {
-        auto [tag, val] = getViewOfValue(idx);
+    for (size_t idx = 0; idx < cnt; ++idx) {
+        auto [tag, val] = deserializeValue(buf);
+        result.reset(idx, true, tag, val);
+    }
+
+    return result;
+}
+
+template <typename RowType>
+void RowBase<RowType>::serializeForSorter(BufBuilder& buf) const {
+    const RowType& self = *static_cast<const RowType*>(this);
+    buf.appendNum(self.size());
+
+    for (size_t idx = 0; idx < self.size(); ++idx) {
+        auto [tag, val] = self.getViewOfValue(idx);
         serializeValue(buf, tag, val);
     }
 }
 
-void MaterializedRow::serializeIntoKeyString(KeyString::Builder& buf) const {
-    for (size_t idx = 0; idx < size(); ++idx) {
-        auto [tag, val] = getViewOfValue(idx);
+
+template <typename RowType>
+void RowBase<RowType>::serializeIntoKeyString(KeyString::Builder& buf) const {
+    const RowType& self = *static_cast<const RowType*>(this);
+    for (size_t idx = 0; idx < self.size(); ++idx) {
+        auto [tag, val] = self.getViewOfValue(idx);
         serializeValueIntoKeyString(buf, tag, val);
     }
 }
 
-MaterializedRow MaterializedRow::deserializeFromKeyString(
-    const KeyString::Value& keyString,
-    BufBuilder* valueBufferBuilder,
-    boost::optional<size_t> numPrefixValsToRead) {
+template <typename RowType>
+RowType RowBase<RowType>::deserializeFromKeyString(const KeyString::Value& keyString,
+                                                   BufBuilder* valueBufferBuilder,
+                                                   boost::optional<size_t> numPrefixValsToRead) {
     BufReader reader(keyString.getBuffer(), keyString.getSize());
     KeyString::TypeBits typeBits(keyString.getTypeBits());
     KeyString::TypeBits::Reader typeBitsReader(typeBits);
 
-    MaterializedRowValueBuilder valBuilder(valueBufferBuilder);
+    RowValueBuilder<RowType> valBuilder(valueBufferBuilder);
     auto keepReading = true;
     do {
         keepReading = KeyString::readSBEValue(
@@ -581,7 +585,7 @@ MaterializedRow MaterializedRow::deserializeFromKeyString(
     } while (keepReading);
 
     size_t sizeOfRow = numPrefixValsToRead ? *numPrefixValsToRead : valBuilder.numValues();
-    MaterializedRow result{sizeOfRow};
+    RowType result{sizeOfRow};
     valBuilder.readValues(result);
 
     return result;
@@ -721,15 +725,31 @@ int getApproximateSize(TypeTags tag, Value val) {
     return result;
 }
 
-int MaterializedRow::memUsageForSorter() const {
+template <typename RowType>
+int RowBase<RowType>::memUsageForSorter() const {
+    const RowType& self = *static_cast<const RowType*>(this);
     int result = sizeof(MaterializedRow);
 
-    for (size_t idx = 0; idx < size(); ++idx) {
-        auto [tag, val] = getViewOfValue(idx);
+    for (size_t idx = 0; idx < self.size(); ++idx) {
+        auto [tag, val] = self.getViewOfValue(idx);
         result += getApproximateSize(tag, val);
     }
 
     return result;
 }
+
+template class RowBase<MaterializedRow>;
+template class RowBase<FixedSizeRow<1>>;
+template class RowBase<FixedSizeRow<2>>;
+template class RowBase<FixedSizeRow<3>>;
+
+
+// This check is needed to ensure that 'std::vector<MaterializedRow>' uses move constructor of
+// 'MaterializedRow' during reallocation. This way, values inside 'MaterializedRow' are not copied
+// during reallocation and references to them remain valid.
+static_assert(std::is_nothrow_move_constructible_v<MaterializedRow>);
+static_assert(std::is_nothrow_move_constructible_v<FixedSizeRow<1>>);
+static_assert(std::is_nothrow_move_constructible_v<FixedSizeRow<2>>);
+static_assert(std::is_nothrow_move_constructible_v<FixedSizeRow<3>>);
 
 }  // namespace mongo::sbe::value

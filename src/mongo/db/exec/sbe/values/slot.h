@@ -32,13 +32,10 @@
 #include <type_traits>
 
 #include "mongo/config.h"
+#include "mongo/db/exec/sbe/values/row.h"
+#include "mongo/db/exec/sbe/values/slot_util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/id_generator.h"
-
-namespace mongo {
-class BufReader;
-class BufBuilder;
-}  // namespace mongo
 
 namespace mongo::sbe::value {
 /**
@@ -73,21 +70,6 @@ public:
      * make a deep copy. The returned value is owned by the caller.
      */
     virtual std::pair<TypeTags, Value> copyOrMoveValue() = 0;
-};
-
-class SlotAccessorHelper {
-public:
-    /**
-     * Asserts that a value has not been invalidated.
-     */
-    MONGO_COMPILER_ALWAYS_INLINE static void dassertValidSlotValue(TypeTags tag, Value val) {
-#if defined(MONGO_CONFIG_DEBUG_BUILD)
-        tassert(7200401,
-                str::stream() << "Unexpected poison value. Likely attempted to access a slot that "
-                                 "was disabled and invalidated in save/restore cycle.",
-                !value::isPoisonValue(tag, val));
-#endif
-    }
 };
 
 /**
@@ -385,207 +367,16 @@ private:
 };
 
 /**
- * This class holds values in a buffer. The most common usage is a sort and hash agg plan stages. A
- * materialized row must only be used to store owned (deep) value copies.
- */
-class MaterializedRow {
-public:
-    MaterializedRow(size_t count = 0) {
-        resize(count);
-    }
-
-    MaterializedRow(const MaterializedRow& other) {
-        resize(other.size());
-        copy(other);
-    }
-
-    MaterializedRow(MaterializedRow&& other) noexcept {
-        swap(*this, other);
-    }
-
-    ~MaterializedRow() noexcept {
-        if (_data) {
-            release();
-            delete[] _data;
-        }
-    }
-
-    MaterializedRow& operator=(MaterializedRow other) noexcept {
-        swap(*this, other);
-        return *this;
-    }
-
-    /**
-     * Make deep copies of values stored in the buffer.
-     */
-    void makeOwned() {
-        for (size_t idx = 0; idx < _count; ++idx) {
-            makeOwned(idx);
-        }
-    }
-
-    void makeOwned(size_t idx) {
-        if (!owned()[idx]) {
-            auto [tag, val] = value::copyValue(tags()[idx], values()[idx]);
-            values()[idx] = val;
-            tags()[idx] = tag;
-            owned()[idx] = true;
-        }
-    }
-
-    std::pair<value::TypeTags, value::Value> getViewOfValue(size_t idx) const {
-        SlotAccessorHelper::dassertValidSlotValue(tags()[idx], values()[idx]);
-        return {tags()[idx], values()[idx]};
-    }
-
-    std::pair<value::TypeTags, value::Value> copyOrMoveValue(size_t idx) {
-        SlotAccessorHelper::dassertValidSlotValue(tags()[idx], values()[idx]);
-        if (owned()[idx]) {
-            owned()[idx] = false;
-            return {tags()[idx], values()[idx]};
-        } else {
-            return value::copyValue(tags()[idx], values()[idx]);
-        }
-    }
-
-    void reset(size_t idx, bool own, value::TypeTags tag, value::Value val) {
-        if (owned()[idx]) {
-            value::releaseValue(tags()[idx], values()[idx]);
-            owned()[idx] = false;
-        }
-        values()[idx] = val;
-        tags()[idx] = tag;
-        owned()[idx] = own;
-    }
-
-    size_t size() const {
-        return _count;
-    }
-
-    bool isEmpty() {
-        return _count == 0 ? true : false;
-    }
-
-    void resize(size_t count) {
-        if (_data) {
-            release();
-            delete[] _data;
-            _data = nullptr;
-            _count = 0;
-        }
-        if (count) {
-            _data = new char[sizeInBytes(count)];
-            _count = count;
-            auto valuePtr = values();
-            auto tagPtr = tags();
-            auto ownedPtr = owned();
-            while (count--) {
-                *valuePtr++ = 0;
-                *tagPtr++ = TypeTags::Nothing;
-                *ownedPtr++ = false;
-            }
-        }
-    }
-
-    // The following methods are used by the sorter only.
-    struct SorterDeserializeSettings {};
-    static MaterializedRow deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&);
-    void serializeForSorter(BufBuilder& buf) const;
-    int memUsageForSorter() const;
-    auto getOwned() const {
-        auto result = *this;
-        result.makeOwned();
-        return result;
-    }
-
-    /**
-     * With these functions, an SBE value can be saved as a KeyString. This functionality is
-     * intended for spilling key values used in the HashAgg stage. The format is not guaranteed to
-     * be stable between versions, so it should not be used for long-term storage or communication
-     * between instances.
-     *
-     * If 'numPrefixValsToRead' is provided, then only the given number of values from 'keyString'
-     * are decoded into the resulting 'MaterializedRow'. The remaining suffix values in the
-     * 'keyString' are ignored.
-     */
-    static MaterializedRow deserializeFromKeyString(
-        const KeyString::Value& keyString,
-        BufBuilder* valueBufferBuilder,
-        boost::optional<size_t> numPrefixValsToRead = boost::none);
-
-    void serializeIntoKeyString(KeyString::Builder& builder) const;
-
-private:
-    static size_t sizeInBytes(size_t count) {
-        return count * (sizeof(value::Value) + sizeof(value::TypeTags) + sizeof(bool));
-    }
-
-    value::Value* values() const {
-        return reinterpret_cast<value::Value*>(_data);
-    }
-
-    value::TypeTags* tags() const {
-        return reinterpret_cast<value::TypeTags*>(_data + _count * sizeof(value::Value));
-    }
-
-    bool* owned() const {
-        return reinterpret_cast<bool*>(_data +
-                                       _count * (sizeof(value::Value) + sizeof(value::TypeTags)));
-    }
-
-    void release() {
-        for (size_t idx = 0; idx < _count; ++idx) {
-            if (owned()[idx]) {
-                value::releaseValue(tags()[idx], values()[idx]);
-                owned()[idx] = false;
-            }
-        }
-    }
-
-    /**
-     * Makes a deep copy on the incoming row.
-     */
-    void copy(const MaterializedRow& other) {
-        invariant(_count == other._count);
-
-        for (size_t idx = 0; idx < _count; ++idx) {
-            if (other.owned()[idx]) {
-                auto [tag, val] = value::copyValue(other.tags()[idx], other.values()[idx]);
-                values()[idx] = val;
-                tags()[idx] = tag;
-                owned()[idx] = true;
-            } else {
-                values()[idx] = other.values()[idx];
-                tags()[idx] = other.tags()[idx];
-                owned()[idx] = false;
-            }
-        }
-    }
-
-    friend void swap(MaterializedRow& lhs, MaterializedRow& rhs) noexcept {
-        std::swap(lhs._data, rhs._data);
-        std::swap(lhs._count, rhs._count);
-    }
-
-    char* _data{nullptr};
-    size_t _count{0};
-};
-
-// This check is needed to ensure that 'std::vector<MaterializedRow>' uses move constructor of
-// 'MaterializedRow' during reallocation. This way, values inside 'MaterializedRow' are not copied
-// during reallocation and references to them remain valid.
-static_assert(std::is_nothrow_move_constructible_v<MaterializedRow>);
-
-/**
  * Provides a view of a slot inside a single MaterializedRow.
  */
-class MaterializedSingleRowAccessor final : public SlotAccessor {
+template <typename RowType>
+class SingleRowAccessor final : public SlotAccessor {
 public:
     /**
      * Constructs an accessor that gives a view of the value at the given 'slot' of a
      * given single row.
      */
-    MaterializedSingleRowAccessor(MaterializedRow& row, size_t slot) : _row(row), _slot(slot) {}
+    SingleRowAccessor(RowType& row, size_t slot) : _row(row), _slot(slot) {}
 
     std::pair<TypeTags, Value> getViewOfValue() const override {
         return _row.getViewOfValue(_slot);
@@ -598,82 +389,10 @@ public:
     }
 
 private:
-    MaterializedRow& _row;
+    RowType& _row;
     const size_t _slot;
 };
-
-struct MaterializedRowEq {
-    using ComparatorType = StringData::ComparatorInterface;
-
-    explicit MaterializedRowEq(const ComparatorType* comparator = nullptr)
-        : _comparator(comparator) {}
-
-    bool operator()(const MaterializedRow& lhs, const MaterializedRow& rhs) const {
-        for (size_t idx = 0; idx < lhs.size(); ++idx) {
-            auto [lhsTag, lhsVal] = lhs.getViewOfValue(idx);
-            auto [rhsTag, rhsVal] = rhs.getViewOfValue(idx);
-            auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal, _comparator);
-
-            if (tag != value::TypeTags::NumberInt32 || value::bitcastTo<int32_t>(val) != 0) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-private:
-    const ComparatorType* _comparator = nullptr;
-};
-
-struct MaterializedRowLess {
-public:
-    MaterializedRowLess(const std::vector<value::SortDirection>& sortDirs) {
-        _sortDirs.reserve(sortDirs.size());
-        for (auto&& dir : sortDirs) {
-            // Store directions 'Ascending' as -1 and 'Descending' as 1 so that we can compare the
-            // result of 'compareValue()' on the two pairs of tags & vals directly to the sort
-            // direction.
-            _sortDirs.push_back(dir == value::SortDirection::Ascending ? -1 : 1);
-        }
-    }
-
-    bool operator()(const MaterializedRow& lhs, const MaterializedRow& rhs) const {
-        for (size_t idx = 0; idx < lhs.size(); ++idx) {
-            auto [lhsTag, lhsVal] = lhs.getViewOfValue(idx);
-            auto [rhsTag, rhsVal] = rhs.getViewOfValue(idx);
-            auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
-
-            if (tag != value::TypeTags::NumberInt32 ||
-                value::bitcastTo<int32_t>(val) != _sortDirs[idx]) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-private:
-    std::vector<int8_t> _sortDirs;
-};
-
-struct MaterializedRowHasher {
-    using CollatorType = CollatorInterface*;
-
-    explicit MaterializedRowHasher(const CollatorType collator = nullptr) : _collator(collator) {}
-
-    std::size_t operator()(const MaterializedRow& k) const {
-        size_t res = hashInit();
-        for (size_t idx = 0; idx < k.size(); ++idx) {
-            auto [tag, val] = k.getViewOfValue(idx);
-            res = hashCombine(res, hashValue(tag, val, _collator));
-        }
-        return res;
-    }
-
-private:
-    const CollatorType _collator = nullptr;
-};
+typedef SingleRowAccessor<MaterializedRow> MaterializedSingleRowAccessor;
 
 /**
  * Read the components of the 'keyString' value and populate 'accessors' with those components. Some
@@ -721,5 +440,4 @@ void orderedSlotMapTraverse(const SlotMap<T>& map, C callback) {
     }
 }
 
-int getApproximateSize(TypeTags tag, Value val);
 }  // namespace mongo::sbe::value
