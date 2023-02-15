@@ -110,7 +110,7 @@ server_parameters:
       cpp_vartype: 'double'
       cpp_varname: gWiredTigerEvictionDirtyTargetGB
       default: 0
-      validator:
+  :
         gte: 0.01
         lte: 10000
 
@@ -149,6 +149,17 @@ server_parameters:
       default: 600
       validator:
         gte: 1
+
+    wiredTigerExtraDiagnostics:
+      description: >-
+          Extra diagnostics that can be enabled in release mode including diagnostic assertions that can cause WiredTiger to abort upon
+          detected invalid state. Valid options include: ["all", "concurrent_access", "data_validation", "invalid_op", "out_of_order",
+          "panic", "slow_operation", "visibility"]
+      set_at: [startup, runtime]
+      cpp_vartype: 'synchronized_value<std::vector<std::string>>'
+      cpp_varname: "gwiredTigerExtraDiagnostics"
+      validator:
+          callback: validateExtraDiagnostics
 
     wiredTigerFileHandleCloseMinimum:
       description: >-

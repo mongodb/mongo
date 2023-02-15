@@ -55,4 +55,9 @@ void stopMongoDFTDC();
 Status validateCollectionStatsNamespaces(std::vector<std::string> value,
                                          const boost::optional<TenantId>& tenantId);
 
+/**
+ * Validation callback for extra diagnostics setParameter
+ */
+Status validateExtraDiagnostics(std::vector<std::string> value);
+
 }  // namespace mongo

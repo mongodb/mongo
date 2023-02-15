@@ -64,6 +64,26 @@ Status validateCollectionStatsNamespaces(const std::vector<std::string> value,
     return Status::OK();
 }
 
+Status validateExtraDiagnostics(const std::vector<std::string> value) {
+    try {
+        std::string flagArr[] = { "all", "concurrent_access", "data_validation", "invalid_op", "out_of_order",
+                "panic", "slow_operation", "visibility" };
+
+        for (const auto& diagFlag : value) {
+            bool exists = std::find(std::begin(flagArr), std::end(flagArr), diagFlag) != std::end(flagArr);
+
+            if (!exists) {
+                return Status(ErrorCodes::BadValue,
+                              fmt::format("'{}' is not a valid flag option", diagFlag));
+            }
+        }
+    } catch (...) {
+        return exceptionToStatus();
+    }
+
+    return Status::OK();
+}
+
 namespace {
 
 class FTDCCollectionStatsCollector final : public FTDCCollectorInterface {

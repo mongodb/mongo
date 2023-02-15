@@ -47,6 +47,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 
+#include <boost/algorithm/string/join.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -363,6 +364,9 @@ WiredTigerKVEngine::WiredTigerKVEngine(OperationContext* opCtx,
     if (gWiredTigerEvictionDirtyTargetGB)
         ss << "eviction_dirty_target="
            << static_cast<size_t>(gWiredTigerEvictionDirtyTargetGB * 1024) << "MB,";
+    if (!gWiredTigerExtraDiagnostics.empty()) 
+        ss << "extra_diagnostics=["
+            << boost::algorithm::join(gWiredTigerExtraDiagnostics, ",") << "],";
     if (gWiredTigerEvictionDirtyMaxGB)
         ss << "eviction_dirty_trigger=" << static_cast<size_t>(gWiredTigerEvictionDirtyMaxGB * 1024)
            << "MB,";

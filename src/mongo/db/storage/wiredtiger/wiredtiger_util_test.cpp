@@ -146,6 +146,13 @@ private:
     std::unique_ptr<OperationContext> _opCtx;
 };
 
+TEST_F(WiredTigerUtilMetadataTest, GetMetadataCreateExtraDiagnostics) {
+    StatusWith<std::string> result =
+        WiredTigerUtil::getMetadataCreate(getOperationContext(), getURI());
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
+}
+
 TEST_F(WiredTigerUtilMetadataTest, GetMetadataCreateInvalid) {
     StatusWith<std::string> result =
         WiredTigerUtil::getMetadataCreate(getOperationContext(), getURI());
