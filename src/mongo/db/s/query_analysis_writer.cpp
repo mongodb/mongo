@@ -26,16 +26,19 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/query_analysis_writer.h"
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -442,7 +445,7 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx, Buffer* buffer) {
     backSwapper.dismiss();
 }
 
-void QueryAnalysisWriter::Buffer::add(BSONObj doc) {
+bool QueryAnalysisWriter::Buffer::add(BSONObj doc) {
     if (doc.objsize() > kMaxBSONObjSizePerInsertBatch) {
         LOGV2_DEBUG(7372301,
                     4,
@@ -450,7 +453,7 @@ void QueryAnalysisWriter::Buffer::add(BSONObj doc) {
                     "namespace"_attr = _nss,
                     "size"_attr = doc.objsize(),
                     "doc"_attr = redact(doc));
-        return;
+        return false;
     }
 
     LOGV2_DEBUG(7372302,
@@ -460,6 +463,7 @@ void QueryAnalysisWriter::Buffer::add(BSONObj doc) {
                 "doc"_attr = redact(doc));
     _docs.push_back(std::move(doc));
     _numBytes += _docs.back().objsize();
+    return true;
 }
 
 void QueryAnalysisWriter::Buffer::truncate(size_t index, long long numBytes) {
@@ -531,10 +535,14 @@ ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(const UUID& sampleId,
             auto expireAt = opCtx->getServiceContext()->getFastClockSource()->now() +
                 mongo::Milliseconds(gQueryAnalysisSampleExpirationSecs.load() * 1000);
             auto doc =
-                SampledQueryDocument{sampleId, nss, *collUuid, cmdName, cmd.toBSON(), expireAt};
+                SampledQueryDocument{sampleId, nss, *collUuid, cmdName, cmd.toBSON(), expireAt}
+                    .toBSON();
 
             stdx::lock_guard<Latch> lk(_mutex);
-            _queries.add(doc.toBSON());
+            if (_queries.add(doc)) {
+                auto counters = _getOrCreateSampleCounters(nss, *collUuid);
+                counters->incrementReads(doc.objsize());
+            }
         })
         .then([this] {
             if (_exceedsMaxSizeBytes()) {
@@ -577,10 +585,14 @@ ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(
                                             *collUuid,
                                             SampledCommandNameEnum::kUpdate,
                                             std::move(sampledUpdateCmd.cmd),
-                                            expireAt};
+                                            expireAt}
+                           .toBSON();
 
             stdx::lock_guard<Latch> lk(_mutex);
-            _queries.add(doc.toBSON());
+            if (_queries.add(doc)) {
+                auto counters = _getOrCreateSampleCounters(sampledUpdateCmd.nss, *collUuid);
+                counters->incrementWrites(doc.objsize());
+            }
         })
         .then([this] {
             if (_exceedsMaxSizeBytes()) {
@@ -623,10 +635,14 @@ ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(
                                             *collUuid,
                                             SampledCommandNameEnum::kDelete,
                                             std::move(sampledDeleteCmd.cmd),
-                                            expireAt};
+                                            expireAt}
+                           .toBSON();
 
             stdx::lock_guard<Latch> lk(_mutex);
-            _queries.add(doc.toBSON());
+            if (_queries.add(doc)) {
+                auto counters = _getOrCreateSampleCounters(sampledDeleteCmd.nss, *collUuid);
+                counters->incrementWrites(doc.objsize());
+            }
         })
         .then([this] {
             if (_exceedsMaxSizeBytes()) {
@@ -671,10 +687,14 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
                                             *collUuid,
                                             SampledCommandNameEnum::kFindAndModify,
                                             std::move(sampledFindAndModifyCmd.cmd),
-                                            expireAt};
+                                            expireAt}
+                           .toBSON();
 
             stdx::lock_guard<Latch> lk(_mutex);
-            _queries.add(doc.toBSON());
+            if (_queries.add(doc)) {
+                auto counters = _getOrCreateSampleCounters(sampledFindAndModifyCmd.nss, *collUuid);
+                counters->incrementWrites(doc.objsize());
+            }
         })
         .then([this] {
             if (_exceedsMaxSizeBytes()) {
@@ -733,6 +753,27 @@ ExecutorFuture<void> QueryAnalysisWriter::addDiff(const UUID& sampleId,
                   "namespace"_attr = nss,
                   "error"_attr = redact(status));
         });
+}
+
+void QueryAnalysisWriter::reportForCurrentOp(std::vector<BSONObj>* ops) const {
+    for (auto it = _sampleCountersMap.begin(); it != _sampleCountersMap.end(); ++it) {
+        ops->push_back(it->second->reportCurrentOp());
+    }
+}
+
+std::shared_ptr<SampleCounters> QueryAnalysisWriter::_getOrCreateSampleCounters(
+    const NamespaceString& nss, const UUID& collUuid) {
+    auto it = _sampleCountersMap.find(collUuid);
+    if (it == _sampleCountersMap.end()) {
+        it = _sampleCountersMap.emplace(collUuid, std::make_shared<SampleCounters>(nss, collUuid))
+                 .first;
+    } else {
+        if (nss != it->second->getNss()) {
+            // TODO SERVER-73990 Make sure collection renames are handled correctly, and test.
+            it->second->setNss(nss);
+        }
+    }
+    return it->second;
 }
 
 }  // namespace analyze_shard_key

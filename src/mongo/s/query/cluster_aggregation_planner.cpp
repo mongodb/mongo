@@ -835,8 +835,10 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
     }
 
     if (eligibleForSampling) {
-        if (auto sampleId =
-                analyze_shard_key::tryGenerateSampleId(opCtx, namespaces.executionNss)) {
+        if (auto sampleId = analyze_shard_key::tryGenerateSampleId(
+                opCtx,
+                namespaces.executionNss,
+                analyze_shard_key::SampledCommandNameEnum::kAggregate)) {
             cmdObj = analyze_shard_key::appendSampleId(std::move(cmdObj), std::move(*sampleId));
         }
     }

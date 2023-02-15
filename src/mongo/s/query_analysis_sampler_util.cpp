@@ -29,6 +29,7 @@
 
 #include "mongo/s/query_analysis_sampler_util.h"
 
+#include "mongo/idl/idl_parser.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/query_analysis_sampler.h"
@@ -49,31 +50,82 @@ auto sampleIter(C&& c) {
     return std::next(c.begin(), (*random)->nextInt64(c.size()));
 }
 
+StringData adjustCmdNameCase(const StringData& cmdName) {
+    if (cmdName == "findandmodify") {
+        return StringData("findAndModify");
+    } else {
+        return cmdName;
+    }
+}
+
 }  // namespace
 
-boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx, const NamespaceString& nss) {
+boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const SampledCommandNameEnum cmdName) {
     return supportsSamplingQueries()
-        ? QueryAnalysisSampler::get(opCtx).tryGenerateSampleId(opCtx, nss)
+        ? QueryAnalysisSampler::get(opCtx).tryGenerateSampleId(opCtx, nss, cmdName)
         : boost::none;
+}
+
+boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const StringData& cmdName) {
+    return tryGenerateSampleId(opCtx,
+                               nss,
+                               SampledCommandName_parse(IDLParserContext("tryGenerateSampleId"),
+                                                        adjustCmdNameCase(cmdName)));
 }
 
 boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* opCtx,
                                                               const NamespaceString& nss,
+                                                              const SampledCommandNameEnum cmdName,
                                                               const std::set<ShardId>& shardIds) {
-    if (auto sampleId = tryGenerateSampleId(opCtx, nss)) {
+    if (auto sampleId = tryGenerateSampleId(opCtx, nss, cmdName)) {
         return TargetedSampleId{*sampleId, getRandomShardId(shardIds)};
     }
     return boost::none;
 }
 
+boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              const StringData& cmdName,
+                                                              const std::set<ShardId>& shardIds) {
+    return tryGenerateTargetedSampleId(
+        opCtx,
+        nss,
+        SampledCommandName_parse(IDLParserContext("tryGenerateTargetedSampleId"),
+                                 adjustCmdNameCase(cmdName)),
+        shardIds);
+}
+
 boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(
     OperationContext* opCtx,
     const NamespaceString& nss,
+    const SampledCommandNameEnum cmdName,
     const std::vector<ShardEndpoint>& endpoints) {
-    if (auto sampleId = tryGenerateSampleId(opCtx, nss)) {
+    if (auto sampleId = tryGenerateSampleId(opCtx, nss, cmdName)) {
         return TargetedSampleId{*sampleId, getRandomShardId(endpoints)};
     }
     return boost::none;
+}
+boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BatchedCommandRequest::BatchType batchType,
+    const std::vector<ShardEndpoint>& endpoints) {
+    auto cmdName = [&] {
+        switch (batchType) {
+            case BatchedCommandRequest::BatchType::BatchType_Delete:
+                return SampledCommandNameEnum::kDelete;
+            case BatchedCommandRequest::BatchType::BatchType_Insert:
+                return SampledCommandNameEnum::kInsert;
+            case BatchedCommandRequest::BatchType::BatchType_Update:
+                return SampledCommandNameEnum::kUpdate;
+        }
+        MONGO_UNREACHABLE;
+    }();
+    return tryGenerateTargetedSampleId(opCtx, nss, cmdName, endpoints);
 }
 
 ShardId getRandomShardId(const std::set<ShardId>& shardIds) {

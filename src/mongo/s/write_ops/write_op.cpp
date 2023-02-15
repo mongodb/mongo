@@ -148,8 +148,8 @@ void WriteOp::targetWrites(OperationContext* opCtx,
         endpoints = targeter.targetAllShards(opCtx);
     }
 
-    const auto targetedSampleId =
-        analyze_shard_key::tryGenerateTargetedSampleId(opCtx, targeter.getNS(), endpoints);
+    const auto targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
+        opCtx, targeter.getNS(), _itemRef.getOpType(), endpoints);
 
     for (auto&& endpoint : endpoints) {
         // If the operation was already successfull on that shard, do not repeat it

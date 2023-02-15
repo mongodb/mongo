@@ -1131,7 +1131,8 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                                            std::move(readConcern),
                                                            boost::none));
     const auto targetedSampleId = eligibleForSampling
-        ? analyze_shard_key::tryGenerateTargetedSampleId(opCtx, expCtx->ns, shardIds)
+        ? analyze_shard_key::tryGenerateTargetedSampleId(
+              opCtx, expCtx->ns, analyze_shard_key::SampledCommandNameEnum::kAggregate, shardIds)
         : boost::none;
 
     // A $changeStream pipeline must run on all shards, and will also open an extra cursor on the

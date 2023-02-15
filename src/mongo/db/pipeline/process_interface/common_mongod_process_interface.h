@@ -178,6 +178,9 @@ protected:
                                                  CurrentOpSessionsMode sessionMode,
                                                  std::vector<BSONObj>* ops) const final;
 
+    void _reportCurrentOpsForQueryAnalysis(OperationContext* opCtx,
+                                           std::vector<BSONObj>* ops) const final;
+
     /**
      * Converts a renameCollection command into an internalRenameIfOptionsAndIndexesMatch command.
      */

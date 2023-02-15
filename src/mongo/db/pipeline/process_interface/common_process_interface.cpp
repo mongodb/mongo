@@ -149,6 +149,8 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
             opCtx, sessionMode == MongoProcessInterface::CurrentOpSessionsMode::kIncludeIdle, &ops);
 
         _reportCurrentOpsForPrimaryOnlyServices(opCtx, connMode, sessionMode, &ops);
+
+        _reportCurrentOpsForQueryAnalysis(opCtx, &ops);
     }
 
     return ops;

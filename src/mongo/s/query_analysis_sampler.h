@@ -31,8 +31,10 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
+#include "mongo/s/query_analysis_sample_counters.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
@@ -102,13 +104,18 @@ public:
             : _serviceContext(serviceContext),
               _nss(nss),
               _collUuid(collUuid),
-              _numTokensPerSecond(numTokensPerSecond) {
+              _numTokensPerSecond(numTokensPerSecond),
+              _counters(nss, collUuid) {
             invariant(_numTokensPerSecond > 0);
             _lastRefillTimeTicks = _serviceContext->getTickSource()->getTicks();
         };
 
         const NamespaceString& getNss() const {
             return _nss;
+        }
+
+        void setNss(const NamespaceString& nss) {
+            _nss = nss;
         }
 
         const UUID& getCollectionUuid() const {
@@ -137,6 +144,10 @@ public:
          */
         void refreshRate(double numTokensPerSecond);
 
+        void incrementCounters(SampledCommandNameEnum cmdName);
+
+        BSONObj reportForCurrentOp() const;
+
     private:
         /**
          * Returns the maximum of number of tokens that a bucket with given rate can store at any
@@ -151,13 +162,15 @@ public:
         void _refill(double numTokensPerSecond, double burstCapacity);
 
         const ServiceContext* _serviceContext;
-        const NamespaceString _nss;
+        NamespaceString _nss;
         const UUID _collUuid;
         double _numTokensPerSecond;
 
         // The bucket is only refilled when there is a consume request or a rate refresh.
         TickSource::Tick _lastRefillTimeTicks;
         double _lastNumTokens = 0;
+
+        SampleCounters _counters;
     };
 
     QueryAnalysisSampler() = default;
@@ -183,9 +196,13 @@ public:
      * internal (defined as not having a network session) unless this operation has explicitly
      * opted into query sampling.
      */
-    boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx, const NamespaceString& nss);
+    boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              SampledCommandNameEnum cmdName);
 
     void appendInfoForServerStatus(BSONObjBuilder* bob) const;
+
+    void reportForCurrentOp(std::vector<BSONObj>* ops) const;
 
     void refreshQueryStatsForTest() {
         _refreshQueryStats();

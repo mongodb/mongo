@@ -283,7 +283,11 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
                                                          configuration.getSampleRate()});
         } else {
             auto rateLimiter = it->second;
-            invariant(rateLimiter.getNss() == configuration.getNs());
+            if (it->second.getNss() != configuration.getNs()) {
+                // Nss changed due to collection rename.
+                // TODO SERVER-73990: Test collection renaming during query sampling
+                it->second.setNss(configuration.getNs());
+            }
             rateLimiter.refreshRate(configuration.getSampleRate());
             sampleRateLimiters.emplace(configuration.getNs(), std::move(rateLimiter));
         }
@@ -291,8 +295,36 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
     _sampleRateLimiters = std::move(sampleRateLimiters);
 }
 
+void QueryAnalysisSampler::SampleRateLimiter::incrementCounters(
+    const SampledCommandNameEnum cmdName) {
+    switch (cmdName) {
+        case SampledCommandNameEnum::kFind:
+        case SampledCommandNameEnum::kAggregate:
+        case SampledCommandNameEnum::kCount:
+        case SampledCommandNameEnum::kDistinct:
+            _counters.incrementReads(boost::none);
+            break;
+        case SampledCommandNameEnum::kInsert:
+        case SampledCommandNameEnum::kUpdate:
+        case SampledCommandNameEnum::kDelete:
+        case SampledCommandNameEnum::kFindAndModify:
+            _counters.incrementWrites(boost::none);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+BSONObj QueryAnalysisSampler::SampleRateLimiter::reportForCurrentOp() const {
+    BSONObjBuilder bob = _counters.reportCurrentOp();
+    bob.append(SampleCounters::kSampleRateFieldName, _numTokensPerSecond);
+    BSONObj obj = bob.obj();
+    return obj;
+}
+
 boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext* opCtx,
-                                                                const NamespaceString& nss) {
+                                                                const NamespaceString& nss,
+                                                                SampledCommandNameEnum cmdName) {
     if (!opCtx->getClient()->session() && !opCtx->explicitlyOptedIntoQuerySampling()) {
         // Do not generate a sample id for an internal query unless it has explicitly opted into
         // query sampling.
@@ -308,6 +340,7 @@ boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext
 
     auto& rateLimiter = it->second;
     if (rateLimiter.tryConsume()) {
+        rateLimiter.incrementCounters(cmdName);
         return UUID::gen();
     }
     return boost::none;
@@ -316,6 +349,12 @@ boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext
 void QueryAnalysisSampler::appendInfoForServerStatus(BSONObjBuilder* bob) const {
     stdx::lock_guard<Latch> lk(_mutex);
     bob->append(kActiveCollectionsFieldName, static_cast<int>(_sampleRateLimiters.size()));
+}
+
+void QueryAnalysisSampler::reportForCurrentOp(std::vector<BSONObj>* ops) const {
+    for (auto it = _sampleRateLimiters.begin(); it != _sampleRateLimiters.end(); ++it) {
+        ops->push_back(it->second.reportForCurrentOp());
+    }
 }
 
 }  // namespace analyze_shard_key

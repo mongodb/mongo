@@ -58,6 +58,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/overflow_arithmetic.h"
+#include "mongo/s/analyze_shard_key_cmd_gen.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard_registry.h"
@@ -576,7 +577,8 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
     // Try to generate a sample id for this query here instead of inside 'runQueryWithoutRetrying()'
     // since it is incorrect to generate multiple sample ids for a single query.
-    const auto sampleId = analyze_shard_key::tryGenerateSampleId(opCtx, query.nss());
+    const auto sampleId = analyze_shard_key::tryGenerateSampleId(
+        opCtx, query.nss(), analyze_shard_key::SampledCommandNameEnum::kFind);
 
     // Re-target and re-send the initial find command to the shards until we have established the
     // shard version.

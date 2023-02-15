@@ -32,7 +32,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -64,7 +66,12 @@ private:
  * invoked once for each query since generating a sample id causes the number of remaining queries
  * to sample to get decremented.
  */
-boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx, const NamespaceString& nss);
+boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          SampledCommandNameEnum cmdName);
+boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const StringData& cmdName);
 
 /**
  * Similar to 'tryGenerateSampleId()' but assigns the sample id to a random shard out of the given
@@ -72,10 +79,24 @@ boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx, const Namespa
  */
 boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* opCtx,
                                                               const NamespaceString& nss,
+                                                              SampledCommandNameEnum cmdName,
                                                               const std::set<ShardId>& shardIds);
+
+boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              const StringData& cmdName,
+                                                              const std::set<ShardId>& shardIds);
+
 boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(
     OperationContext* opCtx,
     const NamespaceString& nss,
+    SampledCommandNameEnum cmdName,
+    const std::vector<ShardEndpoint>& endpoints);
+
+boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    BatchedCommandRequest::BatchType cmdName,
     const std::vector<ShardEndpoint>& endpoints);
 
 ShardId getRandomShardId(const std::set<ShardId>& shardIds);

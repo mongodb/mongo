@@ -159,7 +159,8 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
         cmdObjWithVersions = appendDbVersionIfPresent(cmdObjWithVersions, cm.dbVersion());
 
         if (eligibleForSampling) {
-            if (auto sampleId = analyze_shard_key::tryGenerateSampleId(opCtx, nss)) {
+            if (auto sampleId = analyze_shard_key::tryGenerateSampleId(
+                    opCtx, nss, cmdObj.firstElementFieldName())) {
                 cmdObjWithVersions =
                     analyze_shard_key::appendSampleId(cmdObjWithVersions, *sampleId);
             }
@@ -189,7 +190,8 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
                         nullptr /* targetMinKeyToMaxKey */);
 
     const auto targetedSampleId = eligibleForSampling
-        ? analyze_shard_key::tryGenerateTargetedSampleId(opCtx, nss, shardIds)
+        ? analyze_shard_key::tryGenerateTargetedSampleId(
+              opCtx, nss, cmdObj.firstElementFieldNameStringData(), shardIds)
         : boost::none;
 
     for (const ShardId& shardId : shardIds) {

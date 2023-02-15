@@ -893,31 +893,31 @@ TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdExternalClient) {
     setUpConfigurations(&sampler, configurations);
 
     // Cannot sample if time has not elapsed.
-    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0));
-    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss1));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss1, SampledCommandNameEnum::kFind));
 
     advanceTime(Milliseconds(1000));
     // The number of tokens available in the bucket for rateLimiter0 right after the refill is 0
     // + 1.0.
-    ASSERT(sampler.tryGenerateSampleId(opCtx, nss0));
-    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0));
+    ASSERT(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
     // The number of tokens available in the bucket for rateLimiter1 right after the refill is 0 +
     // 0.5.
-    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss1));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss1, SampledCommandNameEnum::kFind));
     // This collection doesn't have sampling enabled.
-    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss2));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss2, SampledCommandNameEnum::kFind));
 
     advanceTime(Milliseconds(1000));
     // The number of tokens available in the bucket for rateLimiter0 right after the refill is 0
     // + 1.0.
-    ASSERT(sampler.tryGenerateSampleId(opCtx, nss0));
-    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0));
+    ASSERT(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
     // The number of tokens available in the bucket for rateLimiter1 right after the refill is 0.5 +
     // 0.5.
-    ASSERT(sampler.tryGenerateSampleId(opCtx, nss1));
-    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss1));
+    ASSERT(sampler.tryGenerateSampleId(opCtx, nss1, SampledCommandNameEnum::kFind));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss1, SampledCommandNameEnum::kFind));
     // This collection doesn't have sampling enabled.
-    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss2));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss2, SampledCommandNameEnum::kFind));
 }
 
 TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdInternalClient) {
@@ -938,13 +938,13 @@ TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdInternalClient) {
     advanceTime(Milliseconds(1000));
     // The number of tokens available in the bucket for rateLimiter0 right after the refill is 0
     // + 1.0. Cannot sample since the client is internal.
-    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
 
     opCtx->setExplicitlyOptIntoQuerySampling();
     // Can sample now since the client has explicitly opted into query sampling.
-    ASSERT(sampler.tryGenerateSampleId(opCtx, nss0));
+    ASSERT(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
     // Cannot sample since there are no tokens left.
-    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
 }
 
 TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
@@ -974,7 +974,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
 
     advanceTime(Milliseconds(1000));
     // The number of tokens available in the bucket right after the refill is 0 + 2.
-    ASSERT(sampler.tryGenerateSampleId(opCtx, nss0));
+    ASSERT(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
 
     // Force the sampler to refresh and return a different collection uuid and sample rate this
     // time.
@@ -998,7 +998,189 @@ TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
     // Cannot sample if time has not elapsed. There should be no tokens available in the bucket
     // right after the refill unless the one token from the previous configurations was
     // carried over, which is not the correct behavior.
-    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
+}
+
+TEST_F(QueryAnalysisSamplerRateLimiterTest, ReportForCurrentOp) {
+    auto originalIsMongos = isMongos();
+    setMongos(true);
+    ON_BLOCK_EXIT([&] { setMongos(originalIsMongos); });
+
+    const double rate = 1000.0;
+    auto rateLimiter =
+        QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, rate);
+
+    long long expectedReadsCount = 0;
+    long long expectedWritesCount = 0;
+
+    rateLimiter.incrementCounters(SampledCommandNameEnum::kFind);
+    ++expectedReadsCount;
+
+    BSONObj report = rateLimiter.reportForCurrentOp();
+
+    ASSERT_EQ(report.getField(SampleCounters::kDescriptionFieldName).String(),
+              SampleCounters::kDescriptionFieldValue);
+    ASSERT_EQ(report.getField(SampleCounters::kNamespaceStringFieldName).String(), nss.toString());
+    ASSERT_EQ(UUID::parse(report.getField(SampleCounters::kCollUuidFieldName)), collUuid);
+    ASSERT_EQ(report.getField(SampleCounters::kSampleRateFieldName).Double(), rate);
+    ASSERT_EQ(report.getField(SampleCounters::kSampledReadsCountFieldName).Long(),
+              expectedReadsCount);
+    ASSERT_EQ(report.getField(SampleCounters::kSampledWritesCountFieldName).Long(),
+              expectedWritesCount);
+    ASSERT(!report.hasField(SampleCounters::kSampledReadsBytesFieldName));
+    ASSERT(!report.hasField(SampleCounters::kSampledWritesBytesFieldName));
+
+    rateLimiter.incrementCounters(SampledCommandNameEnum::kUpdate);
+    ++expectedWritesCount;
+
+    report = rateLimiter.reportForCurrentOp();
+
+    ASSERT_EQ(report.getField(SampleCounters::kDescriptionFieldName).String(),
+              SampleCounters::kDescriptionFieldValue);
+    ASSERT_EQ(report.getField(SampleCounters::kNamespaceStringFieldName).String(), nss.toString());
+    ASSERT_EQ(UUID::parse(report.getField(SampleCounters::kCollUuidFieldName)), collUuid);
+    ASSERT_EQ(report.getField(SampleCounters::kSampleRateFieldName).Double(), rate);
+    ASSERT_EQ(report.getField(SampleCounters::kSampledReadsCountFieldName).Long(),
+              expectedReadsCount);
+    ASSERT_EQ(report.getField(SampleCounters::kSampledWritesCountFieldName).Long(),
+              expectedWritesCount);
+    ASSERT(!report.hasField(SampleCounters::kSampledReadsBytesFieldName));
+    ASSERT(!report.hasField(SampleCounters::kSampledWritesBytesFieldName));
+}
+
+TEST_F(QueryAnalysisSamplerTest, ReportForCurrentOp) {
+    auto originalIsMongos = isMongos();
+    setMongos(true);
+    ON_BLOCK_EXIT([&] { setMongos(originalIsMongos); });
+
+    const double rate = 1000.0;
+    transport::TransportLayerMock transportLayer;
+    transport::SessionHandle session = transportLayer.createSession();
+    auto client =
+        getGlobalServiceContext()->makeClient("RefreshConfigurationsNewCollectionUuid", session);
+    auto opCtxHolder = client->makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+
+    auto& sampler = QueryAnalysisSampler::get(opCtx);
+
+    std::vector<CollectionQueryAnalyzerConfiguration> configurations;
+    configurations.push_back(CollectionQueryAnalyzerConfiguration{nss0, collUuid0, rate});
+    setUpConfigurations(&sampler, configurations);
+
+    advanceTime(Milliseconds(1000));
+
+    long long expectedReadsCount = 0;
+    long long expectedWritesCount = 0;
+
+    // Sample a read query.
+    boost::optional<UUID> sampleUuid0 =
+        sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind);
+    ASSERT(sampleUuid0);
+    ++expectedReadsCount;
+
+    std::vector<BSONObj> ops;
+    sampler.reportForCurrentOp(&ops);
+
+    ASSERT_EQ(ops.size(), 1);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kDescriptionFieldName).String(),
+              SampleCounters::kDescriptionFieldValue);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kNamespaceStringFieldName).String(), nss0.toString());
+    ASSERT_EQ(UUID::parse(ops[0].getField(SampleCounters::kCollUuidFieldName)), collUuid0);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampleRateFieldName).Double(), rate);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampledReadsCountFieldName).Long(),
+              expectedReadsCount);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampledWritesCountFieldName).Long(),
+              expectedWritesCount);
+
+    // Sample a write query
+    auto sampleUuid1 = sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kUpdate);
+    ASSERT(sampleUuid1);
+    ++expectedWritesCount;
+
+    ops.clear();
+    sampler.reportForCurrentOp(&ops);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kDescriptionFieldName).String(),
+              SampleCounters::kDescriptionFieldValue);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kNamespaceStringFieldName).String(), nss0.toString());
+    ASSERT_EQ(UUID::parse(ops[0].getField(SampleCounters::kCollUuidFieldName)), collUuid0);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampleRateFieldName).Double(), rate);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampledReadsCountFieldName).Long(),
+              expectedReadsCount);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampledWritesCountFieldName).Long(),
+              expectedWritesCount);
+}
+
+TEST_F(QueryAnalysisSamplerTest, ReportForCurrentOpMultipleCollections) {
+    auto originalIsMongos = isMongos();
+    setMongos(true);
+    ON_BLOCK_EXIT([&] { setMongos(originalIsMongos); });
+
+    const double rate = 1000.0;
+    transport::TransportLayerMock transportLayer;
+    transport::SessionHandle session = transportLayer.createSession();
+    auto client =
+        getGlobalServiceContext()->makeClient("RefreshConfigurationsNewCollectionUuid", session);
+    auto opCtxHolder = client->makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+
+    auto& sampler = QueryAnalysisSampler::get(opCtx);
+
+    std::vector<CollectionQueryAnalyzerConfiguration> configOneColl, configTwoColls,
+        configOneCollNew;
+    configOneColl.push_back(CollectionQueryAnalyzerConfiguration{nss0, collUuid0, rate});
+    configTwoColls.push_back(CollectionQueryAnalyzerConfiguration{nss0, collUuid0, rate});
+    configTwoColls.push_back(CollectionQueryAnalyzerConfiguration{nss1, collUuid1, rate});
+    configOneCollNew.push_back(CollectionQueryAnalyzerConfiguration{nss1, collUuid1, rate});
+
+    setUpConfigurations(&sampler, configOneColl);
+
+    std::vector<BSONObj> ops;
+    sampler.reportForCurrentOp(&ops);
+
+    ASSERT_EQ(ops.size(), 1);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kDescriptionFieldName).String(),
+              SampleCounters::kDescriptionFieldValue);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kNamespaceStringFieldName).String(), nss0.toString());
+    ASSERT_EQ(UUID::parse(ops[0].getField(SampleCounters::kCollUuidFieldName)), collUuid0);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampleRateFieldName).Double(), rate);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampledReadsCountFieldName).Long(), 0);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampledWritesCountFieldName).Long(), 0);
+
+    setUpConfigurations(&sampler, configTwoColls);
+
+    ops.clear();
+    sampler.reportForCurrentOp(&ops);
+
+    ASSERT_EQ(ops.size(), 2);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kDescriptionFieldName).String(),
+              SampleCounters::kDescriptionFieldValue);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kNamespaceStringFieldName).String(), nss0.toString());
+    ASSERT_EQ(UUID::parse(ops[0].getField(SampleCounters::kCollUuidFieldName)), collUuid0);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampleRateFieldName).Double(), rate);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampledReadsCountFieldName).Long(), 0);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampledWritesCountFieldName).Long(), 0);
+
+    ASSERT_EQ(ops[1].getField(SampleCounters::kDescriptionFieldName).String(),
+              SampleCounters::kDescriptionFieldValue);
+    ASSERT_EQ(ops[1].getField(SampleCounters::kNamespaceStringFieldName).String(), nss1.toString());
+    ASSERT_EQ(UUID::parse(ops[1].getField(SampleCounters::kCollUuidFieldName)), collUuid1);
+    ASSERT_EQ(ops[1].getField(SampleCounters::kSampleRateFieldName).Double(), rate);
+    ASSERT_EQ(ops[1].getField(SampleCounters::kSampledReadsCountFieldName).Long(), 0);
+    ASSERT_EQ(ops[1].getField(SampleCounters::kSampledWritesCountFieldName).Long(), 0);
+
+    setUpConfigurations(&sampler, configOneCollNew);
+
+    ops.clear();
+    sampler.reportForCurrentOp(&ops);
+
+    ASSERT_EQ(ops.size(), 1);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kDescriptionFieldName).String(),
+              SampleCounters::kDescriptionFieldValue);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kNamespaceStringFieldName).String(), nss1.toString());
+    ASSERT_EQ(UUID::parse(ops[0].getField(SampleCounters::kCollUuidFieldName)), collUuid1);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampleRateFieldName).Double(), rate);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampledReadsCountFieldName).Long(), 0);
+    ASSERT_EQ(ops[0].getField(SampleCounters::kSampledWritesCountFieldName).Long(), 0);
 }
 
 }  // namespace

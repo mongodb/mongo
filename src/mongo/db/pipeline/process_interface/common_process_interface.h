@@ -160,6 +160,12 @@ protected:
                                                          CurrentOpConnectionsMode connMode,
                                                          CurrentOpSessionsMode sessionMode,
                                                          std::vector<BSONObj>* ops) const = 0;
+
+    /**
+     * Reports information about query sampling.
+     */
+    virtual void _reportCurrentOpsForQueryAnalysis(OperationContext* opCtx,
+                                                   std::vector<BSONObj>* ops) const = 0;
 };
 
 }  // namespace mongo

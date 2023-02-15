@@ -33,10 +33,15 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
+#include "mongo/s/query_analysis_sample_counters.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/periodic_runner.h"
+
+#include <map>
+#include <string>
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -82,8 +87,9 @@ public:
         /**
          * Adds the given document to the buffer if its size is below the limit (i.e.
          * BSONObjMaxUserSize - some padding) and increments the total number of bytes accordingly.
+         * Returns true unless the document's size exceeds the limit.
          */
-        void add(BSONObj doc);
+        bool add(BSONObj doc);
 
         /**
          * Removes the documents at 'index' onwards from the buffer and decrements the total number
@@ -188,6 +194,8 @@ public:
         _flushDiffs(opCtx);
     }
 
+    void reportForCurrentOp(std::vector<BSONObj>* ops) const;
+
 private:
     bool shouldRegisterReplicaSetAwareService() const override final;
 
@@ -231,6 +239,14 @@ private:
      */
     bool _exceedsMaxSizeBytes();
 
+    /**
+     * Retrieve the collection's sample counters given the namespace string and the
+     * collection UUID. If the collection's sample counters are not found, a new set of
+     * counters is created for the collection and returned.
+     */
+    std::shared_ptr<SampleCounters> _getOrCreateSampleCounters(const NamespaceString& nss,
+                                                               const UUID& collUuid);
+
     mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisWriter::_mutex");
 
     PeriodicJobAnchor _periodicQueryWriter;
@@ -238,6 +254,8 @@ private:
 
     PeriodicJobAnchor _periodicDiffWriter;
     Buffer _diffs{NamespaceString::kConfigSampledQueriesDiffNamespace};
+
+    std::map<UUID, std::shared_ptr<SampleCounters>> _sampleCountersMap;
 
     // Initialized on startup and joined on shutdown.
     std::shared_ptr<executor::TaskExecutor> _executor;

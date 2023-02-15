@@ -431,7 +431,8 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
     }
 
     if (expCtx->eligibleForSampling()) {
-        if (auto sampleId = analyze_shard_key::tryGenerateSampleId(expCtx->opCtx, expCtx->ns)) {
+        if (auto sampleId = analyze_shard_key::tryGenerateSampleId(
+                expCtx->opCtx, expCtx->ns, analyze_shard_key::SampledCommandNameEnum::kAggregate)) {
             analyze_shard_key::QueryAnalysisWriter::get(expCtx->opCtx)
                 ->addAggregateQuery(
                     *sampleId, expCtx->ns, pipeline->getInitialQuery(), expCtx->getCollatorBSON())
@@ -692,6 +693,13 @@ void CommonMongodProcessInterface::_reportCurrentOpsForIdleSessions(
             ops->emplace_back(op);
         }
     });
+}
+
+void CommonMongodProcessInterface::_reportCurrentOpsForQueryAnalysis(
+    OperationContext* opCtx, std::vector<BSONObj>* ops) const {
+    if (analyze_shard_key::supportsPersistingSampledQueries()) {
+        analyze_shard_key::QueryAnalysisWriter::get(opCtx)->reportForCurrentOp(ops);
+    }
 }
 
 std::unique_ptr<CollatorInterface> CommonMongodProcessInterface::_getCollectionDefaultCollator(

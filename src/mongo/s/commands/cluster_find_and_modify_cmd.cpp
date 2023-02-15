@@ -324,7 +324,8 @@ BSONObj prepareCmdObjForPassthrough(OperationContext* opCtx,
                                     const boost::optional<ShardVersion>& shardVersion) {
     BSONObj filteredCmdObj = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
     if (!isExplain) {
-        if (auto sampleId = analyze_shard_key::tryGenerateSampleId(opCtx, nss)) {
+        if (auto sampleId = analyze_shard_key::tryGenerateSampleId(
+                opCtx, nss, cmdObj.firstElementFieldNameStringData())) {
             filteredCmdObj =
                 analyze_shard_key::appendSampleId(std::move(filteredCmdObj), std::move(*sampleId));
         }

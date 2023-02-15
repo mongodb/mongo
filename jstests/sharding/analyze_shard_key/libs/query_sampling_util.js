@@ -27,13 +27,13 @@ var QuerySamplingUtil = (function() {
     }
 
     /**
-     * Waits for the given node to have one active collection for query sampling.
+     * Waits for the given node to have at least one active collection for query sampling.
      */
     function waitForActiveSampling(node) {
         assert.soon(() => {
             const res = assert.commandWorked(node.adminCommand({serverStatus: 1}));
             assert(res.hasOwnProperty("queryAnalyzers"));
-            return res.queryAnalyzers.activeCollections == 1;
+            return res.queryAnalyzers.activeCollections >= 1;
         });
         // Wait for the bucket to contain at least one second of tokens.
         sleep(1000);

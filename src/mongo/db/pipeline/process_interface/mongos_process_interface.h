@@ -302,6 +302,9 @@ protected:
                                                  CurrentOpConnectionsMode connMode,
                                                  CurrentOpSessionsMode sessionMode,
                                                  std::vector<BSONObj>* ops) const final;
+
+    void _reportCurrentOpsForQueryAnalysis(OperationContext* opCtx,
+                                           std::vector<BSONObj>* ops) const final;
 };
 
 }  // namespace mongo
