@@ -369,7 +369,7 @@ const analyzeShardKeyNumRanges = 10;
                 queryAnalysisSamplerConfigurationRefreshSecs,
                 queryAnalysisWriterIntervalSecs,
                 analyzeShardKeyNumRanges,
-                logComponentVerbosity: tojson({verbosity: 2})
+                logComponentVerbosity: tojson({sharding: 2})
             }
         },
         mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs}}
@@ -394,15 +394,14 @@ const analyzeShardKeyNumRanges = 10;
             // Set up the sharded collection. Make it have three chunks:
             // shard0: [MinKey, -1000]
             // shard1: [-1000, 1000]
-            // shard1: [1000, MaxKey]
-            const nsSharded = dbName + "." + collNameSharded;
-            assert.commandWorked(st.s0.adminCommand({shardCollection: nsSharded, key: {x: 1}}));
-            assert.commandWorked(st.s0.adminCommand({split: nsSharded, middle: {x: -1000}}));
-            assert.commandWorked(st.s0.adminCommand({split: nsSharded, middle: {x: 1000}}));
-            assert.commandWorked(st.s0.adminCommand(
-                {moveChunk: nsSharded, find: {x: -1000}, to: st.shard1.shardName}));
-            assert.commandWorked(st.s0.adminCommand(
-                {moveChunk: nsSharded, find: {x: 1000}, to: st.shard2.shardName}));
+            // shard2: [1000, MaxKey]
+            assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: -1000}}));
+            assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 1000}}));
+            assert.commandWorked(
+                st.s0.adminCommand({moveChunk: ns, find: {x: -1000}, to: st.shard1.shardName}));
+            assert.commandWorked(
+                st.s0.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.shardName}));
         }
 
         const mongos0Coll = st.s0.getDB(dbName).getCollection(collName);
@@ -527,7 +526,7 @@ const analyzeShardKeyNumRanges = 10;
                "and write distribution metrics");
 
     const rst =
-        new ReplSetTest({nodes: 2, setParameter: {logComponentVerbosity: tojson({verbosity: 2})}});
+        new ReplSetTest({nodes: 2, setParameter: {logComponentVerbosity: tojson({sharding: 2})}});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

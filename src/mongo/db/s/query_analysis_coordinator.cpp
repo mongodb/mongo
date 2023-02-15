@@ -38,7 +38,7 @@
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/s/catalog/type_mongos.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace analyze_shard_key {

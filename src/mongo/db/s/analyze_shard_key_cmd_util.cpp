@@ -55,7 +55,7 @@
 #include "mongo/s/service_entry_point_mongos.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
 namespace analyze_shard_key {

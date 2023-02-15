@@ -29,7 +29,7 @@ const st = new ShardingTest({
             queryAnalysisSamplerConfigurationRefreshSecs,
             queryAnalysisWriterIntervalSecs,
             analyzeShardKeyNumRanges,
-            logComponentVerbosity: tojson({verbosity: 2})
+            logComponentVerbosity: tojson({sharding: 2})
         }
     },
     mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs}}

@@ -45,7 +45,7 @@ const st = new ShardingTest({
         setParameter: {
             queryAnalysisSamplerConfigurationRefreshSecs,
             queryAnalysisWriterIntervalSecs,
-            logComponentVerbosity: tojson({verbosity: 2})
+            logComponentVerbosity: tojson({sharding: 2})
         }
     },
     configOptions: {

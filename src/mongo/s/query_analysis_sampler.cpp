@@ -38,7 +38,7 @@
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
 #include "mongo/util/net/socket_utils.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace analyze_shard_key {

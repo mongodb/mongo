@@ -17,7 +17,7 @@ const st = new ShardingTest({
         setParameter: {
             queryAnalysisSamplerConfigurationRefreshSecs,
             queryAnalysisWriterIntervalSecs,
-            logComponentVerbosity: tojson({verbosity: 2})
+            logComponentVerbosity: tojson({sharding: 2})
         }
     },
     // Disable query sampling on mongos to verify that the nested aggregate queries are sampled by

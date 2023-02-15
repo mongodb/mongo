@@ -49,7 +49,7 @@
 #include "mongo/util/future_util.h"
 #include "mongo/util/time_support.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -445,7 +445,7 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx, Buffer* buffer) {
 void QueryAnalysisWriter::Buffer::add(BSONObj doc) {
     if (doc.objsize() > kMaxBSONObjSizePerInsertBatch) {
         LOGV2_DEBUG(7372301,
-                    2,
+                    4,
                     "Ignoring a sample due to its size",
                     "namespace"_attr = _nss,
                     "size"_attr = doc.objsize(),
@@ -454,7 +454,7 @@ void QueryAnalysisWriter::Buffer::add(BSONObj doc) {
     }
 
     LOGV2_DEBUG(7372302,
-                2,
+                4,
                 "Adding a sample to the buffer",
                 "namespace"_attr = _nss,
                 "doc"_attr = redact(doc));
