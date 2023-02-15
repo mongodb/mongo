@@ -236,6 +236,13 @@ public:
                                                         TxnNumber txnNumber,
                                                         const BSONObj& query);
 
+    /**
+     * Find a single document. Returns an empty BSONObj if no matching document is found.
+     */
+    BSONObj findOneConfigDocument(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const BSONObj& query);
+
     //
     // Chunk Operations
     //

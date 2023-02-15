@@ -661,7 +661,12 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     auto targeter = shard->getTargeter();
 
     ScopeGuard stopMonitoringGuard([&] {
-        if (shardConnectionString.type() == ConnectionString::ConnectionType::kReplicaSet) {
+        bool isCatalogShard =
+            shardProposedName && *shardProposedName == ShardId::kCatalogShardId.toString();
+        // The config server will still be a part of the replica set even if it could not be added
+        // as a catalog shard so we do not want to remove the replica set monitor for it.
+        if (shardConnectionString.type() == ConnectionString::ConnectionType::kReplicaSet &&
+            !isCatalogShard) {
             // This is a workaround for the case were we could have some bad shard being
             // requested to be added and we put that bad connection string on the global replica set
             // monitor registry. It needs to be cleaned up so that when a correct replica set is
@@ -757,6 +762,15 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         // NOTE: We don't use a Global IX lock here, because we don't want to hold the global lock
         // while blocking on the network).
         FixedFCVRegion fcvRegion(opCtx);
+
+        // Prevent the race where an FCV downgrade happens concurrently with the catalogShard
+        // being added and the FCV downgrade finishes before the catalogShard is added.
+        uassert(
+            5563604,
+            "Cannot add catalog shard because it is not supported in featureCompatibilityVersion: {}"_format(
+                multiversion::toString(serverGlobalParams.featureCompatibility.getVersion())),
+            gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility) ||
+                shardType.getName() != ShardId::kCatalogShardId.toString());
 
         uassert(5563603,
                 "Cannot add shard while in upgrading/downgrading FCV state",

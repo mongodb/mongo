@@ -957,6 +957,18 @@ boost::optional<BSONObj> ShardingCatalogManager::findOneConfigDocumentInTxn(
     return result.front().getOwned();
 }
 
+BSONObj ShardingCatalogManager::findOneConfigDocument(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const BSONObj& query) {
+    invariant(nss.db() == NamespaceString::kConfigDb);
+
+    FindCommandRequest findCommand(nss);
+    findCommand.setFilter(query);
+
+    DBDirectClient client(opCtx);
+    return client.findOne(findCommand);
+}
+
 void ShardingCatalogManager::withTransactionAPI(OperationContext* opCtx,
                                                 const NamespaceString& namespaceForInitialFind,
                                                 txn_api::Callback callback) {

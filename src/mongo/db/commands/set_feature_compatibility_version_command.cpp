@@ -43,6 +43,7 @@
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
@@ -75,6 +76,7 @@
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/shard_authoritative_catalog_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
@@ -368,6 +370,25 @@ public:
                 // 'kUpgrading' or 'kDowngrading' state, respectively.
                 const auto fcvChangeRegion(
                     FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
+
+                // If catalogShard is enabled and there is an entry in config.shards with _id:
+                // ShardId::kCatalogShardId then the config server is a catalog shard
+                auto isCatalogShard = serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+                    serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+                    !ShardingCatalogManager::get(opCtx)
+                         ->findOneConfigDocument(opCtx,
+                                                 NamespaceString::kConfigsvrShardsNamespace,
+                                                 BSON("_id" << ShardId::kCatalogShardId.toString()))
+                         .isEmpty();
+
+                // TODO SERVER-73784: Update catalog_shard_feature_flag.idl so that the version for
+                // gFeatureFlagCatalogShard is 7.0 when master is 7.0
+                uassert(ErrorCodes::IllegalOperation,
+                        "Cannot downgrade featureCompatibilityVersion to {} "
+                        "with a catalog shard as it may result in data loss "_format(
+                            multiversion::toString(requestedVersion)),
+                        !isCatalogShard ||
+                            gFeatureFlagCatalogShard.isEnabledOnVersion(requestedVersion));
 
                 uassert(ErrorCodes::Error(6744303),
                         "Failing setFeatureCompatibilityVersion before reaching the FCV "
