@@ -335,11 +335,6 @@ std::vector<IndexEntry> QueryPlannerIXSelect::expandIndexes(
     std::vector<IndexEntry> out;
     for (auto&& entry : relevantIndices) {
         if (entry.type == IndexType::INDEX_WILDCARD) {
-            // TODO SERVER-72467: Allow the planner to utilize compound wildcard indexes.
-            if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV() &&
-                entry.keyPattern.nFields() > 1) {
-                continue;
-            }
             wcp::expandWildcardIndexEntry(entry, fields, &out);
         } else {
             out.push_back(std::move(entry));
