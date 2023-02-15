@@ -2165,6 +2165,16 @@ tasks:
       - func: "fetch artifacts"
       - func: "unit test"
 
+  - name: unit-test-macos
+    tags: ["python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+           smp_command: -j $(echo $(sysctl -n hw.logicalcpu) / 2 | bc)
+
   - name: unit-test-nonstandalone
     tags: ["python"]
     depends_on:
@@ -5190,7 +5200,9 @@ buildvariants:
   tasks:
     - name: compile
     - name: make-check-test
-    - name: unit-test
+    # FIXME: WT-9575
+    # Using a special version of unit test for macOS to reduce the concurrency level.
+    - name: unit-test-macos
     - name: fops
 
 - name: little-endian
