@@ -33,6 +33,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/optime.h"
@@ -259,6 +260,10 @@ Status waitForWriteConcern(OperationContext* opCtx,
                 "Waiting for write concern. OpTime: {replOpTime}, write concern: {writeConcern}",
                 "replOpTime"_attr = replOpTime,
                 "writeConcern"_attr = writeConcern.toBSON());
+
+    // Add time waiting for write concern to CurOp.
+    CurOp::get(opCtx)->beginWaitForWriteConcernTimer();
+    ScopeGuard finishTiming([&] { CurOp::get(opCtx)->stopWaitForWriteConcernTimer(); });
 
     auto* const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);

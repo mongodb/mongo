@@ -99,12 +99,30 @@ hangAfterReserveOptime.off();
 // Unblock Writer 2, which should commit after Writer 1.
 hangAfterUpdate.off();
 
-// Unblock write concern wait.
+// Waiting for write concern.
 hangBeforeWaitingForWriteConcern.wait();
+
+// Make sure waitForWriteConcernDurationMillis exists in the currentOp query.
+let foundWaitForWriteConcernDurationMillis = false;
+let allOps = db1.currentOp({ns: "db1.coll"});
+for (const j in allOps.inprog) {
+    let op = allOps.inprog[j];
+    if (op.hasOwnProperty("waitForWriteConcernDurationMillis")) {
+        foundWaitForWriteConcernDurationMillis = true;
+    }
+}
+assert(foundWaitForWriteConcernDurationMillis,
+       () => "did not find waitForWriteConcernDurationMillis in currentOp: " + tojson(allOps));
+
+// Unblock write concern wait.
 hangBeforeWaitingForWriteConcern.off();
 
 joinWriter1();
 joinWriter2();
+
+// Check for the existence of waitForWriteConcernDurationMillis field in slow query.
+const predicate = /Slow query.*"appName":"MongoDB Shell".*"waitForWriteConcernDurationMillis":.*/;
+assert(checkLog.checkContainsOnce(primary, predicate));
 
 const metrics = getDBMetrics(adminDB);
 jsTestLog(metrics);
