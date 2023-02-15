@@ -28,6 +28,10 @@
  */
 
 #pragma once
+#include "mongo/base/string_data.h"
+#include "mongo/util/assert_util.h"
+#include <boost/optional.hpp>
+#include <string>
 
 namespace mongo {
 namespace {
@@ -36,10 +40,6 @@ std::string defaultRedactionStrategy(StringData s) {
     MONGO_UNREACHABLE_TASSERT(7332410);
 }
 }  // namespace
-
-#include <boost/optional.hpp>
-
-#include "mongo/base/string_data.h"
 
 /**
  * A struct with options for how you want to serialize a match or aggregation expression.
