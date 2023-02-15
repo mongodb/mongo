@@ -523,7 +523,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         the lifetime of the struct itself."""))
         self._writer.write_line("bool isOwned() const { return _anchorObj.isOwned(); }")
 
-    def gen_private_ownership_setters(self):
+    def gen_protected_ownership_setters(self):
         # type: () -> None
         """Generate a setter that can be used to allow this IDL struct to particpate in the ownership of some BSON that the struct's members refer to."""
         with self._block('void setAnchor(const BSONObj& obj) {', '}'):
@@ -1148,7 +1148,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                         self.gen_field_list_entries_declaration_struct(struct)
 
                     self.write_unindented_line('protected:')
+                    self.gen_protected_ownership_setters()
                     self.gen_protected_serializer_methods(struct)
+                    self._writer.write_line("BSONObj _anchorObj;")
 
                     # Write private validators
                     if [field for field in struct.fields if field.validator]:
@@ -1158,8 +1160,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                                 self.gen_validators(field)
 
                     self.write_unindented_line('private:')
-
-                    self.gen_private_ownership_setters()
 
                     if struct.generate_comparison_operators:
                         self.gen_comparison_operators_declarations(struct)
@@ -1182,7 +1182,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     for field in struct.fields:
                         if _is_required_serializer_field(field):
                             self.gen_serializer_member(field)
-                    self._writer.write_line("BSONObj _anchorObj;")
                     # Write constexpr struct data
                     self.gen_constexpr_members(struct)
 
