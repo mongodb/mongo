@@ -36,9 +36,12 @@ BSONObj BenchmarkResults::toBSON() const {
         .appendNumber("iterations", static_cast<long long>(_descriptor.numIterations))
         .appendNumber("buckets", static_cast<long long>(_descriptor.numBuckets));
 
-    BSONArrayBuilder valueTypesBab(bob.subarrayStart("valueTypes"));
+    BSONArrayBuilder valueTypesBab(bob.subarrayStart("fields"));
     for (auto&& [fieldName, valueType] : _descriptor.valueTypes) {
-        valueTypesBab.append(BSON(fieldName << toStringData(valueType)));
+        auto fieldPathParameters = _runtimeParameters.getFieldPathParameters(fieldName);
+        valueTypesBab.append(
+            BSON(fieldName << BSON("valueType" << toStringData(valueType) << "histogramSize"
+                                               << fieldPathParameters.histogramSize)));
     }
     valueTypesBab.doneFast();
 

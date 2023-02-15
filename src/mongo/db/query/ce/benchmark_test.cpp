@@ -114,9 +114,14 @@ std::shared_ptr<const stats::ArrayHistogram> generateHistogram(int bucketCount,
 /**
  * Generates a number of histograms based on the information provided in the benchmark 'descriptor'
  * and places them into the collection stats object 'collStats'.
+ *
+ * Returns a 'BenchmarkRuntimeParameters' holding the sizes of the generated histograms for each
+ * field specified in the 'descriptor'.
  */
-void generateHistorgrams(const BenchmarkDescriptor& descriptor,
-                         std::shared_ptr<stats::CollectionStatistics> collStats) {
+BenchmarkRuntimeParameters generateHistorgrams(
+    const BenchmarkDescriptor& descriptor, std::shared_ptr<stats::CollectionStatistics> collStats) {
+    BenchmarkRuntimeParameters runtimeParameters;
+
     for (auto&& [fieldName, valueType] : descriptor.valueTypes) {
         const bool includeArrays = [&fieldName = fieldName, &descriptor]() {
             for (auto&& [indexName, indexDef] : descriptor.indexes) {
@@ -129,9 +134,12 @@ void generateHistorgrams(const BenchmarkDescriptor& descriptor,
             }
             return false;
         }();
-        collStats->addHistogram(fieldName,
-                                generateHistogram(descriptor.numBuckets, valueType, includeArrays));
+        auto histogram = generateHistogram(descriptor.numBuckets, valueType, includeArrays);
+        collStats->addHistogram(fieldName, histogram);
+        runtimeParameters.addFieldPathParameters(fieldName, {histogram->serialize().objsize()});
     }
+
+    return runtimeParameters;
 }
 
 /**
@@ -165,9 +173,8 @@ protected:
 
         const std::string pipeline = "[{$match: " + query + "}]";
 
-        generateHistorgrams(descriptor, collStats);
-
-        BenchmarkResults results(std::move(descriptor));
+        BenchmarkRuntimeParameters runtimeParameters(generateHistorgrams(descriptor, collStats));
+        BenchmarkResults results(std::move(descriptor), std::move(runtimeParameters));
         for (auto&& [estimationType, benchmarks] : allBenchmarks) {
             for (auto&& benchmark : benchmarks) {
                 benchmark->setIndexes(results.getDescriptor().indexes);
