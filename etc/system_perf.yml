@@ -1309,6 +1309,17 @@ tasks:
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
              read_cmd: 'true'}
+  - name: compound-wildcard-index-insert
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: compound-wildcard-insert,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
   - name: wildcard-index-read_read_commands
     commands:
       - func: f_run_dsi_workload
@@ -3988,6 +3999,8 @@ buildvariants:
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: microbenchmarks_standalone-all-feature-flags.2023-01
+    tasks:
+    - name: compound-wildcard-index-insert
 
   - <<: *linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-classic-query-engine-arm.2023-01
@@ -4048,6 +4061,8 @@ buildvariants:
     expansions:
       <<: *standalone-intel-expansions
       mongodb_setup: microbenchmarks_standalone-all-feature-flags.2023-01
+    tasks:
+    - name: compound-wildcard-index-insert
 
   - <<: *linux-microbenchmarks-standalone-intel
     name: linux-microbenchmarks-standalone-classic-query-engine.2023-01
