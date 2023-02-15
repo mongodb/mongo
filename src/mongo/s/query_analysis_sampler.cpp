@@ -150,14 +150,15 @@ double QueryAnalysisSampler::SampleRateLimiter::_getBurstCapacity(double numToke
 
 void QueryAnalysisSampler::SampleRateLimiter::_refill(double numTokensPerSecond,
                                                       double burstCapacity) {
-    auto now = _serviceContext->getFastClockSource()->now();
-    double numSecondsElapsed =
-        duration_cast<Microseconds>(now - _lastRefillTime).count() / 1000000.0;
-
+    auto currTicks = _serviceContext->getTickSource()->getTicks();
+    double numSecondsElapsed = _serviceContext->getTickSource()
+                                   ->ticksTo<Nanoseconds>(currTicks - _lastRefillTimeTicks)
+                                   .count() /
+        1.0e9;
     if (numSecondsElapsed > 0) {
         _lastNumTokens =
             std::min(burstCapacity, numSecondsElapsed * numTokensPerSecond + _lastNumTokens);
-        _lastRefillTime = now;
+        _lastRefillTimeTicks = currTicks;
 
         LOGV2_DEBUG(7372303,
                     2,
@@ -168,7 +169,7 @@ void QueryAnalysisSampler::SampleRateLimiter::_refill(double numTokensPerSecond,
                     "numTokensPerSecond"_attr = numTokensPerSecond,
                     "burstCapacity"_attr = burstCapacity,
                     "lastNumTokens"_attr = _lastNumTokens,
-                    "lastRefillTime"_attr = _lastRefillTime);
+                    "lastRefillTimeTicks"_attr = _lastRefillTimeTicks);
     }
 }
 

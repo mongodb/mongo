@@ -104,7 +104,7 @@ public:
               _collUuid(collUuid),
               _numTokensPerSecond(numTokensPerSecond) {
             invariant(_numTokensPerSecond > 0);
-            _lastRefillTime = _serviceContext->getFastClockSource()->now();
+            _lastRefillTimeTicks = _serviceContext->getTickSource()->getTicks();
         };
 
         const NamespaceString& getNss() const {
@@ -156,7 +156,7 @@ public:
         double _numTokensPerSecond;
 
         // The bucket is only refilled when there is a consume request or a rate refresh.
-        Date_t _lastRefillTime;
+        TickSource::Tick _lastRefillTimeTicks;
         double _lastNumTokens = 0;
     };
 

@@ -42,6 +42,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/periodic_runner_factory.h"
+#include "mongo/util/tick_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -138,27 +139,18 @@ class QueryAnalysisSamplerRateLimiterTest : public ServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();
-        getServiceContext()->setFastClockSource(
-            std::make_unique<SharedClockSourceAdapter>(_mockClock));
-        getServiceContext()->setPreciseClockSource(
-            std::make_unique<SharedClockSourceAdapter>(_mockClock));
+        getServiceContext()->setTickSource(std::make_unique<TickSourceMock<Nanoseconds>>());
     }
 
 protected:
-    void advanceTime(Milliseconds millis) {
-        _mockClock->advance(millis);
-    }
-
-    Date_t now() {
-        return _mockClock->now();
+    void advanceTime(Nanoseconds millis) {
+        dynamic_cast<TickSourceMock<Nanoseconds>*>(getServiceContext()->getTickSource())
+            ->advance(millis);
     }
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("testDb", "testColl");
     const UUID collUuid = UUID::gen();
-
-private:
-    const std::shared_ptr<ClockSourceMock> _mockClock = std::make_shared<ClockSourceMock>();
 };
 
 DEATH_TEST_F(QueryAnalysisSamplerRateLimiterTest, CannotUseZeroRate, "invariant") {
@@ -449,6 +441,40 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterRefresh_RateUnchanged) {
     ASSERT_FALSE(rateLimiter.tryConsume());
 }
 
+TEST_F(QueryAnalysisSamplerRateLimiterTest, MicrosecondResolution) {
+    const RAIIServerParameterControllerForTest burstMultiplierController{
+        "queryAnalysisSamplerBurstMultiplier", 1};
+
+    auto rateLimiter =
+        QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 1e6);
+    ASSERT_EQ(rateLimiter.getRate(), 1e6);
+    ASSERT_EQ(rateLimiter.getBurstCapacity(), 1e6);
+    // There are no token available in the bucket initially.
+    ASSERT_FALSE(rateLimiter.tryConsume());
+
+    advanceTime(Microseconds(1));
+    // The number of tokens available in the bucket right after the refill is 0 + 1.
+    ASSERT(rateLimiter.tryConsume());
+    ASSERT_FALSE(rateLimiter.tryConsume());
+}
+
+TEST_F(QueryAnalysisSamplerRateLimiterTest, NanosecondsResolution) {
+    const RAIIServerParameterControllerForTest burstMultiplierController{
+        "queryAnalysisSamplerBurstMultiplier", 1};
+
+    auto rateLimiter =
+        QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 1e9);
+    ASSERT_EQ(rateLimiter.getRate(), 1e9);
+    ASSERT_EQ(rateLimiter.getBurstCapacity(), 1e9);
+    // There are no token available in the bucket initially.
+    ASSERT_FALSE(rateLimiter.tryConsume());
+
+    advanceTime(Nanoseconds(1));
+    // The number of tokens available in the bucket right after the refill is 0 + 1.
+    ASSERT(rateLimiter.tryConsume());
+    ASSERT_FALSE(rateLimiter.tryConsume());
+}
+
 class QueryAnalysisSamplerTest : public ShardingTestFixture {
 public:
     void setUp() override {
@@ -462,7 +488,7 @@ public:
 
         // Set up a periodic runner.
         auto runner = makePeriodicRunner(getServiceContext());
-        getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
+        getServiceContext()->setTickSource(std::make_unique<TickSourceMock<Nanoseconds>>());
         getServiceContext()->setPeriodicRunner(std::move(runner));
 
         // Reset the counters since each test assumes that the count starts at 0.
@@ -476,12 +502,9 @@ public:
     }
 
 protected:
-    void advanceTime(Milliseconds millis) {
-        _mockClock->advance(millis);
-    }
-
-    Date_t now() {
-        return _mockClock->now();
+    void advanceTime(Nanoseconds millis) {
+        dynamic_cast<TickSourceMock<Nanoseconds>*>(getServiceContext()->getTickSource())
+            ->advance(millis);
     }
 
     /**
@@ -544,7 +567,6 @@ protected:
     const UUID collUuid2 = UUID::gen();
 
 private:
-    const std::shared_ptr<ClockSourceMock> _mockClock = std::make_shared<ClockSourceMock>();
     RAIIServerParameterControllerForTest _featureFlagController{"featureFlagAnalyzeShardKey", true};
     bool _originalIsMongos;
 };
