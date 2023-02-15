@@ -30,27 +30,6 @@ var CheckOrphansAreDeletedHelpers = (function() {
             const dbName = tempNsArray.shift();
             const collName = tempNsArray.join('.');
 
-            // It is possible for a test to drop the shard key index. We skip running the check for
-            // orphan documents being deleted from that collection if it doesn't have a shard key
-            // index.
-            const hintRes = shardConn.getDB(dbName).runCommand({
-                find: collName,
-                hint: collDoc.key,
-                limit: 1,
-                singleBatch: true,
-            });
-
-            if (hintRes.ok !== 1) {
-                assert(
-                    /hint provided does not correspond to an existing index/.test(hintRes.errmsg),
-                    () => {
-                        return 'expected query failure due to bad hint: ' + tojson(hintRes);
-                    });
-                print('Failed to find shard key index on ' + ns +
-                      ' so skipping check for orphan documents being deleted');
-                return;
-            }
-
             print('Checking that orphan documents on shard ' + shardId +
                   ' have been deleted from namespace ' + ns);
 
@@ -82,21 +61,93 @@ var CheckOrphansAreDeletedHelpers = (function() {
                 });
 
             const coll = shardConn.getDB(dbName)[collName];
+
+            // Find chunks that are not owned by the shard.
             const chunksQuery = (collDoc.timestamp) ? {uuid: collDoc.uuid, shard: {$ne: shardId}}
                                                     : {ns: ns, shard: {$ne: shardId}};
-            mongosConn.getDB('config').chunks.find(chunksQuery).forEach(chunkDoc => {
-                // Use $min/$max so this will also work with hashed and compound shard keys.
-                const orphans = coll.find({})
-                                    .collation({locale: "simple"})
-                                    .hint(collDoc.key)
-                                    .min(chunkDoc.min)
-                                    .max(chunkDoc.max)
-                                    .toArray();
+
+            const hintRes = shardConn.getDB(dbName).runCommand({
+                find: collName,
+                hint: collDoc.key,
+                limit: 1,
+                singleBatch: true,
+            });
+
+            if (hintRes.ok !== 1) {
+                // Slow path. There is no shard key index with the same pattern as the shard key.
+
+                // Get the expression that evaluates to the name of the shard key field.
+                const shardKeyPattern = Object.assign({}, collDoc.key);
+                const skValueExpr = Object.entries(shardKeyPattern).map(([key, value]) => {
+                    if (value === "hashed") {
+                        return {$toHashedIndexKey: `$${key}`};
+                    }
+
+                    return {$ifNull: [`$${key}`, null]};
+                });
+
+                // The following query is used to find notOwnedChunks on the actual shard.
+                let arr = [];
+                mongosConn.getDB('config').chunks.find(chunksQuery).forEach(chunkDoc => {
+                    const min = Object.values(Object.assign({}, chunkDoc.min));
+                    const max = Object.values(Object.assign({}, chunkDoc.max));
+                    arr.push({min: min, max: max});
+                });
+
+                if (arr.length === 0) {
+                    // There are no chunks that are not owned by the shard, so there should be no
+                    // orphan documents.
+                    return;
+                }
+
+                // Find documents that the shard key value is greater than or equal to the minimum
+                // bound of the chunk, and less than the max bound of the chunk.
+                const orphans = coll.aggregate([{
+                $match: {$expr: {$let: {vars: {sk: skValueExpr},
+                    in: { $allElementsTrue: [
+                            { $map: {
+                                input: arr,
+                                as: "chunkDoc",
+                                in: {
+                                    $and: [
+                                        {$gte: ["$$sk", "$$chunkDoc.min"]},
+                                        {$or: [
+                                            {$lt : ['$$sk', "$$chunkDoc.max"]},
+                                            {$allElementsTrue: [{$map: {
+                                                input: "$$chunkDoc.max",
+                                                in: {$eq: [{$type: '$$this.max'}, 'MaxKey']}
+                                            }}]}
+                                        ]}
+                                    ]
+                                }
+                            }
+                            }
+                        ]
+                    }
+                }}}}], {collation: {locale: "simple"}}).toArray();
+
                 assert.eq(0,
                           orphans.length,
-                          'found orphans @ ' + shardId + ' within chunk: ' + tojson(chunkDoc) +
-                              ', orphans: ' + tojson(orphans));
-            });
+                          'found orphans @ ' + shardId + ', orphans: ' + tojson(orphans) +
+                              ' for collection ' + ns);
+            } else {
+                // Fast path. There is a shard key index with the same pattern as the shard key, so
+                // we can use hint with min / max in the query.
+
+                mongosConn.getDB('config').chunks.find(chunksQuery).forEach(chunkDoc => {
+                    // Use $min/$max so this will also work with hashed and compound shard keys.
+                    const orphans = coll.find({})
+                                        .collation({locale: "simple"})
+                                        .hint(collDoc.key)
+                                        .min(chunkDoc.min)
+                                        .max(chunkDoc.max)
+                                        .toArray();
+                    assert.eq(0,
+                              orphans.length,
+                              'found orphans @ ' + shardId + ' within chunk: ' + tojson(chunkDoc) +
+                                  ', orphans: ' + tojson(orphans));
+                });
+            }
         });
     }
 
