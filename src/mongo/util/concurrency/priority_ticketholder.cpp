@@ -205,7 +205,7 @@ void PriorityTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
 
 bool PriorityTicketHolder::_tryAcquireTicket() {
     // Test, then test and set to avoid invalidating a cache line unncessarily.
-    if (_ticketsAvailable.loadRelaxed() <= 0) {
+    if (_ticketsAvailable.load() <= 0) {
         return false;
     }
     auto remaining = _ticketsAvailable.subtractAndFetch(1);
@@ -225,8 +225,8 @@ bool PriorityTicketHolder::_dequeueWaitingThread(const stdx::unique_lock<stdx::m
 
     // There is a guarantee that the number of waiters will not increase while holding the growth
     // lock. This check is safe as long as we only compare it against an upper bound.
-    auto lowPrioWaiting = lowPriorityBroker.waitingThreadsRelaxed();
-    auto normalPrioWaiting = normalPriorityBroker.waitingThreadsRelaxed();
+    auto lowPrioWaiting = lowPriorityBroker.waitingThreads(growthLock);
+    auto normalPrioWaiting = normalPriorityBroker.waitingThreads(growthLock);
 
     if (lowPrioWaiting == 0 && normalPrioWaiting == 0) {
         return false;

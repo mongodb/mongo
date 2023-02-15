@@ -132,7 +132,7 @@ void TicketBroker::_unregisterAsWaiter(const stdx::unique_lock<stdx::mutex>& gro
                                        Node& node) noexcept {
     // We've been unregistered by a ticket transfer, nothing to do as the transferer already removed
     // us.
-    if (node.futexWord.loadRelaxed() != 0) {
+    if (node.futexWord.load() != 0) {
         return;
     }
 
@@ -200,7 +200,7 @@ TicketBroker::WaitingResult TicketBroker::attemptWaitForTicketUntil(
 bool TicketBroker::attemptToTransferTicket(
     const stdx::unique_lock<stdx::mutex>& growthLock) noexcept {
     // We can only transfer a ticket if there is a thread waiting for it.
-    if (_numQueued.loadRelaxed() > 0) {
+    if (_numQueued.load() > 0) {
         _numQueued.fetchAndSubtract(1);
 
         // We notify the first element in the queue. To avoid race conditions we first remove the
