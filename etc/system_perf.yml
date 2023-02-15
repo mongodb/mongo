@@ -3841,7 +3841,9 @@ buildvariants:
   #  cron: "0 0 * * 4"  # 00:00 on Thursday
   #  modules: *modules
   #  expansions:
+  #    mongodb_setup_release: 2022-11
   #    mongodb_setup: initialsync-logkeeper-snapshot-update
+  #    infrastructure_provisioning_release: 2022-11
   #    infrastructure_provisioning: initialsync-logkeeper-snapshot-update
   #    # Update this to latest snapshot after each LTS release.
   #    snapshotId: snap-0e28e73fe0f1c503a
