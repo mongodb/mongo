@@ -170,12 +170,12 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
 
     auto catalog = CollectionCatalog::get(opCtx);
     for (const auto& uuid : catalog->getAllCollectionUUIDsFromDb(_name)) {
-        CollectionWriter collection(opCtx, uuid);
+        const Collection* collection = catalog->lookupCollectionByUUID(opCtx, uuid);
         invariant(collection);
         // If this is called from the repair path, the collection is already initialized.
         if (!collection->isInitialized()) {
             WriteUnitOfWork wuow(opCtx);
-            collection.getWritableCollection(opCtx)->init(opCtx);
+            catalog->lookupCollectionByUUIDForMetadataWrite(opCtx, uuid)->init(opCtx);
             wuow.commit();
         }
     }
