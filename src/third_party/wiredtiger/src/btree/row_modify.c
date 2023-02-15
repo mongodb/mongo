@@ -336,7 +336,7 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session, const WT_ITEM *key, u_int skipde
  * __wt_update_obsolete_check --
  *     Check for obsolete updates and force evict the page if the update list is too long.
  */
-WT_UPDATE *
+void
 __wt_update_obsolete_check(
   WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd, bool update_accounting)
 {
@@ -350,6 +350,10 @@ __wt_update_obsolete_check(
     next = NULL;
     page = cbt->ref->page;
     txn_global = &S2C(session)->txn_global;
+
+    /* If we can't lock it, don't scan, that's okay. */
+    if (WT_PAGE_TRYLOCK(session, page) != 0)
+        return;
 
     upd_seen = upd_unstable = 0;
     oldest = txn_global->has_oldest_timestamp ? txn_global->oldest_timestamp : WT_TS_NONE;
@@ -392,8 +396,13 @@ __wt_update_obsolete_check(
      * subsequent to it, other threads of control will terminate their walk in this element. Save a
      * reference to the list we will discard, and terminate the list.
      */
-    if (first != NULL && (next = first->next) != NULL &&
-      __wt_atomic_cas_ptr(&first->next, next, NULL)) {
+    if (first != NULL && (next = first->next) != NULL) {
+        /*
+         * No need to use a compare and swap because we have obtained a lock at the start of the
+         * function.
+         */
+        first->next = NULL;
+
         /*
          * Decrement the dirty byte count while holding the page lock, else we can race with
          * checkpoints cleaning a page.
@@ -418,18 +427,19 @@ __wt_update_obsolete_check(
     }
 
     if (next != NULL)
-        return (next);
-
-    /*
-     * If the list is long, don't retry checks on this page until the transaction state has moved
-     * forwards. This function is used to trim update lists independently of the page state, ensure
-     * there is a modify structure.
-     */
-    if (count > 20 && page->modify != NULL) {
-        page->modify->obsolete_check_txn = txn_global->last_running;
-        if (txn_global->has_pinned_timestamp)
-            page->modify->obsolete_check_timestamp = txn_global->pinned_timestamp;
+        __wt_free_update_list(session, &next);
+    else {
+        /*
+         * If the list is long, don't retry checks on this page until the transaction state has
+         * moved forwards. This function is used to trim update lists independently of the page
+         * state, ensure there is a modify structure.
+         */
+        if (count > 20 && page->modify != NULL) {
+            page->modify->obsolete_check_txn = txn_global->last_running;
+            if (txn_global->has_pinned_timestamp)
+                page->modify->obsolete_check_timestamp = txn_global->pinned_timestamp;
+        }
     }
 
-    return (NULL);
+    WT_PAGE_UNLOCK(session, page);
 }

@@ -239,7 +239,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
   WT_UPDATE **srch_upd, WT_UPDATE **updp, size_t upd_size, bool exclusive)
 {
     WT_DECL_RET;
-    WT_UPDATE *obsolete, *upd;
+    WT_UPDATE *upd;
     wt_timestamp_t obsolete_timestamp, prev_upd_ts;
     uint64_t txn;
 
@@ -317,15 +317,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
         page->modify->obsolete_check_txn = WT_TXN_NONE;
     }
 
-    /* If we can't lock it, don't scan, that's okay. */
-    if (WT_PAGE_TRYLOCK(session, page) != 0)
-        return (0);
-
-    obsolete = __wt_update_obsolete_check(session, cbt, upd->next, true);
-
-    WT_PAGE_UNLOCK(session, page);
-
-    __wt_free_update_list(session, &obsolete);
+    __wt_update_obsolete_check(session, cbt, upd->next, true);
 
     return (0);
 }
