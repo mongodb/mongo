@@ -506,11 +506,23 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock lk, OperationCo
             // Determine if this oplog entry should be migrated. If so, add the oplog entry or the
             // oplog entries derived from it to the oplog buffer.
             if (isInternalSessionForRetryableWrite(*nextOplog->getSessionId())) {
-                invariant(nextOplog->getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
-                // Derive retryable write oplog entries from this retryable internal transaction
-                // applyOps oplog entry, and add them to the oplog buffer.
-                _extractOplogEntriesForInternalTransactionForRetryableWrite(
-                    lk, *nextOplog, &_unprocessedOplogBuffer);
+                if (nextOplog->getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
+                    // Derive retryable write oplog entries from this retryable internal transaction
+                    // applyOps oplog entry, and add them to the oplog buffer.
+                    _extractOplogEntriesForInternalTransactionForRetryableWrite(
+                        lk, *nextOplog, &_unprocessedOplogBuffer);
+                } else {
+                    tassert(7393800,
+                            str::stream() << "Found an oplog entry for a retrayble internal "
+                                             "transaction with an unexpected type"
+                                          << redact(nextOplog->toBSONForLogging()),
+                            nextOplog->getOpType() == repl::OpTypeEnum::kNoop);
+                    if (!nextOplog->getStatementIds().empty() &&
+                        !shouldSkipOplogEntry(nextOplog.value(), _keyPattern, _chunkRange)) {
+                        _unprocessedOplogBuffer.emplace_back(*nextOplog);
+                    }
+                }
+
                 continue;
             }
 
