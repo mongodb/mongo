@@ -683,10 +683,10 @@ std::pair<ReadDistributionMetrics, WriteDistributionMetrics> calculateReadWriteD
 
     // Keep only the percentages.
     readDistributionMetrics.setNumSingleShard(boost::none);
-    readDistributionMetrics.setNumVariableShard(boost::none);
+    readDistributionMetrics.setNumMultiShard(boost::none);
     readDistributionMetrics.setNumScatterGather(boost::none);
     writeDistributionMetrics.setNumSingleShard(boost::none);
-    writeDistributionMetrics.setNumVariableShard(boost::none);
+    writeDistributionMetrics.setNumMultiShard(boost::none);
     writeDistributionMetrics.setNumScatterGather(boost::none);
     writeDistributionMetrics.setNumShardKeyUpdates(boost::none);
     writeDistributionMetrics.setNumSingleWritesWithoutShardKey(boost::none);

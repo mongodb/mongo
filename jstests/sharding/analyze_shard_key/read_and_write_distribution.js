@@ -38,23 +38,22 @@ function assertReadMetricsNonEmptySampleSize(actual, expected, isHashed) {
     assertApprox(actual.percentageOfSingleShardReads,
                  calculatePercentage(expected.numSingleShard, expected.sampleSize.total),
                  {actual, expected});
-    assertApprox(actual.percentageOfVariableShardReads,
-                 calculatePercentage(expected.numVariableShard, expected.sampleSize.total),
+    assertApprox(actual.percentageOfMultiShardReads,
+                 calculatePercentage(expected.numMultiShard, expected.sampleSize.total),
                  {actual, expected});
     assertApprox(actual.percentageOfScatterGatherReads,
                  calculatePercentage(expected.numScatterGather, expected.sampleSize.total),
                  {actual, expected});
 
-    assert.eq(
-        actual.numDispatchedReadsByRange.length, analyzeShardKeyNumRanges, {actual, expected});
+    assert.eq(actual.numReadsByRange.length, analyzeShardKeyNumRanges, {actual, expected});
     if (isHashed) {
-        assert.eq(actual.percentageOfVariableShardReads, 0, {actual, expected});
-        assert.eq(sum(actual.numDispatchedReadsByRange),
+        assert.eq(actual.percentageOfMultiShardReads, 0, {actual, expected});
+        assert.eq(sum(actual.numReadsByRange),
                   expected.numSingleShard + expected.numScatterGather * analyzeShardKeyNumRanges,
                   {actual, expected});
     } else {
-        assert.gte(sum(actual.numDispatchedReadsByRange),
-                   expected.numSingleShard + expected.numVariableShard +
+        assert.gte(sum(actual.numReadsByRange),
+                   expected.numSingleShard + expected.numMultiShard +
                        expected.numScatterGather * analyzeShardKeyNumRanges,
                    {actual, expected});
     }
@@ -70,23 +69,22 @@ function assertWriteMetricsNonEmptySampleSize(actual, expected, isHashed) {
     assertApprox(actual.percentageOfSingleShardWrites,
                  calculatePercentage(expected.numSingleShard, expected.sampleSize.total),
                  {actual, expected});
-    assertApprox(actual.percentageOfVariableShardWrites,
-                 calculatePercentage(expected.numVariableShard, expected.sampleSize.total),
+    assertApprox(actual.percentageOfMultiShardWrites,
+                 calculatePercentage(expected.numMultiShard, expected.sampleSize.total),
                  {actual, expected});
     assertApprox(actual.percentageOfScatterGatherWrites,
                  calculatePercentage(expected.numScatterGather, expected.sampleSize.total),
                  {actual, expected});
 
-    assert.eq(
-        actual.numDispatchedWritesByRange.length, analyzeShardKeyNumRanges, {actual, expected});
+    assert.eq(actual.numWritesByRange.length, analyzeShardKeyNumRanges, {actual, expected});
     if (isHashed) {
-        assert.eq(actual.percentageOfVariableShardWrites, 0, {actual, expected});
-        assert.eq(sum(actual.numDispatchedWritesByRange),
+        assert.eq(actual.percentageOfMultiShardWrites, 0, {actual, expected});
+        assert.eq(sum(actual.numWritesByRange),
                   expected.numSingleShard + expected.numScatterGather * analyzeShardKeyNumRanges,
                   {actual, expected});
     } else {
-        assert.gte(sum(actual.numDispatchedWritesByRange),
-                   expected.numSingleShard + expected.numVariableShard +
+        assert.gte(sum(actual.numWritesByRange),
+                   expected.numSingleShard + expected.numMultiShard +
                        expected.numScatterGather * analyzeShardKeyNumRanges,
                    {actual, expected});
     }
@@ -144,13 +142,13 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
     const readDistribution = {
         sampleSize: {total: 0, find: 0, aggregate: 0, count: 0, distinct: 0},
         numSingleShard: 0,
-        numVariableShard: 0,
+        numMultiShard: 0,
         numScatterGather: 0
     };
     const writeDistribution = {
         sampleSize: {total: 0, update: 0, delete: 0, findAndModify: 0},
         numSingleShard: 0,
-        numVariableShard: 0,
+        numMultiShard: 0,
         numScatterGather: 0,
         numShardKeyUpdates: 0,
         numSingleWritesWithoutShardKey: 0,
@@ -201,7 +199,7 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
             // For hashed sharding, range queries on the shard key target all shards.
             readDistribution.numScatterGather++;
         } else {
-            readDistribution.numVariableShard++;
+            readDistribution.numMultiShard++;
         }
     }
 
@@ -217,7 +215,7 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
             // For hashed sharding, range queries on the shard key target all shards.
             readDistribution.numScatterGather++;
         } else {
-            readDistribution.numVariableShard++;
+            readDistribution.numMultiShard++;
         }
     }
 
@@ -229,7 +227,7 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
             // For hashed sharding, range queries on the shard key target all shards.
             readDistribution.numScatterGather++;
         } else {
-            readDistribution.numVariableShard++;
+            readDistribution.numMultiShard++;
         }
     }
 
@@ -296,7 +294,7 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
             // For hashed sharding, range queries on the shard key target all shards.
             writeDistribution.numScatterGather++;
         } else {
-            writeDistribution.numVariableShard++;
+            writeDistribution.numMultiShard++;
         }
         writeDistribution.numSingleWritesWithoutShardKey++;
     }
@@ -310,7 +308,7 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
             // For hashed sharding, range queries on the shard key target all shards.
             writeDistribution.numScatterGather++;
         } else {
-            writeDistribution.numVariableShard++;
+            writeDistribution.numMultiShard++;
         }
         writeDistribution.numMultiWritesWithoutShardKey++;
     }
@@ -327,7 +325,7 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
             // For hashed sharding, range queries on the shard key target all shards.
             writeDistribution.numScatterGather++;
         } else {
-            writeDistribution.numVariableShard++;
+            writeDistribution.numMultiShard++;
         }
         writeDistribution.numSingleWritesWithoutShardKey++;
     }

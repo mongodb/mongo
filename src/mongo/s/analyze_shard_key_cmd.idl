@@ -163,14 +163,14 @@ structs:
           gte: 0
           lte: 100
         optional: true
-      numVariableShardReads:
+      numMultiShardReads:
         type: long
-        cpp_name: numVariableShard
+        cpp_name: numMultiShard
         validator: { gte: 0 }
         optional: true
-      percentageOfVariableShardReads:
+      percentageOfMultiShardReads:
         type: double
-        cpp_name: percentageOfVariableShard
+        cpp_name: percentageOfMultiShard
         validator:
           gte: 0
           lte: 100
@@ -187,9 +187,9 @@ structs:
           gte: 0
           lte: 100
         optional: true
-      numDispatchedReadsByRange:
+      numReadsByRange:
         type: array<long>
-        cpp_name: numDispatchedByRange
+        cpp_name: numByRange
         description: "The number of dispatched read requests for each chunk range sorted from
                       MinKey to MaxKey."
         optional: true
@@ -212,14 +212,14 @@ structs:
           gte: 0
           lte: 100
         optional: true
-      numVariableShardWrites:
+      numMultiShardWrites:
         type: long
-        cpp_name: numVariableShard
+        cpp_name: numMultiShard
         validator: { gte: 0 }
         optional: true
-      percentageOfVariableShardWrites:
+      percentageOfMultiShardWrites:
         type: double
-        cpp_name: percentageOfVariableShard
+        cpp_name: percentageOfMultiShard
         validator:
           gte: 0
           lte: 100
@@ -236,9 +236,9 @@ structs:
           gte: 0
           lte: 100
         optional: true
-      numDispatchedWritesByRange:
+      numWritesByRange:
         type: array<long>
-        cpp_name: numDispatchedByRange
+        cpp_name: numByRange
         description: "The number of dispatched write requests for each chunk range sorted from
                       MinKey to MaxKey."
         optional: true

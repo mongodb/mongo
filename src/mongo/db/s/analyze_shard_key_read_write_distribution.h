@@ -52,7 +52,7 @@ public:
           _firstShardKeyFieldName(
               _getChunkManager().getShardKeyPattern().toBSON().firstElement().fieldName()) {
         _getChunkManager().forEachChunk([&](const auto& chunk) {
-            _numDispatchedByRange.emplace(std::make_pair(chunk.getRange(), 0));
+            _numByRange.emplace(std::make_pair(chunk.getRange(), 0));
             return true;
         });
     };
@@ -81,18 +81,18 @@ protected:
         _numSingleShard++;
     }
 
-    void _incrementNumVariableShard() {
-        _numVariableShard++;
+    void _incrementNumMultiShard() {
+        _numMultiShard++;
     }
 
     void _incrementNumScatterGather() {
         _numScatterGather++;
     }
 
-    void _incrementNumDispatchedByRanges(const std::set<ChunkRange>& chunkRanges) {
+    void _incrementNumByRanges(const std::set<ChunkRange>& chunkRanges) {
         for (const auto& chunkRange : chunkRanges) {
-            auto it = _numDispatchedByRange.find(chunkRange);
-            invariant(it != _numDispatchedByRange.end());
+            auto it = _numByRange.find(chunkRange);
+            invariant(it != _numByRange.end());
             it->second++;
         }
     }
@@ -129,10 +129,10 @@ protected:
     const StringData _firstShardKeyFieldName;
 
     int64_t _numSingleShard = 0;
-    int64_t _numVariableShard = 0;
+    int64_t _numMultiShard = 0;
     int64_t _numScatterGather = 0;
 
-    std::map<ChunkRange, int64_t> _numDispatchedByRange;
+    std::map<ChunkRange, int64_t> _numByRange;
 };
 
 class ReadDistributionMetricsCalculator
@@ -274,23 +274,21 @@ DistributionMetricsType addDistributionMetricsBase(DistributionMetricsType l,
         metrics.setNumSingleShard(numSingleShard);
         metrics.setPercentageOfSingleShard(calculatePercentage(numSingleShard, numTotal));
 
-        auto numVariableShard =
-            l.getNumVariableShard().value_or(0) + r.getNumVariableShard().value_or(0);
-        metrics.setNumVariableShard(numVariableShard);
-        metrics.setPercentageOfVariableShard(calculatePercentage(numVariableShard, numTotal));
+        auto numMultiShard = l.getNumMultiShard().value_or(0) + r.getNumMultiShard().value_or(0);
+        metrics.setNumMultiShard(numMultiShard);
+        metrics.setPercentageOfMultiShard(calculatePercentage(numMultiShard, numTotal));
 
         auto numScatterGather =
             l.getNumScatterGather().value_or(0) + r.getNumScatterGather().value_or(0);
         metrics.setNumScatterGather(numScatterGather);
         metrics.setPercentageOfScatterGather(calculatePercentage(numScatterGather, numTotal));
 
-        if (l.getNumDispatchedByRange() && r.getNumDispatchedByRange()) {
-            metrics.setNumDispatchedByRange(
-                addElements(*l.getNumDispatchedByRange(), *r.getNumDispatchedByRange()));
-        } else if (l.getNumDispatchedByRange()) {
-            metrics.setNumDispatchedByRange(*l.getNumDispatchedByRange());
-        } else if (r.getNumDispatchedByRange()) {
-            metrics.setNumDispatchedByRange(*r.getNumDispatchedByRange());
+        if (l.getNumByRange() && r.getNumByRange()) {
+            metrics.setNumByRange(addElements(*l.getNumByRange(), *r.getNumByRange()));
+        } else if (l.getNumByRange()) {
+            metrics.setNumByRange(*l.getNumByRange());
+        } else if (r.getNumByRange()) {
+            metrics.setNumByRange(*r.getNumByRange());
         }
     }
     return metrics;
@@ -302,8 +300,8 @@ inline bool areEqualDistributionMetricsBase(const DistributionMetricsType& l,
     return l.getSampleSize() == r.getSampleSize() &&
         l.getNumSingleShard() == r.getNumSingleShard() &&
         l.getPercentageOfSingleShard() == r.getPercentageOfSingleShard() &&
-        l.getNumVariableShard() == r.getNumVariableShard() &&
-        l.getPercentageOfVariableShard() == r.getPercentageOfVariableShard() &&
+        l.getNumMultiShard() == r.getNumMultiShard() &&
+        l.getPercentageOfMultiShard() == r.getPercentageOfMultiShard() &&
         l.getNumScatterGather() == r.getNumScatterGather() &&
         l.getPercentageOfScatterGather() == r.getPercentageOfScatterGather();
 }
