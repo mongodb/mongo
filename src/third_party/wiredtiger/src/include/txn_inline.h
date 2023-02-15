@@ -677,7 +677,7 @@ static inline bool
 __wt_txn_tw_stop_visible(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
 {
     return (WT_TIME_WINDOW_HAS_STOP(tw) && !tw->prepare &&
-      __wt_txn_visible(session, tw->stop_txn, tw->stop_ts));
+      __wt_txn_visible(session, tw->stop_txn, tw->stop_ts, tw->durable_stop_ts));
 }
 
 /*
@@ -695,7 +695,7 @@ __wt_txn_tw_start_visible(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
                (tw->start_txn != tw->stop_txn || tw->start_ts != tw->stop_ts ||
                  tw->durable_start_ts != tw->durable_stop_ts)) ||
               !tw->prepare) &&
-      __wt_txn_visible(session, tw->start_txn, tw->start_ts));
+      __wt_txn_visible(session, tw->start_txn, tw->start_ts, tw->durable_start_ts));
 }
 
 /*
@@ -797,7 +797,8 @@ __txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
  *     Can the current transaction see the given ID / timestamp?
  */
 static inline bool
-__wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp)
+__wt_txn_visible(
+  WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp, wt_timestamp_t durable_timestamp)
 {
     WT_TXN *txn;
     WT_TXN_SHARED *txn_shared;
@@ -816,8 +817,17 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp
     if (!F_ISSET(txn, WT_TXN_SHARED_TS_READ) || timestamp == WT_TS_NONE)
         return (true);
 
+    /*
+     * For checkpoint cursors, just using the commit timestamp visibility check can go wrong when a
+     * prepared transaction gets committed in parallel to a running checkpoint.
+     *
+     * To avoid this problem, along with the visibility check of a commit timestamp, comparing the
+     * durable timestamp against the stable timestamp of a checkpoint can avoid the problems of
+     * returning inconsistent data.
+     */
     if (WT_READING_CHECKPOINT(session))
-        return (timestamp <= txn->checkpoint_read_timestamp);
+        return ((timestamp <= txn->checkpoint_read_timestamp) &&
+          (durable_timestamp <= txn->checkpoint_stable_timestamp));
 
     return (timestamp <= txn_shared->read_timestamp);
 }
@@ -843,7 +853,7 @@ __wt_txn_upd_visible_type(WT_SESSION_IMPL *session, WT_UPDATE *upd)
               upd->type == WT_UPDATE_STANDARD))
             return (WT_VISIBLE_TRUE);
 
-        upd_visible = __wt_txn_visible(session, upd->txnid, upd->start_ts);
+        upd_visible = __wt_txn_visible(session, upd->txnid, upd->start_ts, upd->durable_ts);
 
         /*
          * The visibility check is only valid if the update does not change state. If the state does

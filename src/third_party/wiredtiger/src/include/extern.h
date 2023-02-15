@@ -2084,8 +2084,8 @@ static inline bool __wt_txn_upd_visible(WT_SESSION_IMPL *session, WT_UPDATE *upd
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline bool __wt_txn_upd_visible_all(WT_SESSION_IMPL *session, WT_UPDATE *upd)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-static inline bool __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static inline bool __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp,
+  wt_timestamp_t durable_timestamp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline bool __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id,
   wt_timestamp_t timestamp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline bool __wt_txn_visible_id_snapshot(uint64_t id, uint64_t snap_min, uint64_t snap_max,
