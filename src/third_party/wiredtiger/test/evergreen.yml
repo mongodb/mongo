@@ -3550,6 +3550,43 @@ tasks:
           times: 1       # No of times to run the loop
           no_of_procs: 10 # No of processes to run in the background
 
+  - name: skiplist-stress-test
+    tags: ["stress-test-1", "stress-test-zseries-1"]
+    exec_timeout_secs: 3600 # 1 hour
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/bench/workgen/runner"
+          script: |
+            set -o errexit
+            set -o verbose
+            for i in $(seq 5); do
+                ${test_env_vars|} ${python_binary|python3} skiplist_stress.py
+            done
+
+  - name: skiplist-stress-test-nonstandalone
+    tags: ["stress-test-1-nonstandalone"]
+    exec_timeout_secs: 3600 # 1 hour
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          NONSTANDALONE: -DWT_STANDALONE_BUILD=0
+          CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/bench/workgen/runner"
+          script: |
+            set -o errexit
+            set -o verbose
+            for i in $(seq 5); do
+                ${test_env_vars|} ${python_binary|python3} skiplist_stress.py
+            done
+
   - name: split-stress-test
     tags: ["stress-test-1", "stress-test-zseries-1"]
     commands:

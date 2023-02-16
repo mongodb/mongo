@@ -2280,14 +2280,18 @@ struct __wt_connection {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;slow_checkpoint,
 	 * if true\, slow down checkpoint creation by slowing down internal page processing., a
 	 * boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\,
-	 * write transaction related information to the log for all operations\, even operations for
-	 * tables with logging turned off.  This additional logging information is intended for
-	 * debugging and is informational only\, that is\, it is ignored during recovery., a boolean
-	 * flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;update_restore_evict, if true\,
-	 * control all dirty page evictions through forcing update restore eviction., a boolean
-	 * flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;stress_skiplist,
+	 * Configure various internal parameters to encourage race conditions and other issues with
+	 * internal skip lists\, e.g.  using a more dense representation., a boolean flag; default
+	 * \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\, write transaction
+	 * related information to the log for all operations\, even operations for tables with
+	 * logging turned off.  This additional logging information is intended for debugging and is
+	 * informational only\, that is\, it is ignored during recovery., a boolean flag; default \c
+	 * false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;update_restore_evict, if true\, control all dirty
+	 * page evictions through forcing update restore eviction., a boolean flag; default \c
+	 * false.}
 	 * @config{ ),,}
 	 * @config{error_prefix, prefix string for error messages., a string; default empty.}
 	 * @config{eviction = (, eviction configuration options., a set of related configuration
@@ -3019,13 +3023,17 @@ struct __wt_connection {
  * and \c 10M; default \c 0.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;slow_checkpoint, if true\, slow down
  * checkpoint creation by slowing down internal page processing., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\, write transaction related information to
- * the log for all operations\, even operations for tables with logging turned off.  This additional
- * logging information is intended for debugging and is informational only\, that is\, it is ignored
- * during recovery., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;stress_skiplist, Configure various internal parameters to
+ * encourage race conditions and other issues with internal skip lists\, e.g.  using a more dense
+ * representation., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * update_restore_evict, if true\, control all dirty page evictions through forcing update restore
- * eviction., a boolean flag; default \c false.}
+ * table_logging, if true\, write transaction related information to the log for all operations\,
+ * even operations for tables with logging turned off.  This additional logging information is
+ * intended for debugging and is informational only\, that is\, it is ignored during recovery., a
+ * boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;update_restore_evict, if true\,
+ * control all dirty page evictions through forcing update restore eviction., a boolean flag;
+ * default \c false.}
  * @config{ ),,}
  * @config{direct_io, Use \c O_DIRECT on POSIX systems\, and \c FILE_FLAG_NO_BUFFERING on Windows to
  * access files.  Options are given as a list\, such as <code>"direct_io=[data]"</code>. Configuring
