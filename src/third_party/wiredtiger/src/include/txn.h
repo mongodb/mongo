@@ -14,6 +14,14 @@
 #define WT_TS_NONE 0         /* Beginning of time */
 #define WT_TS_MAX UINT64_MAX /* End of time */
 
+/*
+ * A list of reasons for returning a rollback error from the API. These reasons can be queried via
+ * the session get rollback reason API call. Users of the API could have a dependency on the format
+ * of these messages so changing them must be done with care.
+ */
+#define WT_TXN_ROLLBACK_REASON_CACHE "oldest pinned transaction ID rolled back for eviction"
+#define WT_TXN_ROLLBACK_REASON_CONFLICT "conflict between concurrent operations"
+
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TXN_LOG_CKPT_CLEANUP 0x01u
 #define WT_TXN_LOG_CKPT_PREPARE 0x02u
