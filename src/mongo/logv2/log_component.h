@@ -73,6 +73,7 @@ namespace mongo::logv2 {
     X(kShardingMigration,      , "migration"             , "MIGRATE" , kSharding) \
     X(kResharding,             , "reshard"               , "RESHARD" , kSharding) \
     X(kShardMigrationPerf,     , "migrationPerf"         , "MIG_PERF", kSharding) \
+    X(kMovePrimary,            , "movePrimary"           , "MVPRIMRY", kSharding) \
     X(kStorage,                , "storage"               , "STORAGE" , kDefault) \
     X(kStorageRecovery,        , "recovery"              , "RECOVERY", kStorage) \
     X(kJournal,                , "journal"               , "JOURNAL" , kStorage) \

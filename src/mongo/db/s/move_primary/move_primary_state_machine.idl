@@ -34,6 +34,7 @@ global:
 imports:
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/basic_types.idl"
+    - "mongo/db/s/move_primary/move_primary_recipient_cmds.idl"
 
 enums:
     MovePrimaryDonorState:
@@ -55,8 +56,9 @@ enums:
             kUninitialized: 0
             kStarted: 1
             kConsistent: 2
-            kAborted: 3
-            kDone: 4
+            kBlocking: 3
+            kAborted: 4
+            kDone: 5
 
 structs:
     MovePrimaryDonorDocument:
@@ -92,6 +94,9 @@ structs:
     MovePrimaryRecipientDocument:
         description: "Represents an in-progress movePrimary operation on the recipient."
         strict: false
+        inline_chained_structs: true
+        chained_structs:
+            MovePrimaryRecipientMetadata: MovePrimaryRecipientMetadata
         fields:
             _id:
                 type: uuid
@@ -99,13 +104,6 @@ structs:
                     Unique identifier for the movePrimary operation. 
                     This is sent as migrationId to the recipient by the donor.
                 cpp_name: id
-            databaseName:
-                type: string
-                description: >-
-                    The name of the database being moved as part of movePrimary operation.
-            fromShard:
-                type: string
-                description: "The name of the donor shard."
             state:
                 type: MovePrimaryRecipientState
                 description: "The state of the recipient during an in progress movePrimary operation."

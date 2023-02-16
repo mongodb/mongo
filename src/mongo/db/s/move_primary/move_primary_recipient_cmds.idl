@@ -39,13 +39,14 @@ imports:
 
 structs:
     MovePrimaryRecipientMetadata:
-        description: "Common metadata sent as part of every recipient command"
+        description: "Common metadata at the recipient for movePrimary op"
         strict: false
         inline_chained_structs: true
         generate_comparison_operators: false
         fields:
             migrationId:
-                description: "Unique identifier for the movePrimary operation."
+                description: >-
+                    "Unique identifier for the movePrimary operation."
                 type: uuid
             databaseName:
                 description: "The name of the database being moved as part of movePrimary."

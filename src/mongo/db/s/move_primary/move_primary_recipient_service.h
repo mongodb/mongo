@@ -29,9 +29,12 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/s/move_primary/move_primary_recipient_cmds_gen.h"
 #include <boost/optional.hpp>
 #include <memory>
 
+#include "mongo/client/fetcher.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/primary_only_service.h"
@@ -40,6 +43,11 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+class DBClientConnection;
+class OperationContext;
+class ReplicaSetMonitor;
+class ServiceContext;
 
 /**
  * MovePrimaryRecipientService coordinates online movePrimary data migration on the
@@ -58,7 +66,9 @@ public:
 
     StringData getServiceName() const final;
 
-    NamespaceString getStateDocumentsNS() const final;
+    NamespaceString getStateDocumentsNS() const final override {
+        return NamespaceString::kMovePrimaryRecipientNamespace;
+    }
 
     ThreadPool::Limits getThreadPoolLimits() const final;
 
@@ -85,43 +95,11 @@ public:
          */
         void interrupt(Status status) override;
 
-        /*
-         * Blocks the thread until the movePrimary operation reaches consistent state in an
-         * interruptible mode. Throws exception on error.
-         */
-        void waitUntilMigrationReachesConsistentState(OperationContext* opCtx) const;
-
-        /*
-         * Blocks the thread until the oplog applier applies the data past the
-         * 'returnAfterReachingTimestamp' in an interruptible mode. If the recipient's logical clock
-         * has not yet reached the 'returnAfterReachingTimestamp', advances the recipient's logical
-         * clock to 'returnAfterReachingTimestamp'.
-         */
-        void waitUntilMigrationReachesReturnAfterReachingDonorTimestamp(
-            OperationContext* opCtx, const Timestamp& returnAfterReachingTimestamp);
-
         /**
-         * Interrupts the migration for garbage collection.
+         * Returns a Future that will be resolved when the instance reaches kStarted state.
          */
-        void onReceiveRecipientForgetMigration(OperationContext* opCtx);
-
-        /**
-         * Aborts the movePrimary operation at the recipient.
-         */
-        void onRecieveRecipientAbortMigration(OperationContext* opCtx);
-
-        /**
-         * Returns a Future that will be resolved when the instance reaches kDone state.
-         */
-        SharedSemiFuture<void> getForgetMigrationDurableFuture() const {
-            return _forgetMigrationDurablePromise.getFuture();
-        }
-
-        /**
-         * Returns a Future that will be resolved when the instance reaches kAborted state.
-         */
-        SharedSemiFuture<void> getAbortMigrationDurableFuture() const {
-            return _abortMigrationDurablePromise.getFuture();
+        SharedSemiFuture<void> getRecipientDocDurableFuture() const {
+            return _recipientDocDurablePromise.getFuture();
         }
 
         /**
@@ -133,12 +111,40 @@ public:
 
         void checkIfOptionsConflict(const BSONObj& stateDoc) const final;
 
+        StringData getDatabaseName() const;
+
+        UUID getMigrationId() const;
+
     private:
-        // Promise that is resolved when the instance reaches kDone state
-        SharedPromise<void> _forgetMigrationDurablePromise;  // (W)
-        // Promise that is resolved when the instance reaches kAborted state
-        SharedPromise<void> _abortMigrationDurablePromise;  // (W)
+        ExecutorFuture<void> _enterStartedState(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+            const CancellationToken& token);
+
+        ExecutorFuture<void> _persistRecipientDoc(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+            const CancellationToken& token);
+
+        StringData _parseRecipientState(MovePrimaryRecipientState value);
+
+        const NamespaceString _stateDocumentNS = NamespaceString::kMovePrimaryRecipientNamespace;
+
+        const MovePrimaryRecipientService* _recipientService;
+
+        const MovePrimaryRecipientMetadata _metadata;
+
+        ServiceContext* _serviceContext;
+
+        // To synchronize operations on mutable states below
+        Mutex _mutex = MONGO_MAKE_LATCH("MovePrimaryRecipient::_mutex");
+
+        MovePrimaryRecipientState _state;
+
+        // Promise that is resolved when the recipient doc is persisted in kStarted state
+        SharedPromise<void> _recipientDocDurablePromise;
     };
+
+private:
+    ServiceContext* const _serviceContext;
 };
 
 }  // namespace mongo
