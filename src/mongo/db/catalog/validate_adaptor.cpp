@@ -81,7 +81,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
     BSONObj recordBson = record.toBson();
     *dataSize = recordBson.objsize();
 
-    if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
+    if (MONGO_unlikely(_validateState->logDiagnostics())) {
         LOGV2(4666601, "[validate]", "recordId"_attr = recordId, "recordData"_attr = recordBson);
     }
 

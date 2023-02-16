@@ -123,6 +123,7 @@ public:
 
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
         bool background = cmdObj["background"].trueValue();
+        bool logDiagnostics = cmdObj["logDiagnostics"].trueValue();
 
         // Background validation is not supported on the ephemeralForTest storage engine due to its
         // lack of support for timestamps. Switch the mode to foreground validation instead.
@@ -246,8 +247,8 @@ public:
         }
 
         ValidateResults validateResults;
-        Status status =
-            CollectionValidation::validate(opCtx, nss, mode, repairMode, &validateResults, &result);
+        Status status = CollectionValidation::validate(
+            opCtx, nss, mode, repairMode, &validateResults, &result, logDiagnostics);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }

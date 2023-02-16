@@ -106,7 +106,7 @@ IndexConsistency::IndexConsistency(OperationContext* opCtx,
 
 void IndexConsistency::addMultikeyMetadataPath(const KeyString::Value& ks, IndexInfo* indexInfo) {
     auto hash = _hashKeyString(ks, indexInfo->indexNameHash);
-    if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
+    if (MONGO_unlikely(_validateState->logDiagnostics())) {
         LOGV2(6208500,
               "[validate](multikeyMetadataPath) Adding with the hash",
               "hash"_attr = hash,
@@ -118,7 +118,7 @@ void IndexConsistency::addMultikeyMetadataPath(const KeyString::Value& ks, Index
 void IndexConsistency::removeMultikeyMetadataPath(const KeyString::Value& ks,
                                                   IndexInfo* indexInfo) {
     auto hash = _hashKeyString(ks, indexInfo->indexNameHash);
-    if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
+    if (MONGO_unlikely(_validateState->logDiagnostics())) {
         LOGV2(6208501,
               "[validate](multikeyMetadataPath) Removing with the hash",
               "hash"_attr = hash,
@@ -132,9 +132,26 @@ size_t IndexConsistency::getMultikeyMetadataPathCount(IndexInfo* indexInfo) {
 }
 
 bool IndexConsistency::haveEntryMismatch() const {
-    return std::any_of(_indexKeyBuckets.begin(),
-                       _indexKeyBuckets.end(),
-                       [](const IndexKeyBucket& bucket) -> bool { return bucket.indexKeyCount; });
+    bool haveMismatch =
+        std::any_of(_indexKeyBuckets.begin(),
+                    _indexKeyBuckets.end(),
+                    [](const IndexKeyBucket& bucket) -> bool { return bucket.indexKeyCount; });
+
+    if (haveMismatch && _validateState->logDiagnostics()) {
+        for (size_t i = 0; i < _indexKeyBuckets.size(); i++) {
+            if (_indexKeyBuckets[i].indexKeyCount == 0) {
+                continue;
+            }
+
+            LOGV2(7404500,
+                  "[validate](bucket entry mismatch)",
+                  "hash"_attr = i,
+                  "indexKeyCount"_attr = _indexKeyBuckets[i].indexKeyCount,
+                  "bucketBytesSize"_attr = _indexKeyBuckets[i].bucketSizeBytes);
+        }
+    }
+
+    return haveMismatch;
 }
 
 void IndexConsistency::setSecondPhase() {
@@ -377,7 +394,7 @@ void IndexConsistency::addDocKey(OperationContext* opCtx,
         upper.bucketSizeBytes += ks.getSize();
         indexInfo->numRecords++;
 
-        if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
+        if (MONGO_unlikely(_validateState->logDiagnostics())) {
             LOGV2(4666602,
                   "[validate](record) Adding with hashes",
                   "hashUpper"_attr = hashUpper,
@@ -430,7 +447,7 @@ void IndexConsistency::addIndexKey(OperationContext* opCtx,
         upper.bucketSizeBytes += ks.getSize();
         indexInfo->numKeys++;
 
-        if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
+        if (MONGO_unlikely(_validateState->logDiagnostics())) {
             LOGV2(4666603,
                   "[validate](index) Adding with hashes",
                   "hashUpper"_attr = hashUpper,

@@ -405,7 +405,8 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
                                            CollectionValidation::ValidateMode::kForegroundFull,
                                            CollectionValidation::RepairMode::kNone,
                                            &validateResults,
-                                           &bob));
+                                           &bob,
+                                           /*logDiagnostics=*/false));
         ASSERT_TRUE(validateResults.valid);
     }
 

@@ -156,7 +156,8 @@ TEST_F(ValidateStateTest, NonExistentCollectionShouldThrowNamespaceNotFoundError
         CollectionValidation::ValidateState(opCtx,
                                             kNss,
                                             CollectionValidation::ValidateMode::kForeground,
-                                            CollectionValidation::RepairMode::kNone),
+                                            CollectionValidation::RepairMode::kNone,
+                                            /*logDiagnostics=*/false),
         AssertionException,
         ErrorCodes::NamespaceNotFound);
 
@@ -164,7 +165,8 @@ TEST_F(ValidateStateTest, NonExistentCollectionShouldThrowNamespaceNotFoundError
         CollectionValidation::ValidateState(opCtx,
                                             kNss,
                                             CollectionValidation::ValidateMode::kBackground,
-                                            CollectionValidation::RepairMode::kNone),
+                                            CollectionValidation::RepairMode::kNone,
+                                            /*logDiagnostics=*/false),
         AssertionException,
         ErrorCodes::NamespaceNotFound);
 }
@@ -183,7 +185,8 @@ TEST_F(ValidateStateTest, UncheckpointedCollectionShouldBeAbleToInitializeCursor
         opCtx,
         kNss,
         CollectionValidation::ValidateMode::kBackground,
-        CollectionValidation::RepairMode::kNone);
+        CollectionValidation::RepairMode::kNone,
+        /*logDiagnostics=*/false);
     // Assert that cursors are able to created on the new collection.
     validateState.initializeCursors(opCtx);
     // There should only be a first record id if cursors were initialized successfully.
@@ -210,7 +213,8 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
             opCtx,
             kNss,
             CollectionValidation::ValidateMode::kForeground,
-            CollectionValidation::RepairMode::kNone);
+            CollectionValidation::RepairMode::kNone,
+            /*logDiagnostics=*/false);
         validateState.initializeCursors(opCtx);
 
         // Make sure all of the indexes were found and cursors opened against them. Including the
@@ -228,7 +232,8 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
         opCtx,
         kNss,
         CollectionValidation::ValidateMode::kForeground,
-        CollectionValidation::RepairMode::kNone);
+        CollectionValidation::RepairMode::kNone,
+        /*logDiagnostics=*/false);
     validateState.initializeCursors(opCtx);
     ASSERT_EQ(validateState.getIndexes().size(), 5);
 }
@@ -255,7 +260,8 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexesWithBackground) {
         opCtx,
         kNss,
         CollectionValidation::ValidateMode::kBackground,
-        CollectionValidation::RepairMode::kNone);
+        CollectionValidation::RepairMode::kNone,
+        /*logDiagnostics=*/false);
     validateState.initializeCursors(opCtx);
 
     // We should be able to open a cursor on each index.
@@ -292,7 +298,8 @@ TEST_F(ValidateStateTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatWereL
             opCtx,
             kNss,
             CollectionValidation::ValidateMode::kBackground,
-            CollectionValidation::RepairMode::kNone);
+            CollectionValidation::RepairMode::kNone,
+            /*logDiagnostics=*/false);
         validateState.initializeCursors(opCtx);
         ASSERT_EQ(validateState.getIndexes().size(), 3);
     }
@@ -305,7 +312,8 @@ TEST_F(ValidateStateTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatWereL
         opCtx,
         kNss,
         CollectionValidation::ValidateMode::kBackground,
-        CollectionValidation::RepairMode::kNone);
+        CollectionValidation::RepairMode::kNone,
+        /*logDiagnostics=*/false);
     validateState.initializeCursors(opCtx);
     ASSERT_EQ(validateState.getIndexes().size(), 3);
 }
