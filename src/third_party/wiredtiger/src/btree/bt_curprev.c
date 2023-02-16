@@ -34,7 +34,7 @@
 static inline int
 __cursor_skip_prev(WT_CURSOR_BTREE *cbt)
 {
-    WT_INSERT *current, *ins;
+    WT_INSERT *current, *ins, *next_ins;
     WT_ITEM key;
     WT_SESSION_IMPL *session;
     uint64_t recno;
@@ -82,7 +82,13 @@ restart:
         for (; i >= 0; i--) {
             cbt->ins_stack[i] = NULL;
             cbt->next_stack[i] = NULL;
-            ins = cbt->ins_head->head[i];
+            /*
+             * Compiler may replace the usage of the variable with another read in the following
+             * code.
+             *
+             * Place a read barrier to avoid this issue.
+             */
+            WT_ORDERED_READ(ins, cbt->ins_head->head[i]);
             if (ins != NULL && ins != current)
                 break;
         }
@@ -98,11 +104,26 @@ restart:
             cbt->next_stack[0] = NULL;
             goto restart;
         }
-        if (ins->next[i] != current) /* Stay at this level */
-            ins = ins->next[i];
+        /*
+         * CPU may reorder the read and return a stale value. This can lead us to wrongly skip a
+         * value in the lower levels of the skip list.
+         *
+         * For example, if we have A -> C initially for both level 0 and level 1 and we concurrently
+         * insert B into both level 0 and level 1. If B is visible on level 1 to this thread, it
+         * must also be visible on level 0. Otherwise, we would record an inconsistent stack.
+         *
+         * Place a read barrier to avoid this issue.
+         */
+        WT_ORDERED_READ(next_ins, ins->next[i]);
+        if (next_ins != current) /* Stay at this level */
+            ins = next_ins;
         else { /* Drop down a level */
+            /*
+             * It is possible that we read an old value that is inconsistent to the higher levels of
+             * the skip list due to CPU read reordering. Add a read barrier to avoid this issue.
+             */
+            WT_ORDERED_READ(cbt->next_stack[i], ins->next[i]);
             cbt->ins_stack[i] = &ins->next[i];
-            cbt->next_stack[i] = ins->next[i];
             --i;
         }
     }
