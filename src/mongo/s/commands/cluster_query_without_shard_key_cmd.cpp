@@ -137,17 +137,18 @@ public:
             auto parsedInfoFromRequest = [&] {
                 const auto commandName = request().getWriteCmd().firstElementFieldNameStringData();
 
-                BSONObjBuilder bob(request().getWriteCmd());
-                bob.appendElementsUnique(BSON("$db" << ns().dbName().toString()));
-                auto writeCmdObj = bob.obj();
-
+                // Parse into OpMsgRequest to append the $db field, which is required for command
+                // parsing.
+                const auto opMsgRequest =
+                    OpMsgRequest::fromDBAndBody(nss.db(), request().getWriteCmd());
                 BSONObj query;
                 BSONObj collation;
                 int stmtId = kUninitializedStmtId;
 
-                if (commandName == "update") {
+                if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
                     auto updateRequest = write_ops::UpdateCommandRequest::parse(
-                        IDLParserContext("_clusterQueryWithoutShardKey"), writeCmdObj);
+                        IDLParserContext("_clusterQueryWithoutShardKeyForUpdate"),
+                        opMsgRequest.body);
                     query = updateRequest.getUpdates().front().getQ();
 
                     // In the batch write path, when the request is reconstructed to be passed to
@@ -159,9 +160,10 @@ public:
                     if (auto parsedCollation = updateRequest.getUpdates().front().getCollation()) {
                         collation = *parsedCollation;
                     }
-                } else if (commandName == "delete") {
+                } else if (commandName == write_ops::DeleteCommandRequest::kCommandName) {
                     auto deleteRequest = write_ops::DeleteCommandRequest::parse(
-                        IDLParserContext("_clusterQueryWithoutShardKey"), writeCmdObj);
+                        IDLParserContext("_clusterQueryWithoutShardKeyForDelete"),
+                        opMsgRequest.body);
                     query = deleteRequest.getDeletes().front().getQ();
 
                     // In the batch write path, when the request is reconstructed to be passed to
@@ -173,9 +175,11 @@ public:
                     if (auto parsedCollation = deleteRequest.getDeletes().front().getCollation()) {
                         collation = *parsedCollation;
                     }
-                } else if (commandName == "findAndModify" || commandName == "findandmodify") {
+                } else if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
+                           commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
                     auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
-                        IDLParserContext("_clusterQueryWithoutShardKey"), writeCmdObj);
+                        IDLParserContext("_clusterQueryWithoutShardKeyFindAndModify"),
+                        opMsgRequest.body);
                     query = findAndModifyRequest.getQuery();
                     stmtId = findAndModifyRequest.getStmtId().value_or(kUninitializedStmtId);
 
