@@ -2052,27 +2052,18 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto outerChild = andSortedNode->children[0].get();
     auto innerChild = andSortedNode->children[1].get();
 
-    auto [outerStage, outerOutputs] = build(outerChild, childReqs);
+    auto outerChildReqs = childReqs.copy()
+                              .clear(kSnapshotId)
+                              .clear(kIndexId)
+                              .clear(kIndexKey)
+                              .clear(kIndexKeyPattern);
+    auto [outerStage, outerOutputs] = build(outerChild, outerChildReqs);
+
     auto outerIdSlot = outerOutputs.get(kRecordId);
     auto outerResultSlot = outerOutputs.get(kResult);
 
     auto outerKeySlots = sbe::makeSV(outerIdSlot);
     auto outerProjectSlots = sbe::makeSV(outerResultSlot);
-    if (outerOutputs.has(kSnapshotId)) {
-        outerProjectSlots.push_back(outerOutputs.get(kSnapshotId));
-    }
-
-    if (outerOutputs.has(kIndexId)) {
-        outerProjectSlots.push_back(outerOutputs.get(kIndexId));
-    }
-
-    if (outerOutputs.has(kIndexKey)) {
-        outerProjectSlots.push_back(outerOutputs.get(kIndexKey));
-    }
-
-    if (outerOutputs.has(kIndexKeyPattern)) {
-        outerProjectSlots.push_back(outerOutputs.get(kIndexKeyPattern));
-    }
 
     auto [innerStage, innerOutputs] = build(innerChild, childReqs);
     tassert(5073707, "innerOutputs must contain kRecordId slot", innerOutputs.has(kRecordId));

@@ -73,31 +73,29 @@ void BranchStage::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
     _children[1]->prepare(ctx);
 
+    // All of the slots listed in '_outputVals' must be unique.
     for (size_t idx = 0; idx < _outputVals.size(); ++idx) {
+        auto slot = _outputVals[idx];
+        auto [_, inserted] = dupCheck.insert(slot);
+        uassert(4822831, str::stream() << "duplicate field: " << slot, inserted);
+    }
+
+    for (size_t idx = 0; idx < _outputVals.size(); ++idx) {
+        auto thenSlot = _inputThenVals[idx];
+        auto elseSlot = _inputElseVals[idx];
+
+        // Slots listed in '_inputThenVals' and '_inputElseVals' may not appear in '_outputVals'.
+        bool thenSlotFound = dupCheck.count(thenSlot);
+        bool elseSlotFound = dupCheck.count(elseSlot);
+        uassert(4822829, str::stream() << "duplicate field: " << thenSlot, !thenSlotFound);
+        uassert(4822830, str::stream() << "duplicate field: " << elseSlot, !elseSlotFound);
+
         std::vector<value::SlotAccessor*> accessors;
         accessors.reserve(2);
+        accessors.emplace_back(_children[0]->getAccessor(ctx, thenSlot));
+        accessors.emplace_back(_children[1]->getAccessor(ctx, elseSlot));
 
-        {
-            auto slot = _inputThenVals[idx];
-            auto [it, inserted] = dupCheck.insert(slot);
-            uassert(4822829, str::stream() << "duplicate field: " << slot, inserted);
-
-            accessors.emplace_back(_children[0]->getAccessor(ctx, slot));
-        }
-        {
-            auto slot = _inputElseVals[idx];
-            auto [it, inserted] = dupCheck.insert(slot);
-            uassert(4822830, str::stream() << "duplicate field: " << slot, inserted);
-
-            accessors.emplace_back(_children[1]->getAccessor(ctx, slot));
-        }
-        {
-            auto slot = _outputVals[idx];
-            auto [it, inserted] = dupCheck.insert(slot);
-            uassert(4822831, str::stream() << "duplicate field: " << slot, inserted);
-
-            _outValueAccessors.emplace_back(value::SwitchAccessor{std::move(accessors)});
-        }
+        _outValueAccessors.emplace_back(value::SwitchAccessor{std::move(accessors)});
     }
 
     // compile filter

@@ -175,7 +175,7 @@ PlanState LoopJoinStage::getNext() {
             }
         }
 
-        if (!innerSideMatched && _joinType == JoinType::Left) {
+        if (_joinType == JoinType::Left && !innerSideMatched) {
             for (auto&& [k, v] : _outProjectAccessors) {
                 v.setIndex(1);
             }

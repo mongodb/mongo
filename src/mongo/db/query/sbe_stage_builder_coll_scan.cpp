@@ -83,7 +83,7 @@ makeOplogTimestampSlotsIfNeeded(sbe::RuntimeEnvironment* env,
 
 /**
  * Checks whether a callback function should be created for a ScanStage and returns it, if so. The
- * logic in the provided callback will be executed when the ScanStage is opened or reopened.
+ * logic in the provided callback will be executed when the ScanStage is opened (but not reopened).
  */
 sbe::ScanOpenCallback makeOpenCallbackIfNeeded(const CollectionPtr& collection,
                                                const CollectionScanNode* csn) {
@@ -91,22 +91,20 @@ sbe::ScanOpenCallback makeOpenCallbackIfNeeded(const CollectionPtr& collection,
         invariant(!csn->tailable);
         invariant(collection->ns().isOplog());
 
-        return [](OperationContext* opCtx, const CollectionPtr& collection, bool reOpen) {
-            if (!reOpen) {
-                // Forward, non-tailable scans from the oplog need to wait until all oplog entries
-                // before the read begins to be visible. This isn't needed for reverse scans because
-                // we only hide oplog entries from forward scans, and it isn't necessary for tailing
-                // cursors because they ignore EOF and will eventually see all writes. Forward,
-                // non-tailable scans are the only case where a meaningful EOF will be seen that
-                // might not include writes that finished before the read started. This also must be
-                // done before we create the cursor as that is when we establish the endpoint for
-                // the cursor. Also call abandonSnapshot to make sure that we are using a fresh
-                // storage engine snapshot while waiting. Otherwise, we will end up reading from the
-                // snapshot where the oplog entries are not yet visible even after the wait.
+        return [](OperationContext* opCtx, const CollectionPtr& collection) {
+            // Forward, non-tailable scans from the oplog need to wait until all oplog entries
+            // before the read begins to be visible. This isn't needed for reverse scans because
+            // we only hide oplog entries from forward scans, and it isn't necessary for tailing
+            // cursors because they ignore EOF and will eventually see all writes. Forward,
+            // non-tailable scans are the only case where a meaningful EOF will be seen that
+            // might not include writes that finished before the read started. This also must be
+            // done before we create the cursor as that is when we establish the endpoint for
+            // the cursor. Also call abandonSnapshot to make sure that we are using a fresh
+            // storage engine snapshot while waiting. Otherwise, we will end up reading from the
+            // snapshot where the oplog entries are not yet visible even after the wait.
 
-                opCtx->recoveryUnit()->abandonSnapshot();
-                collection->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
-            }
+            opCtx->recoveryUnit()->abandonSnapshot();
+            collection->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
         };
     }
     return {};

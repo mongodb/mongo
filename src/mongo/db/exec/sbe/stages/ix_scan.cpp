@@ -44,7 +44,7 @@ IndexScanStageBase::IndexScanStageBase(StringData stageType,
                                        UUID collUuid,
                                        StringData indexName,
                                        bool forward,
-                                       boost::optional<value::SlotId> recordSlot,
+                                       boost::optional<value::SlotId> indexKeySlot,
                                        boost::optional<value::SlotId> recordIdSlot,
                                        boost::optional<value::SlotId> snapshotIdSlot,
                                        IndexKeysInclusionSet indexKeysToInclude,
@@ -56,7 +56,7 @@ IndexScanStageBase::IndexScanStageBase(StringData stageType,
       _collUuid(collUuid),
       _indexName(indexName),
       _forward(forward),
-      _recordSlot(recordSlot),
+      _indexKeySlot(indexKeySlot),
       _recordIdSlot(recordIdSlot),
       _snapshotIdSlot(snapshotIdSlot),
       _indexKeysToInclude(indexKeysToInclude),
@@ -65,7 +65,7 @@ IndexScanStageBase::IndexScanStageBase(StringData stageType,
 }
 
 void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
-    if (_recordSlot) {
+    if (_indexKeySlot) {
         _recordAccessor = std::make_unique<value::OwnedValueAccessor>();
     }
 
@@ -100,14 +100,12 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
     _ordering = _entry->ordering();
 
     if (_snapshotIdAccessor) {
-        _snapshotIdAccessor->reset(
-            value::TypeTags::NumberInt64,
-            value::bitcastFrom<uint64_t>(_opCtx->recoveryUnit()->getSnapshotId().toNumber()));
+        _latestSnapshotId = _opCtx->recoveryUnit()->getSnapshotId().toNumber();
     }
 }
 
 value::SlotAccessor* IndexScanStageBase::getAccessor(CompileCtx& ctx, value::SlotId slot) {
-    if (_recordSlot && *_recordSlot == slot) {
+    if (_indexKeySlot && *_indexKeySlot == slot) {
         return _recordAccessor.get();
     }
 
@@ -187,9 +185,7 @@ void IndexScanStageBase::doRestoreState(bool relinquishCursor) {
     // Yield is the only time during plan execution that the snapshotId can change. As such, we
     // update it accordingly as part of yield recovery.
     if (_snapshotIdAccessor) {
-        _snapshotIdAccessor->reset(
-            value::TypeTags::NumberInt64,
-            value::bitcastFrom<uint64_t>(_opCtx->recoveryUnit()->getSnapshotId().toNumber()));
+        _latestSnapshotId = _opCtx->recoveryUnit()->getSnapshotId().toNumber();
     }
 }
 
@@ -217,28 +213,31 @@ PlanStage::TrialRunTrackerAttachResultMask IndexScanStageBase::doAttachToTrialRu
 
 void IndexScanStageBase::openImpl(bool reOpen) {
     _commonStats.opens++;
-    invariant(_opCtx);
 
-    if (_open) {
-        tassert(5071006, "reopened IndexScanStageBase but reOpen=false", reOpen);
-        tassert(5071007, "IndexScanStageBase is open but _coll is null", _coll);
-        tassert(5071008, "IndexScanStageBase is open but don't have _cursor", _cursor);
-    } else {
-        tassert(5071009, "first open to IndexScanStageBase but reOpen=true", !reOpen);
-        if (!_coll) {
-            // We're being opened after 'close()'. We need to re-acquire '_coll' in this case and
-            // make some validity checks (the collection has not been dropped, renamed, etc.).
-            tassert(5071010, "IndexScanStageBase is not open but have _cursor", !_cursor);
-            restoreCollectionAndIndex();
-        }
+    dassert(_opCtx);
+
+    if (reOpen) {
+        dassert(_open && _coll && _cursor);
+        _scanState = ScanState::kNeedSeek;
+        return;
     }
 
-    _open = true;
-    _scanState = ScanState::kNeedSeek;
+    tassert(5071009, "first open to IndexScanStageBase but reOpen=true", !_open);
+
+    if (!_coll) {
+        // We're being opened for the first time after 'close()', or we're being opened for the
+        // first time ever. We need to re-acquire '_coll' in this case and make some validity
+        // checks (the collection has not been dropped, renamed, etc).
+        tassert(5071010, "IndexScanStageBase is not open but have _cursor", !_cursor);
+        restoreCollectionAndIndex();
+    }
 
     if (!_cursor) {
         _cursor = _entry->accessMethod()->asSortedData()->newCursor(_opCtx, _forward);
     }
+
+    _open = true;
+    _scanState = ScanState::kNeedSeek;
 }
 
 void IndexScanStageBase::trackRead() {
@@ -291,6 +290,12 @@ PlanState IndexScanStageBase::getNext() {
             false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_nextRecord->loc));
     }
 
+    if (_snapshotIdAccessor) {
+        // Copy the latest snapshot ID into the 'snapshotId' slot.
+        _snapshotIdAccessor->reset(value::TypeTags::NumberInt64,
+                                   value::bitcastFrom<uint64_t>(_latestSnapshotId));
+    }
+
     if (_accessors.size()) {
         _valuesBuffer.reset();
         readKeyStringValueIntoAccessors(
@@ -321,8 +326,8 @@ std::unique_ptr<PlanStageStats> IndexScanStageBase::getStats(bool includeDebugIn
         bob.appendNumber("keysExamined", static_cast<long long>(_specificStats.keysExamined));
         bob.appendNumber("seeks", static_cast<long long>(_specificStats.seeks));
         bob.appendNumber("numReads", static_cast<long long>(_specificStats.numReads));
-        if (_recordSlot) {
-            bob.appendNumber("recordSlot", static_cast<long long>(*_recordSlot));
+        if (_indexKeySlot) {
+            bob.appendNumber("indexKeySlot", static_cast<long long>(*_indexKeySlot));
         }
         if (_recordIdSlot) {
             bob.appendNumber("recordIdSlot", static_cast<long long>(*_recordIdSlot));
@@ -343,8 +348,8 @@ const SpecificStats* IndexScanStageBase::getSpecificStats() const {
 }
 
 void IndexScanStageBase::debugPrintImpl(std::vector<DebugPrinter::Block>& blocks) const {
-    if (_recordSlot) {
-        DebugPrinter::addIdentifier(blocks, _recordSlot.value());
+    if (_indexKeySlot) {
+        DebugPrinter::addIdentifier(blocks, _indexKeySlot.value());
     } else {
         DebugPrinter::addIdentifier(blocks, DebugPrinter::kNoneKeyword);
     }
@@ -403,7 +408,7 @@ std::string IndexScanStageBase::getIndexName() const {
 SimpleIndexScanStage::SimpleIndexScanStage(UUID collUuid,
                                            StringData indexName,
                                            bool forward,
-                                           boost::optional<value::SlotId> recordSlot,
+                                           boost::optional<value::SlotId> indexKeySlot,
                                            boost::optional<value::SlotId> recordIdSlot,
                                            boost::optional<value::SlotId> snapshotIdSlot,
                                            IndexKeysInclusionSet indexKeysToInclude,
@@ -417,7 +422,7 @@ SimpleIndexScanStage::SimpleIndexScanStage(UUID collUuid,
                          collUuid,
                          indexName,
                          forward,
-                         recordSlot,
+                         indexKeySlot,
                          recordIdSlot,
                          snapshotIdSlot,
                          indexKeysToInclude,
@@ -436,7 +441,7 @@ std::unique_ptr<PlanStage> SimpleIndexScanStage::clone() const {
     return std::make_unique<SimpleIndexScanStage>(_collUuid,
                                                   _indexName,
                                                   _forward,
-                                                  _recordSlot,
+                                                  _indexKeySlot,
                                                   _recordIdSlot,
                                                   _snapshotIdSlot,
                                                   _indexKeysToInclude,
@@ -609,7 +614,7 @@ bool SimpleIndexScanStage::validateKey(const boost::optional<KeyStringEntry>& ke
 GenericIndexScanStage::GenericIndexScanStage(UUID collUuid,
                                              StringData indexName,
                                              GenericIndexScanStageParams params,
-                                             boost::optional<value::SlotId> recordSlot,
+                                             boost::optional<value::SlotId> indexKeySlot,
                                              boost::optional<value::SlotId> recordIdSlot,
                                              boost::optional<value::SlotId> snapshotIdSlot,
                                              IndexKeysInclusionSet indexKeysToInclude,
@@ -621,7 +626,7 @@ GenericIndexScanStage::GenericIndexScanStage(UUID collUuid,
                          collUuid,
                          indexName,
                          params.direction == 1,
-                         recordSlot,
+                         indexKeySlot,
                          recordIdSlot,
                          snapshotIdSlot,
                          indexKeysToInclude,
@@ -640,7 +645,7 @@ std::unique_ptr<PlanStage> GenericIndexScanStage::clone() const {
     return std::make_unique<GenericIndexScanStage>(_collUuid,
                                                    _indexName,
                                                    std::move(params),
-                                                   _recordSlot,
+                                                   _indexKeySlot,
                                                    _recordIdSlot,
                                                    _snapshotIdSlot,
                                                    _indexKeysToInclude,

@@ -39,7 +39,7 @@
 
 namespace mongo {
 namespace sbe {
-using ScanOpenCallback = std::function<void(OperationContext*, const CollectionPtr&, bool)>;
+using ScanOpenCallback = std::function<void(OperationContext*, const CollectionPtr&)>;
 
 struct ScanCallbacks {
     ScanCallbacks(IndexKeyCorruptionCheckCallback indexKeyCorruptionCheck = {},
@@ -149,6 +149,8 @@ private:
     static uint64_t computeFieldMask(const char* name, size_t length) {
         return uint64_t{1} << computeFieldMaskOffset(name, length);
     }
+
+    void initKey();
 
     value::OwnedValueAccessor* getFieldAccessor(StringData name, size_t offset) const;
 

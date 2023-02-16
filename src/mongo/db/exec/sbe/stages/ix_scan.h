@@ -45,7 +45,7 @@ namespace mongo::sbe {
  * 'GenericIndexScanStage'.
  *
  * The "output" slots are
- *   - 'recordSlot': the "KeyString" representing the index entry,
+ *   - 'indexKeySlot': the "KeyString" representing the index entry,
  *   - 'recordIdSlot': a reference that can be used to fetch the entire document,
  *   - 'snapshotIdSlot': the storage snapshot that this index scan is reading from, and
  *   - 'vars': one slot for each value in the index key that should be "projected" out of the entry.
@@ -63,7 +63,7 @@ public:
                        UUID collUuid,
                        StringData indexName,
                        bool forward,
-                       boost::optional<value::SlotId> recordSlot,
+                       boost::optional<value::SlotId> indexKeySlot,
                        boost::optional<value::SlotId> recordIdSlot,
                        boost::optional<value::SlotId> snapshotIdSlot,
                        IndexKeysInclusionSet indexKeysToInclude,
@@ -128,7 +128,7 @@ protected:
     const UUID _collUuid;
     const std::string _indexName;
     const bool _forward;
-    const boost::optional<value::SlotId> _recordSlot;
+    const boost::optional<value::SlotId> _indexKeySlot;
     const boost::optional<value::SlotId> _recordIdSlot;
     const boost::optional<value::SlotId> _snapshotIdSlot;
     const IndexKeysInclusionSet _indexKeysToInclude;
@@ -146,6 +146,11 @@ protected:
     std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _snapshotIdAccessor;
+
+    // This field holds the latest snapshot ID that we've received from _opCtx->recoveryUnit().
+    // This field gets initialized by prepare(), and it gets updated each time doRestoreState() is
+    // called.
+    uint64_t _latestSnapshotId{0};
 
     // One accessor and slot for each key component that this stage will bind from an index entry's
     // KeyString. The accessors are in the same order as the key components they bind to.
@@ -182,10 +187,10 @@ protected:
  *
  * Debug string representation:
  *
- *   ixscan recordSlot? recordIdSlot? snapshotIdSlot? [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
+ *   ixscan indexKeySlot? recordIdSlot? snapshotIdSlot? [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
  *                      collectionUuid indexName forward
  *
- *   ixseek lowKey highKey recordSlot? recordIdSlot? snapshotIdSlot?
+ *   ixseek lowKey highKey indexKeySlot? recordIdSlot? snapshotIdSlot?
  *          [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
  *          collectionUuid indexName forward
  */
@@ -194,7 +199,7 @@ public:
     SimpleIndexScanStage(UUID collUuid,
                          StringData indexName,
                          bool forward,
-                         boost::optional<value::SlotId> recordSlot,
+                         boost::optional<value::SlotId> indexKeySlot,
                          boost::optional<value::SlotId> recordIdSlot,
                          boost::optional<value::SlotId> snapshotIdSlot,
                          IndexKeysInclusionSet indexKeysToInclude,
@@ -245,7 +250,7 @@ private:
  *
  * Debug string representation:
  *
- *   ixscan_generic indexBounds recordSlot? recordIdSlot? snapshotIdSlot?
+ *   ixscan_generic indexBounds indexKeySlot? recordIdSlot? snapshotIdSlot?
  *                  [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
  *                  collectionUuid indexName forward
  */
@@ -261,7 +266,7 @@ public:
     GenericIndexScanStage(UUID collUuid,
                           StringData indexName,
                           GenericIndexScanStageParams params,
-                          boost::optional<value::SlotId> recordSlot,
+                          boost::optional<value::SlotId> indexKeySlot,
                           boost::optional<value::SlotId> recordIdSlot,
                           boost::optional<value::SlotId> snapshotIdSlot,
                           IndexKeysInclusionSet indexKeysToInclude,

@@ -628,6 +628,9 @@ struct StageBuilderState {
 
     // Holds the mapping between the custom ABT variable names and the slot id they are referencing.
     optimizer::SlotVarMap slotVarMap;
+
+    StringMap<sbe::value::SlotId> stringConstantToSlotMap;
+    SimpleBSONObjMap<sbe::value::SlotId> keyPatternToSlotMap;
 };
 
 /**

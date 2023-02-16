@@ -67,10 +67,15 @@ std::unique_ptr<PlanStage> UnionStage::clone() const {
 }
 
 void UnionStage::prepare(CompileCtx& ctx) {
-    value::SlotSet dupCheck;
-
     for (size_t childNum = 0; childNum < _children.size(); childNum++) {
         _children[childNum]->prepare(ctx);
+    }
+
+    // All of the slots listed in '_outputVals' must be unique.
+    value::SlotSet dupCheck;
+    for (auto slot : _outputVals) {
+        auto [it, inserted] = dupCheck.insert(slot);
+        uassert(4822807, str::stream() << "duplicate field: " << slot, inserted);
     }
 
     for (size_t idx = 0; idx < _outputVals.size(); ++idx) {
@@ -78,16 +83,13 @@ void UnionStage::prepare(CompileCtx& ctx) {
         accessors.reserve(_children.size());
 
         for (size_t childNum = 0; childNum < _children.size(); childNum++) {
+            // Slots listed in '_inputVals' may not appear in '_outputVals'.
             auto slot = _inputVals[childNum][idx];
-            auto [it, inserted] = dupCheck.insert(slot);
-            uassert(4822806, str::stream() << "duplicate field: " << slot, inserted);
+            bool slotFound = dupCheck.count(slot);
+            uassert(4822806, str::stream() << "duplicate field: " << slot, !slotFound);
 
             accessors.emplace_back(_children[childNum]->getAccessor(ctx, slot));
         }
-
-        auto slot = _outputVals[idx];
-        auto [it, inserted] = dupCheck.insert(slot);
-        uassert(4822807, str::stream() << "duplicate field: " << slot, inserted);
 
         _outValueAccessors.emplace_back(value::SwitchAccessor{std::move(accessors)});
     }

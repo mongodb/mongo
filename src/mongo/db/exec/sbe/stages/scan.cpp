@@ -330,52 +330,63 @@ RecordCursor* ScanStage::getActiveCursor() const {
     return _useRandomCursor ? _randomCursor.get() : _cursor.get();
 }
 
+void ScanStage::initKey() {
+    auto [tag, val] = _seekKeyAccessor->getViewOfValue();
+    const auto msgTag = tag;
+    tassert(7104002,
+            str::stream() << "Seek key is wrong type: " << msgTag,
+            tag == value::TypeTags::RecordId);
+
+    _key = *value::getRecordIdView(val);
+}
+
 void ScanStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
 
     _commonStats.opens++;
-    invariant(_opCtx);
 
-    if (_open) {
-        tassert(5071001, "reopened ScanStage but reOpen=false", reOpen);
-        tassert(5071002, "ScanStage is open but _coll is not null", _coll);
-        tassert(5071003, "ScanStage is open but doesn't have a cursor", getActiveCursor());
-    } else {
-        tassert(5071004, "first open to ScanStage but reOpen=true", !reOpen);
-        if (!_coll) {
-            // We're being opened after 'close()'. We need to re-acquire '_coll' in this case and
-            // make some validity checks (the collection has not been dropped, renamed, etc.).
-            tassert(5071005, "ScanStage is not open but has a cursor", !getActiveCursor());
-            tassert(5777401, "Collection name should be initialized", _collName);
-            tassert(5777402, "Catalog epoch should be initialized", _catalogEpoch);
-            _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+    dassert(_opCtx);
+
+    // Fast-path for handling the case where 'reOpen' is true.
+    if (MONGO_likely(reOpen)) {
+        dassert(_open && _coll && getActiveCursor());
+
+        if (_seekKeyAccessor) {
+            initKey();
+        } else if (!_useRandomCursor) {
+            _cursor = _coll->getCursor(_opCtx, _forward);
+        } else {
+            _randomCursor = _coll->getRecordStore()->getRandomCursor(_opCtx);
         }
+
+        _firstGetNext = true;
+        return;
     }
+
+    // If we reach here, 'reOpen' is false. That means this stage is either being opened for the
+    // first time ever, or this stage is being opened for the first time after calling close().
+    tassert(5071004, "first open to ScanStage but reOpen=true", !reOpen && !_open);
+    tassert(5071005, "ScanStage is not open but has a cursor", !getActiveCursor());
+    tassert(5777401, "Collection name should be initialized", _collName);
+    tassert(5777402, "Catalog epoch should be initialized", _catalogEpoch);
+
+    // We need to re-acquire '_coll' in this case and make some validity checks (the collection has
+    // not been dropped, renamed, etc).
+    _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+
+    tassert(5959701, "restoreCollection() unexpectedly returned null in ScanStage", _coll);
 
     if (_scanCallbacks.scanOpenCallback) {
-        _scanCallbacks.scanOpenCallback(_opCtx, _coll, reOpen);
+        _scanCallbacks.scanOpenCallback(_opCtx, _coll);
     }
 
-    if (_coll) {
-        if (_seekKeyAccessor) {
-            auto [tag, val] = _seekKeyAccessor->getViewOfValue();
-            const auto msgTag = tag;
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << "seek key is wrong type: " << msgTag,
-                    tag == value::TypeTags::RecordId);
-
-            _key = *value::getRecordIdView(val);
-        }
-
-        if (!_cursor || !_seekKeyAccessor) {
-            if (_useRandomCursor) {
-                _randomCursor = _coll->getRecordStore()->getRandomCursor(_opCtx);
-            } else {
-                _cursor = _coll->getCursor(_opCtx, _forward);
-            }
-        }
+    if (_seekKeyAccessor) {
+        initKey();
+        _cursor = _coll->getCursor(_opCtx, _forward);
+    } else if (!_useRandomCursor) {
+        _cursor = _coll->getCursor(_opCtx, _forward);
     } else {
-        MONGO_UNREACHABLE_TASSERT(5959701);
+        _randomCursor = _coll->getRecordStore()->getRandomCursor(_opCtx);
     }
 
     _open = true;
