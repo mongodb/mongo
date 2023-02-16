@@ -7,7 +7,7 @@
  * listIndexes and subsequently re-apply the single-phase index build entry.
  *
  * @tags: [
- *     requires_fcv_70,
+ *     requires_fcv_63,
  * ]
  */
 
