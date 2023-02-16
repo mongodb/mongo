@@ -20,7 +20,7 @@ Each check should be contained in its own `cpp` and `h` file, and have one or mo
 
 A simple unittest framework is included with the checks so that they will automatically be run in quick, isolated, and minimal fashion. This allows for faster development and ensures the checks continue working.
 
-The `test` directory contains the python unittest script, the test source files, and the SConscript which builds and runs the tests. NOTE: The python unittest script requires arguments to function correctly, you must supply compile_commands.json files matching the correct location and filename to the corresponding tests. For this reason, you should use the scons build as the interface for running the tests as it will create the compile_commands files, and run the unittest script automatically with the correct arguments. To build and test the checks use the scons command `python buildscripts/scons.py --build-profile=compiledb VERBOSE=1 +mongo_tidy_tests`. Note that currently the `--ninja` option does not support running the mongo tidy unittests.
+The `test` directory contains the python unittest script, the test source files, and the SConscript which builds and runs the tests. NOTE: The python unittest script requires arguments to function correctly, you must supply compile_commands.json files matching the correct location and filename to the corresponding tests. For this reason, you should use the scons build as the interface for running the tests as it will create the compile_commands files, and run the unittest script automatically with the correct arguments. To build and test the checks use the scons command `python buildscripts/scons.py --build-profile=compiledb VERBOSE=1 +mongo-tidy-tests`. Note that currently the `--ninja` option does not support running the mongo tidy unittests.
 
 #### Writing your own check checklist
 
@@ -33,7 +33,7 @@ Below is a checklist of all the steps to make sure to perform when writing a new
 5. Write a unittest file named `tests/test_{CHECK_NAME}.cpp` which minimally reproduces the issue.
 6. Add the test file to the list of test sources in `tests/SConscript`.
 7. Add a `def test_{CHECK_NAME}():` function to the `MongoTidyCheck_unittest.py` file which writes the config file, and finds the expected error output in the stdout. Reference the other check funcions for details.
-8. Run the scons build with `python buildscripts/scons.py --build-profile=compiledb VERBOSE=1 +mongo_tidy_tests` to run the tests and see the detailed output of each test.
+8. Run the scons build with `python buildscripts/scons.py --build-profile=compiledb VERBOSE=1 +mongo-tidy-tests` to run the tests and see the detailed output of each test.
 
 #### Questions and Troubleshooting
 
