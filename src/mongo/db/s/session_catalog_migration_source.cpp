@@ -50,6 +50,7 @@
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -483,11 +484,23 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock lk, OperationCo
             // oplog entries derived from it to the oplog buffer.
 
             if (isInternalSessionForRetryableWrite(*nextOplog->getSessionId())) {
-                invariant(nextOplog->getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
-                // Derive retryable write oplog entries from this retryable internal transaction
-                // applyOps oplog entry, and add them to the oplog buffer.
-                _extractOplogEntriesForInternalTransactionForRetryableWrite(
-                    lk, *nextOplog, &_unprocessedOplogBuffer);
+                if (nextOplog->getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
+                    // Derive retryable write oplog entries from this retryable internal transaction
+                    // applyOps oplog entry, and add them to the oplog buffer.
+                    _extractOplogEntriesForInternalTransactionForRetryableWrite(
+                        lk, *nextOplog, &_unprocessedOplogBuffer);
+                } else {
+                    tassert(7393800,
+                            str::stream() << "Found an oplog entry for a retrayble internal "
+                                             "transaction with an unexpected type"
+                                          << redact(nextOplog->toBSONForLogging()),
+                            nextOplog->getOpType() == repl::OpTypeEnum::kNoop);
+                    if (!nextOplog->getStatementIds().empty() &&
+                        !shouldSkipOplogEntry(nextOplog.value(), _keyPattern, _chunkRange)) {
+                        _unprocessedOplogBuffer.emplace_back(*nextOplog);
+                    }
+                }
+
                 continue;
             }
 
