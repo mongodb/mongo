@@ -410,7 +410,8 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
                                            false,
                                            CollectionValidation::RepairMode::kNone,
                                            &validateResults,
-                                           &bob));
+                                           &bob,
+                                           /*logDiagnostics=*/false));
         ASSERT_TRUE(validateResults.valid);
     }
 

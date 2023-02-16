@@ -105,8 +105,14 @@ void foregroundValidate(OperationContext* opCtx,
     for (auto options : optionsList) {
         ValidateResults validateResults;
         BSONObjBuilder output;
-        ASSERT_OK(CollectionValidation::validate(
-            opCtx, kNss, options, /*background*/ false, repairMode, &validateResults, &output));
+        ASSERT_OK(CollectionValidation::validate(opCtx,
+                                                 kNss,
+                                                 options,
+                                                 /*background*/ false,
+                                                 repairMode,
+                                                 &validateResults,
+                                                 &output,
+                                                 /*logDiagnostics=*/false));
         ASSERT_EQ(validateResults.valid, valid);
         ASSERT_EQ(validateResults.errors.size(), static_cast<long unsigned int>(numErrors));
 
@@ -145,7 +151,8 @@ void backgroundValidate(OperationContext* opCtx,
                                        /*background*/ true,
                                        CollectionValidation::RepairMode::kNone,
                                        &validateResults,
-                                       &output));
+                                       &output,
+                                       /*logDiagnostics=*/false));
     BSONObj obj = output.obj();
 
     ASSERT_EQ(validateResults.valid, valid);

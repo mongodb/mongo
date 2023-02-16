@@ -56,13 +56,13 @@ ValidateState::ValidateState(OperationContext* opCtx,
                              bool background,
                              ValidateOptions options,
                              RepairMode repairMode,
-                             bool turnOnExtraLoggingForTest)
+                             bool logDiagnostics)
     : _nss(nss),
       _background(background),
       _options(options),
       _repairMode(repairMode),
       _dataThrottle(opCtx),
-      _extraLoggingForTest(turnOnExtraLoggingForTest) {
+      _logDiagnostics(logDiagnostics) {
 
     // Subsequent re-locks will use the UUID when 'background' is true.
     if (isBackground()) {

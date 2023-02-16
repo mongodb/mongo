@@ -174,7 +174,8 @@ Status repairCollections(OperationContext* opCtx,
                                                 background,
                                                 CollectionValidation::RepairMode::kRepair,
                                                 &validateResults,
-                                                &output);
+                                                &output,
+                                                /*logDiagnostics=*/false);
         if (!status.isOK()) {
             return status;
         }

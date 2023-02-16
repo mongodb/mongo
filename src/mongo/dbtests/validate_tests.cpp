@@ -51,7 +51,7 @@ using std::unique_ptr;
 namespace {
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
-const bool kTurnOnExtraLoggingForTest = true;
+const bool kLogDiagnostics = true;
 
 }  // namespace
 
@@ -110,14 +110,8 @@ protected:
         ValidateResults results;
         BSONObjBuilder output;
 
-        ASSERT_OK(CollectionValidation::validate(&_opCtx,
-                                                 _nss,
-                                                 options,
-                                                 _background,
-                                                 repairMode,
-                                                 &results,
-                                                 &output,
-                                                 kTurnOnExtraLoggingForTest));
+        ASSERT_OK(CollectionValidation::validate(
+            &_opCtx, _nss, options, _background, repairMode, &results, &output, kLogDiagnostics));
 
         //  Check if errors are reported if and only if valid is set to false.
         ASSERT_EQ(results.valid, results.errors.empty());
@@ -1221,7 +1215,7 @@ public:
                 CollectionValidation::RepairMode::kNone,
                 &results,
                 &output,
-                kTurnOnExtraLoggingForTest));
+                kLogDiagnostics));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1344,7 +1338,7 @@ public:
                 CollectionValidation::RepairMode::kNone,
                 &results,
                 &output,
-                kTurnOnExtraLoggingForTest));
+                kLogDiagnostics));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1444,7 +1438,7 @@ public:
                 CollectionValidation::RepairMode::kNone,
                 &results,
                 &output,
-                kTurnOnExtraLoggingForTest));
+                kLogDiagnostics));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1913,7 +1907,7 @@ public:
                 CollectionValidation::RepairMode::kNone,
                 &results,
                 &output,
-                kTurnOnExtraLoggingForTest));
+                kLogDiagnostics));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1943,7 +1937,7 @@ public:
                 CollectionValidation::RepairMode::kRepair,
                 &results,
                 &output,
-                kTurnOnExtraLoggingForTest));
+                kLogDiagnostics));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1974,7 +1968,7 @@ public:
                 CollectionValidation::RepairMode::kRepair,
                 &results,
                 &output,
-                kTurnOnExtraLoggingForTest));
+                kLogDiagnostics));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -2114,7 +2108,7 @@ public:
                 CollectionValidation::RepairMode::kNone,
                 &results,
                 &output,
-                kTurnOnExtraLoggingForTest));
+                kLogDiagnostics));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -2144,7 +2138,7 @@ public:
                 CollectionValidation::RepairMode::kRepair,
                 &results,
                 &output,
-                kTurnOnExtraLoggingForTest));
+                kLogDiagnostics));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -2174,7 +2168,7 @@ public:
                 CollectionValidation::RepairMode::kNone,
                 &results,
                 &output,
-                kTurnOnExtraLoggingForTest));
+                kLogDiagnostics));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
