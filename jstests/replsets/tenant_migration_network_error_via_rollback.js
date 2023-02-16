@@ -11,8 +11,8 @@
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   # The currentOp output field 'migrationCompleted' was renamed to 'garbageCollectable'.
- *   requires_fcv_61,
+ *   # The currentOp output field 'dataSyncCompleted' was renamed to 'migrationCompleted'.
+ *   requires_fcv_70,
  *   serverless,
  * ]
  */
@@ -134,7 +134,7 @@ function runTest({failPointName, failPointData = {}, batchSize = 10 * 1000}) {
     res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
     currOp = res.inprog[0];
     assert.eq(currOp.garbageCollectable, false, () => tojson(currOp));
-    assert.eq(currOp.dataSyncCompleted, false, () => tojson(currOp));
+    assert.eq(currOp.migrationCompleted, false, () => tojson(currOp));
 
     // The sync source has not rolled back, so the recipient has not yet perceived an interruption.
     assert.eq(NumberLong(0), currOp.numRestartsDueToDonorConnectionFailure, () => tojson(currOp));
@@ -164,7 +164,7 @@ function runTest({failPointName, failPointData = {}, batchSize = 10 * 1000}) {
 
     // The migration should still be considered active as it is not yet forgotten.
     assert.eq(currOp.garbageCollectable, false, () => tojson(currOp));
-    assert.eq(currOp.dataSyncCompleted, false, () => tojson(currOp));
+    assert.eq(currOp.migrationCompleted, false, () => tojson(currOp));
 
     // A restart was necessary, due to the sync source closing connections on rollback.
     assert.eq(NumberLong(1), currOp.numRestartsDueToDonorConnectionFailure, () => tojson(currOp));

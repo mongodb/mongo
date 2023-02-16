@@ -447,7 +447,8 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     bob.append("readPreference", _readPreference.toInnerBSON());
     bob.append("receivedCancellation", _abortRequested);
     if (_durableState) {
-        bob.append("lastDurableState", _durableState.value().state);
+        bob.append("lastDurableState",
+                   TenantMigrationDonorState_serializer(_durableState.get().state));
     } else {
         bob.appendUndefined("lastDurableState");
     }

@@ -244,6 +244,14 @@ last-continuous:
     ticket: SERVER-66719
   - test_file: jstests/replsets/prepared_transaction_kill_during_step_up_refresh.js
     ticket: SERVER-66854
+  - test_file: jstests/replsets/tenant_migration_donor_current_op.js
+    ticket: SERVER-66749
+  - test_file: jstests/replsets/tenant_migration_recipient_retry_forget_migration.js
+    ticket: SERVER-66749
+  - test_file: jstests/replsets/tenant_migrations_back_to_back.js
+    ticket: SERVER-66749
+  - test_file: jstests/replsets/tenant_migration_concurrent_migrations_stress_test.js
+    ticket: SERVER-66749
   - test_file: jstests/replsets/step_up_kill_abort_transactions.js
     ticket: SERVER-66854
   - test_file: jstests/sharding/drop_index_fails_if_multikey_index_is_last_compatible.js
@@ -633,6 +641,14 @@ last-lts:
     ticket: SERVER-66719
   - test_file: jstests/replsets/prepared_transaction_kill_during_step_up_refresh.js
     ticket: SERVER-66854
+  - test_file: jstests/replsets/tenant_migration_donor_current_op.js
+    ticket: SERVER-66749
+  - test_file: jstests/replsets/tenant_migration_recipient_retry_forget_migration.js
+    ticket: SERVER-66749
+  - test_file: jstests/replsets/tenant_migrations_back_to_back.js
+    ticket: SERVER-66749
+  - test_file: jstests/replsets/tenant_migration_concurrent_migrations_stress_test.js
+    ticket: SERVER-66749
   - test_file: jstests/replsets/step_up_kill_abort_transactions.js
     ticket: SERVER-66854
   - test_file: jstests/sharding/drop_index_fails_if_multikey_index_is_last_compatible.js

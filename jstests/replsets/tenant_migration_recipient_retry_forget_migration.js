@@ -7,6 +7,8 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
+ *   # The currentOp output field 'state' was changed from an enum value to a string.
+ *   requires_fcv_70,
  * ]
  */
 
@@ -72,7 +74,7 @@ let currOp = assert
                  .commandWorked(recipientPrimary.adminCommand(
                      {currentOp: true, desc: "tenant recipient migration"}))
                  .inprog[0];
-assert.eq(currOp.state, 3 /* kDone */, currOp);
+assert.eq(currOp.state, TenantMigrationTest.RecipientState.kDone, currOp);
 assert(!currOp.hasOwnProperty("expireAt"), currOp);
 
 // Test that we can still read from the recipient.
@@ -109,7 +111,7 @@ currOp = assert
              .commandWorked(newRecipientPrimary.adminCommand(
                  {currentOp: true, desc: "tenant recipient migration"}))
              .inprog[0];
-assert.eq(currOp.state, 3 /* kDone */, currOp);
+assert.eq(currOp.state, TenantMigrationTest.RecipientState.kDone, currOp);
 assert(currOp.hasOwnProperty("expireAt"), currOp);
 
 tenantMigrationTest.stop();

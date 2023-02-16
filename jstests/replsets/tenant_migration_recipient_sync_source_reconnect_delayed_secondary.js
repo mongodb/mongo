@@ -13,8 +13,8 @@
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   # The currentOp output field 'migrationCompleted' was renamed to 'garbageCollectable'.
- *   requires_fcv_61,
+ *   # The currentOp output field 'dataSyncCompleted' was renamed to 'migrationCompleted'.
+ *   requires_fcv_70,
  *   serverless,
  * ]
  */

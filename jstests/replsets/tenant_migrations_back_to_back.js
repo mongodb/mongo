@@ -10,6 +10,8 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
+ *   # The currentOp output field 'lastDurableState' was changed from an enum value to a string.
+ *   requires_fcv_70,
  * ]
  */
 
@@ -102,12 +104,11 @@ assert.eq(
     mtabStatus.recipient.state, TenantMigrationTest.RecipientAccessState.kRejectBefore, mtabStatus);
 assert(mtabStatus.recipient.hasOwnProperty("rejectBeforeTimestamp"), mtabStatus);
 
-// The server value representation of the donor blocking state.
-const kBlocking = 3;
 const res = assert.commandWorked(
     donor2Primary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
 assert.eq(bsonWoCompare(res.inprog[0].instanceID, migration2Id), 0, tojson(res.inprog));
-assert.eq(res.inprog[0].lastDurableState, kBlocking, tojson(res.inprog));
+assert.eq(
+    res.inprog[0].lastDurableState, TenantMigrationTest.DonorState.kBlocking, tojson(res.inprog));
 
 // Get the block timestamp for this new migration.
 const donorDoc2 =

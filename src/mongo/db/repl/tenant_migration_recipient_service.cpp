@@ -443,8 +443,8 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
     }
     bob.append("donorConnectionString", _stateDoc.getDonorConnectionString());
     bob.append("readPreference", _stateDoc.getReadPreference().toInnerBSON());
-    bob.append("state", _stateDoc.getState());
-    bob.append("dataSyncCompleted", _dataSyncCompletionPromise.getFuture().isReady());
+    bob.append("state", TenantMigrationRecipientState_serializer(_stateDoc.getState()));
+    bob.append("migrationCompleted", _dataSyncCompletionPromise.getFuture().isReady());
     bob.append("garbageCollectable", _forgetMigrationDurablePromise.getFuture().isReady());
     bob.append("numRestartsDueToDonorConnectionFailure",
                _stateDoc.getNumRestartsDueToDonorConnectionFailure());

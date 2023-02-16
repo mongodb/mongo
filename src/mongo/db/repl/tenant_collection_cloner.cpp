@@ -178,7 +178,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::countStage() {
     _progressMeter.setTotalWhileRunning(static_cast<unsigned long long>(count));
     {
         stdx::lock_guard<Latch> lk(_mutex);
-        _stats.documentToCopy = count;
+        _stats.documentsToCopyAtStartOfClone = count;
         _stats.approxTotalDataSize = status.isOK() ? res.getField("size").safeNumberLong() : 0;
         _stats.avgObjSize =
             _stats.approxTotalDataSize ? res.getField("avgObjSize").safeNumberLong() : 0;
@@ -588,7 +588,8 @@ BSONObj TenantCollectionCloner::Stats::toBSON() const {
 }
 
 void TenantCollectionCloner::Stats::append(BSONObjBuilder* builder) const {
-    builder->appendNumber(kDocumentsToCopyFieldName, static_cast<long long>(documentToCopy));
+    builder->appendNumber(kDocumentsToCopyFieldName,
+                          static_cast<long long>(documentsToCopyAtStartOfClone));
     builder->appendNumber(kDocumentsCopiedFieldName, static_cast<long long>(documentsCopied));
     builder->appendNumber("indexes", static_cast<long long>(indexes));
     builder->appendNumber("insertedBatches", static_cast<long long>(insertedBatches));
