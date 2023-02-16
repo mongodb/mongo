@@ -1,18 +1,10 @@
 /**
  * Test the creation of views with various options.
  *
- * The test runs commands that are not allowed with security token: applyOps.
  * @tags: [
- *   not_allowed_with_security_token,
- *   # Commands on views not supported in implicitly sharded suites.
- *   assumes_unsharded_collection,
- *   # applyOps is not available on mongos.
- *   assumes_against_mongod_not_mongos,
  *   assumes_superuser_permissions,
- *   # applyOps is not retryable.
- *   requires_non_retryable_commands,
- *   # Tenant migrations don't support applyOps.
- *   tenant_migration_incompatible,
+ *   # TODO SERVER-73967: Remove this tag.
+ *   does_not_support_stepdowns,
  * ]
  */
 (function() {
@@ -119,23 +111,51 @@ assert.commandFailedWithCode(viewsDB.runCommand({
 }),
                              40600);
 
-// These test that, when an existing view in system.views is invalid because of a $out in the
-// pipeline, the database errors on creation of a new view.
-assert.commandWorked(viewsDB.adminCommand({
-    applyOps: [{
-        op: "i",
-        ns: viewsDBName + ".system.views",
-        o: {
-            _id: viewsDBName + ".invalidView",
-            viewOn: "collection",
-            pipeline: [{$project: {_id: false}}, {$out: "notExistingCollection"}]
-        }
-    }]
-}));
-assert.commandFailedWithCode(
-    viewsDB.runCommand({create: "viewWithBadViewCatalog", viewOn: "collection", pipeline: []}),
-    ErrorCodes.OptionNotSupportedOnView);
-assert.commandWorked(viewsDB.adminCommand({
-    applyOps: [{op: "d", ns: viewsDBName + ".system.views", o: {_id: viewsDBName + ".invalidView"}}]
-}));
+// The remainder of this test will not work on server versions < 7.0 as the 'create' command
+// is not idempotent there.  TODO SERVER-74062: remove this.
+if (db.version().split('.')[0] < 7) {
+    return;
+}
+
+// Test that creating a view which already exists with identical options reports success.
+let repeatedCmd = {
+    create: "existingViewTest",
+    viewOn: "collection",
+    pipeline: [{$match: {x: 1}}],
+    collation: {locale: "uk"},
+};
+assert.commandWorked(viewsDB.runCommand(repeatedCmd));
+assert.commandWorked(viewsDB.runCommand(repeatedCmd));
+
+// Test that creating a view with the same name as an existing view but different options fails.
+
+// Different collation.
+assert.commandFailedWithCode(viewsDB.runCommand({
+    create: "existingViewTest",
+    viewOn: "collection",
+    pipeline: [{$match: {x: 1}}],
+    collation: {locale: "fr"},
+}),
+                             ErrorCodes.NamespaceExists);
+
+// Different pipeline.
+assert.commandFailedWithCode(viewsDB.runCommand({
+    create: "existingViewTest",
+    viewOn: "collection",
+    pipeline: [{$match: {x: 2}}],
+    collation: {locale: "uk"},
+}),
+                             ErrorCodes.NamespaceExists);
+// viewOn collection is different.
+assert.commandFailedWithCode(viewsDB.runCommand({
+    create: "existingViewTest",
+    viewOn: "collection1",
+    pipeline: [{$match: {x: 1}}],
+    collation: {locale: "uk"},
+}),
+                             ErrorCodes.NamespaceExists);
+
+// Test that creating a view when there is already a collection with the same name fails.
+assert.commandFailedWithCode(viewsDB.runCommand({create: "collection", viewOn: "collection"}),
+                             ErrorCodes.NamespaceExists);
 }());

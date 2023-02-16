@@ -34,6 +34,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -67,6 +68,78 @@ constexpr auto kCreateCommandHelp =
     "  changeStreamPreAndPostImages: <document: pre- and post-images options for change streams>,\n"
     "  writeConcern: <document: write concern expression for the operation>]\n"
     "}"_sd;
+
+BSONObj pipelineAsBsonObj(const std::vector<BSONObj>& pipeline) {
+    BSONArrayBuilder builder;
+    for (const auto& stage : pipeline) {
+        builder.append(stage);
+    }
+    return builder.obj();
+}
+
+/**
+ * Compares the provided `CollectionOptions` to the the options for the provided `NamespaceString`
+ * in the storage catalog.
+ * If the options match, does nothing.
+ * If the options do not match, throws an exception indicating what doesn't match.
+ * If `ns` is not found in the storage catalog (because it was dropped between checking for its
+ * existence and calling this function), throws the original `NamespaceExists` exception.
+ */
+void checkCollectionOptions(OperationContext* opCtx,
+                            const Status& originalStatus,
+                            const NamespaceString& ns,
+                            const CollectionOptions& options) {
+    auto collOrView = AutoGetCollectionForReadLockFree(
+        opCtx,
+        ns,
+        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+    auto collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
+
+    auto& coll = collOrView.getCollection();
+    if (coll) {
+        auto actualOptions = coll->getCollectionOptions();
+        uassert(ErrorCodes::NamespaceExists,
+                str::stream() << "namespace " << ns.ns()
+                              << " already exists, but with different options: "
+                              << actualOptions.toBSON(),
+                options.matchesStorageOptions(actualOptions, collatorFactory));
+        return;
+    }
+    auto view = collOrView.getView();
+    if (!view) {
+        // If the collection/view disappeared in between attempting to create it
+        // and retrieving the options, just propagate the original error.
+        uassertStatusOK(originalStatus);
+        // The assertion above should always fail, as this function should only ever be called
+        // if the original attempt to create the collection failed.
+        MONGO_UNREACHABLE;
+    }
+
+    auto fullNewNamespace = NamespaceString(ns.dbName(), options.viewOn);
+    uassert(ErrorCodes::NamespaceExists,
+            str::stream() << "namespace " << ns.ns() << " already exists, but is a view on "
+                          << view->viewOn() << " rather than " << fullNewNamespace,
+            view->viewOn() == fullNewNamespace);
+
+    auto existingPipeline = pipelineAsBsonObj(view->pipeline());
+    uassert(ErrorCodes::NamespaceExists,
+            str::stream() << "namespace " << ns.ns() << " already exists, but with pipeline "
+                          << existingPipeline << " rather than " << options.pipeline,
+            existingPipeline.woCompare(options.pipeline) == 0);
+
+    // Note: the server can add more values to collation options which were not
+    // specified in the original user request. Use the collator to check for
+    // equivalence.
+    auto newCollator = options.collation.isEmpty()
+        ? nullptr
+        : uassertStatusOK(collatorFactory->makeFromBSON(options.collation));
+
+    uassert(ErrorCodes::NamespaceExists,
+            str::stream() << "namespace " << ns.ns() << " already exists, but with collation: "
+                          << view->defaultCollator()->getSpec().toBSON() << " rather than "
+                          << options.collation,
+            CollatorInterface::collatorsMatch(view->defaultCollator(), newCollator.get()));
+}
 
 class CmdCreate final : public CreateCmdVersion1Gen<CmdCreate> {
 public:
@@ -325,7 +398,21 @@ public:
 
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(opCtx);
-            uassertStatusOK(createCollection(opCtx, cmd));
+
+            const auto createStatus = createCollection(opCtx, cmd);
+            // NamespaceExists will cause multi-document transactions to implicitly abort, so
+            // in that case we should surface the error to the client. Otherwise, return success
+            // if a collection with identical options already exists.
+            if (createStatus == ErrorCodes::NamespaceExists &&
+                !opCtx->inMultiDocumentTransaction()) {
+                checkCollectionOptions(opCtx,
+                                       createStatus,
+                                       cmd.getNamespace(),
+                                       CollectionOptions::fromCreateCommand(cmd));
+            } else {
+                uassertStatusOK(createStatus);
+            }
+
             return reply;
         }
     };

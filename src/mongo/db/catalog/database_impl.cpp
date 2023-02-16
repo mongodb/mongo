@@ -1032,8 +1032,7 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
             return Status(
                 ErrorCodes::InvalidNamespace,
                 "View name cannot start with 'system.', which is reserved for system namespaces");
-
-        uassertStatusOK(createView(opCtx, nss, collectionOptions));
+        return createView(opCtx, nss, collectionOptions);
     } else {
         invariant(_createCollection(
                       opCtx, nss, collectionOptions, createDefaultIndexes, idIndex, fromMigrate),

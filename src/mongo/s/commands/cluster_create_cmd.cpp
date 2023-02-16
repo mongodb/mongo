@@ -42,48 +42,6 @@
 namespace mongo {
 namespace {
 
-void checkCollectionOptions(OperationContext* opCtx,
-                            const NamespaceString& ns,
-                            const CollectionOptions& options) {
-    auto dbName = ns.db();
-    auto dbInfo = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
-    BSONObjBuilder listCollCmd;
-    listCollCmd.append("listCollections", 1);
-    listCollCmd.append("filter", BSON("name" << ns.coll()));
-
-    auto response = executeCommandAgainstDatabasePrimary(
-        opCtx,
-        dbName,
-        dbInfo,
-        CommandHelpers::filterCommandRequestForPassthrough(listCollCmd.obj()),
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        Shard::RetryPolicy::kIdempotent);
-    uassertStatusOK(response.swResponse);
-
-    auto responseData = response.swResponse.getValue().data;
-    auto listCollectionsStatus = mongo::getStatusFromCommandResult(responseData);
-    uassertStatusOK(listCollectionsStatus);
-
-    auto cursorObj = responseData["cursor"].Obj();
-    auto collections = cursorObj["firstBatch"].Obj();
-
-    BSONObjIterator collIter(collections);
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "cannot find ns: " << ns.ns(),
-            collIter.more());
-
-    auto collectionDetails = collIter.next();
-    CollectionOptions actualOptions =
-        uassertStatusOK(CollectionOptions::parse(collectionDetails["options"].Obj()));
-    // TODO: SERVER-33048 check idIndex field
-
-    uassert(ErrorCodes::NamespaceExists,
-            str::stream() << "ns: " << ns.ns()
-                          << " already exists with different options: " << actualOptions.toBSON(),
-            options.matchesStorageOptions(
-                actualOptions, CollatorFactoryInterface::get(opCtx->getServiceContext())));
-}
-
 class CreateCmd final : public CreateCmdVersion1Gen<CreateCmd> {
 public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
@@ -144,16 +102,7 @@ public:
                     .swResponse);
 
             const auto createStatus = mongo::getStatusFromCommandResult(response.data);
-            if (createStatus == ErrorCodes::NamespaceExists &&
-                !opCtx->inMultiDocumentTransaction()) {
-                // NamespaceExists will cause multi-document transactions to implicitly abort, so
-                // mongos should surface this error to the client.
-                checkCollectionOptions(
-                    opCtx, cmd.getNamespace(), CollectionOptions::fromCreateCommand(cmd));
-            } else {
-                uassertStatusOK(createStatus);
-            }
-
+            uassertStatusOK(createStatus);
             uassertStatusOK(getWriteConcernStatusFromCommandResult(response.data));
             return CreateCommandReply();
         }

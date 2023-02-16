@@ -53,7 +53,7 @@ selector:
   - jstests/core/views/invalid_system_views.js
   - jstests/core/views/view_with_invalid_dbname.js
   - jstests/core/views/views_all_commands.js
-  - jstests/core/views/views_creation.js
+  - jstests/core/views/invalid_view_prevents_creating_new_view.js
   # This test expects a specific error message, which does not match the error message generated in authentication mode.
   - jstests/core/**/commands_with_uuid.js
   # Sharding command "splictVector" is not tenant aware.
