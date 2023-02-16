@@ -85,6 +85,7 @@ size_t sizeArrayElementsMemory(size_t tagCount) {
 }
 
 
+// TODO: SERVER-73303 remove when v2 is enabled by default
 // The algorithm for constructing a list of tags matching an equality predicate on an encrypted
 // field is as follows:
 //
@@ -200,6 +201,58 @@ std::vector<PrfBlock> readTagsWithContention(const FLEStateCollectionReader& esc
     return std::move(binaryTags);
 }
 
+// The algorithm for constructing a list of tags matching an equality predicate on an encrypted
+// field is as follows:
+//
+// (1) GetCounter: Query ESC to obtain the counter value (n) of the most recent insert.
+// (2) Return the set of derived tags for i in [1..n].
+//
+// Given:
+//      s: ESCDerivedFromDataToken
+//      d: EDCDerivedFromDataToken
+//      u: contention factor
+// Do:
+//      n = GetCounter(s, u)
+//      return [ F_d[u, 1, i] | i in [1..n]]
+//
+std::vector<PrfBlock> readTagsWithContentionV2(const FLEStateCollectionReader& esc,
+                                               ESCDerivedFromDataToken s,
+                                               EDCDerivedFromDataToken d,
+                                               uint64_t cf,
+                                               size_t memoryLimit,
+                                               std::vector<PrfBlock>&& binaryTags) {
+
+    auto escTok = DerivedToken::generateESCDerivedFromDataTokenAndContentionFactorToken(s, cf);
+    auto escTag = TwiceDerived::generateESCTwiceDerivedTagToken(escTok);
+    auto escVal = TwiceDerived::generateESCTwiceDerivedValueToken(escTok);
+
+    auto edcTok = DerivedToken::generateEDCDerivedFromDataTokenAndContentionFactorToken(d, cf);
+    auto edcTag = TwiceDerived::generateEDCTwiceDerivedToken(edcTok);
+
+    // (1) GetCounter: query ESC for the counter value after the most recent insert
+    uint64_t numInserts = 0;
+    auto positions = ESCCollection::emuBinaryV2(esc, escTag, escVal);
+    if (positions.cpos.has_value()) {
+        numInserts = positions.cpos.value();
+    } else {
+        auto escId = positions.apos.has_value()
+            ? ESCCollection::generateAnchorId(escTag, positions.apos.value())
+            : ESCCollection::generateNullAnchorId(escTag);
+        auto escDoc = esc.getById(escId);
+        numInserts = uassertStatusOK(ESCCollection::decryptAnchorDocument(escVal, escDoc)).count;
+    }
+
+    auto cumTagCount = binaryTags.size() + numInserts;
+    verifyTagsWillFit(cumTagCount, memoryLimit);
+    binaryTags.reserve(cumTagCount);
+
+    // (2) Generate & return the set of derived tags for i in [1..n]
+    for (uint64_t i = 1; i <= numInserts; i++) {
+        binaryTags.emplace_back(EDCServerCollection::generateTag(edcTag, i));
+    }
+    return std::move(binaryTags);
+}
+
 // A positive contention factor (cm) means we must run the above algorithm (cm) times.
 std::vector<PrfBlock> readTags(FLETagQueryInterface* queryImpl,
                                const NamespaceString& nssEsc,
@@ -221,12 +274,19 @@ std::vector<PrfBlock> readTags(FLETagQueryInterface* queryImpl,
     // The output of readTags will be used as the argument to a $in expression, so make sure we
     // don't exceed the configured memory limit.
     auto limit = static_cast<size_t>(internalQueryFLERewriteMemoryLimit.load());
-    if (!cm || cm.value() == 0) {
-        auto binaryTags = readTagsWithContention(esc, ecc, s, c, d, 0, limit, {});
-    }
+    auto contentionMax = cm.value_or(0);
     std::vector<PrfBlock> binaryTags;
-    for (auto i = 0; i <= cm.value(); i++) {
-        binaryTags = readTagsWithContention(esc, ecc, s, c, d, i, limit, std::move(binaryTags));
+
+    // TODO: SERVER-73303 remove when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        for (auto i = 0; i <= contentionMax; i++) {
+            binaryTags = readTagsWithContention(esc, ecc, s, c, d, i, limit, std::move(binaryTags));
+        }
+        return binaryTags;
+    }
+
+    for (auto i = 0; i <= contentionMax; i++) {
+        binaryTags = readTagsWithContentionV2(esc, s, d, i, limit, std::move(binaryTags));
     }
     return binaryTags;
 }

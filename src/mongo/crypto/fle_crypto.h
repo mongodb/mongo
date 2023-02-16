@@ -698,18 +698,7 @@ using ContentionFactorFn = std::function<uint64_t(const FLE2EncryptionPlaceholde
 
 class FLEClientCrypto {
 public:
-    /**
-     * Explicit encrypt a single value into a placeholder.
-     *
-     * Returns FLE2InsertUpdate payload
-     */
-    static std::vector<uint8_t> encrypt(BSONElement element,
-                                        FLEIndexKeyAndId indexKey,
-                                        FLEUserKeyAndId userKey,
-                                        FLECounter counter);
-
-    static FLE2FindEqualityPayload parseFindPayload(ConstDataRange cdr);
-
+    // TODO: SERVER-73303 delete v1 serialize methods when v2 is enabled by default
     static FLE2FindEqualityPayload serializeFindPayload(FLEIndexKeyAndId indexKey,
                                                         FLEUserKeyAndId userKey,
                                                         BSONElement element,
@@ -722,6 +711,19 @@ public:
                                                           const FLE2RangeFindSpec& spec);
 
     static FLE2FindRangePayload serializeFindRangeStub(const FLE2RangeFindSpec& spec);
+
+    static FLE2FindEqualityPayloadV2 serializeFindPayloadV2(FLEIndexKeyAndId indexKey,
+                                                            FLEUserKeyAndId userKey,
+                                                            BSONElement element,
+                                                            uint64_t maxContentionFactor);
+
+    static FLE2FindRangePayloadV2 serializeFindRangePayloadV2(FLEIndexKeyAndId indexKey,
+                                                              FLEUserKeyAndId userKey,
+                                                              const std::vector<std::string>& edges,
+                                                              uint64_t maxContentionFactor,
+                                                              const FLE2RangeFindSpec& spec);
+
+    static FLE2FindRangePayloadV2 serializeFindRangeStubV2(const FLE2RangeFindSpec& spec);
 
     /**
      * Generates a client-side payload that is sent to the server.
@@ -1473,10 +1475,14 @@ std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(Cons
 
 struct ParsedFindEqualityPayload {
     ESCDerivedFromDataToken escToken;
+    // TODO: SERVER-73303 remove eccToken and serverToken when v2 is enabled by default
     ECCDerivedFromDataToken eccToken;
     EDCDerivedFromDataToken edcToken;
     boost::optional<ServerDataEncryptionLevel1Token> serverToken;
     boost::optional<std::int64_t> maxCounter;
+
+    // v2 fields
+    ServerDerivedFromDataToken serverDataDerivedToken;
 
     explicit ParsedFindEqualityPayload(BSONElement fleFindPayload);
     explicit ParsedFindEqualityPayload(const Value& fleFindPayload);
@@ -1568,11 +1574,17 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
 struct FLEFindEdgeTokenSet {
     EDCDerivedFromDataToken edc;
     ESCDerivedFromDataToken esc;
+
+    // TODO: SERVER-73303 remove ecc field when v2 is enabled by default
     ECCDerivedFromDataToken ecc;
+
+    ServerDerivedFromDataToken server;
 };
 
 struct ParsedFindRangePayload {
     boost::optional<std::vector<FLEFindEdgeTokenSet>> edges;
+
+    // TODO: SERVER-73303 remove serverToken when v2 is enabled by default
     ServerDataEncryptionLevel1Token serverToken;
 
     Fle2RangeOperator firstOp;
@@ -1686,6 +1698,9 @@ std::vector<uint8_t> toEncryptedVector(EncryptedBinDataType dt, const PrfBlock& 
 BSONBinData toBSONBinData(const std::vector<uint8_t>& buf);
 
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(const Value& value);
+
+boost::optional<EncryptedBinDataType> getEncryptedBinDataType(const Value& value);
+boost::optional<EncryptedBinDataType> getEncryptedBinDataType(const BSONElement& elt);
 
 bool hasQueryType(const EncryptedField& field, QueryTypeEnum queryType);
 bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType);

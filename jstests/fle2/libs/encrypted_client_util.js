@@ -447,6 +447,15 @@ function isFLE2ProtocolVersion2Enabled() {
 }
 
 /**
+ * @returns Returns true if internalQueryFLEAlwaysUseEncryptedCollScanMode is enabled
+ */
+function isFLE2AlwaysUseCollScanModeEnabled(db) {
+    const doc = assert.commandWorked(
+        db.adminCommand({getParameter: 1, internalQueryFLEAlwaysUseEncryptedCollScanMode: 1}));
+    return (doc.internalQueryFLEAlwaysUseEncryptedCollScanMode === true);
+}
+
+/**
  * Assert a field is an indexed encrypted field. That includes both
  * equality and range
  *

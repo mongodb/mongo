@@ -142,15 +142,26 @@ protected:
      * Check if the passed-in payload is a FLE2 find payload for the right encrypted index type.
      */
     virtual bool isPayload(const BSONElement& elt) const {
-        return isPayloadOfType(this->encryptedBinDataType(), elt);
+        auto optType = getEncryptedBinDataType(elt);
+        return optType && this->validateType(*optType);
     }
 
     /**
      * Check if the passed-in payload is a FLE2 find payload for the right encrypted index type.
      */
     virtual bool isPayload(const Value& v) const {
-        return isPayloadOfType(this->encryptedBinDataType(), v);
+        auto optType = getEncryptedBinDataType(v);
+        return optType && this->validateType(*optType);
     }
+
+    /**
+     * Check if the payload type is a deprecated payload type, which, if encountered, causes
+     * the rewrite to throw an error.
+     */
+    virtual bool isDeprecatedPayloadType(EncryptedBinDataType type) const {
+        return false;
+    }
+
     /**
      * Generate tags from a FLE2 Find Payload. This function takes in a variant of BSONElement and
      * Value so that it can be used in both the MatchExpression and Aggregation contexts. Virtual
@@ -185,6 +196,12 @@ private:
      * Sub-subtype associated with the find payload for this encrypted predicate.
      */
     virtual EncryptedBinDataType encryptedBinDataType() const = 0;
+
+    /**
+     * Checks if type is a deprecated payload type and if so, throws an exception.
+     * Otherwise returns whether type is the expected find payload for this predicate.
+     */
+    bool validateType(EncryptedBinDataType type) const;
 };
 
 /**

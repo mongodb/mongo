@@ -52,6 +52,13 @@ std::vector<PrfBlock> readTagsWithContention(const FLEStateCollectionReader& esc
                                              size_t memoryLimit,
                                              std::vector<PrfBlock>&& binaryTags);
 
+std::vector<PrfBlock> readTagsWithContentionV2(const FLEStateCollectionReader& esc,
+                                               ESCDerivedFromDataToken s,
+                                               EDCDerivedFromDataToken d,
+                                               uint64_t contentionFactor,
+                                               size_t memoryLimit,
+                                               std::vector<PrfBlock>&& binaryTags);
+
 /**
  * Read a list of binary tags given ESC, ECC, and EDC derived tokens and a maximum contention
  * factor.

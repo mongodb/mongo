@@ -377,6 +377,7 @@ structs:
             description: "Queryable Encryption max counter"
             type: long
             cpp_name: maxCounter
+            optional: true
 
     EdgeFindTokenSet:
         description: "Payload of an edge to query for"

@@ -39,6 +39,16 @@
 namespace mongo {
 namespace fle {
 namespace {
+
+template <class T>
+bool hasRangeTypeToValidate(const T& value) {
+    auto typeToValidate = EncryptedBinDataType::kFLE2FindRangePayloadV2;
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        typeToValidate = EncryptedBinDataType::kFLE2FindRangePayload;
+    }
+    return isPayloadOfType(typeToValidate, value);
+}
+
 MatchExpression::MatchType rangeOpToMatchType(Fle2RangeOperator op) {
     switch (op) {
         case Fle2RangeOperator::kGt:
@@ -83,7 +93,7 @@ void validateOneSidedRange(Fle2RangeOperator ty, const ParsedFindRangePayload& p
 
 void validateOneSidedRange(const ComparisonMatchExpression& expr) {
     auto data = expr.getData();
-    if (!isPayloadOfType(EncryptedBinDataType::kFLE2FindRangePayload, data)) {
+    if (!hasRangeTypeToValidate(data)) {
         return;
     }
     auto payload = parseFindPayload<ParsedFindRangePayload>(data);
@@ -216,7 +226,7 @@ void validateTwoSidedRanges(const AndMatchExpression& expr) {
                 auto compExpr = dynamic_cast<const ComparisonMatchExpression*>(child);
                 tassert(7030717, "Expression must be a comparison expression.", compExpr);
                 auto data = compExpr->getData();
-                if (!isPayloadOfType(EncryptedBinDataType::kFLE2FindRangePayload, data)) {
+                if (!hasRangeTypeToValidate(data)) {
                     // Skip any comparison operators over non-encrypted data.
                     continue;
                 }
@@ -318,7 +328,7 @@ void validateOneSidedRange(const ExpressionCompare& expr) {
         return;
     }
 
-    if (!isPayloadOfType(EncryptedBinDataType::kFLE2FindRangePayload, v.value())) {
+    if (!hasRangeTypeToValidate(v.value())) {
         return;
     }
 
@@ -341,8 +351,7 @@ void validateTwoSidedRanges(const ExpressionAnd& expr) {
                     if (!data.has_value()) {
                         continue;
                     }
-                    if (!isPayloadOfType(EncryptedBinDataType::kFLE2FindRangePayload,
-                                         data.value())) {
+                    if (!hasRangeTypeToValidate(data.value())) {
                         continue;
                     }
                     auto payload = parseFindPayload<ParsedFindRangePayload>(data.value());

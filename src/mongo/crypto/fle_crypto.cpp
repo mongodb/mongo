@@ -508,7 +508,7 @@ void toEncryptedBinData(StringData field,
     builder->appendBinData(field, buf.size(), BinDataType::Encrypt, buf.data());
 }
 
-std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(BSONElement element) {
+std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(const BSONElement element) {
     uassert(
         6672414, "Expected binData with subtype Encrypt", element.isBinData(BinDataType::Encrypt));
 
@@ -1532,6 +1532,19 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
                                    iupayload,
                                    builder);
             } else if (ep.getType() == Fle2PlaceholderType::kFind) {
+
+                if (gFeatureFlagFLE2ProtocolVersion2.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    auto findPayload = FLEClientCrypto::serializeFindPayloadV2(
+                        indexKey, userKey, el, ep.getMaxContentionCounter());
+                    toEncryptedBinData(fieldNameToSerialize,
+                                       EncryptedBinDataType::kFLE2FindEqualityPayloadV2,
+                                       findPayload,
+                                       builder);
+                    return;
+                }
+
+                // TODO: SERVER-73303 delete when v2 is enabled by default
                 auto findpayload = FLEClientCrypto::serializeFindPayload(
                     indexKey, userKey, el, ep.getMaxContentionCounter());
 
@@ -1588,6 +1601,32 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
                 auto rangeFindSpec =
                     FLE2RangeFindSpec::parse(ctx, ep.getValue().getElement().Obj());
 
+                if (gFeatureFlagFLE2ProtocolVersion2.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+
+                    auto findPayload = [&]() {
+                        if (rangeFindSpec.getEdgesInfo().has_value()) {
+                            auto edges = getMinCover(rangeFindSpec, ep.getSparsity().value());
+
+                            return FLEClientCrypto::serializeFindRangePayloadV2(
+                                indexKey,
+                                userKey,
+                                std::move(edges),
+                                ep.getMaxContentionCounter(),
+                                rangeFindSpec);
+                        } else {
+                            return FLEClientCrypto::serializeFindRangeStubV2(rangeFindSpec);
+                        }
+                    }();
+
+                    toEncryptedBinData(fieldNameToSerialize,
+                                       EncryptedBinDataType::kFLE2FindRangePayloadV2,
+                                       findPayload,
+                                       builder);
+                    return;
+                }
+
+                // TODO: SERVER-73303 delete when v2 is enabled by default
                 auto findpayload = [&]() {
                     if (rangeFindSpec.getEdgesInfo().has_value()) {
                         auto edges = getMinCover(rangeFindSpec, ep.getSparsity().value());
@@ -2255,6 +2294,29 @@ std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(const Value
     return fromEncryptedConstDataRange(binDataToCDR(binData));
 }
 
+boost::optional<EncryptedBinDataType> getEncryptedBinDataType(const Value& value) {
+    if (value.getType() != BSONType::BinData) {
+        return boost::none;
+    }
+    auto binData = value.getBinData();
+    if (binData.type != BinDataType::Encrypt || binData.length < 1) {
+        return boost::none;
+    }
+    return static_cast<EncryptedBinDataType>(static_cast<const uint8_t*>(binData.data)[0]);
+}
+
+boost::optional<EncryptedBinDataType> getEncryptedBinDataType(const BSONElement& elt) {
+    if (!elt.isBinData(BinDataType::Encrypt)) {
+        return boost::none;
+    }
+    int dataLen;
+    auto data = elt.binData(dataLen);
+    if (dataLen < 1) {
+        return boost::none;
+    }
+    return static_cast<EncryptedBinDataType>(data[0]);
+}
+
 BSONBinData toBSONBinData(const std::vector<uint8_t>& buf) {
     return BSONBinData(buf.data(), buf.size(), Encrypt);
 }
@@ -2432,16 +2494,6 @@ StatusWith<std::vector<uint8_t>> EncryptedStateCollectionTokensV2::serialize(ECO
 }
 
 FLEKeyVault::~FLEKeyVault() {}
-
-std::vector<uint8_t> FLEClientCrypto::encrypt(BSONElement element,
-                                              FLEIndexKeyAndId indexKey,
-                                              FLEUserKeyAndId userKey,
-                                              FLECounter counter) {
-    return toEncryptedVector(EncryptedBinDataType::kFLE2InsertUpdatePayload,
-                             EDCClientPayload::serializeInsertUpdatePayload(
-                                 indexKey, userKey, element, generateRandomContention(counter)));
-}
-
 
 BSONObj FLEClientCrypto::transformPlaceholders(const BSONObj& obj, FLEKeyVault* keyVault) {
     return transformPlaceholders(obj, keyVault, [](const FLE2EncryptionPlaceholder& ep) {
@@ -3092,11 +3144,6 @@ StatusWith<ECCNullDocument> ECCCollection::decryptNullDocument(ECCTwiceDerivedVa
 }
 
 
-FLE2FindEqualityPayload FLEClientCrypto::parseFindPayload(ConstDataRange cdr) {
-    return parseFromCDR<FLE2FindEqualityPayload>(cdr);
-}
-
-
 FLE2FindEqualityPayload FLEClientCrypto::serializeFindPayload(FLEIndexKeyAndId indexKey,
                                                               FLEUserKeyAndId userKey,
                                                               BSONElement element,
@@ -3129,6 +3176,35 @@ FLE2FindEqualityPayload FLEClientCrypto::serializeFindPayload(FLEIndexKeyAndId i
     return payload;
 }
 
+FLE2FindEqualityPayloadV2 FLEClientCrypto::serializeFindPayloadV2(FLEIndexKeyAndId indexKey,
+                                                                  FLEUserKeyAndId userKey,
+                                                                  BSONElement element,
+                                                                  uint64_t maxContentionFactor) {
+    auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
+
+    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
+    auto serverToken =
+        FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(indexKey.key);
+
+    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
+    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
+
+    auto edcDatakey =
+        FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value);
+    auto escDatakey =
+        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+    auto serverDataDerivedToken =
+        FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(serverToken, value);
+
+    FLE2FindEqualityPayloadV2 payload;
+
+    payload.setEdcDerivedToken(edcDatakey.toCDR());
+    payload.setEscDerivedToken(escDatakey.toCDR());
+    payload.setMaxCounter(maxContentionFactor);
+    payload.setServerDerivedFromDataToken(serverDataDerivedToken.toCDR());
+
+    return payload;
+}
 
 FLE2FindRangePayload FLEClientCrypto::serializeFindRangePayload(
     FLEIndexKeyAndId indexKey,
@@ -3179,8 +3255,64 @@ FLE2FindRangePayload FLEClientCrypto::serializeFindRangePayload(
     return payload;
 }
 
+FLE2FindRangePayloadV2 FLEClientCrypto::serializeFindRangePayloadV2(
+    FLEIndexKeyAndId indexKey,
+    FLEUserKeyAndId userKey,
+    const std::vector<std::string>& edges,
+    uint64_t maxContentionFactor,
+    const FLE2RangeFindSpec& spec) {
+    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
+    auto serverToken =
+        FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(indexKey.key);
+
+    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
+    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
+
+    std::vector<EdgeFindTokenSetV2> tokens;
+    for (auto const& edge : edges) {
+
+        ConstDataRange value(edge.c_str(), edge.size());
+
+        EdgeFindTokenSetV2 tokenSet;
+        tokenSet.setEdcDerivedToken(
+            FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value)
+                .toCDR());
+
+        tokenSet.setEscDerivedToken(
+            FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value)
+                .toCDR());
+        tokenSet.setServerDerivedFromDataToken(
+            FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(serverToken, value)
+                .toCDR());
+        tokens.push_back(std::move(tokenSet));
+    }
+
+    FLE2FindRangePayloadV2 payload;
+    FLE2FindRangePayloadEdgesInfoV2 edgesInfo;
+
+    edgesInfo.setEdges(std::move(tokens));
+    edgesInfo.setMaxCounter(maxContentionFactor);
+
+    payload.setPayload(edgesInfo);
+    payload.setFirstOperator(spec.getFirstOperator());
+    payload.setSecondOperator(spec.getSecondOperator());
+    payload.setPayloadId(spec.getPayloadId());
+
+    return payload;
+}
+
 FLE2FindRangePayload FLEClientCrypto::serializeFindRangeStub(const FLE2RangeFindSpec& spec) {
     FLE2FindRangePayload payload;
+
+    payload.setFirstOperator(spec.getFirstOperator());
+    payload.setSecondOperator(spec.getSecondOperator());
+    payload.setPayloadId(spec.getPayloadId());
+
+    return payload;
+}
+
+FLE2FindRangePayloadV2 FLEClientCrypto::serializeFindRangeStubV2(const FLE2RangeFindSpec& spec) {
+    FLE2FindRangePayloadV2 payload;
 
     payload.setFirstOperator(spec.getFirstOperator());
     payload.setSecondOperator(spec.getSecondOperator());
@@ -4733,6 +4865,25 @@ ParsedFindEqualityPayload::ParsedFindEqualityPayload(ConstDataRange cdr) {
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     auto encryptedType = encryptedTypeBinding;
 
+    // TODO: SERVER-73303 refactor when v2 is enabled by default
+    if (gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        uassert(7292600,
+                str::stream() << "Unexpected encrypted payload type: "
+                              << static_cast<uint32_t>(encryptedType),
+                encryptedType == EncryptedBinDataType::kFLE2FindEqualityPayloadV2);
+
+        auto payload = parseFromCDR<FLE2FindEqualityPayloadV2>(subCdr);
+
+        escToken =
+            FLETokenFromCDR<FLETokenType::ESCDerivedFromDataToken>(payload.getEscDerivedToken());
+        edcToken =
+            FLETokenFromCDR<FLETokenType::EDCDerivedFromDataToken>(payload.getEdcDerivedToken());
+        serverDataDerivedToken = FLETokenFromCDR<FLETokenType::ServerDerivedFromDataToken>(
+            payload.getServerDerivedFromDataToken());
+        maxCounter = payload.getMaxCounter();
+        return;
+    }
+
     uassert(6435600,
             str::stream() << "Unexpected encrypted payload type: "
                           << static_cast<uint32_t>(encryptedType),
@@ -4762,6 +4913,40 @@ ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     auto encryptedType = encryptedTypeBinding;
 
+    // TODO: SERVER-73303 refactor when v2 is enabled by default
+    if (gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        uassert(7292601,
+                str::stream() << "Unexpected encrypted payload type: "
+                              << static_cast<uint32_t>(encryptedType),
+                encryptedType == EncryptedBinDataType::kFLE2FindRangePayloadV2);
+
+        auto payload = parseFromCDR<FLE2FindRangePayloadV2>(subCdr);
+        payloadId = payload.getPayloadId();
+        firstOp = payload.getFirstOperator();
+        secondOp = payload.getSecondOperator();
+
+        if (!payload.getPayload()) {
+            return;
+        }
+
+        edges = std::vector<FLEFindEdgeTokenSet>();
+        auto& edgesRef = edges.value();
+        auto& info = payload.getPayload().value();
+
+        for (auto const& edge : info.getEdges()) {
+            auto escToken =
+                FLETokenFromCDR<FLETokenType::ESCDerivedFromDataToken>(edge.getEscDerivedToken());
+            auto edcToken =
+                FLETokenFromCDR<FLETokenType::EDCDerivedFromDataToken>(edge.getEdcDerivedToken());
+            auto serverDataDerivedToken = FLETokenFromCDR<FLETokenType::ServerDerivedFromDataToken>(
+                edge.getServerDerivedFromDataToken());
+            edgesRef.push_back({edcToken, escToken, {}, serverDataDerivedToken});
+        }
+
+        maxCounter = info.getMaxCounter();
+        return;
+    }
+
     uassert(6869501,
             str::stream() << "Unexpected encrypted payload type: "
                           << static_cast<uint32_t>(encryptedType),
@@ -4789,8 +4974,7 @@ ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
             FLETokenFromCDR<FLETokenType::ECCDerivedFromDataToken>(edge.getEccDerivedToken());
         auto edcToken =
             FLETokenFromCDR<FLETokenType::EDCDerivedFromDataToken>(edge.getEdcDerivedToken());
-
-        edgesRef.push_back({edcToken, escToken, eccToken});
+        edgesRef.push_back({edcToken, escToken, eccToken, {}});
     }
 
     serverToken = FLETokenFromCDR<FLETokenType::ServerDataEncryptionLevel1Token>(
