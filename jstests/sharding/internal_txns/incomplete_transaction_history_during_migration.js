@@ -2,7 +2,7 @@
  * Test that chunk migration can migrate a retryable internal transaction whose oplog entries have
  * been truncated.
  *
- * @tags: [requires_fcv_70]
+ * @tags: [uses_transactions, requires_persistence]
  */
 (function() {
 'use strict';
