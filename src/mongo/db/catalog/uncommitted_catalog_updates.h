@@ -306,13 +306,13 @@ public:
      * in the snapshot.
      */
     void store(std::shared_ptr<const Collection> coll,
-               NamespaceString nss,
+               boost::optional<NamespaceString> nss,
                boost::optional<UUID> uuid);
 
 private:
     struct Entry {
         std::shared_ptr<const Collection> collection;
-        NamespaceString nss;
+        boost::optional<NamespaceString> nss;
         boost::optional<UUID> uuid;
     };
 

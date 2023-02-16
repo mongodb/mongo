@@ -285,18 +285,19 @@ public:
                     // we must update the minVisibleTimestamp with the appropriate value. This is
                     // fine because the collection should not be visible in the catalog until we
                     // call setCommitted(true).
-                    writeJobs.push_back([coll = entry.collection.get(),
-                                         commitTime](CollectionCatalog& catalog) {
-                        if (commitTime) {
-                            coll->setMinimumVisibleSnapshot(commitTime.value());
-                            coll->setMinimumValidSnapshot(commitTime.value());
-                        }
-                        catalog._pushCatalogIdForNSS(coll->ns(), coll->getCatalogId(), commitTime);
+                    writeJobs.push_back(
+                        [coll = entry.collection.get(), commitTime](CollectionCatalog& catalog) {
+                            if (commitTime) {
+                                coll->setMinimumVisibleSnapshot(commitTime.value());
+                                coll->setMinimumValidSnapshot(commitTime.value());
+                            }
+                            catalog._pushCatalogIdForNSSAndUUID(
+                                coll->ns(), coll->uuid(), coll->getCatalogId(), commitTime);
 
-                        catalog._pendingCommitNamespaces.erase(coll->ns());
-                        catalog._pendingCommitUUIDs.erase(coll->uuid());
-                        coll->setCommitted(true);
-                    });
+                            catalog._pendingCommitNamespaces.erase(coll->ns());
+                            catalog._pendingCommitUUIDs.erase(coll->uuid());
+                            coll->setCommitted(true);
+                        });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kReplacedViewsForDatabase: {
@@ -834,14 +835,7 @@ const Collection* CollectionCatalog::_openCollection(
         return _openCollectionAtLatestByUUID(opCtx, *nssOrUUID.uuid());
     }
 
-    // TODO SERVER-71222: Handle lookup at point-in-time by UUID.
-    const auto& nss = nssOrUUID.nss();
-    if (nss) {
-        return _openCollectionAtPointInTimeByNamespace(opCtx, *nss, *readTimestamp);
-    } else {
-        return _openCollectionAtPointInTimeByNamespace(
-            opCtx, resolveNamespaceStringOrUUID(opCtx, nssOrUUID), *readTimestamp);
-    }
+    return _openCollectionAtPointInTimeByNamespaceOrUUID(opCtx, nssOrUUID, *readTimestamp);
 }
 
 const Collection* CollectionCatalog::_openCollectionAtLatestByNamespace(
@@ -860,7 +854,7 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespace(
         catalogId = pendingCollection->getCatalogId();
     } else {
         auto lookupResult = lookupCatalogIdByNSS(nss, boost::none);
-        invariant(lookupResult.result == CatalogIdLookup::NamespaceExistence::kExists);
+        invariant(lookupResult.result == CatalogIdLookup::Existence::kExists);
         catalogId = lookupResult.id;
     }
 
@@ -1006,14 +1000,16 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByUUID(OperationCont
     openedCollections.store(latestCollection, nss, uuid);
     return latestCollection.get();
 }
-const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespace(
-    OperationContext* opCtx, const NamespaceString& nss, Timestamp readTimestamp) const {
+const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespaceOrUUID(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nssOrUUID,
+    Timestamp readTimestamp) const {
     auto& openedCollections = OpenedCollections::get(opCtx);
 
     // Try to find a catalog entry matching 'readTimestamp'.
-    auto catalogEntry = _fetchPITCatalogEntry(opCtx, nss, readTimestamp);
+    auto catalogEntry = _fetchPITCatalogEntry(opCtx, nssOrUUID, readTimestamp);
     if (!catalogEntry) {
-        openedCollections.store(nullptr, nss, boost::none);
+        openedCollections.store(nullptr, nssOrUUID.nss(), nssOrUUID.uuid());
         return nullptr;
     }
 
@@ -1021,7 +1017,7 @@ const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespace(
 
     // Return the in-memory Collection instance if it is compatible with the read timestamp.
     if (isExistingCollectionCompatible(latestCollection, readTimestamp)) {
-        openedCollections.store(latestCollection, nss, latestCollection->uuid());
+        openedCollections.store(latestCollection, latestCollection->ns(), latestCollection->uuid());
         return latestCollection.get();
     }
 
@@ -1030,7 +1026,8 @@ const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespace(
     auto compatibleCollection =
         _createCompatibleCollection(opCtx, latestCollection, readTimestamp, catalogEntry.get());
     if (compatibleCollection) {
-        openedCollections.store(compatibleCollection, nss, compatibleCollection->uuid());
+        openedCollections.store(
+            compatibleCollection, compatibleCollection->ns(), compatibleCollection->uuid());
         return compatibleCollection.get();
     }
 
@@ -1038,50 +1035,99 @@ const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespace(
     // Collection instance from scratch.
     auto newCollection = _createNewPITCollection(opCtx, readTimestamp, catalogEntry.get());
     if (newCollection) {
-        openedCollections.store(newCollection, nss, newCollection->uuid());
+        openedCollections.store(newCollection, newCollection->ns(), newCollection->uuid());
         return newCollection.get();
     }
 
-    openedCollections.store(nullptr, nss, boost::none);
+    openedCollections.store(nullptr, nssOrUUID.nss(), nssOrUUID.uuid());
     return nullptr;
+}
+
+CollectionCatalog::CatalogIdLookup CollectionCatalog::_checkWithOldestCatalogIdTimestampMaintained(
+    boost::optional<Timestamp> ts) const {
+    // If the request was with a time prior to the oldest maintained time it is unknown, otherwise
+    // we know it is not existing.
+    return {RecordId{},
+            ts && *ts < _oldestCatalogIdTimestampMaintained
+                ? CollectionCatalog::CatalogIdLookup::Existence::kUnknown
+                : CollectionCatalog::CatalogIdLookup::Existence::kNotExists};
+}
+
+CollectionCatalog::CatalogIdLookup CollectionCatalog::_findCatalogIdInRange(
+    boost::optional<Timestamp> ts, const std::vector<TimestampedCatalogId>& range) const {
+    if (!ts) {
+        auto catalogId = range.back().id;
+        if (catalogId) {
+            return {*catalogId, CatalogIdLookup::Existence::kExists};
+        }
+        return {RecordId{}, CatalogIdLookup::Existence::kNotExists};
+    }
+
+    auto rangeIt =
+        std::upper_bound(range.begin(), range.end(), *ts, [](const auto& ts, const auto& entry) {
+            return ts < entry.ts;
+        });
+    if (rangeIt == range.begin()) {
+        return _checkWithOldestCatalogIdTimestampMaintained(ts);
+    }
+    // Upper bound returns an iterator to the first entry with a larger timestamp. Decrement the
+    // iterator to get the last entry where the time is less or equal.
+    auto catalogId = (--rangeIt)->id;
+    if (catalogId) {
+        if (*catalogId != kUnknownRangeMarkerId) {
+            return {*catalogId, CatalogIdLookup::Existence::kExists};
+        } else {
+            return {RecordId{}, CatalogIdLookup::Existence::kUnknown};
+        }
+    }
+    return {RecordId{}, CatalogIdLookup::Existence::kNotExists};
 }
 
 boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
     OperationContext* opCtx,
-    const NamespaceString& nss,
+    const NamespaceStringOrUUID& nssOrUUID,
     boost::optional<Timestamp> readTimestamp) const {
-    auto [catalogId, result] = lookupCatalogIdByNSS(nss, readTimestamp);
-    if (result == CatalogIdLookup::NamespaceExistence::kNotExists) {
+    auto [catalogId, result] = nssOrUUID.nss()
+        ? lookupCatalogIdByNSS(*nssOrUUID.nss(), readTimestamp)
+        : lookupCatalogIdByUUID(*nssOrUUID.uuid(), readTimestamp);
+    if (result == CatalogIdLookup::Existence::kNotExists) {
         return boost::none;
     }
 
     auto writeCatalogIdAfterScan = [&](const boost::optional<DurableCatalogEntry>& catalogEntry) {
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog._insertCatalogIdForNSSAfterScan(
-                nss,
+            // Insert catalogId for both the namespace and UUID if the catalog entry is found.
+            catalog._insertCatalogIdForNSSAndUUIDAfterScan(
+                catalogEntry ? catalogEntry->metadata->nss : nssOrUUID.nss(),
+                catalogEntry ? catalogEntry->metadata->options.uuid : nssOrUUID.uuid(),
                 catalogEntry ? boost::make_optional(catalogEntry->catalogId) : boost::none,
                 *readTimestamp);
         });
     };
 
-    if (result == CatalogIdLookup::NamespaceExistence::kUnknown) {
+    if (result == CatalogIdLookup::Existence::kUnknown) {
         // We shouldn't receive kUnknown when we don't have a timestamp since no timestamp means
         // we're operating on the latest.
         invariant(readTimestamp);
 
         // Scan durable catalog when we don't have accurate catalogId mapping for this timestamp.
         gCollectionCatalogSection.numScansDueToMissingMapping.fetchAndAdd(1);
-        auto catalogEntry = DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nss);
+        auto catalogEntry = nssOrUUID.nss()
+            ? DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, *nssOrUUID.nss())
+            : DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, *nssOrUUID.uuid());
         writeCatalogIdAfterScan(catalogEntry);
         return catalogEntry;
     }
 
     auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
-    if (!catalogEntry || nss != catalogEntry->metadata->nss) {
+    if (const auto& nss = nssOrUUID.nss();
+        !catalogEntry || (nss && nss != catalogEntry->metadata->nss)) {
         invariant(readTimestamp);
         // If no entry is found or the entry contains a different namespace, the mapping might be
         // incorrect since it is incomplete after startup; scans durable catalog to confirm.
-        auto catalogEntry = DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nss);
+        auto catalogEntry = nss
+            ? DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, *nss)
+            : DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, *nssOrUUID.uuid());
         writeCatalogIdAfterScan(catalogEntry);
         return catalogEntry;
     }
@@ -1593,45 +1639,18 @@ bool CollectionCatalog::containsCollection(OperationContext* opCtx,
 
 CollectionCatalog::CatalogIdLookup CollectionCatalog::lookupCatalogIdByNSS(
     const NamespaceString& nss, boost::optional<Timestamp> ts) const {
-    if (auto it = _catalogIds.find(nss); it != _catalogIds.end()) {
-        const auto& range = it->second;
-        if (!ts) {
-            auto catalogId = range.back().id;
-            if (catalogId) {
-                return {*catalogId, CatalogIdLookup::NamespaceExistence::kExists};
-            }
-
-            return {RecordId{}, CatalogIdLookup::NamespaceExistence::kNotExists};
-        }
-
-        auto rangeIt = std::upper_bound(
-            range.begin(), range.end(), *ts, [](const auto& ts, const auto& entry) {
-                return ts < entry.ts;
-            });
-        if (rangeIt == range.begin()) {
-            return {RecordId{},
-                    *ts < _oldestCatalogIdTimestampMaintained
-                        ? CatalogIdLookup::NamespaceExistence::kUnknown
-                        : CatalogIdLookup::NamespaceExistence::kNotExists};
-        }
-        // Upper bound returns an iterator to the first entry with a larger timestamp. Decrement the
-        // iterator to get the last entry where the time is less or equal.
-        auto catalogId = (--rangeIt)->id;
-        if (catalogId) {
-            if (*catalogId != kUnknownRangeMarkerId) {
-                return {*catalogId, CatalogIdLookup::NamespaceExistence::kExists};
-            } else {
-                return {RecordId{}, CatalogIdLookup::NamespaceExistence::kUnknown};
-            }
-        }
-        return {RecordId{}, CatalogIdLookup::NamespaceExistence::kNotExists};
+    if (auto it = _nssCatalogIds.find(nss); it != _nssCatalogIds.end()) {
+        return _findCatalogIdInRange(ts, it->second);
     }
-    // If the namespace was requested with a time prior to the oldest maintained time it is unknown,
-    // otherwise we know it is not existing
-    auto existence = ts && *ts < _oldestCatalogIdTimestampMaintained
-        ? CatalogIdLookup::NamespaceExistence::kUnknown
-        : CatalogIdLookup::NamespaceExistence::kNotExists;
-    return {RecordId{}, existence};
+    return _checkWithOldestCatalogIdTimestampMaintained(ts);
+}
+
+CollectionCatalog::CatalogIdLookup CollectionCatalog::lookupCatalogIdByUUID(
+    const UUID& uuid, boost::optional<Timestamp> ts) const {
+    if (auto it = _uuidCatalogIds.find(uuid); it != _uuidCatalogIds.end()) {
+        return _findCatalogIdInRange(ts, it->second);
+    }
+    return _checkWithOldestCatalogIdTimestampMaintained(ts);
 }
 
 void CollectionCatalog::iterateViews(
@@ -1902,7 +1921,7 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
 
     if (commitTime && !commitTime->isNull()) {
         coll->setMinimumValidSnapshot(commitTime.value());
-        _pushCatalogIdForNSS(nss, coll->getCatalogId(), commitTime);
+        _pushCatalogIdForNSSAndUUID(nss, uuid, coll->getCatalogId(), commitTime);
     }
 
 
@@ -1977,7 +1996,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
 
     // Push drop unless this is a rollback of a create
     if (coll->isCommitted()) {
-        _pushCatalogIdForNSS(ns, boost::none, commitTime);
+        _pushCatalogIdForNSSAndUUID(ns, uuid, boost::none, commitTime);
     }
 
     if (!ns.isOnInternalDb() && !ns.isSystem()) {
@@ -2056,57 +2075,67 @@ void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
     }
 }
 
-void CollectionCatalog::_pushCatalogIdForNSS(const NamespaceString& nss,
-                                             boost::optional<RecordId> catalogId,
-                                             boost::optional<Timestamp> ts) {
+void CollectionCatalog::_pushCatalogIdForNSSAndUUID(const NamespaceString& nss,
+                                                    const UUID& uuid,
+                                                    boost::optional<RecordId> catalogId,
+                                                    boost::optional<Timestamp> ts) {
     // TODO SERVER-68674: Remove feature flag check.
     if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
         // No-op.
         return;
     }
 
-    auto& ids = _catalogIds[nss];
+    auto& nssIds = _nssCatalogIds[nss];
+    auto& uuidIds = _uuidCatalogIds[uuid];
 
-    if (!ts) {
-        // Make sure untimestamped writes have a single entry in mapping. If we're mixing
-        // timestamped with untimestamped (such as repair). Ignore the untimestamped writes as an
-        // untimestamped deregister will correspond with an untimestamped register. We should leave
-        // the mapping as-is in this case.
-        if (ids.empty() && catalogId) {
-            // This namespace was added due to an untimestamped write, add an entry with min
-            // timestamp
-            ids.push_back(TimestampedCatalogId{catalogId, Timestamp::min()});
-        } else if (ids.size() == 1 && !catalogId) {
-            // This namespace was removed due to an untimestamped write, clear entries.
-            ids.clear();
+    auto doPushCatalogId = [this, &ts, &catalogId](std::vector<TimestampedCatalogId>& ids,
+                                                   auto& catalogIdsContainer,
+                                                   auto& catalogIdChangesContainer,
+                                                   const auto& key) {
+        if (!ts) {
+            // Make sure untimestamped writes have a single entry in mapping. If we're mixing
+            // timestamped with untimestamped (such as repair). Ignore the untimestamped writes as
+            // an untimestamped deregister will correspond with an untimestamped register. We should
+            // leave the mapping as-is in this case.
+            if (ids.empty() && catalogId) {
+                // This namespace or UUID was added due to an untimestamped write, add an entry
+                // with min timestamp
+                ids.push_back(TimestampedCatalogId{catalogId, Timestamp::min()});
+            } else if (ids.size() == 1 && !catalogId) {
+                // This namespace or UUID was removed due to an untimestamped write, clear entries.
+                ids.clear();
+            }
+
+            // Make sure we erase mapping for namespace or UUID if the list is left empty as
+            // lookups expect at least one entry for existing namespaces or UUIDs.
+            if (ids.empty()) {
+                catalogIdsContainer.erase(key);
+            }
+
+            return;
         }
 
-        // Make sure we erase mapping for namespace if the list is left empty as lookups expect at
-        // least one entry for existing namespaces.
-        if (ids.empty()) {
-            _catalogIds.erase(nss);
+        // An entry could exist already if concurrent writes are performed, keep the latest change
+        // in that case.
+        if (!ids.empty() && ids.back().ts == *ts) {
+            ids.back().id = catalogId;
+            return;
         }
 
-        return;
-    }
+        // Otherwise, push new entry at the end. Timestamp is always increasing
+        invariant(ids.empty() || ids.back().ts < *ts);
+        // If the catalogId is the same as last entry, there's nothing we need to do. This can
+        // happen when the catalog is reopened.
+        if (!ids.empty() && ids.back().id == catalogId) {
+            return;
+        }
 
-    // An entry could exist already if concurrent writes are performed, keep the latest change in
-    // that case.
-    if (!ids.empty() && ids.back().ts == *ts) {
-        ids.back().id = catalogId;
-        return;
-    }
+        ids.push_back(TimestampedCatalogId{catalogId, *ts});
+        _markForCatalogIdCleanupIfNeeded(key, catalogIdChangesContainer, ids);
+    };
 
-    // Otherwise, push new entry at the end. Timestamp is always increasing
-    invariant(ids.empty() || ids.back().ts < *ts);
-    // If the catalogId is the same as last entry, there's nothing we need to do. This can happen
-    // when the catalog is reopened.
-    if (!ids.empty() && ids.back().id == catalogId) {
-        return;
-    }
-
-    ids.push_back(TimestampedCatalogId{catalogId, *ts});
-    _markNamespaceForCatalogIdCleanupIfNeeded(nss, ids);
+    doPushCatalogId(nssIds, _nssCatalogIds, _nssCatalogIdChanges, nss);
+    doPushCatalogId(uuidIds, _uuidCatalogIds, _uuidCatalogIdChanges, uuid);
 }
 
 void CollectionCatalog::_pushCatalogIdForRename(const NamespaceString& from,
@@ -2120,20 +2149,20 @@ void CollectionCatalog::_pushCatalogIdForRename(const NamespaceString& from,
 
     // Get 'toIds' first, it may need to instantiate in the container which invalidates all
     // references.
-    auto& toIds = _catalogIds[to];
-    auto& fromIds = _catalogIds.at(from);
+    auto& toIds = _nssCatalogIds[to];
+    auto& fromIds = _nssCatalogIds.at(from);
     invariant(!fromIds.empty());
 
     // Make sure untimestamped writes have a single entry in mapping. We move the single entry from
     // 'from' to 'to'. We do not have to worry about mixing timestamped and untimestamped like
-    // _pushCatalogIdForNSS.
+    // _pushCatalogId.
     if (!ts) {
         // We should never perform rename in a mixed-mode environment. 'from' should contain a
         // single entry and there should be nothing in 'to' .
         invariant(fromIds.size() == 1);
         invariant(toIds.empty());
         toIds.push_back(TimestampedCatalogId{fromIds.back().id, Timestamp::min()});
-        _catalogIds.erase(from);
+        _nssCatalogIds.erase(from);
         return;
     }
 
@@ -2144,7 +2173,7 @@ void CollectionCatalog::_pushCatalogIdForRename(const NamespaceString& from,
     } else {
         invariant(toIds.empty() || toIds.back().ts < *ts);
         toIds.push_back(TimestampedCatalogId{fromIds.back().id, *ts});
-        _markNamespaceForCatalogIdCleanupIfNeeded(to, toIds);
+        _markForCatalogIdCleanupIfNeeded(to, _nssCatalogIdChanges, toIds);
     }
 
     // Re-write latest entry if timestamp match (multiple changes occured in this transaction),
@@ -2154,92 +2183,108 @@ void CollectionCatalog::_pushCatalogIdForRename(const NamespaceString& from,
     } else {
         invariant(fromIds.empty() || fromIds.back().ts < *ts);
         fromIds.push_back(TimestampedCatalogId{boost::none, *ts});
-        _markNamespaceForCatalogIdCleanupIfNeeded(from, fromIds);
+        _markForCatalogIdCleanupIfNeeded(from, _nssCatalogIdChanges, fromIds);
     }
 }
 
-void CollectionCatalog::_insertCatalogIdForNSSAfterScan(const NamespaceString& nss,
-                                                        boost::optional<RecordId> catalogId,
-                                                        Timestamp ts) {
+void CollectionCatalog::_insertCatalogIdForNSSAndUUIDAfterScan(boost::optional<NamespaceString> nss,
+                                                               boost::optional<UUID> uuid,
+                                                               boost::optional<RecordId> catalogId,
+                                                               Timestamp ts) {
     // TODO SERVER-68674: Remove feature flag check.
     if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
         // No-op.
         return;
     }
 
-    auto& ids = _catalogIds[nss];
+    auto doInsert = [this, &catalogId, &ts](std::vector<TimestampedCatalogId>& ids,
+                                            auto& catalogIdChangesContainer,
+                                            const auto& key) {
+        // Binary search for to the entry with same or larger timestamp
+        auto it = std::lower_bound(
+            ids.begin(), ids.end(), ts, [](const auto& entry, const Timestamp& ts) {
+                return entry.ts < ts;
+            });
 
-    // Binary search for to the entry with same or larger timestamp
-    auto it =
-        std::lower_bound(ids.begin(), ids.end(), ts, [](const auto& entry, const Timestamp& ts) {
-            return entry.ts < ts;
-        });
+        // The logic of what we need to do differs whether we are inserting a valid catalogId or
+        // not.
+        if (catalogId) {
+            if (it != ids.end()) {
+                // An entry could exist already if concurrent writes are performed, keep the latest
+                // change in that case.
+                if (it->ts == ts) {
+                    it->id = catalogId;
+                    return;
+                }
 
-    // The logic of what we need to do differs whether we are inserting a valid catalogId or not.
-    if (catalogId) {
-        if (it != ids.end()) {
-            // An entry could exist already if concurrent writes are performed, keep the latest
-            // change in that case.
-            if (it->ts == ts) {
-                it->id = catalogId;
-                return;
+                // If next element has same catalogId, we can adjust its timestamp to cover a longer
+                // range
+                if (it->id == catalogId) {
+                    it->ts = ts;
+                    _markForCatalogIdCleanupIfNeeded(key, catalogIdChangesContainer, ids);
+                    return;
+                }
             }
 
-            // If next element has same catalogId, we can adjust its timestamp to cover a longer
-            // range
-            if (it->id == catalogId) {
-                it->ts = ts;
-                _markNamespaceForCatalogIdCleanupIfNeeded(nss, ids);
-                return;
-            }
+            // Otherwise insert new entry at timestamp
+            ids.insert(it, TimestampedCatalogId{catalogId, ts});
+            _markForCatalogIdCleanupIfNeeded(key, catalogIdChangesContainer, ids);
+            return;
         }
 
-        // Otherwise insert new entry at timestamp
-        ids.insert(it, TimestampedCatalogId{catalogId, ts});
-        _markNamespaceForCatalogIdCleanupIfNeeded(nss, ids);
-        return;
+        // Avoid inserting missing mapping when the list has grown past the threshold. Will cause
+        // the system to fall back to scanning the durable catalog.
+        if (ids.size() >= kMaxCatalogIdMappingLengthForMissingInsert) {
+            return;
+        }
+
+        if (it != ids.end() && it->ts == ts) {
+            // An entry could exist already if concurrent writes are performed, keep the latest
+            // change in that case.
+            it->id = boost::none;
+        } else {
+            // Otherwise insert new entry
+            it = ids.insert(it, TimestampedCatalogId{boost::none, ts});
+        }
+
+        // The iterator is positioned on the added/modified element above, reposition it to the next
+        // entry
+        ++it;
+
+        // We don't want to assume that the namespace or UUID remains not existing until the next
+        // entry, as there can be times where the namespace or UUID actually does exist. To make
+        // sure we trigger the scanning of the durable catalog in this range we will insert a bogus
+        // entry using an invalid RecordId at the next timestamp. This will treat the range forward
+        // as unknown.
+        auto nextTs = ts + 1;
+
+        // If the next entry is on the next timestamp already, we can skip adding the bogus entry.
+        // If this function is called for a previously unknown namespace or UUID, we may not have
+        // any future valid entries and the iterator would be positioned at and at this point.
+        if (it == ids.end() || it->ts != nextTs) {
+            ids.insert(it, TimestampedCatalogId{kUnknownRangeMarkerId, nextTs});
+        }
+
+        _markForCatalogIdCleanupIfNeeded(key, catalogIdChangesContainer, ids);
+    };
+
+    if (nss) {
+        doInsert(_nssCatalogIds[*nss], _nssCatalogIdChanges, *nss);
     }
 
-    // Avoid inserting missing mapping when the list has grown past the threshold. Will cause the
-    // system to fall back to scanning the durable catalog.
-    if (ids.size() >= kMaxCatalogIdMappingLengthForMissingInsert) {
-        return;
+    if (uuid) {
+        doInsert(_uuidCatalogIds[*uuid], _uuidCatalogIdChanges, *uuid);
     }
-
-    if (it != ids.end() && it->ts == ts) {
-        // An entry could exist already if concurrent writes are performed, keep the latest change
-        // in that case.
-        it->id = boost::none;
-    } else {
-        // Otherwise insert new entry
-        it = ids.insert(it, TimestampedCatalogId{boost::none, ts});
-    }
-
-    // The iterator is positioned on the added/modified element above, reposition it to the next
-    // entry
-    ++it;
-
-    // We don't want to assume that the namespace remains not existing until the next entry, as
-    // there can be times where the namespace actually does exist. To make sure we trigger the
-    // scanning of the durable catalog in this range we will insert a bogus entry using an invalid
-    // RecordId at the next timestamp. This will treat the range forward as unknown.
-    auto nextTs = ts + 1;
-
-    // If the next entry is on the next timestamp already, we can skip adding the bogus entry. If
-    // this function is called for a previously unknown namespace, we may not have any future valid
-    // entries and the iterator would be positioned at and at this point.
-    if (it == ids.end() || it->ts != nextTs) {
-        ids.insert(it, TimestampedCatalogId{kUnknownRangeMarkerId, nextTs});
-    }
-
-    _markNamespaceForCatalogIdCleanupIfNeeded(nss, ids);
 }
 
-void CollectionCatalog::_markNamespaceForCatalogIdCleanupIfNeeded(
-    const NamespaceString& nss, const std::vector<TimestampedCatalogId>& ids) {
+template <class Key, class CatalogIdChangesContainer>
+void CollectionCatalog::_markForCatalogIdCleanupIfNeeded(
+    const Key& key,
+    CatalogIdChangesContainer& catalogIdChangesContainer,
+    const std::vector<TimestampedCatalogId>& ids) {
 
-    auto markForCleanup = [this, &nss](Timestamp ts) {
-        _catalogIdChanges.insert(nss);
+    auto markForCleanup = [this, &key, &catalogIdChangesContainer](Timestamp ts) {
+        catalogIdChangesContainer.insert(key);
         if (ts < _lowestCatalogIdTimestampForCleanup) {
             _lowestCatalogIdTimestampForCleanup = ts;
         }
@@ -2367,88 +2412,103 @@ void CollectionCatalog::cleanupForOldestTimestampAdvanced(Timestamp oldest) {
         nextLowestCleanupTimestamp = std::min(nextLowestCleanupTimestamp, it->ts);
     };
 
-    // Iterate over all namespaces that is marked that they need cleanup
-    for (auto it = _catalogIdChanges.begin(), end = _catalogIdChanges.end(); it != end;) {
-        auto& range = _catalogIds[*it];
+    auto doCleanup = [this, &oldest, &assignLowestCleanupTimestamp](
+                         auto& catalogIdsContainer, auto& catalogIdChangesContainer) {
+        for (auto it = catalogIdChangesContainer.begin(), end = catalogIdChangesContainer.end();
+             it != end;) {
+            auto& range = catalogIdsContainer[*it];
 
-        // Binary search for next larger timestamp
-        auto rangeIt = std::upper_bound(
-            range.begin(), range.end(), oldest, [](const auto& ts, const auto& entry) {
-                return ts < entry.ts;
-            });
+            // Binary search for next larger timestamp
+            auto rangeIt = std::upper_bound(
+                range.begin(), range.end(), oldest, [](const auto& ts, const auto& entry) {
+                    return ts < entry.ts;
+                });
 
-        // Continue if there is nothing to cleanup for this timestamp yet
-        if (rangeIt == range.begin()) {
-            // There should always be at least two entries in the range when we hit this branch. For
-            // the namespace to be put in '_catalogIdChanges' we normally need at least two entries.
-            // The namespace could require cleanup with just a single entry if
-            // 'cleanupForCatalogReopen' leaves a single drop entry in the range. But because we
-            // cannot initialize the namespace with a single drop there must have been a non-drop
-            // entry earlier that got cleaned up in a previous call to
-            // 'cleanupForOldestTimestampAdvanced', which happens when the oldest timestamp advances
-            // past the drop timestamp. This guarantees that the oldest timestamp is larger than the
-            // timestamp in the single drop entry resulting in this branch cannot be taken when we
-            // only have a drop in the range.
-            invariant(range.size() > 1);
-            assignLowestCleanupTimestamp(range);
-            ++it;
-            continue;
+            // Continue if there is nothing to cleanup for this timestamp yet
+            if (rangeIt == range.begin()) {
+                // There should always be at least two entries in the range when we hit this
+                // branch. For the namespace to be put in '_nssCatalogIdChanges' we normally
+                // need at least two entries. The namespace could require cleanup with just a
+                // single entry if 'cleanupForCatalogReopen' leaves a single drop entry in the
+                // range. But because we cannot initialize the namespace with a single drop
+                // there must have been a non-drop entry earlier that got cleaned up in a
+                // previous call to 'cleanupForOldestTimestampAdvanced', which happens when the
+                // oldest timestamp advances past the drop timestamp. This guarantees that the
+                // oldest timestamp is larger than the timestamp in the single drop entry
+                // resulting in this branch cannot be taken when we only have a drop in the
+                // range.
+                invariant(range.size() > 1);
+                assignLowestCleanupTimestamp(range);
+                ++it;
+                continue;
+            }
+
+            // The iterator is positioned to the closest entry that has a larger timestamp,
+            // decrement to get a lower or equal timestamp
+            --rangeIt;
+
+            // Erase range, we will leave at least one element due to the decrement above
+            range.erase(range.begin(), rangeIt);
+
+            // If more changes are needed for this namespace, keep it in the set and keep track
+            // of lowest timestamp.
+            if (range.size() > 1) {
+                assignLowestCleanupTimestamp(range);
+                ++it;
+                continue;
+            }
+            // If the last remaining element is a drop earlier than the oldest timestamp, we can
+            // remove tracking this namespace
+            if (range.back().id == boost::none) {
+                catalogIdsContainer.erase(*it);
+            }
+
+            // Unmark this namespace or UUID for needing changes.
+            catalogIdChangesContainer.erase(it++);
         }
+    };
 
-        // The iterator is positioned to the closest entry that has a larger timestamp, decrement to
-        // get a lower or equal timestamp
-        --rangeIt;
-
-        // Erase range, we will leave at least one element due to the decrement above
-        range.erase(range.begin(), rangeIt);
-
-        // If more changes are needed for this namespace, keep it in the set and keep track of
-        // lowest timestamp.
-        if (range.size() > 1) {
-            assignLowestCleanupTimestamp(range);
-            ++it;
-            continue;
-        }
-
-        // If the last remaining element is a drop earlier than the oldest timestamp, we can remove
-        // tracking this namespace
-        if (range.back().id == boost::none) {
-            _catalogIds.erase(*it);
-        }
-
-        // Unmark this namespace for needing changes.
-        _catalogIdChanges.erase(it++);
-    }
+    // Iterate over all namespaces and UUIDs that is marked that they need cleanup
+    doCleanup(_nssCatalogIds, _nssCatalogIdChanges);
+    doCleanup(_uuidCatalogIds, _uuidCatalogIdChanges);
 
     _lowestCatalogIdTimestampForCleanup = nextLowestCleanupTimestamp;
     _oldestCatalogIdTimestampMaintained = std::max(_oldestCatalogIdTimestampMaintained, oldest);
 }
 
 void CollectionCatalog::cleanupForCatalogReopen(Timestamp stable) {
-    _catalogIdChanges.clear();
+    _nssCatalogIdChanges.clear();
+    _uuidCatalogIdChanges.clear();
     _lowestCatalogIdTimestampForCleanup = Timestamp::max();
     _oldestCatalogIdTimestampMaintained = std::min(_oldestCatalogIdTimestampMaintained, stable);
 
-    for (auto it = _catalogIds.begin(); it != _catalogIds.end();) {
-        auto& ids = it->second;
+    auto removeLargerTimestamps = [this, &stable](auto& catalogIdsContainer,
+                                                  auto& catalogIdChangesContainer) {
+        for (auto it = catalogIdsContainer.begin(); it != catalogIdsContainer.end();) {
+            auto& ids = it->second;
 
-        // Remove all larger timestamps in this range
-        ids.erase(std::upper_bound(ids.begin(),
-                                   ids.end(),
-                                   stable,
-                                   [](Timestamp ts, const auto& entry) { return ts < entry.ts; }),
-                  ids.end());
+            // Remove all larger timestamps in this range
+            ids.erase(
+                std::upper_bound(ids.begin(),
+                                 ids.end(),
+                                 stable,
+                                 [](Timestamp ts, const auto& entry) { return ts < entry.ts; }),
+                ids.end());
 
-        // Remove namespace if there are no entries left
-        if (ids.empty()) {
-            _catalogIds.erase(it++);
-            continue;
+            // Remove namespace or UUID if there are no entries left
+            if (ids.empty()) {
+                catalogIdsContainer.erase(it++);
+                continue;
+            }
+
+            // Calculate when this namespace needs to be cleaned up next
+            _markForCatalogIdCleanupIfNeeded(it->first, catalogIdChangesContainer, ids);
+            ++it;
         }
+    };
 
-        // Calculate when this namespace needs to be cleaned up next
-        _markNamespaceForCatalogIdCleanupIfNeeded(it->first, ids);
-        ++it;
-    }
+    removeLargerTimestamps(_nssCatalogIds, _nssCatalogIdChanges);
+    removeLargerTimestamps(_uuidCatalogIds, _uuidCatalogIdChanges);
 }
 
 void CollectionCatalog::invariantHasExclusiveAccessToCollection(OperationContext* opCtx,

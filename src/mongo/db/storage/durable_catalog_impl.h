@@ -67,6 +67,9 @@ public:
     boost::optional<DurableCatalogEntry> scanForCatalogEntryByNss(OperationContext* opCtx,
                                                                   const NamespaceString& nss) const;
 
+    boost::optional<DurableCatalogEntry> scanForCatalogEntryByUUID(OperationContext* opCtx,
+                                                                   const UUID& uuid) const;
+
     EntryIdentifier getEntry(const RecordId& catalogId) const;
 
     std::string getCollectionIdent(const RecordId& catalogId) const;

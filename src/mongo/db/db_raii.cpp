@@ -1080,7 +1080,9 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
 
         const auto catalogBeforeSnapshot = CollectionCatalog::get(opCtx);
 
-        // TODO (SERVER-71222): This is broken if the UUID doesn't exist in the latest catalog.
+        // It is incorrect to resolve the UUID here as we haven't established a consistent view of
+        // this UUID yet. During a concurrent rename it can be wrong. This namespace is only used to
+        // determine if it is an internal namespace.
         const auto nss = catalogBeforeSnapshot->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
 
         // This may modify the read source on the recovery unit for opCtx if the current read source
@@ -1178,8 +1180,6 @@ getCollectionForLockFreeRead(OperationContext* opCtx,
     // places a compatible PIT collection reference in the 'catalog' if needed and the collection
     // exists at that PIT.
     const Collection* coll = catalog->establishConsistentCollection(opCtx, nsOrUUID, readTimestamp);
-    // TODO (SERVER-71222): This is broken if the UUID doesn't exist in the latest catalog.
-    //
     // Note: This call to resolveNamespaceStringOrUUID must happen after getCollectionFromCatalog
     // above, since getCollectionFromCatalog may call openCollection, which could change the result
     // of namespace resolution.

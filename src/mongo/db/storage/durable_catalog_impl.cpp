@@ -294,6 +294,30 @@ boost::optional<DurableCatalogEntry> DurableCatalogImpl::scanForCatalogEntryByNs
     return boost::none;
 }
 
+boost::optional<DurableCatalogEntry> DurableCatalogImpl::scanForCatalogEntryByUUID(
+    OperationContext* opCtx, const UUID& uuid) const {
+    auto cursor = _rs->getCursor(opCtx);
+    while (auto record = cursor->next()) {
+        BSONObj obj = record->data.releaseToBson();
+
+        if (isFeatureDocument(obj)) {
+            // Skip over the version document because it doesn't correspond to a collection.
+            continue;
+        }
+
+        std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md = _parseMetaData(obj["md"]);
+        if (md->options.uuid == uuid) {
+            BSONElement idxIdent = obj["idxIdent"];
+            return DurableCatalogEntry{record->id,
+                                       obj["ident"].String(),
+                                       idxIdent.eoo() ? BSONObj() : idxIdent.Obj().getOwned(),
+                                       md};
+        }
+    }
+
+    return boost::none;
+}
+
 DurableCatalog::EntryIdentifier DurableCatalogImpl::getEntry(const RecordId& catalogId) const {
     stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
     auto it = _catalogIdToEntryMap.find(catalogId);

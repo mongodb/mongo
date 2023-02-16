@@ -109,6 +109,12 @@ public:
     virtual boost::optional<DurableCatalogEntry> scanForCatalogEntryByNss(
         OperationContext* opCtx, const NamespaceString& nss) const = 0;
 
+    /**
+     * Scans the persisted catalog until an entry is found matching 'uuid'.
+     */
+    virtual boost::optional<DurableCatalogEntry> scanForCatalogEntryByUUID(
+        OperationContext* opCtx, const UUID& uuid) const = 0;
+
     virtual EntryIdentifier getEntry(const RecordId& catalogId) const = 0;
 
     virtual std::string getIndexIdent(OperationContext* opCtx,

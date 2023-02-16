@@ -275,7 +275,10 @@ OpenedCollections& OpenedCollections::get(OperationContext* opCtx) {
 boost::optional<std::shared_ptr<const Collection>> OpenedCollections::lookupByNamespace(
     const NamespaceString& ns) const {
     auto it = std::find_if(_collections.begin(), _collections.end(), [&ns](const auto& entry) {
-        return entry.nss == ns;
+        if (!entry.nss)
+            return false;
+
+        return entry.nss.value() == ns;
     });
     if (it != _collections.end()) {
         return it->collection;
@@ -298,13 +301,13 @@ boost::optional<std::shared_ptr<const Collection>> OpenedCollections::lookupByUU
 }
 
 void OpenedCollections::store(std::shared_ptr<const Collection> coll,
-                              NamespaceString nss,
+                              boost::optional<NamespaceString> nss,
                               boost::optional<UUID> uuid) {
     if (coll) {
         invariant(nss == coll->ns());
         invariant(uuid == coll->uuid());
     }
-    _collections.push_back({std::move(coll), std::move(nss), uuid});
+    _collections.push_back({std::move(coll), nss, uuid});
 }
 
 }  // namespace mongo

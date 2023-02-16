@@ -450,23 +450,25 @@ public:
     bool containsCollection(OperationContext* opCtx, const Collection* collection) const;
 
     /**
-     * Returns the CatalogId for a given 'nss' at timestamp 'ts'.
+     * Returns the CatalogId for a given 'nss' or 'uuid' at timestamp 'ts'.
      */
     struct CatalogIdLookup {
-        enum class NamespaceExistence {
-            // Namespace exists at time 'ts' and catalogId set in 'id'.
+        enum class Existence {
+            // Namespace or UUID exists at time 'ts' and catalogId set in 'id'.
             kExists,
-            // Namespace does not exist at time 'ts'.
+            // Namespace or UUID does not exist at time 'ts'.
             kNotExists,
-            // Namespace existence at time 'ts' is unknown. The durable catalog must be scanned to
-            // determine.
+            // Namespace or UUID existence at time 'ts' is unknown. The durable catalog must be
+            // scanned to determine.
             kUnknown
         };
         RecordId id;
-        NamespaceExistence result;
+        Existence result;
     };
     CatalogIdLookup lookupCatalogIdByNSS(const NamespaceString& nss,
                                          boost::optional<Timestamp> ts = boost::none) const;
+    CatalogIdLookup lookupCatalogIdByUUID(const UUID& uuid,
+                                          boost::optional<Timestamp> ts = boost::none) const;
 
     /**
      * Iterates through the views in the catalog associated with database `dbName`, applying
@@ -706,7 +708,7 @@ private:
      */
     boost::optional<DurableCatalogEntry> _fetchPITCatalogEntry(
         OperationContext* opCtx,
-        const NamespaceString& nss,
+        const NamespaceStringOrUUID& nssOrUUID,
         boost::optional<Timestamp> readTimestamp) const;
 
     /**
@@ -786,12 +788,13 @@ private:
         Timestamp ts;
     };
 
-    // Push a catalogId for namespace at given Timestamp. Timestamp needs to be larger than other
-    // entries for this namespace. boost::none for catalogId represent drop, boost::none for
-    // timestamp turns this operation into a no-op.
-    void _pushCatalogIdForNSS(const NamespaceString& nss,
-                              boost::optional<RecordId> catalogId,
-                              boost::optional<Timestamp> ts);
+    // Push a catalogId for namespace and UUID at given Timestamp. Timestamp needs to be larger than
+    // other entries for this namespace and UUID. boost::none for catalogId represent drop,
+    // boost::none for timestamp turns this operation into a no-op.
+    void _pushCatalogIdForNSSAndUUID(const NamespaceString& nss,
+                                     const UUID& uuid,
+                                     boost::optional<RecordId> catalogId,
+                                     boost::optional<Timestamp> ts);
 
     // Push a catalogId for 'from' and 'to' for a rename operation at given Timestamp. Timestamp
     // needs to be larger than other entries for these namespaces. boost::none for timestamp turns
@@ -800,16 +803,19 @@ private:
                                  const NamespaceString& to,
                                  boost::optional<Timestamp> ts);
 
-    // Inserts a catalogId for namespace at given Timestamp. Used after scanning the durable catalog
-    // for a correct mapping at the given timestamp.
-    void _insertCatalogIdForNSSAfterScan(const NamespaceString& nss,
-                                         boost::optional<RecordId> catalogId,
-                                         Timestamp ts);
+    // Inserts a catalogId for namespace and UUID at given Timestamp, if not boost::none. Used after
+    // scanning the durable catalog for a correct mapping at the given timestamp.
+    void _insertCatalogIdForNSSAndUUIDAfterScan(boost::optional<NamespaceString> nss,
+                                                boost::optional<UUID> uuid,
+                                                boost::optional<RecordId> catalogId,
+                                                Timestamp ts);
 
-    // Helper to calculate if a namespace needs to be marked for cleanup for a set of timestamped
-    // catalogIds
-    void _markNamespaceForCatalogIdCleanupIfNeeded(const NamespaceString& nss,
-                                                   const std::vector<TimestampedCatalogId>& ids);
+    // Helper to calculate if a namespace or UUID needs to be marked for cleanup for a set of
+    // timestamped catalogIds
+    template <class Key, class CatalogIdChangesContainer>
+    void _markForCatalogIdCleanupIfNeeded(const Key& key,
+                                          CatalogIdChangesContainer& catalogIdChangesContainer,
+                                          const std::vector<TimestampedCatalogId>& ids);
 
     /**
      * Returns true if catalog information about this namespace or UUID should be looked up from the
@@ -843,9 +849,16 @@ private:
                                                          const NamespaceString& nss) const;
     const Collection* _openCollectionAtLatestByUUID(OperationContext* opCtx,
                                                     const UUID& uuid) const;
-    const Collection* _openCollectionAtPointInTimeByNamespace(OperationContext* opCtx,
-                                                              const NamespaceString& nss,
-                                                              Timestamp readTimestamp) const;
+    const Collection* _openCollectionAtPointInTimeByNamespaceOrUUID(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nssOrUUID,
+        Timestamp readTimestamp) const;
+
+    // Helpers for 'lookupCatalogIdByNSS' and 'lookupCatalogIdByUUID'.
+    CatalogIdLookup _checkWithOldestCatalogIdTimestampMaintained(
+        boost::optional<Timestamp> ts) const;
+    CatalogIdLookup _findCatalogIdInRange(boost::optional<Timestamp> ts,
+                                          const std::vector<TimestampedCatalogId>& range) const;
 
     /**
      * When present, indicates that the catalog is in closed state, and contains a map from UUID
@@ -873,11 +886,15 @@ private:
     absl::flat_hash_map<NamespaceString, std::shared_ptr<Collection>> _pendingCommitNamespaces;
     absl::flat_hash_map<UUID, std::shared_ptr<Collection>, UUID::Hash> _pendingCommitUUIDs;
 
-    // CatalogId mappings for all known namespaces for the CollectionCatalog. The vector is sorted
-    // on timestamp.
-    absl::flat_hash_map<NamespaceString, std::vector<TimestampedCatalogId>> _catalogIds;
-    // Set of namespaces that need cleanup when the oldest timestamp advances sufficiently.
-    absl::flat_hash_set<NamespaceString> _catalogIdChanges;
+    // CatalogId mappings for all known namespaces and UUIDs for the CollectionCatalog. The vector
+    // is sorted on timestamp. UUIDs will have at most two entries. One for the create and another
+    // for the drop. UUIDs stay the same across collection renames.
+    absl::flat_hash_map<NamespaceString, std::vector<TimestampedCatalogId>> _nssCatalogIds;
+    absl::flat_hash_map<UUID, std::vector<TimestampedCatalogId>, UUID::Hash> _uuidCatalogIds;
+    // Set of namespaces and UUIDs that need cleanup when the oldest timestamp advances
+    // sufficiently.
+    absl::flat_hash_set<NamespaceString> _nssCatalogIdChanges;
+    absl::flat_hash_set<UUID, UUID::Hash> _uuidCatalogIdChanges;
     // Point at which the oldest timestamp need to advance for there to be any catalogId namespace
     // that can be cleaned up
     Timestamp _lowestCatalogIdTimestampForCleanup = Timestamp::max();
