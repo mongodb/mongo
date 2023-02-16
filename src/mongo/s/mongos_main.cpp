@@ -511,7 +511,9 @@ public:
     void onFoundSet(const Key& key) noexcept final {}
 
     void onConfirmedSet(const State& state) noexcept final {
-        auto connStr = state.connStr;
+        const auto& connStr = state.connStr;
+        const auto& setName = connStr.getSetName();
+
         try {
             LOGV2(471693,
                   "Updating the shard registry with confirmed replica set",
@@ -526,16 +528,15 @@ public:
                   "error"_attr = e);
         }
 
-        auto setName = connStr.getSetName();
         bool updateInProgress = false;
         {
             stdx::lock_guard lock(_mutex);
             if (!_hasUpdateState(lock, setName)) {
-                _updateStates.emplace(setName, std::make_shared<ReplSetConfigUpdateState>());
+                _updateStates.emplace(setName, ReplSetConfigUpdateState());
             }
-            auto updateState = _updateStates.at(setName);
-            updateState->nextUpdateToSend = connStr;
-            updateInProgress = updateState->updateInProgress;
+            auto& updateState = _updateStates.at(setName);
+            updateState.nextUpdateToSend = connStr;
+            updateInProgress = updateState.updateInProgress;
         }
 
         if (!updateInProgress) {
@@ -563,26 +564,28 @@ public:
 private:
     // Schedules updates for replica set 'setName' on the config server. Loosly preserves ordering
     // of update execution. Newer updates will not be overwritten by older updates in config.shards.
-    void _scheduleUpdateConfigServer(std::string setName) {
-        ConnectionString update;
+    void _scheduleUpdateConfigServer(const std::string& setName) {
+        ConnectionString updatedConnectionString;
         {
             stdx::lock_guard lock(_mutex);
             if (!_hasUpdateState(lock, setName)) {
                 return;
             }
-            auto updateState = _updateStates.at(setName);
-            if (updateState->updateInProgress) {
+            auto& updateState = _updateStates.at(setName);
+            if (updateState.updateInProgress) {
                 return;
             }
-            updateState->updateInProgress = true;
-            update = updateState->nextUpdateToSend.value();
-            updateState->nextUpdateToSend = boost::none;
+            updateState.updateInProgress = true;
+            updatedConnectionString = updateState.nextUpdateToSend.value();
+            updateState.nextUpdateToSend = boost::none;
         }
 
         auto executor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
         auto schedStatus =
             executor
-                ->scheduleWork([self = shared_from_this(), setName, update](auto args) {
+                ->scheduleWork([self = shared_from_this(),
+                                setName,
+                                update = std::move(updatedConnectionString)](const auto& args) {
                     self->_updateConfigServer(args.status, setName, update);
                 })
                 .getStatus();
@@ -598,7 +601,9 @@ private:
         uassertStatusOK(schedStatus);
     }
 
-    void _updateConfigServer(Status status, std::string setName, ConnectionString update) {
+    void _updateConfigServer(const Status& status,
+                             const std::string& setName,
+                             const ConnectionString& update) {
         if (ErrorCodes::isCancellationError(status.code())) {
             stdx::lock_guard lock(_mutex);
             _updateStates.erase(setName);
@@ -626,28 +631,28 @@ private:
         _endUpdateConfigServer(setName, update);
     }
 
-    void _endUpdateConfigServer(std::string setName, ConnectionString update) {
+    void _endUpdateConfigServer(const std::string& setName, const ConnectionString& update) {
         bool moreUpdates = false;
         {
             stdx::lock_guard lock(_mutex);
             invariant(_hasUpdateState(lock, setName));
-            auto updateState = _updateStates.at(setName);
-            updateState->updateInProgress = false;
-            moreUpdates = (updateState->nextUpdateToSend != boost::none);
+            auto& updateState = _updateStates.at(setName);
+            updateState.updateInProgress = false;
+            moreUpdates = (updateState.nextUpdateToSend != boost::none);
             if (!moreUpdates) {
                 _updateStates.erase(setName);
             }
         }
         if (moreUpdates) {
             auto executor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
-            executor->schedule([self = shared_from_this(), setName](auto args) {
+            executor->schedule([self = shared_from_this(), setName](const auto& _) {
                 self->_scheduleUpdateConfigServer(setName);
             });
         }
     }
 
     // Returns true if a ReplSetConfigUpdateState exists for replica set setName.
-    bool _hasUpdateState(WithLock, std::string setName) {
+    bool _hasUpdateState(WithLock, const std::string& setName) {
         return (_updateStates.find(setName) != _updateStates.end());
     }
 
@@ -660,7 +665,7 @@ private:
         bool updateInProgress = false;
         boost::optional<ConnectionString> nextUpdateToSend;
     };
-    stdx::unordered_map<std::string, std::shared_ptr<ReplSetConfigUpdateState>> _updateStates;
+    stdx::unordered_map<std::string, ReplSetConfigUpdateState> _updateStates;
 };
 
 ExitCode runMongosServer(ServiceContext* serviceContext) {
