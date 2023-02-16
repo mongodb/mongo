@@ -1172,26 +1172,18 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
         return;
     }
 
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    const bool inMultiDocumentTransaction =
-        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
+    MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setTid(collectionName.tenantId());
+    oplogEntry.setNss(collectionName.getCommandNS());
+    oplogEntry.setUuid(options.uuid);
+    oplogEntry.setObject(MutableOplogEntry::makeCreateCollCmdObj(collectionName, options, idIndex));
 
-    if (inMultiDocumentTransaction) {
-        auto operation = MutableOplogEntry::makeCreateCommand(collectionName, options, idIndex);
-        txnParticipant.addTransactionOperation(opCtx, operation);
-    } else {
-        MutableOplogEntry oplogEntry;
-        oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-
-        oplogEntry.setTid(collectionName.tenantId());
-        oplogEntry.setNss(collectionName.getCommandNS());
-        oplogEntry.setUuid(options.uuid);
-        oplogEntry.setObject(
-            MutableOplogEntry::makeCreateCollCmdObj(collectionName, options, idIndex));
+    if (!createOpTime.isNull()) {
         oplogEntry.setOpTime(createOpTime);
-        oplogEntry.setFromMigrateIfTrue(fromMigrate);
-        logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
     }
+
+    logMutableOplogEntry(opCtx, &oplogEntry, fromMigrate, _oplogWriter.get());
 }
 
 void OpObserverImpl::onCollMod(OperationContext* opCtx,
