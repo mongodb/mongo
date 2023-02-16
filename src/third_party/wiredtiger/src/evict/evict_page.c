@@ -559,7 +559,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
                               * this check safe: if that fails, we have raced with a read and should
                               * give up on evicting the parent.
                               */
-            if (!__wt_atomic_casv8(&child->state, WT_REF_DELETED, WT_REF_LOCKED))
+            if (!WT_REF_CAS_STATE(session, child, WT_REF_DELETED, WT_REF_LOCKED))
                 return (__wt_set_return(session, EBUSY));
             /*
              * Insert a read/read barrier so we're guaranteed the page_del state we read below comes
