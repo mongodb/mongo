@@ -365,6 +365,29 @@ protected:
         return opCtxSession;
     }
 
+    void callUnderSplitSessionNoUnstash(
+        const InternalSessionPool::Session& session,
+        std::function<void(OperationContext* opCtx,
+                           TransactionParticipant::Participant& txnParticipant)> fn) {
+        runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+            // Prepared writes as part of a split session must be done with an
+            // `UnreplicatedWritesBlock`. This is how we mimic oplog application.
+            repl::UnreplicatedWritesBlock notReplicated(opCtx);
+            opCtx->setLogicalSessionId(session.getSessionId());
+            opCtx->setTxnNumber(session.getTxnNumber());
+            opCtx->setInMultiDocumentTransaction();
+
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+            std::unique_ptr<MongoDSessionCatalog::Session> session =
+                mongoDSessionCatalog->checkOutSession(opCtx);
+
+            auto newTxnParticipant = TransactionParticipant::get(opCtx);
+            fn(opCtx, newTxnParticipant);
+
+            session->checkIn(opCtx, OperationContextSession::CheckInReason::kDone);
+        });
+    }
+
     void callUnderSplitSession(const InternalSessionPool::Session& session,
                                std::function<void(OperationContext* opCtx)> fn) {
         runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
@@ -5923,7 +5946,9 @@ TEST_F(TxnParticipantTest,
 class OneOffRead {
 public:
     OneOffRead(OperationContext* opCtx, const Timestamp& ts) : _opCtx(opCtx) {
-        _opCtx->recoveryUnit()->abandonSnapshot();
+        if (_opCtx->recoveryUnit()->isActive()) {
+            _opCtx->recoveryUnit()->abandonSnapshot();
+        }
         if (ts.isNull()) {
             _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
         } else {
@@ -5940,7 +5965,182 @@ private:
     OperationContext* _opCtx;
 };
 
-TEST_F(TxnParticipantTest, SplitTransactionOnPrepare) {
+TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
+    // This test simulates:
+    // 1) Preparing a transaction with multiple logical sessions as a secondary.
+    // 2) Aborting the prepared transaction as a primary.
+    //
+    // This test asserts that:
+    // A) The prepares done by both sessions are done with the same timestamp.
+    // B) Aborting the transaction results in the split transaction participants being in the
+    //    aborted state.
+    // C) The split session entries in the `config.transactions` table are not left in the prepared
+    //    state. It is legal for the documents to not exist and it's legal for them to be aborted.
+    //
+    // First we set up infrastructure such that we can simulate oplog application.
+    OperationContext* opCtx = this->opCtx();
+    DurableHistoryRegistry::set(opCtx->getServiceContext(),
+                                std::make_unique<DurableHistoryRegistry>());
+    opCtx->getServiceContext()->setOpObserver(
+        std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+
+    OpDebug* const nullOpDbg = nullptr;
+
+    dynamic_cast<repl::ReplicationCoordinatorMock*>(repl::ReplicationCoordinator::get(opCtx))
+        ->setUpdateCommittedSnapshot(false);
+    // Initiate the term from 0 to 1 for familiarity.
+    ASSERT_OK(repl::ReplicationCoordinator::get(opCtx)->updateTerm(opCtx, 1));
+
+    // Bump the logical clock for easier visual cues.
+    const Timestamp startTs(100, 1);
+    auto oplogInfo = LocalOplogInfo::get(opCtx);
+    oplogInfo->setNewTimestamp(opCtx->getServiceContext(), startTs);
+
+    // Assign the variables that represent the "real", client-facing logical session.
+    std::unique_ptr<MongoDSessionCatalog::Session> userSession = checkOutSession();
+    TransactionParticipant::Participant userTxnParticipant = TransactionParticipant::get(opCtx);
+
+    // TxnResources start in the "stashed" state.
+    userTxnParticipant.unstashTransactionResources(opCtx, "crud ops");
+
+    // Hold the collection lock/datastructure such that it can be released prior to rollback.
+    boost::optional<AutoGetCollection> userColl;
+    userColl.emplace(opCtx, kNss, LockMode::MODE_IX);
+
+    // We split our user session into 2 split sessions.
+    const std::vector<uint32_t> requesterIds{1, 3};
+    auto* splitPrepareManager =
+        repl::ReplicationCoordinator::get(opCtx)->getSplitPrepareSessionManager();
+    const std::vector<repl::SplitSessionInfo>& splitSessions = splitPrepareManager->splitSession(
+        opCtx->getLogicalSessionId().get(), opCtx->getTxnNumber().get(), requesterIds);
+    // Insert an `_id: 1` document.
+    callUnderSplitSession(splitSessions[0].session, [nullOpDbg](OperationContext* opCtx) {
+        AutoGetCollection userColl(opCtx, kNss, LockMode::MODE_IX);
+        ASSERT_OK(
+            collection_internal::insertDocument(opCtx,
+                                                userColl.getCollection(),
+                                                InsertStatement(BSON("_id" << 1 << "value" << 1)),
+                                                nullOpDbg));
+    });
+
+    // Insert an `_id: 2` document.
+    callUnderSplitSession(splitSessions[1].session, [nullOpDbg](OperationContext* opCtx) {
+        AutoGetCollection userColl(opCtx, kNss, LockMode::MODE_IX);
+        ASSERT_OK(
+            collection_internal::insertDocument(opCtx,
+                                                userColl.getCollection(),
+                                                InsertStatement(BSON("_id" << 2 << "value" << 1)),
+                                                nullOpDbg));
+    });
+
+    // Mimic the methods to call for a secondary performing a split prepare. Those are called inside
+    // `UnreplicatedWritesBlock` and explicitly pass in the prepare OpTime.
+    const Timestamp prepTs = startTs;
+    const repl::OpTime prepOpTime(prepTs, 1);
+    callUnderSplitSession(splitSessions[0].session, [prepOpTime](OperationContext* opCtx) {
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        txnParticipant.prepareTransaction(opCtx, prepOpTime);
+    });
+    callUnderSplitSession(splitSessions[1].session, [prepOpTime](OperationContext* opCtx) {
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        txnParticipant.prepareTransaction(opCtx, prepOpTime);
+    });
+
+    // Normally this would also be called on a secondary under a `UnreplicatedWritesBlock`. However
+    // we must change the `config.transactions` state for this logical session. In production, that
+    // transaction table write would come via a synthetic oplog entry.
+    userTxnParticipant.prepareTransaction(opCtx, prepOpTime);
+
+    // Assert for each split session that they are:
+    // 1) Prepared at the expected prepare timestamp.
+    // 2) Have an active recovery unit.
+    // 3) The recovery unit has the expected prepare timestamp.
+    for (const auto& splitSession : splitSessions) {
+        callUnderSplitSessionNoUnstash(
+            splitSession.session,
+            [&](OperationContext* opCtx, TransactionParticipant::Participant& txnParticipant) {
+                ASSERT_EQ(prepOpTime, txnParticipant.getPrepareOpTime());
+                ASSERT(txnParticipant.getTxnResourceStashRecoveryUnitForTest()->isActive());
+                ASSERT_EQ(
+                    prepOpTime.getTimestamp(),
+                    txnParticipant.getTxnResourceStashRecoveryUnitForTest()->getPrepareTimestamp());
+            });
+    }
+
+    // Aborting a transaction destroys the split session objects. Store the LSIDs for a post-abort
+    // transaction table lookup.
+    std::vector<LogicalSessionId> splitLSIDs{splitSessions[0].session.getSessionId(),
+                                             splitSessions[1].session.getSessionId()};
+    userTxnParticipant.abortTransaction(opCtx);
+
+    // The `findOne` helpers invariant by default if no result is found.
+    const bool invariantOnError = true;
+
+    // To claim we rolled back all of the split prepared recovery units, we check that:
+    // 1) A read cannot see the document. If it can, the split transaction was committed.
+    // 2) A write does not generate a write conflict. If it does, the split transaction was left
+    //    open.
+    {
+        OneOffRead oor(opCtx, Timestamp());
+        BSONObj userWrite = Helpers::findOneForTesting(
+            opCtx, userColl->getCollection(), BSON("_id" << 1), !invariantOnError);
+        ASSERT(userWrite.isEmpty());
+        userWrite = Helpers::findOneForTesting(
+            opCtx, userColl->getCollection(), BSON("_id" << 2), !invariantOnError);
+        ASSERT(userWrite.isEmpty());
+    }
+
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_DOES_NOT_THROW(auto _ = collection_internal::insertDocument(
+                                  opCtx,
+                                  userColl->getCollection(),
+                                  InsertStatement(BSON("_id" << 1 << "value" << 1)),
+                                  nullOpDbg));
+    }
+
+    // Assert that the TxnParticipant for the split sessions are in the "aborted prepared
+    // transaction" state.
+    for (const auto& splitSession : splitLSIDs) {
+        const TxnNumber unneeded(0);
+        callUnderSplitSessionNoUnstash(
+            InternalSessionPool::Session(splitSession, unneeded),
+            [&](OperationContext* opCtx, TransactionParticipant::Participant& txnParticipant) {
+                ASSERT(txnParticipant.transactionIsAborted());
+                ASSERT(!txnParticipant.transactionIsAbortedWithoutPrepare());
+            });
+    }
+
+    AutoGetCollection configTransactions(
+        opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IS);
+    {
+        OneOffRead oor(opCtx, Timestamp());
+        BSONObj userTxnObj =
+            Helpers::findOneForTesting(opCtx,
+                                       configTransactions.getCollection(),
+                                       BSON("_id.id" << opCtx->getLogicalSessionId()->getId()),
+                                       !invariantOnError);
+        ASSERT(!userTxnObj.isEmpty());
+        // Assert that the user config.transaction document is in the aborted state.
+        assertSessionState(userTxnObj, DurableTxnStateEnum::kAborted);
+    }
+
+    // Rather than testing the implementation, we'll assert on the weakest necessary state. A split
+    // `config.transactions` document may or may not exist. If it exists, it must not* be in the
+    // "prepared" state.
+    for (const LogicalSessionId& splitLSID : splitLSIDs) {
+        OneOffRead oor(opCtx, Timestamp());
+        BSONObj splitTxnObj = Helpers::findOneForTesting(opCtx,
+                                                         configTransactions.getCollection(),
+                                                         BSON("_id.id" << splitLSID.getId()),
+                                                         !invariantOnError);
+        if (!splitTxnObj.isEmpty()) {
+            assertNotInSessionState(splitTxnObj, DurableTxnStateEnum::kPrepared);
+        }
+    }
+}
+
+TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     // This test simulates:
     // 1) Preparing a transaction with multiple logical sessions as a secondary.
     // 2) Committing the transaction as a primary.
@@ -5991,10 +6191,10 @@ TEST_F(TxnParticipantTest, SplitTransactionOnPrepare) {
     const std::vector<uint32_t> requesterIds{1, 3};
     auto* splitPrepareManager =
         repl::ReplicationCoordinator::get(opCtx)->getSplitPrepareSessionManager();
-    const auto& splitSessInfos = splitPrepareManager->splitSession(
+    const auto& splitSessions = splitPrepareManager->splitSession(
         opCtx->getLogicalSessionId().get(), opCtx->getTxnNumber().get(), requesterIds);
     // Insert an `_id: 1` document.
-    callUnderSplitSession(splitSessInfos[0].session, [nullOpDbg](OperationContext* opCtx) {
+    callUnderSplitSession(splitSessions[0].session, [nullOpDbg](OperationContext* opCtx) {
         AutoGetCollection userColl(opCtx, kNss, LockMode::MODE_IX);
         ASSERT_OK(
             collection_internal::insertDocument(opCtx,
@@ -6004,7 +6204,7 @@ TEST_F(TxnParticipantTest, SplitTransactionOnPrepare) {
     });
 
     // Insert an `_id: 2` document.
-    callUnderSplitSession(splitSessInfos[1].session, [nullOpDbg](OperationContext* opCtx) {
+    callUnderSplitSession(splitSessions[1].session, [nullOpDbg](OperationContext* opCtx) {
         AutoGetCollection userColl(opCtx, kNss, LockMode::MODE_IX);
         ASSERT_OK(
             collection_internal::insertDocument(opCtx,
@@ -6015,22 +6215,21 @@ TEST_F(TxnParticipantTest, SplitTransactionOnPrepare) {
 
     // Update `2` to increment its `value` to 2. This must be done in the same split session as the
     // insert.
-    callUnderSplitSession(splitSessInfos[1].session, [nullOpDbg](OperationContext* opCtx) {
+    callUnderSplitSession(splitSessions[1].session, [nullOpDbg](OperationContext* opCtx) {
         AutoGetCollection userColl(opCtx, kNss, LockMode::MODE_IX);
         Helpers::update(
             opCtx, userColl->ns(), BSON("_id" << 2), BSON("$inc" << BSON("value" << 1)));
     });
 
-
     // Mimic the methods to call for a secondary performing a split prepare. Those are called inside
     // `UnreplicatedWritesBlock` and explicitly pass in the prepare OpTime.
     const Timestamp prepTs = startTs;
     const repl::OpTime prepOpTime(prepTs, 1);
-    callUnderSplitSession(splitSessInfos[0].session, [prepOpTime](OperationContext* opCtx) {
+    callUnderSplitSession(splitSessions[0].session, [prepOpTime](OperationContext* opCtx) {
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.prepareTransaction(opCtx, prepOpTime);
     });
-    callUnderSplitSession(splitSessInfos[1].session, [prepOpTime](OperationContext* opCtx) {
+    callUnderSplitSession(splitSessions[1].session, [prepOpTime](OperationContext* opCtx) {
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.prepareTransaction(opCtx, prepOpTime);
     });
@@ -6055,10 +6254,15 @@ TEST_F(TxnParticipantTest, SplitTransactionOnPrepare) {
     // system clock is within few hundred seconds of the epoch.
     const Timestamp chosenStableTimestamp = visibleTs + 10;
     oplogInfo->setNewTimestamp(opCtx->getServiceContext(), chosenStableTimestamp + 1);
+
+    // Committing a transaction destroys the split session objects. Store the LSIDs for a post-abort
+    // transaction table lookup.
+    std::vector<LogicalSessionId> splitLSIDs{splitSessions[0].session.getSessionId(),
+                                             splitSessions[1].session.getSessionId()};
     userTxnParticipant.commitPreparedTransaction(opCtx, visibleTs, boost::none);
     ASSERT_LT(chosenStableTimestamp, userTxnParticipant.getLastWriteOpTime().getTimestamp());
 
-    // Using the `findOne` helpers by default invariants if no result is found.
+    // The `findOne` helpers will invariant by default if no result is found.
     const bool invariantOnError = true;
     // Print out reads at the interesting times prior to asserting for diagnostics.
     for (const auto& ts : std::vector<Timestamp>{prepTs, visibleTs}) {
@@ -6116,12 +6320,12 @@ TEST_F(TxnParticipantTest, SplitTransactionOnPrepare) {
         // Rather than testing the implementation, we'll assert on the weakest necessary state. A
         // split `config.transactions` document may or may not exist. If it exists, it must be
         // in the "committed" state.
-        for (const auto& sessInfo : splitSessInfos) {
-            BSONObj splitTxnObj = Helpers::findOneForTesting(
-                opCtx,
-                configTransactions.getCollection(),
-                BSON("_id.id" << sessInfo.session.getSessionId().getId()),
-                !invariantOnError);
+        for (std::size_t idx = 0; idx < splitLSIDs.size(); ++idx) {
+            BSONObj splitTxnObj =
+                Helpers::findOneForTesting(opCtx,
+                                           configTransactions.getCollection(),
+                                           BSON("_id.id" << splitLSIDs[idx].getId()),
+                                           !invariantOnError);
             if (!splitTxnObj.isEmpty()) {
                 assertSessionState(splitTxnObj, DurableTxnStateEnum::kCommitted);
             }
@@ -6182,12 +6386,11 @@ TEST_F(TxnParticipantTest, SplitTransactionOnPrepare) {
     // Rather than testing the implementation, we'll assert on the weakest necessary state. A split
     // `config.transactions` document may or may not exist. If it exists, it must not* be in the
     // "prepared" state.
-    for (const auto& sessInfo : splitSessInfos) {
-        BSONObj splitTxnObj =
-            Helpers::findOneForTesting(opCtx,
-                                       configTransactions.getCollection(),
-                                       BSON("_id.id" << sessInfo.session.getSessionId().getId()),
-                                       !invariantOnError);
+    for (std::size_t idx = 0; idx < splitLSIDs.size(); ++idx) {
+        BSONObj splitTxnObj = Helpers::findOneForTesting(opCtx,
+                                                         configTransactions.getCollection(),
+                                                         BSON("_id.id" << splitLSIDs[idx].getId()),
+                                                         !invariantOnError);
         if (!splitTxnObj.isEmpty()) {
             assertNotInSessionState(splitTxnObj, DurableTxnStateEnum::kPrepared);
         }

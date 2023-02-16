@@ -208,6 +208,10 @@ public:
             return _locker.get();
         }
 
+        RecoveryUnit* recoveryUnit() const {
+            return _recoveryUnit.get();
+        }
+
         /**
          * Releases stashed transaction state onto 'opCtx'. Must only be called once.
          * Ephemerally holds the Client lock associated with opCtx.
@@ -766,6 +770,11 @@ public:
             return o().txnResourceStash->locker();
         }
 
+        const RecoveryUnit* getTxnResourceStashRecoveryUnitForTest() const {
+            invariant(o().txnResourceStash);
+            return o().txnResourceStash->recoveryUnit();
+        }
+
         void transitionToPreparedforTest(OperationContext* opCtx, repl::OpTime prepareOpTime) {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).prepareOpTime = prepareOpTime;
@@ -862,6 +871,14 @@ public:
         // needToWriteAbortEntry state bool.
         void _abortActiveTransaction(OperationContext* opCtx,
                                      TransactionState::StateSet expectedStates);
+
+        // Aborts a "split prepared" transction. Prepared transactions processed on secondaries may
+        // split the storage writes into multiple RecoveryUnits. This method will be invoked by a
+        // primary such that it looks for all recovery units and aborts them.
+        void _abortSplitPreparedTxnOnPrimary(OperationContext* opCtx,
+                                             repl::SplitPrepareSessionManager* splitPrepareManager,
+                                             const LogicalSessionId& sessionId,
+                                             const TxnNumber& txnNumber);
 
         // Factors out code for clarity from _abortActiveTransaction.
         void _finishAbortingActiveTransaction(OperationContext* opCtx,

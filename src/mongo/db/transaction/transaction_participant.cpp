@@ -1993,7 +1993,7 @@ void TransactionParticipant::Participant::_commitStorageTransaction(OperationCon
 }
 
 void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
-    OperationContext* parentOpCtx,
+    OperationContext* userOpCtx,
     repl::SplitPrepareSessionManager* splitPrepareManager,
     const LogicalSessionId& userSessionId,
     const TxnNumber& userTxnNumber,
@@ -2003,7 +2003,7 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
     for (const auto& sessInfos :
          splitPrepareManager->getSplitSessions(userSessionId, userTxnNumber).get()) {
 
-        auto splitClientOwned = parentOpCtx->getServiceContext()->makeClient("tempSplitClient");
+        auto splitClientOwned = userOpCtx->getServiceContext()->makeClient("tempSplitClient");
         auto splitOpCtx = splitClientOwned->makeOperationContext();
         AlternativeClientRegion acr(splitClientOwned);
 
@@ -2038,13 +2038,13 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
                 splitOpCtx.get(), operationCount, oplogOperationBytes);
         }
 
-        newTxnParticipant.stashTransactionResources(splitOpCtx.get());
         checkedOutSession->checkIn(splitOpCtx.get(), OperationContextSession::CheckInReason::kDone);
     }
 
-    parentOpCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);
-    parentOpCtx->recoveryUnit()->setDurableTimestamp(durableTimestamp);
-    this->_commitStorageTransaction(parentOpCtx);
+    splitPrepareManager->releaseSplitSessions(userSessionId, userTxnNumber);
+    userOpCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);
+    userOpCtx->recoveryUnit()->setDurableTimestamp(durableTimestamp);
+    this->_commitStorageTransaction(userOpCtx);
 }
 
 void TransactionParticipant::Participant::_finishCommitTransaction(
@@ -2146,6 +2146,17 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
     OperationContext* opCtx, TransactionState::StateSet expectedStates) {
     invariant(!o().txnResourceStash);
 
+    // If this is a split-prepared transaction, cascade the abort.
+    auto* splitPrepareManager =
+        repl::ReplicationCoordinator::get(opCtx)->getSplitPrepareSessionManager();
+    if (splitPrepareManager->isSessionSplit(_sessionId(),
+                                            o().activeTxnNumberAndRetryCounter.getTxnNumber())) {
+        _abortSplitPreparedTxnOnPrimary(opCtx,
+                                        splitPrepareManager,
+                                        _sessionId(),
+                                        o().activeTxnNumberAndRetryCounter.getTxnNumber());
+    }
+
     if (!o().txnState.isInRetryableWriteMode()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).transactionMetricsObserver.onTransactionOperation(
@@ -2202,6 +2213,44 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
         opObserver->onTransactionAbort(opCtx, boost::none);
         _finishAbortingActiveTransaction(opCtx, expectedStates);
     }
+}
+
+void TransactionParticipant::Participant::_abortSplitPreparedTxnOnPrimary(
+    OperationContext* opCtx,
+    repl::SplitPrepareSessionManager* splitPrepareManager,
+    const LogicalSessionId& sessionId,
+    const TxnNumber& txnNumber) {
+    // If there are split prepared sessions, it must be because this transaction was prepared
+    // via an oplog entry applied as a secondary.
+    for (const repl::SplitSessionInfo& sessionInfo :
+         splitPrepareManager->getSplitSessions(sessionId, txnNumber).get()) {
+
+        auto splitClientOwned = opCtx->getServiceContext()->makeClient("tempSplitClient");
+        auto splitOpCtx = splitClientOwned->makeOperationContext();
+        AlternativeClientRegion acr(splitClientOwned);
+
+        std::unique_ptr<MongoDSessionCatalog::Session> checkedOutSession;
+
+        repl::UnreplicatedWritesBlock notReplicated(splitOpCtx.get());
+        splitOpCtx->setLogicalSessionId(sessionInfo.session.getSessionId());
+        splitOpCtx->setTxnNumber(sessionInfo.session.getTxnNumber());
+        splitOpCtx->setInMultiDocumentTransaction();
+
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(splitOpCtx.get());
+        checkedOutSession = mongoDSessionCatalog->checkOutSession(splitOpCtx.get());
+
+        TransactionParticipant::Participant newTxnParticipant =
+            TransactionParticipant::get(splitOpCtx.get());
+        newTxnParticipant.beginOrContinueTransactionUnconditionally(
+            splitOpCtx.get(), {*(splitOpCtx->getTxnNumber())});
+        newTxnParticipant.unstashTransactionResources(splitOpCtx.get(), "abortTransaction");
+        newTxnParticipant.abortTransaction(splitOpCtx.get());
+
+        checkedOutSession->checkIn(splitOpCtx.get(), OperationContextSession::CheckInReason::kDone);
+    }
+
+    splitPrepareManager->releaseSplitSessions(_sessionId(),
+                                              o().activeTxnNumberAndRetryCounter.getTxnNumber());
 }
 
 void TransactionParticipant::Participant::_finishAbortingActiveTransaction(
