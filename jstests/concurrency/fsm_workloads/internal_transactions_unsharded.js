@@ -12,8 +12,6 @@
  *  requires_fcv_60,
  *  uses_transactions,
  *  assumes_unsharded_collection,
- *  # The default linearizable readConcern timeout is too low and may cause tests to fail.
- *  does_not_support_config_fuzzer,
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');
@@ -199,8 +197,11 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.isAcceptableAggregateCmdError = function isAcceptableAggregateCmdError(res) {
         // The aggregate command is expected to involve running getMore commands which are not
         // retryable after network errors.
-        return TestData.runningWithShardStepdowns && res &&
-            (res.code == ErrorCodes.QueryPlanKilled);
+        // The linearizable read has a 15s timeout, then a LinearizableReadConcernError will be
+        // thrown, so we retry on this error in test
+        return res &&
+            (res.code == ErrorCodes.LinearizableReadConcernError ||
+             (TestData.runningWithShardStepdowns && res.code == ErrorCodes.QueryPlanKilled));
     };
 
     $config.data.getRandomDocument = function getRandomDocument(db, collName) {

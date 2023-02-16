@@ -10,8 +10,6 @@
  *  requires_sharding,
  *  uses_transactions,
  *  antithesis_incompatible,
- *  # The default linearizable readConcern timeout is too low and may cause tests to fail.
- *  does_not_support_config_fuzzer,
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');
