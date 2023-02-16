@@ -61,7 +61,8 @@ protected:
             opCtx,
             kNss,
             CollectionValidation::ValidateMode::kForeground,
-            CollectionValidation::RepairMode::kNone);
+            CollectionValidation::RepairMode::kNone,
+            /*logDiagnostics=*/false);
     };
 
     void tearDown() override {

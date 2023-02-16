@@ -166,7 +166,8 @@ TEST_F(ValidateStateTest, NonExistentCollectionShouldThrowNamespaceNotFoundError
         CollectionValidation::ValidateState(opCtx,
                                             kNss,
                                             CollectionValidation::ValidateMode::kForeground,
-                                            CollectionValidation::RepairMode::kNone),
+                                            CollectionValidation::RepairMode::kNone,
+                                            /*logDiagnostics=*/false),
         AssertionException,
         ErrorCodes::NamespaceNotFound);
 
@@ -174,7 +175,8 @@ TEST_F(ValidateStateTest, NonExistentCollectionShouldThrowNamespaceNotFoundError
         CollectionValidation::ValidateState(opCtx,
                                             kNss,
                                             CollectionValidation::ValidateMode::kBackground,
-                                            CollectionValidation::RepairMode::kNone),
+                                            CollectionValidation::RepairMode::kNone,
+                                            /*logDiagnostics=*/false),
         AssertionException,
         ErrorCodes::NamespaceNotFound);
 }
@@ -196,7 +198,8 @@ TEST_F(ValidateStateDiskTest, UncheckpointedCollectionShouldThrowCursorNotFoundE
         opCtx,
         kNss,
         CollectionValidation::ValidateMode::kBackground,
-        CollectionValidation::RepairMode::kNone);
+        CollectionValidation::RepairMode::kNone,
+        /*logDiagnostics=*/false);
     ASSERT_THROWS_CODE(
         validateState.initializeCursors(opCtx), AssertionException, ErrorCodes::CursorNotFound);
 }
@@ -221,7 +224,8 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
             opCtx,
             kNss,
             CollectionValidation::ValidateMode::kForeground,
-            CollectionValidation::RepairMode::kNone);
+            CollectionValidation::RepairMode::kNone,
+            /*logDiagnostics=*/false);
         validateState.initializeCursors(opCtx);
 
         // Make sure all of the indexes were found and cursors opened against them. Including the
@@ -239,7 +243,8 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
         opCtx,
         kNss,
         CollectionValidation::ValidateMode::kForeground,
-        CollectionValidation::RepairMode::kNone);
+        CollectionValidation::RepairMode::kNone,
+        /*logDiagnostics=*/false);
     validateState.initializeCursors(opCtx);
     ASSERT_EQ(validateState.getIndexes().size(), 5);
 }
@@ -266,7 +271,8 @@ TEST_F(ValidateStateDiskTest, OpenCursorsOnCheckpointedIndexes) {
         opCtx,
         kNss,
         CollectionValidation::ValidateMode::kBackground,
-        CollectionValidation::RepairMode::kNone);
+        CollectionValidation::RepairMode::kNone,
+        /*logDiagnostics=*/false);
     validateState.initializeCursors(opCtx);
 
     // Make sure the uncheckpoint'ed indexes are not found.
@@ -312,7 +318,8 @@ TEST_F(ValidateStateDiskTest, OpenCursorsOnConsistentlyCheckpointedIndexes) {
         opCtx,
         kNss,
         CollectionValidation::ValidateMode::kBackground,
-        CollectionValidation::RepairMode::kNone);
+        CollectionValidation::RepairMode::kNone,
+        /*logDiagnostics=*/false);
     validateState.initializeCursors(opCtx);
     ASSERT_EQ(validateState.getIndexes().size(), 3);
 }
@@ -346,7 +353,8 @@ TEST_F(ValidateStateDiskTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatW
             opCtx,
             kNss,
             CollectionValidation::ValidateMode::kBackground,
-            CollectionValidation::RepairMode::kNone);
+            CollectionValidation::RepairMode::kNone,
+            /*logDiagnostics=*/false);
         validateState.initializeCursors(opCtx);
         ASSERT_EQ(validateState.getIndexes().size(), 3);
     }
@@ -359,7 +367,8 @@ TEST_F(ValidateStateDiskTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatW
         opCtx,
         kNss,
         CollectionValidation::ValidateMode::kBackground,
-        CollectionValidation::RepairMode::kNone);
+        CollectionValidation::RepairMode::kNone,
+        /*logDiagnostics=*/false);
     validateState.initializeCursors(opCtx);
     ASSERT_EQ(validateState.getIndexes().size(), 3);
 }
