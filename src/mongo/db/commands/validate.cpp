@@ -141,6 +141,7 @@ public:
 
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         bool background = cmdObj["background"].trueValue();
+        bool logDiagnostics = cmdObj["logDiagnostics"].trueValue();
 
         const bool fullValidate = cmdObj["full"].trueValue();
         if (background && fullValidate) {
@@ -299,8 +300,8 @@ public:
         }
 
         ValidateResults validateResults;
-        Status status =
-            CollectionValidation::validate(opCtx, nss, mode, repairMode, &validateResults, &result);
+        Status status = CollectionValidation::validate(
+            opCtx, nss, mode, repairMode, &validateResults, &result, logDiagnostics);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }

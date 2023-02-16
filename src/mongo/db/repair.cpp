@@ -240,7 +240,8 @@ Status repairCollection(OperationContext* opCtx,
                                        CollectionValidation::ValidateMode::kForegroundFullIndexOnly,
                                        CollectionValidation::RepairMode::kFixErrors,
                                        &validateResults,
-                                       &output);
+                                       &output,
+                                       /*logDiagnostics=*/false);
     if (!status.isOK()) {
         return status;
     }
