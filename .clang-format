@@ -63,7 +63,7 @@ ConstructorInitializerAllOnOneLineOrOnePerLine: true
 ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 4
 Cpp11BracedListStyle: true
-DeriveLineEnding: false
+DeriveLineEnding: true
 DerivePointerAlignment: false
 DisableFormat:   false
 EmptyLineBeforeAccessModifier: LogicalBlock
@@ -229,7 +229,7 @@ ConstructorInitializerAllOnOneLineOrOnePerLine: true
 ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 4
 Cpp11BracedListStyle: true
-DeriveLineEnding: false
+DeriveLineEnding: true
 DerivePointerAlignment: false
 DisableFormat:   false
 EmptyLineBeforeAccessModifier: LogicalBlock
