@@ -1401,7 +1401,8 @@ static void consolidateEqDisjunctions(ABTVector& childResults) {
         newResults.emplace_back(
             make<PathCompare>(Operations::EqMember, make<Constant>(eqMembersTag, eqMembersVal)));
     } else if (eqMembersArray->size() == 1) {
-        const auto [eqConstantTag, eqConstantVal] = eqMembersArray->getAt(0);
+        const auto [eqConstantTag, eqConstantVal] =
+            sbe::value::copyValue(eqMembersArray->getAt(0).first, eqMembersArray->getAt(0).second);
         newResults.emplace_back(
             make<PathCompare>(Operations::Eq, make<Constant>(eqConstantTag, eqConstantVal)));
     }
