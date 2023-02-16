@@ -3,17 +3,13 @@
  * index should be validated correctly. This test also tests that CWI can be validated by validate
  * command.
  *
+ * @tags: [
+ *   featureFlagCompoundWildcardIndexes,
+ * ]
  */
 
 (function() {
 "use strict";
-
-load("jstests/libs/feature_flag_util.js");  // For "FeatureFlagUtil"
-
-if (!FeatureFlagUtil.isEnabled(db, "CompoundWildcardIndexes")) {
-    jsTestLog('Skipping test because the compound wildcard indexes feature flag is disabled.');
-    return;
-}
 
 const coll = db.compound_wildcard_index_validation;
 coll.drop();

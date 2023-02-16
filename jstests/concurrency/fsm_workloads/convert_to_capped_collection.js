@@ -42,7 +42,7 @@ var $config = (function() {
             assertWhenOwnDB(!db[this.threadCollName].isCapped());
             assertWhenOwnDB.commandWorked(db[this.threadCollName].convertToCapped(this.size));
             assertWhenOwnDB(db[this.threadCollName].isCapped());
-            if (!FeatureFlagUtil.isEnabled(db, "CappedCollectionsRelaxedSize")) {
+            if (!FeatureFlagUtil.isPresentAndEnabled(db, "CappedCollectionsRelaxedSize")) {
                 assertWhenOwnDB(isMultiple256(db[this.threadCollName].stats().maxSize));
             }
         }
@@ -54,7 +54,7 @@ var $config = (function() {
 
             assertWhenOwnDB.commandWorked(db[this.threadCollName].convertToCapped(this.size));
             assertWhenOwnDB(db[this.threadCollName].isCapped());
-            if (!FeatureFlagUtil.isEnabled(db, "CappedCollectionsRelaxedSize")) {
+            if (!FeatureFlagUtil.isPresentAndEnabled(db, "CappedCollectionsRelaxedSize")) {
                 assertWhenOwnDB(isMultiple256(db[this.threadCollName].stats().maxSize));
             }
 

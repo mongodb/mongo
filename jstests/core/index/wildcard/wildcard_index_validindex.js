@@ -18,7 +18,8 @@ const coll = db.getCollection(kCollectionName);
 const kIndexName = "wildcard_validindex";
 
 // TODO SERVER-68303: Remove the feature flag and update corresponding tests.
-const allowCompoundWildcardIndexes = FeatureFlagUtil.isEnabled(db, "CompoundWildcardIndexes");
+const allowCompoundWildcardIndexes =
+    FeatureFlagUtil.isPresentAndEnabled(db, "CompoundWildcardIndexes");
 
 // Can create a valid wildcard index.
 IndexCatalogHelpers.createIndexAndVerifyWithDrop(coll, {"$**": 1}, {name: kIndexName});
