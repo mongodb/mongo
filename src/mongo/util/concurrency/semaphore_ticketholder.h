@@ -51,12 +51,12 @@ public:
     explicit SemaphoreTicketHolder(int numTickets, ServiceContext* serviceContext);
     ~SemaphoreTicketHolder() override final;
 
-    int available() const override final;
+    int32_t available() const override final;
 
-    int queued() const override final {
+    int64_t queued() const override final {
         auto removed = _semaphoreStats.totalRemovedQueue.loadRelaxed();
         auto added = _semaphoreStats.totalAddedQueue.loadRelaxed();
-        return std::max(static_cast<int>(added - removed), 0);
+        return std::max(added - removed, (int64_t)0);
     };
 
     int64_t numFinishedProcessing() const override final;
@@ -72,7 +72,7 @@ private:
 
     void _appendImplStats(BSONObjBuilder& b) const override final;
 
-    void _resize(OperationContext* opCtx, int newSize, int oldSize) noexcept override final;
+    void _resize(OperationContext* opCtx, int32_t newSize, int32_t oldSize) noexcept override final;
 
     QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept override final {
         return _semaphoreStats;
@@ -83,7 +83,7 @@ private:
 #else
     bool _tryAcquire();
 
-    int _numTickets;
+    int32_t _numTickets;
     Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "SemaphoreTicketHolder::_mutex");
     stdx::condition_variable _newTicket;

@@ -45,7 +45,7 @@ server_parameters:
   storageEngineConcurrentWriteTransactions:
     description: "Storage Engine Concurrent Write Transactions"
     set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int>
+    cpp_vartype: AtomicWord<int32_t>
     cpp_varname: gConcurrentWriteTransactions
     on_update: "TicketHolderManager::updateConcurrentWriteTransactions"
     deprecated_name:
@@ -58,7 +58,7 @@ server_parameters:
   storageEngineConcurrentReadTransactions:
     description: "Storage Engine Concurrent Read Transactions"
     set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int>
+    cpp_vartype: AtomicWord<int32_t>
     cpp_varname: gConcurrentReadTransactions
     on_update: "TicketHolderManager::updateConcurrentReadTransactions"
     deprecated_name:
@@ -75,7 +75,7 @@ server_parameters:
         waking normal-priority operations for ticket admission. Once the threshold is met, an
         operation from the low-priority queue will be woken for ticket admission.
     set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int>
+    cpp_vartype: AtomicWord<int32_t>
     cpp_varname: gLowPriorityAdmissionBypassThreshold
     on_update: "TicketHolderManager::updateLowPriorityAdmissionBypassThreshold"
     # 0 means low priority operations will never be admitted when there are normal priority

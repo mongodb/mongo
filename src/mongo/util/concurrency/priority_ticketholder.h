@@ -54,17 +54,17 @@ class Ticket;
  */
 class PriorityTicketHolder : public TicketHolderWithQueueingStats {
 public:
-    explicit PriorityTicketHolder(int numTickets,
-                                  int lowPriorityBypassThreshold,
+    explicit PriorityTicketHolder(int32_t numTickets,
+                                  int32_t lowPriorityBypassThreshold,
                                   ServiceContext* serviceContext);
     ~PriorityTicketHolder() override{};
 
-    int available() const override final {
+    int32_t available() const override final {
         return _ticketsAvailable.load();
     };
 
-    int queued() const override final {
-        int result = 0;
+    int64_t queued() const override final {
+        int64_t result = 0;
         for (const auto& queue : _brokers) {
             result += queue.waitingThreadsRelaxed();
         }
@@ -89,7 +89,7 @@ public:
         return _lowPriorityBypassCount.loadRelaxed();
     };
 
-    void updateLowPriorityAdmissionBypassThreshold(const int& newBypassThreshold);
+    void updateLowPriorityAdmissionBypassThreshold(const int32_t& newBypassThreshold);
 
 private:
     enum class QueueType : unsigned int { kLowPriority = 0, kNormalPriority = 1, NumQueues = 2 };
@@ -103,7 +103,7 @@ private:
 
     void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept override final;
 
-    void _resize(OperationContext* opCtx, int newSize, int oldSize) noexcept override final;
+    void _resize(OperationContext* opCtx, int32_t newSize, int32_t oldSize) noexcept override final;
 
     QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept override final;
 
@@ -170,7 +170,7 @@ private:
      *
      * Updates must be done under the _growthMutex.
      */
-    int _lowPriorityBypassThreshold;
+    int32_t _lowPriorityBypassThreshold;
 
     /**
      * Counts the number of times normal operations are dequeued over operations queued in the low
@@ -182,7 +182,7 @@ private:
      * Number of times ticket admission is expedited for low priority operations.
      */
     AtomicWord<std::int64_t> _expeditedLowPriorityAdmissions{0};
-    AtomicWord<int> _ticketsAvailable;
+    AtomicWord<int32_t> _ticketsAvailable;
     ServiceContext* _serviceContext;
 };
 }  // namespace mongo

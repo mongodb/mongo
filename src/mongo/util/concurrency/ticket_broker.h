@@ -100,7 +100,7 @@ public:
      *
      * This value will be consistent while holding the growthLock.
      */
-    int waitingThreads(const stdx::unique_lock<stdx::mutex>& growthLock) const noexcept {
+    int32_t waitingThreads(const stdx::unique_lock<stdx::mutex>& growthLock) const noexcept {
         return _numQueued.load();
     }
 
@@ -110,7 +110,7 @@ public:
      * This method is meant for monitoring and tests only. The value is a snapshot of the system at
      * the moment of calling the method. It will potentially be out of date as soon as it returns.
      */
-    int waitingThreadsRelaxed() const noexcept {
+    int32_t waitingThreadsRelaxed() const noexcept {
         return _numQueued.loadRelaxed();
     }
 
@@ -142,7 +142,7 @@ private:
     /**
      * Number of queued threads in the linked list.
      */
-    AtomicWord<int> _numQueued;
+    AtomicWord<int32_t> _numQueued;
 };
 
 }  // namespace mongo

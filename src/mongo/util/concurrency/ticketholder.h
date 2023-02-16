@@ -63,7 +63,7 @@ public:
     /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
      */
-    virtual void resize(OperationContext* opCtx, int newSize) noexcept {};
+    virtual void resize(OperationContext* opCtx, int32_t newSize) noexcept {};
 
     /**
      * Attempts to acquire a ticket without blocking.
@@ -104,22 +104,22 @@ public:
      * Instantaneous number of tickets 'available' (not checked out by an operation) in the ticket
      * pool.
      */
-    virtual int available() const = 0;
+    virtual int32_t available() const = 0;
 
     /**
      * Instantaneous number of tickets that are checked out by an operation.
      */
-    virtual int used() const = 0;
+    virtual int32_t used() const = 0;
 
     /**
      * Peak number of tickets checked out at once since the previous time this function was called.
      */
-    virtual int getAndResetPeakUsed() = 0;
+    virtual int32_t getAndResetPeakUsed() = 0;
 
     /**
      * The total number of tickets allotted to the ticket pool.
      */
-    virtual int outof() const = 0;
+    virtual int32_t outof() const = 0;
 
     /**
      * The total number of operations that acquired a ticket, completed their work, and released the
@@ -139,7 +139,7 @@ private:
  */
 class TicketHolderWithQueueingStats : public TicketHolder {
 public:
-    TicketHolderWithQueueingStats(int numTickets, ServiceContext* svcCtx)
+    TicketHolderWithQueueingStats(int32_t numTickets, ServiceContext* svcCtx)
         : _outof(numTickets), _serviceContext(svcCtx){};
 
     ~TicketHolderWithQueueingStats() override{};
@@ -158,13 +158,13 @@ public:
     /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
      */
-    void resize(OperationContext* opCtx, int newSize) noexcept override;
+    void resize(OperationContext* opCtx, int32_t newSize) noexcept override;
 
-    int used() const override {
+    int32_t used() const override {
         return outof() - available();
     }
 
-    int outof() const override {
+    int32_t outof() const override {
         return _outof.loadRelaxed();
     }
 
@@ -198,12 +198,15 @@ public:
         AtomicWord<std::int64_t> totalTimeQueuedMicros{0};
     };
 
-    int getAndResetPeakUsed() override;
+    int32_t getAndResetPeakUsed() override;
 
     /**
      * Instantaneous number of operations waiting in queue for a ticket.
+     *
+     * TODO SERVER-74082: Once the SemaphoreTicketHolder is removed, consider changing this metric
+     * to int32_t.
      */
-    virtual int queued() const = 0;
+    virtual int64_t queued() const = 0;
 
 private:
     void _releaseToTicketPool(AdmissionContext* admCtx) noexcept override final;
@@ -219,7 +222,7 @@ private:
 
     virtual void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept = 0;
 
-    virtual void _resize(OperationContext* opCtx, int newSize, int oldSize) noexcept = 0;
+    virtual void _resize(OperationContext* opCtx, int32_t newSize, int32_t oldSize) noexcept = 0;
 
     /**
      * Fetches the queueing statistics corresponding to the 'admCtx'. All statistics that are queue
@@ -231,8 +234,8 @@ private:
 
     Mutex _resizeMutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2),
                                           "TicketHolderWithQueueingStats::_resizeMutex");
-    AtomicWord<int> _outof;
-    AtomicWord<int> _peakUsed;
+    AtomicWord<int32_t> _outof;
+    AtomicWord<int32_t> _peakUsed;
     AtomicWord<std::int64_t> _immediatePriorityAdmissionsCount;
 
 protected:

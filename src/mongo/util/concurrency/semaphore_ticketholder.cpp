@@ -138,21 +138,23 @@ void SemaphoreTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) n
     check(sem_post(&_sem));
 }
 
-int SemaphoreTicketHolder::available() const {
+int32_t SemaphoreTicketHolder::available() const {
     int val = 0;
     check(sem_getvalue(&_sem, &val));
     return val;
 }
 
-void SemaphoreTicketHolder::_resize(OperationContext* opCtx, int newSize, int oldSize) noexcept {
+void SemaphoreTicketHolder::_resize(OperationContext* opCtx,
+                                    int32_t newSize,
+                                    int32_t oldSize) noexcept {
     auto difference = newSize - oldSize;
 
     if (difference > 0) {
-        for (int i = 0; i < difference; i++) {
+        for (int32_t i = 0; i < difference; i++) {
             check(sem_post(&_sem));
         }
     } else if (difference < 0) {
-        for (int i = 0; i < -difference; i++) {
+        for (int32_t i = 0; i < -difference; i++) {
             check(sem_wait(&_sem));
         }
     }
@@ -160,7 +162,7 @@ void SemaphoreTicketHolder::_resize(OperationContext* opCtx, int newSize, int ol
 
 #else
 
-SemaphoreTicketHolder::SemaphoreTicketHolder(int numTickets, ServiceContext* svcCtx)
+SemaphoreTicketHolder::SemaphoreTicketHolder(int32_t numTickets, ServiceContext* svcCtx)
     : TicketHolderWithQueueingStats(numTickets, svcCtx), _numTickets(numTickets) {}
 
 SemaphoreTicketHolder::~SemaphoreTicketHolder() = default;
@@ -207,7 +209,7 @@ void SemaphoreTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) n
     _newTicket.notify_one();
 }
 
-int SemaphoreTicketHolder::available() const {
+int32_t SemaphoreTicketHolder::available() const {
     return _numTickets;
 }
 
@@ -222,14 +224,16 @@ bool SemaphoreTicketHolder::_tryAcquire() {
     return true;
 }
 
-void SemaphoreTicketHolder::_resize(OperationContext* opCtx, int newSize, int oldSize) noexcept {
+void SemaphoreTicketHolder::_resize(OperationContext* opCtx,
+                                    int32_t newSize,
+                                    int32_t oldSize) noexcept {
     auto difference = newSize - oldSize;
 
     stdx::lock_guard<Latch> lk(_mutex);
     _numTickets += difference;
 
     if (difference > 0) {
-        for (int i = 0; i < difference; i++) {
+        for (int32_t i = 0; i < difference; i++) {
             _newTicket.notify_one();
         }
     }

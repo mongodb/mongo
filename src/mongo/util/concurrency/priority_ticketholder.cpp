@@ -41,8 +41,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
-PriorityTicketHolder::PriorityTicketHolder(int numTickets,
-                                           int lowPriorityBypassThreshold,
+PriorityTicketHolder::PriorityTicketHolder(int32_t numTickets,
+                                           int32_t lowPriorityBypassThreshold,
                                            ServiceContext* serviceContext)
     : TicketHolderWithQueueingStats(numTickets, serviceContext),
       _lowPriorityBypassThreshold(lowPriorityBypassThreshold),
@@ -55,7 +55,7 @@ int64_t PriorityTicketHolder::numFinishedProcessing() const {
 }
 
 void PriorityTicketHolder::updateLowPriorityAdmissionBypassThreshold(
-    const int& newBypassThreshold) {
+    const int32_t& newBypassThreshold) {
     stdx::unique_lock<stdx::mutex> growthLock(_growthMutex);
     _lowPriorityBypassThreshold = newBypassThreshold;
 }
@@ -150,14 +150,16 @@ void PriorityTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) no
     }
 }
 
-void PriorityTicketHolder::_resize(OperationContext* opCtx, int newSize, int oldSize) noexcept {
+void PriorityTicketHolder::_resize(OperationContext* opCtx,
+                                   int32_t newSize,
+                                   int32_t oldSize) noexcept {
     auto difference = newSize - oldSize;
 
     if (difference > 0) {
         // As we're adding tickets the waiting threads need to be notified that there are new
         // tickets available.
         stdx::unique_lock dequeuerLock(_growthMutex);
-        for (int i = 0; i < difference; i++) {
+        for (int32_t i = 0; i < difference; i++) {
             auto hasWokenThread = _dequeueWaitingThread(dequeuerLock);
             if (!hasWokenThread) {
                 // There's no-one in the brokers left to wake, so we give the ticket back for
@@ -167,7 +169,7 @@ void PriorityTicketHolder::_resize(OperationContext* opCtx, int newSize, int old
         }
     } else {
         AdmissionContext admCtx;
-        for (int i = 0; i < std::abs(difference); i++) {
+        for (int32_t i = 0; i < std::abs(difference); i++) {
             // This operation is uninterruptible as the resize operation is conceptually atomic.
             // Cancelling the resize and leaving it in-between the old size and the new one is not
             // allowed.
