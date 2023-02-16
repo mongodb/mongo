@@ -99,19 +99,32 @@ donorRst.setChangeStreamState(donorTenantConn1, true);
 const donorCursor1 = donorTenantConn1.getDB("database").collection.watch([]);
 donorTenantConn1.getDB("database")
     .collection.insertMany([{_id: "tenant1_1"}, {_id: "tenant1_2"}, {_id: "tenant1_3"}]);
+donorTenantConn1.getDB("database").collection.updateOne({_id: "tenant1_3"}, {
+    $set: {updated: true}
+});
 
 // Get the first entry from the tenant1 change stream cursor and grab the resume token.
 assert.soon(() => donorCursor1.hasNext());
 const {_id: resumeToken1} = donorCursor1.next();
 
+const donorTenant1Session = donorTenantConn1.startSession({retryWrites: true});
+const donorTenant1SessionCollection = donorTenant1Session.getDatabase("database").collection;
+assert.commandWorked(donorTenant1SessionCollection.insert({_id: "tenant1_4", w: "RETRYABLE"}));
+assert.commandWorked(donorTenant1Session.getDatabase("database").runCommand({
+    findAndModify: "collection",
+    query: {_id: "tenant1_4"},
+    update: {$set: {updated: true}}
+}));
+
 // Start a transaction and perform some writes.
-const donorSession1 = donorTenantConn1.getDB("database").getMongo().startSession();
-donorSession1.startTransaction();
-donorSession1.getDatabase("database").collection.insertOne({_id: "tenant1_in_transaction_1"});
-donorSession1.getDatabase("database").collection.updateOne({_id: "tenant1_in_transaction_1"}, {
+const donorTxnSession1 = donorTenantConn1.getDB("database").getMongo().startSession();
+donorTxnSession1.startTransaction();
+donorTxnSession1.getDatabase("database").collection.insertOne({_id: "tenant1_in_transaction_1"});
+donorTxnSession1.getDatabase("database").collection.updateOne({_id: "tenant1_in_transaction_1"}, {
     $set: {updated: true}
 });
-donorSession1.commitTransaction_forTesting();
+donorTxnSession1.commitTransaction_forTesting();
+donorTxnSession1.endSession();
 
 const fpBeforeMarkingCloneSuccess =
     configureFailPoint(recipientPrimary, "fpBeforeMarkingCloneSuccess", {action: "hang"});
@@ -130,7 +143,13 @@ fpBeforeMarkingCloneSuccess.wait();
 
 // Insert more documents after cloning has completed so that oplog entries are applied during oplog
 // catchup.
-donorTenantConn1.getDB("database").collection.insertOne({_id: "tenant1_4"});
+assert.commandWorked(donorTenantConn1.getDB("database").collection.updateOne({_id: "tenant1_2"}, {
+    $set: {updated: true}
+}));
+
+assert.commandWorked(donorTenant1SessionCollection.insert({_id: "tenant1_5", w: "RETRYABLE"}));
+assert.commandWorked(
+    donorTenant1SessionCollection.updateOne({_id: "tenant1_5"}, {$set: {updated: true}}));
 
 // Enable change streams for the second tenant during oplog catchup.
 donorRst.setChangeStreamState(donorTenantConn2, true);
@@ -174,38 +193,67 @@ tenantIds.forEach(tenantId => {
     });
 });
 
-const recipientTenantConn1 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
+const recipientPrimaryTenantConn1 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
     recipientPrimary.host, tenantId1, tenantId1.str);
 
-const recipientTenantConn2 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
-    recipientPrimary.host, tenantId2, tenantId2.str);
+const recipientSecondaryTenantConn1 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
+    recipientRst.getSecondary().host, tenantId1, tenantId1.str);
 
-// Resume the first change stream on the Recipient.
-const recipientCursor1 =
-    recipientTenantConn1.getDB("database").collection.watch([], {resumeAfter: resumeToken1});
+// Resume the first change stream on the Recipient primary.
+const recipientPrimaryCursor1 =
+    recipientPrimaryTenantConn1.getDB("database").collection.watch([], {resumeAfter: resumeToken1});
+
+// Resume the first change stream on the Recipient secondary.
+const recipientSecondaryCursor1 =
+    recipientSecondaryTenantConn1.getDB("database").collection.watch([], {
+        resumeAfter: resumeToken1,
+    });
+
 [{_id: "tenant1_2", operationType: "insert"},
  {_id: "tenant1_3", operationType: "insert"},
+ {_id: "tenant1_3", operationType: "update"},
+ {_id: "tenant1_4", operationType: "insert"},
+ {_id: "tenant1_4", operationType: "update"},
  {_id: "tenant1_in_transaction_1", operationType: "insert"},
  {_id: "tenant1_in_transaction_1", operationType: "update"},
- {_id: "tenant1_4", operationType: "insert"},
+ {_id: "tenant1_2", operationType: "update"},
+ {_id: "tenant1_5", operationType: "insert"},
+ {_id: "tenant1_5", operationType: "update"},
 ].forEach(expectedEvent => {
-    assert.soon(() => recipientCursor1.hasNext());
-    const changeEvent = recipientCursor1.next();
-    assert.eq(changeEvent.documentKey._id, expectedEvent._id);
-    assert.eq(changeEvent.operationType, expectedEvent.operationType);
+    [recipientPrimaryCursor1, recipientSecondaryCursor1].forEach(cursor => {
+        assert.soon(() => cursor.hasNext());
+        const changeEvent = cursor.next();
+        assert.eq(changeEvent.documentKey._id, expectedEvent._id);
+        assert.eq(changeEvent.operationType, expectedEvent.operationType);
+    });
 });
 
-// Resume the second change stream on the Recipient.
-const recipientCursor2 =
-    recipientTenantConn2.getDB("database").collection.watch([], {resumeAfter: resumeToken2});
+const recipientPrimaryTenantConn2 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
+    recipientPrimary.host, tenantId2, tenantId2.str);
+
+const recipientSecondaryTenantConn2 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
+    recipientRst.getSecondary().host, tenantId2, tenantId2.str);
+
+// Resume the second change stream on the Recipient primary.
+const recipientPrimaryCursor2 =
+    recipientPrimaryTenantConn2.getDB("database").collection.watch([], {resumeAfter: resumeToken2});
+
+// Resume the second change stream on the Recipient secondary.
+const recipientSecondaryCursor2 =
+    recipientSecondaryTenantConn2.getDB("database").collection.watch([], {
+        resumeAfter: resumeToken2,
+    });
+
 [{_id: "tenant2_2", operationType: "insert"},
  {_id: "tenant2_in_transaction_1", operationType: "insert"},
  {_id: "tenant2_in_transaction_1", operationType: "update"},
 ].forEach(expectedEvent => {
-    assert.soon(() => recipientCursor2.hasNext());
-    const changeEvent = recipientCursor2.next();
-    assert.eq(changeEvent.documentKey._id, expectedEvent._id);
-    assert.eq(changeEvent.operationType, expectedEvent.operationType);
+    [recipientPrimaryCursor2, recipientSecondaryCursor2].forEach(cursor => {
+        assert.soon(() => cursor.hasNext());
+        const changeEvent = cursor.next();
+        assert.eq(changeEvent.documentKey._id, expectedEvent._id);
+        assert.eq(changeEvent.operationType, expectedEvent.operationType);
+    });
 });
 
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));

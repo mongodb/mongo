@@ -53,13 +53,13 @@ export function doWriteOperations(rstArgs, tenantIds) {
     return writeResults;
 }
 
-export function addRecipientNodes({rst, numNodes, recipientTagName}) {
+export function addRecipientNodes({rst, numNodes, recipientTagName, nodeOptions}) {
     numNodes = numNodes || 3;  // default to three nodes
     const recipientNodes = [];
-    const options = makeX509OptionsForTest();
+    const options = Object.assign({}, makeX509OptionsForTest().donor, nodeOptions);
     jsTestLog(`Adding ${numNodes} non-voting recipient nodes to donor`);
     for (let i = 0; i < numNodes; ++i) {
-        recipientNodes.push(rst.add(options.donor));
+        recipientNodes.push(rst.add(options));
     }
 
     const primary = rst.getPrimary();
@@ -419,13 +419,13 @@ export class ShardSplitTest {
      * Add recipient nodes to the current donor set.
      * @param {numNodes} indicates the number of recipient nodes to be added.
      */
-    addRecipientNodes(numNodes) {
+    addRecipientNodes({numNodes, nodeOptions} = {}) {
         if (this.recipientNodes.length > 0) {
             throw new Error("Recipient nodes may only be added once");
         }
 
-        this.recipientNodes =
-            addRecipientNodes({rst: this.donor, numNodes, recipientTagName: this.recipientTagName});
+        this.recipientNodes = addRecipientNodes(
+            {rst: this.donor, numNodes, nodeOptions, recipientTagName: this.recipientTagName});
     }
 
     /*
@@ -433,7 +433,7 @@ export class ShardSplitTest {
      * @param {numNodes} indicates the number of recipient nodes to be added.
      */
     addAndAwaitRecipientNodes(numNodes) {
-        this.addRecipientNodes(numNodes);
+        this.addRecipientNodes({numNodes});
         this.donor.awaitSecondaryNodes();
     }
 

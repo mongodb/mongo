@@ -1,10 +1,9 @@
 /**
- * Tests that a shard split handles change collections and cluster parameters.
+ * Tests that a shard split handles change collections.
  * @tags: [requires_fcv_63, serverless]
  */
 
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
-load("jstests/libs/cluster_server_parameter_utils.js");
 load("jstests/serverless/libs/change_collection_util.js");
 
 const tenantIds = [ObjectId(), ObjectId()];
@@ -22,15 +21,30 @@ const donorTenantConn =
     ChangeStreamMultitenantReplicaSetTest.getTenantConnection(donorPrimary.host, tenantIds[0]);
 test.donor.setChangeStreamState(donorTenantConn, true);
 
-// Set a cluster parameter before the split starts.
-assert.commandWorked(donorPrimary.getDB("admin").runCommand(tenantCommand(
-    {setClusterParameter: {"changeStreams": {"expireAfterSeconds": 7200}}}, tenantIds[0])));
-
 // Open a change stream and insert documents into database.collection before the split
 // starts.
 const donorCursor = donorTenantConn.getDB("database").collection.watch([]);
-const insertedDocs = [{n: 0}, {n: 1}, {n: 2}];
+const insertedDocs = [{_id: "tenant1_1"}, {_id: "tenant1_2"}, {_id: "tenant1_3"}];
 donorTenantConn.getDB("database").collection.insertMany(insertedDocs);
+
+const donorTenantSession = donorTenantConn.startSession({retryWrites: true});
+const donorTenantSessionCollection = donorTenantSession.getDatabase("database").collection;
+assert.commandWorked(donorTenantSessionCollection.insert({_id: "tenant1_4", w: "RETRYABLE"}));
+assert.commandWorked(donorTenantSession.getDatabase("database").runCommand({
+    findAndModify: "collection",
+    query: {_id: "tenant1_4"},
+    update: {$set: {updated: true}}
+}));
+
+// Start a transaction and perform some writes.
+const donorTxnSession = donorTenantConn.getDB("database").getMongo().startSession();
+donorTxnSession.startTransaction();
+donorTxnSession.getDatabase("database").collection.insertOne({_id: "tenant1_in_transaction_1"});
+donorTxnSession.getDatabase("database").collection.updateOne({_id: "tenant1_in_transaction_1"}, {
+    $set: {updated: true}
+});
+donorTxnSession.commitTransaction_forTesting();
+donorTxnSession.endSession();
 
 // Get the first entry from the change stream cursor and grab the resume token.
 assert.eq(donorCursor.hasNext(), true);
@@ -55,26 +69,31 @@ operation.forget();
 const recipientRst = test.getRecipient();
 const recipientPrimary = recipientRst.getPrimary();
 
-const recipientTenantConn =
-    ChangeStreamMultitenantReplicaSetTest.getTenantConnection(recipientPrimary.host, tenantIds[0]);
+const recipientPrimaryTenantConn = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
+    recipientPrimary.host, tenantIds[0], tenantIds[0].str);
 
-// Resume the change stream on the Recipient.
-const recipientCursor =
-    recipientTenantConn.getDB("database").collection.watch([], {resumeAfter: resumeToken});
-assert.eq(recipientCursor.hasNext(), true);
-let doc = recipientCursor.next();
-assert.eq(doc.operationType, "insert");
-assert.eq(doc.fullDocument.n, insertedDocs[1].n);
-assert.eq(recipientCursor.hasNext(), true);
-doc = recipientCursor.next();
-assert.eq(doc.operationType, "insert");
-assert.eq(doc.fullDocument.n, insertedDocs[2].n);
-assert.eq(recipientCursor.hasNext(), false);
+const recipientSecondaryConns = recipientRst.getSecondaries().map(
+    node => ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
+        node.host, tenantIds[0], tenantIds[0].str));
 
-const {clusterParameters} = assert.commandWorked(recipientPrimary.getDB("admin").runCommand(
-    tenantCommand({getClusterParameter: ["changeStreams"]}, tenantIds[0])));
-const [changeStreamsClusterParameter] = clusterParameters;
-assert.eq(changeStreamsClusterParameter.expireAfterSeconds, 7200);
+// Resume the change stream on all Recipient nodes.
+const cursors = [recipientPrimaryTenantConn, ...recipientSecondaryConns].map(
+    conn => conn.getDB("database").collection.watch([], {resumeAfter: resumeToken}));
+
+[{_id: "tenant1_2", operationType: "insert"},
+ {_id: "tenant1_3", operationType: "insert"},
+ {_id: "tenant1_4", operationType: "insert"},
+ {_id: "tenant1_4", operationType: "update"},
+ {_id: "tenant1_in_transaction_1", operationType: "insert"},
+ {_id: "tenant1_in_transaction_1", operationType: "update"},
+].forEach(expectedEvent => {
+    cursors.forEach(cursor => {
+        assert.soon(() => cursor.hasNext());
+        const changeEvent = cursor.next();
+        assert.eq(changeEvent.documentKey._id, expectedEvent._id);
+        assert.eq(changeEvent.operationType, expectedEvent.operationType);
+    });
+});
 
 test.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);
 test.stop();

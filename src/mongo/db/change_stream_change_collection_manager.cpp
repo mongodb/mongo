@@ -184,8 +184,10 @@ public:
     }
 
     /**
-     * Writes the batch of insert statements for each change collection. Bails out further writes if
-     * a failure is encountered in writing to a any change collection.
+     * Writes the batch of insert statements for each change collection. If a DuplicateKey error is
+     * encountered, the write is skipped and the remaining inserts are attempted individually. Bails
+     * out further writes if any other type of failure is encountered in writing to any change
+     * collection.
      */
     Status write(OperationContext* opCtx, OpDebug* opDebug) {
         for (auto&& [tenantId, insertStatements] : _tenantStatementsMap) {
@@ -201,17 +203,33 @@ public:
             // Writes to the change collection should not be replicated.
             repl::UnreplicatedWritesBlock unReplBlock(opCtx);
 
-            Status status = collection_internal::insertDocuments(opCtx,
-                                                                 *tenantChangeCollection,
-                                                                 insertStatements.begin(),
-                                                                 insertStatements.end(),
-                                                                 opDebug,
-                                                                 false /* fromMigrate */);
-            if (!status.isOK()) {
-                return Status(status.code(),
-                              str::stream() << "Write to change collection: "
-                                            << tenantChangeCollection->ns().toStringWithTenantId()
-                                            << "failed, reason: " << status.reason());
+            /**
+             * For a serverless shard merge, we clone all change collection entries from the donor
+             * and then fetch/apply retryable writes that took place before the migration. As a
+             * result, we can end up in a situation where a change collection entry already exists.
+             * If we encounter a DuplicateKey error and the entry is identical to the existing one,
+             * we can safely skip and continue.
+             */
+            for (auto&& insertStatement : insertStatements) {
+                Status status = collection_internal::insertDocument(
+                    opCtx, *tenantChangeCollection, insertStatement, opDebug, false);
+
+                if (status.code() == ErrorCodes::DuplicateKey) {
+                    const auto dupKeyInfo = status.extraInfo<DuplicateKeyErrorInfo>();
+                    invariant(dupKeyInfo->toBSON()
+                                  .getObjectField("foundValue")
+                                  .binaryEqual(insertStatement.doc));
+                    LOGV2(7282901,
+                          "Ignoring DuplicateKey error for change collection insert",
+                          "doc"_attr = insertStatement.doc.toString());
+                } else if (!status.isOK()) {
+                    return Status(status.code(),
+                                  str::stream()
+                                      << "Write to change collection: "
+                                      << tenantChangeCollection->ns().toStringWithTenantId()
+                                      << "failed")
+                        .withReason(status.reason());
+                }
             }
         }
 
