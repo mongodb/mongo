@@ -124,6 +124,7 @@ mongo_custom_check = env.SharedLibrary(
         "MongoTestCheck.cpp",
         "MongoHeaderBracketCheck.cpp",
         "MongoUninterruptibleLockGuardCheck.cpp",
+        "MongoCctypeCheck.cpp",
         "MongoTidyModule.cpp",
     ],
     LIBDEPS_NO_INHERIT=[

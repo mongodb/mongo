@@ -126,6 +126,22 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
+    def test_MongoCctypeCheck(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                    Checks: '-*,mongo-cctype-check'
+                    WarningsAsErrors: '*'
+                    HeaderFilterRegex: '(mongo/.*)'
+                    """))
+
+        self.expected_output = [
+            "Use of prohibited \"cctype\" header, use \"mongo/util/ctype.h\"",
+            "Use of prohibited <ctype.h> header, use \"mongo/util/ctype.h\"",
+        ]
+
+        self.run_clang_tidy()
+
 
 if __name__ == '__main__':
 

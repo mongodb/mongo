@@ -25,6 +25,7 @@ if env.GetOption('ninja') == 'disabled':
         'test_MongoTestCheck.cpp',
         'test_MongoHeaderBracketCheck.cpp',
         'test_MongoUninterruptibleLockGuardCheck.cpp',
+        'test_MongoCctypeCheck.cpp',
     ]
 
     # So that we can do fast runs, we will generate a separate compilation database file for each

@@ -26,39 +26,24 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#include "MongoCctypeCheck.h"
-#include "MongoHeaderBracketCheck.h"
-#include "MongoTestCheck.h"
-#include "MongoUninterruptibleLockGuardCheck.h"
+#pragma once
 
 #include <clang-tidy/ClangTidy.h>
 #include <clang-tidy/ClangTidyCheck.h>
-#include <clang-tidy/ClangTidyModule.h>
-#include <clang-tidy/ClangTidyModuleRegistry.h>
 
-namespace mongo {
-namespace tidy {
+namespace mongo::tidy {
 
-class MongoTidyModule : public clang::tidy::ClangTidyModule {
+/**
+    Overrides the default PPCallback class to primarly override
+    the InclusionDirective call which is called for each include. This
+    allows the chance to check whether <cctype> or <ctyhe.h> included or not
+*/
+class MongoCctypeCheck : public clang::tidy::ClangTidyCheck {
 public:
-    void addCheckFactories(clang::tidy::ClangTidyCheckFactories& CheckFactories) override {
-        CheckFactories.registerCheck<MongoUninterruptibleLockGuardCheck>(
-            "mongo-uninterruptible-lock-guard-check");
-        CheckFactories.registerCheck<MongoHeaderBracketCheck>("mongo-header-bracket-check");
-        CheckFactories.registerCheck<MongoCctypeCheck>("mongo-cctype-check");
-        CheckFactories.registerCheck<MongoTestCheck>("mongo-test-check");
-    }
+    MongoCctypeCheck(clang::StringRef Name, clang::tidy::ClangTidyContext* Context);
+    void registerPPCallbacks(const clang::SourceManager& SM,
+                             clang::Preprocessor* PP,
+                             clang::Preprocessor* ModuleExpanderPP) override;
 };
 
-// Register the MongoTidyModule using this statically initialized variable.
-static clang::tidy::ClangTidyModuleRegistry::Add<MongoTidyModule> X("mongo-tidy-module",
-                                                                    "MongoDB custom checks.");
-
-}  // namespace tidy
-
-// This anchor is used to force the linker to link in the generated object file
-// and thus register the MongoTidyModule.
-volatile int MongoTidyModuleAnchorSource = 0;
-
-}  // namespace mongo
+}  // namespace mongo::tidy

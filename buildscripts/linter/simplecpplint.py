@@ -162,7 +162,6 @@ class Linter:
             self._check_for_nonmongo_assert(linenum)
             self._check_for_mongo_unstructured_log(linenum)
             self._check_for_mongo_config_header(linenum)
-            self._check_for_ctype(linenum)
             self._check_for_std_optional(linenum)
             self._check_for_tracing_support(linenum)
             self._check_for_collection_sharding_runtime(linenum)
@@ -284,12 +283,6 @@ class Linter:
             self._error(
                 linenum, 'mongodb/unstructuredlog', 'Illegal use of unstructured logging, '
                 'this is only for local development use and should not be committed.')
-
-    def _check_for_ctype(self, linenum):
-        line = self.clean_lines[linenum]
-        if 'include <cctype>' in line or 'include <ctype.h>' in line:
-            self._error(linenum, 'mongodb/ctype',
-                        'Use of prohibited <ctype.h> or <cctype> header, use "mongo/util/ctype.h"')
 
     def _check_for_std_optional(self, linenum):
         line = self.clean_lines[linenum]
