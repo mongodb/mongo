@@ -199,6 +199,7 @@ let viewsCommandTests = {
     _shardsvrCollModParticipant: {skip: isAnInternalCommand},
     _shardsvrParticipantBlock: {skip: isAnInternalCommand},
     _shardsvrUnregisterIndex: {skip: isAnInternalCommand},
+    _startStreamProcessor: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
     abortReshardCollection: {skip: isUnrelated},

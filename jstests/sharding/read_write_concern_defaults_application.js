@@ -187,6 +187,7 @@ let testCases = {
     _shardsvrCollMod: {skip: "internal command"},
     _shardsvrCollModParticipant: {skip: "internal command"},
     _shardsvrParticipantBlock: {skip: "internal command"},
+    _startStreamProcessor: {skip: "internal command"},
     _transferMods: {skip: "internal command"},
     _vectorClockPersist: {skip: "internal command"},
     abortReshardCollection: {skip: "does not accept read or write concern"},
