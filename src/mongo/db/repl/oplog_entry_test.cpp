@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/idempotency_test_fixture.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/matcher.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -230,6 +229,55 @@ TEST(OplogEntryTest, ParseReplOperationIncludesTidField) {
     ASSERT_EQ(replOp.getTid(), tid);
     ASSERT_EQ(replOp.getNss(), nssWithTid);
 }
+
+TEST(OplogEntryTest, ConvertMutableOplogEntryToReplOperation) {
+    // Required by setTid to take effect
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
+    auto tid = TenantId(OID::gen());
+    auto nssWithTid = NamespaceString::createNamespaceString_forTest(tid, nss.ns());
+    auto opType = repl::OpTypeEnum::kCommand;
+    auto uuid = UUID::gen();
+    std::vector<StmtId> stmtIds{StmtId(0), StmtId(1), StmtId(2)};
+    const auto doc = BSON("x" << 1);
+
+    MutableOplogEntry entry;
+    entry.setTid(tid);
+    entry.setNss(nssWithTid);
+    entry.setTimestamp(Timestamp(1, 1));    // only exists in OplogEntryBase
+    entry.setWallClockTime(Date_t::now());  // only exists in OplogEntryBase
+    entry.setTerm(1);                       // only exists in OplogEntryBase
+    entry.setUuid(uuid);
+    entry.setOpType(opType);
+    entry.setObject(doc);
+    entry.setStatementIds(stmtIds);
+
+    auto replOp = entry.toReplOperation();
+
+    ASSERT_EQ(replOp.getTid(), tid);
+    ASSERT_EQ(replOp.getTid(), entry.getTid());
+    ASSERT_EQ(replOp.getUuid(), uuid);
+    ASSERT_EQ(replOp.getUuid(), entry.getUuid());
+    ASSERT_EQ(replOp.getOpType(), opType);
+    ASSERT_EQ(replOp.getOpType(), entry.getOpType());
+    ASSERT_EQ(replOp.getNss(), nssWithTid);
+    ASSERT_EQ(replOp.getNss(), entry.getNss());
+    ASSERT_FALSE(replOp.getFromMigrate());
+    ASSERT_EQ(replOp.getFromMigrate(), entry.getFromMigrate());
+    ASSERT_BSONOBJ_EQ(replOp.getObject(), doc);
+    ASSERT_BSONOBJ_EQ(replOp.getObject(), entry.getObject());
+    ASSERT_EQ(replOp.getStatementIds().size(), stmtIds.size());
+    ASSERT_EQ(replOp.getStatementIds().size(), entry.getStatementIds().size());
+    ASSERT_THAT(replOp.getStatementIds(), unittest::match::Eq(stmtIds));
+    ASSERT_THAT(replOp.getStatementIds(), unittest::match::Eq(entry.getStatementIds()));
+
+    // While overwhelmingly set to false, a few sharding scenarios
+    // set 'fromMigrate' to true. Therefore, testing it.
+    entry.setFromMigrateIfTrue(true);
+    auto replOp2 = entry.toReplOperation();
+    ASSERT_EQ(replOp2.getFromMigrate(), entry.getFromMigrate());
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

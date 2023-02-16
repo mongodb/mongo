@@ -46,6 +46,7 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -121,6 +122,30 @@ repl::OpTime logOperation(OperationContext* opCtx,
     auto opTime = oplogWriter->logOp(opCtx, oplogEntry);
     times.push_back(opTime);
     return opTime;
+}
+
+/**
+ * Generic function that logs an operation.
+ * Intended to reduce branching at call-sites by accepting the least common denominator
+ * type: a MutableOplogEntry.
+ *
+ * 'fromMigrate' is generally hard-coded to false, but is supplied by a few
+ * scenarios from mongos related behavior.
+ */
+void logMutableOplogEntry(OperationContext* opCtx,
+                          MutableOplogEntry* entry,
+                          bool fromMigrate,
+                          OplogWriter* oplogWriter) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    const bool inMultiDocumentTransaction =
+        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
+
+    if (inMultiDocumentTransaction) {
+        txnParticipant.addTransactionOperation(opCtx, entry->toReplOperation());
+    } else {
+        entry->setFromMigrateIfTrue(fromMigrate);
+        logOperation(opCtx, entry, /*assignWallClockTime=*/true, oplogWriter);
+    }
 }
 
 /**
@@ -374,28 +399,18 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    const UUID& uuid,
                                    BSONObj indexDoc,
                                    bool fromMigrate) {
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    const bool inMultiDocumentTransaction =
-        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
+    BSONObjBuilder builder;
+    builder.append(CreateIndexesCommand::kCommandName, nss.coll());
+    builder.appendElements(indexDoc);
 
-    if (inMultiDocumentTransaction) {
-        auto operation = MutableOplogEntry::makeCreateIndexesCommand(nss, uuid, indexDoc);
-        txnParticipant.addTransactionOperation(opCtx, operation);
-    } else {
-        BSONObjBuilder builder;
-        builder.append("createIndexes", nss.coll());
-        builder.appendElements(indexDoc);
+    MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setTid(nss.tenantId());
+    oplogEntry.setNss(nss.getCommandNS());
+    oplogEntry.setUuid(uuid);
+    oplogEntry.setObject(builder.done());
 
-        MutableOplogEntry oplogEntry;
-        oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-
-        oplogEntry.setTid(nss.tenantId());
-        oplogEntry.setNss(nss.getCommandNS());
-        oplogEntry.setUuid(uuid);
-        oplogEntry.setObject(builder.done());
-        oplogEntry.setFromMigrateIfTrue(fromMigrate);
-        logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
-    }
+    logMutableOplogEntry(opCtx, &oplogEntry, fromMigrate, _oplogWriter.get());
 }
 
 void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,

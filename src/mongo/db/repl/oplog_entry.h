@@ -87,6 +87,13 @@ public:
         return o;
     }
 
+    static ReplOperation parseOwned(const IDLParserContext& ctxt, const BSONObj&& bsonObject) {
+        ReplOperation o;
+        o.parseProtected(ctxt, bsonObject);
+        o.setAnchor(std::move(bsonObject));
+        return o;
+    }
+
     ReplOperation() = default;
     explicit ReplOperation(DurableReplOperation durableReplOp)
         : DurableReplOperation(std::move(durableReplOp)) {}
@@ -385,6 +392,28 @@ public:
         if (value)
             setFromMigrate(value);
     }
+
+    /**
+     * ReplOperation and MutableOplogEntry mostly hold the same data,
+     * but lack a common ancestor in C++. Due to the details of IDL,
+     * there is no generated C++ link between the two hierarchies.
+     *
+     * The primary difference between the two types is the OpTime
+     * stored in OplogEntryBase that is absent in DurableReplOperation.
+     *
+     * This type conversion is useful in contexts when the two type
+     * hierarchies should be interchangeable, like with internal tx's.
+     * See: logMutableOplogEntry() in op_observer_impl.cpp.
+     *
+     * OplogEntryBase<>-------DurableReplOperation
+     *        ^                       ^
+     *        |                       |
+     * MutableOplogEntry       ReplOperation
+     *        ^
+     *        |
+     * DurableOplogEntry
+     */
+    ReplOperation toReplOperation() const noexcept;
 };
 
 /**
