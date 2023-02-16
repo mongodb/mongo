@@ -87,7 +87,7 @@ std::vector<std::pair<BSONObj, ValidateResults>> foregroundValidate(
         ValidateResults validateResults;
         BSONObjBuilder output;
         ASSERT_OK(CollectionValidation::validate(
-            opCtx, kNss, mode, repairMode, &validateResults, &output));
+            opCtx, kNss, mode, repairMode, &validateResults, &output, /*logDiagnostics=*/false));
         BSONObj obj = output.obj();
         BSONObjBuilder validateResultsBuilder;
         validateResults.appendToResultObj(&validateResultsBuilder, true /* debugging */);
@@ -154,7 +154,8 @@ void backgroundValidate(OperationContext* opCtx,
                                              CollectionValidation::ValidateMode::kBackground,
                                              CollectionValidation::RepairMode::kNone,
                                              &validateResults,
-                                             &output));
+                                             &output,
+                                             /*logDiagnostics=*/false));
     BSONObj obj = output.obj();
 
     ASSERT_EQ(validateResults.valid, valid);

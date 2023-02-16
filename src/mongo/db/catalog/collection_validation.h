@@ -103,7 +103,7 @@ Status validate(OperationContext* opCtx,
                 RepairMode repairMode,
                 ValidateResults* results,
                 BSONObjBuilder* output,
-                bool turnOnExtraLoggingForTest = false);
+                bool logDiagnostics);
 
 /**
  * Checks whether a failpoint has been hit in the above validate() code..
