@@ -1257,7 +1257,65 @@ _Code spelunking starting points:_
   * 'durable' confusingly means journaling is enabled.
 * [_Whether WT journals a collection_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp#L560-L580)
 
-# Flow Control
+# Global Lock Admission Control
+There are 2 separate ticketing mechanisms placed in front of the global lock acquisition. Both aim to limit the number of concurrent operations from overwhelming the system. Before an operation can acquire the global lock, it must acquire a ticket from one, or both, of the ticketing mechanisms. When both ticket mechanisms are necessary, the acquisition order is as follows:
+1. Flow Control - Required only for global lock requests in MODE_IX
+2. Execution Admission Control - Required for all global lock requests
+
+
+Flow Control is in place to prevent a majority of secondaries from falling behind in replication, whereas Execution Admission Control aims to limit the number of concurrent storage engine transactions on a single node.
+
+## Admission Priority
+Associated with every operation is an admission priority, stored as a part of the [AdmissionContext](https://github.com/mongodb/mongo/blob/r6.3.0-rc0/src/mongo/util/concurrency/admission_context.h#L40). By default, operations are 'normal' priority.
+
+In both the Execution Admission and Flow Control ticketing system, operations of 'immediate' priority bypass ticket acquisition, regardless of ticket availability. Otherwise, tickets that are not 'immediate' priority must throttle when there are no tickets available.
+
+Flow Control is only concerned whether an operation is 'immediate' priority and does not differentiate between 'normal' and 'low' priorities. The current version of Execution Admission Control relies on admission priority to administer tickets when the server is under load.
+
+**AdmissionContext::Priority**
+* `kImmediate` - An operation that bypasses ticket acquisition in both ticketing mechanisms. Reserved for operations critical to availability (e.g replication workers), or observability (e.g. FTDC), and any operation releasing resources (e.g. committing or aborting prepared transactions).
+* `kNormal` - An operation that should be throttled when the server is under load. If an operation is throttled, it will not affect availability or observability. Most operations, both user and internal, should use this priority unless they qualify as 'kLow' or 'kImmediate' priority.
+* `kLow` - It's of low importance that the operation acquires a ticket in Execution Admission Control. Reserved for background tasks that have no other operations dependent on them. The operation will be throttled under load and make significantly less progress compared to operations of higher priorities in the Execution Admission Control.
+
+Developers should consciously decide admission priority when adding new features. Admission priority can be set through the [SetAdmissionPriorityForLock](https://github.com/10gen/mongo/blob/r6.3.0-rc0/src/mongo/db/concurrency/lock_state.h#L428) RAII.
+
+### Developer Guidelines for Declaring Low Admission Priority
+Developers must evaluate the consequences of each low priority operation from falling too far behind, and implement safeguards to avoid any undesirable behaviors for excessive delays in low priority operations.
+
+An operation should dynamically choose when to be deprioritized or re-prioritized. More
+specifically, all low-priority candidates must assess the state of the system before taking the
+GlobalLock with low priority.
+
+For example, since TTL deletes can be an expensive background task, they should default to low
+priority. However, it's important they don't fall too far behind TTL inserts - otherwise, there is a risk of
+unbounded collection growth. To remedy this issue, TTL deletes on a collection [are reprioritized](https://github.com/10gen/mongo/blob/d1a0e34e1e67d4a2b23104af2512d14290b25e5f/src/mongo/db/ttl.idl#L96) to normal priority if they can't catch up after n-subpasses.
+
+## Execution Admission Control
+A ticketing mechanism that limits the number of concurrent storage engine transactions in a single mongod to reduce contention on storage engine resources.
+
+### Ticket Management
+There are 2 separate pools of available tickets: one pool for global lock read requests (MODE_S/MODE_IS), and one pool of tickets for global lock write requests (MODE_IX).
+
+The size of each pool can be specified at startup via `storageEngineConcurrentReadTransactions` (read ticket pool), and `storageEngineConcurrentWriteTransactions` (write ticket pool). Additionally, the size of the each ticket pool can be changed through the [TicketHolderManager](https://github.com/mongodb/mongo/blob/r6.3.0-rc0/src/mongo/db/storage/ticketholder_manager.h#L51) at runtime.
+
+Each pool of tickets is maintained in a [TicketHolder](https://github.com/mongodb/mongo/blob/r6.3.0-rc0/src/mongo/util/concurrency/ticketholder.h#L52). Tickets distributed from a given TicketHolder will always be returned to the same TicketHolder (a write ticket will always be returned to the TicketHolder with the write ticket pool).
+
+### Deprioritization
+When resources are limited, its important to prioritize which operations are admitted to run first. The [PriorityTicketHolder](https://github.com/mongodb/mongo/blob/r6.3.0-rc0/src/mongo/util/concurrency/priority_ticketholder.h) enables deprioritization of low priority operations and is used by default on [linux machines](https://jira.mongodb.org/browse/SERVER-72616).
+
+If the server is not under load (there are tickets available for the global lock request mode), then tickets are handed out immediately, regardless of admission priority. Otherwise, operations wait until a ticket is available.
+
+Operations waiting for a ticket are assigned to a TicketBroker according to their priority. There are two TicketBrokers, one manages low priority operations, the other normal priority operations.
+![](diagrams/TicketHolder_Request.svg)
+When a ticket is released to the PriorityTicketHolder, the default behavior for the PriorityTicketHolder is as follows:
+1. Attempt a ticket transfer through the normal priority TicketBroker. If unsuccessful (e.g there are no normal priority operations waiting for a ticket), continue to (2)
+2. Attempt a ticket transfer through the the low priority TicketBroker
+3. If no transfer can be made, return the ticket to the general ticket pool
+
+#### Preventing Low Priority Operations from Falling too Far Behind
+If a server is consistently under load, and ticket transfers were always made through the normal priority TicketBroker first, then operations assigned to the low priority TicketBroker could starve. To remedy this, `lowPriorityAdmissionBypassThreshold` limits the number of consecutive ticket transfers to the normal priority TicketBroker before a ticket transfer is issued through the low priority TicketBroker.
+
+## Flow Control
 
 The Flow Control mechanism aims to keep replica set majority committed lag less than or equal to a
 configured maximum. The default value for this maximum lag is 10 seconds. The Flow Control mechanism
@@ -1277,7 +1335,7 @@ admin.
 Flow Control is configurable via several server parameters. Additionally, currentOp, serverStatus,
 database profiling, and slow op log lines include Flow Control information.
 
-## Ticket admission mechanism
+### Flow Control Ticket Admission Mechanism
 
 The ticket admission Flow Control mechanism allows a specified number of global IX lock acquisitions
 every second. Most global IX lock acquisitions (except for those that explicitly circumvent Flow
@@ -1290,26 +1348,27 @@ give and take from; an independent mechanism refreshes the ticket counts every s
 When the Flow Control mechanism refreshes available tickets, it calculates how many tickets it
 should allow in order to address the majority committed lag.
 
-The Flow Control mechanism determines how many tickets to replenish every period based on:
+The Flow Control mechanism determines how many flow control tickets to replenish every period based
+on:
 1. The current majority committed replication lag with respect to the configured target maximum
    replication lag
 1. How many operations the secondary sustaining the commit point has applied in the last period
 1. How many IX locks per operation were acquired in the last period
 
-## Configurable constants
+### Configurable constants
 
-Criterion #2 determines a "base" number of tickets to be used in the calculation. When the current
-majority committed lag is greater than or equal to a certain configurable threshold percentage of
-the target maximum, the Flow Control mechanism scales down this "base" number based on the
-discrepancy between the two lag values. For some configurable constant 0 < k < 1, it calculates the
-following:
+Criterion #2 determines a "base" number of flow control tickets to be used in the calculation. When
+the current majority committed lag is greater than or equal to a certain configurable threshold
+percentage of the target maximum, the Flow Control mechanism scales down this "base" number based on
+the discrepancy between the two lag values. For some configurable constant 0 < k < 1, it calculates
+the following:
 
 `base * k ^ ((lag - threshold)/threshold) * fudge factor`
 
 The fudge factor is also configurable and should be close to 1. Its purpose is to assign slightly
-lower than the "base" number of tickets when the current lag is close to the threshold.  Criterion
-#3 is then multiplied by the result of the above calculation to translate a count of operations into
-a count of lock acquisitions.
+lower than the "base" number of flow control tickets when the current lag is close to the threshold.
+Criterion #3 is then multiplied by the result of the above calculation to translate a count of
+operations into a count of lock acquisitions.
 
 When the majority committed lag is less than the threshold percentage of the target maximum, the
 number of tickets assigned in the previous period is used as the "base" of the calculation. This
@@ -1326,14 +1385,14 @@ Criteria #2 and #3 are determined using a sampling mechanism that periodically s
 data as primaries process writes. The sampling mechanism executes regardless of whether Flow Control
 is enabled.
 
-## Oscillations
+### Oscillations
 
 There are known scenarios in which the Flow Control mechanism causes write throughput to
 oscillate. There is no known work that can be done to eliminate oscillations entirely for this
 mechanism without hindering other aspects of the mechanism. Work was done (see SERVER-39867) to
 dampen the oscillations at the expense of throughput.
 
-## Throttling internal operations
+### Throttling internal operations
 
 The Flow Control mechanism throttles all IX lock acquisitions regardless of whether they are from
 client or system operations unless they are part of an operation that is explicitly excluded from
