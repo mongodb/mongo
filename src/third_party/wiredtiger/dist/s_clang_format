@@ -6,15 +6,25 @@ t=__wt.$$
 trap 'rm -rf $t' 0 1 2 3 13 15
 
 download_clang_format() {
-    if [ `uname` = "Linux" ]; then
-        curl https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-llvm-10.0.0-x86_64-linux-gnu-ubuntu-20.04.tar-1.gz -o dist/clang-format.tar.gz
-        tar --strip=1 -C dist/ -xf dist/clang-format.tar.gz clang-format-llvm-10.0.0-x86_64-linux-gnu-ubuntu-20.04/clang-format && rm dist/clang-format.tar.gz
-    elif [ `uname` = "Darwin" ]; then
-        curl https://s3.amazonaws.com/boxes.10gen.com/build/build/clang-format-llvm-10.0.0-x86_64-apple-darwin.tar.gz -o dist/clang-format.tar.gz
-        tar --strip=1 -C dist/ -xf dist/clang-format.tar.gz clang-format-llvm-10.0.0-x86_64-apple-darwin/clang-format && rm dist/clang-format.tar.gz
+    version=$1
+    # FIXME-WT-10583
+    arch=$(uname -m)
+    if [ ! "$arch" = "x86_64" ]; then
+        echo "$0: unsupported architecture $arch to run clang_format"
+        return 1
+    fi
+
+    archive=dist/clang-format.tar.gz
+    sys_os=$(uname)
+    if [ "$sys_os" = "Linux" ]; then
+        curl https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-llvm-"$version"-x86_64-linux-gnu-ubuntu-20.04.tar-1.gz -o $archive
+        tar --strip=1 -C dist/ -xf $archive clang-format-llvm-"$version"-x86_64-linux-gnu-ubuntu-20.04/clang-format && rm $archive
+    elif [ "$sys_os" = "Darwin" ]; then
+        curl https://s3.amazonaws.com/boxes.10gen.com/build/build/clang-format-llvm-"$version"-x86_64-apple-darwin.tar.gz -o $archive
+        tar --strip=1 -C dist/ -xf $archive clang-format-llvm-"$version"-x86_64-apple-darwin/clang-format && rm $archive
     else
-        echo "$0: unsupported environment $(uname)"
-        exit 1
+        echo "$0: unsupported environment $sys_os"
+        return 1
     fi
 }
 
@@ -29,23 +39,20 @@ if [ -n "$is_mongo_repo" ] ; then
 fi
 cd "$dest_dir" || exit 1
 
-# Override existing Clang Format versions in the PATH.
+# Override existing Clang-Format versions in the PATH.
 export PATH="${PWD}/dist":$PATH
 
-# Download the clang-format binary if it's not in place.
-[ ! -x "$(command -v clang-format)" ] && download_clang_format
-
-# Ensure that we have the correct version of clang-format.
+# Check if Clang-Format is already available with the desired version.
 desired_version="10.0.0"
-
-# On macOS Catalina, users need to manually approve binaries.
-# If we're not allowed to run clang-format, let's exit (should be obvious from the dialog).
-current_version=`clang-format --version` || exit 1
-
-echo $current_version | grep "version $desired_version" >/dev/null 2>&1
-if test $? -ne 0; then
-    download_clang_format
+if ! command -v clang-format &> /dev/null; then
+    download_clang_format $desired_version || exit 1
+elif ! clang-format --version | grep -q $desired_version; then
+    download_clang_format $desired_version || exit 1
 fi
+
+# Users may need to manually approve binaries.
+# If we're not allowed to run Clang-Format, let's exit (should be obvious from the dialog).
+clang-format --version &> /dev/null || exit 1
 
 exclude=true
 case $# in
