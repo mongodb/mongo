@@ -30,6 +30,7 @@
 
 #include "mongo/executor/connection_pool.h"
 
+#include "mongo/db/service_context.h"
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 #include <memory>
@@ -426,10 +427,10 @@ private:
             ~ConnWrap() {
                 if (conn->getTimesUsed() == 0) {
                     if (auto ownerSp = owner.lock())
-                        ownerSp->_neverUsed.addAndFetch(1);
+                        ownerSp->_neverUsed.fetchAndAddRelaxed(1);
                 } else if (conn->getTimesUsed() == 1) {
                     if (auto ownerSp = owner.lock())
-                        ownerSp->_usedOnce.addAndFetch(1);
+                        ownerSp->_usedOnce.fetchAndAddRelaxed(1);
                 }
             }
             const OwnedConnection conn;
@@ -744,11 +745,11 @@ size_t ConnectionPool::SpecificPool::createdConnections() const {
 }
 
 size_t ConnectionPool::SpecificPool::neverUsedConnections() const {
-    return _neverUsed.load();
+    return _neverUsed.loadRelaxed();
 }
 
 size_t ConnectionPool::SpecificPool::getOnceUsedConnections() const {
-    return _usedOnce.load();
+    return _usedOnce.loadRelaxed();
 }
 
 Milliseconds ConnectionPool::SpecificPool::getTotalConnUsageTime() const {
@@ -827,11 +828,11 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
 }
 
 auto ConnectionPool::SpecificPool::makeHandle(ConnectionInterface* connection) -> ConnectionHandle {
-    auto connUseStartedAt = _parent->_factory->now();
+    auto connUseStartedAt = _parent->_getFastClockSource()->now();
     auto deleter =
         [this, anchor = shared_from_this(), connUseStartedAt](ConnectionInterface* connection) {
             stdx::lock_guard lk(_parent->_mutex);
-            _totalConnUsageTime += _parent->_factory->now() - connUseStartedAt;
+            _totalConnUsageTime += _parent->_getFastClockSource()->now() - connUseStartedAt;
             returnConnection(connection);
             _lastActiveTime = _parent->_factory->now();
             updateState();
@@ -1426,6 +1427,10 @@ void ConnectionPool::SpecificPool::updateState() {
             _updateScheduled = false;
             updateController();
         });
+}
+
+ClockSource* ConnectionPool::DependentTypeFactoryInterface::getFastClockSource() {
+    return getGlobalServiceContext()->getFastClockSource();
 }
 
 }  // namespace executor

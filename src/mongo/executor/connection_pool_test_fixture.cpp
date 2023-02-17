@@ -243,6 +243,7 @@ void PoolImpl::setNow(Date_t now) {
 }
 
 boost::optional<Date_t> PoolImpl::_now;
+ClockSourceMock PoolImpl::_fastClockSource;
 
 }  // namespace connection_pool_test_details
 }  // namespace executor
