@@ -100,13 +100,18 @@ function nextStr(str, distance) {
  */
 function generateRanges(values, fieldType, rangeSize) {
     let ranges = [];
-    if (fieldType == 'integer') {
+    if (fieldType == 'integer' || fieldType == 'double') {
         for (const val of values) {
             ranges.push([val, val + rangeSize]);
         }
     } else if (fieldType == 'string') {
         for (const val of values) {
             ranges.push([val, nextStr(val, rangeSize)]);
+        }
+    } else if (fieldType == 'date') {
+        for (const val of values) {
+            const minDate = new Date(val);
+            ranges.push([minDate, new Date(minDate.getTime() + rangeSize)]);
         }
     } else {
         // For other data types use the values array to form the ranges.
@@ -146,6 +151,21 @@ function splitValuesPerType(values) {
     return typedValues;
 }
 
+function getTypeFromFieldName(fieldName) {
+    const fieldMeta = new Set(fieldName.split("_"));
+    let elemType = undefined;
+    if (fieldMeta.has("int")) {
+        elemType = "integer";
+    } else if (fieldMeta.has("dbl")) {
+        elemType = "double";
+    } else if (fieldMeta.has("str")) {
+        elemType = "string";
+    } else if (fieldMeta.has("dt")) {
+        elemType = "date";
+    }
+    return elemType;
+}
+
 /**
  * Generate range predicates with $match and $elemMatch over the 'field' using the values specified
  * in the 'queryValues' document: {values: [1, 15, 37, 72, 100], min: 1, max: 100}. The 'values'
@@ -160,33 +180,26 @@ function generateRangePredicates(field, queryValues, fieldType) {
 
     let elemType = fieldType;
     if (fieldType == 'array') {
-        elemType = typeof queryValues.values[0];
+        elemType = getTypeFromFieldName(field);
     }
     let docs = [];
     for (const qSize in querySpecs) {
         let ranges = [];
-        if (elemType == 'integer') {
+        if (elemType == 'integer' || elemType == 'double') {
             const rangeSize =
                 Math.round((queryValues["max"] - queryValues["min"]) * querySpecs[qSize]);
-            if (rangeSize < 2) {
+            if (rangeSize < 2 && elemType == 'integer') {
                 continue;
             }
             ranges = generateRanges(queryValues["values"], elemType, rangeSize);
         } else if (elemType == 'string') {
             ranges = generateRanges(queryValues["values"], elemType, qSize);
-        } else if (elemType == 'mixed') {
-            const typedValues = splitValuesPerType(queryValues.values);
-            for (const tv of typedValues) {
-                const subType = (typeof tv[0]);
-                if (subType == 'integer') {
-                    const rangeSize = Math.round((tv.at(-1) - tv[0]) * querySpecs[qSize]);
-                    const subRanges = generateRanges(tv, subType, rangeSize);
-                    ranges = ranges.concat(subRanges);
-                } else if (subType == 'string') {
-                    const subRanges = generateRanges(tv, subType, qSize);
-                    ranges = ranges.concat(subRanges);
-                }
-            }
+        } else if (elemType == 'date') {
+            const minDate = new Date(queryValues["min"]);
+            const maxDate = new Date(queryValues["max"]);
+            const rangeSize =
+                Math.round((maxDate.getTime() - minDate.getTime()) * querySpecs[qSize]);
+            ranges = generateRanges(queryValues["values"], elemType, rangeSize);
         } else {
             const step = (qSize == "small") ? 1 : (qSize == "medium") ? 2 : 3;
             ranges = generateRanges(queryValues["values"], elemType, step);
@@ -236,6 +249,7 @@ function selectSamplePos(collSize, n) {
         samplePos.push(pos);
         pos += step;
     }
+    jsTestLog(`Sample positions: ${tojsononeline(samplePos)}\n`);
     return samplePos;
 }
 
@@ -321,20 +335,33 @@ function selectArrayValues(nestedArray) {
     return values;
 }
 
-function selectOutOfRangeValues(minMaxDoc) {
+function selectOutOfRangeValues(minMaxDoc, fieldType) {
     let values = [];
+    const validTypes = new Set(["integer", "double", "string", "date"]);
+    if (!validTypes.has(fieldType)) {
+        return values;
+    }
+
+    const oneHour = 60 * 60 * 1000;
     const min = minMaxDoc["min"];
-    if (typeof min == 'number') {
+    if (fieldType == 'integer' || fieldType == 'double') {
         values.push(min - 1);
-    } else if (typeof min == 'string') {
+    } else if (fieldType == 'string') {
         const prevMin = (min.length > 1) ? min.at(0) : "";
         values.push(prevMin);
+    } else if (fieldType == 'date') {
+        const minDate = new Date(min);
+        values.push(new Date(minDate.getTime() - oneHour));
     }
+
     const max = minMaxDoc["max"];
-    if (typeof max == 'number') {
+    if (fieldType == 'integer' || fieldType == 'double') {
         values.push(max + 1);
-    } else if (typeof max == 'string') {
+    } else if (fieldType == 'string') {
         values.push(nextStr(max, "small"));
+    } else if (fieldType == 'date') {
+        const maxDate = new Date(max);
+        values.push(new Date(maxDate.getTime() + oneHour));
     }
     return values;
 }
@@ -396,7 +423,7 @@ function selectQueryValues(coll, fields, fieldTypes, samplePos, statsColl) {
         v.push(minMaxDoc["max"]);
 
         // Using min/ max values extract out-of-range values.
-        const outOfRange = selectOutOfRangeValues(minMaxDoc);
+        const outOfRange = selectOutOfRangeValues(minMaxDoc, fieldType);
         v = v.concat(outOfRange);
 
         const histValues = selectHistogramBounds(statsColl, field, fieldType);
@@ -420,12 +447,7 @@ function selectQueryValues(coll, fields, fieldTypes, samplePos, statsColl) {
  * Query generation for a collection 'coll' with given fields and field types.
  * The generation uses values from a collection sample with 'sampleSize'.
  */
-function generateQueries(coll, fields, fieldTypes, collSize, sampleSize, statsColl) {
-    const samplePos = selectSamplePos(collSize, sampleSize);
-    jsTestLog(`Sample positions: ${tojsononeline(samplePos)}\n`);
-
-    const queryValues = selectQueryValues(coll, fields, fieldTypes, samplePos, statsColl);
-
+function generateQueries(fields, fieldTypes, queryValues) {
     let testCases = [];
     let i = 0;
     while (i < fields.length) {
@@ -444,4 +466,155 @@ function generateQueries(coll, fields, fieldTypes, collSize, sampleSize, statsCo
     }
 
     return testCases;
+}
+
+/**
+ * Generates multi-field conjunctions by selecting terms from the single-field predicates in
+ * 'testCases'. Uses recursion on the position for which we pick a term predicate.
+ * - cnt: number of terms in the predicate curPos: the position of the current predicate
+ * - chosenIds: array of chosen predicate ids refering to the testCases array
+ * - chosenFields: set of field names chosen so far, to avoid predicates over the same field
+ * - step: step to navigate through the testCases array
+ * - predicates: array of result predicate documents
+ */
+function pickNextTerm(testCases, cnt, curPos, chosenIds, chosenFields, step, predicates) {
+    assert.eq(curPos, chosenIds.length);
+    let i = (curPos == 0) ? 0 : chosenIds.at(-1) + 1;
+
+    while (i < testCases.length) {
+        if (testCases[i].nReturned == 0 || chosenFields.has(testCases[i].fieldName)) {
+            i++;
+            continue;
+        }
+        chosenIds.push(i);
+        chosenFields.add(testCases[i].fieldName);
+        if (curPos == cnt - 1) {
+            // We have picked the last term, create the composite predicate.
+            let terms = [];
+            for (const id of chosenIds) {
+                terms.push(testCases[id].pipeline[0]["$match"]);
+            }
+            const fields = Array.from(chosenFields);
+            let doc = {
+                "pipeline": [{$match: {$and: terms}}],
+                "qtype": "conjunction",
+                "numberOfTerms": cnt,
+                "fieldNames": fields
+            };
+            predicates.push(doc);
+        } else {
+            // Pick next term.
+            pickNextTerm(testCases, cnt, curPos + 1, chosenIds, chosenFields, step, predicates);
+        }
+        chosenIds.pop();
+        chosenFields.delete(testCases[i].fieldName);
+        i = i + step;
+    }
+}
+
+/**
+ * Make a conjunction or disjunction over a single field.
+ * op: $and or $or
+ * comp: array of comparisons for predicate terms
+ */
+function makeSingleFieldComplexPredicate(field, values, op, comp, predicates, isArray = false) {
+    let terms = [];
+    for (let i = 0; i < comp.length; i++) {
+        terms.push({[field]: {[comp[i]]: values[i]}});
+    }
+    let qtype = (op == "$or") ? "disj1field" : "conj1field";
+    if (isArray) {
+        qtype = qtype + "array";
+    }
+
+    let doc = {
+        "pipeline": [{$match: {[op]: terms}}],
+        "qtype": qtype,
+        "numberOfTerms": comp.length,
+        "fieldNames": [field]
+    };
+    predicates.push(doc);
+}
+
+/**
+ * Make a single field DNF predicate.
+ */
+function makeSingleFieldDNF(field, values, predicates) {
+    let term1 = {"$and": [{[field]: {"$gt": values[0]}}, {[field]: {"$lt": values[1]}}]};
+    let term2 = {"$and": [{[field]: {"$gte": values[2]}}, {[field]: {"$lt": values[3]}}]};
+
+    let doc = {
+        "pipeline": [{$match: {"$or": [term1, term2]}}],
+        "qtype": "DNF1field",
+        "numberOfTerms": 4,
+        "fieldNames": [field]
+    };
+    predicates.push(doc);
+}
+
+/**
+ * Generate single-field conjunctions and disjunctions using values from the 'queryValues' document.
+ */
+function generateSingleFieldPredicates(fields, fieldTypes, queryValues, predicates) {
+    let i = 0;
+    while (i < fields.length) {
+        const field = fields[i];
+        const fieldType = fieldTypes[i];
+        let values = queryValues[field].values;
+        // Remove outlier values.
+        if (values.length >= 8) {
+            values = values.slice(2, values.length - 2);
+        }
+
+        while (values.length > 4) {
+            makeSingleFieldComplexPredicate(field, values, "$and", ["$gte", "$lte"], predicates);
+            makeSingleFieldComplexPredicate(
+                field, values, "$and", ["$gt", "$gte", "$lt", "$lte"], predicates);
+            if (fieldType == 'array') {
+                // Make non-overlapping conjunctions for multi-key fields.
+                makeSingleFieldComplexPredicate(
+                    field, values, "$and", ["$lte", "$gte"], predicates, true);
+                makeSingleFieldComplexPredicate(
+                    field, values, "$and", ["$lte", "$eq"], predicates, true);
+                makeSingleFieldComplexPredicate(
+                    field, values, "$and", ["$gt", "$lte", "$gte", "$lt"], predicates, true);
+            }
+            makeSingleFieldComplexPredicate(field, values, "$or", ["$lte", "$gte"], predicates);
+            makeSingleFieldComplexPredicate(field, values, "$or", ["$eq", "$gte"], predicates);
+            makeSingleFieldComplexPredicate(
+                field, values, "$or", ["$lt", "$eq", "$eq", "$gte"], predicates);
+            makeSingleFieldDNF(field, values, predicates);
+            values = values.slice(4, values.length);
+        }
+        i++;
+    }
+}
+
+/**
+ * Generate complex predicates:
+ * - multi-field conjunctions with 2, 4, and 7 terms by combining single-field simple predicates
+ * from the 'testCases' array.
+ * - single-field conjunctions and disjunctions with 2 and 4 terms.
+ * - single-field DNFs.
+ */
+function generateComplexPredicates(testCases, fields, fieldTypes, queryValues) {
+    let predicates = [];
+    // Generate multi-field conjunctions.
+    let chosenFields = new Set();
+    let chosenIds = [];
+    const targetCount = testCases.length / 6;
+    for (let termCount of [2, 4, 7]) {
+        const countPerTerm = Math.pow(targetCount, 1 / termCount);
+        const step = Math.trunc(testCases.length / countPerTerm);
+        pickNextTerm(testCases, termCount, 0, chosenIds, chosenFields, step, predicates);
+    }
+
+    // Generate single-field disjunctions and conjunctions.
+    generateSingleFieldPredicates(fields, fieldTypes, queryValues, predicates);
+
+    i = 0;
+    for (let query of predicates) {
+        query["_id"] = i++;
+    }
+    return predicates;
 }

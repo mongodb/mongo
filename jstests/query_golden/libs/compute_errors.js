@@ -27,14 +27,17 @@ function computeStrategyErrors(testcase, strategy, collSize) {
 /**
  * Compute cardinality estimation errors for a testcase for all CE strategies.
  */
-function computeAndPrintErrors(testcase, ceStrategies, collSize) {
-    let errorDoc = {
-        _id: testcase._id,
-        qtype: testcase.qtype,
-        dtype: testcase.dtype,
-        fieldName: testcase.fieldName,
-        elemMatch: testcase.elemMatch
-    };
+function computeAndPrintErrors(testcase, ceStrategies, collSize, isComplex) {
+    let errorDoc = {_id: testcase._id, qtype: testcase.qtype};
+    if (isComplex == true) {
+        errorDoc["numberOfTerms"] = testcase.numberOfTerms;
+    } else {
+        const categories = testcase.fieldName.split("_");
+        errorDoc["dtype"] = testcase.dtype;
+        errorDoc["distr"] = categories[0];
+        errorDoc["fieldName"] = testcase.fieldName;
+        errorDoc["elemMatch"] = testcase.elemMatch;
+    }
 
     ceStrategies.forEach(function(strategy) {
         const errors = computeStrategyErrors(testcase, strategy, collSize);
@@ -49,21 +52,37 @@ function computeAndPrintErrors(testcase, ceStrategies, collSize) {
 /**
  * Compute CE errors for each query and populate the error collection 'errorColl'.
  */
-function populateErrorCollection(errorColl, testCases, ceStrategies, collSize) {
+function populateErrorCollection(errorColl, testCases, ceStrategies, collSize, isComplex) {
     for (const testcase of testCases) {
         jsTestLog(`Query ${testcase._id}: ${tojsononeline(testcase.pipeline)}`);
         print(`Actual cardinality: ${testcase.nReturned}\n`);
         print(`Cardinality estimates:\n`);
-        const errorDoc = computeAndPrintErrors(testcase, ceStrategies, collSize);
+        const errorDoc = computeAndPrintErrors(testcase, ceStrategies, collSize, isComplex);
         assert.commandWorked(errorColl.insert(errorDoc));
     }
 }
 
 /**
- * Aggregate errors in the 'errorColl' on the 'groupField' for each CE strategy.
+ * Given an array of fields on which we want to perform $group, return an expression computing the
+ * group key.
  */
-function aggregateErrorsPerCategory(errorColl, groupField, ceStrategies) {
-    jsTestLog(`Mean errors per ${groupField}:`);
+function makeGroupKey(groupFields) {
+    let args = [];
+    for (let i = 0; i < groupFields.length; i++) {
+        args.push({$toString: "$" + groupFields[i]});
+        if (i < groupFields.length - 1) {
+            args.push("_");
+        }
+    }
+    return {$concat: args};
+}
+
+/**
+ * Aggregate errors in the 'errorColl' on the 'groupFields' for each CE strategy.
+ */
+function aggregateErrorsPerCategory(errorColl, groupFields, ceStrategies) {
+    const groupKey = makeGroupKey(groupFields);
+    jsTestLog(`Mean errors per ${tojsononeline(groupFields)}:`);
     for (const strategy of ceStrategies) {
         const absError = "$" + strategy + ".absError";
         const relError = "$" + strategy + ".relError";
@@ -73,7 +92,7 @@ function aggregateErrorsPerCategory(errorColl, groupField, ceStrategies) {
                 .aggregate([
                     {
                         $project: {
-                            category: "$" + groupField,
+                            category: groupKey,
                             absError2: {$pow: [absError, 2]},
                             relError2: {$pow: [relError, 2]},
                             absSelError: {$abs: selError}

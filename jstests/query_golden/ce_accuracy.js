@@ -32,6 +32,10 @@ runHistogramsTest(function() {
         "cardinality": 20
     };
 
-    runCETestForCollection(db, collMeta, 4);
+    // Flag to show more information for debugging purposes:
+    // - adds execution of sampling CE strategy;
+    // - prints plan skeleton.
+    const ceDebugFlag = false;
+    runCETestForCollection(db, collMeta, 4, ceDebugFlag);
 });
 })();
