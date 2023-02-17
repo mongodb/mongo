@@ -52,13 +52,6 @@ commands:
         api_version: ""
         type: fcv_string
         fields:
-            downgradeOnDiskChanges:
-                description: "A boolean that indicates whether we should rollback all possible
-                              on-disk changes associated with the upgraded
-                              featureCompatibilityVersion. This should only be called with a
-                              downgraded featureCompatibilityVersion."
-                type: safeBool
-                optional: true
             fromConfigServer:
                 description: "A boolean that indicates whether the command is being requested by a
                               config server. Normally FCV upgrades between last-lts and anything

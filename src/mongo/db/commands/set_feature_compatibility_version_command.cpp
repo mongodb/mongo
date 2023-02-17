@@ -311,18 +311,6 @@ public:
 
         const auto requestedVersion = request.getCommandParameter();
         const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
-        if (request.getDowngradeOnDiskChanges()) {
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream()
-                        << "Cannot set featureCompatibilityVersion to "
-                        << FeatureCompatibilityVersionParser::serializeVersion(requestedVersion)
-                        << " with '"
-                        << SetFeatureCompatibilityVersion::kDowngradeOnDiskChangesFieldName
-                        << "' set to true. This is only allowed when downgrading to "
-                        << multiversion::toString(GenericFCV::kLastContinuous),
-                    requestedVersion <= actualVersion &&
-                        requestedVersion == GenericFCV::kLastContinuous);
-        }
 
         if (requestedVersion == actualVersion) {
             // Set the client's last opTime to the system last opTime so no-ops wait for
@@ -1190,22 +1178,6 @@ private:
         }
 
         hangWhileDowngrading.pauseWhileSet(opCtx);
-
-        if (request.getDowngradeOnDiskChanges()) {
-            invariant(requestedVersion == GenericFCV::kLastContinuous);
-            _downgradeOnDiskChanges();
-            LOGV2(4875603, "Downgrade of on-disk format complete.");
-        }
-    }
-
-    /**
-     * Rolls back any upgraded on-disk changes to reflect the disk format of the last-continuous
-     * version.
-     */
-    void _downgradeOnDiskChanges() {
-        LOGV2(4975602,
-              "Downgrading on-disk format to reflect the last-continuous version.",
-              "last_continuous_version"_attr = multiversion::toString(GenericFCV::kLastContinuous));
     }
 
     /**
