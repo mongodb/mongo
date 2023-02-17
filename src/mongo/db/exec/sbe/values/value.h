@@ -1024,6 +1024,22 @@ inline size_t getStringLength(TypeTags tag, const Value& val) noexcept {
     MONGO_UNREACHABLE;
 }
 
+/*
+ * Using MONGO_COMPILER_ALWAYS_INLINE on a free function does not always play well between
+ * compilers because some require the 'inline' keyword be used while others prohibit it. To get
+ * around this, we wrap the custom strlen() function in a struct.
+ */
+struct TinyStrHelpers {
+    // Often calling the shared library strlen() function is more expensive than a small loop
+    // for small strings.
+    MONGO_COMPILER_ALWAYS_INLINE static size_t strlen(const char* s) {
+        const char* begin = s;
+        while (*s++)
+            ;
+        return s - begin - 1;
+    }
+};
+
 /**
  * getStringView() should be preferred over getRawStringView() where possible.
  */
@@ -1654,6 +1670,9 @@ private:
 /**
  * Holds a view of an array-like type (e.g. TypeTags::Array or TypeTags::bsonArray), and provides an
  * iterface to iterate over the values that are the elements of the array.
+ *
+ * This is a general purpose iterator. If you need to do a simple walk over the entire array in one
+ * go, not saving the place across function calls etc, prefer walkArray().
  */
 class ArrayEnumerator {
 public:

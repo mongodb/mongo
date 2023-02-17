@@ -47,6 +47,7 @@
 #include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/sbe_pattern_value_cmp.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
+#include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
 #include "mongo/db/hasher.h"
@@ -1148,10 +1149,7 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
     auto arrOutput = value::getArrayView(valArrOutput);
     value::ValueGuard guard{tagArrOutput, valArrOutput};
 
-    for (value::ArrayEnumerator enumerator(tagInput, valInput); !enumerator.atEnd();
-         enumerator.advance()) {
-        auto [elemTag, elemVal] = enumerator.getViewOfValue();
-
+    value::arrayForEach(tagInput, valInput, [&](value::TypeTags elemTag, value::Value elemVal) {
         if (maxDepth > 0 && value::isArray(elemTag)) {
             traverseP_nested(code, position, elemTag, elemVal, decrement(maxDepth));
         } else {
@@ -1167,8 +1165,7 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
             retVal = copyVal;
         }
         arrOutput->push_back(retTag, retVal);
-    }
-
+    });
     guard.reset();
     pushStack(true, tagArrOutput, valArrOutput);
 }
@@ -1221,15 +1218,18 @@ void ByteCode::traverseFInArray(const CodeFragment* code, int64_t position, bool
     value::ValueGuard input(ownInput, tagInput, valInput);
     popStack();
 
-    // Return true if any of the array elements is true.
-    for (value::ArrayEnumerator enumerator(tagInput, valInput); !enumerator.atEnd();
-         enumerator.advance()) {
-        auto [elemTag, elemVal] = enumerator.getViewOfValue();
-        pushStack(false, elemTag, elemVal);
-        if (runLambdaPredicate(code, position)) {
-            pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
-            return;
-        }
+    const bool passed =
+        value::arrayAny(tagInput, valInput, [&](value::TypeTags tag, value::Value val) {
+            pushStack(false, tag, val);
+            if (runLambdaPredicate(code, position)) {
+                pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+                return true;
+            }
+            return false;
+        });
+
+    if (passed) {
+        return;
     }
 
     // If this is a filter over a number path then run over the whole array. More details in
@@ -1477,9 +1477,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::getArraySize(value::Typ
             break;
         }
         case value::TypeTags::bsonArray: {
-            auto enumerator = value::ArrayEnumerator{tag, val};
-            for (result = 0; !enumerator.atEnd(); result++, enumerator.advance()) {
-            }
+            value::arrayForEach(
+                tag, val, [&](value::TypeTags t_unused, value::Value v_unused) { result++; });
             break;
         }
         default:
@@ -3581,11 +3580,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArrays(Ari
             return {false, value::TypeTags::Nothing, 0};
         }
 
-        for (auto ae = value::ArrayEnumerator{tag, val}; !ae.atEnd(); ae.advance()) {
-            auto [elTag, elVal] = ae.getViewOfValue();
+        value::arrayForEach(tag, val, [&](value::TypeTags elTag, value::Value elVal) {
             auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
             resView->push_back(copyTag, copyVal);
-        }
+        });
     }
 
     resGuard.reset();
@@ -3672,13 +3670,13 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggConcatArraysC
     auto [tagNewArray, valNewArray] = newArr->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
     tassert(7039519, "expected value of type 'Array'", tagNewArray == value::TypeTags::Array);
 
-    for (auto i = value::ArrayEnumerator{tagNewArray, valNewArray}; !i.atEnd(); i.advance()) {
-        auto [elTag, elVal] = i.getViewOfValue();
-        // TODO SERVER-71952: Since 'valNewArray' is owned here, in the future we could avoid this
-        // copy by moving the element out of the array.
+    value::arrayForEach(tagNewArray, valNewArray, [&](value::TypeTags elTag, value::Value elVal) {
+        // TODO SERVER-71952: Since 'valNewArray' is owned here, in the future
+        // we could avoid this copy by moving the element out of the array.
         auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
         accArr->push_back(copyTag, copyVal);
-    }
+    });
+
 
     accumulatorGuard.reset();
     return {ownArr, tagArr, valArr};
@@ -3703,14 +3701,17 @@ std::pair<value::TypeTags, value::Value> ByteCode::genericIsMember(value::TypeTa
         }
     }
 
-    auto rhsArr = value::ArrayEnumerator{rhsTag, rhsVal};
-    while (!rhsArr.atEnd()) {
-        auto [rhsTag, rhsVal] = rhsArr.getViewOfValue();
-        auto [tag, val] = value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal, collator);
-        if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(val) == 0) {
-            return {value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
-        }
-        rhsArr.advance();
+    const bool found =
+        value::arrayAny(rhsTag, rhsVal, [&](value::TypeTags rhsElemTag, value::Value rhsElemVal) {
+            auto [tag, val] = value::compareValue(lhsTag, lhsVal, rhsElemTag, rhsElemVal, collator);
+            if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(val) == 0) {
+                return true;
+            }
+            return false;
+        });
+
+    if (found) {
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
     }
     return {value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
 }
@@ -3926,13 +3927,10 @@ FastTuple<bool, value::TypeTags, value::Value> setUnion(
         auto argTag = argTags[idx];
         auto argVal = argVals[idx];
 
-        auto arrIter = value::ArrayEnumerator{argTag, argVal};
-        while (!arrIter.atEnd()) {
-            auto [elTag, elVal] = arrIter.getViewOfValue();
+        value::arrayForEach(argTag, argVal, [&](value::TypeTags elTag, value::Value elVal) {
             auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
             resView->push_back(copyTag, copyVal);
-            arrIter.advance();
-        }
+        });
     }
     resGuard.reset();
     return {true, resTag, resVal};
@@ -3953,9 +3951,7 @@ FastTuple<bool, value::TypeTags, value::Value> setIntersection(
         auto val = argVals[idx];
 
         bool atLeastOneCommonElement = false;
-        auto enumerator = value::ArrayEnumerator{tag, val};
-        while (!enumerator.atEnd()) {
-            auto [elTag, elVal] = enumerator.getViewOfValue();
+        value::arrayForEach(tag, val, [&](value::TypeTags elTag, value::Value elVal) {
             if (idx == 0) {
                 intersectionMap[{elTag, elVal}] = 1;
             } else {
@@ -3966,8 +3962,7 @@ FastTuple<bool, value::TypeTags, value::Value> setIntersection(
                     }
                 }
             }
-            enumerator.advance();
-        }
+        });
 
         if (idx > 0 && !atLeastOneCommonElement) {
             resGuard.reset();
@@ -3992,12 +3987,9 @@ value::ValueSetType valueToSetHelper(const value::TypeTags& tag,
                                      const value::Value& value,
                                      const CollatorInterface* collator) {
     value::ValueSetType setValues(0, value::ValueHash(collator), value::ValueEq(collator));
-    auto firstSetIter = value::ArrayEnumerator(tag, value);
-    while (!firstSetIter.atEnd()) {
-        auto [elTag, elVal] = firstSetIter.getViewOfValue();
-        setValues.insert({elTag, elVal});
-        firstSetIter.advance();
-    }
+    value::arrayForEach(tag, value, [&](value::TypeTags elemTag, value::Value elemVal) {
+        setValues.insert({elemTag, elemVal});
+    });
     return setValues;
 }
 
@@ -4013,15 +4005,12 @@ FastTuple<bool, value::TypeTags, value::Value> setDifference(
 
     auto setValuesSecondArg = valueToSetHelper(rhsTag, rhsVal, collator);
 
-    auto lhsIter = value::ArrayEnumerator(lhsTag, lhsVal);
-    while (!lhsIter.atEnd()) {
-        auto [elTag, elVal] = lhsIter.getViewOfValue();
+    value::arrayForEach(lhsTag, lhsVal, [&](value::TypeTags elTag, value::Value elVal) {
         if (setValuesSecondArg.count({elTag, elVal}) == 0) {
             auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
             resView->push_back(copyTag, copyVal);
         }
-        lhsIter.advance();
-    }
+    });
 
     resGuard.reset();
     return {true, resTag, resVal};
@@ -4147,8 +4136,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSetUnionCappedImpl(
     tassert(
         7039525, "expected value of type 'ArraySet'", tagNewValSet == value::TypeTags::ArraySet);
 
-    for (auto i = value::ArrayEnumerator{tagNewValSet, valNewValSet}; !i.atEnd(); i.advance()) {
-        auto [elTag, elVal] = i.getViewOfValue();
+
+    value::arrayForEach(tagNewValSet, valNewValSet, [&](value::TypeTags elTag, value::Value elVal) {
         int elemSize = value::getApproximateSize(elTag, elVal);
         // TODO SERVER-71952: Since 'valNewValSet' is owned here, in the future we could avoid this
         // copy by moving the element out of the array.
@@ -4164,7 +4153,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSetUnionCappedImpl(
                                         << " elements and is " << currentSize << " bytes.");
             }
         }
-    }
+    });
 
     // Update the accumulator with the new total size.
     accArray->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
@@ -4198,13 +4187,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggSetUnion(Arit
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto i = value::ArrayEnumerator{tagNewSet, valNewSet};
-    while (!i.atEnd()) {
-        auto [elTag, elVal] = i.getViewOfValue();
+    value::arrayForEach(tagNewSet, valNewSet, [&](value::TypeTags elTag, value::Value elVal) {
         auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
         acc->push_back(copyTag, copyVal);
-        i.advance();
-    }
+    });
 
     guardAcc.reset();
     return {ownAcc, tagAcc, valAcc};
@@ -4906,8 +4892,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(Ari
         resultGuard.reset();
         return {true, resultTag, resultVal};
     } else if (inputType == value::TypeTags::bsonArray || inputType == value::TypeTags::ArraySet) {
-        value::ArrayEnumerator enumerator{inputType, inputVal};
-
         // Using intermediate vector since bsonArray and ArraySet don't
         // support reverse iteration.
         std::vector<std::pair<value::TypeTags, value::Value>> inputContents;
@@ -4918,10 +4902,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(Ari
             inputContents.reserve(arraySetView->size());
         }
 
-        while (!enumerator.atEnd()) {
-            inputContents.push_back(enumerator.getViewOfValue());
-            enumerator.advance();
-        }
+        value::arrayForEach(inputType, inputVal, [&](value::TypeTags elTag, value::Value elVal) {
+            inputContents.push_back({elTag, elVal});
+        });
 
         if (inputContents.size()) {
             resultView->reserve(inputContents.size());

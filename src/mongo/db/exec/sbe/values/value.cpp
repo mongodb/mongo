@@ -879,18 +879,8 @@ bool ArrayEnumerator::advance() {
     } else {
         if (_arrayCurrent != _arrayEnd - 1) {
             _arrayCurrent = bson::advance(_arrayCurrent, _fieldNameSize);
-
-            // Hand rolled strlen() code is faster than calling into shared library
-            // strlen() for small strings. Since this is a BSON array we are guaranteed
-            // the key names are small.
             if (_arrayCurrent != _arrayEnd - 1) {
-                size_t keySize = 0;
-                auto* fieldName = bson::fieldNameRaw(_arrayCurrent);
-                while (*fieldName) {
-                    keySize++;
-                    fieldName++;
-                }
-                _fieldNameSize = keySize;
+                _fieldNameSize = TinyStrHelpers::strlen(bson::fieldNameRaw(_arrayCurrent));
             }
         }
 
