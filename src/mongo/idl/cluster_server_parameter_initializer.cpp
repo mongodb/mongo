@@ -156,10 +156,10 @@ void ClusterServerParameterInitializer::initializeAllTenantParametersFromDisk(
     doLoadAllTenantParametersFromDisk(
         opCtx,
         "initializing"_sd,
-        [this](OperationContext* opCtx,
-               const BSONObj& doc,
-               StringData mode,
-               const boost::optional<TenantId>& tenantId) {
+        [&](OperationContext* opCtx,
+            const BSONObj& doc,
+            StringData mode,
+            const boost::optional<TenantId>& tenantId) {
             updateParameter(opCtx, doc, mode, tenantId);
         },
         tenantId);
@@ -176,10 +176,10 @@ void ClusterServerParameterInitializer::resynchronizeAllTenantParametersFromDisk
     doLoadAllTenantParametersFromDisk(
         opCtx,
         "resynchronizing"_sd,
-        [this, &unsetSettings](OperationContext* opCtx,
-                               const BSONObj& doc,
-                               StringData mode,
-                               const boost::optional<TenantId>& tenantId) {
+        [&](OperationContext* opCtx,
+            const BSONObj& doc,
+            StringData mode,
+            const boost::optional<TenantId>& tenantId) {
             unsetSettings.erase(doc[kIdField].str());
             updateParameter(opCtx, doc, mode, tenantId);
         },
@@ -192,8 +192,7 @@ void ClusterServerParameterInitializer::resynchronizeAllTenantParametersFromDisk
     }
 }
 
-void ClusterServerParameterInitializer::onInitialDataAvailable(OperationContext* opCtx,
-                                                               bool isMajorityDataAvailable) {
+void ClusterServerParameterInitializer::synchronizeAllParametersFromDisk(OperationContext* opCtx) {
     LOGV2_INFO(6608200, "Initializing cluster server parameters from disk");
     if (gMultitenancySupport) {
         std::set<TenantId> tenantIds;
@@ -208,6 +207,11 @@ void ClusterServerParameterInitializer::onInitialDataAvailable(OperationContext*
         }
     }
     initializeAllTenantParametersFromDisk(opCtx, boost::none);
+}
+
+void ClusterServerParameterInitializer::onInitialDataAvailable(OperationContext* opCtx,
+                                                               bool isMajorityDataAvailable) {
+    synchronizeAllParametersFromDisk(opCtx);
 }
 
 }  // namespace mongo
