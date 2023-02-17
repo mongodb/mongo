@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,42 +27,44 @@
  *    it in the license file.
  */
 
-
 #pragma once
 
-#include "mongo/bson/bsonobj.h"
+#include "mongo/base/status.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/commands.h"
 
 namespace mongo {
 
-class CurOp;
-class OpDebug;
-class OperationContext;
+class SetProfilingFilterGloballyCmdRequest;
 
-class ProfileFilter {
+/**
+ * Command class implementing functionality for both the mongoD and mongoS
+ * 'setProfilingFilterGlobally' command.
+ */
+class SetProfilingFilterGloballyCmd : public BasicCommand {
 public:
-    struct Args {
-        Args(OperationContext* opCtx, const OpDebug& op, const CurOp& curop)
-            : opCtx(opCtx), op(op), curop(curop) {}
+    SetProfilingFilterGloballyCmd() : BasicCommand("setProfilingFilterGlobally") {}
 
-        OperationContext* opCtx;
-        const OpDebug& op;
-        const CurOp& curop;
-    };
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
+        return AllowedOnSecondary::kAlways;
+    }
 
-    virtual bool matches(OperationContext*, const OpDebug&, const CurOp&) const = 0;
-    virtual BSONObj serialize() const = 0;
-    virtual ~ProfileFilter() = default;
+    std::string help() const final {
+        return "updates a global filter that determines which operations are eligible for "
+               "logging/profiling";
+    }
 
-    /**
-     * Thread-safe getter for the global 'ProfileFilter' default.
-     */
-    static std::shared_ptr<ProfileFilter> getDefault();
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
+        return false;
+    }
 
-    /**
-     * Thread-safe setter for the global 'ProfileFilter' default. Initially this is set from the
-     * configuration file on startup.
-     */
-    static void setDefault(std::shared_ptr<ProfileFilter>);
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const final;
+
+    bool run(OperationContext* opCtx,
+             const std::string& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) final;
 };
-
 }  // namespace mongo

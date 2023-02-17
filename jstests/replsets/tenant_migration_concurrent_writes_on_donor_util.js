@@ -722,6 +722,7 @@ TenantMigrationConcurrentWriteUtil.testCases = {
     setCommittedSnapshot: {skip: isNotRunOnUserDatabase},
     setDefaultRWConcern: {skip: isNotRunOnUserDatabase},
     setFeatureCompatibilityVersion: {skip: isNotRunOnUserDatabase},
+    setProfilingFilterGlobally: {skip: isNotRunOnUserDatabase},
     setFreeMonitoring: {skip: isNotRunOnUserDatabase},
     setIndexCommitQuorum: {skip: isNotRunOnUserDatabase},
     setParameter: {skip: isNotRunOnUserDatabase},

@@ -663,6 +663,7 @@ env.Library(
         'profile_common.cpp',
         'profile.idl',
         '$BUILD_DIR/mongo/db/profile_filter_impl.cpp',
+        'set_profiling_filter_globally_cmd.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands',

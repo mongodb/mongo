@@ -66,3 +66,16 @@ commands:
                       an alternative to slowms and sampleRate. The special value 'unset' removes
                       the filter."
         optional: true
+
+  setProfilingFilterGlobally:
+    description: "Parser for the 'setProfilingFilterGlobally' command."
+    command_name: "setProfilingFilterGlobally"
+    cpp_name: SetProfilingFilterGloballyCmdRequest
+    strict: true
+    namespace: ignored
+    api_version: ""
+    fields:
+      filter:
+        type: ObjectOrUnset
+        description: "A query predicate that determines which ops are logged/profiled on a global
+                      level. The special value 'unset' removes the filter."

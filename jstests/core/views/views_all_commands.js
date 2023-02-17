@@ -613,6 +613,7 @@ let viewsCommandTests = {
     setDefaultRWConcern: {skip: isUnrelated},
     setFeatureCompatibilityVersion: {skip: isUnrelated},
     setFreeMonitoring: {skip: isUnrelated},
+    setProfilingFilterGlobally: {skip: isUnrelated},
     setParameter: {skip: isUnrelated},
     setShardVersion: {skip: isUnrelated},
     setClusterParameter: {skip: isUnrelated},

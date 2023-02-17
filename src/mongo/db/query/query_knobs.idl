@@ -871,6 +871,14 @@ server_parameters:
     default:
         expr: false
 
+  internalQueryGlobalProfilingFilter:
+    description: "Enables the setProfilingFilterGlobally command."
+    set_at: [ startup ]
+    cpp_varname: internalQueryGlobalProfilingFilter
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

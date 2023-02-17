@@ -32,12 +32,15 @@
 namespace mongo {
 
 static std::shared_ptr<ProfileFilter> defaultProfileFilter;
+static Mutex mutex = MONGO_MAKE_LATCH("ProfileFilter::mutex");
 
 std::shared_ptr<ProfileFilter> ProfileFilter::getDefault() {
+    stdx::lock_guard<Latch> lk(mutex);
     return defaultProfileFilter;
 }
 
 void ProfileFilter::setDefault(std::shared_ptr<ProfileFilter> filter) {
+    stdx::lock_guard<Latch> lk(mutex);
     defaultProfileFilter = std::move(filter);
 }
 
