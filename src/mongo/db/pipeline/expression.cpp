@@ -640,6 +640,9 @@ Value ExpressionArray::evaluate(const Document& root, Variables* variables) cons
 }
 
 Value ExpressionArray::serialize(SerializationOptions options) const {
+    if (options.replacementForLiteralArgs && selfAndChildrenAreConstant()) {
+        return serializeConstant(Value(options.replacementForLiteralArgs.get()));
+    }
     vector<Value> expressions;
     expressions.reserve(_children.size());
     for (auto&& expr : _children) {
@@ -664,6 +667,15 @@ intrusive_ptr<Expression> ExpressionArray::optimize() {
             getExpressionContext(), evaluate(Document(), &(getExpressionContext()->variables)));
     }
     return this;
+}
+
+bool ExpressionArray::selfAndChildrenAreConstant() const {
+    for (auto&& exprPointer : _children) {
+        if (!exprPointer->selfAndChildrenAreConstant()) {
+            return false;
+        }
+    }
+    return true;
 }
 
 const char* ExpressionArray::getOpName() const {
@@ -1213,7 +1225,7 @@ Value ExpressionConstant::evaluate(const Document& root, Variables* variables) c
 
 Value ExpressionConstant::serialize(SerializationOptions options) const {
     if (options.replacementForLiteralArgs) {
-        return Value(DOC("$const" << *options.replacementForLiteralArgs));
+        return serializeConstant(Value(options.replacementForLiteralArgs.get()));
     }
     return serializeConstant(_value);
 }
@@ -2368,10 +2380,27 @@ Value ExpressionObject::evaluate(const Document& root, Variables* variables) con
     return outputDoc.freezeToValue();
 }
 
+bool ExpressionObject::selfAndChildrenAreConstant() const {
+    for (auto&& [_, exprPointer] : _expressions) {
+        if (!exprPointer->selfAndChildrenAreConstant()) {
+            return false;
+        }
+    }
+    return true;
+}
+
 Value ExpressionObject::serialize(SerializationOptions options) const {
+    if (options.replacementForLiteralArgs && selfAndChildrenAreConstant()) {
+        return serializeConstant(Value(options.replacementForLiteralArgs.get()));
+    }
     MutableDocument outputDoc;
     for (auto&& pair : _expressions) {
-        outputDoc.addField(pair.first, pair.second->serialize(options));
+        if (options.redactFieldNames) {
+            outputDoc.addField(options.redactFieldNamesStrategy(pair.first),
+                               pair.second->serialize(options));
+        } else {
+            outputDoc.addField(pair.first, pair.second->serialize(options));
+        }
     }
     return outputDoc.freezeToValue();
 }
@@ -2534,32 +2563,40 @@ Value ExpressionFieldPath::evaluate(const Document& root, Variables* variables) 
     }
 }
 
+namespace {
+// Shared among expressions that need to serialize dotted paths and redact the path components.
+auto getPrefixAndPath(FieldPath path) {
+    if (path.getFieldName(0) == "CURRENT" && path.getPathLength() > 1) {
+        // use short form for "$$CURRENT.foo" but not just "$$CURRENT"
+        return std::make_pair(std::string("$"), path.tail());
+    } else {
+        return std::make_pair(std::string("$$"), path);
+    }
+}
+std::string hashFieldPath(SerializationOptions options, std::string prefix, FieldPath path) {
+    std::stringstream redacted;
+    redacted << prefix;
+    size_t startPos = 0;
+    // Check if our prefix indicates this path begins with a system variable.
+    if (prefix.length() == 2) {
+        // Don't redact a variable reference.
+        redacted << path.getFieldName(0);
+        ++startPos;
+    }
+    for (size_t i = startPos; i < path.getPathLength(); ++i) {
+        if (i > 0) {
+            redacted << ".";
+        }
+        redacted << options.redactFieldNamesStrategy(path.getFieldName(i));
+    }
+    return redacted.str();
+}
+}  // namespace
+
 Value ExpressionFieldPath::serialize(SerializationOptions options) const {
-    auto&& [prefix, path] = [&]() {
-        if (_fieldPath.getFieldName(0) == "CURRENT" && _fieldPath.getPathLength() > 1) {
-            // use short form for "$$CURRENT.foo" but not just "$$CURRENT"
-            return std::make_pair(std::string("$"), _fieldPath.tail());
-        } else {
-            return std::make_pair(std::string("$$"), _fieldPath);
-        }
-    }();
+    auto [prefix, path] = getPrefixAndPath(_fieldPath);
     if (options.redactFieldNames) {
-        std::stringstream redacted;
-        redacted << prefix;
-        size_t startPos = 0;
-        // Check if our prefix indicates this path begins with a system variable.
-        if (prefix.length() == 2) {
-            // Don't redact a variable reference.
-            redacted << path.getFieldName(0);
-            ++startPos;
-        }
-        for (size_t i = startPos; i < path.getPathLength(); ++i) {
-            if (i > 0) {
-                redacted << ".";
-            }
-            redacted << options.redactFieldNamesStrategy(path.getFieldName(i));
-        }
-        return Value(redacted.str());
+        return Value(hashFieldPath(options, prefix, path));
     } else {
         return Value(prefix + path.fullPath());
     }
@@ -7974,9 +8011,19 @@ intrusive_ptr<Expression> ExpressionGetField::optimize() {
 }
 
 Value ExpressionGetField::serialize(SerializationOptions options) const {
-    return Value(Document{{"$getField"_sd,
-                           Document{{"field"_sd, _children[_kField]->serialize(options)},
-                                    {"input"_sd, _children[_kInput]->serialize(options)}}}});
+    MutableDocument argDoc;
+    if (options.redactFieldNames) {
+        // The parser guarantees that the '_children[_kField]' expression evaluates to a constant
+        // string.
+        auto strPath =
+            static_cast<ExpressionConstant*>(_children[_kField].get())->getValue().getString();
+        argDoc.addField("field"_sd, Value(hashFieldPath(options, {""}, FieldPath(strPath))));
+    } else {
+        argDoc.addField("field"_sd, _children[_kField]->serialize(options));
+    }
+    argDoc.addField("input"_sd, _children[_kInput]->serialize(options));
+
+    return Value(Document{{"$getField"_sd, argDoc.freezeToValue()}});
 }
 
 /* -------------------------- ExpressionSetField ------------------------------ */
@@ -8087,10 +8134,20 @@ intrusive_ptr<Expression> ExpressionSetField::optimize() {
 }
 
 Value ExpressionSetField::serialize(SerializationOptions options) const {
-    return Value(Document{{"$setField"_sd,
-                           Document{{"field"_sd, _children[_kField]->serialize(options)},
-                                    {"input"_sd, _children[_kInput]->serialize(options)},
-                                    {"value"_sd, _children[_kValue]->serialize(options)}}}});
+    MutableDocument argDoc;
+    if (options.redactFieldNames) {
+        // The parser guarantees that the '_children[_kField]' expression evaluates to a constant
+        // string.
+        auto strPath =
+            static_cast<ExpressionConstant*>(_children[_kField].get())->getValue().getString();
+        argDoc.addField("field"_sd, Value(hashFieldPath(options, {""}, FieldPath(strPath))));
+    } else {
+        argDoc.addField("field"_sd, _children[_kField]->serialize(options));
+    }
+    argDoc.addField("input"_sd, _children[_kInput]->serialize(options));
+    argDoc.addField("value"_sd, _children[_kValue]->serialize(options));
+
+    return Value(Document{{"$setField"_sd, argDoc.freezeToValue()}});
 }
 
 /* ------------------------- ExpressionTsSecond ----------------------------- */

@@ -336,6 +336,13 @@ public:
         return monotonic::State::NonMonotonic;
     }
 
+    /**
+     * Helper to determine whether this expression always evaluates to the same value.
+     */
+    virtual bool selfAndChildrenAreConstant() const {
+        return false;
+    }
+
 protected:
     using ExpressionVector = std::vector<boost::intrusive_ptr<Expression>>;
 
@@ -702,6 +709,9 @@ public:
     static bool isConstant(boost::intrusive_ptr<Expression> expression) {
         return dynamic_cast<ExpressionConstant*>(expression.get());
     }
+    bool selfAndChildrenAreConstant() const override final {
+        return true;
+    }
 
     /**
      * Returns true if every expression in 'expressions' is either a nullptr or an instance of an
@@ -1065,6 +1075,8 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    bool selfAndChildrenAreConstant() const override final;
 };
 
 
@@ -2550,6 +2562,8 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    bool selfAndChildrenAreConstant() const override final;
 
 private:
     ExpressionObject(
