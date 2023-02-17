@@ -33,6 +33,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
+#include "mongo/db/commands/set_profiling_filter_globally_cmd.h"
 #include "mongo/db/profile_filter_impl.h"
 
 namespace mongo {
@@ -80,6 +81,8 @@ protected:
     }
 
 } profileCmd;
+
+SetProfilingFilterGloballyCmd setProfilingFilterGloballyCmd;
 
 }  // namespace
 }  // namespace mongo

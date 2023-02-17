@@ -458,6 +458,13 @@ std::vector<std::string> CollectionCatalog::getAllDbNames() const {
     return ret;
 }
 
+void CollectionCatalog::setAllDatabaseProfileFilters(std::shared_ptr<ProfileFilter> filter) {
+    stdx::lock_guard<Latch> lock(_profileSettingsLock);
+    for (auto& [_, settings] : _databaseProfileSettings) {
+        settings.filter = filter;
+    }
+}
+
 void CollectionCatalog::setDatabaseProfileSettings(
     StringData dbName, CollectionCatalog::ProfileSettings newProfileSettings) {
     stdx::lock_guard<Latch> lock(_profileSettingsLock);

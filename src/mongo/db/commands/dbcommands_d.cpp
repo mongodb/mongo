@@ -59,6 +59,7 @@
 #include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/set_profiling_filter_globally_cmd.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
@@ -206,6 +207,8 @@ protected:
     }
 
 } cmdProfile;
+
+SetProfilingFilterGloballyCmd cmdSetProfilingFilterGlobally;
 
 class CmdFileMD5 : public BasicCommand {
 public:

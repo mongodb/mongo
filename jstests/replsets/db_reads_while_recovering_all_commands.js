@@ -278,6 +278,7 @@ const allCommands = {
     setIndexCommitQuorum: {skip: isPrimaryOnly},
     setFeatureCompatibilityVersion: {skip: isPrimaryOnly},
     setFreeMonitoring: {skip: isPrimaryOnly},
+    setProfilingFilterGlobally: {skip: isNotAUserDataRead},
     setParameter: {skip: isNotAUserDataRead},
     setShardVersion: {skip: isNotAUserDataRead},
     shardConnPoolStats: {skip: isNotAUserDataRead},

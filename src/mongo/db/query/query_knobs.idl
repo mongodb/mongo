@@ -440,3 +440,10 @@ server_parameters:
     cpp_varname: "enableTimeoutOfInactiveSessionCursors"
     cpp_vartype: AtomicWord<bool>
     default: false
+
+  internalQueryGlobalProfilingFilter:
+    description: "Enables the setProfilingFilterGlobally command."
+    set_at: [ startup ]
+    cpp_varname: internalQueryGlobalProfilingFilter
+    cpp_vartype: AtomicWord<bool>
+    default: false
