@@ -336,6 +336,7 @@ AuthCounter authCounter;
 AggStageCounters aggStageCounters;
 DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 QueryFrameworkCounters queryFrameworkCounters;
+ValidatorCounters validatorCounters;
 
 OperatorCounters operatorCountersAggExpressions{"operatorCounters.expressions."};
 OperatorCounters operatorCountersMatchExpressions{"operatorCounters.match."};

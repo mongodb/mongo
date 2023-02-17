@@ -444,6 +444,52 @@ private:
     StringMap<std::unique_ptr<ExprCounter>> operatorCountersExprMap = {};
 };
 
+class ValidatorCounters {
+public:
+    ValidatorCounters() {
+        _validatorCounterMap["create"] = std::make_unique<ValidatorCounter>("create");
+        _validatorCounterMap["collMod"] = std::make_unique<ValidatorCounter>("collMod");
+    }
+
+    void incrementCounters(const StringData cmdName,
+                           const BSONObj& validator,
+                           bool parsingSucceeded) {
+        if (!validator.isEmpty()) {
+            auto validatorCounter = _validatorCounterMap.find(cmdName);
+            tassert(7139200,
+                    str::stream() << "The validator counters are not support for the command: "
+                                  << cmdName,
+                    validatorCounter != _validatorCounterMap.end());
+            validatorCounter->second->total.increment();
+
+            if (!parsingSucceeded) {
+                validatorCounter->second->failed.increment();
+            }
+            if (validator.hasField("$jsonSchema")) {
+                validatorCounter->second->jsonSchema.increment();
+            }
+        }
+    }
+
+private:
+    struct ValidatorCounter {
+        ValidatorCounter(const StringData name)
+            : totalMetric("commands." + name + ".validator.total", &total),
+              failedMetric("commands." + name + ".validator.failed", &failed),
+              jsonSchemaMetric("commands." + name + ".validator.jsonSchema", &jsonSchema) {}
+        Counter64 total;
+        Counter64 failed;
+        Counter64 jsonSchema;
+        ServerStatusMetricField<Counter64> totalMetric;
+        ServerStatusMetricField<Counter64> failedMetric;
+        ServerStatusMetricField<Counter64> jsonSchemaMetric;
+    };
+
+    StringMap<std::unique_ptr<ValidatorCounter>> _validatorCounterMap = {};
+};
+
+extern ValidatorCounters validatorCounters;
+
 // Global counters for expressions inside aggregation pipelines.
 extern OperatorCounters operatorCountersAggExpressions;
 // Global counters for match expressions.
