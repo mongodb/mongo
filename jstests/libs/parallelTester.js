@@ -267,8 +267,6 @@ if (typeof _threadInject != "undefined") {
             "timeseries/timeseries_update_multi.js",
             "timeseries/timeseries_delete_multi.js",
             "timeseries/timeseries_delete_one.js",
-
-            // TODO (SERVER-73726): Enable time-series updateOne test.
             "timeseries/timeseries_update_one.js",
         ]);
 

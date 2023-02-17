@@ -1,5 +1,7 @@
 /**
- * Tests running the delete command on a time-series collection.
+ * Tests running the delete command on a time-series collection. These commands operate on the full
+ * bucket document by targeting them with their meta field value.
+ *
  * @tags: [
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
  *   # writes splitting between two primaries, and thus different buckets.
@@ -27,6 +29,9 @@ assert.commandWorked(testDB.dropDatabase());
 const coll = testDB.getCollection('t');
 const timeFieldName = "time";
 const metaFieldName = "tag";
+// TODO (SERVER-66393): Remove the feature flag checking and related test cases.
+const isArbitraryDeleteEnabled =
+    FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesDeletesSupport");
 
 TimeseriesTest.run((insert) => {
     const testDelete = function(
@@ -68,15 +73,17 @@ TimeseriesTest.run((insert) => {
     const objA =
         {[timeFieldName]: ISODate(), "measurement": {"A": "cpu"}, [metaFieldName]: {a: "A"}};
 
-    // Query on a single field that is not the metaField.
-    testDelete([objA], [objA], 0, [{q: {measurement: "cpu"}, limit: 0}], {
-        expectedErrorCode: ErrorCodes.InvalidOptions
-    });
+    if (!isArbitraryDeleteEnabled) {
+        // Query on a single field that is not the metaField.
+        testDelete([objA], [objA], 0, [{q: {measurement: "cpu"}, limit: 0}], {
+            expectedErrorCode: ErrorCodes.InvalidOptions
+        });
 
-    // Query on the "meta" field.
-    testDelete([objA], [objA], 0, [{q: {"meta": "A"}, limit: 0}], {
-        expectedErrorCode: ErrorCodes.InvalidOptions
-    });
+        // Query on the "meta" field.
+        testDelete([objA], [objA], 0, [{q: {"meta": "A"}, limit: 0}], {
+            expectedErrorCode: ErrorCodes.InvalidOptions
+        });
+    }
 
     // Query on a single field that is the metaField using dot notation.
     testDelete([objA], [], 1, [{q: {[metaFieldName + ".a"]: "A"}, limit: 0}]);
@@ -92,66 +99,73 @@ TimeseriesTest.run((insert) => {
     const objC =
         {[timeFieldName]: ISODate(), "measurement": {"A": "cpu"}, [metaFieldName]: {d: "D"}};
 
-    // Query on a single field that is not the metaField using dot notation.
-    testDelete([objA, objB, objC],
-               [objA, objB, objC],
-               0,
-               [{q: {"measurement.A": "cpu"}, limit: 0}],
-               {expectedErrorCode: ErrorCodes.InvalidOptions});
-
     // Multiple queries on a single field that is the metaField.
     testDelete([objA, objB, objC], [objB], 2, [
         {q: {[metaFieldName]: {a: "A"}}, limit: 0},
         {q: {"$or": [{[metaFieldName]: {d: "D"}}, {[metaFieldName]: {c: "C"}}]}, limit: 0}
     ]);
 
-    // Multiple queries on both the metaField and a field that is not the metaField.
-    testDelete([objB],
-               [],
-               1,
-               [
-                   {q: {[metaFieldName]: {b: "B"}}, limit: 0},
-                   {q: {measurement: "cpu", [metaFieldName]: {b: "B"}}, limit: 0}
-               ],
-               {expectedErrorCode: ErrorCodes.InvalidOptions});
+    if (!isArbitraryDeleteEnabled) {
+        // Query on a single field that is not the metaField using dot notation.
+        testDelete([objA, objB, objC],
+                   [objA, objB, objC],
+                   0,
+                   [{q: {"measurement.A": "cpu"}, limit: 0}],
+                   {expectedErrorCode: ErrorCodes.InvalidOptions});
 
-    // Multiple queries on a field that is not the metaField.
-    testDelete([objA, objB, objC],
-               [objA, objB, objC],
-               0,
-               [{q: {measurement: "cpu"}, limit: 0}, {q: {measurement: "cpu-1"}, limit: 0}],
-               {expectedErrorCode: ErrorCodes.InvalidOptions});
+        // Multiple queries on both the metaField and a field that is not the metaField.
+        testDelete([objB],
+                   [],
+                   1,
+                   [
+                       {q: {[metaFieldName]: {b: "B"}}, limit: 0},
+                       {q: {measurement: "cpu", [metaFieldName]: {b: "B"}}, limit: 0}
+                   ],
+                   {expectedErrorCode: ErrorCodes.InvalidOptions});
 
-    // Multiple queries on both the metaField and a field that is not the metaField.
-    testDelete([objA, objB, objC],
-               [],
-               3,
-               [
-                   {q: {[metaFieldName]: {b: "B"}}, limit: 0},
-                   {q: {[metaFieldName]: {a: "A"}}, limit: 0},
-                   {q: {[metaFieldName]: {d: "D"}}, limit: 0},
-                   {q: {measurement: "cpu", [metaFieldName]: {b: "B"}}, limit: 0}
-               ],
-               {expectedErrorCode: ErrorCodes.InvalidOptions});
+        // Multiple queries on a field that is not the metaField.
+        testDelete([objA, objB, objC],
+                   [objA, objB, objC],
+                   0,
+                   [{q: {measurement: "cpu"}, limit: 0}, {q: {measurement: "cpu-1"}, limit: 0}],
+                   {expectedErrorCode: ErrorCodes.InvalidOptions});
 
-    // Query on a single field that is the metaField using limit: 1.
-    testDelete([objA, objB, objC],
-               [objA, objB, objC],
-               0,
-               [{q: {[metaFieldName]: {a: "A"}}, limit: 1}],
-               {expectedErrorCode: ErrorCodes.IllegalOperation});
+        // Multiple queries on both the metaField and a field that is not the metaField.
+        testDelete([objA, objB, objC],
+                   [],
+                   3,
+                   [
+                       {q: {[metaFieldName]: {b: "B"}}, limit: 0},
+                       {q: {[metaFieldName]: {a: "A"}}, limit: 0},
+                       {q: {[metaFieldName]: {d: "D"}}, limit: 0},
+                       {q: {measurement: "cpu", [metaFieldName]: {b: "B"}}, limit: 0}
+                   ],
+                   {expectedErrorCode: ErrorCodes.InvalidOptions});
 
-    // Multiple unordered queries on both the metaField and a field that is not the metaField.
-    testDelete([objA, objB, objC],
-               [],
-               3,
-               [
-                   {q: {measurement: "cpu", [metaFieldName]: {b: "B"}}, limit: 0},
-                   {q: {[metaFieldName]: {b: "B"}}, limit: 0},
-                   {q: {[metaFieldName]: {a: "A"}}, limit: 0},
-                   {q: {[metaFieldName]: {d: "D"}}, limit: 0}
-               ],
-               {expectedErrorCode: ErrorCodes.InvalidOptions, ordered: false});
+        // Query on a single field that is the metaField using limit: 1.
+        testDelete([objA, objB, objC],
+                   [objA, objB, objC],
+                   0,
+                   [{q: {[metaFieldName]: {a: "A"}}, limit: 1}],
+                   {expectedErrorCode: ErrorCodes.IllegalOperation});
+
+        // Multiple unordered queries on both the metaField and a field that is not the metaField.
+        testDelete([objA, objB, objC],
+                   [],
+                   3,
+                   [
+                       {q: {measurement: "cpu", [metaFieldName]: {b: "B"}}, limit: 0},
+                       {q: {[metaFieldName]: {b: "B"}}, limit: 0},
+                       {q: {[metaFieldName]: {a: "A"}}, limit: 0},
+                       {q: {[metaFieldName]: {d: "D"}}, limit: 0}
+                   ],
+                   {expectedErrorCode: ErrorCodes.InvalidOptions, ordered: false});
+
+        // Query on a field that is the prefix of the metaField.
+        testDelete([objA], [objA], 0, [{q: {[metaFieldName + "b"]: "A"}, limit: 0}], {
+            expectedErrorCode: ErrorCodes.InvalidOptions
+        });
+    }
 
     const nestedObjA =
         {[timeFieldName]: ISODate(), "measurement": {"A": "cpu"}, [metaFieldName]: {a: {b: "B"}}};
@@ -171,11 +185,6 @@ TimeseriesTest.run((insert) => {
                [nestedObjC],
                1,
                [{q: {[metaFieldName + ".b.a"]: "A"}, limit: 0}]);
-
-    // Query on a field that is the prefix of the metaField.
-    testDelete([objA], [objA], 0, [{q: {[metaFieldName + "b"]: "A"}, limit: 0}], {
-        expectedErrorCode: ErrorCodes.InvalidOptions
-    });
 
     const objACollation = {[timeFieldName]: ISODate(), [metaFieldName]: "Günter"};
     const objBCollation = {[timeFieldName]: ISODate(), [metaFieldName]: "Gunter"};
@@ -201,19 +210,21 @@ TimeseriesTest.run((insert) => {
                3,
                [{q: {"$jsonSchema": {"required": [metaFieldName]}}, limit: 0}]);
 
-    // Query for documents using $jsonSchema with the metaField in dot notation required.
-    testDelete([nestedObjA, nestedObjB, nestedObjC],
-               [nestedObjA, nestedObjB, nestedObjC],
-               0,
-               [{q: {"$jsonSchema": {"required": [metaFieldName + ".a"]}}, limit: 0}],
-               {expectedErrorCode: ErrorCodes.InvalidOptions});
+    if (!isArbitraryDeleteEnabled) {
+        // Query for documents using $jsonSchema with the metaField in dot notation required.
+        testDelete([nestedObjA, nestedObjB, nestedObjC],
+                   [nestedObjA, nestedObjB, nestedObjC],
+                   0,
+                   [{q: {"$jsonSchema": {"required": [metaFieldName + ".a"]}}, limit: 0}],
+                   {expectedErrorCode: ErrorCodes.InvalidOptions});
 
-    // Query for documents using $jsonSchema with a field that is not the metaField required.
-    testDelete([nestedObjA, nestedObjB, nestedObjC],
-               [nestedObjA, nestedObjB, nestedObjC],
-               0,
-               [{q: {"$jsonSchema": {"required": [metaFieldName, "measurement"]}}, limit: 0}],
-               {expectedErrorCode: ErrorCodes.InvalidOptions});
+        // Query for documents using $jsonSchema with a field that is not the metaField required.
+        testDelete([nestedObjA, nestedObjB, nestedObjC],
+                   [nestedObjA, nestedObjB, nestedObjC],
+                   0,
+                   [{q: {"$jsonSchema": {"required": [metaFieldName, "measurement"]}}, limit: 0}],
+                   {expectedErrorCode: ErrorCodes.InvalidOptions});
+    }
 
     const nestedMetaObj = {[timeFieldName]: ISODate(), [metaFieldName]: {[metaFieldName]: "A"}};
 
@@ -229,21 +240,30 @@ TimeseriesTest.run((insert) => {
                    limit: 0
                }]);
 
-    // Query for documents using $jsonSchema with the metaField required and an optional field that
-    // is not the metaField.
-    testDelete([objA, nestedMetaObj],
-               [objA, nestedMetaObj],
-               0,
-               [{
-                   q: {
-                       "$jsonSchema": {
-                           "required": [metaFieldName],
-                           "properties": {"measurement": {description: "can be any value"}}
-                       }
-                   },
-                   limit: 0
-               }],
-               {expectedErrorCode: ErrorCodes.InvalidOptions});
+    if (!isArbitraryDeleteEnabled) {
+        // Query for documents using $jsonSchema with the metaField required and an optional field
+        // that is not the metaField.
+        testDelete([objA, nestedMetaObj],
+                   [objA, nestedMetaObj],
+                   0,
+                   [{
+                       q: {
+                           "$jsonSchema": {
+                               "required": [metaFieldName],
+                               "properties": {"measurement": {description: "can be any value"}}
+                           }
+                       },
+                       limit: 0
+                   }],
+                   {expectedErrorCode: ErrorCodes.InvalidOptions});
+
+        // Query on the "meta" field.
+        testDelete([objA],
+                   [objA],
+                   0,
+                   [{q: {"meta": "A"}, limit: 0}],
+                   {expectedErrorCode: ErrorCodes.InvalidOptions, includeMetaField: false});
+    }
 
     // Query on the metaField with the metaField nested within nested operators.
     testDelete([objA, objB, objC], [objB, objC], 1, [{
@@ -266,12 +286,5 @@ TimeseriesTest.run((insert) => {
     testDelete([{[timeFieldName]: ISODate(), "meta": "A"}], [], 1, [{q: {}, limit: 0}], {
         includeMetaField: false
     });
-
-    // Query on the "meta" field.
-    testDelete([objA],
-               [objA],
-               0,
-               [{q: {"meta": "A"}, limit: 0}],
-               {expectedErrorCode: ErrorCodes.InvalidOptions, includeMetaField: false});
 });
 })();

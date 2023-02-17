@@ -1,6 +1,8 @@
 /**
  * Tests running the delete command on a time-series collection with concurrent modifications to the
- * collection.
+ * collection. These deletes operate on the full bucket document by targeting them with their meta
+ * field value.
+ *
  * @tags: [
  *   # Fail points in this test do not exist on mongos.
  *   assumes_against_mongod_not_mongos,
@@ -114,11 +116,15 @@ validateDeleteIndex([objA],
                     ErrorCodes.NamespaceNotFound,
                     testCases.REPLACE_COLLECTION);
 
-// Attempt to delete from a collection that has been replaced with a new time-series collection with
-// a different metaField.
-validateDeleteIndex([objA],
-                    [{q: {[metaFieldName]: {a: "A"}}, limit: 0}],
-                    ErrorCodes.InvalidOptions,
-                    testCases.REPLACE_METAFIELD,
-                    "meta");
+// TODO (SERVER-66393): Remove this test case.
+if (!FeatureFlagUtil.isPresentAndEnabled(db.getSiblingDB(dbName),
+                                         "TimeseriesUpdatesDeletesSupport")) {
+    // Attempt to delete from a collection that has been replaced with a new time-series collection
+    // with a different metaField.
+    validateDeleteIndex([objA],
+                        [{q: {[metaFieldName]: {a: "A"}}, limit: 0}],
+                        ErrorCodes.InvalidOptions,
+                        testCases.REPLACE_METAFIELD,
+                        "meta");
+}
 })();

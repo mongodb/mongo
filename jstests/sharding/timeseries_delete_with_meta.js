@@ -1,5 +1,6 @@
 /**
- * Test deletes from sharded timeseries collection.
+ * Test deletes from sharded timeseries collection. These commands operate on the full bucket
+ * document by targeting them with their meta field value.
  *
  * @tags: [
  *   requires_fcv_51,
@@ -257,14 +258,17 @@ function runTest(collConfig, reqConfig, insert) {
 
         // Currently, we do not support queries on non-meta fields for delete commands.
         delete failingDeleteCommand.isTimeseriesNamespace;
-        for (let additionalField of [timeField, 'randomFieldWhichShouldNotBeHere']) {
-            // JavaScript does not have a reliable way to perform deep copy of an object. So instead
-            // of copying delete query each time, we just set and unset additional fields in it. See
-            // https://stackoverflow.com/a/122704 for details.
-            failingDeleteCommand.deletes[0].q[additionalField] = 1;
-            assert.commandFailedWithCode(mainDB.runCommand(failingDeleteCommand),
-                                         ErrorCodes.InvalidOptions);
-            delete failingDeleteCommand.deletes[0].q[additionalField];
+        // TODO (SERVER-66393): Remove this test.
+        if (!FeatureFlagUtil.isPresentAndEnabled(mainDB, "TimeseriesUpdatesDeletesSupport")) {
+            for (let additionalField of [timeField, 'randomFieldWhichShouldNotBeHere']) {
+                // JavaScript does not have a reliable way to perform deep copy of an object. So
+                // instead of copying delete query each time, we just set and unset additional
+                // fields in it. See https://stackoverflow.com/a/122704 for details.
+                failingDeleteCommand.deletes[0].q[additionalField] = 1;
+                assert.commandFailedWithCode(mainDB.runCommand(failingDeleteCommand),
+                                             ErrorCodes.InvalidOptions);
+                delete failingDeleteCommand.deletes[0].q[additionalField];
+            }
         }
 
         // Currently, we support only delete commands with 'limit: 0' for sharded time-series
