@@ -32,7 +32,7 @@
 
 #include <algorithm>
 #include <memory>
-#include <third_party/s2/s2regionintersection.h>  // For s2 search
+#include <s2regionintersection.h>  // For s2 search
 #include <vector>
 
 #include "mongo/db/bson/dotted_path_support.h"

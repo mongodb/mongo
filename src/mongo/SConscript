@@ -99,6 +99,7 @@ baseEnv = env.Clone()
 
 if use_libunwind == True:
     baseEnv.InjectThirdParty('unwind')
+baseEnv.InjectThirdParty('intel_decimal128')
 
 quick_exit_env = baseEnv.Clone()
 if has_option('gcov'):

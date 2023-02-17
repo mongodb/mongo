@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include <MurmurHash3.h>
 #include <bitset>
 #include <boost/intrusive_ptr.hpp>
-#include <third_party/murmurhash3/MurmurHash3.h>
 
 #include "mongo/base/static_assert.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"

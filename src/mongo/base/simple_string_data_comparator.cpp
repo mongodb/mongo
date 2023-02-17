@@ -31,7 +31,7 @@
 
 #include "mongo/base/simple_string_data_comparator.h"
 
-#include <third_party/murmurhash3/MurmurHash3.h>
+#include <MurmurHash3.h>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"

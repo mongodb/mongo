@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include <MurmurHash3.h>
 #include <cstdint>
 #include <memory>
-#include <third_party/murmurhash3/MurmurHash3.h>
 
 #include "mongo/base/secure_allocator.h"
 #include "mongo/platform/atomic_word.h"

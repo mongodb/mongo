@@ -30,8 +30,8 @@
 #include "mongo/db/index/s2_common.h"
 
 #include <cstdlib>
-#include <third_party/s2/s2cellid.h>
-#include <third_party/s2/s2regioncoverer.h>
+#include <s2cellid.h>
+#include <s2regioncoverer.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/geo/geometry_container.h"

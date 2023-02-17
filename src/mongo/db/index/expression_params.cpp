@@ -29,7 +29,7 @@
 
 #include "mongo/db/index/expression_params.h"
 
-#include <third_party/s2/s2.h>
+#include <s2.h>
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/geo/geoconstants.h"

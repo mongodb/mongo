@@ -104,8 +104,9 @@ class MongoTidyTests(unittest.TestCase):
                 """))
 
         self.expected_output = [
-            "non-mongo include 'cctype' should use angle brackets",
-            "mongo include 'test_MongoHeaderBracketCheck.h' should use double quotes",
+            "error: non-mongo include 'cctype' should use angle brackets",
+            "error: mongo include 'test_MongoHeaderBracketCheck.h' should use double quotes",
+            "error: third_party include 'third_party/s2/hash.h' should not start with 'third_party/'",
         ]
 
         self.run_clang_tidy()

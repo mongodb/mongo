@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include <third_party/libstemmer_c/include/libstemmer.h>
+#include <libstemmer.h>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_language.h"

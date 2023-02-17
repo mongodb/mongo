@@ -28,11 +28,11 @@
  */
 
 
+#include <MurmurHash3.h>
 #include <algorithm>
 #include <array>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <string>
-#include <third_party/murmurhash3/MurmurHash3.h>
 #include <unordered_map>
 #include <vector>
 

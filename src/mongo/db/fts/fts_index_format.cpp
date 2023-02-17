@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include <third_party/murmurhash3/MurmurHash3.h>
+#include <MurmurHash3.h>
 
 #include "mongo/base/init.h"
 #include "mongo/db/bson/dotted_path_support.h"

@@ -29,8 +29,8 @@
 
 
 #include <algorithm>
-#include <third_party/s2/s2cell.h>
-#include <third_party/s2/s2latlng.h>
+#include <s2cell.h>
+#include <s2latlng.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"

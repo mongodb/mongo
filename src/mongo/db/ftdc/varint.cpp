@@ -29,7 +29,7 @@
 
 #include "mongo/db/ftdc/varint.h"
 
-#include <third_party/s2/util/coding/varint.h>
+#include <util/coding/varint.h>
 
 #include "mongo/util/assert_util.h"
 

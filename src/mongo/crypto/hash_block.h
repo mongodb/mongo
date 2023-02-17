@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include <MurmurHash3.h>
 #include <array>
 #include <cstddef>
 #include <string>
-#include <third_party/murmurhash3/MurmurHash3.h>
 #include <vector>
 
 #include "mongo/base/data_range.h"

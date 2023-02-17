@@ -97,6 +97,18 @@ public:
                     << clang::FixItHint::CreateReplacement(FilenameRange.getAsRange(), Replacement);
             }
 
+            // Check that the a third party header which is in our vendored tree is not including
+            // the third_party in the include path.
+            if (!startsWithAny(llvm::StringRef(header_path), Check.mongoSourceDirs) &&
+                llvm::StringRef(header_path).startswith("src/third_party") &&
+                FileName.startswith("third_party")) {
+                Check.diag(FilenameRange.getBegin(),
+                           "third_party include '%0' should not start with 'third_party/'. The "
+                           "included file should be useable in either context of system or "
+                           "in-tree third_party libraries.")
+                    << FileName;
+            }
+
             // Check that the a mongo header which is included from a mongo source file
             // is used double quotes.
             else if (IsAngled &&

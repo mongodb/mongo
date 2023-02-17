@@ -29,8 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <MurmurHash3.h>
 #include <map>
-#include <third_party/murmurhash3/MurmurHash3.h>
 
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/commands/fle2_compact.h"

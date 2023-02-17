@@ -11,7 +11,10 @@ if env.GetOption('ninja') == 'disabled':
 
     mongo_tidy_test_env = env.Clone()
 
-    mongo_tidy_test_env.Append(CPPPATH='.')
+    mongo_tidy_test_env.Append(CPPPATH=[
+        '.',
+        '#src',
+    ], )
 
     # These test files will purposefully be error prone, so we can disable warnings any warnings we expect
     # to see.

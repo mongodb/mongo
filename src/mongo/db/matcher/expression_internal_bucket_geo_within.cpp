@@ -29,9 +29,9 @@
 
 
 #include <boost/optional.hpp>
-#include <third_party/s2/s2cellid.h>
-#include <third_party/s2/s2cellunion.h>
-#include <third_party/s2/s2regioncoverer.h>
+#include <s2cellid.h>
+#include <s2cellunion.h>
+#include <s2regioncoverer.h>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/bson/dotted_path_support.h"

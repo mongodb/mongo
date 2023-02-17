@@ -30,7 +30,7 @@
 #include <array>
 #include <string>
 
-#include <third_party/murmurhash3/MurmurHash3.h>
+#include <MurmurHash3.h>
 
 #include "mongo/unittest/unittest.h"
 

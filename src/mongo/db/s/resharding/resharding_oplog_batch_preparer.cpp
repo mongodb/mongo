@@ -31,7 +31,7 @@
 
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 
-#include <third_party/murmurhash3/MurmurHash3.h>
+#include <MurmurHash3.h>
 
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/db/ops/write_ops_retryability.h"

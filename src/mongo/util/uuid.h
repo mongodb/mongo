@@ -32,7 +32,7 @@
 #include <functional>
 #include <string>
 
-#include <third_party/murmurhash3/MurmurHash3.h>
+#include <MurmurHash3.h>
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"

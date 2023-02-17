@@ -30,8 +30,8 @@
 
 #include "mongo/db/index/expression_keys_private.h"
 
-#include <third_party/s2/s2cell.h>
-#include <third_party/s2/s2regioncoverer.h>
+#include <s2cell.h>
+#include <s2regioncoverer.h>
 #include <utility>
 
 #include "mongo/bson/bsonelement_comparator_interface.h"

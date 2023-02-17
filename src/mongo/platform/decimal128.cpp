@@ -41,8 +41,8 @@
 // The Intel C library typedefs wchar_t, but it is a distinct fundamental type
 // in C++, so we #define _WCHAR_T here to prevent the library from trying to typedef.
 #define _WCHAR_T
-#include <third_party/IntelRDFPMathLib20U1/LIBRARY/src/bid_conf.h>
-#include <third_party/IntelRDFPMathLib20U1/LIBRARY/src/bid_functions.h>
+#include <bid_conf.h>
+#include <bid_functions.h>
 #undef _WCHAR_T
 
 #include "mongo/base/static_assert.h"

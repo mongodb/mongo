@@ -32,8 +32,8 @@
 
 #include <cmath>
 #include <memory>
+#include <s2polygonbuilder.h>
 #include <string>
-#include <third_party/s2/s2polygonbuilder.h>
 #include <vector>
 
 #include "mongo/db/bson/dotted_path_support.h"

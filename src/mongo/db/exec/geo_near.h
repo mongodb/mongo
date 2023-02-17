@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <third_party/s2/s2cellunion.h>
+#include <s2cellunion.h>
 
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/near.h"

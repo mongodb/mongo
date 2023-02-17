@@ -40,8 +40,8 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/tcmalloc_parameters_gen.h"
 
+#include <MurmurHash3.h>
 #include <gperftools/malloc_hook.h>
-#include <third_party/murmurhash3/MurmurHash3.h>
 
 #if defined(_POSIX_VERSION) && defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
 #include <dlfcn.h>

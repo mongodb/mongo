@@ -30,12 +30,12 @@
 #pragma once
 
 #include <cmath>
+#include <s2cap.h>
+#include <s2cell.h>
+#include <s2latlng.h>
+#include <s2polygon.h>
+#include <s2polyline.h>
 #include <string>
-#include <third_party/s2/s2cap.h>
-#include <third_party/s2/s2cell.h>
-#include <third_party/s2/s2latlng.h>
-#include <third_party/s2/s2polygon.h>
-#include <third_party/s2/s2polyline.h>
 #include <vector>
 
 #include "mongo/base/clonable_ptr.h"

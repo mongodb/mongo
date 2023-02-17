@@ -29,8 +29,8 @@
 
 #pragma once
 
+#include <s2regionunion.h>
 #include <string>
-#include <third_party/s2/s2regionunion.h>
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/db/bson/dotted_path_support.h"
