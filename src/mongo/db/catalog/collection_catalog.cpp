@@ -67,7 +67,10 @@ struct LatestCollectionCatalog {
 const ServiceContext::Decoration<LatestCollectionCatalog> getCatalog =
     ServiceContext::declareDecoration<LatestCollectionCatalog>();
 
+// Catalog instance for batched write when ongoing. The atomic bool is used to determine if a
+// batched write is ongoing without having to take locks.
 std::shared_ptr<CollectionCatalog> batchedCatalogWriteInstance;
+AtomicWord<bool> ongoingBatchedWrite{false};
 
 const RecoveryUnit::Snapshot::Decoration<std::shared_ptr<const CollectionCatalog>> stashedCatalog =
     RecoveryUnit::Snapshot::declareDecoration<std::shared_ptr<const CollectionCatalog>>();
@@ -475,8 +478,12 @@ std::shared_ptr<const CollectionCatalog> CollectionCatalog::get(OperationContext
 std::shared_ptr<const CollectionCatalog> CollectionCatalog::latest(OperationContext* opCtx) {
     // If there is a batched catalog write ongoing and we are the one doing it return this instance
     // so we can observe our own writes. There may be other callers that reads the CollectionCatalog
-    // without any locks, they must see the immutable regular instance.
-    if (batchedCatalogWriteInstance && opCtx->lockState()->isW()) {
+    // without any locks, they must see the immutable regular instance. We can do a relaxed load
+    // here because the value only matters for the thread that set it. The wrong value for other
+    // threads always results in the non-batched write branch to be taken. Futhermore, the second
+    // part of the condition is checking the lock state will give us sequentially consistent
+    // ordering.
+    if (ongoingBatchedWrite.loadRelaxed() && opCtx->lockState()->isW()) {
         return batchedCatalogWriteInstance;
     }
 
@@ -492,7 +499,7 @@ void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {
     // We should never have ongoing batching here. When batching is in progress the caller should
     // use the overload with OperationContext so we can verify that the global exlusive lock is
     // being held.
-    invariant(!batchedCatalogWriteInstance);
+    invariant(!ongoingBatchedWrite.load());
 
     // It is potentially expensive to copy the collection catalog so we batch the operations by only
     // having one concurrent thread copying the catalog and executing all the write jobs.
@@ -617,8 +624,9 @@ void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {
 void CollectionCatalog::write(OperationContext* opCtx,
                               std::function<void(CollectionCatalog&)> job) {
     // If global MODE_X lock are held we can re-use a cloned CollectionCatalog instance when
-    // 'batchedCatalogWriteInstance' is set. Make sure we are the one holding the write lock.
-    if (batchedCatalogWriteInstance) {
+    // 'ongoingBatchedWrite' and 'batchedCatalogWriteInstance' are set. Make sure we are the one
+    // holding the write lock.
+    if (ongoingBatchedWrite.load()) {
         invariant(opCtx->lockState()->isW());
         job(*batchedCatalogWriteInstance);
         return;
@@ -2550,7 +2558,7 @@ void CollectionCatalog::_replaceViewsForDatabase(const DatabaseName& dbName,
 }
 
 bool CollectionCatalog::_isCatalogBatchWriter() const {
-    return batchedCatalogWriteInstance.get() == this;
+    return ongoingBatchedWrite.load() && batchedCatalogWriteInstance.get() == this;
 }
 
 bool CollectionCatalog::_alreadyClonedForBatchedWriter(
@@ -2616,6 +2624,7 @@ BatchedCollectionCatalogWriter::BatchedCollectionCatalogWriter(OperationContext*
     // batcher
     batchedCatalogWriteInstance = std::make_shared<CollectionCatalog>(*_base);
     _batchedInstance = batchedCatalogWriteInstance.get();
+    ongoingBatchedWrite.store(true);
 }
 BatchedCollectionCatalogWriter::~BatchedCollectionCatalogWriter() {
     invariant(_opCtx->lockState()->isW());
@@ -2628,6 +2637,7 @@ BatchedCollectionCatalogWriter::~BatchedCollectionCatalogWriter() {
         atomic_compare_exchange_strong(&storage.catalog, &_base, batchedCatalogWriteInstance));
 
     // Clear out batched pointer so no more attempts of batching are made
+    ongoingBatchedWrite.store(false);
     _batchedInstance = nullptr;
     batchedCatalogWriteInstance = nullptr;
 }
