@@ -61,6 +61,7 @@
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/collection_uuid_mismatch.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/async_results_merger.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
@@ -300,19 +301,6 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
             "tailable cursor unexpectedly has a sort",
             sortComparatorObj.isEmpty() || !findCommand.getTailable());
 
-    auto establishCursorsOnShards = [&](const std::set<ShardId>& shardIds) {
-        return establishCursors(
-            opCtx,
-            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-            query.nss(),
-            readPref,
-            // Construct the requests that we will use to establish cursors on the targeted shards,
-            // attaching the shardVersion and txnNumber, if necessary.
-            constructRequestsForShards(
-                opCtx, cri, shardIds, query, sampleId, appendGeoNearDistanceProjection),
-            findCommand.getAllowPartialResults());
-    };
-
     try {
         // Establish the cursors with a consistent shardVersion across shards.
 
@@ -331,23 +319,29 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                 "deadline"_attr = deadline);
         }
 
-        // The call to establishCursorsOnShards has its own timeout mechanism that is controlled
-        // by the opCtx, so we don't expect runWithDeadline to throw a timeout at this level. We
-        // use runWithDeadline because it has the side effect of pushing a temporary
-        // (artificial) deadline onto the opCtx used by establishCursorsOnShards.
+        // The call to establishCursors has its own timeout mechanism that is controlled by the
+        // opCtx, so we don't expect runWithDeadline to throw a timeout at this level. We use
+        // runWithDeadline because it has the side effect of pushing a temporary (artificial)
+        // deadline onto the opCtx used by establishCursors.
         opCtx->runWithDeadline(deadline, ErrorCodes::MaxTimeMSExpired, [&]() -> void {
-            params.remotes = establishCursorsOnShards(shardIds);
+            params.remotes = establishCursors(
+                opCtx,
+                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                query.nss(),
+                readPref,
+                // Construct the requests that we will use to establish cursors on the targeted
+                // shards, attaching the shardVersion and txnNumber, if necessary.
+                constructRequestsForShards(
+                    opCtx, cri, shardIds, query, sampleId, appendGeoNearDistanceProjection),
+                findCommand.getAllowPartialResults());
         });
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::CollectionUUIDMismatch &&
             !ex.extraInfo<CollectionUUIDMismatchInfo>()->actualCollection() &&
             !shardIds.count(cm.dbPrimary())) {
-            // We received CollectionUUIDMismatchInfo but it does not contain the actual
-            // namespace, and we did not attempt to establish a cursor on the primary shard.
-            // Attempt to do so now in case the collection corresponding to the provided UUID is
-            // unsharded. This should throw CollectionUUIDMismatchInfo, StaleShardVersion, or
-            // StaleDbVersion.
-            establishCursorsOnShards({cm.dbPrimary()});
+            // We received CollectionUUIDMismatch but it does not contain the actual namespace, and
+            // we did not attempt to establish a cursor on the primary shard.
+            uassertStatusOK(populateCollectionUUIDMismatch(opCtx, ex.toStatus()));
             MONGO_UNREACHABLE;
         }
         throw;
