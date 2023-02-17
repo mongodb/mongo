@@ -59,7 +59,7 @@ const dataDir = 'jstests/query_golden/libs/data/';
 const sampleRate = 0.2;
 
 load(`${dataDir}${collData}.schema`);  // For 'dbMetadata'.
-load(`${dataDir}${collData}.data`);    // For 'dataSet'.
+load(`${dataDir}${collData}.data`);    // For 'chunkNames'.
 
 /**
  * Main testing function. Initializes histograms and sample collection, and then executes a series
@@ -86,7 +86,7 @@ runHistogramsTest(function testSampleHistogram() {
     ];
 
     // Initialize base collection.
-    loadJSONDataset(baseDB, dataSet, dbMetadata);
+    loadJSONDataset(baseDB, chunkNames, dataDir, dbMetadata);
     const collSize = baseColl.count();
 
     // Select approximately 'sampleRate'*collSize documents from the base collection to insert

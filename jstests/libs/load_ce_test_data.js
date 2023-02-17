@@ -36,34 +36,42 @@ function importDataset(dbName, dataDir, dbMetadata) {
 
         // Create single-field indexes and analyze each field.
         analyzeAndIndexEnabledFields(testDB, coll, collMetadata.fields);
-
-        // TODO: Create compound indexes. I doubt we will need it for CE testing.
-        // for (indexFields of collMetadata.compound_indexes) {
-        //}
     }
     print("Done mongorestore\n");
 }
 
 /**
- * Load a JSON dataset stored as an array of pairs of collection name, and data.
+ * Load a JSON dataset stored as an array of names of data files, where each file contains
+ * a variable that holds an object with the properties{collName, collData}.
  * For instance:
- * [{collName: "physical_scan_5000", collData: [{_id: 3, field1: "some_string"}, ...]} ...]
+ * ce_data_20_1 = {collName: "ce_data_20",
+ *                 collData: [{"_id": 0, "uniform_int_0-1000-1": 899, ...}, ...]}
  */
-function loadJSONDataset(db, dataSet, dbMetadata) {
+function loadJSONDataset(db, dataSet, dataDir, dbMetadata) {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
 
-    for (const dataElem of dataSet) {
-        print(`\nInserting collection: ${dataElem.collName}`);
-        coll = db[dataElem.collName];
+    for (const collMetadata of dbMetadata) {
+        coll = db[collMetadata.collectionName];
         coll.drop();
-        assert.commandWorked(coll.insertMany(dataElem.collData, {ordered: false}));
     }
 
-    // Create single-field indexes and analyze each field.
-    for (const collMetadata of dbMetadata) {
-        print(`\nIndexing collection: ${collMetadata.collectionName}`);
-        coll = db[collMetadata.collectionName];
-        analyzeAndIndexEnabledFields(db, coll, collMetadata.fields);
+    for (const chunkName of dataSet) {
+        chunkFilePath = `${dataDir}${chunkName}`;
+        print(`Loading chunk file: ${chunkFilePath}\n`);
+        load(chunkFilePath);
+        // At this point there is a variable named as the value of chunkName.
+        coll = eval(`db[${chunkName}.collName]`);
+        eval(`assert.commandWorked(coll.insertMany(${chunkName}.collData, {ordered: false}));`);
+        // Free the chunk memory after insertion into the DB
+        eval(`${chunkName} = null`);
     }
+
+    // TODO: This is better done by the CE-testing script because it knows better what fields to
+    // analyze. Create single-field indexes and analyze each field. for (const collMetadata of
+    // dbMetadata) {
+    //     print(`\nIndexing collection: ${collMetadata.collectionName}`);
+    //     coll = db[collMetadata.collectionName];
+    //     analyzeAndIndexEnabledFields(db, coll, collMetadata.fields);
+    // }
 }

@@ -114,182 +114,182 @@ const dbMetadata = [
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0000_~~~~_248",
+                "fieldName": "choice_str_0002_~~~}_230",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0000_~~~~_248",
+                "fieldName": "choice_str_0002_~~~}_230",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0000_~~~~_248",
+                "fieldName": "choice_str_0002_~~~}_230",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0000_~~~~_248",
+                "fieldName": "choice_str_0002_~~~}_230",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0nQf_~s|{_250",
+                "fieldName": "choice_str_0FJl_~K@[_250",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0nQf_~s|{_250",
+                "fieldName": "choice_str_0FJl_~K@[_250",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0nQf_~s|{_250",
+                "fieldName": "choice_str_0FJl_~K@[_250",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0nQf_~s|{_250",
+                "fieldName": "choice_str_0FJl_~K@[_250",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0:[y_~ds]_250",
+                "fieldName": "choice_str_08zC_~wk=_249",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0:[y_~ds]_250",
+                "fieldName": "choice_str_08zC_~wk=_249",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0:[y_~ds]_250",
+                "fieldName": "choice_str_08zC_~wk=_249",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0:[y_~ds]_250",
+                "fieldName": "choice_str_08zC_~wk=_249",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0006_~~~~_851",
+                "fieldName": "choice_str_0003_~~~~_828",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0006_~~~~_851",
+                "fieldName": "choice_str_0003_~~~~_828",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0006_~~~~_851",
+                "fieldName": "choice_str_0003_~~~~_828",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0006_~~~~_851",
+                "fieldName": "choice_str_0003_~~~~_828",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0760_~hFc_1000",
+                "fieldName": "choice_str_0?g__~z>P_1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0760_~hFc_1000",
+                "fieldName": "choice_str_0?g__~z>P_1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0760_~hFc_1000",
+                "fieldName": "choice_str_0?g__~z>P_1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0760_~hFc_1000",
+                "fieldName": "choice_str_0?g__~z>P_1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_04;?_~|7D_1000",
+                "fieldName": "choice_str_07d~_~vT__1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_04;?_~|7D_1000",
+                "fieldName": "choice_str_07d~_~vT__1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_04;?_~|7D_1000",
+                "fieldName": "choice_str_07d~_~vT__1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_04;?_~|7D_1000",
+                "fieldName": "choice_str_07d~_~vT__1000",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0000_~~~~_4944",
+                "fieldName": "choice_str_0000_~~~~_4855",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0000_~~~~_4944",
+                "fieldName": "choice_str_0000_~~~~_4855",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0000_~~~~_4944",
+                "fieldName": "choice_str_0000_~~~~_4855",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0000_~~~~_4944",
+                "fieldName": "choice_str_0000_~~~~_4855",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0107_~~:z_9993",
+                "fieldName": "choice_str_00pb_~~W__9996",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0107_~~:z_9993",
+                "fieldName": "choice_str_00pb_~~W__9996",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0107_~~:z_9993",
+                "fieldName": "choice_str_00pb_~~W__9996",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_0107_~~:z_9993",
+                "fieldName": "choice_str_00pb_~~W__9996",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_01p>_~~5l_9999",
+                "fieldName": "choice_str_00lI_~~gU_9995",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_01p>_~~5l_9999",
+                "fieldName": "choice_str_00lI_~~gU_9995",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_01p>_~~5l_9999",
+                "fieldName": "choice_str_00lI_~~gU_9995",
                 "dataType": "string",
                 "indexed": false
             },
             {
-                "fieldName": "choice_str_01p>_~~5l_9999",
+                "fieldName": "choice_str_00lI_~~gU_9995",
                 "dataType": "string",
                 "indexed": false
             },
@@ -324,32 +324,32 @@ const dbMetadata = [
                 "indexed": false
             },
             {
-                "fieldName": "choice_array_choice_str_0000_~~~~_248",
+                "fieldName": "choice_array_choice_str_0002_~~~}_230",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "choice_array_choice_str_0000_~~~~_248",
+                "fieldName": "choice_array_choice_str_0002_~~~}_230",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "choice_array_choice_str_0000_~~~~_248",
+                "fieldName": "choice_array_choice_str_0002_~~~}_230",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "choice_array_choice_str_01p>_~~5l_9999",
+                "fieldName": "choice_array_choice_str_00lI_~~gU_9995",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "choice_array_choice_str_01p>_~~5l_9999",
+                "fieldName": "choice_array_choice_str_00lI_~~gU_9995",
                 "dataType": "array",
                 "indexed": false
             },
             {
-                "fieldName": "choice_array_choice_str_01p>_~~5l_9999",
+                "fieldName": "choice_array_choice_str_00lI_~~gU_9995",
                 "dataType": "array",
                 "indexed": false
             },
@@ -474,72 +474,72 @@ const dbMetadata = [
                 "indexed": false
             },
             {
-                "fieldName": "mixdist_uniform_int_0-1000-1_choice_str_0000_~~~~_248_",
+                "fieldName": "mixdist_uniform_int_0-1000-1_choice_str_0002_~~~}_230_",
                 "dataType": "mixdata",
                 "indexed": false
             },
             {
-                "fieldName": "mixdist_normal_int_700000-800000-100_choice_str_01p>_~~5l_9999_",
+                "fieldName": "mixdist_normal_int_700000-800000-100_choice_str_00lI_~~gU_9995_",
                 "dataType": "mixdata",
                 "indexed": false
             },
             {
-                "fieldName": "mixdist_uniform_int_0-1000-1_choice_str_0000_~~~~_248_",
+                "fieldName": "mixdist_uniform_int_0-1000-1_choice_str_0002_~~~}_230_",
                 "dataType": "mixdata",
                 "indexed": false
             },
             {
-                "fieldName": "mixdist_uniform_int_0-1000-1_choice_str_0000_~~~~_248_",
+                "fieldName": "mixdist_uniform_int_0-1000-1_choice_str_0002_~~~}_230_",
                 "dataType": "mixdata",
                 "indexed": false
             },
             {
-                "fieldName": "mixdist_normal_int_700000-800000-100_choice_str_01p>_~~5l_9999_",
+                "fieldName": "mixdist_normal_int_700000-800000-100_choice_str_00lI_~~gU_9995_",
                 "dataType": "mixdata",
                 "indexed": false
             },
             {
-                "fieldName": "mixdist_normal_int_700000-800000-100_choice_str_01p>_~~5l_9999_",
+                "fieldName": "mixdist_normal_int_700000-800000-100_choice_str_00lI_~~gU_9995_",
                 "dataType": "mixdata",
                 "indexed": false
             },
             {
-                "fieldName": "mixdist_normal_dbl_48,0-126,0-0,01_choice_str_0000_~~~~_248_",
+                "fieldName": "mixdist_normal_dbl_48,0-126,0-0,01_choice_str_0002_~~~}_230_",
                 "dataType": "mixdata",
                 "indexed": false
             },
             {
-                "fieldName": "mixdist_normal_dbl_48,0-126,0-0,01_choice_str_0000_~~~~_248_",
+                "fieldName": "mixdist_normal_dbl_48,0-126,0-0,01_choice_str_0002_~~~}_230_",
                 "dataType": "mixdata",
                 "indexed": false
             },
             {
-                "fieldName": "mixdist_normal_dbl_48,0-126,0-0,01_choice_str_0000_~~~~_248_",
+                "fieldName": "mixdist_normal_dbl_48,0-126,0-0,01_choice_str_0002_~~~}_230_",
                 "dataType": "mixdata",
                 "indexed": false
             },
             {
-                "fieldName": "mixdist_normal_dbl_0,0-1000000,0-1000_choice_str_0000_~~~~_248_",
+                "fieldName": "mixdist_normal_dbl_0,0-1000000,0-1000_choice_str_0002_~~~}_230_",
                 "dataType": "mixdata",
                 "indexed": false
             },
             {
-                "fieldName": "mixdist_normal_dbl_0,0-1000000,0-1000_choice_str_0nQf_~s|{_250_",
+                "fieldName": "mixdist_normal_dbl_0,0-1000000,0-1000_choice_str_0FJl_~K@[_250_",
                 "dataType": "mixdata",
                 "indexed": false
             },
             {
-                "fieldName": "mixdist_normal_dbl_48,0-126,0-0,01_choice_str_0nQf_~s|{_250_uniform_dt_2007-01-01-2008-01-01-3600_",
+                "fieldName": "mixdist_normal_dbl_48,0-126,0-0,01_choice_str_0FJl_~K@[_250_uniform_dt_2007-01-01-2008-01-01-3600_",
                 "dataType": "mixdata",
                 "indexed": false
             },
             {
-                "fieldName": "mixdist_choice_str_0000_~~~~_248_mixdist_uniform_dt_2006-01-01-2016-01-01-86400_uniform_dt_1995-01-01-2005-01-01-86400_uniform_dt_1997-10-01-2017-11-01-2592000__",
+                "fieldName": "mixdist_choice_str_0002_~~~}_230_mixdist_uniform_dt_2006-01-01-2016-01-01-86400_uniform_dt_1995-01-01-2005-01-01-86400_uniform_dt_1997-10-01-2017-11-01-2592000__",
                 "dataType": "mixdata",
                 "indexed": false
             },
             {
-                "fieldName": "mixdist_choice_str_01p>_~~5l_9999_uniform_dt_2007-01-01-2008-01-01-3600_",
+                "fieldName": "mixdist_choice_str_00lI_~~gU_9995_uniform_dt_2007-01-01-2008-01-01-3600_",
                 "dataType": "mixdata",
                 "indexed": false
             }
