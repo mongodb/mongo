@@ -543,10 +543,9 @@ private:
             _createSchemaOnConfigSettings(opCtx, requestedVersion);
             _initializePlacementHistory(opCtx, requestedVersion);
             _setOnCurrentShardSinceFieldOnChunks(opCtx, requestedVersion);
-        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        } else {
-            return;
         }
+
+        _removeRecordPreImagesCollectionOption(opCtx);
     }
 
     // TODO SERVER-68889 remove once 7.0 becomes last LTS
@@ -651,6 +650,33 @@ private:
         if (feature_flags::gAutoMerger.isEnabledOnVersion(requestedVersion)) {
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setOnCurrentShardSinceFieldOnChunks(opCtx));
+        }
+    }
+
+    // Removes collection option "recordPreImages" from all collection definitions.
+    // TODO SERVER-74036: Remove once FCV 7.0 becomes last-LTS.
+    void _removeRecordPreImagesCollectionOption(OperationContext* opCtx) {
+        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+            Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+            catalog::forEachCollectionFromDb(
+                opCtx,
+                dbName,
+                MODE_X,
+                [&](const CollectionPtr& collection) {
+                    // To remove collection option "recordPreImages" from persistent storage, issue
+                    // the "collMod" command with none of the parameters set.
+                    BSONObjBuilder responseBuilder;
+                    uassertStatusOK(processCollModCommand(
+                        opCtx, collection->ns(), CollMod{collection->ns()}, &responseBuilder));
+                    LOGV2(7383300,
+                          "Removed 'recordPreImages' collection option",
+                          "ns"_attr = collection->ns(),
+                          "collModResponse"_attr = responseBuilder.obj());
+                    return true;
+                },
+                [&](const CollectionPtr& collection) {
+                    return collection->getCollectionOptions().recordPreImagesOptionUsed;
+                });
         }
     }
 
