@@ -26,6 +26,7 @@ utEnv.Library(
         'bson_test_util.cpp',
         'death_test.cpp',
         'golden_test.cpp',
+        'inline_auto_update.cpp',
         'matcher.cpp',
         'stringify.cpp',
         'temp_dir.cpp',
@@ -125,6 +126,7 @@ env.CppUnitTest(
         'temp_dir_test.cpp',
         'thread_assertion_monitor_test.cpp',
         'assert_that_test.cpp',
+        'inline_auto_update_test.cpp',
     ],
 )
 

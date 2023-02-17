@@ -686,7 +686,7 @@ SpawnInfo& getSpawnInfo() {
     return *v;
 }
 
-bool& getAutoUpdateOptimizerAsserts() {
+bool& getAutoUpdateAsserts() {
     static bool flag = false;
     return flag;
 }

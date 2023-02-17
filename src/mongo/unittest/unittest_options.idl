@@ -61,7 +61,7 @@ configs:
     tempPath:
         description: 'Directory to place mongo::TempDir subdirectories'
         arg_vartype: String
-    autoUpdateOptimizerAsserts:
-        description: 'Auto-update expected output for asserts in the optimizer unit tests which support auto-updating.'
+    autoUpdateAsserts:
+        description: 'Auto-update expected output for asserts in unit tests which support auto-updating.'
         arg_vartype: Switch
         default: false

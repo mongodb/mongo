@@ -45,7 +45,7 @@ TEST(TestInfra, AutoUpdateExplain) {
     /**
      * To exercise the auto-updating behavior:
      *   1. Induce a failure: change something in the expected output.
-     *   2. Run the test binary with the flag "--autoUpdateOptimizerAsserts".
+     *   2. Run the test binary with the flag "--autoUpdateAsserts".
      *   3. Observe afterwards that the test file is updated with the correct output.
      */
     ASSERT_EXPLAIN_V2_AUTO(  // NOLINT (test auto-update)
@@ -78,71 +78,6 @@ TEST(TestInfra, AutoUpdateExplain) {
         plansExplored);
 }
 
-TEST(TestInfra, DiffTest) {
-    const std::vector<std::string> expected{"line 1\n",
-                                            "line 2\n",
-                                            "line 3\n",
-                                            "line 5\n",
-                                            "line 7\n",
-                                            "line 8\n",
-                                            "line 10\n",
-                                            "line 11\n"};
-    const std::vector<std::string> actual{"line 2\n",
-                                          "line 4\n",
-                                          "line 5\n",
-                                          "line 6\n",
-                                          "line 8\n",
-                                          "line 10\n",
-                                          "line 11\n",
-                                          "line 12\n",
-                                          "line 13\n"};
-
-    std::string diffStr;
-
-    {
-        std::ostringstream os;
-        outputDiff(os, expected, actual, 0);
-        diffStr = os.str();
-    }
-    ASSERT_STR_EQ_AUTO(  // NOLINT (test auto-update)
-        "L0: -line 1\n"
-        "L1: +line 4\n"
-        "L2: -line 3\n"
-        "L3: +line 6\n"
-        "L4: -line 7\n"
-        "L7: +line 12\n"
-        "L8: +line 13\n",
-        diffStr);
-
-    {
-        std::ostringstream os;
-        outputDiff(os, {}, {"line1\n", "line2\n", "line3\n"}, 10);
-        diffStr = os.str();
-    }
-    ASSERT_STR_EQ_AUTO(  // NOLINT (test auto-update)
-        "L10: +line1\n"
-        "L11: +line2\n"
-        "L12: +line3\n",
-        diffStr);
-
-    {
-        std::ostringstream os;
-        outputDiff(os, {"line1\n", "line2\n", "line3\n"}, {}, 7);
-        diffStr = os.str();
-    }
-    ASSERT_STR_EQ_AUTO(  // NOLINT (test auto-update)
-        "L7: -line1\n"
-        "L8: -line2\n"
-        "L9: -line3\n",
-        diffStr);
-
-    {
-        std::ostringstream os;
-        outputDiff(os, {}, {}, 10);
-        diffStr = os.str();
-    }
-    ASSERT(diffStr.empty());
-}
 
 TEST(TestInfra, ABTLiterals) {
     // Demonstrate shorthand tree initialization using the ABT string literal constructors.

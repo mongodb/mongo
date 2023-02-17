@@ -96,13 +96,13 @@ int main(int argc, char** argv) {
     std::string verbose;
     std::string fileNameFilter;
     std::string internalRunDeathTest;
-    bool autoUpdateOptimizerAsserts = false;
+    bool autoUpdateAsserts = false;
 
-    // "list", "repeat", and "autoUpdateOptimizerAsserts" will be assigned with default values, if
+    // "list", "repeat", and "autoUpdateAsserts" will be assigned with default values, if
     // not present.
     invariant(environment.get("list", &list));
     invariant(environment.get("repeat", &repeat));
-    invariant(environment.get("autoUpdateOptimizerAsserts", &autoUpdateOptimizerAsserts));
+    invariant(environment.get("autoUpdateAsserts", &autoUpdateAsserts));
 
     // The default values of "suite" "filter" and "verbose" are empty.
     environment.get("suite", &suites).ignore();
@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
     }
 
     mongo::unittest::getSpawnInfo() = {argVec, internalRunDeathTest, true};
-    mongo::unittest::getAutoUpdateOptimizerAsserts() = autoUpdateOptimizerAsserts;
+    mongo::unittest::getAutoUpdateAsserts() = autoUpdateAsserts;
 
     if (std::any_of(verbose.cbegin(), verbose.cend(), [](char ch) { return ch != 'v'; })) {
         std::cerr << "The string for the --verbose option cannot contain characters other than 'v'"

@@ -36,6 +36,7 @@
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/unittest/inline_auto_update.h"
 
 
 namespace mongo::optimizer {
@@ -43,45 +44,6 @@ namespace mongo::optimizer {
 void maybePrintABT(const ABT& abt);
 
 std::string getPropsStrForExplain(const OptPhaseManager& phaseManager);
-
-/**
- * Computes a difference between the expected and actual formatted output and outputs it to the
- * provide stream instance. Used to display difference between expected and actual format for
- * auto-update macros. It is exposed in the header here for testability.
- */
-void outputDiff(std::ostream& os,
-                const std::vector<std::string>& expFormatted,
-                const std::vector<std::string>& actualFormatted,
-                size_t startLineNumber);
-
-bool handleAutoUpdate(const std::string& expected,
-                      const std::string& actual,
-                      const std::string& fileName,
-                      size_t lineNumber,
-                      bool needsEscaping);
-
-/**
- * Auto update result back in the source file if the assert fails.
- * The expected result must be a multi-line string in the following form:
- *
- * ASSERT_EXPLAIN_V2_AUTO(     // NOLINT
- *       "BinaryOp [Add]\n"
- *       "|   Const [2]\n"
- *       "Const [1]\n",
- *       tree);
- *
- * Limitations:
- *      1. There should not be any comments or other formatting inside the multi-line string
- *      constant other than 'NOLINT'. If we have a single-line constant, the auto-updating will
- *      generate a 'NOLINT' at the end of the line.
- *      2. The expression which we are explaining ('tree' in the example above) must fit on a single
- *      line.
- *      3. The macro should be indented by 4 spaces.
- */
-#define AUTO_UPDATE_HELPER(expected, actual, needsEscaping) \
-    handleAutoUpdate(expected, actual, __FILE__, __LINE__, needsEscaping)
-
-#define ASSERT_STR_EQ_AUTO(expected, actual) ASSERT(AUTO_UPDATE_HELPER(expected, actual, true))
 
 
 #define ASSERT_EXPLAIN(expected, abt) \
@@ -145,10 +107,6 @@ bool handleAutoUpdate(const std::string& expected,
     ASSERT_EQ(expected,                                             \
               dotted_path_support::extractElementAtPath(bson, path) \
                   .toString(false /*includeFieldName*/));
-
-
-#define ASSERT_NUMBER_EQ_AUTO(expected, actual) \
-    ASSERT(AUTO_UPDATE_HELPER(str::stream() << expected, str::stream() << actual, false))
 
 #define ASSERT_BETWEEN(a, b, value) \
     ASSERT_LTE(a, value);           \

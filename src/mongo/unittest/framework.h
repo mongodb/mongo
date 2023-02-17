@@ -445,6 +445,6 @@ SpawnInfo& getSpawnInfo();
  * If set to true will cause optimizer tests with _AUTO asserts to auto-update their expected
  * results based on the actual test results.
  */
-bool& getAutoUpdateOptimizerAsserts();
+bool& getAutoUpdateAsserts();
 
 }  // namespace mongo::unittest
