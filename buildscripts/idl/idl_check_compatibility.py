@@ -233,6 +233,8 @@ IGNORE_STABLE_TO_UNSTABLE_LIST: List[str] = [
     'hello-reply-serviceId',
     'refreshSessions-param-txnNumber',
     'refreshSessions-param-txnUUID',
+    # upsertSupplied is an internal implementation detail of $merge
+    'update-param-upsertSupplied',
 ]
 
 # Once a field is part of the stable API, either by direct addition or by changing it from unstable

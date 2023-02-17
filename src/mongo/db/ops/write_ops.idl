@@ -272,7 +272,7 @@ structs:
                               the query, the update subsystem will insert the document supplied as
                               'c.new' rather than generating a new document from the update spec."
                 type: optionalBool
-                stability: stable
+                stability: internal
             collation:
                 description: "Specifies the collation to use for the operation."
                 type: object
