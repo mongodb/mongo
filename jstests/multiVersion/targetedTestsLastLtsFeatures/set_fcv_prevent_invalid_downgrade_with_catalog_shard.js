@@ -34,7 +34,7 @@ mongosAdminDB = st.s.getDB("admin");
 
 assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 assert.commandFailed(
-    mongosAdminDB.runCommand({addShard: st.configRS.getURL(), name: kCatalogShardId}),
+    mongosAdminDB.runCommand({transitionToCatalogShard: 1}),
     "Cannot add a shard with catalogShard as its name if the catalog shard feature flag is not enabled");
 
 st.stop();
