@@ -29,6 +29,8 @@
 
 #include "mongo/db/s/database_sharding_state.h"
 
+#include <fmt/format.h>
+
 #include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -195,8 +197,9 @@ void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx,
                                                       const DatabaseName& dbName) {
     if (dbName == NamespaceString::kConfigDb) {
         // TODO (SERVER-72488): Include the admin database.
-        invariant(gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV());
-        invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+        uassert(7393700,
+                "The config server is the primary shard for database: {}"_format(dbName.toString()),
+                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
         return;
     }
 
