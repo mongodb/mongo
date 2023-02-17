@@ -1,5 +1,6 @@
 /**
- * Tests that Compound Wildcard Indexes can be added/removed/listed from index filters.
+ * Tests that Compound Wildcard Indexes can be added/removed/listed from index filters and that
+ * Compound Wildcard Indexes objey index filters.
  *
  * @tags: [
  *   not_allowed_with_security_token,
@@ -11,6 +12,11 @@
 (function() {
 "use strict";
 
+load("jstests/libs/wildcard_index_helpers.js");
+
+/**
+ * Utility function to find an index filter by keyPattern or index name in the given filterList.
+ */
 function findFilter(cwiFilter, filterList) {
     for (const filter of filterList) {
         if (bsonWoCompare(cwiFilter.query, filter.query) == 0) {
@@ -27,13 +33,35 @@ function findFilter(cwiFilter, filterList) {
     return null;
 }
 
-function getIndexName(coll, keyPattern) {
-    const indexes = coll.getIndexes();
-    const index = indexes.find(index => bsonWoCompare(index.key, keyPattern) == 0);
-    if (index !== undefined) {
-        return index.name;
-    }
-    return null;
+/**
+ * Utility function to list index filters.
+ */
+function getFilters(coll) {
+    const res = assert.commandWorked(coll.runCommand('planCacheListFilters'));
+    assert(res.hasOwnProperty('filters'), 'filters missing from planCacheListFilters result');
+    return res.filters;
+}
+
+/**
+ * Sets an index filter given a query shape then confirms that the expected index was used
+ * to answer a query.
+ */
+function assertExpectedIndexAnswersQueryWithFilter(
+    coll, filterQuery, filterIndexes, query, expectedIndexName) {
+    // Clear existing cache filters.
+    assert.commandWorked(coll.runCommand('planCacheClearFilters'), 'planCacheClearFilters failed');
+
+    // Make sure that the filter is set correctly.
+    assert.commandWorked(
+        coll.runCommand('planCacheSetFilter', {query: filterQuery, indexes: filterIndexes}));
+    assert.eq(1,
+              getFilters(coll).length,
+              'no change in query settings after successfully setting index filters');
+
+    // Check that expectedIndex index was used over another index.
+    const explain = assert.commandWorked(coll.find(query).explain('executionStats'));
+
+    WildcardIndexHelpers.assertExpectedIndexIsUsed(explain, expectedIndexName);
 }
 
 const collectionName = "compound_wildcard_index_filter";
@@ -46,44 +74,43 @@ const cwiFilterList = [
         keyPattern: {a: 1, b: 1, "c.$**": 1},
         wildcardProjection: undefined,
         query: {a: 1, b: 1, "c.d": 1},
+        correspondingRegularKeyPattern: {a: 1, b: 1, "c.d": 1},
     },
     {
-        keyPattern: {a: 1, "c.$**": 1, b: 1},
+        keyPattern: {a: 1, "c.$**": -1, b: 1},
         wildcardProjection: undefined,
         query: {a: 1, b: 1, "c.a": 1},
+        correspondingRegularKeyPattern: {a: 1, "c.a": -1, b: 1},
     },
     {
         keyPattern: {"c.$**": 1, a: 1, b: 1},
         wildcardProjection: undefined,
         query: {a: 1, b: 1, "c.front": 1},
+        correspondingRegularKeyPattern: {"c.front": 1, a: 1, b: 1},
     },
     {
-        keyPattern: {a: 1, b: 1, "$**": 1},
+        keyPattern: {a: -1, b: 1, "$**": 1},
         wildcardProjection: {"c": 1},
         query: {a: 1, b: 1, "c": 1},
+        correspondingRegularKeyPattern: {a: -1, b: 1, c: 1},
     },
     {
-        keyPattern: {a: 1, "$**": 1, b: 1},
+        keyPattern: {a: 1, "$**": 1, b: -1},
         wildcardProjection: {"d": 1},
         query: {a: 1, b: 1, "d": 1},
+        correspondingRegularKeyPattern: {a: 1, d: 1, b: -1},
     },
     {
         keyPattern: {"$**": 1, a: 1, b: 1},
         wildcardProjection: {"front": 1},
         query: {a: 1, b: 1, "front": 1},
+        correspondingRegularKeyPattern: {a: 1, b: 1, front: 1},
     },
 ];
 
 // create indexes
 for (const cwiFilter of cwiFilterList) {
-    const options = {};
-    if (cwiFilter.wildcardProjection) {
-        options["wildcardProjection"] = cwiFilter.wildcardProjection;
-    }
-
-    assert.commandWorked(coll.createIndex(cwiFilter.keyPattern, options));
-    cwiFilter.indexName = getIndexName(coll, cwiFilter.keyPattern);
-    assert.neq(null, cwiFilter.indexName);
+    WildcardIndexHelpers.createIndex(coll, cwiFilter);
 }
 
 let expectedNumberOfFilters = 0;
@@ -150,5 +177,16 @@ for (const cwiFilter of cwiFilterList) {
     assert.eq(expectedNumberOfFilters, filters.filters.length, filters);
 
     assert.eq(null, findFilter(cwiFilter, filters.filters), filters.filters);
+}
+
+// Create regular indexes.
+for (const cwiFilter of cwiFilterList) {
+    assert.commandWorked(coll.createIndex(cwiFilter.correspondingRegularKeyPattern));
+}
+
+// Test that CWI obey Index Filters.
+for (const cwiFilter of cwiFilterList) {
+    assertExpectedIndexAnswersQueryWithFilter(
+        coll, cwiFilter.query, [cwiFilter.keyPattern], cwiFilter.query, cwiFilter.indexName);
 }
 })();
