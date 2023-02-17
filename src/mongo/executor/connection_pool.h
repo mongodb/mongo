@@ -31,6 +31,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <queue>
 
 #include "mongo/config.h"
@@ -40,6 +41,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/hierarchical_acquisition.h"
@@ -271,6 +273,8 @@ public:
     }
 
 private:
+    ClockSource* _getFastClockSource() const;
+
     std::string _name;
 
     const std::shared_ptr<DependentTypeFactoryInterface> _factory;
@@ -285,6 +289,9 @@ private:
     stdx::unordered_map<HostAndPort, std::shared_ptr<SpecificPool>> _pools;
 
     EgressTagCloserManager* _manager;
+
+    mutable ClockSource* _fastClockSource{nullptr};
+    mutable std::once_flag _fastClkSrcInitFlag;
 };
 
 /**
@@ -549,10 +556,24 @@ public:
     virtual Date_t now() = 0;
 
     /**
+     * Returns the fast clock source.
+     * The default implementation gets it from the global service context.
+     */
+    virtual ClockSource* getFastClockSource();
+
+    /**
      * shutdown
      */
     virtual void shutdown() = 0;
 };
+
+inline ClockSource* ConnectionPool::_getFastClockSource() const {
+    if (MONGO_unlikely(!_fastClockSource)) {
+        std::call_once(_fastClkSrcInitFlag,
+                       [&]() { _fastClockSource = _factory->getFastClockSource(); });
+    }
+    return _fastClockSource;
+}
 
 }  // namespace executor
 }  // namespace mongo
