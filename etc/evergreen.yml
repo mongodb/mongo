@@ -1510,6 +1510,7 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-xlarge
+  - name: streams
   - name: generate_buildid_to_debug_symbols_mapping
 
 - &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
@@ -1635,6 +1636,7 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
   - name: .shard_merge
+  - name: streams
   - name: telemetry_passthrough
 
 - &enterprise-rhel-80-64-bit-dynamic-classic-engine
@@ -2695,6 +2697,7 @@ buildvariants:
   tasks:
   - name: .config_fuzzer
   - name: .config_fuzzer_stress
+  - name: streams
 
 - &enterprise-rhel80-debug-tsan-template
   name: &enterprise-rhel80-debug-tsan enterprise-rhel80-debug-tsan
@@ -2916,6 +2919,7 @@ buildvariants:
   - name: .serverless
     distros:
     - rhel80-xlarge
+  - name: streams
 
 - name: &enterprise-rhel80-no-latch-64-bit enterprise-rhel80-no-latch-64-bit
   display_name: "~ Enterprise RHEL 8.0 (without Diagnostic Latches)"

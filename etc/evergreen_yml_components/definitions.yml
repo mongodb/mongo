@@ -7969,6 +7969,13 @@ tasks:
   - func: "do setup"
   - func: "run tests"
 
+- <<: *task_template
+  name: streams
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
 - name: shared_scons_cache_pruning
   tags: []
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
