@@ -346,4 +346,5 @@ ServerStatusMetricField<Counter64> displayUpdateManyCount("query.updateManyCount
 Counter64 deleteManyCount;
 ServerStatusMetricField<Counter64> displayeleteManyCount("query.deleteManyCount", &deleteManyCount);
 
+ValidatorCounters validatorCounters;
 }  // namespace mongo
