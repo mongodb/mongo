@@ -124,6 +124,9 @@ std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt,
         typeChecker.typeCheck(abt);
 
         modified = typeChecker.modified();
+        if (modified) {
+            env.rebuild(abt);
+        }
     } while (modified);
 
     // And finally convert to the SBE expression.
