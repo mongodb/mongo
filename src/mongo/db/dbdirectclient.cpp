@@ -125,7 +125,8 @@ namespace {
 DbResponse loopbackBuildResponse(OperationContext* const opCtx, Message& toSend) {
     DirectClientScope directClientScope(opCtx);
 
-    CurOp curOp(opCtx);
+    CurOp curOp;
+    curOp.push(opCtx);
 
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(0);

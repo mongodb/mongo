@@ -95,7 +95,9 @@ class CurOp::CurOpStack {
     CurOpStack& operator=(const CurOpStack&) = delete;
 
 public:
-    CurOpStack() : _base(nullptr, this) {}
+    CurOpStack() {
+        _pushNoLock(&_base);
+    }
 
     /**
      * Returns the top of the CurOp stack.
@@ -105,23 +107,14 @@ public:
     }
 
     /**
-     * Adds "curOp" to the top of the CurOp stack for a client. Called by CurOp's constructor.
+     * Adds "curOp" to the top of the CurOp stack for a client.
+     *
+     * This sets the "_parent", "_stack", and "_lockStatsBase" fields
+     * of "curOp".
      */
-    void push(OperationContext* opCtx, CurOp* curOp) {
-        invariant(opCtx);
-        if (_opCtx) {
-            invariant(_opCtx == opCtx);
-        } else {
-            _opCtx = opCtx;
-        }
-        stdx::lock_guard<Client> lk(*_opCtx->getClient());
-        push_nolock(curOp);
-    }
-
-    void push_nolock(CurOp* curOp) {
-        invariant(!curOp->_parent);
-        curOp->_parent = _top;
-        _top = curOp;
+    void push(CurOp* curOp) {
+        stdx::lock_guard<Client> lk(*opCtx()->getClient());
+        _pushNoLock(curOp);
     }
 
     /**
@@ -138,30 +131,53 @@ public:
         // the client during the final pop.
         const bool shouldLock = _top->_parent;
         if (shouldLock) {
-            invariant(_opCtx);
-            _opCtx->getClient()->lock();
+            opCtx()->getClient()->lock();
         }
         invariant(_top);
         CurOp* retval = _top;
         _top = _top->_parent;
         if (shouldLock) {
-            _opCtx->getClient()->unlock();
+            opCtx()->getClient()->unlock();
         }
         return retval;
     }
 
+    OperationContext* opCtx() {
+        auto ctx = _curopStack.owner(this);
+        invariant(ctx);
+        return ctx;
+    }
+
 private:
-    OperationContext* _opCtx = nullptr;
+    void _pushNoLock(CurOp* curOp) {
+        invariant(!curOp->_parent);
+        curOp->_stack = this;
+        curOp->_parent = _top;
+
+        // If `curOp` is a sub-operation, we store the snapshot of lock stats as the base lock stats
+        // of the current operation.
+        if (_top) {
+            if (auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none)) {
+                curOp->_lockStatsBase = lockerInfo->stats;
+            }
+        }
+
+        _top = curOp;
+    }
 
     // Top of the stack of CurOps for a Client.
     CurOp* _top = nullptr;
 
     // The bottom-most CurOp for a client.
-    const CurOp _base;
+    CurOp _base;
 };
 
 const OperationContext::Decoration<CurOp::CurOpStack> CurOp::_curopStack =
     OperationContext::declareDecoration<CurOp::CurOpStack>();
+
+void CurOp::push(OperationContext* opCtx) {
+    _curopStack(opCtx).push(this);
+}
 
 CurOp* CurOp::get(const OperationContext* opCtx) {
     return get(*opCtx);
@@ -249,7 +265,7 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
             lsid->serialize(&lsidBuilder);
         }
 
-        CurOp::get(clientOpCtx)->reportState(clientOpCtx, infoBuilder, truncateOps);
+        CurOp::get(clientOpCtx)->reportState(infoBuilder, truncateOps);
     }
 
 #ifndef MONGO_CONFIG_USE_RAW_LATCHES
@@ -283,6 +299,11 @@ bool CurOp::currentOpBelongsToTenant(Client* client, TenantId tenantId) {
     return true;
 }
 
+OperationContext* CurOp::opCtx() {
+    invariant(_stack);
+    return _stack->opCtx();
+}
+
 void CurOp::setOpDescription_inlock(const BSONObj& opDescription) {
     _opDescription = serializeDollarDbInOpDescription(_nss.tenantId(), opDescription);
 }
@@ -291,39 +312,13 @@ void CurOp::setGenericCursor_inlock(GenericCursor gc) {
     _genericCursor = std::move(gc);
 }
 
-void CurOp::_finishInit(OperationContext* opCtx, CurOpStack* stack) {
-    _stack = stack;
-    _tickSource = globalSystemTickSource();
-
-    if (opCtx) {
-        _stack->push(opCtx, this);
-    } else {
-        _stack->push_nolock(this);
-    }
-}
-
-CurOp::CurOp(OperationContext* opCtx) {
-    // If this is a sub-operation, we store the snapshot of lock stats as the base lock stats of the
-    // current operation.
-    if (_parent != nullptr)
-        _lockStatsBase = opCtx->lockState()->getLockerInfo(boost::none)->stats;
-
-    // Add the CurOp object onto the stack of active CurOp objects.
-    _finishInit(opCtx, &_curopStack(opCtx));
-}
-
-CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) {
-    _finishInit(opCtx, stack);
-}
-
 CurOp::~CurOp() {
     if (parent() != nullptr)
         parent()->yielded(_numYields.load());
-    invariant(this == _stack->pop());
+    invariant(!_stack || this == _stack->pop());
 }
 
-void CurOp::setGenericOpRequestDetails(OperationContext* opCtx,
-                                       NamespaceString nss,
+void CurOp::setGenericOpRequestDetails(NamespaceString nss,
                                        const Command* command,
                                        BSONObj cmdObj,
                                        NetworkOp op) {
@@ -333,7 +328,7 @@ void CurOp::setGenericOpRequestDetails(OperationContext* opCtx,
     const bool isCommand = (op == dbMsg || (op == dbQuery && nss.isCommand()));
     auto logicalOp = (command ? command->getLogicalOp() : networkOpToLogicalOp(op));
 
-    stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+    stdx::lock_guard<Client> clientLock(*opCtx()->getClient());
     _isCommand = _debug.iscommand = isCommand;
     _logicalOp = _debug.logicalOp = logicalOp;
     _networkOp = _debug.networkOp = op;
@@ -371,14 +366,14 @@ void CurOp::setNS_inlock(const DatabaseName& dbName) {
     _nss = NamespaceString(dbName);
 }
 
-TickSource::Tick CurOp::startTime(OperationContext* opCtx) {
+TickSource::Tick CurOp::startTime() {
     auto start = _start.load();
     if (start != 0) {
         return start;
     }
 
     // Start the CPU timer if this system supports it.
-    if (auto cpuTimers = OperationCPUTimers::get(opCtx)) {
+    if (auto cpuTimers = OperationCPUTimers::get(opCtx())) {
         _cpuTimer = cpuTimers->makeTimer();
         _cpuTimer->start();
     }
@@ -412,14 +407,14 @@ Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
     return _tickSource->ticksTo<Microseconds>(endTime - startTime);
 }
 
-void CurOp::enter_inlock(OperationContext* opCtx, NamespaceString nss, int dbProfileLevel) {
-    ensureStarted(opCtx);
+void CurOp::enter_inlock(NamespaceString nss, int dbProfileLevel) {
+    ensureStarted();
     _nss = std::move(nss);
     raiseDbProfileLevel(dbProfileLevel);
 }
 
-void CurOp::enter_inlock(OperationContext* opCtx, const DatabaseName& dbName, int dbProfileLevel) {
-    enter_inlock(opCtx, NamespaceString(dbName), dbProfileLevel);
+void CurOp::enter_inlock(const DatabaseName& dbName, int dbProfileLevel) {
+    enter_inlock(NamespaceString(dbName), dbProfileLevel);
 }
 
 void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
@@ -428,12 +423,12 @@ void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
 
 static constexpr size_t appendMaxElementSize = 50 * 1024;
 
-bool CurOp::completeAndLogOperation(OperationContext* opCtx,
-                                    logv2::LogComponent component,
+bool CurOp::completeAndLogOperation(logv2::LogComponent component,
                                     std::shared_ptr<const ProfileFilter> filter,
                                     boost::optional<size_t> responseLength,
                                     boost::optional<long long> slowMsOverride,
                                     bool forceLog) {
+    auto opCtx = this->opCtx();
     const long long slowMs = slowMsOverride.value_or(serverGlobalParams.slowMS.load());
 
     // Record the size of the response returned to the client, if applicable.
@@ -669,7 +664,8 @@ BSONObj CurOp::truncateAndSerializeGenericCursor(GenericCursor* cursor,
     return serialized;
 }
 
-void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool truncateOps) {
+void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
+    auto opCtx = this->opCtx();
     auto start = _start.load();
     if (start) {
         auto end = _end.load();

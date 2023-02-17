@@ -74,7 +74,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeTailableQueryPlan(
     awaitDataState(opCtx).shouldWaitForInserts = true;
     awaitDataState(opCtx).waitForInsertsDeadline =
         opCtx->getServiceContext()->getPreciseClockSource()->now() + Seconds(1);
-    CurOp::get(opCtx)->ensureStarted(opCtx);
+    CurOp::get(opCtx)->ensureStarted();
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
 

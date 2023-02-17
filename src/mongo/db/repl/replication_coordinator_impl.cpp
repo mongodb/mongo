@@ -4239,7 +4239,7 @@ void ReplicationCoordinatorImpl::_reconfigToRemoveNewlyAddedField(
         curOp->setOpDescription_inlock(bob.obj());
         // TODO SERVER-62491 Use systemTenantId.
         curOp->setNS_inlock(NamespaceString(boost::none, "local.system.replset"));
-        curOp->ensureStarted(opCtx.get());
+        curOp->ensureStarted();
     }
 
     if (MONGO_unlikely(hangDuringAutomaticReconfig.shouldFail())) {

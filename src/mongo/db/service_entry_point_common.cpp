@@ -1539,7 +1539,7 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     if (CommandHelpers::isHelpRequest(helpField)) {
-        CurOp::get(opCtx)->ensureStarted(opCtx);
+        CurOp::get(opCtx)->ensureStarted();
         // We disable not-primary-error tracker for help requests due to SERVER-11492, because
         // config servers use help requests to determine which commands are database writes, and so
         // must be forwarded to all config servers.
@@ -1743,7 +1743,7 @@ void ExecCommandDatabase::_initiateCommand() {
         uassertStatusOK(status);
     }
 
-    CurOp::get(opCtx)->ensureStarted(opCtx);
+    CurOp::get(opCtx)->ensureStarted();
 
     command->incrementCommandsExecuted();
 
@@ -2320,7 +2320,6 @@ void HandleRequest::completeOperation(DbResponse& response) {
     // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
     // this op should be written to the profiler.
     const bool shouldProfile = currentOp.completeAndLogOperation(
-        opCtx,
         MONGO_LOGV2_DEFAULT_COMPONENT,
         CollectionCatalog::get(opCtx)
             ->getDatabaseProfileSettings(currentOp.getNSS().dbName())

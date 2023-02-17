@@ -369,9 +369,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->enter_inlock(
-            opCtx,
-            nsString,
-            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.dbName()));
+            nsString, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.dbName()));
     }
 
     assertCanWrite_inlock(opCtx, nsString);
@@ -402,7 +400,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
     // Fill out OpDebug with the number of deleted docs.
     opDebug->additiveMetrics.ndeleted = docFound ? 1 : 0;
 
-    if (curOp->shouldDBProfile(opCtx)) {
+    if (curOp->shouldDBProfile()) {
         auto&& explainer = exec->getPlanExplainer();
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
         curOp->debug().execStats = std::move(stats);
@@ -435,9 +433,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->enter_inlock(
-            opCtx,
-            nsString,
-            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.dbName()));
+            nsString, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.dbName()));
     }
 
     assertCanWrite_inlock(opCtx, nsString);
@@ -506,7 +502,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
         dotsAndDollarsFieldsCounters.incrementForUpsert(!updateResult.upsertedId.isEmpty());
     }
 
-    if (curOp->shouldDBProfile(opCtx)) {
+    if (curOp->shouldDBProfile()) {
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
         curOp->debug().execStats = std::move(stats);
     }
