@@ -105,12 +105,6 @@ structs:
                 type: safeInt64
                 description: "Max chunk size in bytes."
                 optional: true
-            # TODO SERVER-65332 remove the field once 6.0 becomes lastLTS
-            chunksAlreadySplitForDowngrade:
-                type: optionalBool
-                description: "This flag will be set to true by the balancer when all the chunks of 
-                              this collection have been already split and ready for downgrade"
-                default: false
             defragmentCollection:
                 type: bool
                 description: "Balancer will merge chunks up to the configured maxChunkSizeBytes."

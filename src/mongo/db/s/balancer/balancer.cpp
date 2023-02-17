@@ -45,7 +45,6 @@
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
 #include "mongo/db/s/balancer/balancer_defragmentation_policy_impl.h"
-#include "mongo/db/s/balancer/cluster_chunks_resize_policy_impl.h"
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
@@ -281,9 +280,7 @@ Balancer::Balancer()
           std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get(), _random)),
       _commandScheduler(std::make_unique<BalancerCommandsSchedulerImpl>()),
       _defragmentationPolicy(std::make_unique<BalancerDefragmentationPolicyImpl>(
-          _clusterStats.get(), [this]() { _onActionsStreamPolicyStateUpdate(); })),
-      _clusterChunksResizePolicy(std::make_unique<ClusterChunksResizePolicyImpl>(
-          [this] { _onActionsStreamPolicyStateUpdate(); })) {}
+          _clusterStats.get(), [this]() { _onActionsStreamPolicyStateUpdate(); })) {}
 
 Balancer::~Balancer() {
     // Terminate the balancer thread so it doesn't leak memory.
@@ -474,10 +471,7 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
 }
 
 void Balancer::_consumeActionStreamLoop() {
-    ScopeGuard onExitCleanup([this] {
-        _defragmentationPolicy->interruptAllDefragmentations();
-        _clusterChunksResizePolicy->stop();
-    });
+    ScopeGuard onExitCleanup([this] { _defragmentationPolicy->interruptAllDefragmentations(); });
 
     Client::initThread("BalancerSecondary");
     auto opCtx = cc().makeOperationContext();
@@ -488,12 +482,6 @@ void Balancer::_consumeActionStreamLoop() {
         Grid::get(opCtx.get())->getExecutorPool()->getFixedExecutor());
 
     auto selectStream = [&]() -> ActionsStreamPolicy* {
-        // This policy has higher priority - and once activated, it cannot be disabled through cfg
-        // changes.
-        if (_clusterChunksResizePolicy->isActive()) {
-            return _clusterChunksResizePolicy.get();
-        }
-
         if (balancerConfig->shouldBalanceForAutoSplit()) {
             return _defragmentationPolicy.get();
         }
@@ -722,8 +710,7 @@ void Balancer::_mainThread() {
                 continue;
             }
 
-            if (!balancerConfig->shouldBalance() || _stopRequested() ||
-                _clusterChunksResizePolicy->isActive()) {
+            if (!balancerConfig->shouldBalance() || _stopRequested()) {
 
                 if (balancerConfig->getBalancerMode() == BalancerSettingsType::BalancerMode::kOff &&
                     Date_t::now() - lastDrainingShardsCheckTime >= kDrainingShardsCheckInterval) {
@@ -1027,8 +1014,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
     auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
 
     // If the balancer was disabled since we started this round, don't start new chunk moves
-    if (_stopRequested() || !balancerConfig->shouldBalance() ||
-        _clusterChunksResizePolicy->isActive()) {
+    if (_stopRequested() || !balancerConfig->shouldBalance()) {
         LOGV2_DEBUG(21870, 1, "Skipping balancing round because balancer was stopped");
         return 0;
     }
@@ -1136,26 +1122,6 @@ void Balancer::notifyPersistedBalancerSettingsChanged(OperationContext* opCtx) {
 
 void Balancer::abortCollectionDefragmentation(OperationContext* opCtx, const NamespaceString& nss) {
     _defragmentationPolicy->abortCollectionDefragmentation(opCtx, nss);
-}
-
-SharedSemiFuture<void> Balancer::applyLegacyChunkSizeConstraintsOnClusterData(
-    OperationContext* opCtx) {
-    try {
-        ShardingCatalogManager::get(opCtx)->applyLegacyConfigurationToSessionsCollection(opCtx);
-    } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
-        // config.system.collections does not appear in config.collections; continue.
-    }
-
-    // Ensure now that each collection in the cluster complies with its "maxChunkSize" constraint
-    const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-    uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
-    auto futureOutcome =
-        _clusterChunksResizePolicy->activate(opCtx, balancerConfig->getMaxChunkSizeBytes());
-    {
-        stdx::lock_guard<Latch> scopedLock(_mutex);
-        _defragmentationCondVar.notify_all();
-    }
-    return futureOutcome;
 }
 
 BalancerCollectionStatusResponse Balancer::getBalancerStatusForNs(OperationContext* opCtx,

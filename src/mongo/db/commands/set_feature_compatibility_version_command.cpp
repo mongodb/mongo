@@ -66,7 +66,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
-#include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
@@ -1128,8 +1127,6 @@ private:
                        const SetFeatureCompatibilityVersion& request,
                        boost::optional<Timestamp> changeTimestamp) {
         const auto requestedVersion = request.getCommandParameter();
-        // TODO  SERVER-65332 remove logic bound to this future object when v7.0 branches out
-        boost::optional<SharedSemiFuture<void>> chunkResizeAsyncTask;
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             uassert(ErrorCodes::Error(6794600),
@@ -1142,14 +1139,6 @@ private:
         // Any actions that should be done before taking the FCV full transition lock in S mode
         // should go in this function.
         _prepareForDowngrade(opCtx);
-
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-            requestedVersion == GenericFCV::kLastLTS) {
-            // As data size aware balancing is supported starting from v6.1, chunks resizing is
-            // required only when downgrading to v6.0
-            chunkResizeAsyncTask =
-                Balancer::get(opCtx)->applyLegacyChunkSizeConstraintsOnClusterData(opCtx);
-        }
 
         {
             // Take the FCV full transition lock in S mode to create a barrier for operations taking
@@ -1198,18 +1187,6 @@ private:
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // Tell the shards to enter phase-2 of setFCV (fully downgraded)
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
-            if (!feature_flags::gNoMoreAutoSplitter.isEnabledOnVersion(requestedVersion)) {
-                // chunkResizeAsyncTask is only used by config servers as part of internal server
-                // downgrade cleanup. Waiting for the task to complete is put at the end of
-                // _runDowngrade instead of inside _internalServerDowngradeCleanup because the task
-                // might take a long time to complete.
-                invariant(chunkResizeAsyncTask.has_value());
-                LOGV2(6417108, "Waiting for cluster chunks resize process to complete.");
-                uassertStatusOKWithContext(
-                    chunkResizeAsyncTask->getNoThrow(opCtx),
-                    "Failed to enforce chunk size constraint during FCV downgrade");
-                LOGV2(6417109, "Cluster chunks resize process completed.");
-            }
         }
 
         hangWhileDowngrading.pauseWhileSet(opCtx);

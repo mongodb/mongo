@@ -455,13 +455,6 @@ public:
                                       boost::optional<bool> enableAutoMerger);
 
     /**
-     * Removes the maxChunkSize constraint from config.system.collection to ensure compatibility
-     * with the balancing strategy implemented in v6.1.
-     * TODO SERVER-65332 remove the function once 6.1 branches out.
-     */
-    void applyLegacyConfigurationToSessionsCollection(OperationContext* opCtx);
-
-    /**
      * Updates the bucketing parameters of a time-series collection. Also bumps the shard versions
      * for all shards.
      */

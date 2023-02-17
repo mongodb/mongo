@@ -83,7 +83,6 @@ public:
     static constexpr auto kEpochFieldName = kPre22CompatibleEpochFieldName;
 
     using CollectionTypeBase::kAllowMigrationsFieldName;
-    using CollectionTypeBase::kChunksAlreadySplitForDowngradeFieldName;
     using CollectionTypeBase::kDefaultCollationFieldName;
     using CollectionTypeBase::kDefragmentationPhaseFieldName;
     using CollectionTypeBase::kDefragmentCollectionFieldName;
