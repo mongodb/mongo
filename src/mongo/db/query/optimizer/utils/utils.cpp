@@ -30,6 +30,7 @@
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
@@ -182,22 +183,24 @@ public:
         if (!pathResult || !inputResult) {
             return {};
         }
-        if (pathResult->_bound || !inputResult->_bound || !inputResult->_reqMap.empty()) {
+        if (pathResult->_bound || !inputResult->_bound || !inputResult->_reqMap.isNoop()) {
             return {};
         }
 
         if (auto boundPtr = inputResult->_bound->cast<Variable>(); boundPtr != nullptr) {
             const ProjectionName& boundVarName = boundPtr->name();
-            PartialSchemaRequirements newMap;
+            PSRExpr::Builder newReqs;
+            newReqs.pushDisj().pushConj();
 
             for (auto& [key, req] : pathResult->_reqMap.conjuncts()) {
                 if (key._projectionName) {
                     return {};
                 }
-                newMap.add(PartialSchemaKey{boundVarName, key._path}, std::move(req));
+
+                newReqs.atom(PartialSchemaKey{boundVarName, key._path}, std::move(req));
             }
 
-            PartialSchemaReqConversion result{std::move(newMap)};
+            PartialSchemaReqConversion result{std::move(*newReqs.finish())};
             result._retainPredicate = pathResult->_retainPredicate;
             return result;
         }
@@ -310,7 +313,8 @@ public:
             // Each side is a conjunction, and we're taking a disjunction.
             // Use the fact that OR distributes over AND to build a new conjunction:
             //     (a & b) | (x & y) == (a | x) & (a | y) & (b | x) & (b | y)
-            PartialSchemaRequirements resultMap;
+            PSRExpr::Builder resultReqs;
+            resultReqs.pushDisj().pushConj();
             for (const auto& [rightKey1, rightReq1] : rightReqMap.conjuncts()) {
                 for (const auto& [leftKey1, leftReq1] : leftReqMap.conjuncts()) {
                     auto combinedIntervals = leftReq1.getIntervals();
@@ -323,11 +327,11 @@ public:
                         std::move(combinedIntervals),
                         leftReq1.getIsPerfOnly(),
                     };
-                    resultMap.add(leftKey1, combinedReq);
+                    resultReqs.atom(leftKey1, combinedReq);
                 }
             }
 
-            leftReqMap = std::move(resultMap);
+            leftReqMap = std::move(*resultReqs.finish());
             return leftResult;
         }
         // Left and right don't all use the same key.
@@ -468,7 +472,8 @@ public:
         }
 
         // New map has keys with appended paths.
-        PartialSchemaRequirements newMap;
+        PSRExpr::Builder newReqs;
+        newReqs.pushDisj().pushConj();
 
         for (const auto& entry : inputResult->_reqMap.conjuncts()) {
             if (entry.first._projectionName) {
@@ -482,10 +487,10 @@ public:
             std::swap(appendedPath.cast<T>()->getPath(), path);
             std::swap(path, appendedPath);
 
-            newMap.add(PartialSchemaKey{std::move(path)}, std::move(entry.second));
+            newReqs.atom(PartialSchemaKey{std::move(path)}, std::move(entry.second));
         }
 
-        inputResult->_reqMap = std::move(newMap);
+        inputResult->_reqMap = std::move(*newReqs.finish());
         return inputResult;
     }
 
@@ -558,7 +563,7 @@ public:
         if (!inputResult) {
             return {};
         }
-        if (!inputResult->_bound || !inputResult->_reqMap.empty()) {
+        if (!inputResult->_bound || !inputResult->_reqMap.isNoop()) {
             return {};
         }
 
@@ -659,7 +664,7 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
     }
 
     auto& reqMap = result->_reqMap;
-    if (reqMap.empty()) {
+    if (reqMap.isNoop()) {
         return {};
     }
 
@@ -686,7 +691,8 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
                                    PartialSchemaRequirements& reqMap,
                                    ProjectionRenames& projectionRenames,
                                    const ConstFoldFn& constFold) {
-    PartialSchemaRequirements result;
+    PSRExpr::Builder resultReqs;
+    resultReqs.pushDisj().pushConj();
     boost::optional<std::pair<PartialSchemaKey, PartialSchemaRequirement>> prevEntry;
 
     const auto simplifyFn = [&constFold](IntervalReqExpr::Node& intervals) -> bool {
@@ -736,7 +742,7 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
                            std::move(resultIntervals),
                            req.getIsPerfOnly() && prevReq.getIsPerfOnly()};
             } else {
-                result.add(std::move(prevEntry->first), std::move(prevEntry->second));
+                resultReqs.atom(std::move(prevEntry->first), std::move(prevEntry->second));
                 prevEntry.reset({std::move(newKey), req});
             }
         } else {
@@ -744,12 +750,14 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
         }
     }
     if (prevEntry) {
-        result.add(std::move(prevEntry->first), std::move(prevEntry->second));
+        resultReqs.atom(std::move(prevEntry->first), std::move(prevEntry->second));
     }
+
+    PartialSchemaRequirements newReqs{std::move(*resultReqs.finish())};
 
     // Intersect and normalize intervals.
     const bool representable =
-        result.simplify([&](const PartialSchemaKey&, PartialSchemaRequirement& req) -> bool {
+        newReqs.simplify([&](const PartialSchemaKey&, PartialSchemaRequirement& req) -> bool {
             auto resultIntervals = req.getIntervals();
             if (!simplifyFn(resultIntervals)) {
                 return false;
@@ -766,7 +774,7 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
         return true;
     }
 
-    reqMap = std::move(result);
+    reqMap = std::move(newReqs);
     return false;
 }
 

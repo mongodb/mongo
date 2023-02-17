@@ -477,7 +477,7 @@ public:
                 const auto& indexDefName = candidateIndexEntry._indexDefName;
                 const auto& indexDef = scanDef.getIndexDefs().at(indexDefName);
 
-                if (!indexDef.getPartialReqMap().empty() &&
+                if (!indexDef.getPartialReqMap().isNoop() &&
                     (_hints._disableIndexes == DisableIndexOptions::DisablePartialOnly ||
                      satisfiedPartialIndexes.count(indexDefName) == 0)) {
                     // Consider only indexes for which we satisfy partial requirements.

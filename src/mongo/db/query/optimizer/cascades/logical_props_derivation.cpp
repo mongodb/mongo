@@ -232,7 +232,7 @@ public:
 
         auto& satisfiedPartialIndexes = indexingAvailability.getSatisfiedPartialIndexes();
         for (const auto& [indexDefName, indexDef] : scanDef.getIndexDefs()) {
-            if (!indexDef.getPartialReqMap().empty()) {
+            if (!indexDef.getPartialReqMap().isNoop()) {
                 if (isSubsetOfPartialSchemaReq(node.getReqMap(), indexDef.getPartialReqMap())) {
                     satisfiedPartialIndexes.insert(indexDefName);
                 }

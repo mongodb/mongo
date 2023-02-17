@@ -672,7 +672,7 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         return true;
     });
 
-    if (conversion->_reqMap.empty()) {
+    if (conversion->_reqMap.isNoop()) {
         // If the filter has no constraints after removing no-ops, then replace with its child. We
         // need to copy the child since we hold it by reference from the memo, and during
         // subtitution the current group will be erased.
@@ -1160,10 +1160,9 @@ template <class Type>
 struct ExploreConvert {
     void operator()(ABT::reference_type nodeRef, RewriteContext& ctx) = delete;
 };
-
 struct SplitRequirementsResult {
-    PartialSchemaRequirements _leftReqs;
-    PartialSchemaRequirements _rightReqs;
+    PSRExprBuilder _leftReqsBuilder;
+    PSRExprBuilder _rightReqsBuilder;
 
     bool _hasFieldCoverage = true;
 };
@@ -1187,17 +1186,20 @@ static SplitRequirementsResult splitRequirements(
     const boost::optional<FieldNameSet>& indexFieldPrefixMapForScanDef,
     const PartialSchemaRequirements& reqMap) {
     SplitRequirementsResult result;
-    auto& leftReqs = result._leftReqs;
-    auto& rightReqs = result._rightReqs;
 
-    const auto addRequirement = [](PartialSchemaRequirements& reqMap,
-                                   PartialSchemaKey key,
-                                   boost::optional<ProjectionName> boundProjectionName,
-                                   IntervalReqExpr::Node intervals) {
+    result._leftReqsBuilder.pushDisj().pushConj();
+    result._rightReqsBuilder.pushDisj().pushConj();
+
+    const auto addRequirement = [&](bool left,
+                                    PartialSchemaKey key,
+                                    boost::optional<ProjectionName> boundProjectionName,
+                                    IntervalReqExpr::Node intervals) {
         // We always strip out the perf-only flag.
-        reqMap.add(key,
-                   PartialSchemaRequirement{
-                       std::move(boundProjectionName), std::move(intervals), false /*isPerfOnly*/});
+        auto& builder = left ? result._leftReqsBuilder : result._rightReqsBuilder;
+        builder.atom(std::move(key),
+                     PartialSchemaRequirement{std::move(boundProjectionName),
+                                              std::move(intervals),
+                                              false /*isPerfOnly*/});
     };
 
     size_t index = 0;
@@ -1209,13 +1211,16 @@ static SplitRequirementsResult splitRequirements(
                 // We can never return Null values from the requirement.
                 if (isIndex || hints._disableYieldingTolerantPlans || req.getIsPerfOnly()) {
                     // Insert into left side unchanged.
-                    addRequirement(leftReqs, key, req.getBoundProjectionName(), req.getIntervals());
+                    addRequirement(
+                        true /*left*/, key, req.getBoundProjectionName(), req.getIntervals());
                 } else {
                     // Insert a requirement on the right side too, left side is non-binding.
+                    addRequirement(true /*left*/,
+                                   key,
+                                   boost::none /*boundProjectionName*/,
+                                   req.getIntervals());
                     addRequirement(
-                        leftReqs, key, boost::none /*boundProjectionName*/, req.getIntervals());
-                    addRequirement(
-                        rightReqs, key, req.getBoundProjectionName(), req.getIntervals());
+                        false /*left*/, key, req.getBoundProjectionName(), req.getIntervals());
                 }
                 addedToLeft = true;
             } else {
@@ -1226,11 +1231,13 @@ static SplitRequirementsResult splitRequirements(
                 // we remove the output binding for the left side, and return the value from the
                 // right (seek) side.
                 if (!isFullyOpen.at(index)) {
-                    addRequirement(
-                        leftReqs, key, boost::none /*boundProjectionName*/, req.getIntervals());
+                    addRequirement(true /*left*/,
+                                   key,
+                                   boost::none /*boundProjectionName*/,
+                                   req.getIntervals());
                     addedToLeft = true;
                 }
-                addRequirement(rightReqs,
+                addRequirement(false /*left*/,
                                key,
                                req.getBoundProjectionName(),
                                hints._disableYieldingTolerantPlans
@@ -1250,7 +1257,7 @@ static SplitRequirementsResult splitRequirements(
                 }
             }
         } else if (isIndex || !req.getIsPerfOnly()) {
-            addRequirement(rightReqs, key, req.getBoundProjectionName(), req.getIntervals());
+            addRequirement(false /*left*/, key, req.getBoundProjectionName(), req.getIntervals());
         }
         index++;
     }
@@ -1347,14 +1354,17 @@ struct ExploreConvert<SargableNode> {
                                                                     indexFieldPrefixMapForScanDef,
                                                                     reqMap);
 
-            if (splitResult._leftReqs.empty()) {
+            auto leftReqs = splitResult._leftReqsBuilder.finish();
+            auto rightReqs = splitResult._rightReqsBuilder.finish();
+
+            if (!leftReqs) {
                 // Can happen if we have intervals containing null.
                 invariant(!hints._fastIndexNullHandling && !isIndex);
                 continue;
             }
 
-            const bool hasLeftintervals = hasProperIntervals(splitResult._leftReqs);
-            const bool hasRightIntervals = hasProperIntervals(splitResult._rightReqs);
+            const bool hasLeftintervals = hasProperIntervals(*leftReqs);
+            const bool hasRightIntervals = rightReqs && hasProperIntervals(*rightReqs);
             if (isIndex) {
                 if (!hasLeftintervals || !hasRightIntervals) {
                     // Reject. Must have at least one proper interval on either side.
@@ -1373,7 +1383,7 @@ struct ExploreConvert<SargableNode> {
             bool hasEmptyLeftInterval = false;
             auto leftCandidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
                                                                 scanProjectionName,
-                                                                splitResult._leftReqs,
+                                                                *leftReqs,
                                                                 scanDef,
                                                                 hints,
                                                                 hasEmptyLeftInterval,
@@ -1384,13 +1394,17 @@ struct ExploreConvert<SargableNode> {
             }
 
             bool hasEmptyRightInterval = false;
-            auto rightCandidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
-                                                                 scanProjectionName,
-                                                                 splitResult._rightReqs,
-                                                                 scanDef,
-                                                                 hints,
-                                                                 hasEmptyRightInterval,
-                                                                 ctx.getConstFold());
+            CandidateIndexes rightCandidateIndexes;
+            if (rightReqs) {
+                rightCandidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
+                                                                scanProjectionName,
+                                                                *rightReqs,
+                                                                scanDef,
+                                                                hints,
+                                                                hasEmptyRightInterval,
+                                                                ctx.getConstFold());
+            }
+
             if (isIndex && rightCandidateIndexes.empty()) {
                 // With empty candidate map, reject only if we cannot implement as Seek.
                 continue;
@@ -1400,21 +1414,25 @@ struct ExploreConvert<SargableNode> {
                     !hasEmptyLeftInterval && !hasEmptyRightInterval);
 
             ABT scanDelegator = make<MemoLogicalDelegatorNode>(scanGroupId);
-            ABT leftChild = make<SargableNode>(std::move(splitResult._leftReqs),
+            ABT leftChild = make<SargableNode>(std::move(*leftReqs),
                                                std::move(leftCandidateIndexes),
                                                boost::none,
                                                IndexReqTarget::Index,
                                                scanDelegator);
 
-            auto rightScanParams =
-                computeScanParams(ctx.getPrefixId(), splitResult._rightReqs, scanProjectionName);
-            ABT rightChild = splitResult._rightReqs.empty()
-                ? scanDelegator
-                : make<SargableNode>(std::move(splitResult._rightReqs),
+            boost::optional<ScanParams> rightScanParams;
+            if (rightReqs) {
+                rightScanParams =
+                    computeScanParams(ctx.getPrefixId(), *rightReqs, scanProjectionName);
+            }
+
+            ABT rightChild = rightReqs
+                ? make<SargableNode>(std::move(*rightReqs),
                                      std::move(rightCandidateIndexes),
                                      std::move(rightScanParams),
                                      isIndex ? IndexReqTarget::Index : IndexReqTarget::Seek,
-                                     scanDelegator);
+                                     scanDelegator)
+                : scanDelegator;
 
             ABT newRoot = make<RIDIntersectNode>(
                 scanProjectionName, std::move(leftChild), std::move(rightChild));

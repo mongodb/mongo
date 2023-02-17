@@ -56,7 +56,7 @@ ScanDefinition createScanDef(ScanDefOptions options,
     for (const auto& [indexDefName, indexDef] : indexDefs) {
         // Skip partial indexes. A path could be non-multikey on a partial index (subset of the
         // collection), but still be multikey on the overall collection.
-        if (!indexDef.getPartialReqMap().empty()) {
+        if (!indexDef.getPartialReqMap().isNoop()) {
             continue;
         }
 

@@ -31,25 +31,102 @@
 
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/utils/abt_compare.h"
 
 namespace mongo::optimizer {
-void PartialSchemaRequirements::normalize() {
-    std::stable_sort(
-        _repr.begin(),
-        _repr.end(),
-        [lt = PartialSchemaKeyLessComparator{}](const auto& entry1, const auto& entry2) -> bool {
-            return lt(entry1.first, entry2.first);
-        });
+namespace {
+class PSRNormalizeTransporter {
+public:
+    void transport(const PSRExpr::Atom& node) {
+        // Noop.
+    }
+
+    void transport(PSRExpr::Conjunction& node, std::vector<PSRExpr::Node>& children) {
+        sortChildren(children);
+    }
+
+    void transport(PSRExpr::Disjunction& node, std::vector<PSRExpr::Node>& children) {
+        sortChildren(children);
+    }
+
+    void normalize(PSRExpr::Node& node) {
+        return algebra::transport<false>(node, *this);
+    }
+
+private:
+    void sortChildren(std::vector<PSRExpr::Node>& children) {
+        struct Comparator {
+            bool operator()(const PSRExpr::Node& i1, const PSRExpr::Node& i2) const {
+                return comparePartialSchemaRequirementsExpr(i1, i2) < 0;
+            }
+        };
+        std::sort(children.begin(), children.end(), Comparator{});
+    }
+};
+
+// Make a BoolExpr representing a conjunction of the entries. It will be an OR of a single AND.
+PSRExpr::Node makePSRExpr(std::vector<PartialSchemaEntry> entries) {
+    PSRExpr::Builder b;
+    b.pushDisj().pushConj();
+    for (auto& entry : entries) {
+        b.atom(std::move(entry));
+    }
+
+    auto res = b.finish();
+    tassert(7016402, "PartialSchemaRequirements could not be constructed", res.has_value());
+    return res.get();
 }
 
-PartialSchemaRequirements::PartialSchemaRequirements(
-    std::vector<PartialSchemaRequirements::Entry> entries) {
-    for (Entry& entry : entries) {
-        _repr.push_back(std::move(entry));
+// A no-op entry has a default key and a requirement that is fully open and does not bind.
+PartialSchemaEntry makeNoopPartialSchemaEntry() {
+    return {PartialSchemaKey(),
+            PartialSchemaRequirement(
+                boost::none /*boundProjectionName*/,
+                IntervalReqExpr::makeSingularDNF(IntervalRequirement(
+                    BoundRequirement::makeMinusInf(), BoundRequirement::makePlusInf())),
+                false /*isPerfOnly*/)};
+}
+
+// Apply 'func' to all of the atoms of 'n', where 'n' is in CNF or DNF.
+template <bool isConst = true,
+          class MaybeConstNode = std::conditional_t<isConst, const PSRExpr::Node, PSRExpr::Node>,
+          class MaybeConstVisitor =
+              std::conditional_t<isConst, PSRExpr::AtomVisitorConst, PSRExpr::AtomVisitor>>
+void applyToEachAtom(MaybeConstNode& n, const MaybeConstVisitor& func) {
+    if (PSRExpr::isCNF(n)) {
+        PSRExpr::visitConjuncts(n, [&](MaybeConstNode& conjunct, const size_t) {
+            PSRExpr::visitDisjuncts(conjunct, [&](MaybeConstNode& disjunct, const size_t) {
+                PSRExpr::visitAtom(disjunct, func);
+            });
+        });
+    } else {
+        PSRExpr::visitDisjuncts(n, [&](MaybeConstNode& disjunct, const size_t) {
+            PSRExpr::visitConjuncts(disjunct, [&](MaybeConstNode& conjunct, const size_t) {
+                PSRExpr::visitAtom(conjunct, func);
+            });
+        });
     }
+}
+}  // namespace
+
+void PartialSchemaRequirements::normalize() {
+    PSRNormalizeTransporter{}.normalize(_expr);
+}
+
+PartialSchemaRequirements::PartialSchemaRequirements(std::vector<Entry> entries)
+    : PartialSchemaRequirements(makePSRExpr(entries)) {}
+
+PartialSchemaRequirements::PartialSchemaRequirements(PSRExpr::Node requirements)
+    : _expr(std::move(requirements)) {
+    tassert(7016403,
+            "PartialSchemaRequirements must be in CNF or DNF",
+            PSRExpr::isCNF(_expr) || PSRExpr::isDNF(_expr));
 
     normalize();
 }
+
+PartialSchemaRequirements::PartialSchemaRequirements()
+    : PartialSchemaRequirements(PSRExpr::makeSingularDNF(makeNoopPartialSchemaEntry())) {}
 
 std::set<ProjectionName> PartialSchemaRequirements::getBoundNames() const {
     std::set<ProjectionName> names;
@@ -60,81 +137,168 @@ std::set<ProjectionName> PartialSchemaRequirements::getBoundNames() const {
 }
 
 bool PartialSchemaRequirements::operator==(const PartialSchemaRequirements& other) const {
-    return _repr == other._repr;
+    return _expr == other._expr;
 }
 
-bool PartialSchemaRequirements::empty() const {
-    return _repr.empty();
+bool PartialSchemaRequirements::isNoop() const {
+    // A PartialSchemaRequirements is a no-op if it has exactly zero predicates/projections...
+    auto numPreds = numLeaves();
+    if (numPreds == 0) {
+        return true;
+    } else if (numPreds > 1) {
+        return false;
+    }
+
+    // ...or if it has exactly one predicate which is a no-op.
+    auto reqIsNoop = false;
+    applyToEachAtom(
+        _expr, [&](const Entry& entry) { reqIsNoop = (entry == makeNoopPartialSchemaEntry()); });
+
+    return reqIsNoop;
 }
 
 size_t PartialSchemaRequirements::numLeaves() const {
-    return _repr.size();
+    size_t n = 0;
+    applyToEachAtom(_expr, [&](const Entry& entry) { n++; });
+    return n;
 }
 
 size_t PartialSchemaRequirements::numConjuncts() const {
-    return _repr.size();
+    return numLeaves();
 }
 
 boost::optional<ProjectionName> PartialSchemaRequirements::findProjection(
     const PartialSchemaKey& key) const {
-    for (auto [k, req] : _repr) {
-        if (k == key) {
-            return req.getBoundProjectionName();
+    tassert(7016404, "Expected a PartialSchemaRequirements in DNF form", PSRExpr::isDNF(_expr));
+
+    boost::optional<ProjectionName> proj;
+    applyToEachAtom(_expr, [&](const Entry& entry) {
+        if (!proj && entry.first == key) {
+            proj = entry.second.getBoundProjectionName();
         }
-    }
-    return {};
+    });
+    return proj;
 }
 
 boost::optional<std::pair<size_t, PartialSchemaRequirement>>
 PartialSchemaRequirements::findFirstConjunct(const PartialSchemaKey& key) const {
+    assertIsSingletonDisjunction();
+
     size_t i = 0;
-    for (auto [k, req] : _repr) {
-        if (k == key) {
-            return {{i, req}};
+    boost::optional<std::pair<size_t, PartialSchemaRequirement>> res;
+    applyToEachAtom(_expr, [&](const Entry& entry) {
+        if (!res && entry.first == key) {
+            res = {{i, entry.second}};
         }
         ++i;
-    }
-    return {};
+    });
+    return res;
 }
 
 PartialSchemaRequirements::Bindings PartialSchemaRequirements::iterateBindings() const {
     Bindings result;
-    for (auto&& [key, req] : _repr) {
-        if (auto binding = req.getBoundProjectionName()) {
-            result.emplace_back(key, *binding);
-        }
-    }
+    applyToEachAtom(_expr, [&](const Entry& entry) {
+        if (auto binding = entry.second.getBoundProjectionName()) {
+            result.emplace_back(entry.first, std::move(*binding));
+        };
+    });
     return result;
 }
 
 void PartialSchemaRequirements::add(PartialSchemaKey key, PartialSchemaRequirement req) {
-    _repr.emplace_back(std::move(key), std::move(req));
+    tassert(7016406, "Expected a PartialSchemaRequirements in DNF form", PSRExpr::isDNF(_expr));
 
+    // Add an entry to the first conjunction
+    PSRExpr::visitDisjuncts(_expr, [&](PSRExpr::Node& disjunct, const size_t i) {
+        if (i == 0) {
+            const auto& conjunction = disjunct.cast<PSRExpr::Conjunction>();
+            conjunction->nodes().emplace_back(
+                PSRExpr::make<PSRExpr::Atom>(Entry(std::move(key), std::move(req))));
+        }
+    });
     normalize();
 }
 
 void PartialSchemaRequirements::transform(
     std::function<void(const PartialSchemaKey&, PartialSchemaRequirement&)> func) {
-    for (auto& [key, req] : _repr) {
-        func(key, req);
-    }
+    applyToEachAtom<false /*isConst*/>(_expr,
+                                       [&](Entry& entry) { func(entry.first, entry.second); });
 }
+
+void PartialSchemaRequirements::assertIsSingletonDisjunction() const {
+    if (auto disjunction = _expr.cast<PSRExpr::Disjunction>();
+        disjunction && disjunction->nodes().size() == 1) {
+        return;
+    }
+    tasserted(7016405, "Expected PartialSchemaRequirement to be a singleton disjunction");
+}
+
+namespace {
+// TODO SERVER-73827: Apply this simplification during BoolExpr building.
+template <bool isCNF,
+          class TopLevel = std::conditional_t<isCNF, PSRExpr::Conjunction, PSRExpr::Disjunction>,
+          class SecondLevel = std::conditional_t<isCNF, PSRExpr::Disjunction, PSRExpr::Conjunction>>
+static bool simplifyExpr(
+    PSRExpr::Node& n,
+    std::function<bool(const PartialSchemaKey&, PartialSchemaRequirement&)> func) {
+    auto& children = n.template cast<TopLevel>()->nodes();
+    for (auto it = children.begin(); it != children.end();) {
+        auto& atoms = (*it).template cast<SecondLevel>()->nodes();
+
+        bool removeChild = false;
+        for (auto atomIt = atoms.begin(); atomIt != atoms.end();) {
+            auto& [key, req] = (*atomIt).template cast<PSRExpr::Atom>()->getExpr();
+            // If 'req' is always-false then: Under OR, remove the atom. Under AND, remove the AND.
+            if (!func(key, req)) {
+                if (isCNF) {
+                    atomIt = atoms.erase(atomIt);
+                    continue;
+                } else {
+                    removeChild = true;
+                    break;
+                }
+            }
+
+            // If 'req' is always-true then: Under AND, remove the atom. Under OR, remove the OR.
+            if (isIntervalReqFullyOpenDNF(req.getIntervals()) && !req.getBoundProjectionName()) {
+                if (isCNF) {
+                    removeChild = true;
+                    break;
+                } else {
+                    atomIt = atoms.erase(atomIt);
+                    continue;
+                }
+            }
+
+            ++atomIt;
+        }
+
+        if (atoms.empty() && isCNF) {
+            // We have an OR of nothing-- so we have simplified to always-false
+            return false;
+        }
+
+        if (removeChild) {
+            it = children.erase(it);
+            continue;
+        }
+        ++it;
+    }
+
+    if (children.empty() && !isCNF) {
+        // We have an OR of nothing-- so we have simplified to always-false
+        return false;
+    }
+    return true;
+}
+}  // namespace
 
 bool PartialSchemaRequirements::simplify(
     std::function<bool(const PartialSchemaKey&, PartialSchemaRequirement&)> func) {
-    for (auto it = _repr.begin(); it != _repr.end();) {
-        auto& [key, req] = *it;
-
-        if (!func(key, req)) {
-            return false;
-        }
-        if (isIntervalReqFullyOpenDNF(it->second.getIntervals()) && !req.getBoundProjectionName()) {
-            it = _repr.erase(it);
-        } else {
-            ++it;
-        }
+    if (PSRExpr::isCNF(_expr)) {
+        return simplifyExpr<true /*isCNF*/>(_expr, func);
     }
-    return true;
+    return simplifyExpr<false /*isCNF*/>(_expr, func);
 }
 
 }  // namespace mongo::optimizer

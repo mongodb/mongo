@@ -130,6 +130,8 @@ void CompoundIntervalRequirement::push_back(IntervalRequirement interval) {
     _highBound.push_back(std::move(interval.getHighBound()));
 }
 
+PartialSchemaKey::PartialSchemaKey() : PartialSchemaKey(make<PathIdentity>()) {}
+
 PartialSchemaKey::PartialSchemaKey(ABT path) : PartialSchemaKey(boost::none, std::move(path)) {}
 
 PartialSchemaKey::PartialSchemaKey(ProjectionName projectionName, ABT path)

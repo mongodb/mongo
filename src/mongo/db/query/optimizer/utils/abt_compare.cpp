@@ -390,4 +390,42 @@ int compareIntervalExpr(const IntervalReqExpr::Node& i1, const IntervalReqExpr::
     return IntervalExprComparator{}.compareIntExpr(i1, i2);
 }
 
+class PSRExprComparator {
+public:
+    template <typename T>
+    int operator()(const PSRExpr::Node& n, const T& node, const PSRExpr::Node& other) {
+        if (const auto otherPtr = other.cast<T>()) {
+            // If the types are the same, route to method which compares them.
+            return compare(node, *otherPtr);
+        }
+
+        // When types are different, sort based on tags.
+        const auto t1 = n.tagOf();
+        const auto t2 = other.tagOf();
+        return (t1 < t2) ? -1 : 1;
+    }
+
+    int comparePSRExpr(const PSRExpr::Node& n1, const PSRExpr::Node& n2) {
+        return n1.visit(*this, n2);
+    }
+
+private:
+    int compare(const PSRExpr::Atom& node, const PSRExpr::Atom& other) {
+        auto isSorted =
+            PartialSchemaKeyLessComparator{}(node.getExpr().first, other.getExpr().first);
+        return isSorted ? -1 : 1;
+    }
+
+    int compare(const PSRExpr::Conjunction& node, const PSRExpr::Conjunction& other) {
+        return compareContainers(node.nodes(), other.nodes(), comparePartialSchemaRequirementsExpr);
+    }
+
+    int compare(const PSRExpr::Disjunction& node, const PSRExpr::Disjunction& other) {
+        return compareContainers(node.nodes(), other.nodes(), comparePartialSchemaRequirementsExpr);
+    }
+};
+
+int comparePartialSchemaRequirementsExpr(const PSRExpr::Node& n1, const PSRExpr::Node& n2) {
+    return PSRExprComparator{}.comparePSRExpr(n1, n2);
+}
 }  // namespace mongo::optimizer

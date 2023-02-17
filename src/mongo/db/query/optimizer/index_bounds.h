@@ -187,6 +187,9 @@ public:
 using CompoundIntervalReqExpr = BoolExpr<CompoundIntervalRequirement>;
 
 struct PartialSchemaKey {
+    // The default construct sets the path to PathIdentity and the projectionName to boost::none.
+    PartialSchemaKey();
+
     PartialSchemaKey(ABT path);
     PartialSchemaKey(ProjectionName projectionName, ABT path);
     PartialSchemaKey(boost::optional<ProjectionName> projectionName, ABT path);

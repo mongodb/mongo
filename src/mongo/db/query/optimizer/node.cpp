@@ -400,7 +400,7 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
       _scanParams(std::move(scanParams)),
       _target(target) {
     assertNodeSort(getChild());
-    tassert(6624085, "SargableNode requires at least one predicate", !_reqMap.empty());
+    tassert(6624085, "SargableNode requires at least one predicate", !_reqMap.isNoop());
     tassert(6624086,
             str::stream() << "SargableNode has too many predicates: " << _reqMap.numLeaves(),
             _reqMap.numLeaves() <= kMaxPartialSchemaReqs);
@@ -435,7 +435,7 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
     // Assert that non-multikey paths have at most one requirement.
     {
         PartialSchemaKeySet seen;
-        for (auto&& [key, req] : reqMap.conjuncts()) {
+        for (auto&& [key, req] : _reqMap.conjuncts()) {
             if (!checkPathContainsTraverse(key._path)) {
                 auto inserted = seen.insert(key).second;
                 tassert(7155020,

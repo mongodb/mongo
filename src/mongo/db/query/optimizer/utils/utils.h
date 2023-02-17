@@ -210,7 +210,7 @@ struct PartialSchemaReqConversion {
     // If set, contains a Constant or Variable bound of an (yet unknown) interval.
     boost::optional<ABT> _bound;
 
-    // Requirements we have built so far.
+    // Requirements we have built so far. May be trivially true.
     PartialSchemaRequirements _reqMap;
 
     // Have we added a PathComposeM.

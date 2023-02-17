@@ -154,7 +154,7 @@ private:
 
     const DistributionAndPaths _distributionAndPaths;
 
-    // Requirements map for partial filter expression.
+    // Requirements map for partial filter expression. May be trivially true.
     PartialSchemaRequirements _partialReqMap;
 };
 

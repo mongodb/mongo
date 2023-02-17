@@ -50,4 +50,8 @@ int compareIntervals(const IntervalRequirement& i1, const IntervalRequirement& i
  */
 int compareIntervalExpr(const IntervalReqExpr::Node& i1, const IntervalReqExpr::Node& i2);
 
+/**
+ * Used to compare PartialSchemaEntry trees.
+ */
+int comparePartialSchemaRequirementsExpr(const PSRExpr::Node& n1, const PSRExpr::Node& n2);
 }  // namespace mongo::optimizer

@@ -30,8 +30,16 @@
 #pragma once
 
 #include "mongo/db/query/optimizer/index_bounds.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
 
 namespace mongo::optimizer {
+
+using PartialSchemaEntry = std::pair<PartialSchemaKey, PartialSchemaRequirement>;
+using PSRExpr = BoolExpr<PartialSchemaEntry>;
+using PSRExprBuilder = PSRExpr::Builder<false /*simplifyEmptyOrSingular*/,
+                                        false /*removeDups*/,
+                                        NoOpNegator<PartialSchemaEntry>>;
+
 /**
  * Represents a set of predicates and projections. Cannot represent all predicates/projections:
  * only those that can typically be answered efficiently with an index.
@@ -45,43 +53,80 @@ namespace mongo::optimizer {
 class PartialSchemaRequirements {
 public:
     using Entry = std::pair<PartialSchemaKey, PartialSchemaRequirement>;
-    struct ConstIter {
-        auto begin() const {
-            return _begin;
+
+    // TODO SERVER-74101: In the follow up ticket to update callsites, remove these iterator
+    // constructs.
+    using ConstNodeVecIter = std::vector<PSRExpr::Node>::const_iterator;
+    using NodeVecIter = std::vector<PSRExpr::Node>::iterator;
+
+    template <bool IsConst>
+    using MaybeConstNodeVecIter =
+        typename std::conditional<IsConst, ConstNodeVecIter, NodeVecIter>::type;
+
+    template <bool IsConst>
+    struct PSRIterator {
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = ptrdiff_t;
+        using value_type = Entry;
+        using pointer = typename std::conditional<IsConst, const Entry*, Entry*>::type;
+        using reference = typename std::conditional<IsConst, const Entry&, Entry&>::type;
+
+        PSRIterator(MaybeConstNodeVecIter<IsConst> atomsIt) : _atomsIt(atomsIt) {}
+
+        reference operator*() const {
+            return _atomsIt->template cast<PSRExpr::Atom>()->getExpr();
         }
-        auto end() const {
-            return _end;
-        }
-        auto cbegin() const {
-            return _begin;
-        }
-        auto cend() const {
-            return _end;
+        pointer operator->() {
+            return &(_atomsIt->template cast<PSRExpr::Atom>()->getExpr());
         }
 
-        std::vector<Entry>::const_iterator _begin;
-        std::vector<Entry>::const_iterator _end;
+        PSRIterator& operator++() {
+            _atomsIt++;
+            return *this;
+        }
+
+        PSRIterator operator++(int) {
+            PSRIterator tmp = *this;
+            ++(*this);
+            return tmp;
+        }
+
+        friend bool operator==(const PSRIterator& a, const PSRIterator& b) {
+            return a._atomsIt == b._atomsIt;
+        };
+        friend bool operator!=(const PSRIterator& a, const PSRIterator& b) {
+            return a._atomsIt != b._atomsIt;
+        };
+
+        MaybeConstNodeVecIter<IsConst> _atomsIt;
     };
 
-    struct Iter {
+    template <bool IsConst>
+    struct Range {
         auto begin() const {
-            return _begin;
+            return PSRIterator<IsConst>(_begin);
         }
         auto end() const {
-            return _end;
+            return PSRIterator<IsConst>(_end);
         }
         auto cbegin() const {
-            return _begin;
+            return PSRIterator<true>(_begin);
         }
         auto cend() const {
-            return _end;
+            return PSRIterator<true>(_end);
         }
 
-        std::vector<Entry>::iterator _begin;
-        std::vector<Entry>::iterator _end;
+        MaybeConstNodeVecIter<IsConst> _begin;
+        MaybeConstNodeVecIter<IsConst> _end;
     };
 
-    PartialSchemaRequirements() = default;
+    // Default PartialSchemaRequirements is a singular DNF of an empty PartialSchemaKey and
+    // fully-open PartialSchemaRequirement which does not bind.
+    PartialSchemaRequirements();
+
+    PartialSchemaRequirements(PSRExpr::Node requirements);
+
+    // TODO SERVER-74101: In the follow up ticket to update callsites, remove these constructors.
     PartialSchemaRequirements(std::vector<Entry>);
     PartialSchemaRequirements(std::initializer_list<Entry> entries)
         : PartialSchemaRequirements(std::vector<Entry>(entries)) {}
@@ -89,36 +134,66 @@ public:
     bool operator==(const PartialSchemaRequirements& other) const;
 
     /**
-     * Return true if there are zero predicates and zero projections.
+     * Return true if there are zero predicates and zero projections, or if there is a single
+     * fully-open predicate with no projections.
      */
-    bool empty() const;
+    bool isNoop() const;
 
+    /**
+     * Return the number of PartialSchemaEntries.
+     */
     size_t numLeaves() const;
+
+    /**
+     * Return the number of Disjunctions under a top-level Conjunction.
+     * TODO SERVER-74101 In the follow up ticket to update callsites, remove or clarify this method.
+     */
     size_t numConjuncts() const;
 
     std::set<ProjectionName> getBoundNames() const;
 
+    /**
+     * Return the bound projection name corresponding to the first conjunct matching the given key.
+     * Assert on non-DNF requirements.
+     */
     boost::optional<ProjectionName> findProjection(const PartialSchemaKey&) const;
 
     /**
-     * Picks the first top-level conjunct matching the given key.
+     * Pick the first conjunct matching the given key. Assert on non-DNF requirements.
      *
-     * Result includes the index of the top-level conjunct.
+     * Result includes the index of the conjunct.
      */
     boost::optional<std::pair<size_t, PartialSchemaRequirement>> findFirstConjunct(
         const PartialSchemaKey&) const;
 
-    ConstIter conjuncts() const {
-        return {_repr.begin(), _repr.end()};
+    // TODO SERVER-74101: Remove these methods in favor of visitDis/Conjuncts().
+    Range<true> conjuncts() const {
+        assertIsSingletonDisjunction();
+        const auto& atoms = _expr.cast<PSRExpr::Disjunction>()
+                                ->nodes()
+                                .begin()
+                                ->cast<PSRExpr::Conjunction>()
+                                ->nodes();
+        return {atoms.begin(), atoms.end()};
     }
 
-    Iter conjuncts() {
-        return {_repr.begin(), _repr.end()};
+    Range<false> conjuncts() {
+        assertIsSingletonDisjunction();
+        auto& atoms = _expr.cast<PSRExpr::Disjunction>()
+                          ->nodes()
+                          .begin()
+                          ->cast<PSRExpr::Conjunction>()
+                          ->nodes();
+        return {atoms.begin(), atoms.end()};
     }
 
     using Bindings = std::vector<std::pair<PartialSchemaKey, ProjectionName>>;
     Bindings iterateBindings() const;
 
+    /**
+     * Add an entry to the first AND under a top-level OR. Asserts on non-DNF requirements.
+     * TODO SERVER-74101 In the follow up ticket to update callsites, remove or clarify this method.
+     */
     void add(PartialSchemaKey, PartialSchemaRequirement);
 
     /**
@@ -139,15 +214,21 @@ public:
      *
      * This method will also remove any predicates that are trivially true (those will
      * a fully open DNF interval).
+     *
+     * TODO SERVER-73827: Consider applying this simplification during BoolExpr building.
      */
     bool simplify(std::function<bool(const PartialSchemaKey&, PartialSchemaRequirement&)>);
 
 private:
     // Restore the invariant that the entries are sorted by key.
+    // TODO SERVER-73827: Consider applying this normalization during BoolExpr building.
     void normalize();
 
-    using Repr = std::vector<Entry>;
-    Repr _repr;
+    // Asserts that _expr is in DNF form where the disjunction has a single conjunction child.
+    void assertIsSingletonDisjunction() const;
+
+    // _expr is currently always in DNF.
+    PSRExpr::Node _expr;
 };
 
 }  // namespace mongo::optimizer
