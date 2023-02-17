@@ -166,6 +166,9 @@ void ValuePrinter<T>::writeTagToStream(TypeTags tag) {
         case TypeTags::csiCell:
             stream << "csiCell";
             break;
+        case TypeTags::sortKeyComponentVector:
+            stream << "SortKeyComponentVector";
+            break;
         default:
             stream << "unknown tag";
             break;
@@ -538,6 +541,13 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             break;
         case TypeTags::csiCell:
             stream << "CsiCell(" << getCsiCellView(val) << ")";
+            break;
+        case TypeTags::sortKeyComponentVector:
+            stream << "SortKeyComponentVector(";
+            for (auto elt : getSortKeyComponentVectorView(val)->elts) {
+                stream << elt << ", ";
+            }
+            stream << ")";
             break;
         default:
             MONGO_UNREACHABLE;

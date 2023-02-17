@@ -85,12 +85,10 @@ ScanStage::ScanStage(UUID collectionUuid,
                  _fields.end()));
     // We cannot use a random cursor if we are seeking or requesting a reverse scan.
     invariant(!_useRandomCursor || (!_seekKeySlot && _forward));
-    // Initialize _fieldsBloomFilter.
-    _fieldsBloomFilter = 0;
     for (size_t idx = 0; idx < _fields.size(); ++idx) {
         const char* str = _fields[idx].c_str();
         auto len = _fields[idx].size();
-        _fieldsBloomFilter = _fieldsBloomFilter | computeFieldMask(str, len);
+        _fieldsBloomFilter.insert(str, len);
     }
 }
 
@@ -512,7 +510,7 @@ PlanState ScanStage::getNext() {
                 // the field.
                 auto field = bson::fieldNameAndLength(bsonElement);
                 const size_t offset = computeFieldMaskOffset(field.rawData(), field.size());
-                if (!(_fieldsBloomFilter & computeFieldMask(offset))) {
+                if (!(_fieldsBloomFilter.maybeContainsHash(computeFieldMask(offset)))) {
                     bsonElement = bson::advance(bsonElement, field.size());
                     continue;
                 }

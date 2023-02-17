@@ -30,11 +30,14 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/field_name_bloom_filter.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -58,6 +61,18 @@ public:
     Value computeSortKey(const WorkingSetMember&) const;
 
     /**
+     * Computes a KeyString that can be used as the sort key for this object.
+     */
+    KeyString::Value computeSortKeyString(const BSONObj& bson) const;
+
+    /**
+     * Determines all of the portions of the sort key for the given document and populates the
+     * output vector with their positions. The results in the output vector are valid until the
+     * next call.
+     */
+    void generateSortKeyComponentVector(const BSONObj& obj, std::vector<BSONElement>* out);
+
+    /**
      * Returns the sort key for the input 'doc' as a Value or throws if no key could be generated.
      * When the sort pattern has multiple components, the resulting sort key is an Array-typed Value
      * with one element for each component. For sort patterns with just one component, the sort key
@@ -79,7 +94,68 @@ public:
         return _sortPattern;
     }
 
+    void setCollator(const CollatorInterface* c) {
+        _collator = c;
+    }
+
+    size_t getApproximateSize() const {
+        return sizeof(this) + (_indexKeyGen ? _indexKeyGen->getApproximateSize() : 0) +
+            _sortKeyTreeRoot.getApproximateSize() + _sortSpecWithoutMeta.objsize() +
+            _localObjStorage.objsize();
+    }
+
 private:
+    /* Tree representation of the sort key pattern. E.g. {a.b:1, a.x: 1}
+     *      a
+     *    /  \
+     *   b    x
+     * This is used for the fast path where the sort key is generated in one pass over the bson.
+     * This is only used when the sort pattern does not include a $meta.
+     */
+    struct SortKeyTreeNode {
+        std::string name;
+        const SortPattern::SortPatternPart* part = nullptr;  // Pointer into the SortPattern.
+        std::vector<std::unique_ptr<SortKeyTreeNode>> children;
+        size_t partIdx = 0;
+
+        // Tracks field names of the children. We use this when scanning the bson to quickly skip
+        // over fields irrelevant to the sort pattern.
+        FieldNameBloomFilter<> bloomFilter;
+
+        // Adds a new component of the sort pattern to the tree.
+        void addSortPatternPart(const SortPattern::SortPatternPart* part,
+                                const size_t pathIdx,
+                                const size_t partIdx) {
+            if (pathIdx == part->fieldPath->getPathLength()) {
+                tassert(7103700, "Invalid sort tree", !this->part);
+                this->part = part;
+                this->partIdx = partIdx;
+                return;
+            }
+
+            for (auto& c : children) {
+                // Check if we already have a child with the same prefix.
+                if (c->name == part->fieldPath->getFieldName(pathIdx)) {
+                    c->addSortPatternPart(part, pathIdx + 1, partIdx);
+                    return;
+                }
+            }
+
+            children.push_back(std::make_unique<SortKeyTreeNode>());
+            children.back()->name = part->fieldPath->getFieldName(pathIdx).toString();
+            children.back()->addSortPatternPart(part, pathIdx + 1, partIdx);
+            bloomFilter.insert(children.back()->name.c_str(), children.back()->name.size());
+        }
+
+        size_t getApproximateSize() const {
+            size_t size = sizeof(this) + name.size();
+            for (auto& c : children) {
+                size += c->getApproximateSize();
+            }
+            return size;
+        }
+    };
+
     // Returns the sort key for the input 'doc' as a Value.
     //
     // Note that this function will ignore any metadata (e.g., textScore, randVal), in 'doc' but
@@ -135,6 +211,12 @@ private:
     // should always be sorted with the simple (i.e. binary) collation.
     Value getCollationComparisonKey(const Value& val) const;
 
+    // Fast path for reading a BSON obj and computing the sort key. Returns true on success, false
+    // when an array is encountered and the slow path needs to be used instead.
+    bool fastFillOutSortKeyParts(const BSONObj& bson,
+                                 const SortKeyGenerator::SortKeyTreeNode& tree,
+                                 std::vector<BSONElement>* out);
+
     const CollatorInterface* _collator = nullptr;
 
     SortPattern _sortPattern;
@@ -142,11 +224,18 @@ private:
     // The sort pattern with any $meta sort components stripped out, since the underlying index key
     // generator does not understand $meta sort.
     BSONObj _sortSpecWithoutMeta;
+    Ordering _ordering;
 
     // If we're not sorting with a $meta value we can short-cut some work.
     bool _sortHasMeta = false;
 
+    bool _sortHasRepeatKey = false;
+
     std::unique_ptr<BtreeKeyGenerator> _indexKeyGen;
+
+    // Used for fastFillOutSortKeyParts()/extractSortKeyParts().
+    SortKeyTreeNode _sortKeyTreeRoot;
+    BSONObj _localObjStorage;
 };
 
 }  // namespace mongo

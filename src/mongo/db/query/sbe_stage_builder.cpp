@@ -1364,27 +1364,66 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             std::move(stage), std::move(sortExpressions), root->nodeId());
 
     } else {
-        // Handle the case where two or more parts of the sort pattern have a common prefix.
-        orderBy = _slotIdGenerator.generateMultiple(1);
-        direction = {sbe::value::SortDirection::Ascending};
+        // When there's no limit on the sort, the dominating factor is number of comparisons
+        // (nlogn). A sort with a limit of k requires only nlogk comparisons. When k is small, the
+        // number of key generations (n) can actually dominate the runtime. So for all top-k sorts
+        // we use a "cheap" sort key: it's cheaper to construct but more expensive to compare. The
+        // assumption here is that k << n.
+
+        StringData sortKeyGenerator = sn->limit ? "generateCheapSortKey" : "generateSortKey";
 
         auto sortSpec = std::make_unique<sbe::value::SortSpec>(sn->pattern);
         auto sortSpecExpr =
             makeConstant(sbe::value::TypeTags::sortSpec,
                          sbe::value::bitcastFrom<sbe::value::SortSpec*>(sortSpec.release()));
 
+        const auto fullSortKeySlot = _slotIdGenerator.generate();
+
         // generateSortKey() will handle the parallel arrays check and sort key traversal for us,
         // so we don't need to generate our own sort key traversal logic in the SBE plan.
         stage = sbe::makeProjectStage(std::move(stage),
                                       root->nodeId(),
-                                      orderBy[0],
-                                      collatorSlot ? makeFunction("generateSortKey",
+                                      fullSortKeySlot,
+                                      collatorSlot ? makeFunction(sortKeyGenerator,
                                                                   std::move(sortSpecExpr),
                                                                   makeVariable(outputSlotId),
                                                                   makeVariable(*collatorSlot))
-                                                   : makeFunction("generateSortKey",
+                                                   : makeFunction(sortKeyGenerator,
                                                                   std::move(sortSpecExpr),
                                                                   makeVariable(outputSlotId)));
+
+        if (sortKeyGenerator == "generateSortKey") {
+            // In this case generateSortKey() produces a mem-comparable KeyString so we use for
+            // the comparison. We always sort in ascending order because the KeyString takes the
+            // ordering into account.
+            orderBy = {fullSortKeySlot};
+            direction = {sbe::value::SortDirection::Ascending};
+        } else {
+            // Generate the cheap sort key represented as an array then extract each component into
+            // a slot:
+            //
+            // sort [s1, s2] [asc, dsc] ...
+            // project s1=getElement(fullSortKey,0), s2=getElement(fullSortKey,1)
+            // project fullSortKey=generateSortKeyCheap(bson)
+            sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> prjSlotToExprMap;
+
+            int i = 0;
+            for (const auto& part : sortPattern) {
+                auto sortKeySlot = _slotIdGenerator.generate();
+
+                orderBy.push_back(sortKeySlot);
+                direction.push_back(part.isAscending ? sbe::value::SortDirection::Ascending
+                                                     : sbe::value::SortDirection::Descending);
+
+                prjSlotToExprMap[sortKeySlot] =
+                    makeFunction("sortKeyComponentVectorGetElement",
+                                 makeVariable(fullSortKeySlot),
+                                 makeConstant(sbe::value::TypeTags::NumberInt32, i));
+                ++i;
+            }
+            stage = sbe::makeS<sbe::ProjectStage>(
+                std::move(stage), std::move(prjSlotToExprMap), root->nodeId());
+        }
     }
 
     // Slots for sort stage to forward to parent stage. Values in these slots are not used during

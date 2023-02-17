@@ -4937,27 +4937,52 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetRegexFlags(Ar
     return {true, strType, strValue};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateSortKey(ArityType arity) {
+std::pair<value::SortSpec*, CollatorInterface*> ByteCode::generateSortKeyHelper(ArityType arity) {
     invariant(arity == 2 || arity == 3);
 
     auto [ssOwned, ssTag, ssVal] = getFromStack(0);
     auto [objOwned, objTag, objVal] = getFromStack(1);
     if (ssTag != value::TypeTags::sortSpec || !value::isObject(objTag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return {nullptr, nullptr};
     }
 
     CollatorInterface* collator{nullptr};
     if (arity == 3) {
         auto [collatorOwned, collatorTag, collatorVal] = getFromStack(2);
         if (collatorTag != value::TypeTags::collator) {
-            return {false, value::TypeTags::Nothing, 0};
+            return {nullptr, nullptr};
         }
         collator = value::getCollatorView(collatorVal);
     }
 
     auto ss = value::getSortSpecView(ssVal);
+    return {ss, collator};
+}
 
-    auto obj = [objTag = objTag, objVal = objVal]() {
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateCheapSortKey(
+    ArityType arity) {
+    auto [sortSpec, collator] = generateSortKeyHelper(arity);
+    if (!sortSpec) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    // We "move" the object argument into the sort spec.
+    auto sortKeyComponentVector =
+        sortSpec->generateSortKeyComponentVector(moveFromStack(1), collator);
+
+    return {false,
+            value::TypeTags::sortKeyComponentVector,
+            value::bitcastFrom<value::SortKeyComponentVector*>(sortKeyComponentVector)};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateSortKey(ArityType arity) {
+    auto [sortSpec, collator] = generateSortKeyHelper(arity);
+    if (!sortSpec) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto [objOwned, objTag, objVal] = getFromStack(1);
+    auto bsonObj = [objTag = objTag, objVal = objVal]() {
         if (objTag == value::TypeTags::bsonObject) {
             return BSONObj{value::bitcastTo<const char*>(objVal)};
         } else if (objTag == value::TypeTags::Object) {
@@ -4972,7 +4997,26 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateSortKey(
     return {true,
             value::TypeTags::ksValue,
             value::bitcastFrom<KeyString::Value*>(
-                new KeyString::Value(ss->generateSortKey(obj, collator)))};
+                new KeyString::Value(sortSpec->generateSortKey(bsonObj, collator)))};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponentVectorGetElement(
+    ArityType arity) {
+    invariant(arity == 2);
+
+    auto [sortVecOwned, sortVecTag, sortVecVal] = getFromStack(0);
+    auto [idxOwned, idxTag, idxVal] = getFromStack(1);
+    if (sortVecTag != value::TypeTags::sortKeyComponentVector ||
+        idxTag != value::TypeTags::NumberInt32) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto* sortObj = value::getSortKeyComponentVectorView(sortVecVal);
+    const auto idxInt32 = value::bitcastTo<int32_t>(idxVal);
+
+    invariant(idxInt32 >= 0 && static_cast<size_t>(idxInt32) < sortObj->elts.size());
+    auto [outTag, outVal] = sortObj->elts[idxInt32];
+    return {false, outTag, outVal};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(ArityType arity) {
@@ -5538,6 +5582,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinFtsMatch(arity);
         case Builtin::generateSortKey:
             return builtinGenerateSortKey(arity);
+        case Builtin::generateCheapSortKey:
+            return builtinGenerateCheapSortKey(arity);
+        case Builtin::sortKeyComponentVectorGetElement:
+            return builtinSortKeyComponentVectorGetElement(arity);
         case Builtin::makeBsonObj:
             return builtinMakeBsonObj(arity);
         case Builtin::tsSecond:
@@ -5773,6 +5821,10 @@ std::string builtinToString(Builtin b) {
             return "ftsMatch";
         case Builtin::generateSortKey:
             return "generateSortKey";
+        case Builtin::generateCheapSortKey:
+            return "generateCheapSortKey";
+        case Builtin::sortKeyComponentVectorGetElement:
+            return "sortKeyComponentVectorGetElement";
         case Builtin::makeBsonObj:
             return "makeBsonObj";
         case Builtin::tsSecond:

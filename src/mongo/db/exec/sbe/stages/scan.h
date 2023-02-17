@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/config.h"
+#include "mongo/db/exec/field_name_bloom_filter.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
@@ -217,7 +218,7 @@ private:
     // the accessor quickly rather than having to look it up in the _fieldAccessors hashtable.
     value::SlotAccessor* _tsFieldAccessor{nullptr};
 
-    uint64_t _fieldsBloomFilter{0};
+    FieldNameBloomFilter<computeFieldMask> _fieldsBloomFilter;
 
     RecordId _recordId;
 

@@ -36,27 +36,29 @@
 #include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
-
-SortKeyGenerator::SortKeyGenerator(SortPattern sortPattern, const CollatorInterface* collator)
-    : _collator(collator), _sortPattern(std::move(sortPattern)) {
+namespace {
+BSONObj createSortSpecWithoutMeta(const SortPattern& sortPattern) {
     BSONObjBuilder btreeBob;
-    size_t nFields = 0;
-
-    for (auto&& part : _sortPattern) {
+    for (auto&& part : sortPattern) {
         if (part.fieldPath) {
             btreeBob.append(part.fieldPath->fullPath(), part.isAscending ? 1 : -1);
-            ++nFields;
         }
     }
+    return btreeBob.obj();
+}
+}  // namespace
 
-    // The fake index key pattern used to generate Btree keys.
-    _sortSpecWithoutMeta = btreeBob.obj();
-    _sortHasMeta = nFields < _sortPattern.size();
-
+SortKeyGenerator::SortKeyGenerator(SortPattern sortPattern, const CollatorInterface* collator)
+    : _collator(collator),
+      _sortPattern(std::move(sortPattern)),
+      _sortSpecWithoutMeta(createSortSpecWithoutMeta(_sortPattern)),
+      _ordering(Ordering::make(_sortSpecWithoutMeta)),
+      _sortHasMeta(static_cast<size_t>(_sortSpecWithoutMeta.nFields()) < _sortPattern.size()) {
     // If we're just sorting by meta, don't bother creating an index key generator.
     if (_sortSpecWithoutMeta.isEmpty()) {
         return;
     }
+    const auto nFields = _sortSpecWithoutMeta.nFields();
 
     // We'll need to treat arrays as if we were to create an index over them. that is, we may need
     // to unnest the first level and consider each array element to decide the sort order. In order
@@ -69,11 +71,24 @@ SortKeyGenerator::SortKeyGenerator(SortPattern sortPattern, const CollatorInterf
     }
 
     constexpr bool isSparse = false;
-    _indexKeyGen = std::make_unique<BtreeKeyGenerator>(fieldNames,
-                                                       fixed,
-                                                       isSparse,
-                                                       KeyString::Version::kLatestVersion,
-                                                       Ordering::make(_sortSpecWithoutMeta));
+    _indexKeyGen = std::make_unique<BtreeKeyGenerator>(
+        fieldNames, fixed, isSparse, KeyString::Version::kLatestVersion, _ordering);
+
+    {
+        // TODO SERVER-74725: Remove this.
+        std::set<std::string> fieldNameSet;
+        for (auto& fn : fieldNames) {
+            fieldNameSet.insert(fn);
+        }
+        _sortHasRepeatKey = (fieldNameSet.size() != fieldNames.size());
+    }
+
+    if (!_sortHasMeta && !_sortHasRepeatKey) {
+        size_t i = 0;
+        for (auto&& keyPart : _sortPattern) {
+            _sortKeyTreeRoot.addSortPatternPart(&keyPart, 0, i++);
+        }
+    }
 }
 
 Value SortKeyGenerator::computeSortKey(const WorkingSetMember& wsm) const {
@@ -82,6 +97,21 @@ Value SortKeyGenerator::computeSortKey(const WorkingSetMember& wsm) const {
     }
 
     return computeSortKeyFromIndexKey(wsm);
+}
+
+KeyString::Value SortKeyGenerator::computeSortKeyString(const BSONObj& obj) const {
+    // This function could be optimized to have a fast path for the non-array case.
+
+    KeyStringSet keySet;
+    SharedBufferFragmentBuilder allocator(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+    const bool skipMultikey = false;
+    MultikeyPaths* multikeyPaths = nullptr;
+    _indexKeyGen->getKeys(allocator, obj, skipMultikey, &keySet, multikeyPaths, _collator);
+
+    // When 'isSparse' is false, BtreeKeyGenerator::getKeys() is guaranteed to insert at least
+    // one key into 'keySet', so this assertion should always be true.
+    tassert(5037000, "BtreeKeyGenerator failed to generate key", !keySet.empty());
+    return std::move(*keySet.extract_sequence().begin());
 }
 
 Value SortKeyGenerator::computeSortKeyFromIndexKey(const WorkingSetMember& member) const {
@@ -313,5 +343,111 @@ Value SortKeyGenerator::computeSortKeyFromDocument(const Document& doc,
     return DocumentMetadataFields::deserializeSortKey(_sortPattern.isSingleElementKey(),
                                                       extractKeyWithArray(doc, metadata));
 }
+
+
+bool SortKeyGenerator::fastFillOutSortKeyParts(const BSONObj& bson,
+                                               const SortKeyGenerator::SortKeyTreeNode& tree,
+                                               std::vector<BSONElement>* out) {
+    // Walk the BSON once and fill out the sort key parts.
+    // Returns false if array is encountered and fallback is needed.
+    BSONObjIterator it(bson);
+
+    size_t childrenVisited = 0;
+    while (it.more()) {
+        auto elt = it.next();
+
+        const SortKeyGenerator::SortKeyTreeNode* childNode = nullptr;
+        for (auto& child : tree.children) {
+            auto fieldNameSd = elt.fieldNameStringData();
+            if (tree.bloomFilter.maybeContains(fieldNameSd.rawData(), fieldNameSd.size())) {
+                // Could use a hash table, but sort patterns are small so brute force search is good
+                // enough.
+                if (child->name == fieldNameSd) {
+                    childNode = child.get();
+                    break;
+                }
+            }
+        }
+
+        if (childNode) {
+            if (elt.type() == BSONType::Array) {
+                // Slow path needed.
+                return false;
+            }
+
+            if (childNode->part) {
+                (*out)[childNode->partIdx] = elt;
+            }
+
+            if (elt.type() == BSONType::Object && !childNode->children.empty()) {
+                if (!fastFillOutSortKeyParts(elt.embeddedObject(), *childNode, out)) {
+                    return false;
+                }
+            }
+
+            ++childrenVisited;
+            if (childrenVisited == tree.children.size()) {
+                return true;
+            }
+        }
+    }
+
+    return true;
+}
+
+void SortKeyGenerator::generateSortKeyComponentVector(const BSONObj& bson,
+                                                      std::vector<BSONElement>* eltsOut) {
+    tassert(7103704, "Sort cannot have meta", !_sortHasMeta);
+    tassert(7103701, "Sort cannot have repeat keys", !_sortHasRepeatKey);
+    tassert(7103702, "Cannot pass null as eltsOut", eltsOut);
+    const static BSONObj kBsonWithNull = BSON("" << NullLabeler{});
+    const static BSONElement kNullElement = kBsonWithNull.firstElement();
+
+    for (size_t i = 0; i < eltsOut->size(); ++i) {
+        // In MQL missing sort keys are substituted with JS null.
+        (*eltsOut)[i] = kNullElement;
+    }
+
+    const bool fastPathSucceeded = fastFillOutSortKeyParts(bson, _sortKeyTreeRoot, eltsOut);
+
+    if (fastPathSucceeded) {
+        if (_collator) {
+            // Eventually we could reuse the buffer from _localObjStorage here.
+            BSONObjBuilder bob;
+            for (auto elt : *eltsOut) {
+                CollationIndexKey::collationAwareIndexKeyAppend(elt, _collator, &bob);
+            }
+            _localObjStorage = bob.obj();
+
+            {
+                size_t i = 0;
+                for (auto elt : _localObjStorage) {
+                    (*eltsOut)[i++] = elt;
+                }
+            }
+        }
+
+        // Fast path succeeded, we're done.
+        return;
+    }
+
+    // Slow, generic path, used when an array was encountered.
+    Document doc(bson);
+    DocumentMetadataFields meta;
+
+    Value sortKeyVal = computeSortKeyFromDocument(doc, meta);
+
+    Document outDoc(std::vector<std::pair<StringData, Value>>{{""_sd, sortKeyVal}});
+    _localObjStorage = outDoc.toBson();
+    if (_localObjStorage.firstElement().type() == BSONType::Array) {
+        size_t i = 0;
+        for (auto& elt : _localObjStorage.firstElement().embeddedObject()) {
+            (*eltsOut)[i++] = elt;
+        }
+    } else {
+        (*eltsOut)[0] = _localObjStorage.firstElement();
+    }
+}
+
 
 }  // namespace mongo

@@ -126,6 +126,10 @@ enum class TypeTags : uint8_t {
     MinKey,
     MaxKey,
 
+    // Pointer to sort key component vector. This type is always owned within a SortSpec,
+    // and is never created, copied, or destroyed by SBE.
+    sortKeyComponentVector,
+
     // Pointer to a struct with data necessary to read values from a columnstore index cell. The
     // values of this type are fully owned by the column_scan stage and are never created, cloned or
     // destroyed by SBE.
@@ -919,6 +923,13 @@ private:
     ValueSetType _values;
 };
 
+/*
+ * A vector of values representing a sort key. The values are NOT owned by this object.
+ */
+struct SortKeyComponentVector {
+    std::vector<std::pair<value::TypeTags, value::Value>> elts;
+};
+
 bool operator==(const ArraySet& lhs, const ArraySet& rhs);
 bool operator!=(const ArraySet& lhs, const ArraySet& rhs);
 
@@ -1258,6 +1269,10 @@ inline MakeObjSpec* getMakeObjSpecView(Value val) noexcept {
 
 inline IndexBounds* getIndexBoundsView(Value val) noexcept {
     return reinterpret_cast<IndexBounds*>(val);
+}
+
+inline SortKeyComponentVector* getSortKeyComponentVectorView(Value v) noexcept {
+    return reinterpret_cast<SortKeyComponentVector*>(v);
 }
 
 inline sbe::value::CsiCell* getCsiCellView(Value val) noexcept {
