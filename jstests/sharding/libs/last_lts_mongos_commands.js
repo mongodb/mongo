@@ -15,6 +15,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "reshardCollection",
     "rotateCertificates",
     "setAllowMigrations",
+    "setProfilingFilterGlobally",  // TODO SERVER-73305
     "testDeprecation",
     "testDeprecationInVersion2",
     "testRemoval",

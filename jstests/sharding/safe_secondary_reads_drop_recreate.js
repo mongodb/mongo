@@ -299,6 +299,7 @@ let testCases = {
     setIndexCommitQuorum: {skip: "primary only"},
     setFeatureCompatibilityVersion: {skip: "primary only"},
     setFreeMonitoring: {skip: "primary only"},
+    setProfilingFilterGlobally: {skip: "does not return user data"},
     setParameter: {skip: "does not return user data"},
     setShardVersion: {skip: "does not return user data"},
     shardCollection: {skip: "primary only"},
