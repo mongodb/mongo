@@ -61,6 +61,7 @@
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/collection_uuid_mismatch.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/async_results_merger.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
@@ -303,12 +304,9 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         if (ex.code() == ErrorCodes::CollectionUUIDMismatch &&
             !ex.extraInfo<CollectionUUIDMismatchInfo>()->actualCollection() &&
             !shardIds.count(cm.dbPrimary())) {
-            // We received CollectionUUIDMismatchInfo but it does not contain the actual
-            // namespace, and we did not attempt to establish a cursor on the primary shard.
-            // Attempt to do so now in case the collection corresponding to the provided UUID is
-            // unsharded. This should throw CollectionUUIDMismatchInfo, StaleShardVersion, or
-            // StaleDbVersion.
-            establishCursorsOnShards({cm.dbPrimary()});
+            // We received CollectionUUIDMismatch but it does not contain the actual namespace, and
+            // we did not attempt to establish a cursor on the primary shard.
+            uassertStatusOK(populateCollectionUUIDMismatch(opCtx, ex.toStatus()));
             MONGO_UNREACHABLE;
         }
 
