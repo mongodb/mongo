@@ -368,17 +368,6 @@ public:
     }
 
     /**
-     * Validates a collection, checking for errors and reporting back statistics.
-     * This operation is slow and blocking.
-     */
-    bool validate(const std::string& ns) {
-        BSONObj cmd = BSON("validate" << nsGetCollection(ns));
-        BSONObj info;
-        // TODO SERVER-72943: Use ns.dbName() which is DatabaseName object already.
-        return runCommand(DatabaseName(boost::none, nsGetDB(ns)), cmd, info);
-    }
-
-    /**
      * { name : "<short collection name>",
      *   options : { }
      * }
