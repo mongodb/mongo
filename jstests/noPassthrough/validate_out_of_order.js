@@ -2,7 +2,7 @@
  * Tests that out-of-order keys are detected by validation during both the collection and index scan
  * phases.
  *
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, requires_replication]
  */
 (function() {
 "use strict";
