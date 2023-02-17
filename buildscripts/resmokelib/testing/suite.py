@@ -373,11 +373,19 @@ class Suite(object):
                 sb.append("    %s (%d %s)" % (test_info.test_file, test_info.return_code,
                                               translate_exit_code(test_info.return_code)))
 
+                for exception_extractor in test_info.exception_extractors:
+                    for log_line in exception_extractor.get_exception():
+                        sb.append("        %s" % (log_line))
+
         if report.num_errored > 0:
             sb.append("The following tests had errors:")
             for test_info in report.get_errored():
                 test_names.append(test_info.test_file)
                 sb.append("    %s" % (test_info.test_file))
+
+                if test_info.error:
+                    for log_line in test_info.error:
+                        sb.append("        %s" % (log_line))
 
         if num_failed > 0 or report.num_errored > 0:
             test_names.sort(key=_report.test_order)

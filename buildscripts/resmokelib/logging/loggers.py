@@ -11,6 +11,7 @@ from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.core import redirect as redirect_lib
 from buildscripts.resmokelib.logging import buildlogger
 from buildscripts.resmokelib.logging import formatters
+from buildscripts.resmokelib.logging.handlers import ExceptionExtractionHandler, ExceptionExtractor, Truncate
 
 _DEFAULT_FORMAT = "[%(name)s] %(message)s"
 
@@ -191,6 +192,29 @@ def new_testqueue_logger(test_kind):
     logger = logging.Logger(name=test_kind)
     logger.parent = ROOT_TESTS_LOGGER
     return logger
+
+
+def configure_exception_capture(test_logger):
+    """Configure the test logger to extract exceptions and return the exception extractors."""
+    js_exception = ExceptionExtractor(
+        start_regex=r"^uncaught exception:",
+        end_regex=r"^exiting with code",
+        truncate=Truncate.LAST,
+    )
+    py_exception = ExceptionExtractor(
+        start_regex=r"^Traceback",
+        end_regex=r"^\S*:",
+        truncate=Truncate.FIRST,
+    )
+
+    # py_exception extracts Python exception messages from the stdout of a Python subprocess.
+    # Both it and js_exception are registered as logging.Handlers to avoid specializing which
+    # programming language exceptions to expect from certain kinds of tests. Python exceptions
+    # from resmoke hooks and fixtures are handled separately through TestReport.addError().
+    test_logger.addHandler(ExceptionExtractionHandler(js_exception))
+    test_logger.addHandler(ExceptionExtractionHandler(py_exception))
+
+    return [js_exception, py_exception]
 
 
 def new_test_logger(test_shortname, test_basename, command, parent, job_num, test_id, job_logger):

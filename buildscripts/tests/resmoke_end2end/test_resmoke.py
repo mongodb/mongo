@@ -4,6 +4,7 @@ import logging
 import json
 import os
 import os.path
+import subprocess
 import sys
 import time
 import unittest
@@ -12,6 +13,8 @@ from shutil import rmtree
 import yaml
 
 from buildscripts.resmokelib import core
+
+# pylint: disable=unsupported-membership-test
 
 
 class _ResmokeSelftest(unittest.TestCase):
@@ -423,3 +426,46 @@ class TestSetParameters(_ResmokeSelftest):
                     """--mongodSetParameter={"mirrorReads": {samplingRate: 1.0}}""",
                     """--mongodSetParameter={"mirrorReads": {samplingRate: 1.0}}"""
                 ]).wait())
+
+
+def execute_resmoke(resmoke_args):
+    return subprocess.run([sys.executable, "buildscripts/resmoke.py", "run"] + resmoke_args,
+                          text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout
+
+
+class TestExceptionExtraction(unittest.TestCase):
+    def test_resmoke_python_exception(self):
+        resmoke_args = [
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_failing_python.yml",
+        ]
+        output = execute_resmoke(resmoke_args)
+
+        expected = "The following tests failed (with exit code):\n        buildscripts/tests/resmoke_end2end/failtestfiles/python_failure.py (1 DB Exception)\n            [LAST Part of Exception]"
+        assert expected in output
+
+    def test_resmoke_javascript_exception(self):
+        resmoke_args = [
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_failing_javascript.yml",
+        ]
+        output = execute_resmoke(resmoke_args)
+
+        expected = "The following tests failed (with exit code):\n        buildscripts/tests/resmoke_end2end/failtestfiles/js_failure.js (253 Failure executing JS file)\n            uncaught exception: Error: [true] != [false] are not equal"
+        assert expected in output
+
+    def test_resmoke_fixture_error(self):
+        resmoke_args = [
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_fixture_error.yml",
+        ]
+        output = execute_resmoke(resmoke_args)
+
+        expected = "The following tests had errors:\n    job0_fixture_setup_0\n        Traceback (most recent call last):\n"
+        assert expected in output
+
+    def test_resmoke_hook_error(self):
+        resmoke_args = [
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_hook_error.yml",
+        ]
+        output = execute_resmoke(resmoke_args)
+
+        expected = "The following tests had errors:\n    buildscripts/tests/resmoke_end2end/failtestfiles/js_failure.js\n        Traceback (most recent call last):\n"
+        assert expected in output

@@ -1,7 +1,10 @@
 """Additional handlers that are used as the base classes of the buildlogger handler."""
 
+from collections import deque
+from enum import Enum
 import json
 import logging
+import re
 import threading
 import warnings
 
@@ -21,6 +24,75 @@ from buildscripts.resmokelib.logging import flush
 from buildscripts.resmokelib import utils
 
 _TIMEOUT_SECS = 55
+MAX_EXCEPTION_LENGTH = 10
+
+
+class Truncate(Enum):
+    """Enum to specify to truncate first/last part of exceptions upon overflow."""
+
+    FIRST = "FIRST"
+    LAST = "LAST"
+
+
+class ExceptionExtractor:
+    """A class which extracts an exception based on regex."""
+
+    def __init__(self, start_regex, end_regex, truncate):
+        """Initialize the exception extractor."""
+        self.start_re = re.compile(start_regex)
+        self.end_re = re.compile(end_regex)
+
+        self.current_exception = deque([])
+        self.active = False
+
+        self.truncate = truncate
+        self.current_exception_is_truncated = False
+
+        self.exception_detected = False
+
+    def process_log_line(self, log_line):
+        """Process the log line."""
+        if self.exception_detected:
+            return
+        if not self.active and self.start_re.search(log_line):
+            self.active = True
+            self.current_exception.append(log_line)
+        elif self.active:
+            self.current_exception.append(log_line)
+            if len(self.current_exception) > MAX_EXCEPTION_LENGTH:
+                self.current_exception_is_truncated = True
+                if self.truncate == Truncate.FIRST:
+                    self.current_exception.popleft()
+                else:
+                    self.current_exception.pop()
+
+            # Finalize Exception
+            if self.end_re.search(log_line):
+                self.exception_detected = True
+                if self.current_exception_is_truncated:
+                    self.current_exception.appendleft(
+                        "[LAST Part of Exception]" if self.truncate ==
+                        Truncate.FIRST else "[FIRST Part of Exception]")
+
+    def get_exception(self):
+        """Get the exception as a list of strings if it exists."""
+        if not self.exception_detected:
+            return []
+        return list(self.current_exception)
+
+
+class ExceptionExtractionHandler(logging.Handler):
+    """A handler class that extracts exceptions using the logger."""
+
+    def __init__(self, exception_extractor):
+        """Initialize the handler with the specified regex."""
+
+        logging.Handler.__init__(self)
+        self.exception_extractor = exception_extractor
+
+    def emit(self, record):
+        """Pass the log line to the exception extractor."""
+        self.exception_extractor.process_log_line(record.getMessage())
 
 
 class BufferedHandler(logging.Handler):

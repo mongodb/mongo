@@ -128,6 +128,10 @@ class TestReport(unittest.TestResult):
                                                                       test.basename(), command,
                                                                       test.logger, self.job_num,
                                                                       test.id(), self.job_logger)
+
+        # Set up logging handlers to capture exceptions.
+        test_info.exception_extractors = logging.loggers.configure_exception_capture(test_logger)
+
         test_info.url_endpoint = url_endpoint
         if self.logging_prefix is not None:
             test_logger.info(self.logging_prefix)
@@ -187,8 +191,9 @@ class TestReport(unittest.TestResult):
             test_info.status = "error"
             test_info.evergreen_status = "fail"
             test_info.return_code = test.return_code
+            test_info.error = self._exc_info_to_string(err, test).split('\n')
 
-    def setError(self, test):
+    def setError(self, test, err):
         """Change the outcome of an existing test to an error."""
         self.job_logger.info("setError(%s)", test)
 
@@ -201,6 +206,7 @@ class TestReport(unittest.TestResult):
             test_info.status = "error"
             test_info.evergreen_status = "fail"
             test_info.return_code = 2
+            test_info.error = self._exc_info_to_string(err, test).split('\n')
 
         # Recompute number of success, failures, and errors.
         self.num_succeeded = len(self.get_successful())
@@ -408,6 +414,8 @@ class TestInfo(object):
         self.evergreen_status = None
         self.return_code = None
         self.url_endpoint = None
+        self.exception_extractors = None
+        self.error = None
 
 
 def test_order(test_name):

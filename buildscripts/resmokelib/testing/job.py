@@ -304,7 +304,7 @@ class Job(object):
                 raise errors.StopExecution("A hook's after_test failed")
 
         except:
-            self.report.setError(test)
+            self.report.setError(test, sys.exc_info())
             raise
 
     def _fail_test(self, test, exc_info, return_code=1):
