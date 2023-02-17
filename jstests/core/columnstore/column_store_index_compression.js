@@ -61,7 +61,7 @@ class IndexStatsReader {
      * index _and_ that index is ready. Ready indexes do not have a "buildUUID" field.
      */
     static assertIndexReadySoon(remoteDB, collectionName, indexName) {
-        assert.soon(() => {
+        assert.soonNoExcept(() => {
             const indexResult = assert.commandWorked(
                 remoteDB.runCommand({listIndexes: collectionName, includeBuildUUIDs: true}));
             return indexResult.cursor.firstBatch.findIndex(
