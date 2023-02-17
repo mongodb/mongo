@@ -174,6 +174,10 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
         } else if (fieldName == "flags") {
             // Ignoring this field as it is deprecated.
             continue;
+        } else if (fieldName == "recordPreImages") {
+            // Ignoring this field as it is not supported.
+            collectionOptions.recordPreImagesOptionUsed = true;
+            continue;
         } else if (fieldName == "temp") {
             collectionOptions.temp = e.trueValue();
         } else if (fieldName == "changeStreamPreAndPostImages") {

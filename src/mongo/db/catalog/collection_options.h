@@ -124,6 +124,12 @@ struct CollectionOptions {
 
     bool temp = false;
 
+    // Indicates whether "recordPreImages" collection option was used in the collection definition.
+    // This needs to be remembered to make it possible to efficiently remove the option upon FCV
+    // upgrade. Otherwise, this option is not supported.
+    // TODO SERVER-74036: Remove once FCV 7.0 becomes last-LTS.
+    bool recordPreImagesOptionUsed{false};
+
     // Change stream options define whether or not to store the pre-images of the documents affected
     // by update and delete operations in a dedicated collection, that will be used for reading data
     // via changeStreams.
