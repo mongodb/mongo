@@ -253,7 +253,8 @@ class MongodLauncher(object):
         # that has migrated off of a shard, meant to allow most dependent queries on secondaries to
         # complete first. It defaults to 900, or 15 minutes, which is prohibitively long for tests.
         # Setting it in the .yml file overrides this.
-        if "shardsvr" in mongod_options and "orphanCleanupDelaySecs" not in suite_set_parameters:
+        if (("shardsvr" in mongod_options or "configsvr" in mongod_options)
+                and "orphanCleanupDelaySecs" not in suite_set_parameters):
             suite_set_parameters["orphanCleanupDelaySecs"] = 1
 
         # The LogicalSessionCache does automatic background refreshes in the server. This is
