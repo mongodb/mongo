@@ -27,40 +27,33 @@
  *    it in the license file.
  */
 
-#include "MongoCctypeCheck.h"
-#include "MongoHeaderBracketCheck.h"
-#include "MongoStdOptionalCheck.h"
-#include "MongoTestCheck.h"
-#include "MongoUninterruptibleLockGuardCheck.h"
-
-#include <clang-tidy/ClangTidy.h>
-#include <clang-tidy/ClangTidyCheck.h>
-#include <clang-tidy/ClangTidyModule.h>
-#include <clang-tidy/ClangTidyModuleRegistry.h>
+#include <optional>
+#include <string>
 
 namespace mongo {
-namespace tidy {
 
-class MongoTidyModule : public clang::tidy::ClangTidyModule {
-public:
-    void addCheckFactories(clang::tidy::ClangTidyCheckFactories& CheckFactories) override {
-        CheckFactories.registerCheck<MongoUninterruptibleLockGuardCheck>(
-            "mongo-uninterruptible-lock-guard-check");
-        CheckFactories.registerCheck<MongoHeaderBracketCheck>("mongo-header-bracket-check");
-        CheckFactories.registerCheck<MongoCctypeCheck>("mongo-cctype-check");
-        CheckFactories.registerCheck<MongoStdOptionalCheck>("mongo-std-optional-check");
-        CheckFactories.registerCheck<MongoTestCheck>("mongo-test-check");
-    }
+// Variable Decl and Parameter Decl
+void f(std::optional<std::string> parameterDeclTest) {
+    std::optional<std::string> variableDeclTest;
+}
+
+// Field Decl
+struct CertInformationToLog {
+    std::optional<int> fieldDeclTest = 5;
 };
 
-// Register the MongoTidyModule using this statically initialized variable.
-static clang::tidy::ClangTidyModuleRegistry::Add<MongoTidyModule> X("mongo-tidy-module",
-                                                                    "MongoDB custom checks.");
+// Reference Decl
+void functionName(const std::optional<int>& referenceDeclTest) {
+    return;
+}
 
-}  // namespace tidy
+class StringData {};
+// Function Return type Decl
+std::optional<std::string> functionReturnTypeDeclTest(StringData name);
 
-// This anchor is used to force the linker to link in the generated object file
-// and thus register the MongoTidyModule.
-volatile int MongoTidyModuleAnchorSource = 0;
+template <typename T>
+std::optional<T> templateDeclTest;
+
+using std::optional;
 
 }  // namespace mongo

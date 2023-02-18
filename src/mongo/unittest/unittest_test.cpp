@@ -205,7 +205,7 @@ class UnitTestFormatTest : public mongo::unittest::Test {
 public:
     template <template <typename...> class Optional, typename T, typename... As>
     auto mkOptional(As&&... as) {
-        return Optional<T>(std::forward<As>(as)...);
+        return Optional<T>(std::forward<As>(as)...);  // NOLINT
     }
 
     template <template <typename...> class OptionalTemplate>
@@ -219,10 +219,10 @@ public:
 
     template <template <typename...> class OptionalTemplate, class None>
     void runEqOptionalTest(None none) {
-        ASSERT_EQ(OptionalTemplate<int>{1}, OptionalTemplate<int>{1});
-        ASSERT_NE(OptionalTemplate<int>{1}, OptionalTemplate<int>{2});
-        ASSERT_EQ(OptionalTemplate<int>{}, OptionalTemplate<int>{});
-        ASSERT_EQ(OptionalTemplate<int>{}, none);
+        ASSERT_EQ(OptionalTemplate<int>{1}, OptionalTemplate<int>{1});  // NOLINT
+        ASSERT_NE(OptionalTemplate<int>{1}, OptionalTemplate<int>{2});  // NOLINT
+        ASSERT_EQ(OptionalTemplate<int>{}, OptionalTemplate<int>{});    // NOLINT
+        ASSERT_EQ(OptionalTemplate<int>{}, none);                       // NOLINT
     }
 };
 

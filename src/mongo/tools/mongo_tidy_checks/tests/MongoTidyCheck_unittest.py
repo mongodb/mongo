@@ -143,6 +143,26 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
+    def test_MongoStdOptionalCheck(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-std-optional-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = [
+            "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\nvoid f(std::optional<std::string> parameterDeclTest) {",
+            "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\n    std::optional<std::string> variableDeclTest;",
+            "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\n    std::optional<int> fieldDeclTest = 5;",
+            "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\nvoid functionName(const std::optional<int>& referenceDeclTest) {",
+            "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\nstd::optional<std::string> functionReturnTypeDeclTest(StringData name);",
+            "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\nstd::optional<T> templateDeclTest;",
+            "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\nusing std::optional;",
+        ]
+
+        self.run_clang_tidy()
+
 
 if __name__ == '__main__':
 
