@@ -2153,6 +2153,26 @@ tasks:
         vars:
           test_name: wt9937_parse_opts
 
+  - name: csuite-wt10461-skip-list-stress-test
+    tags: ["stress-test-1"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "csuite test"
+        vars:
+          test_name: wt10461_skip_list_stress
+
+  - name: csuite-wt10461-skip-list-stress-test-nonstandalone
+    tags: ["stress-test-1"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          NONSTANDALONE: -DWT_STANDALONE_BUILD=0
+      - func: "csuite test"
+        vars:
+          test_name: wt10461_skip_list_stress
+
   # End of csuite test tasks
 
   # Start of Python unit test tasks
