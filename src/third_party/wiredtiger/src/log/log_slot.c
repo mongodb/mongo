@@ -154,7 +154,7 @@ retry:
         while (slot->slot_unbuffered == 0) {
             WT_STAT_CONN_INCR(session, log_slot_close_unbuf);
             __wt_yield();
-            if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_SLOW_OPERATION)) {
+            if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_SLOW_OPERATION)) {
                 ++count;
                 if (count > WT_MILLION) {
                     time_stop = __wt_clock(session);

@@ -523,30 +523,6 @@ connection_runtime_config = [
         the maximum number of milliseconds an application thread will wait for space to be
         available in cache before giving up. Default will wait forever''',
         min=0),
-    Config('extra_diagnostics', '[]', r'''
-        enable additional diagnostics in WiredTiger. These additional diagnostics include 
-        diagnostic assertions that can cause WiredTiger to abort when an invalid state 
-        is detected.
-        Options are given as a list, such as 
-        <code>"extra_diagnostics=[out_of_order,visibility]"</code>.
-        Choosing \c all enables all assertions. When WiredTiger is compiled with 
-        \c HAVE_DIAGNOSTIC=1 all assertions are enabled and cannot be reconfigured
-        ''',
-        type='list', choices=[
-            "all", "concurrent_access", "data_validation", "invalid_op", "out_of_order",
-            "panic", "slow_operation", "visibility"]),
-
-    Config('history_store', '', r'''
-        history store configuration options''',
-        type='category', subconfig=[
-        Config('file_max', '0', r'''
-            the maximum number of bytes that WiredTiger is allowed to use for its history store
-            mechanism. If the history store file exceeds this size, a panic will be triggered. The
-            default value means that the history store file is unbounded and may use as much
-            space as the filesystem will accommodate. The minimum non-zero setting is 100MB.''',
-            # !!! Must match WT_HS_FILE_MIN
-            min='0')
-        ]),
     Config('cache_overhead', '8', r'''
         assume the heap allocator overhead is the specified percentage, and adjust the cache
         usage by that amount (for example, if there is 10GB of data in cache, a percentage of
@@ -695,6 +671,19 @@ connection_runtime_config = [
         cache_size and has to be greater than its counterpart \c eviction_updates_target. This
         setting only alters behavior if it is lower than \c eviction_trigger''',
         min=0, max='10TB'),
+    Config('extra_diagnostics', '[]', r'''
+        enable additional diagnostics in WiredTiger. These additional diagnostics include 
+        diagnostic assertions that can cause WiredTiger to abort when an invalid state 
+        is detected.
+        Options are given as a list, such as 
+        <code>"extra_diagnostics=[out_of_order,visibility]"</code>.
+        Choosing \c all enables all assertions. When WiredTiger is compiled with 
+        \c HAVE_DIAGNOSTIC=1 all assertions are enabled and cannot be reconfigured
+        ''',
+        type='list', choices=[
+            "all", "checkpoint_validate", "cursor_check", "disk_validate", "eviction_check", 
+            "generation_check", "hs_validate", "key_out_of_order", "log_validate", "prepared", 
+            "slow_operation", "txn_visibility"]),
     Config('file_manager', '', r'''
         control how file handles are managed''',
         type='category', subconfig=[
@@ -708,6 +697,17 @@ connection_runtime_config = [
         Config('close_scan_interval', '10', r'''
             interval in seconds at which to check for files that are inactive and close them''',
             min=1, max=100000),
+        ]),
+    Config('history_store', '', r'''
+        history store configuration options''',
+        type='category', subconfig=[
+        Config('file_max', '0', r'''
+            the maximum number of bytes that WiredTiger is allowed to use for its history store
+            mechanism. If the history store file exceeds this size, a panic will be triggered. The
+            default value means that the history store file is unbounded and may use as much
+            space as the filesystem will accommodate. The minimum non-zero setting is 100MB.''',
+            # !!! Must match WT_HS_FILE_MIN
+            min='0')
         ]),
     Config('io_capacity', '', r'''
         control how many bytes per second are written and read. Exceeding the capacity results

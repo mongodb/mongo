@@ -373,7 +373,7 @@ __split_ref_prepare(
         }
         WT_INTL_FOREACH_END;
 
-        if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_OUT_OF_ORDER))
+        if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_KEY_OUT_OF_ORDER))
             WT_WITH_PAGE_INDEX(session, __split_verify_intl_key_order(session, child));
     }
     *lockedp = locked;
@@ -535,7 +535,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
     /* Finalize the WT_REF move. */
     __split_ref_final(session, split_gen, &locked);
 
-    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_DATA_VALIDATION)) {
+    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_KEY_OUT_OF_ORDER)) {
         WT_WITH_PAGE_INDEX(session, ret = __split_verify_root(session, root));
         WT_ERR(ret);
     }
@@ -790,7 +790,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
     split_gen = __wt_gen(session, WT_GEN_SPLIT);
     parent->pg_intl_split_gen = split_gen;
 
-    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_OUT_OF_ORDER))
+    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_KEY_OUT_OF_ORDER))
         WT_WITH_PAGE_INDEX(session, __split_verify_intl_key_order(session, parent));
 
     /* The split is complete and verified, ignore benign errors. */
@@ -1062,7 +1062,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
     /* Finalize the WT_REF move. */
     __split_ref_final(session, split_gen, &locked);
 
-    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_OUT_OF_ORDER)) {
+    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_KEY_OUT_OF_ORDER)) {
         WT_WITH_PAGE_INDEX(session, __split_verify_intl_key_order(session, parent));
         WT_WITH_PAGE_INDEX(session, __split_verify_intl_key_order(session, page));
     }
@@ -1677,7 +1677,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi, WT_R
       session, multi->disk_image != NULL || (multi->supd_entries == 0 && !multi->supd_restore));
 
     /* Verify any disk image we have. */
-    WT_ASSERT_OPTIONAL(session, WT_DIAG_DATA_VALIDATION,
+    WT_ASSERT_OPTIONAL(session, WT_DIAGNOSTIC_DISK_VALIDATE,
       multi->disk_image == NULL ||
         __wt_verify_dsk_image(session, "[page instantiate]", multi->disk_image, 0, &multi->addr,
           WT_VRFY_DISK_EMPTY_PAGE_OK) == 0,
@@ -1778,7 +1778,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
      * otherwise the page might be evicted based on its last reconciliation which no longer matches
      * reality after the split.
      */
-    WT_ASSERT_OPTIONAL(session, WT_DIAG_DATA_VALIDATION, __wt_leaf_page_can_split(session, page),
+    WT_ASSERT_ALWAYS(session, __wt_leaf_page_can_split(session, page),
       "Attempted to split a page that cannot be split");
     WT_ASSERT_ALWAYS(session, __wt_page_is_modified(page), "Attempted to split a clean page");
 

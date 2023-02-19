@@ -1002,7 +1002,7 @@ __curhs_insert(WT_CURSOR *cursor)
     /* We no longer own the update memory, the page does; don't free it under any circumstances. */
     hs_tombstone = hs_upd = NULL;
 
-    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_OUT_OF_ORDER)) {
+    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_HS_VALIDATE)) {
         /* Do a search again and call next to check the key order. */
         ret = __curhs_file_cursor_search_near(session, file_cursor, &exact);
         /* We can get not found if the inserted history store record is obsolete. */

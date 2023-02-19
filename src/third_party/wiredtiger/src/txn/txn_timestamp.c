@@ -458,9 +458,8 @@ __txn_assert_after_reads(WT_SESSION_IMPL *session, const char *op, wt_timestamp_
     uint32_t i, session_cnt;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
 
-    txn_global = &S2C(session)->txn_global;
-
-    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_VISIBILITY)) {
+    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_TXN_VISIBILITY)) {
+        txn_global = &S2C(session)->txn_global;
         WT_ORDERED_READ(session_cnt, S2C(session)->session_cnt);
         WT_STAT_CONN_INCR(session, txn_walk_sessions);
         WT_STAT_CONN_INCRV(session, txn_sessions_walked, session_cnt);
@@ -485,6 +484,7 @@ __txn_assert_after_reads(WT_SESSION_IMPL *session, const char *op, wt_timestamp_
         WT_UNUSED(session);
         WT_UNUSED(op);
         WT_UNUSED(ts);
+        WT_UNUSED(txn_global);
     }
 }
 

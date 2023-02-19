@@ -1963,11 +1963,16 @@ err:
 int
 __wt_extra_diagnostics_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
-    static const WT_NAME_FLAG extra_diagnostics_types[] = {{"all", WT_DIAG_ALL},
-      {"concurrent_access", WT_DIAG_CONCURRENT_ACCESS},
-      {"data_validation", WT_DIAG_DATA_VALIDATION}, {"invalid_op", WT_DIAG_INVALID_OP},
-      {"out_of_order", WT_DIAG_OUT_OF_ORDER}, {"panic", WT_DIAG_PANIC},
-      {"slow_operation", WT_DIAG_SLOW_OPERATION}, {"visibility", WT_DIAG_VISIBILITY}, {NULL, 0}};
+    static const WT_NAME_FLAG extra_diagnostics_types[] = {{"all", WT_DIAGNOSTIC_ALL},
+      {"checkpoint_validate", WT_DIAGNOSTIC_CHECKPOINT_VALIDATE},
+      {"cursor_check", WT_DIAGNOSTIC_CURSOR_CHECK}, {"disk_validate", WT_DIAGNOSTIC_DISK_VALIDATE},
+      {"eviction_check", WT_DIAGNOSTIC_EVICTION_CHECK},
+      {"generation_check", WT_DIAGNOSTIC_GENERATION_CHECK},
+      {"hs_validate", WT_DIAGNOSTIC_HS_VALIDATE},
+      {"key_out_of_order", WT_DIAGNOSTIC_KEY_OUT_OF_ORDER},
+      {"log_validate", WT_DIAGNOSTIC_LOG_VALIDATE}, {"prepared", WT_DIAGNOSTIC_PREPARED},
+      {"slow_operation", WT_DIAGNOSTIC_SLOW_OPERATION},
+      {"txn_visibility", WT_DIAGNOSTIC_TXN_VISIBILITY}, {NULL, 0}};
 
     WT_CONNECTION_IMPL *conn;
     WT_CONFIG_ITEM cval, sval;
@@ -1980,7 +1985,7 @@ __wt_extra_diagnostics_config(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(__wt_config_gets(session, cfg, "extra_diagnostics", &cval));
 
 #ifdef HAVE_DIAGNOSTIC
-    flags = WT_DIAG_ALL;
+    flags = WT_DIAGNOSTIC_ALL;
     for (ft = extra_diagnostics_types; ft->name != NULL; ft++) {
         if ((ret = __wt_config_subgets(session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
             WT_RET_MSG(session, EINVAL,

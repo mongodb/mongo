@@ -72,7 +72,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint
         live_open = block->live_open;
         block->live_open = true;
         __wt_spin_unlock(session, &block->live_lock);
-        WT_ERR_ASSERT(session, WT_DIAG_CONCURRENT_ACCESS, live_open == false, EBUSY,
+        WT_ERR_ASSERT(session, WT_DIAGNOSTIC_CHECKPOINT_VALIDATE, live_open == false, EBUSY,
           "%s: attempt to re-open live file", block->name);
 
         ci = &block->live;
@@ -486,7 +486,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
     ci = &block->live;
     fatal = locked = false;
 
-    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_DATA_VALIDATION))
+    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_CHECKPOINT_VALIDATE))
         WT_RET(__ckpt_verify(session, ckptbase));
 
     /*
@@ -581,7 +581,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
          */
         if (next_ckpt->bpriv == NULL && !F_ISSET(next_ckpt, WT_CKPT_ADD)) {
             WT_ERR(__ckpt_extlist_read(session, block, next_ckpt, &local));
-            WT_ERR_ASSERT(session, WT_DIAG_INVALID_OP, local == true, WT_PANIC,
+            WT_ERR_ASSERT(session, WT_DIAGNOSTIC_CHECKPOINT_VALIDATE, local == true, WT_PANIC,
               "tiered storage checkpoint follows local checkpoint");
         }
     }

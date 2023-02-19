@@ -78,7 +78,7 @@ __txn_op_log(
      * operations, we shouldn't see them here.
      */
     if (CUR2BT(cbt)->type == BTREE_ROW) {
-        if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_DATA_VALIDATION))
+        if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_LOG_VALIDATE))
             __txn_op_log_row_key_check(session, cbt);
 
         switch (upd->type) {

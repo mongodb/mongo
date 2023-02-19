@@ -839,7 +839,7 @@ __rec_write(WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, size_t *addr_
     btree = S2BT(session);
     result_len = 0;
 
-    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_DATA_VALIDATION)) {
+    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_DISK_VALIDATE)) {
         /* Checkpoint calls are different than standard calls. */
         WT_ASSERT_ALWAYS(session,
           (!checkpoint && addr != NULL && addr_sizep != NULL) ||

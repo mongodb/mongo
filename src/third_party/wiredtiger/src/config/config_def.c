@@ -136,9 +136,10 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
   {"eviction_updates_target", "int", NULL, "min=0,max=10TB", NULL, 0},
   {"eviction_updates_trigger", "int", NULL, "min=0,max=10TB", NULL, 0},
   {"extra_diagnostics", "list", NULL,
-    "choices=[\"all\",\"concurrent_access\","
-    "\"data_validation\",\"invalid_op\",\"out_of_order\",\"panic\","
-    "\"slow_operation\",\"visibility\"]",
+    "choices=[\"all\",\"checkpoint_validate\",\"cursor_check\""
+    ",\"disk_validate\",\"eviction_check\",\"generation_check\","
+    "\"hs_validate\",\"key_out_of_order\",\"log_validate\","
+    "\"prepared\",\"slow_operation\",\"txn_visibility\"]",
     NULL, 0},
   {"file_manager", "category", NULL, NULL, confchk_wiredtiger_open_file_manager_subconfigs, 3},
   {"history_store", "category", NULL, NULL, confchk_wiredtiger_open_history_store_subconfigs, 1},
@@ -890,9 +891,10 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
   {"eviction_updates_trigger", "int", NULL, "min=0,max=10TB", NULL, 0},
   {"exclusive", "boolean", NULL, NULL, NULL, 0}, {"extensions", "list", NULL, NULL, NULL, 0},
   {"extra_diagnostics", "list", NULL,
-    "choices=[\"all\",\"concurrent_access\","
-    "\"data_validation\",\"invalid_op\",\"out_of_order\",\"panic\","
-    "\"slow_operation\",\"visibility\"]",
+    "choices=[\"all\",\"checkpoint_validate\",\"cursor_check\""
+    ",\"disk_validate\",\"eviction_check\",\"generation_check\","
+    "\"hs_validate\",\"key_out_of_order\",\"log_validate\","
+    "\"prepared\",\"slow_operation\",\"txn_visibility\"]",
     NULL, 0},
   {"file_extend", "list", NULL, "choices=[\"data\",\"log\"]", NULL, 0},
   {"file_manager", "category", NULL, NULL, confchk_wiredtiger_open_file_manager_subconfigs, 3},
@@ -981,9 +983,10 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
   {"eviction_updates_trigger", "int", NULL, "min=0,max=10TB", NULL, 0},
   {"exclusive", "boolean", NULL, NULL, NULL, 0}, {"extensions", "list", NULL, NULL, NULL, 0},
   {"extra_diagnostics", "list", NULL,
-    "choices=[\"all\",\"concurrent_access\","
-    "\"data_validation\",\"invalid_op\",\"out_of_order\",\"panic\","
-    "\"slow_operation\",\"visibility\"]",
+    "choices=[\"all\",\"checkpoint_validate\",\"cursor_check\""
+    ",\"disk_validate\",\"eviction_check\",\"generation_check\","
+    "\"hs_validate\",\"key_out_of_order\",\"log_validate\","
+    "\"prepared\",\"slow_operation\",\"txn_visibility\"]",
     NULL, 0},
   {"file_extend", "list", NULL, "choices=[\"data\",\"log\"]", NULL, 0},
   {"file_manager", "category", NULL, NULL, confchk_wiredtiger_open_file_manager_subconfigs, 3},
@@ -1071,9 +1074,10 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
   {"eviction_updates_trigger", "int", NULL, "min=0,max=10TB", NULL, 0},
   {"extensions", "list", NULL, NULL, NULL, 0},
   {"extra_diagnostics", "list", NULL,
-    "choices=[\"all\",\"concurrent_access\","
-    "\"data_validation\",\"invalid_op\",\"out_of_order\",\"panic\","
-    "\"slow_operation\",\"visibility\"]",
+    "choices=[\"all\",\"checkpoint_validate\",\"cursor_check\""
+    ",\"disk_validate\",\"eviction_check\",\"generation_check\","
+    "\"hs_validate\",\"key_out_of_order\",\"log_validate\","
+    "\"prepared\",\"slow_operation\",\"txn_visibility\"]",
     NULL, 0},
   {"file_extend", "list", NULL, "choices=[\"data\",\"log\"]", NULL, 0},
   {"file_manager", "category", NULL, NULL, confchk_wiredtiger_open_file_manager_subconfigs, 3},
@@ -1158,9 +1162,10 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
   {"eviction_updates_trigger", "int", NULL, "min=0,max=10TB", NULL, 0},
   {"extensions", "list", NULL, NULL, NULL, 0},
   {"extra_diagnostics", "list", NULL,
-    "choices=[\"all\",\"concurrent_access\","
-    "\"data_validation\",\"invalid_op\",\"out_of_order\",\"panic\","
-    "\"slow_operation\",\"visibility\"]",
+    "choices=[\"all\",\"checkpoint_validate\",\"cursor_check\""
+    ",\"disk_validate\",\"eviction_check\",\"generation_check\","
+    "\"hs_validate\",\"key_out_of_order\",\"log_validate\","
+    "\"prepared\",\"slow_operation\",\"txn_visibility\"]",
     NULL, 0},
   {"file_extend", "list", NULL, "choices=[\"data\",\"log\"]", NULL, 0},
   {"file_manager", "category", NULL, NULL, confchk_wiredtiger_open_file_manager_subconfigs, 3},

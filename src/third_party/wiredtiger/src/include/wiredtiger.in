@@ -2351,8 +2351,10 @@ struct __wt_connection {
 	 * <code>"extra_diagnostics=[out_of_order\,visibility]"</code>. Choosing \c all enables all
 	 * assertions.  When WiredTiger is compiled with \c HAVE_DIAGNOSTIC=1 all assertions are
 	 * enabled and cannot be reconfigured., a list\, with values chosen from the following
-	 * options: \c "all"\, \c "concurrent_access"\, \c "data_validation"\, \c "invalid_op"\, \c
-	 * "out_of_order"\, \c "panic"\, \c "slow_operation"\, \c "visibility"; default \c [].}
+	 * options: \c "all"\, \c "checkpoint_validate"\, \c "cursor_check"\, \c "disk_validate"\,
+	 * \c "eviction_check"\, \c "generation_check"\, \c "hs_validate"\, \c "key_out_of_order"\,
+	 * \c "log_validate"\, \c "prepared"\, \c "slow_operation"\, \c "txn_visibility"; default \c
+	 * [].}
 	 * @config{file_manager = (, control how file handles are managed., a set of related
 	 * configuration options defined as follows.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
@@ -3123,8 +3125,9 @@ struct __wt_connection {
  * <code>"extra_diagnostics=[out_of_order\,visibility]"</code>. Choosing \c all enables all
  * assertions.  When WiredTiger is compiled with \c HAVE_DIAGNOSTIC=1 all assertions are enabled and
  * cannot be reconfigured., a list\, with values chosen from the following options: \c "all"\, \c
- * "concurrent_access"\, \c "data_validation"\, \c "invalid_op"\, \c "out_of_order"\, \c "panic"\,
- * \c "slow_operation"\, \c "visibility"; default \c [].}
+ * "checkpoint_validate"\, \c "cursor_check"\, \c "disk_validate"\, \c "eviction_check"\, \c
+ * "generation_check"\, \c "hs_validate"\, \c "key_out_of_order"\, \c "log_validate"\, \c
+ * "prepared"\, \c "slow_operation"\, \c "txn_visibility"; default \c [].}
  * @config{file_extend, file size extension configuration.  If set\, extend files of the given type
  * in allocations of the given size\, instead of a block at a time as each new block is written.
  * For example\, <code>file_extend=(data=16MB)</code>. If set to 0\, disable file size extension for

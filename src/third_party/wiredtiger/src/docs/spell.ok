@@ -391,6 +391,7 @@ hugepage
 iSi
 icount
 ie
+ifdef
 iflag
 incr
 indices

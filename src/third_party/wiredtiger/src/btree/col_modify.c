@@ -81,7 +81,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
         /* Since on this path we never set append, make sure we aren't appending. */
         WT_ASSERT_ALWAYS(
           session, recno != WT_RECNO_OOB, "Out-of-bound recno provided for a non-append operation");
-        WT_ASSERT_OPTIONAL(session, WT_DIAG_OUT_OF_ORDER,
+        WT_ASSERT_OPTIONAL(session, WT_DIAGNOSTIC_KEY_OUT_OF_ORDER,
           cbt->compare == 0 ||
             recno <= (btree->type == BTREE_COL_VAR ? __col_var_last_recno(cbt->ref) :
                                                      __col_fix_last_recno(cbt->ref)),
