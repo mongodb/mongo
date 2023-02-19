@@ -282,6 +282,12 @@ config_bool(
 )
 
 config_bool(
+    ENABLE_LAZYFS
+    "Build LazyFS for testing"
+    DEFAULT OFF
+)
+
+config_bool(
     ENABLE_S3
     "Build the S3 storage extension"
     DEFAULT OFF

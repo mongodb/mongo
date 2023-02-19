@@ -45,6 +45,16 @@
 #define DEFAULT_TABLE_SCHEMA "key_format=i,value_format=S"
 #define MKDIR_COMMAND "mkdir "
 
+/* Subdirectory names, if we need to split the test directory into multiple subdirectories. */
+#define RECORDS_DIR "records"
+#define WT_HOME_DIR "WT_HOME"
+
+/* Default file and subdirectory names to use for LazyFS in the tests. */
+#define LAZYFS_BASE_DIR "base"
+#define LAZYFS_CONFIG_FILE "lazyfs-config.toml"
+#define LAZYFS_CONTROL_FILE "lazyfs-control.fifo"
+#define LAZYFS_LOG_FILE "lazyfs.log"
+
 #ifdef _WIN32
 #include "windows_shim.h"
 #endif
@@ -138,6 +148,18 @@ typedef struct {
     int threadnum;
     int thread_counter;
 } TEST_PER_THREAD_OPTS;
+
+/*
+ * A data structure for everything that we need to keep track of when using LazyFS.
+ */
+typedef struct {
+    char base[PATH_MAX];       /* The base home directory under LazyFS, if using it */
+    char config[PATH_MAX];     /* The LazyFS config file */
+    char control[PATH_MAX];    /* The LazyFS FIFO file for controlling it */
+    char mountpoint[PATH_MAX]; /* The mount home directory under LazyFS, if using it */
+    char logfile[PATH_MAX];    /* The LazyFS log file */
+    pid_t pid;                 /* The PID of the LazyFS process */
+} WT_LAZY_FS;
 
 /*
  * testutil_assert --
@@ -389,6 +411,15 @@ const char *example_setup(int, char *const *);
  */
 int handle_op_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
 int handle_op_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
+bool is_mounted(const char *);
+void lazyfs_command(const char *, const char *);
+void lazyfs_clear_cache(const char *);
+void lazyfs_create_config(const char *, const char *, const char *);
+void lazyfs_display_cache_usage(const char *);
+void lazyfs_init(void);
+bool lazyfs_is_implicitly_enabled(void);
+pid_t lazyfs_mount(const char *, const char *, const char *);
+void lazyfs_unmount(const char *, pid_t);
 void op_bulk(void *);
 void op_bulk_unique(void *);
 void op_create(void *);
@@ -407,6 +438,9 @@ void testutil_create_backup_directory(const char *);
 void testutil_deduce_build_dir(TEST_OPTS *opts);
 int testutil_general_event_handler(
   WT_EVENT_HANDLER *, WT_CONNECTION *, WT_SESSION *, WT_EVENT_TYPE, void *);
+void testutil_lazyfs_cleanup(WT_LAZY_FS *);
+void testutil_lazyfs_clear_cache(WT_LAZY_FS *);
+void testutil_lazyfs_setup(WT_LAZY_FS *, const char *);
 void testutil_make_work_dir(const char *);
 void testutil_modify_apply(WT_ITEM *, WT_ITEM *, WT_MODIFY *, int, uint8_t);
 void testutil_parse_begin_opt(int, char *const *, const char *, TEST_OPTS *);

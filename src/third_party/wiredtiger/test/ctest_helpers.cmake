@@ -233,8 +233,8 @@ function(define_c_test)
         0
         "C_TEST"
         ""
-        "TARGET;DIR_NAME;DEPENDS;EXEC_SCRIPT"
-        "SOURCES;FLAGS;ARGUMENTS;VARIANTS;ADDITIONAL_FILES"
+        "TARGET;DIR_NAME;EXEC_SCRIPT"
+        "SOURCES;FLAGS;ARGUMENTS;VARIANTS;DEPENDS;ADDITIONAL_FILES"
     )
     if (NOT "${C_TEST_UNPARSED_ARGUMENTS}" STREQUAL "")
         message(FATAL_ERROR "Unknown arguments to define_c_test: ${C_TEST_UNPARSED_ARGUMENTS}")

@@ -31,6 +31,10 @@
 #include <sys/wait.h>
 #endif
 
+#ifdef __linux__
+#include <libgen.h>
+#endif
+
 void (*custom_die)(void) = NULL;
 const char *progname = "program name not set";
 
@@ -563,4 +567,26 @@ example_setup(int argc, char *const *argv)
         home = "WT_HOME";
     testutil_make_work_dir(home);
     return (home);
+}
+
+/*
+ * is_mounted --
+ *     Check whether the given directory (other than /) is mounted. Works only on Linux.
+ */
+bool
+is_mounted(const char *mount_dir)
+{
+#ifndef __linux__
+    WT_UNUSED(mount_dir);
+    return false;
+#else
+    struct stat sb, parent_sb;
+    char buf[PATH_MAX];
+
+    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", mount_dir));
+    testutil_assert_errno(stat(mount_dir, &sb) == 0);
+    testutil_assert_errno(stat(dirname(buf), &parent_sb) == 0);
+
+    return sb.st_dev != parent_sb.st_dev;
+#endif
 }
