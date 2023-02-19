@@ -36,10 +36,26 @@
 #include <signal.h>
 #endif
 
+#ifdef __linux__
 #define LAZYFS_PATH "../../../lazyfs/src/lazyfs/lazyfs"
+#endif
+
 #define LAZYFS_SUFFIX "_lazyfs"
 
+#ifdef __linux__
 static char lazyfs_home[PATH_MAX]; /* Path to LazyFS */
+#endif
+
+/*
+ * Deal with compiler errors due to the following functions not returning outside of Linux.
+ */
+#ifndef __linux__
+void lazyfs_init(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+pid_t lazyfs_mount(const char *, const char *, const char *) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+void lazyfs_unmount(const char *, pid_t) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+void testutil_lazyfs_setup(WT_LAZY_FS *, const char *) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+void testutil_lazyfs_cleanup(WT_LAZY_FS *) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+#endif
 
 /*
  * lazyfs_is_implicitly_enabled --
@@ -328,8 +344,13 @@ testutil_lazyfs_clear_cache(WT_LAZY_FS *lazyfs)
 void
 testutil_lazyfs_cleanup(WT_LAZY_FS *lazyfs)
 {
+#ifndef __linux__
+    WT_UNUSED(lazyfs);
+    testutil_die(ENOENT, "LazyFS is not available on this platform.");
+#else
     lazyfs_unmount(lazyfs->mountpoint, lazyfs->pid);
     lazyfs->pid = 0;
 
     testutil_clean_work_dir(lazyfs->mountpoint);
+#endif
 }
