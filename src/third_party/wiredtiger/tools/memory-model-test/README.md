@@ -32,37 +32,50 @@ There are two broad groups of tests:
 
 ### Requirements
 * ARM64 or x86_64 based CPU
-* C++ compiler that supports C++ 20
+* C++ compiler that supports C++ 17 or (better) C++ 20
 * (optional) CMake and ninja
+
+By default, the Memory Model Tool will use the C++ 20 `std::binary_semaphore`. Unfortunately, this class is not
+available in all compilers that say they support C++ 20. If necessary, define the `AVOID_CPP20_SEMAPHORE` macro to 
+use the `basic_semaphore` class included in this project instead of `std::binary_semaphore`.
 
 ### Build
 
 There are two options:
 
-* Use the CMakeLists.txt file with CMake:
+- Use the CMakeLists.txt file with CMake:
   ```
   mkdir build
   cmake -G Ninja ../.
   ninja
   ```
-* Use `g++` directly.
+- Use `g++` directly.
 
-  For Evergreen, first ensure that the correct C++ compiler is on the path:
+  For Ubuntu on Evergreen, first ensure that the correct C++ compiler is on the path:
   
   ```
   export "PATH=/opt/mongodbtoolchain/v4/bin:$PATH"
   ```
 
-  On both Mac or Evergreen, compile using g++:
-  ```
-  g++ -o memory_model_test -O2 memory_model_test.cpp -lpthread -std=c++20 -Wall -Werror
-  ```
+  On both Mac or Evergreen, compile using g++.
+ 
+  - For C++ 20:
+    ```
+    g++ -o memory_model_test -O2 memory_model_test.cpp -lpthread -std=c++20 -Wall -Werror
+    ```
+  - For C++ 17 with the local `basic_semaphore`:
+    ```
+    g++ -o memory_model_test -O2 memory_model_test.cpp -lpthread -std=c++17 -Wall -Werror -DAVOID_CPP20_SEMAPHORE
+    ```
+  
 
 Some tests use compiler barriers to prevent the compiler re-ordering memory accesses during optimisation.
 
 Note: if you get compile errors related to `#include <semaphore>` or semaphores in general,
-then check that you are using both the correct compiler and compiling for C++ 20. 
-The test uses the C++ 20 semaphore library as it is supported on both Mac and Ubuntu.
+then check that you are using both the correct compiler and compiling for C++ 20, 
+or use the `AVOID_CPP20_SEMAPHORE` macro to use the local `basic_semaphore`. 
+
+The test uses the C++ semaphore library as it is supported on both Mac and Ubuntu.
 
 ### Running the test
 

@@ -13,12 +13,21 @@
 
 #include <iostream>
 #include <list>
-#include <semaphore>
 #include <thread>
 #include <chrono>
 #include <random>
 #include <utility>
 #include <unistd.h>
+
+#ifdef AVOID_CPP20_SEMAPHORE
+#include "basic_semaphore.h"
+using  binary_semaphore = basic_semaphore;
+const std::string binary_semaphore_version = "basic_semaphore";
+#else
+#include <semaphore>
+using std::binary_semaphore;
+const std::string binary_semaphore_version = "std::binary_semaphore";
+#endif
 
 #if defined(x86_64) || defined(__x86_64__)
 #define BARRIER_INSTRUCTION "mfence"
@@ -33,8 +42,8 @@ const bool is_arm64 = true;
 
 template <typename code>
 void
-thread_function(std::string const &thread_name, std::binary_semaphore &start_semaphore,
-  std::binary_semaphore &end_semaphore, int rng_seed, int loop_count, code code_param)
+thread_function(std::string const &thread_name, binary_semaphore &start_semaphore,
+  binary_semaphore &end_semaphore, int rng_seed, int loop_count, code code_param)
 {
     std::mt19937 rng(rng_seed);
     for (int iterations = 0; iterations < loop_count; iterations++) {
@@ -70,9 +79,9 @@ class test_config {
 template <typename thread_1_code, typename thread_2_code, typename out_of_order_check_code>
 void
 perform_test(test_config<thread_1_code, thread_2_code, out_of_order_check_code> config, int &x,
-  int &y, int &r1, int &r2, std::binary_semaphore &start_semaphore1,
-  std::binary_semaphore &start_semaphore2, std::binary_semaphore &end_semaphore1,
-  std::binary_semaphore &end_semaphore2, std::ostream &ostream, int loop_count, bool progress)
+  int &y, int &r1, int &r2, binary_semaphore &start_semaphore1,
+  binary_semaphore &start_semaphore2, binary_semaphore &end_semaphore1,
+  binary_semaphore &end_semaphore2, std::ostream &ostream, int loop_count, bool progress)
 {
     ostream << "Test name:        " << config._test_name << std::endl;
     ostream << "Test description: " << config._test_description << std::endl;
@@ -142,10 +151,10 @@ void
 thread_pair(int loop_count, std::ostream &ostream)
 {
 
-    std::binary_semaphore start_semaphore1{0};
-    std::binary_semaphore start_semaphore2{0};
-    std::binary_semaphore end_semaphore1{0};
-    std::binary_semaphore end_semaphore2{0};
+    binary_semaphore start_semaphore1{0};
+    binary_semaphore start_semaphore2{0};
+    binary_semaphore end_semaphore1{0};
+    binary_semaphore end_semaphore2{0};
 
     // We declare the shared variables above the lambdas so the lambdas have access to them.
 
@@ -389,10 +398,14 @@ main(int argc, char *argv[])
         }
     }
 
+    std::cout << "C++ language standard: " << __cplusplus << ", with binary_semaphore: " << binary_semaphore_version
+              << std::endl;
+
     if (is_arm64)
         std::cout << "Running on ARM64";
     else
         std::cout << "Running on x86";
+
     std::cout << " with " << num_thread_pairs << " thread pairs(s) and loop count " << loop_count
               << std::endl
               << std::endl;
