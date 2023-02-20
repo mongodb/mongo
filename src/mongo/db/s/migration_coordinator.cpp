@@ -36,6 +36,8 @@
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/fail_point.h"
@@ -156,6 +158,11 @@ boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(Operat
           "migrationId"_attr = _migrationInfo.getId());
 
     boost::optional<SemiFuture<void>> cleanupCompleteFuture = boost::none;
+
+    // Persist the config time before the migration decision to ensure that in case of stepdown
+    // next filtering metadata refresh on the new primary will always include the effect of this
+    // migration.
+    VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
     switch (*decision) {
         case DecisionEnum::kAborted:

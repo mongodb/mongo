@@ -829,11 +829,6 @@ void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& mi
 }
 
 void deleteMigrationCoordinatorDocumentLocally(OperationContext* opCtx, const UUID& migrationId) {
-    // Before deleting the migration coordinator document, ensure that in the case of a crash, the
-    // node will start-up from at least the configTime, which it obtained as part of recovery of the
-    // shardVersion, which will ensure that it will see at least the same shardVersion.
-    VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
-
     PersistentTaskStore<MigrationCoordinatorDocument> store(
         NamespaceString::kMigrationCoordinatorsNamespace);
     store.remove(opCtx,
@@ -1023,6 +1018,15 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
                               currentMetadata.getChunkManager()->getUUID(),
                           "coordinatorDocumentUUID"_attr = doc.getCollectionUuid());
                 }
+
+                // TODO SERVER-71918 once the drop collection coordinator starts persisting the
+                // config time we can remove this. Since the collection has been dropped,
+                // persist config time inclusive of the drop collection event before deleting
+                // leftover migration metadata.
+                // This will ensure that in case of stepdown the new
+                // primary won't read stale data from config server and think that the sharded
+                // collection still exists.
+                VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
                 deleteRangeDeletionTaskOnRecipient(opCtx, doc.getRecipientShardId(), doc.getId());
                 deleteRangeDeletionTaskLocally(opCtx, doc.getId());
