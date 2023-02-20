@@ -5,8 +5,7 @@ import inject
 import structlog
 from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 from buildscripts.timeouts.timeout import TimeoutEstimate
-from buildscripts.util.teststats import HistoricTaskData
-from evergreen import EvergreenApi
+from buildscripts.util.teststats import HistoricTaskData, normalize_test_name
 
 LOGGER = structlog.get_logger(__name__)
 CLEAN_EVERY_N_HOOK = "CleanEveryN"
@@ -53,7 +52,10 @@ class TimeoutService:
         if not historic_stats:
             return TimeoutEstimate.no_timeouts()
 
-        test_set = set(self.resmoke_proxy.list_tests(timeout_params.suite_name))
+        test_set = {
+            normalize_test_name(test)
+            for test in self.resmoke_proxy.list_tests(timeout_params.suite_name)
+        }
         test_runtimes = [
             stat for stat in historic_stats.get_tests_runtimes() if stat.test_name in test_set
         ]

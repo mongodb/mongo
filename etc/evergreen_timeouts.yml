@@ -10,125 +10,28 @@
 # in alphabetical order.
 
 overrides:
-  amazon-linux2-arm64-compile:
-    - task: server_discovery_and_monitoring_json_test
-      exec_timeout: 30  # 30 min.
-
-  enterprise-amazon2-arm64:
-  - task: config_fuzzer_replica_sets_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours.
-
-  enterprise-amazon2022-arm64:
-  - task: config_fuzzer_replica_sets_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours.
-
-  enterprise-rhel-70-64-bit:
-  - task: config_fuzzer_replica_sets_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours.
 
   enterprise-macos:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
-  - task: run_unittests
-    exec_timeout: 60
 
   enterprise-macos-arm64:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
-  - task: run_unittests
-    exec_timeout: 60
-
-  enterprise-macos-cxx20:
-  - task: run_unittests
-    exec_timeout: 60
-
-  enterprise-macos-rosetta-2:
-  - task: run_unittests
-    exec_timeout: 60
 
   enterprise-rhel-80-64-bit-coverage:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours.
 
-  enterprise-rhel-80-64-bit-dynamic-required:
-  - task: replica_sets_large_txns_format
-    exec_timeout: 120  # 2 hours.
-  - task: config_fuzzer_replica_sets_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours.
-
-  enterprise-rhel80-debug-tsan:
-  - task: run_unittests
-    exec_timeout: 24
-
-  enterprise-windows:
-  - task: replica_sets_jscore_passthrough
-    exec_timeout: 180  # 3 hours.
-
-  enterprise-windows-all-feature-flags-suggested:
-  - task: replica_sets_jscore_passthrough
-    exec_timeout: 180  # 3 hours.
-  - task: replica_sets_update_v1_oplog_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours.
-
-  enterprise-windows-inmem:
-  - task: replica_sets_jscore_passthrough
-    exec_timeout: 180  # 3 hours.
-
-  enterprise-windows-required:
-  - task: replica_sets_jscore_passthrough
-    exec_timeout: 180  # 3 hours.
-  - task: replica_sets_update_v1_oplog_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours.
-
-  linux-64-debug:
-  - task: auth
-    exec_timeout: 60  # 1 hour.
-
-  linux-x86-dynamic-compile-required:
-    - task: server_discovery_and_monitoring_json_test
-      exec_timeout: 30  # 30 min.
-
-  linux-64-debug-repeated-execution:
-  - task: run_unittests
-    exec_timeout: 120  # 2 hours.
-
   macos:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
-  - task: run_unittests
-    exec_timeout: 60
-  - task: sharded_collections_jscore_passthrough
-    exec_timeout: 300 # 5 hours
-
-  macos-debug-suggested:
-  - task: run_unittests
-    exec_timeout: 60
 
   macos-arm64:
-  - task: run_unittests
-    exec_timeout: 60
-  - task: sharding_update_v1_oplog_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours
-  - task: sharded_collections_jscore_passthrough
-    exec_timeout: 300 # 5 hours
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
 
-  rhel80-asan:
-  - task: run_unittests
-    exec_timeout: 24
-
-  rhel80-debug-asan:
-  - task: run_unittests
-    exec_timeout: 24
-
-  rhel80-debug-aubsan-lite:
-  - task: run_unittests
-    exec_timeout: 24
-
   rhel80-debug-ubsan:
-  - task: run_unittests
-    exec_timeout: 24
   - task: update_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
 
@@ -136,18 +39,14 @@ overrides:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 180  # 3 hours.
 
-  rhel80-ubsan:
-  - task: run_unittests
-    exec_timeout: 24
+  rhel80-debug-ubsan-all-feature-flags:
+  - task: update_timeseries_fuzzer
+    exec_timeout: 150  # 2.5 hours
 
-  windows:
-  - task: replica_sets
-    exec_timeout: 180  # 3 hours.
+  rhel80-debug-ubsan-classic-engine:
+  - task: update_timeseries_fuzzer
+    exec_timeout: 150  # 2.5 hours
 
-  windows-debug-suggested:
-  - task: replica_sets_initsync_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours.
-  - task: replica_sets_jscore_passthrough
-    exec_timeout: 180  # 3 hours.
-  - task: replica_sets_update_v1_oplog_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours.
+  rhel80-debug-v4ubsan-all-feature-flags-experimental:
+  - task: update_timeseries_fuzzer
+    exec_timeout: 150  # 2.5 hours
