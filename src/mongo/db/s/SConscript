@@ -328,6 +328,7 @@ env.Library(
     source=[
         'add_shard_cmd.idl',
         'add_shard_util.cpp',
+        'balancer/auto_merger_policy.cpp',
         'balancer/balance_stats.cpp',
         'balancer/balancer_chunk_selection_policy_impl.cpp',
         'balancer/balancer_chunk_selection_policy.cpp',

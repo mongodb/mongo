@@ -386,6 +386,16 @@ SemiFuture<DataSizeResponse> BalancerCommandsSchedulerImpl::requestDataSize(
         .semi();
 }
 
+SemiFuture<void> BalancerCommandsSchedulerImpl::requestMergeAllChunksOnShard(
+    OperationContext* opCtx, const NamespaceString& nss, const ShardId& shardId) {
+    auto commandInfo = std::make_shared<MergeAllChunksOnShardCommandInfo>(nss, shardId);
+    return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
+        .then([](const executor::RemoteCommandResponse& remoteResponse) {
+            return processRemoteResponse(remoteResponse);
+        })
+        .semi();
+}
+
 Future<executor::RemoteCommandResponse> BalancerCommandsSchedulerImpl::_buildAndEnqueueNewRequest(
     OperationContext* opCtx, std::shared_ptr<CommandInfo>&& commandInfo) {
     const auto newRequestId = UUID::gen();

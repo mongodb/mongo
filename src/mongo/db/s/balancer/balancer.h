@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/s/balancer/auto_merger_policy.h"
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
 #include "mongo/db/s/balancer/balancer_random.h"
 #include "mongo/platform/mutex.h"
@@ -271,7 +272,7 @@ private:
 
     AtomicWord<int> _outstandingStreamingOps{0};
 
-    AtomicWord<bool> _newInfoOnStreamingActions{true};
+    AtomicWord<bool> _actionStreamsStateUpdated{true};
 
     // Indicates whether the balancer is currently executing a balancer round
     bool _inBalancerRound{false};
@@ -283,7 +284,7 @@ private:
     // changes (in particular, state/balancer round and number of balancer rounds).
     stdx::condition_variable _condVar;
 
-    stdx::condition_variable _defragmentationCondVar;
+    stdx::condition_variable _actionStreamCondVar;
 
     // Number of moved chunks in last round
     int _balancedLastTime;
@@ -302,6 +303,8 @@ private:
     std::unique_ptr<BalancerCommandsScheduler> _commandScheduler;
 
     std::unique_ptr<BalancerDefragmentationPolicy> _defragmentationPolicy;
+
+    std::unique_ptr<AutoMergerPolicy> _autoMergerPolicy;
 };
 
 }  // namespace mongo

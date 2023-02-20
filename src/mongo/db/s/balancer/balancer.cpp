@@ -42,6 +42,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/balancer/auto_merger_policy.h"
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
 #include "mongo/db/s/balancer/balancer_defragmentation_policy_impl.h"
@@ -280,7 +281,9 @@ Balancer::Balancer()
           std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get(), _random)),
       _commandScheduler(std::make_unique<BalancerCommandsSchedulerImpl>()),
       _defragmentationPolicy(std::make_unique<BalancerDefragmentationPolicyImpl>(
-          _clusterStats.get(), [this]() { _onActionsStreamPolicyStateUpdate(); })) {}
+          _clusterStats.get(), [this]() { _onActionsStreamPolicyStateUpdate(); })),
+      _autoMergerPolicy(
+          std::make_unique<AutoMergerPolicy>([this]() { _onActionsStreamPolicyStateUpdate(); })) {}
 
 Balancer::~Balancer() {
     // Terminate the balancer thread so it doesn't leak memory.
@@ -336,7 +339,7 @@ void Balancer::interruptBalancer() {
     }
 
     _condVar.notify_all();
-    _defragmentationCondVar.notify_all();
+    _actionStreamCondVar.notify_all();
 }
 
 void Balancer::waitForBalancerToStop() {
@@ -471,7 +474,10 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
 }
 
 void Balancer::_consumeActionStreamLoop() {
-    ScopeGuard onExitCleanup([this] { _defragmentationPolicy->interruptAllDefragmentations(); });
+    ScopeGuard onExitCleanup([this] {
+        _defragmentationPolicy->interruptAllDefragmentations();
+        _autoMergerPolicy->disable();
+    });
 
     Client::initThread("BalancerSecondary");
     auto opCtx = cc().makeOperationContext();
@@ -481,13 +487,7 @@ void Balancer::_consumeActionStreamLoop() {
     executor::ScopedTaskExecutor executor(
         Grid::get(opCtx.get())->getExecutorPool()->getFixedExecutor());
 
-    auto selectStream = [&]() -> ActionsStreamPolicy* {
-        if (balancerConfig->shouldBalanceForAutoSplit()) {
-            return _defragmentationPolicy.get();
-        }
-        return nullptr;
-    };
-
+    // Lambda function for applying action response
     auto applyActionResponseTo = [this](const DefragmentationAction& action,
                                         const DefragmentationActionResponse& response,
                                         ActionsStreamPolicy* policy) {
@@ -497,6 +497,7 @@ void Balancer::_consumeActionStreamLoop() {
         policy->applyActionResult(opCtx.get(), action, response);
     };
 
+    // Lambda function to sleep for throttling
     auto applyThrottling = [lastActionTime = Date_t::fromMillisSinceEpoch(0)]() mutable {
         const Milliseconds throttle{chunkDefragmentationThrottlingMS.load()};
         auto timeSinceLastAction = Date_t::now() - lastActionTime;
@@ -510,45 +511,61 @@ void Balancer::_consumeActionStreamLoop() {
         }
         lastActionTime = Date_t::now();
     };
-    ActionsStreamPolicy* selectedStream(nullptr);
-    bool streamDrained = false;
+
+    // allStreamsDrained is used to keep asking actions until all streams are drained
+    bool allStreamsDrained = false;
+
     while (true) {
-        bool newStreamSelected = false;
         {
             stdx::unique_lock<Latch> ul(_mutex);
-            _defragmentationCondVar.wait(ul, [&] {
-                auto nextSelection = selectStream();
-                if (nextSelection != selectedStream) {
-                    newStreamSelected = true;
-                    selectedStream = nextSelection;
-                    streamDrained = false;
-                }
-                auto canConsumeStream = selectedStream != nullptr &&
-                    _outstandingStreamingOps.load() <= kMaxOutstandingStreamingOperations;
+            _actionStreamCondVar.wait(ul, [&] {
                 return _state != kRunning ||
-                    (canConsumeStream && (!streamDrained || _newInfoOnStreamingActions.load()));
+                    (_outstandingStreamingOps.load() <= kMaxOutstandingStreamingOperations &&
+                     (_actionStreamsStateUpdated.load() || !allStreamsDrained));
             });
             if (_state != kRunning) {
                 break;
             }
         }
 
-        if (newStreamSelected) {
-            LOGV2(6417110,
-                  "New actions stream source selected",
-                  "selectedStream"_attr = selectedStream->getName());
-        }
+        // Get active streams
+        auto activeStreams = [&]() -> std::vector<ActionsStreamPolicy*> {
+            std::vector<ActionsStreamPolicy*> streams;
+            if (_autoMergerPolicy->isEnabled()) {
+                streams.push_back(_autoMergerPolicy.get());
+            }
+            if (balancerConfig->shouldBalanceForAutoSplit()) {
+                streams.push_back(_defragmentationPolicy.get());
+            }
+            return streams;
+        }();
 
-        _newInfoOnStreamingActions.store(false);
-        auto nextAction = selectedStream->getNextStreamingAction(opCtx.get());
-        if ((streamDrained = !nextAction.has_value())) {
+        // Clear notification flag
+        _actionStreamsStateUpdated.store(false);
+
+        // Get next action from a random stream together with its stream
+        auto [nextAction, sourcedStream] =
+            [&]() -> std::tuple<boost::optional<DefragmentationAction>, ActionsStreamPolicy*> {
+            std::shuffle(activeStreams.begin(), activeStreams.end(), _random);
+            for (auto stream : activeStreams) {
+                auto action = stream->getNextStreamingAction(opCtx.get());
+                if (action.has_value()) {
+                    return std::make_tuple(std::move(action), stream);
+                }
+            }
+            return std::make_tuple(boost::none, nullptr);
+        }();
+
+        if (!nextAction.has_value()) {
+            allStreamsDrained = true;
             continue;
         }
+        allStreamsDrained = false;
 
         _outstandingStreamingOps.fetchAndAdd(1);
         stdx::visit(
             OverloadedVisitor{
-                [&, selectedStream](MergeInfo&& mergeAction) {
+                [&, stream = sourcedStream](MergeInfo&& mergeAction) {
                     applyThrottling();
                     auto result =
                         _commandScheduler
@@ -559,13 +576,13 @@ void Balancer::_consumeActionStreamLoop() {
                                                  mergeAction.collectionVersion)
                             .thenRunOn(*executor)
                             .onCompletion([this,
-                                           selectedStream,
+                                           stream,
                                            &applyActionResponseTo,
                                            action = std::move(mergeAction)](const Status& status) {
-                                applyActionResponseTo(action, status, selectedStream);
+                                applyActionResponseTo(action, status, stream);
                             });
                 },
-                [&, selectedStream](DataSizeInfo&& dataSizeAction) {
+                [&, stream = sourcedStream](DataSizeInfo&& dataSizeAction) {
                     auto result =
                         _commandScheduler
                             ->requestDataSize(opCtx.get(),
@@ -578,14 +595,14 @@ void Balancer::_consumeActionStreamLoop() {
                                               dataSizeAction.maxSize)
                             .thenRunOn(*executor)
                             .onCompletion([this,
-                                           selectedStream,
+                                           stream,
                                            &applyActionResponseTo,
                                            action = std::move(dataSizeAction)](
                                               const StatusWith<DataSizeResponse>& swDataSize) {
-                                applyActionResponseTo(action, swDataSize, selectedStream);
+                                applyActionResponseTo(action, swDataSize, stream);
                             });
                 },
-                [&, selectedStream](AutoSplitVectorInfo&& splitVectorAction) {
+                [&, stream = sourcedStream](AutoSplitVectorInfo&& splitVectorAction) {
                     auto result =
                         _commandScheduler
                             ->requestAutoSplitVector(opCtx.get(),
@@ -598,14 +615,14 @@ void Balancer::_consumeActionStreamLoop() {
                             .thenRunOn(*executor)
                             .onCompletion(
                                 [this,
-                                 selectedStream,
+                                 stream,
                                  &applyActionResponseTo,
                                  action = std::move(splitVectorAction)](
                                     const StatusWith<AutoSplitVectorResponse>& swSplitPoints) {
-                                    applyActionResponseTo(action, swSplitPoints, selectedStream);
+                                    applyActionResponseTo(action, swSplitPoints, stream);
                                 });
                 },
-                [&, selectedStream](SplitInfoWithKeyPattern&& splitAction) {
+                [&, stream = sourcedStream](SplitInfoWithKeyPattern&& splitAction) {
                     applyThrottling();
                     auto result =
                         _commandScheduler
@@ -619,17 +636,34 @@ void Balancer::_consumeActionStreamLoop() {
                                                 splitAction.info.splitKeys)
                             .thenRunOn(*executor)
                             .onCompletion([this,
-                                           selectedStream,
+                                           stream,
                                            &applyActionResponseTo,
                                            action = std::move(splitAction)](const Status& status) {
-                                applyActionResponseTo(action, status, selectedStream);
+                                applyActionResponseTo(action, status, stream);
+                            });
+                },
+                [&, stream = sourcedStream](MergeAllChunksOnShardInfo&& mergeAllChunksAction) {
+                    if (mergeAllChunksAction.applyThrottling) {
+                        applyThrottling();
+                    }
+
+                    auto result =
+                        _commandScheduler
+                            ->requestMergeAllChunksOnShard(
+                                opCtx.get(), mergeAllChunksAction.nss, mergeAllChunksAction.shardId)
+                            .thenRunOn(*executor)
+                            .onCompletion([this,
+                                           stream,
+                                           &applyActionResponseTo,
+                                           action = mergeAllChunksAction](const Status& status) {
+                                applyActionResponseTo(action, status, stream);
                             });
                 },
                 [](MigrateInfo&& _) {
                     uasserted(ErrorCodes::BadValue,
                               "Migrations cannot be processed as Streaming Actions");
                 }},
-            std::move(*nextAction));
+            std::move(nextAction.value()));
     }
 }
 
@@ -725,9 +759,15 @@ void Balancer::_mainThread() {
                     lastDrainingShardsCheckTime = Date_t::now();
                 }
 
+                _autoMergerPolicy->disable();
+
                 LOGV2_DEBUG(21859, 1, "Skipping balancing round because balancing is disabled");
                 _endRound(opCtx.get(), kBalanceRoundDefaultInterval);
                 continue;
+            }
+
+            if (!_autoMergerPolicy->isEnabled() && balancerConfig->shouldBalanceForAutoMerge()) {
+                _autoMergerPolicy->enable();
             }
 
             boost::optional<Milliseconds> forcedBalancerRoundInterval(boost::none);
@@ -738,33 +778,36 @@ void Balancer::_mainThread() {
                       "balancerInterval"_attr = *forcedBalancerRoundInterval);
             });
 
+
+            LOGV2_DEBUG(21860,
+                        1,
+                        "Start balancing round. waitForDelete: {waitForDelete}, "
+                        "secondaryThrottle: {secondaryThrottle}",
+                        "Start balancing round",
+                        "waitForDelete"_attr = balancerConfig->waitForDelete(),
+                        "secondaryThrottle"_attr = balancerConfig->getSecondaryThrottle().toBSON());
+
+            static Occasionally sampler;
+            if (sampler.tick()) {
+                warnOnMultiVersion(uassertStatusOK(_clusterStats->getStats(opCtx.get())));
+            }
+
+            // Collect and apply up-to-date configuration values on the cluster collections.
+            {
+                OperationContext* ctx = opCtx.get();
+                auto allCollections = catalogClient->getCollections(ctx, {});
+                for (const auto& coll : allCollections) {
+                    _defragmentationPolicy->startCollectionDefragmentation(ctx, coll);
+                }
+            }
+
+            // Reactivate the Automerger if needed.
+            _autoMergerPolicy->checkInternalUpdates();
+
             // The current configuration is allowing the balancer to perform operations.
             // Unblock the secondary thread if needed.
-            _defragmentationCondVar.notify_all();
+            _actionStreamCondVar.notify_all();
             {
-                LOGV2_DEBUG(21860,
-                            1,
-                            "Start balancing round. waitForDelete: {waitForDelete}, "
-                            "secondaryThrottle: {secondaryThrottle}",
-                            "Start balancing round",
-                            "waitForDelete"_attr = balancerConfig->waitForDelete(),
-                            "secondaryThrottle"_attr =
-                                balancerConfig->getSecondaryThrottle().toBSON());
-
-                static Occasionally sampler;
-                if (sampler.tick()) {
-                    warnOnMultiVersion(uassertStatusOK(_clusterStats->getStats(opCtx.get())));
-                }
-
-                // Collect and apply up-to-date configuration values on the cluster collections.
-                {
-                    OperationContext* ctx = opCtx.get();
-                    auto allCollections = catalogClient->getCollections(ctx, {});
-                    for (const auto& coll : allCollections) {
-                        _defragmentationPolicy->startCollectionDefragmentation(ctx, coll);
-                    }
-                }
-
                 Status status = _splitChunksIfNeeded(opCtx.get());
                 if (!status.isOK()) {
                     LOGV2_WARNING(21878,
@@ -779,6 +822,7 @@ void Balancer::_mainThread() {
                     uassertStatusOK(_clusterStats->getStats(opCtx.get()));
 
                 stdx::unordered_set<ShardId> availableShards;
+                availableShards.reserve(shardStats.size());
                 std::transform(
                     shardStats.begin(),
                     shardStats.end(),
@@ -1112,11 +1156,16 @@ int Balancer::_moveChunks(OperationContext* opCtx,
 void Balancer::_onActionsStreamPolicyStateUpdate() {
     // On any internal update of the defragmentation/cluster chunks resize policy status,
     // wake up the thread consuming the stream of actions
-    _newInfoOnStreamingActions.store(true);
-    _defragmentationCondVar.notify_all();
+    _actionStreamsStateUpdated.store(true);
+    _actionStreamCondVar.notify_all();
 }
 
 void Balancer::notifyPersistedBalancerSettingsChanged(OperationContext* opCtx) {
+    if (!Grid::get(opCtx)->getBalancerConfiguration()->shouldBalanceForAutoMerge()) {
+        _autoMergerPolicy->disable();
+    }
+
+    // Try to awake the main balancer thread
     _condVar.notify_all();
 }
 

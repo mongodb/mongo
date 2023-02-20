@@ -154,6 +154,10 @@ public:
                                               const ShardsvrMoveRange& request,
                                               const WriteConcernOptions& secondaryThrottleWC,
                                               bool issuedByRemoteUser) = 0;
+
+    virtual SemiFuture<void> requestMergeAllChunksOnShard(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          const ShardId& shardId) = 0;
 };
 
 }  // namespace mongo

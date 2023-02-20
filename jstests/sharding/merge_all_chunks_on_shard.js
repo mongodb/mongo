@@ -3,6 +3,8 @@
  *
  * @tags: [
  *   featureFlagAutoMerger,
+ *   # Balancer is stopped when stepping down
+ *   does_not_support_stepdowns,
  * ]
  */
 (function() {
@@ -73,7 +75,7 @@ function setHistoryWindowInConfigServers(st, valueInSeconds) {
 }
 
 /* Set back history window to its default value in all config servers */
-function setHistoryWindowToDefaultInConfigServers(st) {
+function resetHistoryWindowInConfigServers(st) {
     assert(defaultMinSnapshotHistoryWindowInSeconds);
     assert(defaultTransactionLifetimeLimitSeconds);
     st.forEachConfigServer((conn) => {
@@ -87,6 +89,46 @@ function setHistoryWindowToDefaultInConfigServers(st) {
             setParameter: 1,
             transactionLifetimeLimitSeconds: defaultTransactionLifetimeLimitSeconds
         }));
+    });
+}
+
+/* Set balancer merge throttling */
+let defaultChunkDefragmentationThrottlingMS = null;
+function setBalancerMergeThrottling(st, valueInMS) {
+    st.forEachConfigServer((conn) => {
+        const res =
+            conn.adminCommand({setParameter: 1, chunkDefragmentationThrottlingMS: valueInMS});
+        assert.commandWorked(res);
+        defaultChunkDefragmentationThrottlingMS = res.was;
+    });
+}
+
+/* Unset custom throttling parameter so that default gets applied */
+function resetBalancerMergeThrottling(st) {
+    st.forEachConfigServer((conn) => {
+        assert.commandWorked(conn.adminCommand({
+            setParameter: 1,
+            chunkDefragmentationThrottlingMS: defaultChunkDefragmentationThrottlingMS
+        }));
+    });
+}
+
+/* Override balancer round default interval */
+function setBalanceRoundInterval(st, valueInMs) {
+    st.forEachConfigServer((conn) => {
+        assert.commandWorked(conn.adminCommand({
+            configureFailPoint: 'overrideBalanceRoundInterval',
+            mode: 'alwaysOn',
+            data: {intervalMs: valueInMs}
+        }));
+    });
+}
+
+/* Set balancer round interval to its default value */
+function resetBalanceRoundInterval(st) {
+    st.forEachConfigServer((conn) => {
+        assert.commandWorked(
+            conn.adminCommand({configureFailPoint: 'overrideBalanceRoundInterval', mode: 'off'}));
     });
 }
 
@@ -166,6 +208,8 @@ function buildInitialScenario(st, coll, shard0, shard1, historyWindowInSeconds) 
 
 /* Tests mergeAllChunks command */
 function mergeAllChunksOnShardTest(st, testDB) {
+    jsTestLog("Testing mergeAllChunksOnShard command");
+
     const configDB = st.s.getDB("config");
     const shard0 = st.shard0.shardName;
     const shard1 = st.shard1.shardName;
@@ -176,29 +220,31 @@ function mergeAllChunksOnShardTest(st, testDB) {
     const historyWindowInSeconds = 30;
     setHistoryWindowInConfigServers(st, historyWindowInSeconds);
 
-    // Distribute deterministically the chunks across the shards(Scenario A)
+    // Distribute deterministically the chunks across the shards
     const now = buildInitialScenario(st, coll, shard0, shard1, historyWindowInSeconds);
 
     // Make sure that all chunks are out of the history window
     setOnCurrentShardSince(configDB, coll, {}, now, -historyWindowInSeconds - 1000);
 
-    // Merge all contiguous chunks on shard0
+    // Merge all mergeable chunks on shard0
     assert.commandWorked(
         st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard0}));
     assertExpectedChunks(
         configDB, coll, shard0, [{min: MinKey, max: 1}, {min: 3, max: 7}, {min: 10, max: MaxKey}]);
 
-    // Merge all contiguous chunks on shard1
+    // Merge all mergeable chunks on shard1
     assert.commandWorked(
         st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard1}));
     assertExpectedChunks(configDB, coll, shard1, [{min: 1, max: 3}, {min: 7, max: 10}]);
 
     // Set back snapshot history window to its default value
-    setHistoryWindowToDefaultInConfigServers(st);
+    resetHistoryWindowInConfigServers(st);
 }
 
 /* Tests mergeAllChunks command considering history window preservation */
 function mergeAllChunksOnShardConsideringHistoryWindowTest(st, testDB) {
+    jsTestLog("Testing mergeAllChunksOnShard command considering history window preservation");
+
     const configDB = st.s.getDB("config");
     const shard0 = st.shard0.shardName;
     const shard1 = st.shard1.shardName;
@@ -220,7 +266,7 @@ function mergeAllChunksOnShardConsideringHistoryWindowTest(st, testDB) {
     moveRange(st, coll, 1, 2, shard0);
     moveRange(st, coll, 2, 3, shard0);
 
-    // Try to merge all contiguous chunks on shard0
+    // Try to merge all mergeable chunks on shard0
     assert.commandWorked(
         st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard0}));
 
@@ -234,17 +280,19 @@ function mergeAllChunksOnShardConsideringHistoryWindowTest(st, testDB) {
         {min: 10, max: MaxKey}
     ]);
 
-    // Try to merge all contiguous chunks on shard1 and check expected results
+    // Try to merge all mergeable chunks on shard1 and check expected results
     assert.commandWorked(
         st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard1}));
     assertExpectedChunks(configDB, coll, shard1, [{min: 7, max: 10}]);
 
     // Set back history windows to its default value
-    setHistoryWindowToDefaultInConfigServers(st);
+    resetHistoryWindowInConfigServers(st);
 }
 
 /* Tests mergeAllChunks command considering jumbo flag */
 function mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB) {
+    jsTestLog("Testing mergeAllChunksOnShard command considering jumbo flag");
+
     const configDB = st.s.getDB("config");
     const shard0 = st.shard0.shardName;
     const shard1 = st.shard1.shardName;
@@ -266,7 +314,7 @@ function mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB) {
     setJumboFlag(configDB, coll, {min: {x: 3}});
     setJumboFlag(configDB, coll, {min: {x: 8}});
 
-    // Try to merge all contiguous chunks on shard0
+    // Try to merge all mergeable chunks on shard0
     assert.commandWorked(
         st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard0}));
 
@@ -277,7 +325,7 @@ function mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB) {
         shard0,
         [{min: MinKey, max: 1}, {min: 3, max: 4}, {min: 4, max: 7}, {min: 10, max: MaxKey}]);
 
-    // Try to merge all contiguous chunks on shard1
+    // Try to merge all mergeable chunks on shard1
     assert.commandWorked(
         st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard1}));
 
@@ -288,7 +336,63 @@ function mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB) {
                          [{min: 1, max: 3}, {min: 7, max: 8}, {min: 8, max: 9}, {min: 9, max: 10}]);
 
     // Set back history windows to its default value
-    setHistoryWindowToDefaultInConfigServers(st);
+    resetHistoryWindowInConfigServers(st);
+}
+
+/* Tests automerger on first balancer round */
+function balancerTriggersAutomergerWhenIsEnabledTest(st, testDB) {
+    jsTestLog("Testing automerger on first balancer round");
+
+    const configDB = st.s.getDB("config");
+    const shard0 = st.shard0.shardName;
+    const shard1 = st.shard1.shardName;
+
+    // Create 3 collections
+    const numColls = 3;
+    let colls = [];
+    for (let i = 0; i < numColls; i++) {
+        colls.push(newShardedColl(st, testDB));
+    }
+
+    // Set history window to a known value
+    const historyWindowInSeconds = 30;
+    setHistoryWindowInConfigServers(st, historyWindowInSeconds);
+
+    colls.forEach((coll) => {
+        // Distribute deterministically the chunks across the shards
+        const now = buildInitialScenario(st, coll, shard0, shard1, historyWindowInSeconds);
+
+        // Make sure that all chunks are out of the history window
+        setOnCurrentShardSince(configDB, coll, {}, now, -historyWindowInSeconds - 1000);
+    });
+
+    // Override balancer round interval and merge throttling to speed up the test
+    setBalanceRoundInterval(st, 100 /* ms */);
+    setBalancerMergeThrottling(st, 0);
+
+    // Enable Automerger
+    st.startBalancer();
+
+    // Perform a couple of balancer rounds to give automerger time to do its job
+    for (let i = 0; i < 3; ++i) {
+        st.awaitBalancerRound();
+    }
+
+    st.stopBalancer();
+
+    // All mergeable chunks should be merged
+    colls.forEach((coll) => {
+        assertExpectedChunks(configDB,
+                             coll,
+                             shard0,
+                             [{min: MinKey, max: 1}, {min: 3, max: 7}, {min: 10, max: MaxKey}]);
+        assertExpectedChunks(configDB, coll, shard1, [{min: 1, max: 3}, {min: 7, max: 10}]);
+    });
+
+    // Set settings to default
+    resetHistoryWindowInConfigServers(st);
+    resetBalanceRoundInterval(st);
+    resetBalancerMergeThrottling(st);
 }
 
 /* Test setup */
@@ -301,9 +405,9 @@ assert.commandWorked(
 
 /* Perform tests */
 mergeAllChunksOnShardTest(st, testDB);
-
 mergeAllChunksOnShardConsideringHistoryWindowTest(st, testDB);
 mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB);
+balancerTriggersAutomergerWhenIsEnabledTest(st, testDB);
 
 st.stop();
 })();

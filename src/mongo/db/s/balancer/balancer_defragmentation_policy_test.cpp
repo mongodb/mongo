@@ -616,9 +616,10 @@ TEST_F(BalancerDefragmentationPolicyTest, PhaseOneNotConsecutive) {
                                 ++timesMiddleRangeDataSizeFound;
                             }
                         },
-                        [&](const AutoSplitVectorInfo& _) { FAIL("Unexpected action type"); },
-                        [&](const SplitInfoWithKeyPattern& _) { FAIL("Unexpected action type"); },
-                        [&](const MigrateInfo& _) {
+                        [](const AutoSplitVectorInfo& _) { FAIL("Unexpected action type"); },
+                        [](const SplitInfoWithKeyPattern& _) { FAIL("Unexpected action type"); },
+                        [](const MigrateInfo& _) { FAIL("Unexpected action type"); },
+                        [](const MergeAllChunksOnShardInfo& _) {
                             FAIL("Unexpected action type");
                         }},
                     action);

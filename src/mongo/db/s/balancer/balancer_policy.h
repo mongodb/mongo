@@ -180,6 +180,17 @@ struct MergeInfo {
     ChunkRange chunkRange;
 };
 
+struct MergeAllChunksOnShardInfo {
+    MergeAllChunksOnShardInfo(const ShardId& shardId, const NamespaceString& nss);
+
+    std::string toString() const;
+
+    ShardId shardId;
+    NamespaceString nss;
+
+    bool applyThrottling{false};
+};
+
 struct DataSizeInfo {
     DataSizeInfo(const ShardId& shardId,
                  const NamespaceString& nss,
@@ -211,9 +222,13 @@ struct DataSizeResponse {
     bool maxSizeReached;
 };
 
-typedef stdx::
-    variant<MergeInfo, AutoSplitVectorInfo, DataSizeInfo, SplitInfoWithKeyPattern, MigrateInfo>
-        DefragmentationAction;
+typedef stdx::variant<MergeInfo,
+                      AutoSplitVectorInfo,
+                      DataSizeInfo,
+                      SplitInfoWithKeyPattern,
+                      MigrateInfo,
+                      MergeAllChunksOnShardInfo>
+    DefragmentationAction;
 
 typedef stdx::variant<Status, StatusWith<AutoSplitVectorResponse>, StatusWith<DataSizeResponse>>
     DefragmentationActionResponse;

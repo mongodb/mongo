@@ -331,13 +331,16 @@ public:
                                 },
                                 [&]() { _abort(getType()); });
                         },
-                        [&](const AutoSplitVectorInfo& _) {
+                        [](const AutoSplitVectorInfo& _) {
                             uasserted(ErrorCodes::BadValue, "Unexpected action type");
                         },
-                        [&](const SplitInfoWithKeyPattern& _) {
+                        [](const SplitInfoWithKeyPattern& _) {
                             uasserted(ErrorCodes::BadValue, "Unexpected action type");
                         },
-                        [&](const MigrateInfo& _) {
+                        [](const MigrateInfo& _) {
+                            uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                        },
+                        [](const MergeAllChunksOnShardInfo& _) {
                             uasserted(ErrorCodes::BadValue, "Unexpected action type");
                         }},
                     action);
@@ -656,13 +659,16 @@ public:
                                            onNonRetriableError);
                     }
                 },
-                [&](const DataSizeInfo& dataSizeAction) {
+                [](const DataSizeInfo& dataSizeAction) {
                     uasserted(ErrorCodes::BadValue, "Unexpected action type");
                 },
-                [&](const AutoSplitVectorInfo& _) {
+                [](const AutoSplitVectorInfo& _) {
                     uasserted(ErrorCodes::BadValue, "Unexpected action type");
                 },
-                [&](const SplitInfoWithKeyPattern& _) {
+                [](const SplitInfoWithKeyPattern& _) {
+                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                },
+                [](const MergeAllChunksOnShardInfo& _) {
                     uasserted(ErrorCodes::BadValue, "Unexpected action type");
                 }},
             action);
@@ -1152,16 +1158,19 @@ public:
                                                      onRetriableError,
                                                      onNonretriableError);
                               },
-                              [&](const DataSizeInfo& _) {
+                              [](const DataSizeInfo& _) {
                                   uasserted(ErrorCodes::BadValue, "Unexpected action type");
                               },
-                              [&](const AutoSplitVectorInfo& _) {
+                              [](const AutoSplitVectorInfo& _) {
                                   uasserted(ErrorCodes::BadValue, "Unexpected action type");
                               },
-                              [&](const SplitInfoWithKeyPattern& _) {
+                              [](const SplitInfoWithKeyPattern& _) {
                                   uasserted(ErrorCodes::BadValue, "Unexpected action type");
                               },
-                              [&](const MigrateInfo& _) {
+                              [](const MigrateInfo& _) {
+                                  uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                              },
+                              [](const MergeAllChunksOnShardInfo& _) {
                                   uasserted(ErrorCodes::BadValue, "Unexpected action type");
                               }},
             action);
@@ -1378,7 +1387,10 @@ public:
                         },
                         [&]() { _abort(getType()); });
                 },
-                [&](const MigrateInfo& _) {
+                [](const MigrateInfo& _) {
+                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                },
+                [](const MergeAllChunksOnShardInfo& _) {
                     uasserted(ErrorCodes::BadValue, "Unexpected action type");
                 }},
             action);
@@ -1642,11 +1654,34 @@ void BalancerDefragmentationPolicyImpl::applyActionResult(
         stdx::lock_guard<Latch> lk(_stateMutex);
         DefragmentationPhase* targetState = nullptr;
         stdx::visit(
-            [&](auto&& act) {
-                if (_defragmentationStates.contains(act.uuid)) {
-                    targetState = _defragmentationStates.at(act.uuid).get();
-                }
-            },
+            OverloadedVisitor{[&](const MergeInfo& act) {
+                                  if (_defragmentationStates.contains(act.uuid)) {
+                                      targetState = _defragmentationStates.at(act.uuid).get();
+                                  }
+                              },
+                              [&](const DataSizeInfo& act) {
+                                  if (_defragmentationStates.contains(act.uuid)) {
+                                      targetState = _defragmentationStates.at(act.uuid).get();
+                                  }
+                              },
+                              [&](const AutoSplitVectorInfo& act) {
+                                  if (_defragmentationStates.contains(act.uuid)) {
+                                      targetState = _defragmentationStates.at(act.uuid).get();
+                                  }
+                              },
+                              [&](const SplitInfoWithKeyPattern& act) {
+                                  if (_defragmentationStates.contains(act.uuid)) {
+                                      targetState = _defragmentationStates.at(act.uuid).get();
+                                  }
+                              },
+                              [&](const MigrateInfo& act) {
+                                  if (_defragmentationStates.contains(act.uuid)) {
+                                      targetState = _defragmentationStates.at(act.uuid).get();
+                                  }
+                              },
+                              [](const MergeAllChunksOnShardInfo& _) {
+                                  uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                              }},
             action);
 
         if (targetState) {

@@ -38,6 +38,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/request_types/auto_split_vector_gen.h"
+#include "mongo/s/request_types/merge_chunk_request_gen.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/stdx/condition_variable.h"
@@ -424,6 +425,17 @@ private:
     static const std::string kSplitKeys;
 };
 
+class MergeAllChunksOnShardCommandInfo : public CommandInfo {
+public:
+    MergeAllChunksOnShardCommandInfo(const NamespaceString& nss, const ShardId& shardId)
+        : CommandInfo(shardId, nss, boost::none) {}
+
+    BSONObj serialise() const override {
+        ShardSvrMergeAllChunksOnShard req(getNameSpace(), getTarget());
+        return req.toBSON({});
+    }
+};
+
 /**
  * Helper data structure for submitting the remote command associated to a BalancerCommandsScheduler
  * Request.
@@ -586,6 +598,10 @@ public:
                                                  const KeyPattern& keyPattern,
                                                  bool estimatedValue,
                                                  int64_t maxSize) override;
+
+    SemiFuture<void> requestMergeAllChunksOnShard(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const ShardId& shardId) override;
 
 private:
     enum class SchedulerState { Recovering, Running, Stopping, Stopped };
