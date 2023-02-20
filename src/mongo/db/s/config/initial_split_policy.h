@@ -63,7 +63,6 @@ public:
         const ShardKeyPattern& shardKeyPattern,
         std::int64_t numInitialChunks,
         bool presplitHashedZones,
-        const boost::optional<std::vector<BSONObj>>& initialSplitPoints,
         const std::vector<TagsType>& tags,
         size_t numShards,
         bool collectionIsEmpty,
@@ -157,19 +156,11 @@ public:
 };
 
 /**
- * Split point building strategy to be used when explicit split points are supplied, or where the
- * appropriate splitpoints can be trivially deduced from the shard key.
+ * Split point building strategy to be used when the appropriate splitpoints can be trivially
+ * deduced from the shard key.
  */
 class SplitPointsBasedSplitPolicy : public InitialSplitPolicy {
 public:
-    /**
-     * Constructor used when split points are provided.
-     */
-    SplitPointsBasedSplitPolicy(std::vector<BSONObj> explicitSplitPoints)
-        : _splitPoints(std::move(explicitSplitPoints)) {
-        _numContiguousChunksPerShard = 1;
-    }
-
     /**
      * Constructor used when generating split points for a hashed-prefix shard key.
      */

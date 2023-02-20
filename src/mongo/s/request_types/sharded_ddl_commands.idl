@@ -142,12 +142,6 @@ structs:
                     True if the chunks should be pre-split based on the existing zones when
                     sharding a collection with hashed shard key.
                 optional: true
-            initialSplitPoints:
-                type: array<object_owned>
-                description: >-
-                    A specific set of points to create initial splits at, currently used only by
-                    mapReduce.
-                optional: true
             timeseries:
                 description: "The options to create the time-series collection with."
                 type: TimeseriesOptions

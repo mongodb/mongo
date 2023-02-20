@@ -259,7 +259,6 @@ std::unique_ptr<InitialSplitPolicy> InitialSplitPolicy::calculateOptimizationStr
     const ShardKeyPattern& shardKeyPattern,
     const std::int64_t numInitialChunks,
     const bool presplitHashedZones,
-    const boost::optional<std::vector<BSONObj>>& initialSplitPoints,
     const std::vector<TagsType>& tags,
     size_t numShards,
     bool collectionIsEmpty,
@@ -273,9 +272,6 @@ std::unique_ptr<InitialSplitPolicy> InitialSplitPolicy::calculateOptimizationStr
                 << "When the prefix of the hashed shard key is a range field, "
                    "'numInitialChunks' can only be used when the 'presplitHashedZones' is true",
             !numInitialChunks || shardKeyPattern.hasHashedPrefix() || presplitHashedZones);
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "Cannot have both initial split points and tags set",
-            !initialSplitPoints || tags.empty());
 
     // If 'presplitHashedZones' flag is set, we always use 'PresplitHashedZonesSplitPolicy', to make
     // sure we throw the correct assertion if further validation fails.
@@ -284,13 +280,8 @@ std::unique_ptr<InitialSplitPolicy> InitialSplitPolicy::calculateOptimizationStr
             opCtx, shardKeyPattern, tags, numInitialChunks, collectionIsEmpty);
     }
 
-    // The next preference is to use split points based strategy. This is only possible if
-    // 'initialSplitPoints' is set, or if the collection is empty with shard key having a hashed
-    // prefix.
-    if (initialSplitPoints) {
-        return std::make_unique<SplitPointsBasedSplitPolicy>(*initialSplitPoints);
-    }
-
+    // The next preference is to use split points based strategy. This is only possible if the
+    // collection is empty with shard key having a hashed prefix.
     if (tags.empty() && shardKeyPattern.hasHashedPrefix() && collectionIsEmpty) {
         return std::make_unique<SplitPointsBasedSplitPolicy>(
             shardKeyPattern, numShards, numInitialChunks);
