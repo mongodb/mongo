@@ -1600,22 +1600,32 @@ struct __wt_col_fix_auxiliary_header {
  * examining an index, we don't want the oldest split generation to move forward and potentially
  * free it.
  */
-#define WT_ENTER_PAGE_INDEX(session)                                         \
-    do {                                                                     \
-        uint64_t __prev_split_gen = __wt_session_gen(session, WT_GEN_SPLIT); \
-        if (__prev_split_gen == 0)                                           \
-            __wt_session_gen_enter(session, WT_GEN_SPLIT);
+#define WT_ENTER_PAGE_INDEX(session) WT_ENTER_GENERATION((session), WT_GEN_SPLIT);
 
-#define WT_LEAVE_PAGE_INDEX(session)                   \
-    if (__prev_split_gen == 0)                         \
-        __wt_session_gen_leave(session, WT_GEN_SPLIT); \
-    }                                                  \
-    while (0)
+#define WT_LEAVE_PAGE_INDEX(session) WT_LEAVE_GENERATION((session), WT_GEN_SPLIT);
 
 #define WT_WITH_PAGE_INDEX(session, e) \
     WT_ENTER_PAGE_INDEX(session);      \
     (e);                               \
     WT_LEAVE_PAGE_INDEX(session)
+
+/*
+ * Manage the given generation number with support for re-entry. Re-entry is allowed as the previous
+ * generation as it must be as low as the current generation.
+ */
+#define WT_ENTER_GENERATION(session, generation)              \
+    do {                                                      \
+        bool __entered_##generation = false;                  \
+        if (__wt_session_gen((session), (generation)) == 0) { \
+            __wt_session_gen_enter((session), (generation));  \
+            __entered_##generation = true;                    \
+        }
+
+#define WT_LEAVE_GENERATION(session, generation)         \
+    if (__entered_##generation)                          \
+        __wt_session_gen_leave((session), (generation)); \
+    }                                                    \
+    while (0)
 
 /*
  * WT_VERIFY_INFO -- A structure to hold all the information related to a verify operation.

@@ -105,13 +105,12 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     WT_DECL_RET;
     WT_PAGE *page;
     uint64_t eviction_time, eviction_time_seconds;
-    bool clean_page, closing, force_evict_hs, inmem_split, local_gen, tree_dead;
+    bool clean_page, closing, force_evict_hs, inmem_split, tree_dead;
 
     conn = S2C(session);
     page = ref->page;
     closing = LF_ISSET(WT_EVICT_CALL_CLOSING);
     force_evict_hs = false;
-    local_gen = false;
     eviction_time = eviction_time_seconds = 0;
 
     __wt_verbose(
@@ -122,13 +121,12 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
         LF_SET(WT_EVICT_CALL_NO_SPLIT);
 
     /*
-     * Enter the eviction generation. If we re-enter eviction, leave the previous eviction
-     * generation (which must be as low as the current generation), untouched.
+     * Enter the eviction and split generation. If we re-enter eviction, leave the previous
+     * generation (eviction or split) generation (which must be as low as the current generation),
+     * untouched.
      */
-    if (__wt_session_gen(session, WT_GEN_EVICT) == 0) {
-        local_gen = true;
-        __wt_session_gen_enter(session, WT_GEN_EVICT);
-    }
+    WT_ENTER_GENERATION(session, WT_GEN_EVICT);
+    WT_ENTER_GENERATION(session, WT_GEN_SPLIT);
 
     WT_CLEAR(session->reconcile_timeline);
     WT_CLEAR(session->evict_timeline);
@@ -283,8 +281,8 @@ done:
           WT_CLOCKDIFF_US(session->reconcile_timeline.hs_wrapup_finish,
             session->reconcile_timeline.hs_wrapup_start));
     /* Leave any local eviction generation. */
-    if (local_gen)
-        __wt_session_gen_leave(session, WT_GEN_EVICT);
+    WT_LEAVE_GENERATION(session, WT_GEN_SPLIT);
+    WT_LEAVE_GENERATION(session, WT_GEN_EVICT);
 
     return (ret);
 }
