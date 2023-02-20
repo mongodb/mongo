@@ -30,6 +30,7 @@
 #include "mongo/db/s/range_deleter_service_op_observer.h"
 
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/range_deleter_service.h"
@@ -54,6 +55,16 @@ void registerTaskWithOngoingQueriesOnOpLogEntryCommit(OperationContext* opCtx,
                                                                                   rdt.getNss())
                     ->getOngoingQueriesCompletionFuture(rdt.getCollectionUuid(), rdt.getRange())
                     .semi();
+            if (!waitForActiveQueriesToComplete.isReady()) {
+                const auto openCursorsIds =
+                    CursorManager::get(opCtx)->getCursorIdsForNamespace(rdt.getNss());
+                LOGV2_INFO(
+                    7179200,
+                    "Range deletion will be scheduled after all possibly dependent queries finish",
+                    "namespace"_attr = rdt.getNss(),
+                    "range"_attr = rdt.getRange(),
+                    "cursorsDirectlyReferringTheNamespace"_attr = openCursorsIds);
+            }
             (void)RangeDeleterService::get(opCtx)->registerTask(
                 rdt, std::move(waitForActiveQueriesToComplete));
         } catch (const DBException& ex) {

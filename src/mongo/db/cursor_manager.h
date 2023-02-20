@@ -194,6 +194,17 @@ public:
                                                            const SessionKiller::Matcher& matcher);
 
     /**
+     * Returns a vector of open cursor ids registered on the `nss`. The result doesn't include
+     * cursors registered for a different namespace but also acting on `nss` (e.g. in presence of
+     * sub-pipelines).
+     *
+     * Locks/inspects one partition at a time, hence the result might not include new cursors being
+     * opened on the namespace. The only guarantee is that the result will include any cursor opened
+     * before calling this method and not closed before iterating the partition holding it.
+     */
+    std::vector<CursorId> getCursorIdsForNamespace(const NamespaceString& nss);
+
+    /**
      * Set the CursorManager's ClockSource*.
      */
     void setPreciseClockSource(ClockSource* preciseClockSource) {
