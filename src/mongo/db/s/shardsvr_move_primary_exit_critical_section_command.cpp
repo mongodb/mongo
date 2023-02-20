@@ -91,11 +91,15 @@ public:
                     scopedDss->clearDbInfo(newOpCtx.get());
                 }
 
+                // The critical section may have been entered by another operation, which implies
+                // that the one with the specified reason has already been exited. Consequently,
+                // this skips the requirement that reason must match.
                 ShardingRecoveryService::get(newOpCtx.get())
                     ->releaseRecoverableCriticalSection(newOpCtx.get(),
                                                         NamespaceString(dbName),
                                                         csReason,
-                                                        ShardingCatalogClient::kLocalWriteConcern);
+                                                        ShardingCatalogClient::kLocalWriteConcern,
+                                                        false /* throwIfReasonDiffers */);
             }
 
             // Since no write that generated a retryable write oplog entry with this sessionId and
