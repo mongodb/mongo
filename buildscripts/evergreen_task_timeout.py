@@ -28,20 +28,21 @@ DEFAULT_TIMEOUT_OVERRIDES = "etc/evergreen_timeouts.yml"
 DEFAULT_EVERGREEN_CONFIG = "etc/evergreen.yml"
 DEFAULT_EVERGREEN_AUTH_CONFIG = "~/.evergreen.yml"
 COMMIT_QUEUE_ALIAS = "__commit_queue"
-UNITTEST_TASK = "run_unittests"
 IGNORED_SUITES = {
-    "integration_tests_replset", "integration_tests_replset_ssl_auth", "integration_tests_sharded",
-    "integration_tests_standalone", "integration_tests_standalone_audit", "mongos_test",
-    "server_selection_json_test"
+    "integration_tests_replset",
+    "integration_tests_replset_ssl_auth",
+    "integration_tests_sharded",
+    "integration_tests_standalone",
+    "integration_tests_standalone_audit",
+    "mongos_test",
+    "server_selection_json_test",
+    "sdam_json_test",
 }
 HISTORY_LOOKBACK = timedelta(weeks=2)
 
-COMMIT_QUEUE_TIMEOUT = timedelta(minutes=40)
+COMMIT_QUEUE_TIMEOUT = timedelta(minutes=20)
 DEFAULT_REQUIRED_BUILD_TIMEOUT = timedelta(hours=1, minutes=20)
 DEFAULT_NON_REQUIRED_BUILD_TIMEOUT = timedelta(hours=2)
-# 2x the longest "run tests" phase for unittests as of c9bf1dbc9cc46e497b2f12b2d6685ef7348b0726,
-# which is 5 mins 47 secs, excluding outliers below
-UNITTESTS_TIMEOUT = timedelta(minutes=12)
 
 
 class TimeoutOverride(BaseModel):
@@ -224,11 +225,6 @@ class TaskTimeoutOrchestrator:
         elif override is not None:
             LOGGER.info("Overriding configured timeout", exec_timeout_secs=override.total_seconds())
             determined_timeout = override
-
-        elif task_name == UNITTEST_TASK and override is None:
-            LOGGER.info("Overriding unittest timeout",
-                        exec_timeout_secs=UNITTESTS_TIMEOUT.total_seconds())
-            determined_timeout = UNITTESTS_TIMEOUT
 
         elif _is_required_build_variant(
                 variant) and determined_timeout > DEFAULT_REQUIRED_BUILD_TIMEOUT:
