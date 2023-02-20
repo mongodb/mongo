@@ -402,7 +402,7 @@ void generatePredicate(MatchExpressionVisitorContext* context,
  */
 void generateAlwaysBoolean(MatchExpressionVisitorContext* context, bool value) {
     auto& frame = context->topFrame();
-    frame.pushExpr(makeConstant(sbe::value::TypeTags::Boolean, value));
+    frame.pushExpr(abt::wrap(optimizer::Constant::boolean(value)));
 }
 
 /**
@@ -854,10 +854,10 @@ public:
             _context->state, matchExpr->getExpression().get(), _context->rootSlot, _context->slots);
 
         // We need to convert the result of the '{$expr: ..}' expression to a boolean value.
-        auto logicExpr =
-            makeFillEmptyFalse(makeFunction("coerceToBool", expr.extractExpr(_context->state)));
+        auto logicExpr = makeFillEmptyFalse(makeABTFunction(
+            "coerceToBool"_sd, abt::unwrap(expr.extractABT(_context->state.slotVarMap))));
 
-        frame.pushExpr(std::move(logicExpr));
+        frame.pushExpr(abt::wrap(std::move(logicExpr)));
     }
 
     void visit(const GTEMatchExpression* expr) final {
