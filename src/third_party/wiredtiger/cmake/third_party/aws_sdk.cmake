@@ -15,7 +15,7 @@ config_choice(
         "package;IMPORT_S3_SDK_PACKAGE;ENABLE_S3"
         "external;IMPORT_S3_SDK_EXTERNAL;ENABLE_S3"
 )
- 
+
 if(IMPORT_S3_SDK_NONE)
     message(FATAL_ERROR "Cannot enable S3 extension without specifying an IMPORT_S3_SDK method (package, external).")
 endif()
@@ -35,15 +35,15 @@ elseif(IMPORT_S3_SDK_EXTERNAL)
     ExternalProject_Add(aws-sdk
         PREFIX aws-sdk-cpp
         GIT_REPOSITORY https://github.com/aws/aws-sdk-cpp.git
-        GIT_TAG 1.9.175
+        GIT_TAG 1.11.17
         CMAKE_ARGS
             -DBUILD_SHARED_LIBS=ON
             -DBUILD_ONLY=s3-crt
             -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON
             # ENABLE TESTING decides whether or not to build the AWS CPP SDK with the services integration tests.
-            # Alternatively you can build with testing enabled but set AUTORUN_UNIT_TESTS flag to ON/OFF to decide 
-            # whether or not to run the tests. If testing is not enabled, the AUTORUN_UNIT_TESTS flag gets ignored. 
+            # Alternatively you can build with testing enabled but set AUTORUN_UNIT_TESTS flag to ON/OFF to decide
+            # whether or not to run the tests. If testing is not enabled, the AUTORUN_UNIT_TESTS flag gets ignored.
             -DENABLE_TESTING=OFF
         BUILD_ALWAYS FALSE
         INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install

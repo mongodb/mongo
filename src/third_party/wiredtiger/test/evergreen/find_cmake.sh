@@ -4,7 +4,7 @@ set -o errexit  # Exit the script with error if any of the commands fail
 # CMake version we fallback to and download when cmake doesn't exist on the
 # host system.
 CMAKE_MAJOR_VER=3
-CMAKE_MINOR_VER=11
+CMAKE_MINOR_VER=13
 CMAKE_PATCH_VER=0
 CMAKE_VERSION=$CMAKE_MAJOR_VER.$CMAKE_MINOR_VER.$CMAKE_PATCH_VER
 
@@ -14,6 +14,9 @@ find_cmake ()
 {
     if [ -n "$CMAKE" ]; then
         return 0
+    elif [ -f "/opt/mongodbtoolchain/v4/bin/cmake" ]; then
+        CMAKE="/opt/mongodbtoolchain/v4/bin/cmake"
+        CTEST="/opt/mongodbtoolchain/v4/bin/ctest"
     elif [ -f "/Applications/CMake.app/Contents/bin/cmake" ]; then
         CMAKE="/Applications/CMake.app/Contents/bin/cmake"
         CTEST="/Applications/CMake.app/Contents/bin/ctest"
