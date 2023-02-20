@@ -891,3 +891,19 @@ env.Benchmark(
         'sharding_runtime_d',
     ],
 )
+
+env.Benchmark(
+    target='placement_history_bm',
+    source=[
+        'placement_history_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/mongo/db/shard_role_api',
+        '$BUILD_DIR/mongo/s/sharding_test_fixture_common',
+        'config_server_test_fixture',
+        'sharding_catalog_manager',
+        'sharding_runtime_d',
+    ],
+)
