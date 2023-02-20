@@ -158,10 +158,14 @@ struct ThreadRunner {
     int open_all();
     int run();
 
+    void op_clear_table(Operation *op);
     void op_create_all(Operation *, size_t &keysize, size_t &valuesize);
     uint64_t op_get_key_recno(Operation *, uint64_t range, tint_t tint);
     void op_get_static_counts(Operation *, Stats &, int);
+    void op_kv_gen(Operation *op, const tint_t tint);
     int op_run(Operation *);
+    int op_run_setup(Operation *);
+    void op_set_table(Operation *op, const std::string &uri, const tint_t tint);
     float random_signed();
     uint32_t random_value();
 
@@ -199,14 +203,21 @@ private:
 };
 
 struct TableRuntime {
-    uint64_t _max_recno;                           // highest recno allocated
-    bool _disjoint;                                // does key space have holes?
+    uint64_t _max_recno;              // highest recno allocated
+    bool _disjoint;                   // does key space have holes?
 
-    /* Only used for the dynamic table set. */
-    uint32_t _in_use;                              // How many operations are using this table
-    bool _pending_delete;                          // Delete this table once not in use
+    // Only used for the dynamic table set.
+    bool _is_base;                    // true if this is the base table, false if the mirror
+    std::string _mirror;              // table uri of mirror, if mirrored
+    uint32_t _in_use;                 // How many operations are using this table
+    bool _pending_delete;             // Delete this table once not in use
 
-    TableRuntime() : _max_recno(0), _disjoint(0), _in_use(0), _pending_delete(false) {}
+    TableRuntime() : _max_recno(0), _disjoint(0), _is_base(true), _mirror(std::string()),
+        _in_use(0), _pending_delete(false) {}
+    TableRuntime(const bool is_base, const std::string &mirror) : _max_recno(0), _disjoint(0),
+        _is_base(is_base), _mirror(mirror), _in_use(0), _pending_delete(false) {}
+    bool is_base_table() { return _is_base == true; }
+    bool has_mirror() { return !_mirror.empty(); }
 };
 
 struct ContextInternal {
@@ -223,7 +234,6 @@ struct ContextInternal {
     tint_t _dyn_tint_last;
     // This mutex should be used to protect the access to the dynamic tables set.
     std::shared_mutex* _dyn_mutex;
-
     // unique id per context, to work with multiple contexts, starts at 1.
     uint32_t _context_count;
 
@@ -268,7 +278,7 @@ struct TableOperationInternal : OperationInternal {
     uint_t _valuemax;
 
     TableOperationInternal() : OperationInternal(), _keysize(0), _valuesize(0),
-			       _keymax(0),_valuemax(0) {}
+			       _keymax(0), _valuemax(0) {}
     TableOperationInternal(const TableOperationInternal &other) :
 	OperationInternal(other),
 	_keysize(other._keysize), _valuesize(other._valuesize),
@@ -319,12 +329,17 @@ struct WorkloadRunner {
 private:
     int close_all();
     int create_all(WT_CONNECTION *conn, Context *context);
+    int create_table(WT_SESSION *session, const std::string &config, const std::string &uri,
+      const std::string &mirror_uri, const bool is_base);
     void final_report(timespec &);
+    void schedule_table_for_drop(const std::map<std::string, tint_t>::iterator &itr,
+      std::vector<std::string> &pending_delete);
     void get_stats(Stats *stats);
     int open_all();
     void open_report_file(std::ofstream &, const std::string&, const std::string&);
     void report(time_t, time_t, Stats *stats);
     int run_all(WT_CONNECTION *conn);
+    int select_table_for_drop(std::vector<std::string> &pending_delete);
 
     WorkloadRunner(const WorkloadRunner &);                 // disallowed
     WorkloadRunner& operator=(const WorkloadRunner &other); // disallowed

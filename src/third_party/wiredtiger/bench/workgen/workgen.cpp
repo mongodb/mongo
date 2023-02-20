@@ -63,7 +63,8 @@ extern "C" {
 #define LATENCY_MS_BUCKETS 1000
 #define LATENCY_SEC_BUCKETS 100
 
-#define THROTTLE_PER_SEC 20 // times per sec we will throttle
+#define TABLE_MAX_RETRIES 10 // times we will retry an operation on a table
+#define THROTTLE_PER_SEC 20  // times per sec we will throttle
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) < (b) ? (b) : (a))
@@ -106,7 +107,9 @@ extern "C" {
 #define OP_HAS_VALUE(op) \
     ((op)->_optype == Operation::OP_INSERT || (op)->_optype == Operation::OP_UPDATE)
 
-#define DYN_TABLE_APP_METADATA "app_metadata=\"workgen_dynamic_table\""
+const std::string DYN_TABLE_APP_METADATA = "workgen_dynamic_table=true";
+const std::string MIRROR_TABLE_APP_METADATA = "workgen_table_mirror=";
+const std::string BASE_TABLE_APP_METADATA = "workgen_base_table=";
 
 namespace workgen {
 
@@ -285,7 +288,7 @@ WorkloadRunner::start_table_idle_cycle(WT_CONNECTION *conn)
          * Drop the table. Keep retrying on EBUSY failure - it is an expected return when
          * checkpoints are happening.
          */
-        while ((ret = session->drop(session, uri, "force,checkpoint_wait=false")) == EBUSY)
+        while ((ret = session->drop(session, uri, "checkpoint_wait=false")) == EBUSY)
             sleep(1);
 
         if (ret != 0) {
@@ -341,6 +344,47 @@ gen_random_table_name(char *name, workgen_random_state volatile *rand_state)
     }
     name[DYNAMIC_TABLE_LEN - 1] = '\0';
 }
+
+// Create a dynamic table with the specified name and config. If mirroring tables, add the
+// mirror table uri to the table runtime. Return an error status if the uri already exists
+// or the create fails.
+int
+WorkloadRunner::create_table(WT_SESSION *session, const std::string &config, const std::string &uri,
+  const std::string &mirror_uri, const bool is_base)
+{
+    // Check if a table with this name already exists. Return if it does. Use a shared lock to
+    // read the dynamic table structure.
+    ContextInternal *icontext = _workload->_context->_internal;
+    {
+        const std::shared_lock lock(*icontext->_dyn_mutex);
+        if (icontext->_tint.count(uri) > 0 || icontext->_dyn_tint.count(uri) > 0)
+            return EEXIST;
+    }
+
+    // Create the table.
+    WT_DECL_RET;
+    if ((ret = session->create(session, uri.c_str(), config.c_str())) != 0) {
+        if (ret != EBUSY)
+            THROW("Failed to create table '" << uri << "'.");
+        return ret;
+    }
+
+    // The data structures for the dynamic table set are protected by a mutex.
+    {
+        const std::lock_guard<std::shared_mutex> lock(*icontext->_dyn_mutex);
+
+        // Add the table into the list of dynamic set.
+        tint_t tint = icontext->_dyn_tint_last;
+        icontext->_dyn_tint[uri] = tint;
+        icontext->_dyn_table_names[tint] = uri;
+        icontext->_dyn_table_runtime[tint] = TableRuntime(is_base, mirror_uri);
+        ++icontext->_dyn_tint_last;
+        VERBOSE(*_workload, "Created table and added to the dynamic set: " << uri);
+    }
+
+    return 0;
+}
+
 /*
  * This function creates one or more tables at regular intervals, where the interval length and
  * number of tables are specified in the workload options. It also monitors the database size and
@@ -366,6 +410,25 @@ WorkloadRunner::start_tables_create(WT_CONNECTION *conn)
         // Initially we start creating tables if the database size is less than the create target.
         creating = db_size < _workload->options.create_target;
     }
+
+    std::string uri;
+    std::string mirror_uri = std::string();
+    int creates, retries, status;
+    char rand_chars[DYNAMIC_TABLE_LEN];
+
+    // Add app_metadata to the config to indicate the table was created dynamically (can be
+    // selected for random deletion), the name of the table's mirror if mirroring is enabled,
+    // and if this table is a base table or a mirror. We want these settings to persist over
+    // restarts.
+    std::string base_config =
+      "key_format=S,value_format=S,app_metadata=\"" + DYN_TABLE_APP_METADATA;
+    if (_workload->options.mirror_tables) {
+        base_config += "," + MIRROR_TABLE_APP_METADATA;
+    } else {
+        base_config += "," + BASE_TABLE_APP_METADATA + "true\"";
+    }
+    std::string config = base_config;
+
     while (!stopping) {
         /*
          * When managing the database size: If we are creating tables, continue until we reach the
@@ -397,55 +460,85 @@ WorkloadRunner::start_tables_create(WT_CONNECTION *conn)
             continue;
         }
 
-        int creates = 0;
+        retries = 0;
+        creates = 0;
         while (creates < _workload->options.create_count) {
-            char rand_chars[DYNAMIC_TABLE_LEN];
-            gen_random_table_name(rand_chars, _rand_state);
 
-            std::string uri("table:");
-            // Add the user specified prefix and a random alphanumeric sequence.
+            // Generate a table name from the user specified prefix and a random alphanumeric
+            // sequence.
+            gen_random_table_name(rand_chars, _rand_state);
+            uri = "table:";
             uri += _workload->options.create_prefix;
             uri += rand_chars;
 
-            // Check if a table with this name already exists. Skip if it does.
-            // Use a shared lock to read the dynamic tables structures.
-            {
-                const std::shared_lock lock(*icontext->_dyn_mutex);
-                if (icontext->_tint.count(uri) > 0 || icontext->_dyn_tint.count(uri) > 0)
-                    continue;
+            if (_workload->options.mirror_tables) {
+                // The mirror table name is the table name with the user specified suffix.
+                mirror_uri = uri + _workload->options.mirror_suffix;
+                config = base_config + mirror_uri + "," + BASE_TABLE_APP_METADATA + "true\"";
             }
 
-            /*
-             * Create the table. Mark the table as part of the dynamic set by storing extra
-             * information in the app_metadata.
-             */
-            WT_DECL_RET;
-            if ((ret = session->create(session, uri.c_str(),
-                   "key_format=S,value_format=S," DYN_TABLE_APP_METADATA)) != 0) {
-                if (ret == EBUSY)
-                    continue;
-                THROW("Table create failed in start_tables_create.");
+            // Create the table. Simply continue on failure.
+            if (create_table(session, config, uri, mirror_uri, true) == 0) {
+                VERBOSE(*_workload, "Created base table '" << uri << "'");
+                if (_workload->options.mirror_tables) {
+                    // Create the mirror. Retry on failure and throw an exception after
+                    // making too many retry attempts.
+                    config = base_config + uri + "," + BASE_TABLE_APP_METADATA + "false\"";
+                    do
+                        status = create_table(session, config, mirror_uri, uri, false);
+                    while (status == EBUSY && ++retries < TABLE_MAX_RETRIES);
+                    if (status != 0)
+                        THROW_ERRNO(
+                          status, "Failed to create mirror table '" << mirror_uri << "'.");
+                    VERBOSE(*_workload, "Created mirror table '" << mirror_uri << "'");
+                }
+                ++creates;
             }
-
-            // The data structures for the dynamic table set are protected by a mutex.
-            {
-                const std::lock_guard<std::shared_mutex> lock(*icontext->_dyn_mutex);
-
-                // Add the table into the list of dynamic set.
-                tint_t tint = icontext->_dyn_tint_last;
-                icontext->_dyn_tint[uri] = tint;
-                icontext->_dyn_table_names[tint] = uri;
-                icontext->_dyn_table_runtime[tint] = TableRuntime();
-                ++icontext->_dyn_tint_last;
-                VERBOSE(*_workload, "Created table and added to the dynamic set: " << uri);
-            }
-            ++creates;
         }
-
         sleep(_workload->options.create_interval);
     }
 
     return 0;
+}
+
+// Randomly select a dynamic table to drop and schedule it for deletion. The function
+// returns an EEXIST error status if the selected table is already scheduled for deletion.
+int
+WorkloadRunner::select_table_for_drop(std::vector<std::string> &pending_delete)
+{
+    // Select a random table to drop. Skip tables already flagged for deletion.
+    ContextInternal *icontext = _workload->_context->_internal;
+    auto table_itr = icontext->_dyn_tint.begin();
+    std::advance(table_itr, workgen_random(_rand_state) % icontext->_dyn_tint.size());
+    if (icontext->_dyn_table_runtime[table_itr->second]._pending_delete) {
+        return EEXIST;
+    }
+    schedule_table_for_drop(table_itr, pending_delete);
+
+    // If the table has a mirror, schedule the mirror table for deletion too.
+    if (icontext->_dyn_table_runtime[table_itr->second].has_mirror()) {
+        auto mirror_itr =
+          icontext->_dyn_tint.find(icontext->_dyn_table_runtime[table_itr->second]._mirror);
+        schedule_table_for_drop(mirror_itr, pending_delete);
+    }
+    return 0;
+}
+
+// The table specified by the dynamic table iterator is flagged for deletion and added to the
+// pending delete list. If the table has a mirror, the mirror is also flagged for deletion and
+// added to the pending delete list.
+void
+WorkloadRunner::schedule_table_for_drop(
+  const std::map<std::string, tint_t>::iterator &itr, std::vector<std::string> &pending_delete)
+{
+    ContextInternal *icontext = _workload->_context->_internal;
+    ASSERT(itr != icontext->_dyn_tint.end());
+    VERBOSE(*_workload, "Flagging pending delete for: " << itr->first);
+    icontext->_dyn_table_runtime[itr->second]._pending_delete = true;
+
+    ASSERT(
+      std::find(pending_delete.begin(), pending_delete.end(), itr->first) == pending_delete.end());
+    pending_delete.push_back(itr->first);
 }
 
 /*
@@ -518,21 +611,9 @@ WorkloadRunner::start_tables_drop(WT_CONNECTION *conn)
             int drop_count = std::min(tables_remaining, _workload->options.drop_count);
             int drops = 0;
             while (drops < drop_count) {
-                /*
-                 * Walk the map and select random tables to delete. Skip tables already marked for
-                 * deletion.
-                 */
-                auto it = icontext->_dyn_tint.begin();
-                std::advance(it, workgen_random(_rand_state) % icontext->_dyn_tint.size());
-                if (icontext->_dyn_table_runtime[it->second]._pending_delete) {
+                if (select_table_for_drop(pending_delete) != 0) {
                     continue;
                 }
-
-                VERBOSE(*_workload, "Marking pending removal for: " << it->first);
-                icontext->_dyn_table_runtime[it->second]._pending_delete = true;
-                ASSERT(std::find(pending_delete.begin(), pending_delete.end(), it->first) ==
-                  pending_delete.end());
-                pending_delete.push_back(it->first);
                 ++drops;
             }
 
@@ -551,6 +632,7 @@ WorkloadRunner::start_tables_drop(WT_CONNECTION *conn)
                 }
 
                 // Delete all local data related to the table.
+                ASSERT(icontext->_dyn_table_runtime[tint]._in_use == 0);
                 pending_delete.erase(pending_delete.begin() + i);
                 icontext->_dyn_tint.erase(uri);
                 icontext->_dyn_table_names.erase(tint);
@@ -565,13 +647,13 @@ WorkloadRunner::start_tables_drop(WT_CONNECTION *conn)
          */
         for (auto uri : drop_files) {
             WT_DECL_RET;
-            // Spin on EBUSY, we do not expect to get stuck
-            while (
-              (ret = session->drop(session, uri.c_str(), "force,checkpoint_wait=false")) == EBUSY) {
+            // Spin on EBUSY. We do not expect to get stuck.
+            while ((ret = session->drop(session, uri.c_str(), "checkpoint_wait=false")) == EBUSY) {
                 VERBOSE(*_workload, "Drop returned EBUSY for table: " << uri);
+                sleep(1);
             }
             if (ret != 0)
-                THROW("Table drop failed in start_tables_drop.");
+                THROW("Table drop failed for '" << uri << "' in start_tables_drop.");
 
             VERBOSE(*_workload, "Dropped table: " << uri);
         }
@@ -793,24 +875,51 @@ ContextInternal::create_all(WT_CONNECTION *conn)
 
     /* Walk the entries in the metadata and extract the dynamic set. */
     while ((ret = cursor->next(cursor)) == 0) {
-        const char *key, *value;
+        const char *key, *v;
         if ((ret = cursor->get_key(cursor, &key)) != 0) {
             THROW(
               "Error getting the key for a metadata entry while extracting dynamic set of tables.");
         }
-        if ((ret = cursor->get_value(cursor, &value)) != 0) {
+        if ((ret = cursor->get_value(cursor, &v)) != 0) {
             THROW(
               "Error getting the value for a metadata entry while extracting dynamic set of "
               "tables.");
         }
 
-        if (std::string(value).find(DYN_TABLE_APP_METADATA) != std::string::npos &&
-          WT_PREFIX_MATCH(key, "table:")) {
+        std::string value = std::string(v);
+        size_t pos = value.find(DYN_TABLE_APP_METADATA);
+        if (pos != std::string::npos && WT_PREFIX_MATCH(key, "table:")) {
             // Add the table into the list of dynamic set. We are single threaded here and hence
             // do not yet need to protect the dynamic table structures with a lock.
             _dyn_tint[key] = _dyn_tint_last;
             _dyn_table_names[_dyn_tint_last] = key;
             _dyn_table_runtime[_dyn_tint_last] = TableRuntime();
+
+            size_t start, end;
+            pos = value.find(MIRROR_TABLE_APP_METADATA);
+            // If the table has a mirror, add the mirror name to the runtime data.
+            if (pos != std::string::npos) {
+                start = value.find_first_of('=', pos);
+                end = value.find_first_of(",\"", start);
+                if (start == std::string::npos || end == std::string::npos) {
+                    THROW("Unable to retrieve mirror name from metadata.");
+                }
+                _dyn_table_runtime[_dyn_tint_last]._mirror =
+                  value.substr(start + 1, end - start - 1);
+            }
+
+            pos = value.find(BASE_TABLE_APP_METADATA);
+            // Is this a base table or a mirror?
+            if (pos != std::string::npos) {
+                start = value.find_first_of('=', pos);
+                end = value.find_first_of(",\"", start);
+                if (start == std::string::npos || end == std::string::npos) {
+                    THROW("Unable to retrieve base table status from metadata.");
+                }
+                _dyn_table_runtime[_dyn_tint_last]._is_base =
+                  (value.substr(start + 1, end - start - 1) == "true");
+            }
+
             ++_dyn_tint_last;
         }
     }
@@ -1193,8 +1302,9 @@ ThreadRunner::run()
     if (options->throttle != 0) {
         _throttle = new Throttle(*this, options->throttle, options->throttle_burst);
     }
-    for (int cnt = 0; !_stop && (_repeat || cnt < 1) && ret == 0; cnt++)
-        WT_ERR(op_run(&_thread->_op));
+    for (int cnt = 0; !_stop && (_repeat || cnt < 1) && ret == 0; cnt++) {
+        WT_ERR(op_run_setup(&_thread->_op));
+    }
 
 err :
 #ifdef _DEBUG
@@ -1222,9 +1332,10 @@ ThreadRunner::op_create_all(Operation *op, size_t &keysize, size_t &valuesize)
     op->create_all();
     if (op->is_table_op()) {
         op->kv_compute_max(true, false);
-        if (OP_HAS_VALUE(op))
-            op->kv_compute_max(false, op->_table.options.random_value);
-
+        if (OP_HAS_VALUE(op)) {
+            op->kv_compute_max(
+              false, (op->_table.options.random_value || _workload->options.random_table_values));
+        }
         if (op->_key._keytype == Key::KEYGEN_PARETO && op->_key._pareto.param == 0)
             THROW("Key._pareto value must be set if KEYGEN_PARETO specified");
         op->kv_size_buffer(true, keysize);
@@ -1328,37 +1439,84 @@ ThreadRunner::op_get_key_recno(Operation *op, uint64_t range, tint_t tint)
     return (rval % recno_count + 1); // recnos are one-based.
 }
 
-int
-ThreadRunner::op_run(Operation *op)
+// Clear the table uri and tint value for a dynamic table operation.
+void
+ThreadRunner::op_clear_table(Operation *op)
 {
-    Track *track;
-    tint_t tint;
-    WT_CURSOR *cursor;
-    WT_ITEM item;
-    WT_DECL_RET;
-    uint64_t recno;
-    uint64_t range;
-    bool measure_latency, own_cursor, retry_op;
-    timespec start_time;
-    uint64_t time_us;
-    char buf[BUF_SIZE];
-    std::string table_uri;
+    if (op->_random_table && op->is_table_op()) {
+        op->_table._uri = std::string();
+        op->_table._internal->_tint = 0;
+    }
+}
 
-    WT_CLEAR(item);
-    track = nullptr;
-    cursor = nullptr;
-    recno = 0;
-    own_cursor = false;
-    retry_op = true;
-    range = op->_table.options.range;
+// Set the table uri and tint value for a dynamic table operation.
+void
+ThreadRunner::op_set_table(Operation *op, const std::string &uri, const tint_t tint)
+{
+    if (op->_random_table && op->is_table_op()) {
+        op->_table._uri = uri;
+        op->_table._internal->_tint = tint;
+    }
+}
+
+// Generate and set a key and value for the operation managed by this thread.
+void
+ThreadRunner::op_kv_gen(Operation *op, const tint_t tint)
+{
+    if (!op->is_table_op()) {
+        return;
+    }
+
+    // A potential race: thread1 is inserting, and increments Context->_recno[] for fileX.wt.
+    // thread2 is doing one of remove/search/update and grabs the new value of Context->_recno[]
+    // for fileX.wt. thread2 randomly chooses the highest recno (which has not yet been inserted
+    // by thread1), and when it accesses the record will get WT_NOTFOUND. It should be somewhat
+    // rare (and most likely when the threads are first beginning). Any WT_NOTFOUND returns are
+    // allowed and get their own statistic bumped.
+    uint64_t recno = 0;
+    uint64_t range = op->_table.options.range;
+    if (op->_optype == Operation::OP_INSERT) {
+        if (op->_key._keytype == Key::KEYGEN_APPEND || op->_key._keytype == Key::KEYGEN_AUTO) {
+            if (op->_random_table) {
+                const std::shared_lock lock(*_icontext->_dyn_mutex);
+                recno = workgen_atomic_add64(&_icontext->_dyn_table_runtime.at(tint)._max_recno, 1);
+            } else {
+                recno = workgen_atomic_add64(&_icontext->_table_runtime[tint]._max_recno, 1);
+            }
+        } else {
+            recno = op_get_key_recno(op, range, tint);
+        }
+    } else {
+        recno = op_get_key_recno(op, range, tint);
+    }
+
+    VERBOSE(*this,
+      "OP " << op->_optype << " " << _icontext->_dyn_table_names[tint].c_str()
+            << ", recno=" << recno);
+
+    // Generate the key and value for the operation.
+    op->kv_gen(this, true, 100, recno, _keybuf);
+    if (OP_HAS_VALUE(op)) {
+        uint64_t compressibility =
+          (op->_table.options.random_value || _workload->options.random_table_values) ?
+          0 :
+          op->_table.options.value_compressibility;
+        op->kv_gen(this, false, compressibility, recno, _valuebuf);
+    }
+}
+
+int
+ThreadRunner::op_run_setup(Operation *op)
+{
+    WT_DECL_RET;
+
     if (_throttle != nullptr) {
         while (_throttle_ops >= _throttle_limit && !_in_transaction && !_stop) {
-            /*
-             * Calling throttle causes a sleep until the next time division, and we are given a new
-             * batch of operations to do before calling throttle again. If the number of operations
-             * in the batch is zero, we'll need to go around and throttle again.
-             */
-            WT_ERR(_throttle->throttle(_throttle_ops, &_throttle_limit));
+            // Calling throttle causes a sleep until the next time division, and we are given a
+            // new batch of operations to do before calling throttle again. If the number of
+            // operations in the batch is zero, we'll need to go around and throttle again.
+            if ((ret = _throttle->throttle(_throttle_ops, &_throttle_limit)) != 0)
+                return ret;
             _throttle_ops = 0;
             if (_throttle_limit != 0)
                 break;
@@ -1367,90 +1525,132 @@ ThreadRunner::op_run(Operation *op)
             ++_throttle_ops;
     }
 
-    // Find a table to operate on.
-    if (op->_random_table) {
-        const std::shared_lock lock(*_icontext->_dyn_mutex);
-        size_t num_tables = _icontext->_dyn_table_names.size();
-
-        if (num_tables == 0)
-            goto err;
-
-        // Select a random table.
-        auto it = _icontext->_dyn_tint.begin();
-        std::advance(it, random_value() % _icontext->_dyn_tint.size());
-        const std::string uri(it->first);
-
-        // Make sure the table is not marked for deletion.
-        bool marked_deleted = _icontext->_dyn_table_runtime[_icontext->_tint[uri]]._pending_delete;
-        if (!marked_deleted) {
-            table_uri = uri;
-            tint = _icontext->_dyn_tint[uri];
-            // Use atomic here as we can race with another thread that acquires the shared lock.
-            (void)workgen_atomic_add32(&_icontext->_dyn_table_runtime[tint]._in_use, 1);
-        } else {
-            goto err;
-        }
-    } else {
-        tint = op->_table._internal->_tint;
-        table_uri = op->_table._uri;
+    // If this is not a table operation, or if it is and has a table assigned, we have
+    // nothing more to do here.
+    if (!op->is_table_op() || op->has_table()) {
+        return op_run(op);
     }
 
-    /*
-     * A potential race: thread1 is inserting, and increments Context->_recno[] for fileX.wt.
-     * thread2 is doing one of remove/search/update and grabs the new value of Context->_recno[] for
-     * fileX.wt. thread2 randomly chooses the highest recno (which has not yet been inserted by
-     * thread1), and when it accesses the record will get WT_NOTFOUND. It should be somewhat rare
-     * (and most likely when the threads are first beginning). Any WT_NOTFOUND returns are allowed
-     * and get their own statistic bumped.
-     */
+    // Find a random table to operate on.
+    ASSERT(op->_random_table);
+    Operation base_op, mirror_op;
+
+    {
+        const std::shared_lock lock(*_icontext->_dyn_mutex);
+
+        // Select a random base table that is not flagged for deletion.
+        std::map<std::string, tint_t>::iterator itr;
+        uint32_t retries = 0;
+        size_t num_tables;
+
+        while (
+          (num_tables = _icontext->_dyn_table_names.size()) > 0 && ++retries < TABLE_MAX_RETRIES) {
+            itr = _icontext->_dyn_tint.begin();
+            std::advance(itr, random_value() % num_tables);
+
+            if (_icontext->_dyn_table_runtime[itr->second]._is_base &&
+              !_icontext->_dyn_table_runtime[itr->second]._pending_delete) {
+                break;
+            }
+        }
+        if (num_tables == 0 || retries >= TABLE_MAX_RETRIES) { // Try again next time.
+            return 0;
+        }
+
+        std::string op_uri = itr->first; // Get the table name.
+        tint_t op_tint = itr->second;    // Get the tint.
+        op_kv_gen(op, op_tint);          // Set the key and value for the operation.
+
+        // Use atomic here as we can race with another thread that acquires the shared lock.
+        (void)workgen_atomic_add32(&_icontext->_dyn_table_runtime[op_tint]._in_use, 1);
+
+        // Do we need to mirror operations? If not, we are done here.
+        if (!_icontext->_dyn_table_runtime[op_tint].has_mirror()) {
+            op_set_table(op, op_uri, op_tint);
+            return op_run(op);
+        }
+
+        // Copy this operation to two new operations on the base table and the mirror.
+        base_op = *op;
+        op_set_table(&base_op, op_uri, op_tint);
+
+        mirror_op = *op;
+        std::string mirror_op_uri = _icontext->_dyn_table_runtime[op_tint]._mirror;
+        tint_t mirror_op_tint = _icontext->_dyn_tint[mirror_op_uri];
+        op_set_table(&mirror_op, mirror_op_uri, mirror_op_tint);
+        (void)workgen_atomic_add32(&_icontext->_dyn_table_runtime[mirror_op_tint]._in_use, 1);
+        ASSERT(!_icontext->_dyn_table_runtime[mirror_op_tint]._pending_delete);
+    }
+
+    // Create a new operation with the base and mirror table ops. Group them in a transaction
+    // unless we are already in a transaction.
+    Operation new_op;
+    std::vector<Operation> new_group = {base_op, mirror_op};
+    new_op._group = &new_group;
+    new_op._repeatgroup = 1;
+
+    Transaction txn;
+    if (!_in_transaction) {
+        new_op.transaction = &txn;
+    }
+
+    return op_run(&new_op);
+}
+
+int
+ThreadRunner::op_run(Operation *op)
+{
+    Track *track;
+    WT_CURSOR *cursor;
+    WT_ITEM item;
+    WT_DECL_RET;
+    bool measure_latency, own_cursor, retry_op;
+    timespec start_time;
+    uint64_t time_us;
+    char buf[BUF_SIZE];
+    std::string table_uri = op->_table._uri;
+    tint_t tint = op->_table._internal->_tint;
+
+    WT_CLEAR(item);
+    track = nullptr;
+    cursor = nullptr;
+    own_cursor = false;
+    retry_op = true;
+
     switch (op->_optype) {
     case Operation::OP_CHECKPOINT:
-        recno = 0;
         track = &_stats.checkpoint;
         break;
     case Operation::OP_INSERT:
         track = &_stats.insert;
-        if (op->_key._keytype == Key::KEYGEN_APPEND || op->_key._keytype == Key::KEYGEN_AUTO) {
-            if (op->_random_table) {
-                const std::shared_lock lock(*_icontext->_dyn_mutex);
-                recno = workgen_atomic_add64(&_icontext->_dyn_table_runtime.at(tint)._max_recno, 1);
-            } else {
-                recno = workgen_atomic_add64(&_icontext->_table_runtime[tint]._max_recno, 1);
-            }
-        } else
-            recno = op_get_key_recno(op, range, tint);
         break;
     case Operation::OP_LOG_FLUSH:
     case Operation::OP_NONE:
     case Operation::OP_NOOP:
-        recno = 0;
         break;
     case Operation::OP_REMOVE:
         track = &_stats.remove;
-        recno = op_get_key_recno(op, range, tint);
         break;
     case Operation::OP_SEARCH:
         track = &_stats.read;
-        recno = op_get_key_recno(op, range, tint);
         break;
     case Operation::OP_UPDATE:
         track = &_stats.update;
-        recno = op_get_key_recno(op, range, tint);
         break;
     case Operation::OP_SLEEP:
-        recno = 0;
         break;
     }
+
     if (op->_random_table || ((op->_internal->_flags & WORKGEN_OP_REOPEN) != 0)) {
         WT_ERR(_session->open_cursor(_session, table_uri.c_str(), nullptr, nullptr, &cursor));
         own_cursor = true;
-    } else
+    } else {
         cursor = _cursors[tint];
+    }
 
     measure_latency = track != nullptr && track->ops != 0 && track->track_latency() &&
       (track->ops % _workload->options.sample_rate == 0);
 
-    VERBOSE(*this, "OP " << op->_optype << " " << table_uri.c_str() << ", recno=" << recno);
     uint64_t start;
     if (measure_latency)
         workgen_clock(&start);
@@ -1460,10 +1660,10 @@ ThreadRunner::op_run(Operation *op)
     if (track != nullptr)
         track->begin();
 
-    // Set up the key and value first, outside the transaction which may
-    // be retried.
+    // Set the cursor for the key and value first, outside the transaction which may
+    // be retried. The key and value are generated in op_run_setup.
     if (op->is_table_op()) {
-        op->kv_gen(this, true, 100, recno, _keybuf);
+
         const std::string key_format(cursor->key_format);
         if (key_format == "S") {
             cursor->set_key(cursor, _keybuf);
@@ -1475,9 +1675,7 @@ ThreadRunner::op_run(Operation *op)
             THROW("The key format ('" << key_format << "') must be 'u' or 'S'.");
         }
         if (OP_HAS_VALUE(op)) {
-            uint64_t compressibility =
-              op->_table.options.random_value ? 0 : op->_table.options.value_compressibility;
-            op->kv_gen(this, false, compressibility, recno, _valuebuf);
+
             const std::string value_format(cursor->value_format);
             if (value_format == "S") {
                 cursor->set_value(cursor, _valuebuf);
@@ -1535,6 +1733,7 @@ ThreadRunner::op_run(Operation *op)
             default:
                 ASSERT(false);
             }
+
             // Assume success and no retry unless ROLLBACK.
             retry_op = false;
             if (ret != 0 && ret != WT_ROLLBACK)
@@ -1574,13 +1773,15 @@ ThreadRunner::op_run(Operation *op)
           *this, "GROUP operation " << op->_timed << " secs, " << op->_repeatgroup << "times");
 
         do {
-            for (int count = 0; !_stop && count < op->_repeatgroup; count++) {
+            // Wait for transactions to complete before stopping.
+            for (int count = 0; (!_stop || _in_transaction) && count < op->_repeatgroup; count++) {
                 for (std::vector<Operation>::iterator i = op->_group->begin();
-                     i != op->_group->end(); i++)
-                    WT_ERR(op_run(&*i));
+                     i != op->_group->end(); i++) {
+                    WT_ERR(op_run_setup(&*i));
+                }
             }
             workgen_clock(&now);
-        } while (!_stop && ns_to_us(now) < endtime);
+        } while ((!_stop || _in_transaction) && ns_to_us(now) < endtime);
 
         if (op->_timed != 0.0)
             _op_time_us = endtime;
@@ -1589,9 +1790,9 @@ err:
     if (own_cursor)
         WT_TRET(cursor->close(cursor));
     if (op->transaction != nullptr) {
-        if (ret != 0 || op->transaction->_rollback)
+        if (ret != 0 || op->transaction->_rollback) {
             WT_TRET(_session->rollback_transaction(_session, nullptr));
-        else if (_in_transaction) {
+        } else if (_in_transaction) {
             // Set prepare, commit and durable timestamp if prepare is set.
             if (op->transaction->use_prepare_timestamp) {
                 time_us = WorkgenTimeStamp::get_timestamp();
@@ -1612,13 +1813,14 @@ err:
         _in_transaction = false;
     }
 
-    // For operations on random tables, if a table has been selected, decrement the reference
-    // counter.
-    if (op->_random_table && !table_uri.empty()) {
+    if (op->_random_table) {
         const std::shared_lock lock(*_icontext->_dyn_mutex);
+        // For operations on random tables, if a table has been selected, decrement the
+        // reference counter.
         ASSERT(_icontext->_dyn_table_runtime[tint]._in_use > 0);
         // Use atomic here as we can race with another thread that acquires the shared lock.
         (void)workgen_atomic_sub32(&_icontext->_dyn_table_runtime[tint]._in_use, 1);
+        op_clear_table(op);
     }
 
     return (ret);
@@ -1999,6 +2201,12 @@ Operation::get_static_counts(Stats &stats, int multiplier)
     if (_group != nullptr)
         for (std::vector<Operation>::iterator i = _group->begin(); i != _group->end(); i++)
             i->get_static_counts(stats, multiplier * _repeatgroup);
+}
+
+bool
+Operation::has_table() const
+{
+    return (!_table._uri.empty());
 }
 
 bool
@@ -2683,7 +2891,8 @@ WorkloadOptions::WorkloadOptions()
       sample_rate(1), warmup(0), oldest_timestamp_lag(0.0), stable_timestamp_lag(0.0),
       timestamp_advance(0.0), max_idle_table_cycle_fatal(false), create_count(0),
       create_interval(0), create_prefix(""), create_target(0), create_trigger(0), drop_count(0),
-      drop_interval(0), drop_target(0), drop_trigger(0), _options()
+      drop_interval(0), drop_target(0), drop_trigger(0), random_table_values(false),
+      mirror_tables(false), mirror_suffix("_mirror"), _options()
 {
     _options.add_int("max_latency", max_latency,
       "prints warning if any latency measured exceeds this number of "
@@ -2739,6 +2948,11 @@ WorkloadOptions::WorkloadOptions()
       "if specified, start dropping tables when the database exceeds this size in MB");
     _options.add_int("drop_target", drop_target,
       "if specified, stop dropping tables when the database drops below this size in MB");
+    _options.add_bool(
+      "random_table_values", random_table_values, "generate random content for the table value");
+    _options.add_bool("mirror_tables", mirror_tables, "mirror database operations");
+    _options.add_string(
+      "mirror_suffix", mirror_suffix, "the suffix to append to mirrored table names");
 }
 
 WorkloadOptions::WorkloadOptions(const WorkloadOptions &other)
