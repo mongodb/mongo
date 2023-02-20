@@ -17,7 +17,7 @@ const dbname = "foo";
 const isDirectoryPerDBSupported =
     jsTest.options().storageEngine == "wiredTiger" || !jsTest.options().storageEngine;
 
-const m = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: ''});
+const m = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: '', syncdelay: 1});
 
 if (!isDirectoryPerDBSupported) {
     assert.isnull(m, 'storage engine without directoryperdb support should fail to start up');
