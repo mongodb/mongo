@@ -32,6 +32,7 @@
 #include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/session_catalog_router.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
@@ -288,12 +289,13 @@ TEST_F(BatchWriteOpTest, SingleStaleError) {
     Timestamp timestamp{1, 0};
     response.addToErrDetails(write_ops::WriteError(
         0,
-        Status{StaleConfigInfo(nss,
-                               ShardVersion(ChunkVersion({epoch, timestamp}, {101, 200}),
-                                            boost::optional<CollectionIndexes>(boost::none)),
-                               ShardVersion(ChunkVersion({epoch, timestamp}, {105, 200}),
-                                            boost::optional<CollectionIndexes>(boost::none)),
-                               ShardId("shard")),
+        Status{StaleConfigInfo(
+                   nss,
+                   ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {101, 200}),
+                                             boost::optional<CollectionIndexes>(boost::none)),
+                   ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {105, 200}),
+                                             boost::optional<CollectionIndexes>(boost::none)),
+                   ShardId("shard")),
                "mock stale error"}));
 
     // First stale response comes back, we should retry

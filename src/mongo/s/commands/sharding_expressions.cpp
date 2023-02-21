@@ -48,6 +48,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/s/shard_version_factory.h"
 
 namespace mongo {
 namespace {
@@ -386,16 +387,13 @@ Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* v
     // Setting 'allowLocks' to true when evaluating on mongod, as otherwise an invariant is thrown.
     // We can safely set it to true as there is no risk of deadlock, because the code still throws
     // when a refresh would actually need to take place.
-    const auto chunkManager =
-        uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, ns, true /* allowLocks */))
-            .cm;
+    const auto cri =
+        uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, ns, true /* allowLocks */));
 
     // Invalidate catalog cache if the chunk manager version is stale.
-    if (chunkManager.getVersion().isOlderThan(shardVersion.placementVersion())) {
-        boost::optional<CollectionIndexes> collIndexes;
-        ShardVersion currentShardVersion(chunkManager.getVersion(), collIndexes);
+    if (cri.cm.getVersion().isOlderThan(shardVersion.placementVersion())) {
         uasserted(StaleConfigInfo(ns,
-                                  currentShardVersion,
+                                  cri.getCollectionVersion(),
                                   boost::none /* wanted */,
                                   ShardingState::get(opCtx)->shardId()),
                   str::stream()
@@ -405,7 +403,7 @@ Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* v
 
     // Retrieve the shard id for the given shard key value.
     std::set<ShardId> shardIds;
-    chunkManager.getShardIdsForRange(shardKeyVal, shardKeyVal, &shardIds);
+    cri.cm.getShardIdsForRange(shardKeyVal, shardKeyVal, &shardIds);
     uassert(6868601, "The value should belong to exactly one ShardId", shardIds.size() == 1);
     const auto shardId = *(shardIds.begin());
     return Value(shardId.toString());

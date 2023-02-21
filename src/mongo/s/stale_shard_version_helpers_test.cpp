@@ -28,6 +28,7 @@
  */
 
 #include "mongo/logv2/log.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/unittest/unittest.h"
@@ -96,12 +97,13 @@ TEST_F(AsyncShardVersionRetry, LimitedStaleErrorsShouldReturnCorrectValue) {
                 const CollectionGeneration gen1(OID::gen(), Timestamp(1, 0));
                 const CollectionGeneration gen2(OID::gen(), Timestamp(1, 0));
                 uassert(
-                    StaleConfigInfo(nss(),
-                                    ShardVersion(ChunkVersion(gen1, {5, 23}),
-                                                 boost::optional<CollectionIndexes>(boost::none)),
-                                    ShardVersion(ChunkVersion(gen2, {6, 99}),
-                                                 boost::optional<CollectionIndexes>(boost::none)),
-                                    ShardId("sB")),
+                    StaleConfigInfo(
+                        nss(),
+                        ShardVersionFactory::make(ChunkVersion(gen1, {5, 23}),
+                                                  boost::optional<CollectionIndexes>(boost::none)),
+                        ShardVersionFactory::make(ChunkVersion(gen2, {6, 99}),
+                                                  boost::optional<CollectionIndexes>(boost::none)),
+                        ShardId("sB")),
                     "testX",
                     false);
             }

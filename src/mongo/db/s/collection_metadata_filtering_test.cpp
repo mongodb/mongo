@@ -32,6 +32,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 
 namespace mongo {
@@ -157,8 +158,8 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
     auto scopedCss =
         CollectionShardingState::assertCollectionLockedAndAcquire(operationContext(), kNss);
@@ -188,8 +189,8 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
     auto scopedCss =
         CollectionShardingState::assertCollectionLockedAndAcquire(operationContext(), kNss);
@@ -227,8 +228,8 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
     auto scopedCss =
         CollectionShardingState::assertCollectionLockedAndAcquire(operationContext(), kNss);

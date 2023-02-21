@@ -36,6 +36,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/s/query/sharded_agg_test_fixture.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/unittest/unittest.h"
 
@@ -162,11 +163,12 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
         OID epoch{OID::gen()};
         Timestamp timestamp{1, 0};
         return createErrorCursorResponse(
-            Status{StaleConfigInfo(kTestAggregateNss,
-                                   ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                boost::optional<CollectionIndexes>(boost::none)),
-                                   boost::none,
-                                   ShardId{"0"}),
+            Status{StaleConfigInfo(
+                       kTestAggregateNss,
+                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       boost::none,
+                       ShardId{"0"}),
                    "Mock error: shard version mismatch"});
     });
 
@@ -251,11 +253,12 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
         OID epoch{OID::gen()};
         Timestamp timestamp{1, 0};
         return createErrorCursorResponse(
-            Status{StaleConfigInfo(kTestAggregateNss,
-                                   ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                boost::optional<CollectionIndexes>(boost::none)),
-                                   boost::none,
-                                   ShardId{"0"}),
+            Status{StaleConfigInfo(
+                       kTestAggregateNss,
+                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       boost::none,
+                       ShardId{"0"}),
                    "Mock error: shard version mismatch"});
     });
 
@@ -348,20 +351,22 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
 
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
-            Status{StaleConfigInfo(kTestAggregateNss,
-                                   ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                boost::optional<CollectionIndexes>(boost::none)),
-                                   boost::none,
-                                   ShardId{"0"}),
+            Status{StaleConfigInfo(
+                       kTestAggregateNss,
+                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       boost::none,
+                       ShardId{"0"}),
                    "Mock error: shard version mismatch"});
     });
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
-            Status{StaleConfigInfo(kTestAggregateNss,
-                                   ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                boost::optional<CollectionIndexes>(boost::none)),
-                                   boost::none,
-                                   ShardId{"0"}),
+            Status{StaleConfigInfo(
+                       kTestAggregateNss,
+                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       boost::none,
+                       ShardId{"0"}),
                    "Mock error: shard version mismatch"});
     });
 

@@ -31,6 +31,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/s/shard_version_factory.h"
 
 namespace mongo {
 
@@ -69,7 +70,7 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
 
     const auto placementVersion = metadata.getShardVersion();
     const auto shardVersion =
-        ShardVersion(placementVersion, scopedCsr->getCollectionIndexes(opCtx));
+        ShardVersionFactory::make(metadata, scopedCsr->getCollectionIndexes(opCtx));
 
     uassert(StaleConfigInfo(nss,
                             ShardVersion::IGNORED() /* receivedVersion */,
@@ -98,10 +99,10 @@ void checkShardKeyPattern(OperationContext* opCtx,
                           const ChunkRange& chunkRange) {
     const auto shardId = ShardingState::get(opCtx)->shardId();
     const auto& keyPattern = metadata.getKeyPattern();
-    const auto shardVersion =
-        ShardVersion(metadata.getShardVersion(),
-                     globalIndexInfo ? boost::make_optional(globalIndexInfo->getCollectionIndexes())
-                                     : boost::none);
+    const auto shardVersion = ShardVersionFactory::make(
+        metadata,
+        globalIndexInfo ? boost::make_optional(globalIndexInfo->getCollectionIndexes())
+                        : boost::none);
 
     uassert(StaleConfigInfo(nss,
                             ShardVersion::IGNORED() /* receivedVersion */,
@@ -119,10 +120,10 @@ void checkChunkMatchesRange(OperationContext* opCtx,
                             const boost::optional<GlobalIndexesCache>& globalIndexInfo,
                             const ChunkRange& chunkRange) {
     const auto shardId = ShardingState::get(opCtx)->shardId();
-    const auto shardVersion =
-        ShardVersion(metadata.getShardVersion(),
-                     globalIndexInfo ? boost::make_optional(globalIndexInfo->getCollectionIndexes())
-                                     : boost::none);
+    const auto shardVersion = ShardVersionFactory::make(
+        metadata,
+        globalIndexInfo ? boost::make_optional(globalIndexInfo->getCollectionIndexes())
+                        : boost::none);
 
     ChunkType existingChunk;
     uassert(StaleConfigInfo(nss,
@@ -148,10 +149,10 @@ void checkRangeWithinChunk(OperationContext* opCtx,
                            const boost::optional<GlobalIndexesCache>& globalIndexInfo,
                            const ChunkRange& chunkRange) {
     const auto shardId = ShardingState::get(opCtx)->shardId();
-    const auto shardVersion =
-        ShardVersion(metadata.getShardVersion(),
-                     globalIndexInfo ? boost::make_optional(globalIndexInfo->getCollectionIndexes())
-                                     : boost::none);
+    const auto shardVersion = ShardVersionFactory::make(
+        metadata,
+        globalIndexInfo ? boost::make_optional(globalIndexInfo->getCollectionIndexes())
+                        : boost::none);
 
     ChunkType existingChunk;
     uassert(StaleConfigInfo(nss,
@@ -170,10 +171,10 @@ void checkRangeOwnership(OperationContext* opCtx,
                          const boost::optional<GlobalIndexesCache>& globalIndexInfo,
                          const ChunkRange& chunkRange) {
     const auto shardId = ShardingState::get(opCtx)->shardId();
-    const auto shardVersion =
-        ShardVersion(metadata.getShardVersion(),
-                     globalIndexInfo ? boost::make_optional(globalIndexInfo->getCollectionIndexes())
-                                     : boost::none);
+    const auto shardVersion = ShardVersionFactory::make(
+        metadata,
+        globalIndexInfo ? boost::make_optional(globalIndexInfo->getCollectionIndexes())
+                        : boost::none);
 
     ChunkType existingChunk;
     BSONObj minKey = chunkRange.getMin();

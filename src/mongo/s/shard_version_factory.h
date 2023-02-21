@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,37 +26,33 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
+
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/s/shard_version.h"
-#include "mongo/s/shard_version_factory.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
-namespace {
 
-TEST(ShardVersionTest, ConstructCorrectly) {
-    const CollectionGeneration gen(OID::gen(), Timestamp(1, 2));
-    const ChunkVersion chunkVersion(gen, {3, 4});
-    const CollectionIndexes collectionIndexes(UUID::gen(), Timestamp(5, 6));
-    const ShardVersion shardVersion = ShardVersionFactory::make(chunkVersion, collectionIndexes);
-    ASSERT_EQ(shardVersion.placementVersion().getTimestamp(), Timestamp(1, 2));
-    ASSERT_EQ(shardVersion.placementVersion().majorVersion(), 3);
-    ASSERT_EQ(shardVersion.placementVersion().minorVersion(), 4);
-    ASSERT_EQ(shardVersion.indexVersion(), Timestamp(5, 6));
-}
+/**
+ * This class is used to build shard version objects.
+ */
+class ShardVersionFactory {
+public:
+    static ShardVersion make(const ChunkManager& chunkManager,
+                             const boost::optional<CollectionIndexes>& collectionIndexes);
 
-TEST(ShardVersionTest, ToAndFromBSON) {
-    const CollectionGeneration gen(OID::gen(), Timestamp(1, 2));
-    const ChunkVersion chunkVersion(gen, {3, 4});
-    const CollectionIndexes collectionIndexes(UUID::gen(), Timestamp(5, 6));
-    const ShardVersion shardVersion = ShardVersionFactory::make(chunkVersion, collectionIndexes);
+    static ShardVersion make(const ChunkManager& chunkManager,
+                             const ShardId& shardId,
+                             const boost::optional<CollectionIndexes>& collectionIndexes);
 
-    BSONObjBuilder builder;
-    shardVersion.serialize(ShardVersion::kShardVersionField, &builder);
-    const auto obj = builder.obj();
+    static ShardVersion make(const CollectionMetadata& cm,
+                             const boost::optional<CollectionIndexes>& collectionIndexes);
 
-    const auto fromBSON = ShardVersion::parse(obj[ShardVersion::kShardVersionField]);
-    ASSERT_EQ(fromBSON, shardVersion);
-}
+    // The other three builders should be used instead of this one whenever possible. This
+    // builder should only be used for the rare cases in which we know that the chunk version and
+    // collection indexes come from the same collection.
+    static ShardVersion make(const ChunkVersion& chunkVersion,
+                             const boost::optional<CollectionIndexes>& collectionIndexes);
+};
 
-}  // namespace
 }  // namespace mongo

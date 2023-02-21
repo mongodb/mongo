@@ -33,7 +33,7 @@
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
-
+#include "mongo/s/shard_version_factory.h"
 
 namespace mongo {
 namespace {
@@ -317,7 +317,8 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulRequestChunkDataSizeCommand) {
         kNss,
         chunk.getShard(),
         chunk.getRange(),
-        ShardVersion(chunk.getVersion(), boost::optional<CollectionIndexes>(boost::none)),
+        ShardVersionFactory::make(chunk.getVersion(),
+                                  boost::optional<CollectionIndexes>(boost::none)),
         KeyPattern(BSON("x" << 1)),
         false /* issuedByRemoteUser */,
         (kDefaultMaxChunkSizeBytes / 100) * 25 /* maxSize */);

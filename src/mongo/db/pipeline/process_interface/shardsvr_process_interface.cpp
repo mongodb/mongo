@@ -51,6 +51,7 @@
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/router.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -78,11 +79,11 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
 
     // Mark the cache entry routingInfo for the 'nss' and 'shardId' if the entry is staler than
     // 'targetCollectionVersion'.
-    const ShardVersion ignoreIndexVersion{
+    const ShardVersion ignoreIndexVersion = ShardVersionFactory::make(
         targetCollectionVersion,
         currentGlobalIndexesInfo
             ? boost::make_optional(currentGlobalIndexesInfo->getCollectionIndexes())
-            : boost::none};
+            : boost::none);
     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         nss, ignoreIndexVersion, shardId);
 

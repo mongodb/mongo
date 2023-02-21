@@ -42,6 +42,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/shard_version_factory.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -56,18 +57,14 @@ BSONObj selectMedianKey(OperationContext* opCtx,
                         const ShardId& shardId,
                         const NamespaceString& nss,
                         const ShardKeyPattern& shardKeyPattern,
-                        const ChunkVersion& chunkVersion,
+                        const CollectionRoutingInfo& cri,
                         const ChunkRange& chunkRange) {
-    const auto gii =
-        Grid::get(opCtx)->catalogCache()->getCollectionIndexInfoWithRefresh(opCtx, nss);
-    ShardVersion shardVersion(
-        chunkVersion, gii ? boost::make_optional(gii->getCollectionIndexes()) : boost::none);
     BSONObjBuilder cmd;
     cmd.append("splitVector", nss.ns());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
     chunkRange.append(&cmd);
     cmd.appendBool("force", true);
-    shardVersion.serialize(ShardVersion::kShardVersionField, &cmd);
+    cri.getShardVersion(shardId).serialize(ShardVersion::kShardVersionField, &cmd);
 
     auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
 
@@ -136,9 +133,10 @@ public:
                    BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
 
-        const auto cm = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx,
-                                                                                           nss));
+        const auto cri = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                         nss));
+        const auto& cm = cri.cm;
 
         const BSONField<BSONObj> findField("find", BSONObj());
         const BSONField<BSONArray> boundsField("bounds", BSONArray());
@@ -257,7 +255,7 @@ public:
                               chunk->getShardId(),
                               nss,
                               cm.getShardKeyPattern(),
-                              cm.getVersion(chunk->getShardId()),
+                              cri,
                               ChunkRange(chunk->getMin(), chunk->getMax()));
 
         LOGV2(22758,

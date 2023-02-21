@@ -54,11 +54,7 @@ BSONObj makeVersionedCmdObj(const CollectionRoutingInfo& cri,
                             const BSONObj& unversionedCmdObj,
                             ShardId shardId) {
     if (cri.cm.isSharded()) {
-        return appendShardVersion(
-            unversionedCmdObj,
-            ShardVersion(cri.cm.getVersion(shardId),
-                         cri.gii ? boost::make_optional(cri.gii->getCollectionIndexes())
-                                 : boost::none));
+        return appendShardVersion(unversionedCmdObj, cri.getShardVersion(shardId));
     }
     auto versionedCmdObj = appendShardVersion(unversionedCmdObj, ShardVersion::UNSHARDED());
     return appendDbVersionIfPresent(versionedCmdObj, cri.cm.dbVersion());

@@ -32,6 +32,7 @@
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/type_collection_common_types_gen.h"
@@ -288,8 +289,8 @@ TEST_F(CatalogCacheTest, OnStaleDatabaseVersionNoVersion) {
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
-    const auto cachedCollVersion =
-        ShardVersion(ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
+    const auto cachedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);
@@ -301,8 +302,8 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
-    const auto cachedCollVersion =
-        ShardVersion(ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
+    const auto cachedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);
@@ -316,10 +317,10 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithGreaterPlacementVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
-    const auto cachedCollVersion =
-        ShardVersion(ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
-    const auto wantedCollVersion =
-        ShardVersion(ChunkVersion(gen, {2, 0}), boost::optional<CollectionIndexes>(boost::none));
+    const auto cachedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
+    const auto wantedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {2, 0}), boost::optional<CollectionIndexes>(boost::none));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);
@@ -333,8 +334,8 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithGreaterPlacementVersion) {
 TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     const auto gen = CollectionGeneration(OID::gen(), Timestamp(42));
-    const auto version =
-        ShardVersion(ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
+    const auto version = ShardVersionFactory::make(ChunkVersion(gen, {1, 0}),
+                                                   boost::optional<CollectionIndexes>(boost::none));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
 
@@ -391,8 +392,8 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
 TEST_F(CatalogCacheTest, LookupCollectionWithInvalidOptions) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     const auto gen = CollectionGeneration(OID::gen(), Timestamp(42));
-    const auto version =
-        ShardVersion(ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
+    const auto version = ShardVersionFactory::make(ChunkVersion(gen, {1, 0}),
+                                                   boost::optional<CollectionIndexes>(boost::none));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
 
@@ -412,10 +413,10 @@ TEST_F(CatalogCacheTest, LookupCollectionWithInvalidOptions) {
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithGreaterIndexVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
-    const auto cachedCollVersion =
-        ShardVersion(ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
-    const auto wantedCollVersion =
-        ShardVersion(ChunkVersion(gen, {1, 0}), CollectionIndexes(kUUID, Timestamp(1, 0)));
+    const auto cachedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
+    const auto wantedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {1, 0}), CollectionIndexes(kUUID, Timestamp(1, 0)));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
     CollectionType coll = loadCollection(cachedCollVersion);
@@ -439,10 +440,10 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithGreaterIndexVersion) {
 TEST_F(CatalogCacheTest, OnStaleShardVersionIndexVersionBumpNotNone) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
-    const auto cachedCollVersion =
-        ShardVersion(ChunkVersion(gen, {1, 0}), CollectionIndexes(kUUID, Timestamp(1, 0)));
-    const auto wantedCollVersion =
-        ShardVersion(ChunkVersion(gen, {1, 0}), CollectionIndexes(kUUID, Timestamp(2, 0)));
+    const auto cachedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {1, 0}), CollectionIndexes(kUUID, Timestamp(1, 0)));
+    const auto wantedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {1, 0}), CollectionIndexes(kUUID, Timestamp(2, 0)));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
     CollectionType coll = loadCollection(cachedCollVersion);

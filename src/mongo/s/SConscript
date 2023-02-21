@@ -267,6 +267,7 @@ env.Library(
         'shard_key_pattern.cpp',
         'shard_version.cpp',
         'shard_version.idl',
+        'shard_version_factory.cpp',
         'sharding_feature_flags.idl',
         'stale_exception.cpp',
         'type_collection_common_types.idl',

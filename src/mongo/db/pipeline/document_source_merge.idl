@@ -33,12 +33,12 @@ global:
     cpp_includes:
         - "mongo/db/namespace_string.h"
         - "mongo/db/pipeline/document_source_merge_spec.h"
-        - "mongo/s/shard_version.h"
+        - "mongo/s/chunk_version.h"
 
 imports:
     - "mongo/db/pipeline/document_source_merge_modes.idl"
     - "mongo/db/basic_types.idl"
-    - "mongo/s/sharding_types.idl"
+    - "mongo/s/chunk_version.idl"
 types:
     MergeTargetNss:
         bson_serialization_type: any
@@ -113,9 +113,9 @@ structs:
                              do not match.
 
             targetCollectionVersion:
-                type: shard_version
+                type: ChunkVersion
                 optional: true
-                description: If set, the collection's ShardVersion found when parsed on mongos. Can
+                description: If set, the collection's ChunkVersion found when parsed on mongos. Can
                              be used to check if a collection has since been dropped and re-created,
                              in which case the shard key may have changed, or had its shard key
                              refined. This also can be used to detect if the collection has gone

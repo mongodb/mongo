@@ -47,6 +47,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_version_factory.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -120,15 +121,15 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
             metadataAfterSplit->isSharded());
     const auto placementVersion = metadataAfterSplit->getShardVersion();
     const auto epoch = placementVersion.epoch();
-    uassert(
-        StaleConfigInfo(nss,
-                        ShardVersion::IGNORED() /* receivedVersion */,
-                        ShardVersion(placementVersion,
-                                     scopedCSR->getCollectionIndexes(opCtx)) /* wantedVersion */,
-                        shardId),
-        str::stream() << "Collection " << nss.ns() << " changed since split start",
-        epoch == expectedEpoch &&
-            (!expectedTimestamp || placementVersion.getTimestamp() == expectedTimestamp));
+    uassert(StaleConfigInfo(nss,
+                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersionFactory::make(
+                                *metadataAfterSplit,
+                                scopedCSR->getCollectionIndexes(opCtx)) /* wantedVersion */,
+                            shardId),
+            str::stream() << "Collection " << nss.ns() << " changed since split start",
+            epoch == expectedEpoch &&
+                (!expectedTimestamp || placementVersion.getTimestamp() == expectedTimestamp));
 
     ChunkType nextChunk;
     for (auto it = splitPoints.begin(); it != splitPoints.end(); ++it) {

@@ -270,11 +270,12 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
                 opCtx, bucketsNs));
         }
-        auto [bucketsPlacementInfo, _] =
+        auto [bucketsPlacementInfo, bucketsIndexInfo] =
             uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, bucketsNs));
         if (bucketsPlacementInfo.isSharded()) {
             _nss = bucketsNs;
             cm = std::move(bucketsPlacementInfo);
+            gii = std::move(bucketsIndexInfo);
             _isRequestOnTimeseriesViewNamespace = true;
         }
     } else if (!cm.isSharded() && _isRequestOnTimeseriesViewNamespace) {
@@ -286,9 +287,9 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
             uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
         }
-        auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
-        cm = cri.cm;
-        gii = cri.gii;
+        auto [newCm, newGii] = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
+        cm = std::move(newCm);
+        gii = std::move(newGii);
         _isRequestOnTimeseriesViewNamespace = false;
     }
 

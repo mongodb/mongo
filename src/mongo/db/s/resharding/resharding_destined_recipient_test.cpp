@@ -49,6 +49,7 @@
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -198,8 +199,8 @@ protected:
         ReshardingEnv env(CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, kNss).value());
         env.destShard = kShardList[1].getName();
         CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
-        env.version = ShardVersion(ChunkVersion(gen, {1, 0}),
-                                   boost::optional<CollectionIndexes>(boost::none));
+        env.version = ShardVersionFactory::make(ChunkVersion(gen, {1, 0}),
+                                                boost::optional<CollectionIndexes>(boost::none));
         env.tempNss = NamespaceString::createNamespaceString_forTest(
             kNss.db(),
             fmt::format("{}{}",

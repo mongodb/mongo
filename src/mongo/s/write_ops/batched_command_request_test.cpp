@@ -29,6 +29,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/ops/write_ops_parsers_test_helpers.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
 
@@ -72,8 +73,8 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
 
         ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest().getNamespace().ns());
         ASSERT(insertRequest.hasShardVersion());
-        ASSERT_EQ(ShardVersion(ChunkVersion({epoch, timestamp}, {1, 2}),
-                               boost::optional<CollectionIndexes>(boost::none))
+        ASSERT_EQ(ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 2}),
+                                            boost::optional<CollectionIndexes>(boost::none))
                       .toString(),
                   insertRequest.getShardVersion().toString());
     }

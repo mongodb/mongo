@@ -62,6 +62,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 
 
@@ -1342,8 +1343,8 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
           "numInitialChunks"_attr = _initialChunks->chunks.size(),
           "initialCollectionVersion"_attr = _initialChunks->collVersion());
 
-    auto result = CreateCollectionResponse(
-        {placementVersion, boost::optional<CollectionIndexes>(boost::none)});
+    auto result = CreateCollectionResponse(ShardVersionFactory::make(
+        placementVersion, boost::optional<CollectionIndexes>(boost::none)));
     result.setCollectionUUID(_collectionUUID);
     _result = std::move(result);
 

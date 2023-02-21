@@ -38,6 +38,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -131,9 +132,9 @@ protected:
 
     const NamespaceString nssShardedCollection1 =
         NamespaceString::createNamespaceString_forTest(dbNameTestDb, "sharded");
-    const ShardVersion shardVersionShardedCollection1{
+    const ShardVersion shardVersionShardedCollection1 = ShardVersionFactory::make(
         ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(5, 0)}, CollectionPlacement(10, 1)),
-        boost::optional<CollectionIndexes>(boost::none)};
+        boost::optional<CollectionIndexes>(boost::none));
 
     // Workaround to be able to write parametrized TEST_F
     void testRestoreFailsIfCollectionNoLongerExists(
@@ -798,7 +799,8 @@ TEST_F(ShardRoleTest, RestoreForWriteFailsIfPlacementConcernNoLongerMet) {
     const auto newShardVersion = [&]() {
         auto newPlacementVersion = shardVersionShardedCollection1.placementVersion();
         newPlacementVersion.incMajor();
-        return ShardVersion(newPlacementVersion, boost::optional<CollectionIndexes>(boost::none));
+        return ShardVersionFactory::make(newPlacementVersion,
+                                         boost::optional<CollectionIndexes>(boost::none));
     }();
     const auto uuid = getCollectionUUID(opCtx(), nss);
     installShardedCollectionMetadata(
@@ -853,7 +855,8 @@ TEST_F(ShardRoleTest, RestoreWithShardVersionIgnored) {
     const auto newShardVersion = [&]() {
         auto newPlacementVersion = shardVersionShardedCollection1.placementVersion();
         newPlacementVersion.incMajor();
-        return ShardVersion(newPlacementVersion, boost::optional<CollectionIndexes>(boost::none));
+        return ShardVersionFactory::make(newPlacementVersion,
+                                         boost::optional<CollectionIndexes>(boost::none));
     }();
 
     const auto uuid = getCollectionUUID(opCtx(), nss);
@@ -1025,8 +1028,8 @@ TEST_F(ShardRoleTest, RestoreForReadSucceedsEvenIfPlacementHasChanged) {
         const auto newShardVersion = [&]() {
             auto newPlacementVersion = shardVersionShardedCollection1.placementVersion();
             newPlacementVersion.incMajor();
-            return ShardVersion(newPlacementVersion,
-                                boost::optional<CollectionIndexes>(boost::none));
+            return ShardVersionFactory::make(newPlacementVersion,
+                                             boost::optional<CollectionIndexes>(boost::none));
         }();
 
         const auto uuid = getCollectionUUID(opCtx(), nss);

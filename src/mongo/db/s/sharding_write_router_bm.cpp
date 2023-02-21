@@ -48,6 +48,7 @@
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/catalog_cache_mock.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
@@ -148,12 +149,13 @@ std::unique_ptr<CatalogCacheMock> createCatalogCacheMock(OperationContext* opCtx
         opCtx->getServiceContext(),
         std::make_unique<CollectionShardingStateFactoryShard>(opCtx->getServiceContext()));
 
-    const ChunkVersion placementVersion = chunkManager.getVersion(originatorShard);
     OperationShardingState::setShardRole(
         opCtx,
         kNss,
-        ShardVersion(placementVersion,
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            chunkManager,
+            originatorShard,
+            boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */);
 
     // Configuring the filtering metadata such that calls to getCollectionDescription return what we

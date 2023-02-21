@@ -34,7 +34,8 @@
 namespace mongo {
 
 /**
- * This class is used to represent the shard version of a collection.
+ * This class is used to represent the shard version of a collection. Objects of this class can be
+ * constructed through the ShardVersionFactory.
  *
  * It contains the chunk placement information through the ChunkVersion. This class is used for
  * network requests and the shard versioning protocol.
@@ -47,11 +48,6 @@ public:
      * if they want to convey shard version.
      */
     static constexpr StringData kShardVersionField = "shardVersion"_sd;
-
-    ShardVersion(ChunkVersion chunkVersion, boost::optional<CollectionIndexes> indexVersion)
-        : _chunkVersion(chunkVersion),
-          _indexVersion(indexVersion ? boost::make_optional(indexVersion->indexVersion())
-                                     : boost::none) {}
 
     ShardVersion() : _chunkVersion(ChunkVersion()), _indexVersion(boost::none) {}
 
@@ -92,8 +88,16 @@ public:
     std::string toString() const;
 
 private:
+    ShardVersion(const ChunkVersion& chunkVersion,
+                 const boost::optional<CollectionIndexes>& collectionIndexes)
+        : _chunkVersion(chunkVersion),
+          _indexVersion(collectionIndexes ? boost::make_optional(collectionIndexes->indexVersion())
+                                          : boost::none) {}
+
     ShardVersion(ChunkVersion chunkVersion, boost::optional<Timestamp> indexVersionTimestamp)
         : _chunkVersion(chunkVersion), _indexVersion(indexVersionTimestamp) {}
+
+    friend class ShardVersionFactory;
 
     ChunkVersion _chunkVersion;
     boost::optional<Timestamp> _indexVersion;

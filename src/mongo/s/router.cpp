@@ -105,11 +105,7 @@ CollectionRouter::CollectionRouter(ServiceContext* service, NamespaceString nss)
 void CollectionRouter::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
                                                        const CollectionRoutingInfo& cri,
                                                        BSONObjBuilder* builder) {
-    auto chunkVersion(cri.cm.getVersion(shardId));
-    auto collectionIndexes(cri.gii ? boost::make_optional(cri.gii->getCollectionIndexes())
-                                   : boost::none);
-
-    if (chunkVersion == ChunkVersion::UNSHARDED()) {
+    if (cri.cm.getVersion(shardId) == ChunkVersion::UNSHARDED()) {
         // Need to add the database version as well
         const auto& dbVersion = cri.cm.dbVersion();
         if (!dbVersion.isFixed()) {
@@ -117,8 +113,7 @@ void CollectionRouter::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
             dbVersion.serialize(&dbvBuilder);
         }
     }
-    ShardVersion(chunkVersion, collectionIndexes)
-        .serialize(ShardVersion::kShardVersionField, builder);
+    cri.getShardVersion(shardId).serialize(ShardVersion::kShardVersionField, builder);
 }
 
 CollectionRoutingInfo CollectionRouter::_getRoutingInfo(OperationContext* opCtx) const {

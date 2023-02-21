@@ -39,6 +39,7 @@
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/fail_point.h"
 
@@ -272,8 +273,8 @@ protected:
         ScopedSetShardRole scopedSetShardRole{
             opCtx,
             sourceNss,
-            ShardVersion(metadata.getShardVersion(),
-                         boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+            ShardVersionFactory::make(
+                metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
             boost::none /* databaseVersion */};
 
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, sourceNss)
@@ -354,8 +355,8 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ConstructDonorDocumentFromRe
     ScopedSetShardRole scopedSetShardRole{
         opCtx,
         kOriginalNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
 
     auto reshardingFields =
@@ -375,8 +376,8 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest,
     ScopedSetShardRole scopedSetShardRole{
         opCtx,
         kTemporaryReshardingNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
 
     auto reshardingFields =
@@ -395,8 +396,8 @@ TEST_F(ReshardingDonorRecipientCommonTest, CreateDonorServiceInstance) {
     ScopedSetShardRole scopedSetShardRole{
         opCtx,
         kOriginalNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
 
     auto reshardingFields =
@@ -423,8 +424,8 @@ TEST_F(ReshardingDonorRecipientCommonTest, CreateRecipientServiceInstance) {
     ScopedSetShardRole scopedSetShardRole{
         opCtx,
         kTemporaryReshardingNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
 
     auto reshardingFields =
@@ -452,8 +453,8 @@ TEST_F(ReshardingDonorRecipientCommonTest,
     ScopedSetShardRole scopedSetShardRole{
         opCtx,
         kOriginalNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
 
     auto reshardingFields =
@@ -475,8 +476,8 @@ TEST_F(ReshardingDonorRecipientCommonTest,
     ScopedSetShardRole scopedSetShardRole{
         opCtx,
         kTemporaryReshardingNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
 
     auto reshardingFields =
@@ -504,8 +505,8 @@ TEST_F(ReshardingDonorRecipientCommonTest, ProcessDonorFieldsWhenShardDoesntOwnA
     ScopedSetShardRole scopedSetShardRole{
         opCtx,
         kOriginalNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
 
     auto reshardingFields =
@@ -530,8 +531,8 @@ TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsWhenShardDoesnt
     ScopedSetShardRole scopedSetShardRole{
         opCtx,
         kTemporaryReshardingNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
 
     auto reshardingFields =
@@ -557,8 +558,8 @@ TEST_F(ReshardingDonorRecipientCommonTest, ProcessReshardingFieldsWithoutDonorOr
     ScopedSetShardRole scopedSetShardRole{
         opCtx,
         kTemporaryReshardingNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
 
     auto reshardingFields =

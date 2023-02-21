@@ -41,6 +41,7 @@
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/s/shard_version_factory.h"
 
 namespace mongo {
 namespace {
@@ -124,8 +125,8 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kTestNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
@@ -150,8 +151,8 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kTestNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
@@ -179,8 +180,8 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kTestNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
@@ -208,8 +209,8 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kTestNss,
-        ShardVersion(metadata.getShardVersion(),
-                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        ShardVersionFactory::make(
+            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
