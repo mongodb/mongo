@@ -64,16 +64,6 @@ bool FeatureFlag::isEnabled(const ServerGlobalParams::FeatureCompatibility& fcv)
     return fcv.isGreaterThanOrEqualTo(_version);
 }
 
-bool FeatureFlag::isEnabledUseDefaultFCVWhenUninitialized(
-    const ServerGlobalParams::FeatureCompatibility& fcv) const {
-    if (fcv.isVersionInitialized()) {
-        return isEnabled(fcv);
-    } else {
-        return isEnabledOnVersion(
-            multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
-    }
-}
-
 bool FeatureFlag::isEnabledAndIgnoreFCV() const {
     return _enabled;
 }

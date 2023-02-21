@@ -52,39 +52,38 @@ public:
     static ClusterServerParameterInitializer* get(OperationContext* opCtx);
     static ClusterServerParameterInitializer* get(ServiceContext* serviceContext);
 
-    static void updateParameter(OperationContext* opCtx,
-                                BSONObj doc,
-                                StringData mode,
-                                const boost::optional<TenantId>& tenantId);
-    static void clearParameter(OperationContext* opCtx,
-                               ServerParameter* sp,
-                               const boost::optional<TenantId>& tenantId);
-    static void clearParameter(OperationContext* opCtx,
-                               StringData id,
-                               const boost::optional<TenantId>& tenantId);
-    static void clearAllTenantParameters(OperationContext* opCtx,
-                                         const boost::optional<TenantId>& tenantId);
+    void updateParameter(OperationContext* opCtx,
+                         BSONObj doc,
+                         StringData mode,
+                         const boost::optional<TenantId>& tenantId);
+    void clearParameter(OperationContext* opCtx,
+                        ServerParameter* sp,
+                        const boost::optional<TenantId>& tenantId);
+    void clearParameter(OperationContext* opCtx,
+                        StringData id,
+                        const boost::optional<TenantId>& tenantId);
+    void clearAllTenantParameters(OperationContext* opCtx,
+                                  const boost::optional<TenantId>& tenantId);
 
     /**
      * Used to initialize in-memory cluster parameter state based on the on-disk contents after
      * startup recovery or initial sync is complete.
      */
-    static void initializeAllTenantParametersFromDisk(OperationContext* opCtx,
-                                                      const boost::optional<TenantId>& tenantId);
+    void initializeAllTenantParametersFromDisk(OperationContext* opCtx,
+                                               const boost::optional<TenantId>& tenantId);
 
     /**
      * Used on rollback and rename with drop.
      * Updates settings which are present and clears settings which are not.
      */
-    static void resynchronizeAllTenantParametersFromDisk(OperationContext* opCtx,
-                                                         const boost::optional<TenantId>& tenantId);
+    void resynchronizeAllTenantParametersFromDisk(OperationContext* opCtx,
+                                                  const boost::optional<TenantId>& tenantId);
 
     // Virtual methods coming from the ReplicaSetAwareService
     void onStartup(OperationContext* opCtx) override final {}
 
     void onSetCurrentConfig(OperationContext* opCtx) override final {}
 
-    static void synchronizeAllParametersFromDisk(OperationContext* opCtx);
     /**
      * Called after startup recovery or initial sync is complete.
      */
@@ -98,10 +97,10 @@ public:
 
 private:
     template <typename OnEntry>
-    static void doLoadAllTenantParametersFromDisk(OperationContext* opCtx,
-                                                  StringData mode,
-                                                  OnEntry onEntry,
-                                                  const boost::optional<TenantId>& tenantId) try {
+    void doLoadAllTenantParametersFromDisk(OperationContext* opCtx,
+                                           StringData mode,
+                                           OnEntry onEntry,
+                                           const boost::optional<TenantId>& tenantId) try {
 
         // If the RecoveryUnit already had an open snapshot, keep the snapshot open. Otherwise
         // abandon the snapshot when exiting the function.

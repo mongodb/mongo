@@ -60,13 +60,6 @@ public:
     bool isEnabled(const ServerGlobalParams::FeatureCompatibility& fcv) const;
 
     /**
-     * Returns true if the flag is set to true and enabled for this FCV version. If the FCV version
-     * is unset, instead checks against the default last LTS FCV version.
-     */
-    bool isEnabledUseDefaultFCVWhenUninitialized(
-        const ServerGlobalParams::FeatureCompatibility& fcv) const;
-
-    /**
      * Returns true if this flag is enabled regardless of the current FCV version.
      *
      * isEnabled() is prefered over this function since it will prevent upgrade/downgrade issues.
