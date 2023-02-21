@@ -70,7 +70,7 @@ public:
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, req.getShard()));
 
             ShardSvrMergeAllChunksOnShard shardSvrMergeAllChunksOnShard(nss);
-            shardSvrMergeAllChunksOnShard.setDbName(NamespaceString::kAdminDb);
+            shardSvrMergeAllChunksOnShard.setDbName(DatabaseName::kAdmin);
             shardSvrMergeAllChunksOnShard.setShard(req.getShard());
 
             auto swCommandResponse = shard->runCommandWithFixedRetryAttempts(

@@ -54,7 +54,7 @@ namespace {
 ShardsvrSetUserWriteBlockMode makeShardsvrSetUserWriteBlockModeCommand(
     bool block, ShardsvrSetUserWriteBlockModePhaseEnum phase) {
     ShardsvrSetUserWriteBlockMode shardsvrSetUserWriteBlockModeCmd;
-    shardsvrSetUserWriteBlockModeCmd.setDbName(NamespaceString::kAdminDb);
+    shardsvrSetUserWriteBlockModeCmd.setDbName(DatabaseName::kAdmin);
     SetUserWriteBlockModeRequest setUserWriteBlockModeRequest(block /* global */);
     shardsvrSetUserWriteBlockModeCmd.setSetUserWriteBlockModeRequest(
         std::move(setUserWriteBlockModeRequest));

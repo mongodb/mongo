@@ -73,7 +73,7 @@ public:
                    const NamespaceString& collectionName,
                    const BSONObj& query,
                    BSONObj* result) override {
-        if (_findsShouldFail && collectionName == AuthorizationManager::usersCollectionNamespace) {
+        if (_findsShouldFail && collectionName == NamespaceString::kAdminUsersNamespace) {
             return Status(ErrorCodes::UnknownError,
                           "findOne on admin.system.users set to fail in mock.");
         }
@@ -137,7 +137,7 @@ public:
         return managerState->insert(
             _opCtx.get(),
             NamespaceString::createNamespaceString_forTest(
-                username.getTenant(), NamespaceString::kAdminDb, NamespaceString::kSystemUsers),
+                username.getTenant(), DatabaseName::kAdmin.db(), NamespaceString::kSystemUsers),
             userDoc.obj(),
             {});
     }
@@ -454,11 +454,8 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
 
     // Change the user to be read-only
     int ignored;
-    ASSERT_OK(managerState->remove(_opCtx.get(),
-                                   AuthorizationManager::usersCollectionNamespace,
-                                   BSONObj(),
-                                   BSONObj(),
-                                   &ignored));
+    ASSERT_OK(managerState->remove(
+        _opCtx.get(), NamespaceString::kAdminUsersNamespace, BSONObj(), BSONObj(), &ignored));
     ASSERT_OK(createUser(kSpencerTest, {{"read", "test"}}));
 
     // Make sure that invalidating the user causes the session to reload its privileges.
@@ -472,11 +469,8 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
     user = authzSession->lookupUser(kSpencerTest);
 
     // Delete the user.
-    ASSERT_OK(managerState->remove(_opCtx.get(),
-                                   AuthorizationManager::usersCollectionNamespace,
-                                   BSONObj(),
-                                   BSONObj(),
-                                   &ignored));
+    ASSERT_OK(managerState->remove(
+        _opCtx.get(), NamespaceString::kAdminUsersNamespace, BSONObj(), BSONObj(), &ignored));
     // Make sure that invalidating the user causes the session to reload its privileges.
     authzManager->invalidateUserByName(_opCtx.get(), user->getName());
     authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
@@ -503,11 +497,8 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
     // Change the user to be read-only
     int ignored;
     managerState->setFindsShouldFail(true);
-    ASSERT_OK(managerState->remove(_opCtx.get(),
-                                   AuthorizationManager::usersCollectionNamespace,
-                                   BSONObj(),
-                                   BSONObj(),
-                                   &ignored));
+    ASSERT_OK(managerState->remove(
+        _opCtx.get(), NamespaceString::kAdminUsersNamespace, BSONObj(), BSONObj(), &ignored));
     ASSERT_OK(createUser(kSpencerTest, {{"read", "test"}}));
 
     // Even though the user's privileges have been reduced, since we've configured user

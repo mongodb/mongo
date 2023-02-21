@@ -150,7 +150,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 const auto cmdResponse = uassertStatusOK(configShard->runCommand(
                     opCtx,
                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    NamespaceString::kAdminDb.toString(),
+                    DatabaseName::kAdmin.toString(),
                     CommandHelpers::appendMajorityWriteConcern(
                         configsvrRefineCollShardKey.toBSON({}), opCtx->getWriteConcern()),
                     Shard::RetryPolicy::kIdempotent));

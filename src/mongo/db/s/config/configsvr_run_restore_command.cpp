@@ -120,15 +120,16 @@ std::set<std::string> getDatabasesToRestore(OperationContext* opCtx) {
 const stdx::unordered_map<NamespaceString,
                           std::pair<boost::optional<std::string>, boost::optional<std::string>>>
     kCollectionEntries = {
-        {NamespaceString("config.chunks"), std::make_pair(boost::none, std::string("uuid"))},
-        {NamespaceString("config.collections"),
+        {NamespaceString::kConfigsvrChunksNamespace,
+         std::make_pair(boost::none, std::string("uuid"))},
+        {NamespaceString::kConfigsvrCollectionsNamespace,
          std::make_pair(std::string("_id"), std::string("uuid"))},
-        {NamespaceString("config.migrationCoordinators"),
+        {NamespaceString::kMigrationCoordinatorsNamespace,
          std::make_pair(std::string("nss"), std::string("collectionUuid"))},
-        {NamespaceString("config.tags"), std::make_pair(std::string("ns"), boost::none)},
-        {NamespaceString("config.rangeDeletions"),
+        {NamespaceString::kConfigsvrTagsNamespace, std::make_pair(std::string("ns"), boost::none)},
+        {NamespaceString::kRangeDeletionNamespace,
          std::make_pair(std::string("nss"), std::string("collectionUuid"))},
-        {NamespaceString("config.system.sharding_ddl_coordinators"),
+        {NamespaceString::kShardingDDLCoordinatorsNamespace,
          std::make_pair(std::string("_id.namespace"), boost::none)}};
 
 class ConfigSvrRunRestoreCommand : public BasicCommand {
@@ -269,7 +270,7 @@ public:
 
         {
             const std::vector<NamespaceString> databasesEntries = {
-                NamespaceString("config.databases")};
+                NamespaceString::kConfigDatabasesNamespace};
 
             // Remove database entries from the config collections if no collection for the given
             // database was restored.

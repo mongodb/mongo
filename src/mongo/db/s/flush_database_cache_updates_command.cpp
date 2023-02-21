@@ -62,7 +62,7 @@ namespace {
  */
 Status insertDatabaseEntryForBackwardCompatibility(OperationContext* opCtx,
                                                    const DatabaseName& dbName) {
-    invariant(dbName == NamespaceString::kAdminDb || dbName == NamespaceString::kConfigDb);
+    invariant(dbName == DatabaseName::kAdmin || dbName == DatabaseName::kConfig);
 
     DBDirectClient client(opCtx);
     auto commandResponse = client.runCommand([&] {
@@ -143,7 +143,7 @@ public:
                     "Can't call _flushDatabaseCacheUpdates if in read-only mode",
                     !opCtx->readOnly());
 
-            if (_dbName() == NamespaceString::kAdminDb || _dbName() == NamespaceString::kConfigDb) {
+            if (_dbName() == DatabaseName::kAdmin || _dbName() == DatabaseName::kConfig) {
                 // The admin and config databases have fixed metadata that does not need to be
                 // refreshed.
 

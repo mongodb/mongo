@@ -283,12 +283,12 @@ void cleanupPartialChunksFromPreviousAttempt(OperationContext* opCtx,
 
     // Remove the chunks matching uuid
     ConfigsvrRemoveChunks configsvrRemoveChunksCmd(uuid);
-    configsvrRemoveChunksCmd.setDbName(NamespaceString::kAdminDb);
+    configsvrRemoveChunksCmd.setDbName(DatabaseName::kAdmin);
 
     const auto swRemoveChunksResult = configShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        NamespaceString::kAdminDb.toString(),
+        DatabaseName::kAdmin.toString(),
         CommandHelpers::appendMajorityWriteConcern(configsvrRemoveChunksCmd.toBSON(osi.toBSON())),
         Shard::RetryPolicy::kIdempotent);
 
@@ -803,7 +803,7 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
     LOGV2_DEBUG(
         5277902, 2, "Create collection _checkCommandArguments", "namespace"_attr = originalNss());
 
-    if (originalNss().db() == NamespaceString::kConfigDb) {
+    if (originalNss().dbName() == DatabaseName::kConfig) {
         // Only allowlisted collections in config may be sharded (unless we are in test mode)
         uassert(ErrorCodes::IllegalOperation,
                 "only special collections in the config db may be sharded",
@@ -855,7 +855,7 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
                     numChunks <= maxNumInitialChunksTotal);
     }
 
-    if (originalNss().db() == NamespaceString::kConfigDb) {
+    if (originalNss().dbName() == DatabaseName::kConfig) {
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
         auto findReponse = uassertStatusOK(
@@ -1333,7 +1333,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
         auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardid));
         shard->runFireAndForgetCommand(opCtx,
                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                       NamespaceString::kAdminDb.toString(),
+                                       DatabaseName::kAdmin.toString(),
                                        BSON("_flushRoutingTableCacheUpdates" << nss().ns()));
     }
 

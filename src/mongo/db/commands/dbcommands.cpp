@@ -141,7 +141,7 @@ public:
             auto dbName = request().getDbName();
             // disallow dropping the config database
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-                (dbName == NamespaceString::kConfigDb)) {
+                (dbName == DatabaseName::kConfig)) {
                 uasserted(ErrorCodes::IllegalOperation,
                           "Cannot drop 'config' database if mongod started "
                           "with --configsvr");
@@ -149,7 +149,7 @@ public:
 
             if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
                  repl::ReplicationCoordinator::modeNone) &&
-                (dbName == NamespaceString::kLocalDb)) {
+                (dbName == DatabaseName::kLocal)) {
                 uasserted(ErrorCodes::IllegalOperation,
                           str::stream() << "Cannot drop '" << dbName
                                         << "' database while replication is active");

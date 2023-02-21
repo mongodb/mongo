@@ -171,7 +171,7 @@ public:
                 const long long size = sizeEntry.second;
 
                 // Skip the local database, since all shards have their own independent local
-                if (name == NamespaceString::kLocalDb)
+                if (name == DatabaseName::kLocal.db())
                     continue;
 
                 if (authorizedDatabases && !as->isAuthorizedForAnyActionOnAnyResourceInDB(name)) {

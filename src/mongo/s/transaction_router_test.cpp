@@ -159,7 +159,7 @@ protected:
             onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
                 seenHostAndPorts.insert(request.target);
 
-                ASSERT_EQ(NamespaceString::kAdminDb, request.dbname);
+                ASSERT_EQ(DatabaseName::kAdmin.db(), request.dbname);
 
                 auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
                 ASSERT_EQ(cmdName, "abortTransaction");

@@ -103,7 +103,7 @@ void AuthzManagerExternalStateMock::setAuthzVersion(int version) {
     OperationContextNoop opCtx;
     uassertStatusOK(
         updateOne(&opCtx,
-                  AuthorizationManager::versionCollectionNamespace,
+                  NamespaceString::kServerConfigurationNamespace,
                   AuthorizationManager::versionDocumentQuery,
                   BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName << version)),
                   true,
@@ -189,7 +189,7 @@ Status AuthzManagerExternalStateMock::insert(OperationContext* opCtx,
 Status AuthzManagerExternalStateMock::insertPrivilegeDocument(OperationContext* opCtx,
                                                               const BSONObj& userObj,
                                                               const BSONObj& writeConcern) {
-    return insert(opCtx, AuthorizationManager::usersCollectionNamespace, userObj, writeConcern);
+    return insert(opCtx, NamespaceString::kAdminUsersNamespace, userObj, writeConcern);
 }
 
 Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,

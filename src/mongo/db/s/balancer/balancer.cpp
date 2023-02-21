@@ -444,7 +444,7 @@ Status Balancer::moveRange(OperationContext* opCtx,
     }();
 
     ShardsvrMoveRange shardSvrRequest(nss);
-    shardSvrRequest.setDbName(NamespaceString::kAdminDb);
+    shardSvrRequest.setDbName(DatabaseName::kAdmin);
     shardSvrRequest.setMoveRangeRequestBase(request.getMoveRangeRequestBase());
     shardSvrRequest.setMaxChunkSizeBytes(maxChunkSize);
     shardSvrRequest.setFromShard(fromShardId);
@@ -1043,7 +1043,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
         requestBase.setMax(migrateInfo.maxKey);
 
         ShardsvrMoveRange shardSvrRequest(migrateInfo.nss);
-        shardSvrRequest.setDbName(NamespaceString::kAdminDb);
+        shardSvrRequest.setDbName(DatabaseName::kAdmin);
         shardSvrRequest.setMoveRangeRequestBase(requestBase);
         shardSvrRequest.setMaxChunkSizeBytes(maxChunkSizeBytes);
         shardSvrRequest.setFromShard(migrateInfo.from);

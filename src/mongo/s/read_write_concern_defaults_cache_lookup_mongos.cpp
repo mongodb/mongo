@@ -39,13 +39,13 @@ namespace mongo {
 boost::optional<RWConcernDefault> readWriteConcernDefaultsCacheLookupMongoS(
     OperationContext* opCtx) {
     GetDefaultRWConcern configsvrRequest;
-    configsvrRequest.setDbName(NamespaceString::kAdminDb);
+    configsvrRequest.setDbName(DatabaseName::kAdmin);
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting(ReadPreference::Nearest),
-        NamespaceString::kAdminDb.toString(),
+        DatabaseName::kAdmin.toString(),
         configsvrRequest.toBSON({}),
         Shard::RetryPolicy::kIdempotent));
 

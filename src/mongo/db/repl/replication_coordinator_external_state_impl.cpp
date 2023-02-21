@@ -135,8 +135,6 @@ namespace repl {
 namespace {
 
 const char kLocalDbName[] = "local";
-// TODO SERVER-62491 Use SystemTenantId
-const DatabaseName kConfigDatabaseName{boost::none, kLocalDbName};
 
 MONGO_FAIL_POINT_DEFINE(dropPendingCollectionReaperHang);
 
@@ -1128,7 +1126,7 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
     for (const auto& dbName : dbNames) {
         // The local db is special because it isn't replicated. It is cleared at startup even on
         // replica set members.
-        if (dbName.db() == NamespaceString::kLocalDb)
+        if (dbName == DatabaseName::kLocal)
             continue;
 
         LOGV2_DEBUG(21309,
@@ -1288,14 +1286,12 @@ bool ReplicationCoordinatorExternalStateImpl::isShardPartOfShardedCluster(
 bool ReplicationCoordinatorExternalStateImpl::isCWWCSetOnConfigShard(
     OperationContext* opCtx) const {
     GetDefaultRWConcern configsvrRequest;
-    // Empty tenant id is acceptable here as command's tenant id will not be serialized to BSON.
-    // TODO SERVER-62491: Use system tenant id.
-    configsvrRequest.setDbName(DatabaseName(boost::none, NamespaceString::kAdminDb));
+    configsvrRequest.setDbName(DatabaseName::kAdmin);
     auto cmdResponse = uassertStatusOK(
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            NamespaceString::kAdminDb.toString(),
+            DatabaseName::kAdmin.toString(),
             configsvrRequest.toBSON({}),
             Shard::RetryPolicy::kIdempotent));
 

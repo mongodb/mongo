@@ -504,9 +504,8 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
 
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto dbNames = storageEngine->listDatabases();
-    bool nonLocalDatabases = std::any_of(dbNames.begin(), dbNames.end(), [](auto dbName) {
-        return dbName.db() != NamespaceString::kLocalDb;
-    });
+    bool nonLocalDatabases = std::any_of(
+        dbNames.begin(), dbNames.end(), [](auto dbName) { return dbName != DatabaseName::kLocal; });
 
     // Fail to start up if there is no featureCompatibilityVersion document and there are non-local
     // databases present.

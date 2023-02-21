@@ -276,7 +276,7 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
                                      const ChunkRange& range,
                                      const ChunkVersion& preMigrationChunkVersion) {
     ConfigsvrEnsureChunkVersionIsGreaterThan ensureChunkVersionIsGreaterThanRequest;
-    ensureChunkVersionIsGreaterThanRequest.setDbName(NamespaceString::kAdminDb);
+    ensureChunkVersionIsGreaterThanRequest.setDbName(DatabaseName::kAdmin);
     ensureChunkVersionIsGreaterThanRequest.setMinKey(range.getMin());
     ensureChunkVersionIsGreaterThanRequest.setMaxKey(range.getMax());
     ensureChunkVersionIsGreaterThanRequest.setVersion(preMigrationChunkVersion);
@@ -1181,7 +1181,7 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
                     const auto response = recipientShard->runCommandWithFixedRetryAttempts(
                         newOpCtx,
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                        NamespaceString::kAdminDb.toString(),
+                        DatabaseName::kAdmin.toString(),
                         commandObj,
                         Shard::RetryPolicy::kIdempotent);
 

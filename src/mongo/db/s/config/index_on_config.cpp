@@ -44,7 +44,7 @@ Status createIndexOnConfigCollection(OperationContext* opCtx,
                                      const NamespaceString& ns,
                                      const BSONObj& keys,
                                      bool unique) {
-    invariant(ns.db() == NamespaceString::kConfigDb || ns.db() == NamespaceString::kAdminDb);
+    invariant(ns.db() == DatabaseName::kConfig.db() || ns.db() == DatabaseName::kAdmin.db());
 
     return sharding_util::createIndexOnCollection(opCtx, ns, keys, unique);
 }

@@ -59,7 +59,6 @@
 namespace mongo {
 
 namespace {
-static const NamespaceString kConfigNss("local.system.replset");
 static const std::string kRepairIncompleteFileName = "_repair_incomplete";
 
 const auto getRepairObserver =
@@ -158,7 +157,7 @@ void StorageRepairObserver::_invalidateReplConfigIfNeeded(OperationContext* opCt
     // If this node is a standalone, this would lead to a confusing error message if it were
     // added to a replica set later on.
     auto storage = repl::StorageInterface::get(opCtx);
-    auto swConfig = storage->findSingleton(opCtx, kConfigNss);
+    auto swConfig = storage->findSingleton(opCtx, NamespaceString::kSystemReplSetNamespace);
     if (!swConfig.isOK()) {
         return;
     }
@@ -168,7 +167,10 @@ void StorageRepairObserver::_invalidateReplConfigIfNeeded(OperationContext* opCt
     }
     BSONObjBuilder configBuilder(config);
     configBuilder.append(repl::ReplSetConfig::kRepairedFieldName, true);
-    fassert(7101800, storage->putSingleton(opCtx, kConfigNss, {configBuilder.obj(), Timestamp{}}));
+    fassert(7101800,
+            storage->putSingleton(opCtx,
+                                  NamespaceString::kSystemReplSetNamespace,
+                                  {configBuilder.obj(), Timestamp{}}));
 
     JournalFlusher::get(opCtx)->waitForJournalFlush();
 }

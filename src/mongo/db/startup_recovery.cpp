@@ -495,8 +495,7 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
     // whether not to rebuild unfinished two-phase index builds if this is a replica set node
     // running in standalone mode.
     auto dbNames = storageEngine->listDatabases();
-    if (auto it = std::find(
-            dbNames.begin(), dbNames.end(), DatabaseName(boost::none, NamespaceString::kLocalDb));
+    if (auto it = std::find(dbNames.begin(), dbNames.end(), DatabaseName::kLocal);
         it != dbNames.end()) {
         fassertNoTrace(4805001, repair::repairDatabase(opCtx, storageEngine, *it));
 
@@ -583,12 +582,12 @@ void startupRecovery(OperationContext* opCtx,
             checkForIdIndexesAndDropPendingCollections(opCtx, dbName);
             // Ensure oplog is capped (mongodb does not guarantee order of inserts on noncapped
             // collections)
-            if (dbName.db() == NamespaceString::kLocalDb) {
+            if (dbName == DatabaseName::kLocal) {
                 assertCappedOplog(opCtx);
             }
         }
 
-        if (shouldClearNonLocalTmpCollections || dbName.db() == NamespaceString::kLocalDb) {
+        if (shouldClearNonLocalTmpCollections || dbName == DatabaseName::kLocal) {
             clearTempCollections(opCtx, dbName);
         }
     });

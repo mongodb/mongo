@@ -137,18 +137,6 @@ public:
 
     // Reserved system namespaces
 
-    // Namespace for the admin database
-    static constexpr StringData kAdminDb = "admin"_sd;
-
-    // Namespace for the local database
-    static constexpr StringData kLocalDb = "local"_sd;
-
-    // Namespace for the system database
-    static constexpr StringData kSystemDb = "system"_sd;
-
-    // Namespace for the sharding config database
-    static constexpr StringData kConfigDb = "config"_sd;
-
     // The $external database used by X.509, LDAP, etc...
     static constexpr StringData kExternalDb = "$external"_sd;
 
@@ -293,6 +281,11 @@ public:
     static NamespaceString parseFromStringExpectTenantIdInMultitenancyMode(StringData ns);
 
     /**
+     * Constructs a NamespaceString in the global config db, "config.<collName>".
+     */
+    static NamespaceString makeGlobalConfigCollection(StringData collName);
+
+    /**
      * These functions construct a NamespaceString without checking for presence of TenantId.
      *
      * MUST only be used for tests.
@@ -371,6 +364,18 @@ public:
     static NamespaceString makeBulkWriteNSS();
 
     /**
+     * Constructs the oplog buffer NamespaceString for the given UUID and donor shardId.
+     */
+    static NamespaceString makeReshardingLocalOplogBufferNSS(const UUID& existingUUID,
+                                                             const std::string& donorShardId);
+
+    /**
+     * Constructs the conflict stash NamespaceString for the given UUID and donor shardId.
+     */
+    static NamespaceString makeReshardingLocalConflictStashNSS(const UUID& existingUUID,
+                                                               const std::string& donorShardId);
+
+    /**
      * NOTE: DollarInDbNameBehavior::allow is deprecated.
      *
      * Please use DollarInDbNameBehavior::disallow and check explicitly for any DB names that must
@@ -437,10 +442,10 @@ public:
         return !isSystem() && !(isLocal() && coll().startsWith("replset."));
     }
     bool isAdminDB() const {
-        return db() == kAdminDb;
+        return db() == DatabaseName::kAdmin.db();
     }
     bool isLocal() const {
-        return db() == kLocalDb;
+        return db() == DatabaseName::kLocal.db();
     }
     bool isSystemDotProfile() const {
         return coll() == kSystemDotProfileCollectionName;
@@ -452,7 +457,7 @@ public:
         return coll() == kSystemDotJavascriptCollectionName;
     }
     bool isServerConfigurationCollection() const {
-        return (db() == kAdminDb) && (coll() == "system.version");
+        return (db() == DatabaseName::kAdmin.db()) && (coll() == "system.version");
     }
     bool isPrivilegeCollection() const {
         if (!isAdminDB()) {
@@ -461,7 +466,7 @@ public:
         return (coll() == kSystemUsers) || (coll() == kSystemRoles);
     }
     bool isConfigDB() const {
-        return db() == kConfigDb;
+        return db() == DatabaseName::kConfig.db();
     }
     bool isCommand() const {
         return coll() == "$cmd";
@@ -470,11 +475,11 @@ public:
         return oplog(_ns);
     }
     bool isOnInternalDb() const {
-        if (db() == kAdminDb)
+        if (db() == DatabaseName::kAdmin.db())
             return true;
-        if (db() == kLocalDb)
+        if (db() == DatabaseName::kLocal.db())
             return true;
-        if (db() == kConfigDb)
+        if (db() == DatabaseName::kConfig.db())
             return true;
         return false;
     }

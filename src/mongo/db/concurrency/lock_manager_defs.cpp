@@ -34,8 +34,6 @@ namespace mongo {
 // Hardcoded resource IDs.
 const ResourceId resourceIdLocalDB =
     ResourceId(RESOURCE_DATABASE, DatabaseName(boost::none, "local"));
-const ResourceId resourceIdOplog =
-    ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "local.oplog.rs"));
 const ResourceId resourceIdAdminDB =
     ResourceId(RESOURCE_DATABASE, DatabaseName(boost::none, "admin"));
 const ResourceId resourceIdGlobal =

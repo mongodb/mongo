@@ -80,11 +80,11 @@ public:
             auto nss = request().getNamespace();
             uassert(ErrorCodes::IllegalOperation,
                     "Cannot drop collection in 'config' database in sharded cluster",
-                    nss.db() != NamespaceString::kConfigDb);
+                    nss.dbName() != DatabaseName::kConfig);
 
             uassert(ErrorCodes::IllegalOperation,
                     "Cannot drop collection in 'admin' database in sharded cluster",
-                    nss.db() != NamespaceString::kAdminDb);
+                    nss.dbName() != DatabaseName::kAdmin);
 
             try {
                 // Invalidate the routing table cache entry for this collection so that we reload it

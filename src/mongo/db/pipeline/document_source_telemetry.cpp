@@ -89,7 +89,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceTelemetry::createFromBson(
 
     uassert(ErrorCodes::InvalidNamespace,
             "$telemetry must be run against the 'admin' database with {aggregate: 1}",
-            nss.db() == NamespaceString::kAdminDb && nss.isCollectionlessAggregateNS());
+            nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
 
     return new DocumentSourceTelemetry(pExpCtx,
                                        parseTelemetryEmbeddedObject(spec.embeddedObject()));

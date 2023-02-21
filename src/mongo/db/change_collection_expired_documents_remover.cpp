@@ -99,7 +99,7 @@ void removeExpiredDocuments(Client* client) {
             // opCtx->lockState()->isRSTLLocked()).
             if (!changeCollection ||
                 !repl::ReplicationCoordinator::get(opCtx.get())
-                     ->canAcceptWritesForDatabase(opCtx.get(), NamespaceString::kConfigDb)) {
+                     ->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kConfig.toString())) {
                 continue;
             }
 

@@ -225,9 +225,9 @@ void AuthOpObserver::_onReplicationRollback(OperationContext* opCtx,
                                             const RollbackObserverInfo& rbInfo) {
     // Invalidate any in-memory auth data if necessary.
     const auto& rollbackNamespaces = rbInfo.rollbackNamespaces;
-    if (rollbackNamespaces.count(AuthorizationManager::versionCollectionNamespace) == 1 ||
-        rollbackNamespaces.count(AuthorizationManager::usersCollectionNamespace) == 1 ||
-        rollbackNamespaces.count(AuthorizationManager::rolesCollectionNamespace) == 1) {
+    if (rollbackNamespaces.count(NamespaceString::kServerConfigurationNamespace) == 1 ||
+        rollbackNamespaces.count(NamespaceString::kAdminUsersNamespace) == 1 ||
+        rollbackNamespaces.count(NamespaceString::kAdminRolesNamespace) == 1) {
         AuthorizationManager::get(opCtx->getServiceContext())->invalidateUserCache(opCtx);
     }
 }

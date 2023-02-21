@@ -62,7 +62,7 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOrFirstShard(
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy) {
     ShardId shardId;
-    if (dbName == NamespaceString::kConfigDb) {
+    if (dbName == DatabaseName::kConfig.db()) {
         auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
         uassert(ErrorCodes::IllegalOperation, "there are no shards to target", !shardIds.empty());
         std::sort(shardIds.begin(), shardIds.end());
@@ -92,7 +92,7 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
 
     if (dbStatus == ErrorCodes::NamespaceNotFound) {
         ConfigsvrCreateDatabase request(dbName.toString());
-        request.setDbName(NamespaceString::kAdminDb);
+        request.setDbName(DatabaseName::kAdmin);
         if (suggestedPrimaryId)
             request.setPrimaryShardId(*suggestedPrimaryId);
 

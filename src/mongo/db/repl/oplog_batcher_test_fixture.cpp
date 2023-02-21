@@ -255,8 +255,7 @@ OplogEntry makeNoopOplogEntry(int t, const StringData& msg) {
  * Generates an applyOps oplog entry with the given number used for the timestamp.
  */
 OplogEntry makeApplyOpsOplogEntry(int t, bool prepare, const std::vector<OplogEntry>& innerOps) {
-    auto nss =
-        NamespaceString::createNamespaceString_forTest(NamespaceString::kAdminDb).getCommandNS();
+    auto nss = NamespaceString::createNamespaceString_forTest(DatabaseName::kAdmin).getCommandNS();
     BSONObjBuilder oField;
     BSONArrayBuilder applyOpsBuilder = oField.subarrayStart("applyOps");
     for (const auto& op : innerOps) {
@@ -338,8 +337,7 @@ OplogEntry makeLargeTransactionOplogEntries(int t,
                                             int count,
                                             const std::vector<OplogEntry> innerOps) {
     // TODO SERVER-62491: Replace TenantId with kSystemTenantId.
-    auto nss =
-        NamespaceString::createNamespaceString_forTest(NamespaceString::kAdminDb).getCommandNS();
+    auto nss = NamespaceString::createNamespaceString_forTest(DatabaseName::kAdmin).getCommandNS();
     OpTime prevWriteOpTime = isFirst ? OpTime() : OpTime(Timestamp(t - 1, 1), 1);
     BSONObj oField;
     if (isLast && prepared) {

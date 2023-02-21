@@ -185,7 +185,7 @@ BSONObj sendCommitDirectlyToShards(OperationContext* opCtx, const std::vector<Sh
     std::vector<AsyncRequestsSender::Request> requests;
     for (const auto& shardId : shardIds) {
         CommitTransaction commitCmd;
-        commitCmd.setDbName(NamespaceString::kAdminDb);
+        commitCmd.setDbName(DatabaseName::kAdmin);
         const auto commitCmdObj = commitCmd.toBSON(
             BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
         requests.emplace_back(shardId, commitCmdObj);
@@ -195,7 +195,7 @@ BSONObj sendCommitDirectlyToShards(OperationContext* opCtx, const std::vector<Sh
     MultiStatementTransactionRequestsSender ars(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-        DatabaseName(boost::none, NamespaceString::kAdminDb),
+        DatabaseName::kAdmin,
         requests,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         Shard::RetryPolicy::kIdempotent);
@@ -771,7 +771,7 @@ void TransactionRouter::Router::_clearPendingParticipants(OperationContext* opCt
                                             << WriteConcernOptions().toBSON()));
         }
         auto responses = gatherResponses(opCtx,
-                                         NamespaceString::kAdminDb,
+                                         DatabaseName::kAdmin.db(),
                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                          Shard::RetryPolicy::kIdempotent,
                                          abortRequests);
@@ -1138,7 +1138,7 @@ BSONObj TransactionRouter::Router::_handOffCommitToCoordinator(OperationContext*
     MultiStatementTransactionRequestsSender ars(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-        DatabaseName(boost::none, NamespaceString::kAdminDb),
+        DatabaseName::kAdmin,
         {{*o().coordinatorId, coordinateCommitCmdObj}},
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         Shard::RetryPolicy::kIdempotent);
@@ -1331,7 +1331,7 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
                 "numParticipantShards"_attr = o().participants.size());
 
     const auto responses = gatherResponses(opCtx,
-                                           NamespaceString::kAdminDb,
+                                           DatabaseName::kAdmin.db(),
                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                            Shard::RetryPolicy::kIdempotent,
                                            abortRequests);
@@ -1418,7 +1418,7 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
     try {
         // Ignore the responses.
         gatherResponses(opCtx,
-                        NamespaceString::kAdminDb,
+                        DatabaseName::kAdmin.db(),
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                         Shard::RetryPolicy::kIdempotent,
                         abortRequests);

@@ -269,7 +269,7 @@ void setAllowMigrations(OperationContext* opCtx,
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            NamespaceString::kAdminDb.toString(),
+            DatabaseName::kAdmin.toString(),
             CommandHelpers::appendMajorityWriteConcern(configsvrSetAllowMigrationsCmd.toBSON({})),
             Shard::RetryPolicy::kIdempotent  // Although ConfigsvrSetAllowMigrations is not really
                                              // idempotent (because it will cause the collection
@@ -412,12 +412,12 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx,
 
     // Remove config.tags entries
     ConfigsvrRemoveTags configsvrRemoveTagsCmd(nss);
-    configsvrRemoveTagsCmd.setDbName(NamespaceString::kAdminDb);
+    configsvrRemoveTagsCmd.setDbName(DatabaseName::kAdmin);
 
     const auto swRemoveTagsResult = configShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        NamespaceString::kAdminDb.toString(),
+        DatabaseName::kAdmin.toString(),
         CommandHelpers::appendMajorityWriteConcern(configsvrRemoveTagsCmd.toBSON(osi.toBSON())),
         Shard::RetryPolicy::kIdempotent);
 
@@ -452,7 +452,7 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx,
     const auto deleteResult = configShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        NamespaceString::kConfigDb.toString(),
+        DatabaseName::kConfig.toString(),
         CommandHelpers::appendMajorityWriteConcern(deleteCmd.toBSON({})),
         Shard::RetryPolicy::kIdempotent);
 
@@ -603,7 +603,7 @@ void shardedRenameMetadata(OperationContext* opCtx,
             auto reply = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
-                NamespaceString::kConfigDb.toString(),
+                DatabaseName::kConfig.toString(),
                 distinctRequest.toBSON({}),
                 Shard::RetryPolicy::kIdempotent));
 

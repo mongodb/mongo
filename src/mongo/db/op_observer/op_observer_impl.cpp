@@ -1253,7 +1253,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName&
 
     uassert(50714,
             "dropping the admin database is not allowed.",
-            dbName.db() != NamespaceString::kAdminDb);
+            dbName.db() != DatabaseName::kAdmin.db());
 
     if (dbName.db() == NamespaceString::kSessionTransactionsTableNamespace.db()) {
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
@@ -1672,7 +1672,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
     const auto txnRetryCounter = *opCtx->getTxnRetryCounter();
 
     oplogEntry->setOpType(repl::OpTypeEnum::kCommand);
-    oplogEntry->setNss({"admin", "$cmd"});
+    oplogEntry->setNss(NamespaceString::kAdminCommandNamespace);
     oplogEntry->setSessionId(opCtx->getLogicalSessionId());
     oplogEntry->setTxnNumber(opCtx->getTxnNumber());
     if (!isDefaultTxnRetryCounter(txnRetryCounter)) {
@@ -2093,7 +2093,7 @@ void OpObserverImpl::onTransactionPrepare(
                     auto oplogSlot = reservedSlots.front();
                     MutableOplogEntry oplogEntry;
                     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-                    oplogEntry.setNss({"admin", "$cmd"});
+                    oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
                     oplogEntry.setOpTime(oplogSlot);
                     oplogEntry.setPrevWriteOpTimeInTransaction(repl::OpTime());
                     oplogEntry.setObject(applyOpsBuilder.done());

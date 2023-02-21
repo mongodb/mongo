@@ -76,7 +76,7 @@ public:
                     ns().isValid());
 
             ConfigSvrCommitMergeAllChunksOnShard configSvrCommitMergeAllChunksOnShard(ns());
-            configSvrCommitMergeAllChunksOnShard.setDbName(NamespaceString::kAdminDb);
+            configSvrCommitMergeAllChunksOnShard.setDbName(DatabaseName::kAdmin);
             configSvrCommitMergeAllChunksOnShard.setShard(request().getShard());
 
             auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();

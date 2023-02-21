@@ -100,8 +100,7 @@ constexpr int kCheckpointTsBackupCursorErrorCode = 6929900;
 constexpr int kCloseCursorBeforeOpenErrorCode = 50886;
 
 NamespaceString getOplogBufferNs(const UUID& migrationUUID) {
-    return NamespaceString(NamespaceString::kConfigDb,
-                           kOplogBufferPrefix + migrationUUID.toString());
+    return NamespaceString(DatabaseName::kConfig, kOplogBufferPrefix + migrationUUID.toString());
 }
 
 bool isMigrationCompleted(TenantMigrationRecipientStateEnum state) {
@@ -1008,7 +1007,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_openBackupCursor(
 
     const auto aggregateCommandRequestObj = [] {
         AggregateCommandRequest aggRequest(
-            NamespaceString::makeCollectionlessAggregateNSS(NamespaceString::kAdminDb),
+            NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin),
             {BSON("$backupCursor" << BSONObj())});
         // We must set a writeConcern on internal commands.
         aggRequest.setWriteConcern(WriteConcernOptions());
@@ -1132,7 +1131,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_openBackupCursor(
     _donorFilenameBackupCursorFileFetcher = std::make_unique<Fetcher>(
         _backupCursorExecutor.get(),
         _client->getServerHostAndPort(),
-        NamespaceString::kAdminDb.toString(),
+        DatabaseName::kAdmin.toString(),
         aggregateCommandRequestObj,
         fetcherCallback,
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),

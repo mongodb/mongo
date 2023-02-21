@@ -1308,7 +1308,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughDefaultBeginFetchingOpTimeSc
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 
     ASSERT_EQUALS(syncSource, request.target);
-    ASSERT_EQUALS(NamespaceString::kLocalDb, request.dbname);
+    ASSERT_EQUALS(DatabaseName::kLocal.db(), request.dbname);
     assertRemoteCommandNameEquals("find", request);
 }
 
@@ -1397,7 +1397,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingOpTimeSchedu
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 
     ASSERT_EQUALS(syncSource, request.target);
-    ASSERT_EQUALS(NamespaceString::kConfigDb, request.dbname);
+    ASSERT_EQUALS(DatabaseName::kConfig.db(), request.dbname);
     assertRemoteCommandNameEquals("find", request);
 }
 

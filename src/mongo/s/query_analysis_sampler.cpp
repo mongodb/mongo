@@ -229,7 +229,7 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
     }
 
     RefreshQueryAnalyzerConfiguration cmd;
-    cmd.setDbName(NamespaceString::kAdminDb);
+    cmd.setDbName(DatabaseName::kAdmin);
     cmd.setName(getHostNameCached() + ":" + std::to_string(serverGlobalParams.port));
     cmd.setNumQueriesExecutedPerSecond(*lastAvgCount);
 
@@ -237,7 +237,7 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
     auto swResponse = configShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        NamespaceString::kAdminDb.toString(),
+        DatabaseName::kAdmin.toString(),
         cmd.toBSON({}),
         Shard::RetryPolicy::kIdempotent);
     auto status = Shard::CommandResponse::getEffectiveStatus(swResponse);

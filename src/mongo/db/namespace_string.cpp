@@ -92,7 +92,7 @@ bool NamespaceString::isLegalClientSystemNS(
     const ServerGlobalParams::FeatureCompatibility& currentFCV) const {
     auto dbname = dbName().db();
 
-    if (dbname == kAdminDb) {
+    if (dbname == DatabaseName::kAdmin.db()) {
         if (coll() == "system.roles")
             return true;
         if (coll() == kServerConfigurationNamespace.coll())
@@ -101,7 +101,7 @@ bool NamespaceString::isLegalClientSystemNS(
             return true;
         if (coll() == "system.backup_users")
             return true;
-    } else if (dbname == kConfigDb) {
+    } else if (dbname == DatabaseName::kConfig.db()) {
         if (coll() == "system.sessions")
             return true;
         if (coll() == kIndexBuildEntryNamespace.coll())
@@ -112,7 +112,7 @@ bool NamespaceString::isLegalClientSystemNS(
             return true;
         if (coll() == kConfigsvrCoordinatorsNamespace.coll())
             return true;
-    } else if (dbname == kLocalDb) {
+    } else if (dbname == DatabaseName::kLocal.db()) {
         if (coll() == kSystemReplSetNamespace.coll())
             return true;
         if (coll() == kLocalHealthLogNamespace.coll())
@@ -176,12 +176,12 @@ bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
 }
 
 NamespaceString NamespaceString::makeBulkWriteNSS() {
-    return NamespaceString(kAdminDb, bulkWriteCursorCol);
+    return NamespaceString(DatabaseName::kAdmin, bulkWriteCursorCol);
 }
 
 NamespaceString NamespaceString::makeClusterParametersNSS(
     const boost::optional<TenantId>& tenantId) {
-    return tenantId ? NamespaceString(tenantId, kConfigDb, "clusterParameters")
+    return tenantId ? NamespaceString(tenantId, DatabaseName::kConfig.db(), "clusterParameters")
                     : kClusterParametersNamespace;
 }
 
@@ -196,6 +196,10 @@ NamespaceString NamespaceString::makeListCollectionsNSS(const DatabaseName& dbNa
     return nss;
 }
 
+NamespaceString NamespaceString::makeGlobalConfigCollection(StringData collName) {
+    return NamespaceString(DatabaseName::kConfig, collName);
+}
+
 NamespaceString NamespaceString::makeCollectionlessAggregateNSS(const DatabaseName& dbName) {
     NamespaceString nss(dbName, collectionlessAggregateCursorCol);
     dassert(nss.isValid());
@@ -205,17 +209,31 @@ NamespaceString NamespaceString::makeCollectionlessAggregateNSS(const DatabaseNa
 
 NamespaceString NamespaceString::makeChangeCollectionNSS(
     const boost::optional<TenantId>& tenantId) {
-    return NamespaceString{tenantId, kConfigDb, kChangeCollectionName};
+    return NamespaceString{tenantId, DatabaseName::kConfig.db(), kChangeCollectionName};
 }
 
 NamespaceString NamespaceString::makeGlobalIndexNSS(const UUID& id) {
-    return NamespaceString(kSystemDb,
+    return NamespaceString(DatabaseName::kSystem,
                            NamespaceString::kGlobalIndexCollectionPrefix + id.toString());
 }
 
 NamespaceString NamespaceString::makePreImageCollectionNSS(
     const boost::optional<TenantId>& tenantId) {
-    return NamespaceString{tenantId, kConfigDb, kPreImagesCollectionName};
+    return NamespaceString{tenantId, DatabaseName::kConfig.db(), kPreImagesCollectionName};
+}
+
+NamespaceString NamespaceString::makeReshardingLocalOplogBufferNSS(
+    const UUID& existingUUID, const std::string& donorShardId) {
+    return NamespaceString(DatabaseName::kConfig,
+                           "localReshardingOplogBuffer." + existingUUID.toString() + "." +
+                               donorShardId);
+}
+
+NamespaceString NamespaceString::makeReshardingLocalConflictStashNSS(
+    const UUID& existingUUID, const std::string& donorShardId) {
+    return NamespaceString(DatabaseName::kConfig,
+                           "localReshardingConflictStash." + existingUUID.toString() + "." +
+                               donorShardId);
 }
 
 std::string NamespaceString::getSisterNS(StringData local) const {
@@ -296,11 +314,11 @@ StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const 
 
 bool NamespaceString::isNamespaceAlwaysUnsharded() const {
     // Local and admin never have sharded collections
-    if (db() == NamespaceString::kLocalDb || db() == NamespaceString::kAdminDb)
+    if (db() == DatabaseName::kLocal.db() || db() == DatabaseName::kAdmin.db())
         return true;
 
     // Config can only have the system.sessions as sharded
-    if (db() == NamespaceString::kConfigDb)
+    if (db() == DatabaseName::kConfig.db())
         return *this != NamespaceString::kLogicalSessionsNamespace;
 
     if (isSystemDotProfile())
@@ -333,11 +351,11 @@ bool NamespaceString::isTimeseriesBucketsCollection() const {
 }
 
 bool NamespaceString::isChangeStreamPreImagesCollection() const {
-    return _dbName.db() == kConfigDb && coll() == kPreImagesCollectionName;
+    return _dbName.db() == DatabaseName::kConfig.db() && coll() == kPreImagesCollectionName;
 }
 
 bool NamespaceString::isChangeCollection() const {
-    return _dbName.db() == kConfigDb && coll() == kChangeCollectionName;
+    return _dbName.db() == DatabaseName::kConfig.db() && coll() == kChangeCollectionName;
 }
 
 bool NamespaceString::isConfigImagesCollection() const {

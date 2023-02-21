@@ -2339,9 +2339,7 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
                 DistinctCommandRequest distinctRequest(ChunkType::ConfigNS);
                 distinctRequest.setKey(ChunkType::shard.name());
                 distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << collUuid));
-                return txnClient
-                    .runCommand(DatabaseName(boost::none, NamespaceString::kConfigDb),
-                                distinctRequest.toBSON({}))
+                return txnClient.runCommand(DatabaseName::kConfig, distinctRequest.toBSON({}))
                     .thenRunOn(txnExec)
                     .then([=, &txnClient](BSONObj reply) {
                         uassertStatusOK(getStatusFromWriteCommandReply(reply));

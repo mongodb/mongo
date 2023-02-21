@@ -106,14 +106,6 @@ public:
     static constexpr StringData V1_USER_NAME_FIELD_NAME = "user"_sd;
     static constexpr StringData V1_USER_SOURCE_FIELD_NAME = "userSource"_sd;
 
-    static const NamespaceString adminCommandNamespace;
-    static const NamespaceString rolesCollectionNamespace;
-    static const NamespaceString usersBackupCollectionNamespace;
-    static const NamespaceString usersCollectionNamespace;
-    static const NamespaceString versionCollectionNamespace;
-    static const NamespaceString defaultTempUsersCollectionNamespace;  // for mongorestore
-    static const NamespaceString defaultTempRolesCollectionNamespace;  // for mongorestore
-
     /**
      * Status to be returned when authentication fails. Being consistent about our returned Status
      * prevents information leakage.

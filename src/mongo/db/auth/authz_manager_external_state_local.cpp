@@ -61,7 +61,7 @@ using ResolveRoleOption = AuthzManagerExternalStateLocal::ResolveRoleOption;
 Status AuthzManagerExternalStateLocal::hasValidStoredAuthorizationVersion(
     OperationContext* opCtx, BSONObj* foundVersionDoc) {
     Status status = findOne(opCtx,
-                            AuthorizationManager::versionCollectionNamespace,
+                            NamespaceString::kServerConfigurationNamespace,
                             AuthorizationManager::versionDocumentQuery,
                             foundVersionDoc);
     if (status.isOK()) {
@@ -105,11 +105,11 @@ Status AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(OperationCo
 namespace {
 
 NamespaceString getUsersCollection(const boost::optional<TenantId>& tenant) {
-    return NamespaceString(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemUsers);
+    return NamespaceString(tenant, DatabaseName::kAdmin.db(), NamespaceString::kSystemUsers);
 }
 
 NamespaceString getRolesCollection(const boost::optional<TenantId>& tenant) {
-    return NamespaceString(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemRoles);
+    return NamespaceString(tenant, DatabaseName::kAdmin.db(), NamespaceString::kSystemRoles);
 }
 
 void serializeResolvedRoles(BSONObjBuilder* user,
@@ -254,7 +254,7 @@ Status AuthzManagerExternalStateLocal::hasAnyUserDocuments(
     OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
     BSONObj userBSONObj;
     return findOne(opCtx,
-                   NamespaceString(tenantId, AuthorizationManager::usersCollectionNamespace.ns()),
+                   NamespaceString(tenantId, NamespaceString::kAdminUsersNamespace.ns()),
                    BSONObj(),
                    &userBSONObj);
 }
@@ -277,7 +277,7 @@ bool AuthzManagerExternalStateLocal::hasAnyPrivilegeDocuments(OperationContext* 
 
     BSONObj userBSONObj;
     Status statusFindRoles =
-        findOne(opCtx, AuthorizationManager::rolesCollectionNamespace, BSONObj(), &userBSONObj);
+        findOne(opCtx, NamespaceString::kAdminRolesNamespace, BSONObj(), &userBSONObj);
     if (statusFindRoles != ErrorCodes::NoMatchingDocument) {
         _hasAnyPrivilegeDocuments.store(true);
         return true;
@@ -291,8 +291,7 @@ AuthzManagerExternalStateLocal::RolesLocks::RolesLocks(OperationContext* opCtx,
     if (!storageGlobalParams.disableLockFreeReads) {
         _readLockFree = std::make_unique<AutoReadLockFree>(opCtx);
     } else {
-        _adminLock = std::make_unique<Lock::DBLock>(
-            opCtx, DatabaseName(boost::none, NamespaceString::kAdminDb), LockMode::MODE_IS);
+        _adminLock = std::make_unique<Lock::DBLock>(opCtx, DatabaseName::kAdmin, LockMode::MODE_IS);
         _rolesLock = std::make_unique<Lock::CollectionLock>(
             opCtx, getRolesCollection(tenant), LockMode::MODE_S);
     }
@@ -753,19 +752,19 @@ public:
     explicit AuthzCollection(const NamespaceString& nss) : _tenant(nss.tenantId()) {
         // Capture events regardless of what Tenant they occured in,
         // invalidators will purge cache on a per-tenant basis as needed.
-        auto db = nss.dbName().db();
+        auto db = nss.dbName();
         auto coll = nss.coll();
-        if (db != NamespaceString::kAdminDb) {
+        if (db.db() != DatabaseName::kAdmin.db()) {
             return;
         }
 
         // System-only collections.
-        if (coll == AuthorizationManager::versionCollectionNamespace.coll()) {
+        if (coll == NamespaceString::kServerConfigurationNamespace.coll()) {
             _type = AuthzCollectionType::kVersion;
             return;
         }
 
-        if (coll == AuthorizationManager::adminCommandNamespace.coll()) {
+        if (coll == NamespaceString::kAdminCommandNamespace.coll()) {
             _type = AuthzCollectionType::kAdmin;
             return;
         }

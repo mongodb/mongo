@@ -73,14 +73,14 @@ public:
             ScopeGuard purgeDatabaseOnExit([&] { catalogCache->purgeDatabase(dbName); });
 
             ConfigsvrCreateDatabase configsvrCreateDatabase{dbName.toString()};
-            configsvrCreateDatabase.setDbName(NamespaceString::kAdminDb);
+            configsvrCreateDatabase.setDbName(DatabaseName::kAdmin);
             configsvrCreateDatabase.setPrimaryShardId(request().getPrimaryShard());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                NamespaceString::kAdminDb.toString(),
+                DatabaseName::kAdmin.toString(),
                 CommandHelpers::appendMajorityWriteConcern(configsvrCreateDatabase.toBSON({})),
                 Shard::RetryPolicy::kIdempotent));
 

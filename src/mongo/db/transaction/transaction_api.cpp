@@ -492,8 +492,7 @@ SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
 }
 
 SemiFuture<CommitResult> Transaction::commit() {
-    return _commitOrAbort(DatabaseName(boost::none, NamespaceString::kAdminDb),
-                          CommitTransaction::kCommandName)
+    return _commitOrAbort(DatabaseName::kAdmin, CommitTransaction::kCommandName)
         .thenRunOn(_executor)
         .then([](BSONObj res) {
             auto wcErrorHolder = getWriteConcernErrorDetailFromBSONObj(res);
@@ -507,8 +506,7 @@ SemiFuture<CommitResult> Transaction::commit() {
 }
 
 SemiFuture<void> Transaction::abort() {
-    return _commitOrAbort(DatabaseName(boost::none, NamespaceString::kAdminDb),
-                          AbortTransaction::kCommandName)
+    return _commitOrAbort(DatabaseName::kAdmin, AbortTransaction::kCommandName)
         .thenRunOn(_executor)
         .then([](BSONObj res) {
             uassertStatusOK(getStatusFromCommandResult(res));

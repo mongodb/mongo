@@ -1495,7 +1495,7 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
     ASSERT_OK(_insertOplogEntry(insertOp1.first));
 
     // Common field values for applyOps oplog entries.
-    auto adminCmdNss = NamespaceString(NamespaceString::kAdminDb).getCommandNS();
+    auto adminCmdNss = NamespaceString(DatabaseName::kAdmin).getCommandNS();
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(makeLogicalSessionId(_opCtx.get()));
     sessionInfo.setTxnNumber(1);

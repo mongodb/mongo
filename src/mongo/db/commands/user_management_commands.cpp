@@ -225,17 +225,17 @@ Status checkOkayToGrantPrivilegesToRole(const RoleName& role, const PrivilegeVec
 
 NamespaceString usersNSS(const boost::optional<TenantId>& tenant) {
     if (tenant) {
-        return NamespaceString(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemUsers);
+        return NamespaceString(tenant, DatabaseName::kAdmin.db(), NamespaceString::kSystemUsers);
     } else {
-        return AuthorizationManager::usersCollectionNamespace;
+        return NamespaceString::kAdminUsersNamespace;
     }
 }
 
 NamespaceString rolesNSS(const boost::optional<TenantId>& tenant) {
     if (tenant) {
-        return NamespaceString(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemRoles);
+        return NamespaceString(tenant, DatabaseName::kAdmin.db(), NamespaceString::kSystemRoles);
     } else {
-        return AuthorizationManager::rolesCollectionNamespace;
+        return NamespaceString::kAdminRolesNamespace;
     }
 }
 
@@ -480,7 +480,7 @@ Status writeAuthSchemaVersionIfNeeded(OperationContext* opCtx,
                                       int foundSchemaVersion) {
     Status status = updateOneAuthzDocument(
         opCtx,
-        AuthorizationManager::versionCollectionNamespace,
+        NamespaceString::kServerConfigurationNamespace,
         AuthorizationManager::versionDocumentQuery,
         BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName << foundSchemaVersion)),
         true);  // upsert
@@ -1005,7 +1005,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
     // Validate input
     uassert(ErrorCodes::BadValue,
             "Cannot create users in the local database",
-            dbname.db() != NamespaceString::kLocalDb);
+            dbname != DatabaseName::kLocal);
 
     uassert(ErrorCodes::BadValue,
             "Username cannot contain NULL characters",
@@ -1499,7 +1499,7 @@ void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCt
 
     uassert(ErrorCodes::BadValue,
             "Cannot create roles in the local database",
-            dbname.db() != NamespaceString::kLocalDb);
+            dbname != DatabaseName::kLocal);
 
     uassert(ErrorCodes::BadValue,
             "Cannot create roles in the $external database",
@@ -2302,7 +2302,7 @@ void _processUsers(OperationContext* opCtx,
                               << 1 << AuthorizationManager::USER_DB_FIELD_NAME << 1);
 
         uassertStatusOK(queryAuthzDocument(opCtx,
-                                           AuthorizationManager::usersCollectionNamespace,
+                                           NamespaceString::kAdminUsersNamespace,
                                            query,
                                            fields,
                                            [&](const BSONObj& userObj) {
@@ -2430,7 +2430,7 @@ void _processRoles(OperationContext* opCtx,
                               << 1 << AuthorizationManager::ROLE_DB_FIELD_NAME << 1);
 
         uassertStatusOK(queryAuthzDocument(opCtx,
-                                           AuthorizationManager::rolesCollectionNamespace,
+                                           NamespaceString::kAdminRolesNamespace,
                                            query,
                                            fields,
                                            [&](const BSONObj& roleObj) {

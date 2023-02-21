@@ -87,7 +87,7 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
 
     uassert(ErrorCodes::Unauthorized,
             str::stream() << command->getName() << " may only be run against the admin database.",
-            !command->adminOnly() || request.getDatabase() == NamespaceString::kAdminDb);
+            !command->adminOnly() || request.getDatabase() == DatabaseName::kAdmin.db());
 
     auto authzSession = AuthorizationSession::get(client);
     uassert(ErrorCodes::ReauthenticationRequired,
@@ -565,12 +565,12 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
             str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction.",
             command->allowedInTransactions());
 
-    const auto dbName = nss.db();
+    const auto dbName = nss.dbName();
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot run command against the '" << dbName
                           << "' database in a transaction.",
-            dbName != NamespaceString::kLocalDb);
+            dbName.db() != DatabaseName::kLocal.db());
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot run command against the '" << nss
@@ -585,7 +585,7 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
     } else {
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot run command against the config database in a transaction.",
-                dbName != "config"_sd);
+                dbName.db() != DatabaseName::kConfig.db());
     }
 }
 

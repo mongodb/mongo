@@ -71,7 +71,7 @@ public:
             hangInShardsvrSetClusterParameter.pauseWhileSet();
 
             SetClusterParameter setClusterParameterRequest(request().getCommandParameter());
-            setClusterParameterRequest.setDbName(NamespaceString::kAdminDb);
+            setClusterParameterRequest.setDbName(DatabaseName::kAdmin);
             std::unique_ptr<ServerParameterService> parameterService =
                 std::make_unique<ClusterParameterService>();
             DBDirectClient client(opCtx);

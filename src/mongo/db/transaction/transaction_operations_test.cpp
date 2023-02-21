@@ -523,9 +523,9 @@ TEST(TransactionOperationsTest, LogOplogEntriesSingleOperation) {
                                           std::vector<StmtId> stmtIdsWritten) {
         ASSERT(entry) << "tried to log null applyOps oplog entry";
         ASSERT_EQ(entry->getOpType(), repl::OpTypeEnum::kCommand);
-        ASSERT_EQ(entry->getNss(),
-                  NamespaceString::createNamespaceString_forTest(NamespaceString::kAdminDb)
-                      .getCommandNS());
+        ASSERT_EQ(
+            entry->getNss(),
+            NamespaceString::createNamespaceString_forTest(DatabaseName::kAdmin).getCommandNS());
         ASSERT_EQ(entry->getOpTime(), oplogSlots[0]);
         const auto& prevWriteOpTime = entry->getPrevWriteOpTimeInTransaction();
         ASSERT(prevWriteOpTime);
@@ -609,9 +609,9 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsCommitUnprepare
         ASSERT(entry) << "tried to log null applyOps oplog entry";
 
         ASSERT_EQ(entry->getOpType(), repl::OpTypeEnum::kCommand);
-        ASSERT_EQ(entry->getNss(),
-                  NamespaceString::createNamespaceString_forTest(NamespaceString::kAdminDb)
-                      .getCommandNS());
+        ASSERT_EQ(
+            entry->getNss(),
+            NamespaceString::createNamespaceString_forTest(DatabaseName::kAdmin).getCommandNS());
 
         auto expectedOpTime = oplogSlots[numEntriesLogged];
         ASSERT_EQ(entry->getOpTime(), expectedOpTime);
@@ -730,9 +730,9 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsPreparedTransac
                                                               std::vector<StmtId> stmtIdsWritten) {
         ASSERT(entry) << "tried to log null applyOps oplog entry";
         ASSERT_EQ(entry->getOpType(), repl::OpTypeEnum::kCommand);
-        ASSERT_EQ(entry->getNss(),
-                  NamespaceString::createNamespaceString_forTest(NamespaceString::kAdminDb)
-                      .getCommandNS());
+        ASSERT_EQ(
+            entry->getNss(),
+            NamespaceString::createNamespaceString_forTest(DatabaseName::kAdmin).getCommandNS());
 
         auto expectedOpTime = oplogSlots[numEntriesLogged];
         ASSERT_EQ(entry->getOpTime(), expectedOpTime);

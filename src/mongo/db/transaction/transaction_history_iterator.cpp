@@ -76,7 +76,7 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
-    const DatabaseName dbName(boost::none, NamespaceString::kLocalDb);
+    const DatabaseName dbName(DatabaseName::kLocal);
     const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, dbName);
     invariant(localDb);
     AutoStatsTracker statsTracker(opCtx,

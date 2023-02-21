@@ -293,7 +293,7 @@ void registerCollectors(FreeMonController* controller) {
             "replSetGetConfig", "replSetGetConfig", "", BSON("replSetGetConfig" << 1)));
 
         // Collect UUID for certain collections.
-        std::set<NamespaceString> namespaces({NamespaceString("local.oplog.rs")});
+        std::set<NamespaceString> namespaces({NamespaceString::kRsOplogNamespace});
         controller->addRegistrationCollector(
             std::make_unique<FreeMonNamespaceUUIDCollector>(namespaces));
         controller->addMetricsCollector(

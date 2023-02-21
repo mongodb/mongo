@@ -85,11 +85,11 @@ void ActiveMigrationsRegistry::lock(OperationContext* opCtx, StringData reason) 
     // request with a retriable error and allow the draining mode to invoke registerReceiveChunk()
     // as part of its recovery sequence.
     {
-        AutoGetDb autoDB(opCtx, NamespaceString::kAdminDb, MODE_IS);
+        AutoGetDb autoDB(opCtx, DatabaseName::kAdmin, MODE_IS);
         uassert(ErrorCodes::NotWritablePrimary,
                 "Cannot lock the registry while the node is in draining mode",
                 repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-                    opCtx, NamespaceString::kAdminDb));
+                    opCtx, DatabaseName::kAdmin.toString()));
     }
 
     unblockMigrationsOnError.dismiss();

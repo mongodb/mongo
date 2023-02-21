@@ -528,7 +528,7 @@ CollStatsMetrics calculateCollStats(OperationContext* opCtx, const NamespaceStri
  * Generates the namespace for the temporary collection storing the split points.
  */
 NamespaceString makeSplitPointsNss(const UUID& origCollUuid, const UUID& tempCollUuid) {
-    return NamespaceString(NamespaceString::kConfigDb,
+    return NamespaceString(DatabaseName::kConfig,
                            fmt::format("{}{}.{}",
                                        NamespaceString::kAnalyzeShardKeySplitPointsCollectionPrefix,
                                        origCollUuid.toString(),

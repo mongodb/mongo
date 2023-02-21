@@ -281,7 +281,7 @@ void doNothing(const BSONObj&) {}
 Timestamp getLatestClusterTime(DBClientBase* conn) {
     // Sort by descending 'ts' in the query to the oplog collection. The first entry will have the
     // latest cluster time.
-    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString("local.oplog.rs"));
+    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString::kRsOplogNamespace);
     findCommand->setSort(BSON("$natural" << -1));
     findCommand->setLimit(1LL);
     findCommand->setSingleBatch(true);

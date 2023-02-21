@@ -111,7 +111,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
     // Assume that the config.cache.chunks collection isn't a view either.
     auto tempNss = resharding::constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
     auto tempCacheChunksNss =
-        NamespaceString(NamespaceString::kConfigDb, "cache.chunks." + tempNss.ns());
+        NamespaceString(DatabaseName::kConfig, "cache.chunks." + tempNss.ns());
     resolvedNamespaces[tempCacheChunksNss.coll()] = {tempCacheChunksNss, std::vector<BSONObj>{}};
 
     // sharded_agg_helpers::targetShardsAndAddMergeCursors() ignores the collation set on the

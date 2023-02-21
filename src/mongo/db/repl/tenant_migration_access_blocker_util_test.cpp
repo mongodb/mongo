@@ -223,7 +223,7 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, TestValidateNssBeingMigrated) {
     // No tenantId should work for an adminDB.
     tenant_migration_access_blocker::validateNssIsBeingMigrated(
         boost::none,
-        NamespaceString::createNamespaceString_forTest(NamespaceString::kAdminDb, "test"),
+        NamespaceString::createNamespaceString_forTest(DatabaseName::kAdmin, "test"),
         UUID::gen());
 
     // No tenantId will throw if it's not an adminDB.
@@ -252,7 +252,7 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, TestValidateNssBeingMigrated) {
     // Finally everything works.
     tenant_migration_access_blocker::validateNssIsBeingMigrated(
         kTenantId,
-        NamespaceString::createNamespaceString_forTest(NamespaceString::kAdminDb, "test"),
+        NamespaceString::createNamespaceString_forTest(DatabaseName::kAdmin, "test"),
         migrationId);
 }
 

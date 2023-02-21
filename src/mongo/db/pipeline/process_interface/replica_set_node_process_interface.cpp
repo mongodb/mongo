@@ -173,7 +173,7 @@ void ReplicaSetNodeProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
             originalIndexes);
     }
     // internalRenameIfOptionsAndIndexesMatch can only be run against the admin DB.
-    NamespaceString adminNs{NamespaceString::kAdminDb};
+    NamespaceString adminNs{DatabaseName::kAdmin};
     auto cmd = CommonMongodProcessInterface::_convertRenameToInternalRename(
         opCtx, sourceNs, targetNs, originalCollectionOptions, originalIndexes);
     uassertStatusOK(_executeCommandOnPrimary(opCtx, adminNs, cmd));

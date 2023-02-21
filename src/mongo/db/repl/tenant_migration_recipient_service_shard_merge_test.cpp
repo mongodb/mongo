@@ -446,11 +446,10 @@ void sendReponseToExpectedRequest(const BSONObj& backupCursorResponse,
 }
 
 BSONObj createServerAggregateReply() {
-    return CursorResponse(
-               NamespaceString::makeCollectionlessAggregateNSS(NamespaceString::kAdminDb),
-               0 /* cursorId */,
-               {BSON("byteOffset" << 0 << "endOfFile" << true << "data"
-                                  << BSONBinData(0, 0, BinDataGeneral))})
+    return CursorResponse(NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin),
+                          0 /* cursorId */,
+                          {BSON("byteOffset" << 0 << "endOfFile" << true << "data"
+                                             << BSONBinData(0, 0, BinDataGeneral))})
         .toBSONAsInitialResponse();
 }
 

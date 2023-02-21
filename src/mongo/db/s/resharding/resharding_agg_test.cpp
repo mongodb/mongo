@@ -50,9 +50,8 @@ namespace {
 
 using namespace fmt::literals;
 
-const NamespaceString kRemoteOplogNss{"local.oplog.rs"};
-const NamespaceString kLocalOplogBufferNss{"{}.{}xxx.yyy"_format(
-    NamespaceString::kConfigDb, NamespaceString::kReshardingLocalOplogBufferPrefix)};
+const NamespaceString kLocalOplogBufferNss = NamespaceString::createNamespaceString_forTest(
+    "config", "{}xxx.yyy"_format(NamespaceString::kReshardingLocalOplogBufferPrefix));
 
 // A mock TransactionHistoryIterator to support DSReshardingIterateTransaction.
 class MockTransactionHistoryIterator : public TransactionHistoryIteratorBase {
@@ -265,7 +264,8 @@ boost::intrusive_ptr<ExpressionContextForTest> createExpressionContext(Operation
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(
         new ExpressionContextForTest(opCtx, kLocalOplogBufferNss));
     expCtx->setResolvedNamespace(kLocalOplogBufferNss, {kLocalOplogBufferNss, {}});
-    expCtx->setResolvedNamespace(kRemoteOplogNss, {kRemoteOplogNss, {}});
+    expCtx->setResolvedNamespace(NamespaceString::kRsOplogNamespace,
+                                 {NamespaceString::kRsOplogNamespace, {}});
     return expCtx;
 }
 
@@ -358,7 +358,7 @@ protected:
         std::deque<DocumentSource::GetNextResult> pipelineSource) {
         // Set up the oplog collection state for $lookup and $graphLookup calls.
         auto expCtx = createExpressionContext();
-        expCtx->ns = kRemoteOplogNss;
+        expCtx->ns = NamespaceString::kRsOplogNamespace;
         expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(pipelineSource);
 
         auto pipeline = resharding::createOplogFetchingPipelineForResharding(
@@ -520,7 +520,7 @@ TEST_F(ReshardingAggTest, VerifyPipelineOutputHasOplogSchema) {
                                                                 Document(deleteOplog.toBSON())};
 
     boost::intrusive_ptr<ExpressionContext> expCtx = createExpressionContext();
-    expCtx->ns = kRemoteOplogNss;
+    expCtx->ns = NamespaceString::kRsOplogNamespace;
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(pipelineSource);
 
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline =
@@ -621,7 +621,7 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxn) {
 
     boost::intrusive_ptr<ExpressionContext> expCtx = createExpressionContext();
     // Set up the oplog collection state for $lookup and $graphLookup calls.
-    expCtx->ns = kRemoteOplogNss;
+    expCtx->ns = NamespaceString::kRsOplogNamespace;
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(pipelineSource);
 
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline =

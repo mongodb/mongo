@@ -59,7 +59,7 @@ PreWriteFilter::PreWriteFilter(OperationContext* opCtx, NamespaceString nss)
 
           // Always allow writes on standalone and secondary nodes.
           const auto replCoord{repl::ReplicationCoordinator::get(opCtx)};
-          return !replCoord->canAcceptWritesForDatabase(opCtx, NamespaceString::kAdminDb);
+          return !replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin.toString());
       }()) {}
 
 PreWriteFilter::Action PreWriteFilter::computeAction(const Document& doc) {

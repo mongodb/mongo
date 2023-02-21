@@ -96,7 +96,7 @@ ShardId selectShardForNewDatabase(OperationContext* opCtx, ShardRegistry* shardR
 DatabaseType ShardingCatalogManager::createDatabase(
     OperationContext* opCtx, StringData dbName, const boost::optional<ShardId>& optPrimaryShard) {
 
-    if (dbName == NamespaceString::kConfigDb) {
+    if (dbName == DatabaseName::kConfig.db()) {
         return DatabaseType(
             dbName.toString(), ShardId::kConfigServerId, DatabaseVersion::makeFixed());
     }
@@ -106,9 +106,9 @@ DatabaseType ShardingCatalogManager::createDatabase(
     // but only with that exact casing.
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "Cannot manually create database'" << dbName << "'",
-            !dbName.equalCaseInsensitive(NamespaceString::kAdminDb) &&
-                !dbName.equalCaseInsensitive(NamespaceString::kLocalDb) &&
-                !dbName.equalCaseInsensitive(NamespaceString::kConfigDb));
+            !dbName.equalCaseInsensitive(DatabaseName::kAdmin.db()) &&
+                !dbName.equalCaseInsensitive(DatabaseName::kLocal.db()) &&
+                !dbName.equalCaseInsensitive(DatabaseName::kConfig.db()));
 
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid db name specified: " << dbName,

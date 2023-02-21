@@ -258,8 +258,6 @@ MONGO_FAIL_POINT_DEFINE(hangDuringQuiesceMode);
 MONGO_FAIL_POINT_DEFINE(pauseWhileKillingOperationsAtShutdown);
 MONGO_FAIL_POINT_DEFINE(hangBeforeShutdown);
 
-const NamespaceString startupLogCollectionName("local.startup_log");
-
 #ifdef _WIN32
 const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
     L"MongoDB", L"MongoDB", L"MongoDB Server"};
@@ -287,19 +285,20 @@ void logStartup(OperationContext* opCtx) {
     BSONObj o = toLog.obj();
 
     Lock::GlobalWrite lk(opCtx);
-    AutoGetDb autoDb(opCtx, startupLogCollectionName.dbName(), mongo::MODE_X);
+    AutoGetDb autoDb(opCtx, NamespaceString::kStartupLogNamespace.dbName(), mongo::MODE_X);
     auto db = autoDb.ensureDbExists(opCtx);
-    auto collection =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, startupLogCollectionName);
+    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+        opCtx, NamespaceString::kStartupLogNamespace);
     WriteUnitOfWork wunit(opCtx);
     if (!collection) {
         BSONObj options = BSON("capped" << true << "size" << 10 * 1024 * 1024);
         repl::UnreplicatedWritesBlock uwb(opCtx);
         CollectionOptions collectionOptions = uassertStatusOK(
             CollectionOptions::parse(options, CollectionOptions::ParseKind::parseForCommand));
-        uassertStatusOK(db->userCreateNS(opCtx, startupLogCollectionName, collectionOptions));
+        uassertStatusOK(
+            db->userCreateNS(opCtx, NamespaceString::kStartupLogNamespace, collectionOptions));
         collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-            opCtx, startupLogCollectionName);
+            opCtx, NamespaceString::kStartupLogNamespace);
     }
     invariant(collection);
 

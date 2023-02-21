@@ -337,7 +337,7 @@ TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
         BSONObj updateQuery = BSON("user" << userDoc.getStringField(kUserFieldName));
         ASSERT_OK(
             externalState->updateOne(opCtx.get(),
-                                     AuthorizationManager::usersCollectionNamespace,
+                                     NamespaceString::kAdminUsersNamespace,
                                      updateQuery,
                                      BSON("$set" << BSON("roles" << BSON_ARRAY(updatedRoles[0]))),
                                      true,

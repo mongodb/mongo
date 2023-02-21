@@ -106,11 +106,11 @@ public:
 
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot drop indexes in 'config' database in sharded cluster",
-                nss.db() != NamespaceString::kConfigDb);
+                nss.dbName() != DatabaseName::kConfig);
 
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot drop indexes in 'admin' database in sharded cluster",
-                nss.db() != NamespaceString::kAdminDb);
+                nss.dbName() != DatabaseName::kAdmin);
 
         LOGV2_DEBUG(22751,
                     1,

@@ -283,7 +283,7 @@ size_t deleteExpiredChangeStreamPreImages(OperationContext* opCtx,
     // Early exit if the collection doesn't exist or running on a secondary.
     if (!preImageColl ||
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-            opCtx, NamespaceString::kConfigDb)) {
+            opCtx, DatabaseName::kConfig.toString())) {
         return 0;
     }
 
@@ -330,7 +330,7 @@ size_t deleteExpiredChangeStreamPreImagesForTenants(OperationContext* opCtx,
     // Early exit if the collection doesn't exist or running on a secondary.
     if (!preImageColl ||
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-            opCtx, NamespaceString::kConfigDb)) {
+            opCtx, DatabaseName::kConfig.toString())) {
         return 0;
     }
 

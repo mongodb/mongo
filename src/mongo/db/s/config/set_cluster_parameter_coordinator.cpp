@@ -147,11 +147,11 @@ void SetClusterParameterCoordinator::_sendSetClusterParameterToAllShards(
     LOGV2_DEBUG(6387001, 1, "Sending setClusterParameter to shards:", "shards"_attr = shards);
 
     ShardsvrSetClusterParameter request(_doc.getParameter());
-    request.setDbName(DatabaseName(_doc.getTenantId(), NamespaceString::kAdminDb));
+    request.setDbName(DatabaseName(_doc.getTenantId(), DatabaseName::kAdmin.db()));
     request.setClusterParameterTime(*_doc.getClusterParameterTime());
     sharding_util::sendCommandToShards(
         opCtx,
-        NamespaceString::kAdminDb,
+        DatabaseName::kAdmin.db(),
         CommandHelpers::appendMajorityWriteConcern(request.toBSON(session.toBSON())),
         shards,
         **executor);
@@ -162,7 +162,7 @@ void SetClusterParameterCoordinator::_commit(OperationContext* opCtx) {
 
     SetClusterParameter setClusterParameterRequest(_doc.getParameter());
     setClusterParameterRequest.setDbName(
-        DatabaseName(_doc.getTenantId(), NamespaceString::kAdminDb));
+        DatabaseName(_doc.getTenantId(), DatabaseName::kAdmin.db()));
     std::unique_ptr<ServerParameterService> parameterService =
         std::make_unique<ClusterParameterService>();
     DBDirectClient client(opCtx);

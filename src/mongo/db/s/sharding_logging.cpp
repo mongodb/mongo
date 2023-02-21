@@ -159,7 +159,7 @@ Status ShardingLogging::_log(OperationContext* opCtx,
           "namespace"_attr = logCollName,
           "event"_attr = redact(changeLogBSON));
 
-    const NamespaceString nss("config", logCollName);
+    const NamespaceString nss(NamespaceString::makeGlobalConfigCollection(logCollName));
     Status result = Grid::get(opCtx)->catalogClient()->insertConfigDocument(
         opCtx, nss, changeLogBSON, writeConcern);
 

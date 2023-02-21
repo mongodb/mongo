@@ -145,7 +145,7 @@ public:
 
             BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
             for (const auto& db : databases) {
-                if (db != NamespaceString::kLocalDb) {
+                if (db != DatabaseName::kLocal.db()) {
                     dbs.append(db);
                 }
             }

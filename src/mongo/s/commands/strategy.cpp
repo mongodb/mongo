@@ -259,7 +259,7 @@ void ExecCommandClient::_prologue() {
     const auto dbname = request.getDatabase();
     uassert(ErrorCodes::IllegalOperation,
             "Can't use 'local' database through mongos",
-            dbname != NamespaceString::kLocalDb);
+            dbname != DatabaseName::kLocal.db());
     uassert(ErrorCodes::InvalidNamespace,
             "Invalid database name: '{}'"_format(dbname),
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));

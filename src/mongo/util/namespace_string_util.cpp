@@ -65,8 +65,8 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
         // TODO SERVER-62491: Invariant for all databases. Remove the invariant bypass for
         // admin, local, config dbs.
         StringData dbName = ns.substr(0, ns.find('.'));
-        if (!(dbName == NamespaceString::kAdminDb) && !(dbName == NamespaceString::kLocalDb) &&
-            !(dbName == NamespaceString::kConfigDb)) {
+        if (!(dbName == DatabaseName::kAdmin.db()) && !(dbName == DatabaseName::kLocal.db()) &&
+            !(dbName == DatabaseName::kConfig.db())) {
             massert(6972100,
                     str::stream() << "TenantId must be set on nss " << ns,
                     tenantId != boost::none);

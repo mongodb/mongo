@@ -348,14 +348,13 @@ bool isFinalOplog(const repl::OplogEntry& oplog, UUID reshardingUUID) {
 }
 
 NamespaceString getLocalOplogBufferNamespace(UUID existingUUID, ShardId donorShardId) {
-    return NamespaceString("config.localReshardingOplogBuffer.{}.{}"_format(
-        existingUUID.toString(), donorShardId.toString()));
+    return NamespaceString::makeReshardingLocalOplogBufferNSS(existingUUID,
+                                                              donorShardId.toString());
 }
 
 NamespaceString getLocalConflictStashNamespace(UUID existingUUID, ShardId donorShardId) {
-    return NamespaceString{NamespaceString::kConfigDb,
-                           "localReshardingConflictStash.{}.{}"_format(existingUUID.toString(),
-                                                                       donorShardId.toString())};
+    return NamespaceString::makeReshardingLocalConflictStashNSS(existingUUID,
+                                                                donorShardId.toString());
 }
 
 void doNoopWrite(OperationContext* opCtx, StringData opStr, const NamespaceString& nss) {

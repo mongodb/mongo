@@ -129,19 +129,19 @@ ServiceContext::ConstructorActionRegisterer setClusterNetworkRestrictionManager{
     }};
 
 bool isAuthzNamespace(const NamespaceString& nss) {
-    return (nss == AuthorizationManager::rolesCollectionNamespace ||
-            nss == AuthorizationManager::usersCollectionNamespace ||
-            nss == AuthorizationManager::versionCollectionNamespace);
+    return (nss == NamespaceString::kAdminRolesNamespace ||
+            nss == NamespaceString::kAdminUsersNamespace ||
+            nss == NamespaceString::kServerConfigurationNamespace);
 }
 
 bool isAuthzCollection(StringData coll) {
-    return (coll == AuthorizationManager::rolesCollectionNamespace.coll() ||
-            coll == AuthorizationManager::usersCollectionNamespace.coll() ||
-            coll == AuthorizationManager::versionCollectionNamespace.coll());
+    return (coll == NamespaceString::kAdminRolesNamespace.coll() ||
+            coll == NamespaceString::kAdminUsersNamespace.coll() ||
+            coll == NamespaceString::kServerConfigurationNamespace.coll());
 }
 
 bool loggedCommandOperatesOnAuthzData(const NamespaceString& nss, const BSONObj& cmdObj) {
-    if (nss != AuthorizationManager::adminCommandNamespace)
+    if (nss != NamespaceString::kAdminCommandNamespace)
         return false;
 
     const StringData cmdName(cmdObj.firstElement().fieldNameStringData());

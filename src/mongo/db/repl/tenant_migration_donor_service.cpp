@@ -785,7 +785,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
         repl::ReplicationCoordinator::get(_serviceContext)->getConfigConnectionString();
 
     RecipientSyncData request;
-    request.setDbName(NamespaceString::kAdminDb);
+    request.setDbName(DatabaseName::kAdmin);
 
     MigrationRecipientCommonData commonData(
         _migrationUuid, donorConnString.toString(), _readPreference);
@@ -828,7 +828,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
         repl::ReplicationCoordinator::get(_serviceContext)->getConfigConnectionString();
 
     RecipientForgetMigration request;
-    request.setDbName(NamespaceString::kAdminDb);
+    request.setDbName(DatabaseName::kAdmin);
 
     MigrationRecipientCommonData commonData(
         _migrationUuid, donorConnString.toString(), _readPreference);

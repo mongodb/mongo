@@ -202,7 +202,7 @@ protected:
 auto makeDummyPrepareCommand(const LogicalSessionId& lsid,
                              const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
     PrepareTransaction prepareCmd;
-    prepareCmd.setDbName(NamespaceString::kAdminDb);
+    prepareCmd.setDbName(DatabaseName::kAdmin);
     auto prepareObj = prepareCmd.toBSON(
         BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumberAndRetryCounter.getTxnNumber()
                     << "txnRetryCounter" << *txnNumberAndRetryCounter.getTxnRetryCounter()

@@ -123,7 +123,7 @@ public:
                 auto swResponse = shard->runCommandWithFixedRetryAttempts(
                     opCtx,
                     ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
-                    NamespaceString::kAdminDb.toString(),
+                    DatabaseName::kAdmin.toString(),
                     versionedCmdObj,
                     Shard::RetryPolicy::kIdempotent);
                 auto status = Shard::CommandResponse::getEffectiveStatus(swResponse);

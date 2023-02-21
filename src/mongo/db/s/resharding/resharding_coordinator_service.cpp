@@ -1292,7 +1292,7 @@ void markCompleted(const Status& status, ReshardingMetrics* metrics) {
 BSONObj createFlushReshardingStateChangeCommand(const NamespaceString& nss,
                                                 const UUID& reshardingUUID) {
     _flushReshardingStateChange cmd(nss);
-    cmd.setDbName(NamespaceString::kAdminDb);
+    cmd.setDbName(DatabaseName::kAdmin);
     cmd.setReshardingUUID(reshardingUUID);
     return cmd.toBSON(
         BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
@@ -1301,7 +1301,7 @@ BSONObj createFlushReshardingStateChangeCommand(const NamespaceString& nss,
 BSONObj createShardsvrCommitReshardCollectionCmd(const NamespaceString& nss,
                                                  const UUID& reshardingUUID) {
     ShardsvrCommitReshardCollection cmd(nss);
-    cmd.setDbName(NamespaceString::kAdminDb);
+    cmd.setDbName(DatabaseName::kAdmin);
     cmd.setReshardingUUID(reshardingUUID);
     return cmd.toBSON(
         BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
@@ -2207,7 +2207,7 @@ void ReshardingCoordinator::_sendCommandToAllParticipants(
 
     _reshardingCoordinatorExternalState->sendCommandToShards(
         opCtx.get(),
-        NamespaceString::kAdminDb,
+        DatabaseName::kAdmin.db(),
         command,
         {participantShardIds.begin(), participantShardIds.end()},
         **executor);
@@ -2221,7 +2221,7 @@ void ReshardingCoordinator::_sendCommandToAllRecipients(
 
     _reshardingCoordinatorExternalState->sendCommandToShards(
         opCtx.get(),
-        NamespaceString::kAdminDb,
+        DatabaseName::kAdmin.db(),
         command,
         {recipientShardIds.begin(), recipientShardIds.end()},
         **executor);
@@ -2235,7 +2235,7 @@ void ReshardingCoordinator::_sendCommandToAllDonors(
 
     _reshardingCoordinatorExternalState->sendCommandToShards(
         opCtx.get(),
-        NamespaceString::kAdminDb,
+        DatabaseName::kAdmin.db(),
         command,
         {donorShardIds.begin(), donorShardIds.end()},
         **executor);

@@ -222,7 +222,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
 
     tassert(ErrorCodes::IllegalOperation,
             "Can't check version of {} database"_format(dbName),
-            dbName != NamespaceString::kAdminDb && dbName != NamespaceString::kConfigDb);
+            dbName != DatabaseName::kAdmin.db() && dbName != DatabaseName::kConfig.db());
 
     Timer t{};
     ScopeGuard finishTiming([&] {

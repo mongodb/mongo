@@ -471,7 +471,7 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::getChunksS
 
 SemiFuture<DatabaseType> ShardServerCatalogCacheLoader::getDatabase(StringData dbName) {
     // The admin and config database have fixed metadata that does not need to be refreshed.
-    if (dbName == NamespaceString::kAdminDb || dbName == NamespaceString::kConfigDb) {
+    if (dbName == DatabaseName::kAdmin.db() || dbName == DatabaseName::kConfig.db()) {
         return DatabaseType(
             dbName.toString(), ShardId::kConfigServerId, DatabaseVersion::makeFixed());
     }

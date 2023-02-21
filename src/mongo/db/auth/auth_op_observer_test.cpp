@@ -111,19 +111,18 @@ TEST_F(AuthOpObserverTest, OnRollbackInvalidatesAuthCacheWhenAuthNamespaceRolled
 
     // Verify that the rollback op observer invalidates the user cache for each auth namespace by
     // checking that the cache generation changes after a call to the rollback observer method.
-    auto nss = AuthorizationManager::rolesCollectionNamespace;
     OpObserver::RollbackObserverInfo rbInfo;
-    rbInfo.rollbackNamespaces = {AuthorizationManager::rolesCollectionNamespace};
+    rbInfo.rollbackNamespaces = {NamespaceString::kAdminRolesNamespace};
     opObserver.onReplicationRollback(opCtx.get(), rbInfo);
     ASSERT_NE(initCacheGen, authMgr->getCacheGeneration());
 
     initCacheGen = authMgr->getCacheGeneration();
-    rbInfo.rollbackNamespaces = {AuthorizationManager::usersCollectionNamespace};
+    rbInfo.rollbackNamespaces = {NamespaceString::kAdminUsersNamespace};
     opObserver.onReplicationRollback(opCtx.get(), rbInfo);
     ASSERT_NE(initCacheGen, authMgr->getCacheGeneration());
 
     initCacheGen = authMgr->getCacheGeneration();
-    rbInfo.rollbackNamespaces = {AuthorizationManager::versionCollectionNamespace};
+    rbInfo.rollbackNamespaces = {NamespaceString::kServerConfigurationNamespace};
     opObserver.onReplicationRollback(opCtx.get(), rbInfo);
     ASSERT_NE(initCacheGen, authMgr->getCacheGeneration());
 }
@@ -135,7 +134,6 @@ TEST_F(AuthOpObserverTest, OnRollbackDoesntInvalidateAuthCacheWhenNoAuthNamespac
     auto initCacheGen = authMgr->getCacheGeneration();
 
     // Verify that the rollback op observer doesn't invalidate the user cache.
-    auto nss = AuthorizationManager::rolesCollectionNamespace;
     OpObserver::RollbackObserverInfo rbInfo;
     opObserver.onReplicationRollback(opCtx.get(), rbInfo);
     auto newCacheGen = authMgr->getCacheGeneration();

@@ -130,10 +130,9 @@ Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
 }
 
 Status validateIsNotInDbs(const NamespaceString& ns,
-                          const std::vector<StringData>& disallowedDbs,
+                          const std::vector<DatabaseName>& disallowedDbs,
                           StringData optionName) {
-    // TODO SERVER-62491 Check for DatabaseName instead
-    if (std::find(disallowedDbs.begin(), disallowedDbs.end(), ns.db()) != disallowedDbs.end()) {
+    if (std::find(disallowedDbs.begin(), disallowedDbs.end(), ns.dbName()) != disallowedDbs.end()) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << optionName << " collection option is not supported on the "
                               << ns.db() << " database"};
@@ -145,10 +144,10 @@ Status validateIsNotInDbs(const NamespaceString& ns,
 // Validates that the option is not used on admin, local or config db as well as not being used on
 // config servers.
 Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceString& ns) {
-    const auto validationStatus = validateIsNotInDbs(
-        ns,
-        {NamespaceString::kAdminDb, NamespaceString::kLocalDb, NamespaceString::kConfigDb},
-        "changeStreamPreAndPostImages");
+    const auto validationStatus =
+        validateIsNotInDbs(ns,
+                           {DatabaseName::kAdmin, DatabaseName::kLocal, DatabaseName::kConfig},
+                           "changeStreamPreAndPostImages");
     if (validationStatus != Status::OK()) {
         return validationStatus;
     }

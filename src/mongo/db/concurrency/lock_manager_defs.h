@@ -328,7 +328,6 @@ typedef uint64_t LockerId;
 // Hardcoded resource id for the oplog collection, which is special-cased both for resource
 // acquisition purposes and for statistics reporting.
 extern const ResourceId resourceIdLocalDB;
-extern const ResourceId resourceIdOplog;
 
 // Hardcoded resource id for admin db. This is to ensure direct writes to auth collections
 // are serialized (see SERVER-16092)

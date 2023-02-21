@@ -410,7 +410,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onDropDatabase) {
         boost::none);
 
     // Actually drop the config DB.
-    doDropDatabase(DatabaseName(boost::none, kConfigDB));
+    doDropDatabase(DatabaseName::kConfig);
 
     auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);

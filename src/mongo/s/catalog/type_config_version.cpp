@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-const NamespaceString VersionType::ConfigNS("config.version");
+const NamespaceString VersionType::ConfigNS(NamespaceString::kConfigVersionNamespace);
 
 const BSONField<int> VersionType::minCompatibleVersion("minCompatibleVersion");
 const BSONField<int> VersionType::currentVersion("currentVersion");

@@ -64,8 +64,6 @@ std::string v3SystemRolesIndexName;
 IndexSpec v3SystemUsersIndexSpec;
 IndexSpec v3SystemRolesIndexSpec;
 
-const NamespaceString sessionCollectionNamespace("config.system.sessions");
-
 MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
     v1SystemUsersKeyPattern = BSON("user" << 1 << "userSource" << 1);
     v3SystemUsersKeyPattern = BSON(AuthorizationManager::USER_NAME_FIELD_NAME
@@ -130,8 +128,8 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
 }  // namespace
 
 Status verifySystemIndexes(OperationContext* opCtx) {
-    const NamespaceString& systemUsers = AuthorizationManager::usersCollectionNamespace;
-    const NamespaceString& systemRoles = AuthorizationManager::rolesCollectionNamespace;
+    const NamespaceString& systemUsers = NamespaceString::kAdminUsersNamespace;
+    const NamespaceString& systemRoles = NamespaceString::kAdminRolesNamespace;
 
     // Create indexes for the admin.system.users collection.
     {
@@ -198,11 +196,11 @@ void createSystemIndexes(OperationContext* opCtx, CollectionWriter& collection, 
     invariant(collection);
     const NamespaceString& ns = collection->ns();
     BSONObj indexSpec;
-    if (ns == AuthorizationManager::usersCollectionNamespace) {
+    if (ns == NamespaceString::kAdminUsersNamespace) {
         indexSpec = fassert(
             40455, index_key_validate::validateIndexSpec(opCtx, v3SystemUsersIndexSpec.toBSON()));
 
-    } else if (ns == AuthorizationManager::rolesCollectionNamespace) {
+    } else if (ns == NamespaceString::kAdminRolesNamespace) {
         indexSpec = fassert(
             40457, index_key_validate::validateIndexSpec(opCtx, v3SystemRolesIndexSpec.toBSON()));
     }

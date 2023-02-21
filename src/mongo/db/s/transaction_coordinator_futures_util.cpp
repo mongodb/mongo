@@ -127,7 +127,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
             auto start = _executor->now();
 
             auto requestOpMsg =
-                OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, commandObj).serialize();
+                OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin.db(), commandObj).serialize();
             const auto replyOpMsg = OpMsg::parseOwned(
                 service->getServiceEntryPoint()->handleRequest(opCtx, requestOpMsg).get().response);
 
@@ -145,7 +145,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
         .then([this, shardId, commandObj = commandObj.getOwned(), readPref](
                   HostAndShard hostAndShard) mutable {
             executor::RemoteCommandRequest request(hostAndShard.hostTargeted,
-                                                   NamespaceString::kAdminDb.toString(),
+                                                   DatabaseName::kAdmin.toString(),
                                                    commandObj,
                                                    readPref.toContainingBSON(),
                                                    nullptr);

@@ -429,7 +429,7 @@ TEST_F(DropDatabaseTest,
 
 TEST_F(DropDatabaseTest, DropDatabaseFailsToDropAdmin) {
     NamespaceString adminNSS =
-        NamespaceString::createNamespaceString_forTest(NamespaceString::kAdminDb, "foo");
+        NamespaceString::createNamespaceString_forTest(DatabaseName::kAdmin, "foo");
     _createCollection(_opCtx.get(), adminNSS);
     ASSERT_THROWS_CODE_AND_WHAT(dropDatabaseForApplyOps(_opCtx.get(), adminNSS.dbName()),
                                 AssertionException,

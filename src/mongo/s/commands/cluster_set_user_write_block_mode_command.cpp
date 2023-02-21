@@ -62,7 +62,7 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             ConfigsvrSetUserWriteBlockMode configsvrSetUserWriteBlockModeCmd;
-            configsvrSetUserWriteBlockModeCmd.setDbName(NamespaceString::kAdminDb);
+            configsvrSetUserWriteBlockModeCmd.setDbName(DatabaseName::kAdmin);
             SetUserWriteBlockModeRequest setUserWriteBlockModeRequest(
                 request().getSetUserWriteBlockModeRequest());
             configsvrSetUserWriteBlockModeCmd.setSetUserWriteBlockModeRequest(
@@ -72,7 +72,7 @@ public:
             auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                NamespaceString::kAdminDb.toString(),
+                DatabaseName::kAdmin.toString(),
                 CommandHelpers::appendMajorityWriteConcern(
                     configsvrSetUserWriteBlockModeCmd.toBSON({}), opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));

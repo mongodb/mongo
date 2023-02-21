@@ -81,10 +81,9 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
         auto mockLoader = std::make_unique<CatalogCacheLoaderMock>();
 
         // The config database's primary shard is always config, and it is always sharded.
-        mockLoader->setDatabaseRefreshReturnValue(
-            DatabaseType{NamespaceString::kConfigDb.toString(),
-                         ShardId::kConfigServerId,
-                         DatabaseVersion::makeFixed()});
+        mockLoader->setDatabaseRefreshReturnValue(DatabaseType{DatabaseName::kConfig.toString(),
+                                                               ShardId::kConfigServerId,
+                                                               DatabaseVersion::makeFixed()});
 
         // The config.transactions collection is always unsharded.
         mockLoader->setCollectionRefreshReturnValue(

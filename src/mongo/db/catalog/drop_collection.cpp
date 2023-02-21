@@ -599,7 +599,7 @@ void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx,
                                                 const DatabaseName& dbName) {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
 
-    if (dbName.db() == NamespaceString::kLocalDb) {
+    if (dbName == DatabaseName::kLocal) {
         // Collections in the local database are not replicated, so we do not need an _id index on
         // any collection. For the same reason, it is not possible for the local database to contain
         // any drop-pending collections (drops are effective immediately).

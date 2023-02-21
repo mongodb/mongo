@@ -44,4 +44,6 @@ DBNAME_CONSTANT(kLocal, "local"_sd)
 
 DBNAME_CONSTANT(kConfig, "config"_sd)
 
+DBNAME_CONSTANT(kSystem, "system"_sd)
+
 DBNAME_CONSTANT(kEmpty, ""_sd)

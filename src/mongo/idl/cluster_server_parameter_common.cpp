@@ -48,7 +48,7 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
     }
     // Find all tenant config databases.
     ListDatabasesForAllTenantsCommand listDbCommand;
-    listDbCommand.setDbName(NamespaceString::kAdminDb);
+    listDbCommand.setDbName(DatabaseName::kAdmin);
     listDbCommand.setFilter(BSON("name"_sd
                                  << "config"));
     listDbCommand.setNameOnly(true);
@@ -61,7 +61,7 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
         }
         auto host = std::move(swHost.getValue());
         executor::RemoteCommandRequest request(
-            host, NamespaceString::kAdminDb.toString(), listDbCommand.toBSON(BSONObj()), opCtx);
+            host, DatabaseName::kAdmin.toString(), listDbCommand.toBSON(BSONObj()), opCtx);
 
         executor::RemoteCommandResponse response =
             Status(ErrorCodes::InternalError, "Internal error running command");
@@ -102,7 +102,7 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
         auto swListDbResponse =
             shard->runCommand(opCtx,
                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                              NamespaceString::kAdminDb.toString(),
+                              DatabaseName::kAdmin.toString(),
                               listDbCommand.toBSON(BSONObj()),
                               Shard::RetryPolicy::kIdempotent);
         if (!swListDbResponse.isOK()) {

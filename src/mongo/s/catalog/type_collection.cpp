@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-const NamespaceString CollectionType::ConfigNS("config.collections");
+const NamespaceString CollectionType::ConfigNS(NamespaceString::kConfigsvrCollectionsNamespace);
 
 CollectionType::CollectionType(NamespaceString nss,
                                OID epoch,

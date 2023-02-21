@@ -494,8 +494,8 @@ public:
      * Returns whether the database's metrics should be collected.
      */
     static bool shouldCollectMetricsForDatabase(StringData dbName) {
-        if (dbName == NamespaceString::kAdminDb || dbName == NamespaceString::kConfigDb ||
-            dbName == NamespaceString::kLocalDb) {
+        if (dbName == DatabaseName::kAdmin.db() || dbName == DatabaseName::kConfig.db() ||
+            dbName == DatabaseName::kLocal.db()) {
             return false;
         }
         return true;

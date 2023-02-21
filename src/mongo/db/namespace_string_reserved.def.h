@@ -239,3 +239,36 @@ NSS_CONSTANT(kConfigSampledQueriesDiffNamespace, DatabaseName::kConfig, "sampled
 
 // Namespace used for the health log.
 NSS_CONSTANT(kLocalHealthLogNamespace, DatabaseName::kLocal, "system.healthlog"_sd)
+
+// Namespace used for command oplog entries.
+NSS_CONSTANT(kAdminCommandNamespace, DatabaseName::kAdmin, "$cmd"_sd)
+
+// Namespace used to store roles.
+NSS_CONSTANT(kAdminRolesNamespace, DatabaseName::kAdmin, "system.roles"_sd)
+
+// Namespace used to store users.
+NSS_CONSTANT(kAdminUsersNamespace, DatabaseName::kAdmin, "system.users"_sd)
+
+// Namespace used by mms-automation.
+NSS_CONSTANT(kLocalClusterManagerNamespace, DatabaseName::kLocal, "clustermanager"_sd)
+
+// Namespace used for startup log.
+NSS_CONSTANT(kStartupLogNamespace, DatabaseName::kLocal, "startup_log"_sd)
+
+// Namespace for storing the persisted state of migrations.
+NSS_CONSTANT(kMigrationsNamespace, DatabaseName::kConfig, "migrations"_sd)
+
+// Namespace for changelog on CSRS.
+NSS_CONSTANT(kConfigChangelogNamespace, DatabaseName::kConfig, "changelog"_sd)
+
+// Namespace used for storing the list of chunks on the CSRS.
+NSS_CONSTANT(kConfigsvrChunksNamespace, DatabaseName::kConfig, "chunks"_sd)
+
+// Namespace used for storing the list of tags on the CSRS.
+NSS_CONSTANT(kConfigsvrTagsNamespace, DatabaseName::kConfig, "tags"_sd)
+
+// Namespace used for storing version info on the CSRS.
+NSS_CONSTANT(kConfigVersionNamespace, DatabaseName::kConfig, "version"_sd)
+
+// Namespace used for storing mongos info on the CSRS.
+NSS_CONSTANT(kConfigMongosNamespace, DatabaseName::kConfig, "mongos"_sd)

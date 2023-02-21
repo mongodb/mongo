@@ -60,7 +60,7 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.db());
     auto cmdObj = CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}));
-    sendCommandToShards(opCtx, NamespaceString::kAdminDb, cmdObj, shardIds, executor);
+    sendCommandToShards(opCtx, DatabaseName::kAdmin.db(), cmdObj, shardIds, executor);
 }
 
 std::vector<AsyncRequestsSender::Response> processShardResponses(

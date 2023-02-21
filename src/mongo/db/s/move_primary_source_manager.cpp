@@ -346,13 +346,13 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx,
 
     const auto commitStatus = [&] {
         ConfigsvrCommitMovePrimary commitRequest(_dbname, expectedDbVersion, _toShard);
-        commitRequest.setDbName(NamespaceString::kAdminDb);
+        commitRequest.setDbName(DatabaseName::kAdmin);
 
         const auto commitResponse =
             Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                NamespaceString::kAdminDb.toString(),
+                DatabaseName::kAdmin.toString(),
                 CommandHelpers::appendMajorityWriteConcern(commitRequest.toBSON({})),
                 Shard::RetryPolicy::kIdempotent);
 

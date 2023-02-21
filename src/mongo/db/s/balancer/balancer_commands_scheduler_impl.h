@@ -82,7 +82,7 @@ public:
     }
 
     virtual std::string getTargetDb() const {
-        return NamespaceString::kAdminDb.toString();
+        return DatabaseName::kAdmin.toString();
     }
 
     const ShardId& getTarget() const {

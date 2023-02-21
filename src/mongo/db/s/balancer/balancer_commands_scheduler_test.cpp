@@ -198,7 +198,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveRangeCommand) {
         }});
     _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     ShardsvrMoveRange shardsvrRequest(kNss);
-    shardsvrRequest.setDbName(NamespaceString::kAdminDb);
+    shardsvrRequest.setDbName(DatabaseName::kAdmin);
     shardsvrRequest.setFromShard(kShardId0);
     shardsvrRequest.setMaxChunkSizeBytes(1024);
     auto& moveRangeRequestBase = shardsvrRequest.getMoveRangeRequestBase();

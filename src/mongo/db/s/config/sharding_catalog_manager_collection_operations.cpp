@@ -90,7 +90,7 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
             shard->runFireAndForgetCommand(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                NamespaceString::kAdminDb.toString(),
+                DatabaseName::kAdmin.toString(),
                 BSON("_flushRoutingTableCacheUpdates" << coll.getNss().ns()));
         }
     }

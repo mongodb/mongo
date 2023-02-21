@@ -117,7 +117,7 @@ OpMsg runCommandInLocalTxn(OperationContext* opCtx,
 BSONObj executeConfigRequest(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const BatchedCommandRequest& request) {
-    invariant(nss.db() == NamespaceString::kConfigDb);
+    invariant(nss.dbName() == DatabaseName::kConfig);
     DBDirectClient client(opCtx);
     BSONObj result;
     client.runCommand(nss.dbName(), request.toBSON(), result);
@@ -173,15 +173,14 @@ BSONObj commitOrAbortTransaction(OperationContext* opCtx,
 
     const auto cmdObj = bob.obj();
 
-    const auto replyOpMsg =
-        OpMsg::parseOwned(newOpCtx->getServiceContext()
-                              ->getServiceEntryPoint()
-                              ->handleRequest(newOpCtx.get(),
-                                              OpMsgRequest::fromDBAndBody(
-                                                  NamespaceString::kAdminDb.toString(), cmdObj)
-                                                  .serialize())
-                              .get()
-                              .response);
+    const auto replyOpMsg = OpMsg::parseOwned(
+        newOpCtx->getServiceContext()
+            ->getServiceEntryPoint()
+            ->handleRequest(
+                newOpCtx.get(),
+                OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin.toString(), cmdObj).serialize())
+            .get()
+            .response);
     return replyOpMsg.body;
 }
 
@@ -850,7 +849,7 @@ BSONObj ShardingCatalogManager::writeToConfigDocumentInTxn(OperationContext* opC
                                                            const NamespaceString& nss,
                                                            const BatchedCommandRequest& request,
                                                            TxnNumber txnNumber) {
-    invariant(nss.db() == NamespaceString::kConfigDb);
+    invariant(nss.dbName() == DatabaseName::kConfig);
     auto response = runCommandInLocalTxn(
                         opCtx, nss.db(), false /* startTransaction */, txnNumber, request.toBSON())
                         .body;
@@ -864,7 +863,7 @@ void ShardingCatalogManager::insertConfigDocuments(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    std::vector<BSONObj> docs,
                                                    boost::optional<TxnNumber> txnNumber) {
-    invariant(nss.db() == NamespaceString::kConfigDb);
+    invariant(nss.dbName() == DatabaseName::kConfig);
 
     // if the operation is in a transaction then the overhead for each document is different.
     const auto documentOverhead = txnNumber
@@ -895,7 +894,7 @@ boost::optional<BSONObj> ShardingCatalogManager::findOneConfigDocumentInTxn(
     TxnNumber txnNumber,
     const BSONObj& query) {
 
-    invariant(nss.db() == NamespaceString::kConfigDb);
+    invariant(nss.dbName() == DatabaseName::kConfig);
 
     FindCommandRequest findCommand(nss);
     findCommand.setFilter(query);
@@ -921,7 +920,7 @@ boost::optional<BSONObj> ShardingCatalogManager::findOneConfigDocumentInTxn(
 BSONObj ShardingCatalogManager::findOneConfigDocument(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       const BSONObj& query) {
-    invariant(nss.db() == NamespaceString::kConfigDb);
+    invariant(nss.dbName().db() == DatabaseName::kConfig.db());
 
     FindCommandRequest findCommand(nss);
     findCommand.setFilter(query);

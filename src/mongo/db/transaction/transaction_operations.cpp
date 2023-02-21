@@ -35,8 +35,6 @@
 namespace mongo {
 namespace {
 
-const auto kAdminCommandNamespace = NamespaceString{NamespaceString::kAdminDb}.getCommandNS();
-
 /**
  * Returns operations that can fit into an "applyOps" entry. The returned operations are
  * serialized to BSON. The operations are given by range ['operationsBegin', 'operationsEnd').
@@ -350,7 +348,7 @@ std::size_t TransactionOperations::logOplogEntries(
 
         repl::MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-        oplogEntry.setNss(kAdminCommandNamespace);
+        oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
         oplogEntry.setOpTime(applyOpsEntry.oplogSlot);
         oplogEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTime);
         oplogEntry.setWallClockTime(wallClockTime);

@@ -71,7 +71,7 @@ Shard::CommandResponse commitMergeOnConfigServer(OperationContext* opCtx,
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            NamespaceString::kAdminDb.toString(),
+            DatabaseName::kAdmin.toString(),
             request.toBSON(BSON(WriteConcernOptions::kWriteConcernField
                                 << ShardingCatalogClient::kMajorityWriteConcern.toBSON())),
             Shard::RetryPolicy::kIdempotent));

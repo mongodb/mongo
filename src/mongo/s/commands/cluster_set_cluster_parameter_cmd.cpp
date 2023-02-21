@@ -73,7 +73,7 @@ public:
             const auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                NamespaceString::kAdminDb.toString(),
+                DatabaseName::kAdmin.toString(),
                 configsvrSetClusterParameter.toBSON({}),
                 Shard::RetryPolicy::kIdempotent));
 

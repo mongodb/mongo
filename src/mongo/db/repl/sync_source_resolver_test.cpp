@@ -300,11 +300,11 @@ void _scheduleFirstOplogEntryFetcherResponse(executor::NetworkInterfaceMock* net
     ASSERT_TRUE(net->hasReadyRequests());
     auto request = net->scheduleSuccessfulResponse(makeCursorResponse(0, nss, docs));
     ASSERT_EQUALS(currentSyncSource, request.target);
-    ASSERT_EQUALS(SyncSourceResolver::kLocalOplogNss.db(), request.dbname);
+    ASSERT_EQUALS(NamespaceString::kRsOplogNamespace.db(), request.dbname);
     ASSERT_EQUALS(SyncSourceResolver::kFetcherTimeout, request.timeout);
     auto firstElement = request.cmdObj.firstElement();
     ASSERT_EQUALS("find"_sd, firstElement.fieldNameStringData());
-    ASSERT_EQUALS(SyncSourceResolver::kLocalOplogNss.coll(), firstElement.String());
+    ASSERT_EQUALS(NamespaceString::kRsOplogNamespace.coll(), firstElement.String());
     ASSERT_EQUALS(1, request.cmdObj.getIntField("limit"));
     ASSERT_BSONOBJ_EQ(BSON("$natural" << 1), request.cmdObj.getObjectField("sort"));
 
@@ -681,11 +681,11 @@ void _scheduleRequiredOpTimeFetcherResponse(executor::NetworkInterfaceMock* net,
     ASSERT_TRUE(net->hasReadyRequests());
     auto request = net->scheduleSuccessfulResponse(makeCursorResponse(0, nss, docs));
     ASSERT_EQUALS(currentSyncSource, request.target);
-    ASSERT_EQUALS(SyncSourceResolver::kLocalOplogNss.db(), request.dbname);
+    ASSERT_EQUALS(NamespaceString::kRsOplogNamespace.db(), request.dbname);
     ASSERT_EQUALS(SyncSourceResolver::kFetcherTimeout, request.timeout);
     auto firstElement = request.cmdObj.firstElement();
     ASSERT_EQUALS("find"_sd, firstElement.fieldNameStringData());
-    ASSERT_EQUALS(SyncSourceResolver::kLocalOplogNss.coll(), firstElement.String());
+    ASSERT_EQUALS(NamespaceString::kRsOplogNamespace.coll(), firstElement.String());
     auto filter = request.cmdObj.getObjectField("filter");
     ASSERT_TRUE(filter.hasField("ts")) << request.cmdObj;
     auto tsFilter = filter.getObjectField("ts");
@@ -904,7 +904,7 @@ TEST_F(SyncSourceResolverRequiredOpTimeTest,
     _shouldFailRequest = [](const executor::RemoteCommandRequest& request) {
         // Fail find commands reading the oplog with filter containing a "ts" predicate.
         if (StringData{request.cmdObj.getStringField("find")} !=
-            SyncSourceResolver::kLocalOplogNss.coll()) {
+            NamespaceString::kRsOplogNamespace.coll()) {
             return false;
         }
 

@@ -136,7 +136,7 @@ public:
                         validateRequest.setKey(newShardKeyPattern.getKeyPattern());
                         validateRequest.setEnforceUniquenessCheck(
                             request().getEnforceUniquenessCheck());
-                        validateRequest.setDbName(NamespaceString::kAdminDb);
+                        validateRequest.setDbName(DatabaseName::kAdmin);
                         try {
                             sharding_util::sendCommandToShardsWithVersion(
                                 opCtx,

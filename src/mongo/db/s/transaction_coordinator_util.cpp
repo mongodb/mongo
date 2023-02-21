@@ -249,7 +249,7 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
                                          const APIParameters& apiParams,
                                          const txn::ParticipantsList& participants) {
     PrepareTransaction prepareTransaction;
-    prepareTransaction.setDbName(NamespaceString::kAdminDb);
+    prepareTransaction.setDbName(DatabaseName::kAdmin);
     BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber"
                                    << txnNumberAndRetryCounter.getTxnNumber() << "autocommit"
                                    << false << WriteConcernOptions::kWriteConcernField
@@ -463,7 +463,7 @@ Future<void> sendCommit(ServiceContext* service,
                         const txn::ParticipantsList& participants,
                         Timestamp commitTimestamp) {
     CommitTransaction commitTransaction;
-    commitTransaction.setDbName(NamespaceString::kAdminDb);
+    commitTransaction.setDbName(DatabaseName::kAdmin);
     commitTransaction.setCommitTimestamp(commitTimestamp);
     BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber"
                                    << txnNumberAndRetryCounter.getTxnNumber() << "autocommit"
@@ -508,7 +508,7 @@ Future<void> sendAbort(ServiceContext* service,
                        const APIParameters& apiParams,
                        const txn::ParticipantsList& participants) {
     AbortTransaction abortTransaction;
-    abortTransaction.setDbName(NamespaceString::kAdminDb);
+    abortTransaction.setDbName(DatabaseName::kAdmin);
     BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber"
                                    << txnNumberAndRetryCounter.getTxnNumber() << "autocommit"
                                    << false << WriteConcernOptions::kWriteConcernField

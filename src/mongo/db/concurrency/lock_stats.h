@@ -137,7 +137,7 @@ public:
     }
 
     LockStatCountersType& get(ResourceId resId, LockMode mode) {
-        if (resId == resourceIdOplog) {
+        if (resId == ResourceId(RESOURCE_COLLECTION, NamespaceString::kRsOplogNamespace)) {
             return _oplogStats.modeStats[mode];
         }
 

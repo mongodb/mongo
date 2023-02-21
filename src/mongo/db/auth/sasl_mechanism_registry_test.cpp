@@ -198,7 +198,7 @@ public:
 
         ASSERT_OK(authManagerExternalState->updateOne(
             opCtx.get(),
-            AuthorizationManager::versionCollectionNamespace,
+            NamespaceString::kServerConfigurationNamespace,
             AuthorizationManager::versionDocumentQuery,
             BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName
                                 << AuthorizationManager::schemaVersion26Final)),

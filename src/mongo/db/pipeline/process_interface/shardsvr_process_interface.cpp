@@ -190,7 +190,7 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     auto response =
         executeCommandAgainstDatabasePrimary(opCtx,
                                              // internalRenameIfOptionsAndIndexesMatch is adminOnly.
-                                             NamespaceString::kAdminDb,
+                                             DatabaseName::kAdmin.db(),
                                              std::move(cachedDbInfo),
                                              newCmdObj,
                                              ReadPreferenceSetting(ReadPreference::PrimaryOnly),

@@ -43,7 +43,7 @@ namespace mongo {
 
 using std::string;
 
-const NamespaceString TagsType::ConfigNS("config.tags");
+const NamespaceString TagsType::ConfigNS(NamespaceString::kConfigsvrTagsNamespace);
 
 const BSONField<std::string> TagsType::ns("ns");
 const BSONField<std::string> TagsType::tag("tag");

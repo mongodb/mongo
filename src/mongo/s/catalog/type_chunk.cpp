@@ -43,7 +43,7 @@
 
 namespace mongo {
 
-const NamespaceString ChunkType::ConfigNS("config.chunks");
+const NamespaceString ChunkType::ConfigNS(NamespaceString::kConfigsvrChunksNamespace);
 
 // The final namespace of the cached chunks metadata is composed of the namespace of the related
 // sharded collection (i.e., config.cache.chunks.<ns>). As a result, the maximum namespace length of

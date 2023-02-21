@@ -47,7 +47,7 @@ namespace add_shard_util {
 
 AddShard createAddShardCmd(OperationContext* opCtx, const ShardId& shardName) {
     AddShard addShardCmd;
-    addShardCmd.setDbName(NamespaceString::kAdminDb);
+    addShardCmd.setDbName(DatabaseName::kAdmin);
 
     ShardIdentity shardIdentity;
     shardIdentity.setShardName(shardName.toString());

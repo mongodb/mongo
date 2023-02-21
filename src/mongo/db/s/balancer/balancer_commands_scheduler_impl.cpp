@@ -52,13 +52,13 @@ MONGO_FAIL_POINT_DEFINE(deferredCleanupCompletedCheckpoint);
 void waitForQuiescedCluster(OperationContext* opCtx) {
     const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     ShardsvrJoinMigrations joinShardOnMigrationsRequest;
-    joinShardOnMigrationsRequest.setDbName(NamespaceString::kAdminDb);
+    joinShardOnMigrationsRequest.setDbName(DatabaseName::kAdmin);
 
     auto unquiescedShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
     const auto responses =
         sharding_util::sendCommandToShards(opCtx,
-                                           NamespaceString::kAdminDb.toString(),
+                                           DatabaseName::kAdmin.toString(),
                                            joinShardOnMigrationsRequest.toBSON({}),
                                            unquiescedShardIds,
                                            executor,

@@ -415,7 +415,7 @@ void ResourceConsumption::merge(OperationContext* opCtx,
     // inconsistent state is not impactful for the purposes of metrics collection, perform a
     // best-effort check so that we can record metrics for this operation.
     auto isPrimary = repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(
-        opCtx, NamespaceString::kAdminDb);
+        opCtx, DatabaseName::kAdmin.toString());
 
     AggregatedMetrics newMetrics;
     if (isPrimary) {

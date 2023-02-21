@@ -94,8 +94,6 @@ const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::Prim
 const int kMaxReadRetry = 3;
 const int kMaxWriteRetry = 3;
 
-const NamespaceString kSettingsNamespace("config", "settings");
-
 void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();
     response->setStatus(status);
@@ -415,13 +413,13 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
             NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
 
     // The admin database is always hosted on the config server.
-    if (dbName == NamespaceString::kAdminDb) {
+    if (dbName == DatabaseName::kAdmin.db()) {
         return DatabaseType(
             dbName.toString(), ShardId::kConfigServerId, DatabaseVersion::makeFixed());
     }
 
     // The config database's primary shard is always config, and it is always sharded.
-    if (dbName == NamespaceString::kConfigDb) {
+    if (dbName == DatabaseName::kConfig.db()) {
         return DatabaseType(
             dbName.toString(), ShardId::kConfigServerId, DatabaseVersion::makeFixed());
     }
@@ -467,7 +465,7 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchData
     const std::string& dbName,
     const ReadPreferenceSetting& readPref,
     repl::ReadConcernLevel readConcernLevel) {
-    invariant(dbName != NamespaceString::kAdminDb && dbName != NamespaceString::kConfigDb);
+    invariant(dbName != DatabaseName::kAdmin.db() && dbName != DatabaseName::kConfig.db());
 
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               readPref,
@@ -502,7 +500,7 @@ HistoricalPlacement ShardingCatalogClientImpl::_fetchPlacementMetadata(
     auto remoteResponse = uassertStatusOK(_getConfigShard(opCtx)->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        NamespaceString::kAdminDb.toString(),
+        DatabaseName::kAdmin.toString(),
         request.toBSON(BSONObj()),
         Shard::kDefaultConfigCommandTimeout,
         Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
@@ -596,7 +594,7 @@ StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContex
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               kConfigReadSelector,
                                               repl::ReadConcernLevel::kMajorityReadConcern,
-                                              kSettingsNamespace,
+                                              NamespaceString::kConfigSettingsNamespace,
                                               BSON("_id" << key),
                                               BSONObj(),
                                               1);
@@ -1056,7 +1054,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
                                                        const NamespaceString& nss,
                                                        const BSONObj& doc,
                                                        const WriteConcernOptions& writeConcern) {
-    invariant(nss.db() == NamespaceString::kAdminDb || nss.db() == NamespaceString::kConfigDb);
+    invariant(nss.dbName() == DatabaseName::kAdmin || nss.dbName() == DatabaseName::kConfig);
 
     const BSONElement idField = doc.getField("_id");
 
@@ -1157,7 +1155,7 @@ StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
     bool upsert,
     const WriteConcernOptions& writeConcern,
     Milliseconds maxTimeMs) {
-    invariant(nss.db() == NamespaceString::kConfigDb);
+    invariant(nss.dbName() == DatabaseName::kConfig);
 
     BatchedCommandRequest request([&] {
         write_ops::UpdateCommandRequest updateOp(nss);
@@ -1191,7 +1189,7 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
                                                         const BSONObj& query,
                                                         const WriteConcernOptions& writeConcern,
                                                         boost::optional<BSONObj> hint) {
-    invariant(nss.db() == NamespaceString::kConfigDb);
+    invariant(nss.db() == DatabaseName::kConfig.db());
 
     BatchedCommandRequest request([&] {
         write_ops::DeleteCommandRequest deleteOp(nss);

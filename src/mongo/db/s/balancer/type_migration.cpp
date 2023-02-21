@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-const NamespaceString MigrationType::ConfigNS("config.migrations");
+const NamespaceString MigrationType::ConfigNS(NamespaceString::kMigrationsNamespace);
 
 const BSONField<std::string> MigrationType::ns("ns");
 const BSONField<BSONObj> MigrationType::min("min");

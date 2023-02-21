@@ -148,7 +148,7 @@ protected:
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
         SetFeatureCompatibilityVersion fcvCmd(multiversion::GenericFCV::kLatest);
         fcvCmd.setFromConfigServer(true);
-        fcvCmd.setDbName(NamespaceString::kAdminDb);
+        fcvCmd.setDbName(DatabaseName::kAdmin);
         const auto setFcvObj = fcvCmd.toBSON(BSON("writeConcern" << writeConcern));
 
         onCommandForAddShard([&, target, response](const RemoteCommandRequest& request) {
@@ -201,7 +201,7 @@ protected:
         std::vector<std::string> dbnamesOnTarget;
         for (const auto& tenantId : tenantsOnTarget) {
             dbnamesOnTarget.push_back(
-                DatabaseName(tenantId, NamespaceString::kConfigDb).toStringWithTenantId());
+                DatabaseName(tenantId, DatabaseName::kConfig.db()).toStringWithTenantId());
         }
 
         if (gMultitenancySupport) {
@@ -231,7 +231,7 @@ protected:
             ASSERT_EQ(results.size(), 1);
             ASSERT_EQ(results[0]["_id"].String(), "testStrClusterParameter");
             ASSERT_EQ(results[0]["strData"].String(),
-                      DatabaseName(tenantId, NamespaceString::kConfigDb).toStringWithTenantId());
+                      DatabaseName(tenantId, DatabaseName::kConfig.db()).toStringWithTenantId());
         }
     }
 
@@ -239,7 +239,7 @@ protected:
         const HostAndPort& target, const std::vector<boost::optional<TenantId>>& tenantsOnTarget) {
         onCommandForAddShard([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, target);
-            ASSERT_EQ(request.dbname, NamespaceString::kAdminDb);
+            ASSERT_EQ(request.dbname, DatabaseName::kAdmin.db());
             ASSERT_EQ(request.cmdObj["listDatabasesForAllTenants"].Int(), 1);
             BSONArrayBuilder b;
             for (const auto& tenantId : tenantsOnTarget) {
@@ -286,7 +286,7 @@ protected:
             for (auto& param : params) {
                 SetClusterParameter setClusterParameterRequest(param);
                 setClusterParameterRequest.setDbName(
-                    DatabaseName(tenantId, NamespaceString::kAdminDb));
+                    DatabaseName(tenantId, DatabaseName::kAdmin.db()));
                 DBDirectClient client(operationContext());
                 ClusterParameterDBClientService dbService(client);
                 std::unique_ptr<ServerParameterService> parameterService =
@@ -376,7 +376,7 @@ protected:
             ShardingCatalogClient::kMajorityWriteConcern);
 
         const auto opMsgRequest =
-            OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, upsertCmdObj);
+            OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin.db(), upsertCmdObj);
         expectUpdatesReturnSuccess(expectedHost,
                                    NamespaceString(NamespaceString::kServerConfigurationNamespace),
                                    UpdateOp::parse(opMsgRequest));
@@ -392,7 +392,7 @@ protected:
             ShardingCatalogClient::kMajorityWriteConcern);
 
         const auto opMsgRequest =
-            OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, upsertCmdObj);
+            OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin.db(), upsertCmdObj);
         expectUpdatesReturnFailure(expectedHost,
                                    NamespaceString(NamespaceString::kServerConfigurationNamespace),
                                    UpdateOp::parse(opMsgRequest),

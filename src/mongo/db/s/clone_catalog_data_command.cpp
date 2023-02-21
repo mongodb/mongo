@@ -111,8 +111,8 @@ public:
 
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "Can't clone catalog data for " << dbname << " database",
-                dbname != NamespaceString::kAdminDb && dbname != NamespaceString::kConfigDb &&
-                    dbname != NamespaceString::kLocalDb);
+                dbname != DatabaseName::kAdmin.db() && dbname != DatabaseName::kConfig.db() &&
+                    dbname != DatabaseName::kLocal.db());
 
         auto from = cloneCatalogDataRequest.getFrom();
 
