@@ -171,37 +171,9 @@ SaslReply doSaslStep(OperationContext* opCtx,
         return mechanism.step(opCtx, payload.get());
     }();
 
-    auto makeLogAttributes = [&]() {
-        logv2::DynamicAttributes attrs;
-        attrs.add("mechanism", mechanism.mechanismName());
-        attrs.add("speculative", session->isSpeculative());
-        attrs.add("principalName", mechanism.getPrincipalName());
-        attrs.add("authenticationDatabase", mechanism.getAuthenticationDatabase());
-        attrs.addDeepCopy("remote", opCtx->getClient()->getRemote().toString());
-        {
-            auto bob = BSONObjBuilder();
-            mechanism.appendExtraInfo(&bob);
-            attrs.add("extraInfo", bob.obj());
-        }
-
-        return attrs;
-    };
-
     if (!swResponse.isOK()) {
-        int64_t dLevel = 0;
-        if (session->isSpeculative() &&
-            (swResponse.getStatus() == ErrorCodes::MechanismUnavailable)) {
-            dLevel = 5;
-        }
-
-        auto attrs = makeLogAttributes();
-        auto errorString = redact(swResponse.getStatus());
-        attrs.add("error", errorString);
-        LOGV2_DEBUG(20249, dLevel, "Authentication failed", attrs);
-
         sleepmillis(saslGlobalParams.authFailedDelay.load());
-        // All the client needs to know is that authentication has failed.
-        uassertStatusOK(AuthorizationManager::authenticationFailedStatus);
+        uassertStatusOK(swResponse);
     }
 
     if (mechanism.isSuccess()) {
@@ -209,11 +181,6 @@ SaslReply doSaslStep(OperationContext* opCtx,
         auto expirationTime = mechanism.getExpirationTime();
         uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
                             ->addAndAuthorizeUser(opCtx, request, expirationTime));
-
-        if (!serverGlobalParams.quiet.load()) {
-            auto attrs = makeLogAttributes();
-            LOGV2(20250, "Authentication succeeded", attrs);
-        }
 
         session->markSuccessful();
     }
@@ -275,18 +242,35 @@ SaslReply runSaslContinue(OperationContext* opCtx,
                           AuthenticationSession* session,
                           const SaslContinueCommand& request);
 
-SaslReply CmdSaslStart::Invocation::typedRun(OperationContext* opCtx) {
+SaslReply CmdSaslStart::Invocation::typedRun(OperationContext* opCtx) try {
     return AuthenticationSession::doStep(
         opCtx, AuthenticationSession::StepType::kSaslStart, [&](auto session) {
             return runSaslStart(opCtx, session, request());
         });
+} catch (const DBException& ex) {
+    switch (ex.code()) {
+        case ErrorCodes::MechanismUnavailable:
+        case ErrorCodes::ProtocolError:
+            throw;
+        default:
+            uasserted(AuthorizationManager::authenticationFailedStatus.code(),
+                      AuthorizationManager::authenticationFailedStatus.reason());
+    }
 }
 
-SaslReply CmdSaslContinue::Invocation::typedRun(OperationContext* opCtx) {
+
+SaslReply CmdSaslContinue::Invocation::typedRun(OperationContext* opCtx) try {
     return AuthenticationSession::doStep(
         opCtx, AuthenticationSession::StepType::kSaslContinue, [&](auto session) {
             return runSaslContinue(opCtx, session, request());
         });
+} catch (const DBException& ex) {
+    if (ex.code() == ErrorCodes::ProtocolError) {
+        throw;
+    }
+
+    uasserted(AuthorizationManager::authenticationFailedStatus.code(),
+              AuthorizationManager::authenticationFailedStatus.reason());
 }
 
 SaslReply runSaslContinue(OperationContext* opCtx,

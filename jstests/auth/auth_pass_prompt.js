@@ -22,7 +22,7 @@ if (!_isWindows()) {
 
     assert.soon(() => {
         const output = rawMongoProgramOutput();
-        return output.includes("Enter password:") && output.includes("Authentication succeeded");
+        return output.includes("Enter password:") && output.includes("Successfully authenticated");
     });
 
     MongoRunner.stopMongod(conn);

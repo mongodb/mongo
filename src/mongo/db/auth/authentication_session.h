@@ -236,7 +236,6 @@ public:
             }
             throw;
         } catch (...) {
-            // Swallow other errors.
             session->markFailed(
                 Status(ErrorCodes::InternalError, "Encountered an unhandleable error"));
             throw;

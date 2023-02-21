@@ -334,12 +334,21 @@ public:
             return NamespaceString(request().getDbName());
         }
 
-        Reply typedRun(OperationContext* opCtx) final {
+        Reply typedRun(OperationContext* opCtx) final try {
             return AuthenticationSession::doStep(
                 opCtx, AuthenticationSession::StepType::kAuthenticate, [&](auto session) {
                     CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
                     return authCommand(opCtx, session, request());
                 });
+        } catch (const DBException& ex) {
+            switch (ex.code()) {
+                case ErrorCodes::UserNotFound:
+                case ErrorCodes::ProtocolError:
+                    throw;
+                default:
+                    uasserted(AuthorizationManager::authenticationFailedStatus.code(),
+                              AuthorizationManager::authenticationFailedStatus.reason());
+            }
         }
     };
 

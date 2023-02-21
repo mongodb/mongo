@@ -357,16 +357,19 @@ void AuthenticationSession::markSuccessful() {
 void AuthenticationSession::markFailed(const Status& status) {
     _finish();
 
-    auto event = audit::AuthenticateEvent(_mechName,
-                                          _userName.getDB(),
-                                          _userName.getUser(),
-                                          makeAppender(_mech.get()),
-                                          status.code());
-    audit::logAuthentication(_client, event);
+    if (!_isSpeculative) {
+        auto event = audit::AuthenticateEvent(_mechName,
+                                              _userName.getDB(),
+                                              _userName.getUser(),
+                                              makeAppender(_mech.get()),
+                                              status.code());
+        audit::logAuthentication(_client, event);
+    }
 
     BSONObj metrics = _metricsRecorder.capture();
 
     if (gEnableDetailedConnectionHealthMetricLogLines) {
+
         LOGV2(5286307,
               "Failed to authenticate",
               "client"_attr = _client->getRemote(),
@@ -375,10 +378,9 @@ void AuthenticationSession::markFailed(const Status& status) {
               "mechanism"_attr = _mechName,
               "user"_attr = _userName.getUser(),
               "db"_attr = _userName.getDB(),
-              "error"_attr = status,
+              "error"_attr = redact(status),
               "result"_attr = status.code(),
               "metrics"_attr = metrics);
     }
 }
-
 }  // namespace mongo
