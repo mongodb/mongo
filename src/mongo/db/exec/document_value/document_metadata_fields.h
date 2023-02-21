@@ -67,6 +67,7 @@ public:
         kSearchScoreDetails,
         kTimeseriesBucketMinTime,
         kTimeseriesBucketMaxTime,
+        kSearchSortValues,
 
         // New fields must be added before the kNumFields sentinel.
         kNumFields
@@ -359,6 +360,24 @@ public:
         _holder->metaFields.set(MetaType::kTimeseriesBucketMaxTime);
         _holder->timeseriesBucketMaxTime = time;
     }
+
+    bool hasSearchSortValues() const {
+        return _holder && _holder->metaFields.test(MetaType::kSearchSortValues);
+    }
+
+    BSONObj getSearchSortValues() const {
+        tassert(7320401, "Document must have $searchSortValues set", hasSearchSortValues());
+        return _holder->searchSortValues;
+    }
+
+    void setSearchSortValues(BSONObj vals) {
+        if (!_holder) {
+            _holder = std::make_unique<MetadataHolder>();
+        }
+        _holder->metaFields.set(MetaType::kSearchSortValues);
+        _holder->searchSortValues = vals.getOwned();
+    }
+
     void serializeForSorter(BufBuilder& buf) const;
 
 private:
@@ -383,6 +402,7 @@ private:
         BSONObj searchScoreDetails;
         Date_t timeseriesBucketMinTime;
         Date_t timeseriesBucketMaxTime;
+        BSONObj searchSortValues;
     };
 
     // Null until the first setter is called, at which point a MetadataHolder struct is allocated.
