@@ -95,7 +95,9 @@ void renameGlobalIndexesMetadata(OperationContext* opCtx,
                                     "renameGlobalIndexesMetadata has index version older than "
                                     "current collection index version",
                                     "collectionIndexVersion"_attr = toIndexVersion,
-                                    "expectedIndexVersion"_attr = indexVersion);
+                                    "expectedIndexVersion"_attr = indexVersion,
+                                    "fromNss"_attr = redact(fromNss.toString()),
+                                    "toNss"_attr = redact(toNss.toString()));
                         return;
                     }
                     toUuid.emplace(collectionTo.getUuid());
@@ -195,7 +197,8 @@ void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
                                     "addGlobalIndexCatalogEntryToCollection has index version "
                                     "older than current collection index version",
                                     "collectionIndexVersion"_attr = *collection.getIndexVersion(),
-                                    "expectedIndexVersion"_attr = lastmod);
+                                    "expectedIndexVersion"_attr = lastmod,
+                                    "nss"_attr = redact(userCollectionNss.toString()));
                         return;
                     }
                 }
@@ -270,7 +273,8 @@ void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
                                     "removeGlobalIndexCatalogEntryFromCollection has index version "
                                     "older than current collection index version",
                                     "collectionIndexVersion"_attr = *collection.getIndexVersion(),
-                                    "expectedIndexVersion"_attr = lastmod);
+                                    "expectedIndexVersion"_attr = lastmod,
+                                    "nss"_attr = redact(nss.toString()));
                         return;
                     }
                 }
@@ -326,12 +330,30 @@ void replaceCollectionGlobalIndexes(OperationContext* opCtx,
                                         AutoGetCollection::Options{}.secondaryNssOrUUIDs(
                                             {NamespaceString::kShardIndexCatalogNamespace}));
             {
-                // Set final indexVersion
                 const auto query =
                     BSON(ShardAuthoritativeCollectionType::kNssFieldName
                          << nss.ns() << ShardAuthoritativeCollectionType::kUuidFieldName << uuid);
+                BSONObj collectionDoc;
+                bool docExists =
+                    Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc);
+                if (docExists) {
+                    auto collection = ShardAuthoritativeCollectionType::parse(
+                        IDLParserContext("ReplaceIndexCatalogEntry"), collectionDoc);
+                    if (collection.getIndexVersion() &&
+                        indexVersion <= *collection.getIndexVersion()) {
+                        LOGV2_DEBUG(6712304,
+                                    1,
+                                    "replaceCollectionGlobalIndexes has index version older than "
+                                    "current collection index version",
+                                    "collectionIndexVersion"_attr = *collection.getIndexVersion(),
+                                    "expectedIndexVersion"_attr = indexVersion,
+                                    "nss"_attr = redact(nss.toString()));
+                        return;
+                    }
+                }
 
-                // Update the document (or create it) with the new index version
+                // Set final indexVersion. Update the document (or create it) with the new index
+                // version
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 auto request = UpdateRequest();
                 request.setNamespaceString(NamespaceString::kShardCollectionCatalogNamespace);
