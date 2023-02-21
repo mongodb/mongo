@@ -121,7 +121,6 @@ var $config = (function() {
         startState: 'create',
         states: states,
         transitions: transitions,
-        data: {skipMovePrimary: false},
         setup: setup,
         teardown: teardown,
         passConnectionCache: true
