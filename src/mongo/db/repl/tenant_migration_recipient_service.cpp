@@ -3265,7 +3265,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             stdx::lock_guard lk(_mutex);
             invariant(_dataSyncCompletionPromise.getFuture().isReady());
 
-            if (status.code() == ErrorCodes::ConflictingServerlessOperation) {
+            if (status == ErrorCodes::ConflictingServerlessOperation) {
                 LOGV2(6531506,
                       "Migration failed as another serverless operation was in progress",
                       "migrationId"_attr = getMigrationUUID(),
@@ -3273,9 +3273,18 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                       "status"_attr = status);
                 setPromiseOkifNotReady(lk, _forgetMigrationDurablePromise);
                 return status;
-            } else if (!status.isOK()) {
-                // We should only hit here on a stepDown/shutDown, or a 'conflicting migration'
-                // error.
+            }
+
+            if (status == ErrorCodes::CallbackCanceled) {
+                // Replace the CallbackCanceled error with InterruptedDueToReplStateChange to
+                // support retry behavior. We can receive a CallbackCanceled error here during
+                // a failover if the ScopedTaskExecutor is shut down and rejects a task before
+                // the OperationContext is interrupted.
+                status = Status{ErrorCodes::InterruptedDueToReplStateChange,
+                                "operation was interrupted"};
+            }
+
+            if (!status.isOK()) {
                 LOGV2(4881402,
                       "Migration not marked to be garbage collectable",
                       "migrationId"_attr = getMigrationUUID(),
@@ -3283,6 +3292,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                       "status"_attr = status);
                 setPromiseErrorifNotReady(lk, _forgetMigrationDurablePromise, status);
             }
+
             _taskState.setState(TaskState::kDone);
 
             return Status::OK();
