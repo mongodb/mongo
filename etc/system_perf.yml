@@ -74,6 +74,7 @@ variables:
     - YCSB
     - py-tpcc
     - PrivateWorkloads
+    - flamegraph
 
 
 modules:
@@ -118,6 +119,10 @@ modules:
     repo: git@github.com:mongodb-labs/py-tpcc.git
     prefix: ${workdir}/src
     branch: production
+  - name: flamegraph
+    repo: git@github.com:mongodb-forks/flamegraph.git
+    prefix: ${workdir}/src
+    branch: master
 #  - name: mongo
 #    repo: git@github.com:mongodb/mongo.git
 #    prefix: ${workdir}/src
@@ -172,6 +177,7 @@ functions:
           mongo-perf: ${mongo-perf_rev}
           YCSB: ${YCSB_rev}
           py-tpcc: ${py-tpcc_rev}
+          flamegraph: ${flamegraph_rev}
           # mongo: ${mongo_rev}
           PrivateWorkloads: ${PrivateWorkloads_rev}
     - command: expansions.write
