@@ -1364,13 +1364,17 @@ primary.
 
 ### Conditional
 
-The `replSetStepDown` command is one way that a node relinquishes its position as primary. We
-consider this a conditional step down because it can fail if the following conditions are not met:
-* `force` is true and now > `waitUntil` deadline, which is the amount of time we will wait before
-stepping down (Note: If `force` is true, only this condition needs to be met)
-* The [`lastApplied`](#replication-timestamp-glossary) OpTime of the primary must be replicated to
-a majority of the nodes
-* At least one of the up-to-date secondaries is also electable
+The `replSetStepDown` command is one way that a node relinquishes its position as primary. Stepdown via the
+`replSetStepDown` command is called "conditional" because it may or may not succeed. Success in this case
+depends on the params passed to the command as well as the state of nodes of the replica set.
+* If the `force` option is set to `true`:
+  * In this case the primary node will wait for `secondaryCatchUpPeriodSecs`, a `replSetStepDown` parameter,
+  before stepping down regardless of whether the other nodes have caught up or are electable.
+* If the `force` option is omitted or set to `false`, the following conditions must be met for the command to
+succeed:
+  * The [`lastApplied`](#replication-timestamp-glossary) OpTime of the primary must be replicated to a majority
+  of the nodes
+  * At least one of the up-to-date secondaries must also be electable
 
 When a `replSetStepDown` command comes in, the node begins to check if it can step down. First, the
 node attempts to acquire the [RSTL](#replication-state-transition-lock). In order to do so, it must
@@ -1379,11 +1383,14 @@ kill all conflicting user/system operations and abort all unprepared transaction
 Now, the node loops trying to step down. If force is `false`, it repeatedly checks if a majority of
 nodes have reached the `lastApplied` optime, meaning that they are caught up. It must also check
 that at least one of those nodes is electable. If force is `true`, it does not wait for these
-conditions and steps down immediately after it reaches the `waitUntil` deadline.
+conditions and steps down immediately after it reaches the `secondaryCatchUpPeriodSecs` deadline.
 
 Upon a successful stepdown, it yields locks held by
 [prepared transactions](#stepdown-with-a-prepared-transaction) because we are now a secondary.
 Finally, we log stepdown metrics and update our member state to `SECONDARY`.
+* User-facing documentation is
+available [here](https://www.mongodb.com/docs/manual/reference/command/replSetStepDown/#command-fields).
+* [Code spelunking point](https://github.com/mongodb/mongo/blob/843762120897ed2dbfe8bbc69dbbf99b641c009c/src/mongo/db/repl/replication_coordinator_impl.cpp#L2737).
 
 ### Unconditional
 
