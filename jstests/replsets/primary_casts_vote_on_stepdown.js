@@ -12,7 +12,7 @@ let name = "primary_casts_vote_on_stepdown";
 let replTest = new ReplSetTest({name: name, nodes: 2});
 
 let nodes = replTest.startSet();
-replTest.initiate();
+replTest.initiateWithHighElectionTimeout();
 
 // Make sure node 0 is initially primary, and then step up node 1 and make sure it is able to
 // become primary in one election, gathering the vote of node 0, who will be forced to step
