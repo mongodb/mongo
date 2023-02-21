@@ -191,6 +191,7 @@
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
+#include "mongo/idl/cluster_server_parameter_initializer.h"
 #include "mongo/idl/cluster_server_parameter_op_observer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/process_id.h"
@@ -562,6 +563,14 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         exitCleanly(ExitCode::needDowngrade);
     }
 
+    // If we are on standalone, load cluster parameters from disk. If we are replicated, this is not
+    // a concern as the cluster parameter initializer runs automatically.
+    auto replCoord = repl::ReplicationCoordinator::get(startupOpCtx.get());
+    invariant(replCoord);
+    if (!replCoord->isReplEnabled()) {
+        ClusterServerParameterInitializer::synchronizeAllParametersFromDisk(startupOpCtx.get());
+    }
+
     // Ensure FCV document exists and is initialized in-memory. Fatally asserts if there is an
     // error.
     FeatureCompatibilityVersion::fassertInitializedAfterStartup(startupOpCtx.get());
@@ -712,8 +721,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                               << "startupRecoveryForRestore at the same time",
                 !repl::startupRecoveryForRestore);
 
-        auto replCoord = repl::ReplicationCoordinator::get(startupOpCtx.get());
-        invariant(replCoord);
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Cannot use queryableBackupMode in a replica set",
                 !replCoord->isReplEnabled());
@@ -729,9 +736,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         }
 
         startFreeMonitoring(serviceContext);
-
-        auto replCoord = repl::ReplicationCoordinator::get(startupOpCtx.get());
-        invariant(replCoord);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
             // Note: For replica sets, ShardingStateRecovery happens on transition to primary.
