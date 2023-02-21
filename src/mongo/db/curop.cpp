@@ -441,6 +441,7 @@ bool CurOp::completeAndLogOperation(logv2::LogComponent component,
     _debug.executionTime = duration_cast<Microseconds>(elapsedTimeExcludingPauses());
     const auto executionTimeMillis = durationCount<Milliseconds>(_debug.executionTime);
 
+    // TODO SERVER-73727 remove telemetry collection here once metrics are aggregated in cursor
     telemetry::collectTelemetry(opCtx, CurOp::get(opCtx)->debug());
 
     if (_debug.isReplOplogGetMore) {

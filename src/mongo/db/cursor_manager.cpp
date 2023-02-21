@@ -55,15 +55,6 @@
 
 namespace mongo {
 
-static CounterMetric cursorStatsLifespanLessThan1Second{"cursor.lifespan.lessThan1Second"};
-static CounterMetric cursorStatsLifespanLessThan5Seconds{"cursor.lifespan.lessThan5Seconds"};
-static CounterMetric cursorStatsLifespanLessThan15Seconds{"cursor.lifespan.lessThan15Seconds"};
-static CounterMetric cursorStatsLifespanLessThan30Seconds{"cursor.lifespan.lessThan30Seconds"};
-static CounterMetric cursorStatsLifespanLessThan1Minute{"cursor.lifespan.lessThan1Minute"};
-static CounterMetric cursorStatsLifespanLessThan10Minutes{"cursor.lifespan.lessThan10Minutes"};
-static CounterMetric cursorStatsLifespanGreaterThanOrEqual10Minutes{
-    "cursor.lifespan.greaterThanOrEqual10Minutes"};
-
 constexpr int CursorManager::kNumPartitions;
 
 namespace {
@@ -76,26 +67,6 @@ ServiceContext::ConstructorActionRegisterer cursorManagerRegisterer{
         auto cursorManager = std::make_unique<CursorManager>(svcCtx->getPreciseClockSource());
         CursorManager::set(svcCtx, std::move(cursorManager));
     }};
-
-void incrementCursorLifespanMetric(Date_t birth, Date_t death) {
-    auto elapsed = death - birth;
-
-    if (elapsed < Seconds(1)) {
-        cursorStatsLifespanLessThan1Second.increment();
-    } else if (elapsed < Seconds(5)) {
-        cursorStatsLifespanLessThan5Seconds.increment();
-    } else if (elapsed < Seconds(15)) {
-        cursorStatsLifespanLessThan15Seconds.increment();
-    } else if (elapsed < Seconds(30)) {
-        cursorStatsLifespanLessThan30Seconds.increment();
-    } else if (elapsed < Minutes(1)) {
-        cursorStatsLifespanLessThan1Minute.increment();
-    } else if (elapsed < Minutes(10)) {
-        cursorStatsLifespanLessThan10Minutes.increment();
-    } else {
-        cursorStatsLifespanGreaterThanOrEqual10Minutes.increment();
-    }
-}
 }  // namespace
 
 CursorManager* CursorManager::get(ServiceContext* svcCtx) {
@@ -141,7 +112,7 @@ CursorManager::~CursorManager() {
         for (auto&& cursor : *partition) {
             // Callers must ensure that no cursors are in use.
             invariant(!cursor.second->_operationUsingCursor);
-            cursor.second->dispose(nullptr);
+            cursor.second->dispose(nullptr, boost::none);
             delete cursor.second;
         }
     }
@@ -181,7 +152,7 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
               "Cursor timed out",
               "cursorId"_attr = cursor->cursorid(),
               "idleSince"_attr = cursor->getLastUseDate());
-        cursor->dispose(opCtx);
+        cursor->dispose(opCtx, boost::none);
     }
     return toDisposeWithoutMutex.size();
 }
@@ -418,26 +389,41 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
     return ClientCursorPin(opCtx, unownedCursor, this);
 }
 
-void CursorManager::deregisterCursor(ClientCursor* cursor) {
-    removeCursorFromMap(_cursorMap, cursor);
-    incrementCursorLifespanMetric(cursor->_createdDate, _preciseClockSource->now());
+// Note the following subleties of the implementations of deregisterAndDestroyCursor:
+// - We must make sure the cursor is unpinned (by clearing the '_operationUsingCursor' field) before
+//   destruction, since it is an error to delete a pinned cursor.
+// - In addition, we must deregister the cursor from the manager's map before clearing the
+//   '_operationUsingCursor' field, since it is an error to unpin a registered cursor without
+//   holidng the appropriate cursor manager mutex. By first deregistering the cursor, we ensure that
+//   no other thread can access '_cursor', meaning that it is safe for us to write to
+//   '_operationUsingCursor' without holding the CursorManager mutex.
+void CursorManager::deregisterAndDestroyCursor(
+    OperationContext* opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor) {
+    removeCursorFromMap(_cursorMap, cursor.get());
+    _destroyCursor(opCtx, std::move(cursor));
 }
 
 void CursorManager::deregisterAndDestroyCursor(
     Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>::OnePartition&& lk,
     OperationContext* opCtx,
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor) {
+    // Restrict the scope of the lock so we can destroy the cursor without holding any cursor
+    // manager mutexes.
     {
         auto lockWithRestrictedScope = std::move(lk);
         removeCursorFromMap(lockWithRestrictedScope, cursor.get());
     }
+    _destroyCursor(opCtx, std::move(cursor));
+}
 
-    incrementCursorLifespanMetric(cursor->_createdDate, _preciseClockSource->now());
+void CursorManager::_destroyCursor(OperationContext* opCtx,
+                                   std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor) {
     // Dispose of the cursor without holding any cursor manager mutexes. Disposal of a cursor can
     // require taking lock manager locks, which we want to avoid while holding a mutex. If we did
     // so, any caller of a CursorManager method which already held a lock manager lock could induce
     // a deadlock when trying to acquire a CursorManager lock.
-    cursor->dispose(opCtx);
+    cursor->dispose(opCtx, _preciseClockSource->now());
+    cursor->_operationUsingCursor = nullptr;
 }
 
 Status CursorManager::killCursor(OperationContext* opCtx, CursorId id) {

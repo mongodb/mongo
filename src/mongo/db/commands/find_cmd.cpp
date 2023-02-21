@@ -723,8 +723,10 @@ public:
                     CurOp::get(opCtx)->debug().storageStats =
                         opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
                 }
+                collectTelemetry(opCtx, pinnedCursor, false);
             } else {
                 endQueryOp(opCtx, collection, *exec, numResults, cursorId);
+                collectTelemetry(opCtx, boost::none, false);
             }
 
             // Generate the response object to send to the client.
@@ -736,8 +738,6 @@ public:
             metricsCollector.incrementDocUnitsReturned(nss.ns(), docUnitsReturned);
             query_request_helper::validateCursorResponse(result->getBodyBuilder().asTempObj(),
                                                          nss.tenantId());
-
-            telemetry::recordExecution(opCtx, _didDoFLERewrite);
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {
@@ -768,10 +768,6 @@ public:
         const OpMsgRequest _request;
         const DatabaseName _dbName;
 
-        // Since we remove encryptionInformation after rewriting a FLE2 query, this boolean keeps
-        // track of whether the input query did originally have enryption information.
-        bool _didDoFLERewrite = false;
-
         // Parses the command object to a FindCommandRequest. If the client request did not specify
         // any runtime constants, make them available to the query here.
         std::unique_ptr<FindCommandRequest> _parseCmdObjectToFindCommandRequest(
@@ -786,7 +782,9 @@ public:
                 invariant(findCommand->getNamespaceOrUUID().nss());
                 processFLEFindD(
                     opCtx, findCommand->getNamespaceOrUUID().nss().value(), findCommand.get());
-                _didDoFLERewrite = true;
+                // Set the telemetryStoreKey to none so telemetry isn't collected when we've done a
+                // FLE rewrite.
+                CurOp::get(opCtx)->debug().telemetryStoreKey = boost::none;
             }
 
             if (findCommand->getMirrored().value_or(false)) {

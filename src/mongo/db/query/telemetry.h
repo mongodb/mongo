@@ -64,7 +64,7 @@ ShardedTelemetryStoreKey telemetryKeyToShardedStoreId(const BSONObj& key, std::s
 /**
  * Get the telemetry query shape from the opCtx.
  */
-BSONObj getTelemetryKeyFromOpCtx(OperationContext* opCtx);
+boost::optional<BSONObj> getTelemetryKeyFromOpCtx(OperationContext* opCtx);
 
 /**
  * Given an object builder these functions append the telemetry key to it in the form
@@ -115,6 +115,7 @@ struct AggregatedMetric {
     uint64_t sumOfSquares = 0;
 };
 
+// Used to aggregate the metrics for one telemetry key over all its executions.
 class TelemetryMetrics {
 public:
     TelemetryMetrics() : firstSeenTimestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0) {}
@@ -218,13 +219,26 @@ void registerGetMoreRequest(OperationContext* opCtx);
 // Its purpose is to track the number of times a given query shape has been ran. The execution count
 // is incremented outside of registering the command because the originating command could be an
 // explain request and therefore the query is not actually executed.
+// TODO SERVER-73727 remove this function
 void recordExecution(OperationContext* opCtx, bool isFle);
 
 /**
- * Collect telemetry for the operation identified by `key`. The `isExec` flag should be set if it's
- * the beginning of execution (first batch) of results and not set for subsequent getMore() calls.
+ * Collect telemetry for the operation identified by the telemetryKey stored on
+ * opDebug.
+ * TODO SERVER-73727 remove this function
  */
 void collectTelemetry(OperationContext* opCtx, const OpDebug& opDebug);
 
+
+/**
+ * Writes telemetry to the telemetry store for the operation identified by `telemetryKey`.
+ */
+void writeTelemetry(OperationContext* opCtx,
+                    boost::optional<BSONObj> telemetryKey,
+                    uint64_t queryOptMicros,
+                    uint64_t queryExecMicros,
+                    uint64_t docsReturned,
+                    uint64_t docsScanned,
+                    uint64_t keysScanned);
 }  // namespace telemetry
 }  // namespace mongo

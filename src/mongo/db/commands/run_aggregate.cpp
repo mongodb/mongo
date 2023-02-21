@@ -751,8 +751,8 @@ Status runAggregate(OperationContext* opCtx,
         collections.clear();
     };
 
-    auto collectTelemetry = [&]() -> void {
-        // Collect telemetry. Exclude queries against collections with encrypted fields.
+    auto registerTelemetry = [&]() -> void {
+        // Register telemetry. Exclude queries against collections with encrypted fields.
         // We still collect telemetry on collection-less aggregations.
         if (!(ctx && ctx->getCollection() &&
               ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
@@ -764,10 +764,6 @@ Status runAggregate(OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto curOp = CurOp::get(opCtx);
     auto catalog = CollectionCatalog::get(opCtx);
-
-    // Since we remove encryptionInformation after rewriting a FLE2 query, this boolean keeps track
-    // of whether the input query did originally have encryption information.
-    bool didDoFLERewrite = false;
 
     {
         // If we are in a transaction, check whether the parsed pipeline supports being in
@@ -843,7 +839,7 @@ Status runAggregate(OperationContext* opCtx,
 
             // Obtain collection locks on the execution namespace; that is, the oplog.
             initContext(auto_get_collection::ViewMode::kViewsForbidden);
-            collectTelemetry();
+            registerTelemetry();
         } else if (nss.isCollectionlessAggregateNS() && pipelineInvolvedNamespaces.empty()) {
             uassert(4928901,
                     str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
@@ -863,11 +859,11 @@ Status runAggregate(OperationContext* opCtx,
             tassert(6235101,
                     "A collection-less aggregate should not take any locks",
                     ctx == boost::none);
-            collectTelemetry();
+            registerTelemetry();
         } else {
             // This is a regular aggregation. Lock the collection or view.
             initContext(auto_get_collection::ViewMode::kViewsPermitted);
-            collectTelemetry();
+            registerTelemetry();
             auto [collator, match] =
                 PipelineD::resolveCollator(opCtx,
                                            request.getCollation().get_value_or(BSONObj()),
@@ -1011,7 +1007,9 @@ Status runAggregate(OperationContext* opCtx,
             pipeline = processFLEPipelineD(
                 opCtx, nss, request.getEncryptionInformation().value(), std::move(pipeline));
             request.setEncryptionInformation(boost::none);
-            didDoFLERewrite = true;
+            // Set the telemetryStoreKey to none so telemetry isn't collected when we've done a FLE
+            // rewrite.
+            CurOp::get(opCtx)->debug().telemetryStoreKey = boost::none;
         }
 
         pipeline->optimizePipeline();
@@ -1150,7 +1148,8 @@ Status runAggregate(OperationContext* opCtx,
         curOp->debug().setPlanSummaryMetrics(stats);
         curOp->debug().nreturned = stats.nReturned;
 
-        telemetry::recordExecution(opCtx, didDoFLERewrite);
+        boost::optional<ClientCursorPin&> cursorForTelemetry = pins[0];
+        collectTelemetry(opCtx, keepCursor ? cursorForTelemetry : boost::none, false);
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.

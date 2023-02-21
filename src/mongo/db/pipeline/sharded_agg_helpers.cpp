@@ -745,8 +745,11 @@ void setTelemetryKeyOnAggRequest(AggregateCommandRequest& request, ExpressionCon
     if (!telemetry::isTelemetryEnabled()) {
         return;
     }
-    request.setHashedTelemetryKey(telemetry::telemetryKeyToShardedStoreId(
-        telemetry::getTelemetryKeyFromOpCtx(expCtx->opCtx), getHostNameCachedAndPort()));
+
+    if (auto telemetryKey = telemetry::getTelemetryKeyFromOpCtx(expCtx->opCtx)) {
+        request.setHashedTelemetryKey(
+            telemetry::telemetryKeyToShardedStoreId(*telemetryKey, getHostNameCachedAndPort()));
+    }
 }
 
 }  // namespace

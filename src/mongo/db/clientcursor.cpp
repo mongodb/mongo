@@ -48,6 +48,7 @@
 #include "mongo/db/cursor_server_params.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/telemetry.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/background.h"
@@ -65,6 +66,35 @@ static CounterMetric cursorStatsOpenNoTimeout{"cursor.open.noTimeout"};
 static CounterMetric cursorStatsTimedOut{"cursor.timedOut"};
 static CounterMetric cursorStatsTotalOpened{"cursor.totalOpened"};
 static CounterMetric cursorStatsMoreThanOneBatch{"cursor.moreThanOneBatch"};
+
+static CounterMetric cursorStatsLifespanLessThan1Second{"cursor.lifespan.lessThan1Second"};
+static CounterMetric cursorStatsLifespanLessThan5Seconds{"cursor.lifespan.lessThan5Seconds"};
+static CounterMetric cursorStatsLifespanLessThan15Seconds{"cursor.lifespan.lessThan15Seconds"};
+static CounterMetric cursorStatsLifespanLessThan30Seconds{"cursor.lifespan.lessThan30Seconds"};
+static CounterMetric cursorStatsLifespanLessThan1Minute{"cursor.lifespan.lessThan1Minute"};
+static CounterMetric cursorStatsLifespanLessThan10Minutes{"cursor.lifespan.lessThan10Minutes"};
+static CounterMetric cursorStatsLifespanGreaterThanOrEqual10Minutes{
+    "cursor.lifespan.greaterThanOrEqual10Minutes"};
+
+void incrementCursorLifespanMetric(Date_t birth, Date_t death) {
+    auto elapsed = death - birth;
+
+    if (elapsed < Seconds(1)) {
+        cursorStatsLifespanLessThan1Second.increment();
+    } else if (elapsed < Seconds(5)) {
+        cursorStatsLifespanLessThan5Seconds.increment();
+    } else if (elapsed < Seconds(15)) {
+        cursorStatsLifespanLessThan15Seconds.increment();
+    } else if (elapsed < Seconds(30)) {
+        cursorStatsLifespanLessThan30Seconds.increment();
+    } else if (elapsed < Minutes(1)) {
+        cursorStatsLifespanLessThan1Minute.increment();
+    } else if (elapsed < Minutes(10)) {
+        cursorStatsLifespanLessThan10Minutes.increment();
+    } else {
+        cursorStatsLifespanGreaterThanOrEqual10Minutes.increment();
+    }
+}
 
 const ClientCursor::Decoration<std::shared_ptr<ExternalDataSourceScopeGuard>>
     ExternalDataSourceScopeGuard::get =
@@ -119,19 +149,34 @@ ClientCursor::~ClientCursor() {
         // needs to keep data pinned.
         _stashedRecoveryUnit->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kAbort);
     }
+}
+
+void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now) {
+    if (_disposed) {
+        return;
+    }
+
+    if (_telemetryStoreKey && opCtx) {
+        telemetry::writeTelemetry(opCtx,
+                                  _telemetryStoreKey,
+                                  _queryOptMicros,
+                                  _queryExecMicros,
+                                  _docsReturned,
+                                  _metrics.docsExamined.value_or(0),
+                                  _metrics.keysExamined.value_or(0));
+    }
+
+    if (now) {
+        incrementCursorLifespanMetric(_createdDate, *now);
+    }
 
     cursorStatsOpen.decrement();
     if (isNoTimeout()) {
         cursorStatsOpenNoTimeout.decrement();
     }
 
-    if (_nBatchesReturned > 1)
+    if (_nBatchesReturned > 1) {
         cursorStatsMoreThanOneBatch.increment();
-}
-
-void ClientCursor::dispose(OperationContext* opCtx) {
-    if (_disposed) {
-        return;
     }
 
     _exec->dispose(opCtx);
@@ -264,24 +309,12 @@ void ClientCursorPin::deleteUnderlying() {
     invariant(_cursor);
     invariant(_cursor->_operationUsingCursor);
     invariant(_cursorManager);
-    // Note the following subtleties of this method's implementation:
-    // - We must unpin the cursor (by clearing the '_operationUsingCursor' field) before
-    //   destruction, since it is an error to delete a pinned cursor.
-    // - In addition, we must deregister the cursor before clearing the '_operationUsingCursor'
-    //   field, since it is an error to unpin a registered cursor without holding the appropriate
-    //   cursor manager mutex. By first deregistering the cursor, we ensure that no other thread can
-    //   access '_cursor', meaning that it is safe for us to write to '_operationUsingCursor'
-    //   without holding the CursorManager mutex.
 
-    _cursorManager->deregisterCursor(_cursor);
-
-    // Make sure the cursor is disposed and unpinned before being destroyed.
-    _cursor->dispose(_opCtx);
-    _cursor->_operationUsingCursor = nullptr;
-    delete _cursor;
+    std::unique_ptr<ClientCursor, ClientCursor::Deleter> ownedCursor(_cursor);
+    _cursor = nullptr;
+    _cursorManager->deregisterAndDestroyCursor(_opCtx, std::move(ownedCursor));
 
     cursorStatsOpenPinned.decrement();
-    _cursor = nullptr;
     _shouldSaveRecoveryUnit = false;
 }
 
@@ -351,6 +384,46 @@ void _appendCursorStats(BSONObjBuilder& b) {
 
 void startClientCursorMonitor() {
     getClientCursorMonitor(getGlobalServiceContext()).go();
+}
+
+void collectTelemetry(OperationContext* opCtx,
+                      boost::optional<ClientCursorPin&> pinnedCursor,
+                      bool isGetMoreOp) {
+    auto&& opDebug = CurOp::get(opCtx)->debug();
+    if (pinnedCursor) {
+        auto cursor = pinnedCursor->getCursor();
+        // TODO SERVER-73727 setting shouldRecordTelemetry to boost::none is only
+        // temporarily necessary to avoid collecting metrics a second time in
+        // CurOp::completeAndLogOperation
+        opDebug.telemetryStoreKey = boost::none;
+
+        // We have to use `elapsedTimeExcludingPauses` to count execution time since
+        // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
+        cursor->incCursorMetrics(opDebug.additiveMetrics,
+                                 CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
+                                 opDebug.nreturned);
+
+        // If the current operation is a getMore, planning time was already aggregated on the
+        // initial operation.
+        if (!isGetMoreOp) {
+            cursor->setQueryOptMicros(opDebug.planningTime.count());
+        }
+    } else {
+        tassert(7301701, "getMore operations should aggregate metrics on the cursor", !isGetMoreOp);
+        auto&& opDebug = CurOp::get(opCtx)->debug();
+        // If we haven't registered a cursor to prepare for getMore requests, we record
+        // telemetry directly.
+        //
+        // We have to use `elapsedTimeExcludingPauses` to count execution time since
+        // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
+        telemetry::writeTelemetry(opCtx,
+                                  opDebug.telemetryStoreKey,
+                                  opDebug.planningTime.count(),
+                                  CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
+                                  opDebug.nreturned,
+                                  opDebug.additiveMetrics.docsExamined.value_or(0),
+                                  opDebug.additiveMetrics.keysExamined.value_or(0));
+    }
 }
 
 }  // namespace mongo

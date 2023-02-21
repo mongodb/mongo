@@ -75,7 +75,7 @@ ShardedTelemetryStoreKey telemetryKeyToShardedStoreId(const BSONObj& key, std::s
     return ShardedTelemetryStoreKey(hostAndPort, md5Bin);
 }
 
-BSONObj getTelemetryKeyFromOpCtx(OperationContext* opCtx) {
+boost::optional<BSONObj> getTelemetryKeyFromOpCtx(OperationContext* opCtx) {
     return CurOp::get(opCtx)->debug().telemetryStoreKey;
 }
 
@@ -85,13 +85,11 @@ void appendShardedTelemetryKeyIfApplicable(MutableDocument& objToModify,
     if (!isTelemetryEnabled()) {
         return;
     }
-    auto telemetryKey = getTelemetryKeyFromOpCtx(opCtx);
-    if (telemetryKey.isEmpty()) {
-        return;
+    if (auto telemetryKey = getTelemetryKeyFromOpCtx(opCtx)) {
+        objToModify.addField(
+            kTelemetryKeyInShardedCommand,
+            Value(telemetryKeyToShardedStoreId(*telemetryKey, hostAndPort).toBSON()));
     }
-    objToModify.addField(
-        kTelemetryKeyInShardedCommand,
-        Value(telemetryKeyToShardedStoreId(getTelemetryKeyFromOpCtx(opCtx), hostAndPort).toBSON()));
 }
 
 void appendShardedTelemetryKeyIfApplicable(BSONObjBuilder& objToModify,
@@ -101,11 +99,11 @@ void appendShardedTelemetryKeyIfApplicable(BSONObjBuilder& objToModify,
         return;
     }
     auto telemetryKey = getTelemetryKeyFromOpCtx(opCtx);
-    if (telemetryKey.isEmpty()) {
+    if (!telemetryKey) {
         return;
     }
     objToModify.append(kTelemetryKeyInShardedCommand,
-                       telemetryKeyToShardedStoreId(telemetryKey, hostAndPort).toBSON());
+                       telemetryKeyToShardedStoreId(*telemetryKey, hostAndPort).toBSON());
 }
 
 
@@ -441,7 +439,6 @@ const BSONObj& TelemetryMetrics::redactKey(const BSONObj& key, bool redactFieldN
 // Once query execution is complete, the telemetry context is grabbed from OpDebug, a telemetry key
 // is generated from this and metrics are paired to this key in the telemetry store.
 void registerAggRequest(const AggregateCommandRequest& request, OperationContext* opCtx) {
-
     if (!isTelemetryEnabled()) {
         return;
     }
@@ -457,7 +454,6 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
     if (auto hashKey = request.getHashedTelemetryKey()) {
         // The key is in the command request in "telemetryKey".
         CurOp::get(opCtx)->debug().telemetryStoreKey = hashKey->toBSON();
-        CurOp::get(opCtx)->debug().shouldRecordTelemetry = true;
         return;
     }
 
@@ -482,8 +478,6 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
     }
 
     CurOp::get(opCtx)->debug().telemetryStoreKey = telemetryKey.obj();
-    // Mark this request as one that telemetry machinery has decided to collect metrics from.
-    CurOp::get(opCtx)->debug().shouldRecordTelemetry = true;
 }
 
 void registerFindRequest(const FindCommandRequest& request,
@@ -505,7 +499,6 @@ void registerFindRequest(const FindCommandRequest& request,
     if (auto hashKey = request.getHashedTelemetryKey()) {
         // The key is in the command request in "hashedTelemetryKey".
         CurOp::get(opCtx)->debug().telemetryStoreKey = hashKey->toBSON();
-        CurOp::get(opCtx)->debug().shouldRecordTelemetry = true;
         return;
     }
 
@@ -529,9 +522,10 @@ void registerFindRequest(const FindCommandRequest& request,
         return;
     }
     CurOp::get(opCtx)->debug().telemetryStoreKey = telemetryKey.obj();
-    CurOp::get(opCtx)->debug().shouldRecordTelemetry = true;
 }
 
+// TODO SERVER-73727 registerGetMoreRequest should be removed once metrics are aggregated on cursors
+// across getMores on mongos
 void registerGetMoreRequest(OperationContext* opCtx) {
     if (!isTelemetryEnabled()) {
         return;
@@ -545,7 +539,6 @@ void registerGetMoreRequest(OperationContext* opCtx) {
     if (!shouldCollect(opCtx->getServiceContext())) {
         return;
     }
-    CurOp::get(opCtx)->debug().shouldRecordTelemetry = true;
 }
 
 TelemetryStore& getTelemetryStore(OperationContext* opCtx) {
@@ -554,7 +547,6 @@ TelemetryStore& getTelemetryStore(OperationContext* opCtx) {
 }
 
 void recordExecution(OperationContext* opCtx, bool isFle) {
-
     if (!isTelemetryEnabled()) {
         return;
     }
@@ -564,10 +556,10 @@ void recordExecution(OperationContext* opCtx, bool isFle) {
     // Confirms that this is an operation the telemetry machinery has decided to collect metrics
     // from.
     auto&& opDebug = CurOp::get(opCtx)->debug();
-    if (!opDebug.shouldRecordTelemetry) {
+    if (!opDebug.telemetryStoreKey) {
         return;
     }
-    auto&& metrics = LockedMetrics::get(opCtx, opDebug.telemetryStoreKey);
+    auto&& metrics = LockedMetrics::get(opCtx, *opDebug.telemetryStoreKey);
     metrics->execCount++;
     metrics->queryOptMicros.aggregate(opDebug.planningTime.count());
 }
@@ -575,16 +567,37 @@ void recordExecution(OperationContext* opCtx, bool isFle) {
 void collectTelemetry(OperationContext* opCtx, const OpDebug& opDebug) {
     // Confirms that this is an operation the telemetry machinery has decided to collect metrics
     // from.
-    if (!opDebug.shouldRecordTelemetry) {
+    if (!opDebug.telemetryStoreKey) {
         return;
     }
 
-    auto&& metrics = LockedMetrics::get(opCtx, opDebug.telemetryStoreKey);
+    auto&& metrics = LockedMetrics::get(opCtx, *opDebug.telemetryStoreKey);
     metrics->docsReturned.aggregate(opDebug.nreturned);
     metrics->docsScanned.aggregate(opDebug.additiveMetrics.docsExamined.value_or(0));
     metrics->keysScanned.aggregate(opDebug.additiveMetrics.keysExamined.value_or(0));
     metrics->lastExecutionMicros = opDebug.executionTime.count();
     metrics->queryExecMicros.aggregate(opDebug.executionTime.count());
+}
+
+void writeTelemetry(OperationContext* opCtx,
+                    boost::optional<BSONObj> telemetryKey,
+                    const uint64_t queryOptMicros,
+                    const uint64_t queryExecMicros,
+                    const uint64_t docsReturned,
+                    const uint64_t docsScanned,
+                    const uint64_t keysScanned) {
+    if (!telemetryKey) {
+        return;
+    }
+    auto&& metrics = LockedMetrics::get(opCtx, *telemetryKey);
+
+    metrics->lastExecutionMicros = queryExecMicros;
+    metrics->execCount++;
+    metrics->queryOptMicros.aggregate(queryOptMicros);
+    metrics->queryExecMicros.aggregate(queryExecMicros);
+    metrics->docsReturned.aggregate(docsReturned);
+    metrics->docsScanned.aggregate(docsScanned);
+    metrics->keysScanned.aggregate(keysScanned);
 }
 }  // namespace telemetry
 }  // namespace mongo

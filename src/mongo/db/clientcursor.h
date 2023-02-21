@@ -37,6 +37,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_executor.h"
@@ -214,6 +215,19 @@ public:
         _nReturnedSoFar = n;
     }
 
+    void setQueryOptMicros(uint64_t queryOptMicros) {
+        tassert(7301700, "queryOptMicros should only be set once per cursor", _queryOptMicros == 0);
+        _queryOptMicros = queryOptMicros;
+    }
+
+    void incCursorMetrics(OpDebug::AdditiveMetrics newMetrics,
+                          uint64_t newExecutionTime,
+                          uint64_t newDocsReturned) {
+        _metrics.add(newMetrics);
+        _queryExecMicros += newExecutionTime;
+        _docsReturned += newDocsReturned;
+    }
+
     /**
      * Returns the number of batches returned by this cursor so far.
      */
@@ -351,9 +365,10 @@ private:
     /**
      * Disposes this ClientCursor's PlanExecutor. Must be called before deleting a ClientCursor to
      * ensure it has a chance to clean up any resources it is using. Can be called multiple times.
-     * It is an error to call any other method after calling dispose().
+     * It is an error to call any other method after calling dispose(). If 'now' is specified,
+     * will track cursor lifespan metrics.
      */
-    void dispose(OperationContext* opCtx);
+    void dispose(OperationContext* opCtx, boost::optional<Date_t> now);
 
     bool isNoTimeout() const {
         return _isNoTimeout;
@@ -447,8 +462,16 @@ private:
     // requests.
     boost::optional<uint32_t> _planCacheKey;
     boost::optional<uint32_t> _queryHash;
+
     // The shape of the original query serialized with readConcern, application name, and namespace.
-    BSONObj _telemetryStoreKey;
+    // If boost::none, telemetry should not be collected for this cursor.
+    boost::optional<BSONObj> _telemetryStoreKey;
+    // Metrics used for telemetry. TODO SERVER-73933 consider merging more into '_metrics'
+    uint64_t _queryOptMicros = 0;
+    uint64_t _queryExecMicros = 0;
+    uint64_t _docsReturned = 0;
+    OpDebug::AdditiveMetrics _metrics;
+
     // The client OperationKey associated with this cursor.
     boost::optional<OperationKey> _opKey;
 
@@ -574,5 +597,15 @@ private:
 };
 
 void startClientCursorMonitor();
+
+
+/**
+ * Aggregates telemetry for the current operation via metrics stored on opDebug. If a cursor pin is
+ * provided, metrics are aggregated on the cursor; otherwise, metrics are written directly to the
+ * telemetry store.
+ */
+void collectTelemetry(OperationContext* opCtx,
+                      boost::optional<ClientCursorPin&> cursor,
+                      bool isGetMoreOp);
 
 }  // namespace mongo
