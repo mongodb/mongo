@@ -25,10 +25,6 @@ var waitForPrimary = function(conn) {
  * initial write to the admin.system.version collection is fully flushed out of the oplog before
  * restarting.  That allows our standalone corrupting update to see the write (and cause us to
  * fail on startup).
- *
- * TODO: Remove awaitVersionUpdate after SERVER-41005, where we figure out how to wait until
- *       after replication is started before reading our shard identity from
- *       admin.system.version
  */
 var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
     var shardIdentityDoc = {
