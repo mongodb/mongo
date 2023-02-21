@@ -226,29 +226,6 @@ bool shouldDoFLERewrite(const T& cmd) {
 }
 
 /**
- * Basic set of functions to read/query data from state collections to perform EmuBinary.
- */
-class FLETagQueryInterface {
-public:
-    virtual ~FLETagQueryInterface();
-
-    /**
-     * Retrieve a single document by _id == BSONElement from nss.
-     *
-     * Returns an empty BSONObj if no document is found.
-     * Expected to throw an error if it detects more then one documents.
-     */
-    virtual BSONObj getById(const NamespaceString& nss, BSONElement element) = 0;
-
-    /**
-     * Count the documents in the collection.
-     *
-     * Throws if the collection is not found.
-     */
-    virtual uint64_t countDocuments(const NamespaceString& nss) = 0;
-};
-
-/**
  * Abstraction layer for FLE
  */
 class FLEQueryInterface : public FLETagQueryInterface {

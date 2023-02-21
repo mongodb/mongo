@@ -2495,6 +2495,8 @@ StatusWith<std::vector<uint8_t>> EncryptedStateCollectionTokensV2::serialize(ECO
 
 FLEKeyVault::~FLEKeyVault() {}
 
+FLETagQueryInterface::~FLETagQueryInterface() {}
+
 BSONObj FLEClientCrypto::transformPlaceholders(const BSONObj& obj, FLEKeyVault* keyVault) {
     return transformPlaceholders(obj, keyVault, [](const FLE2EncryptionPlaceholder& ep) {
         // Generate a number between [1,maxContentionFactor]

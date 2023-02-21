@@ -996,8 +996,6 @@ processFindAndModifyRequest<write_ops::FindAndModifyCommandRequest>(
     GetTxnCallback getTxns,
     ProcessFindAndModifyCallback<write_ops::FindAndModifyCommandRequest> processCallback);
 
-FLETagQueryInterface::~FLETagQueryInterface() {}
-
 StatusWith<write_ops::InsertCommandReply> processInsert(
     FLEQueryInterface* queryImpl,
     const NamespaceString& edcNss,
