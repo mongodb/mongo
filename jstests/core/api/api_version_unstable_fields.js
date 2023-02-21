@@ -5,6 +5,7 @@
  *   uses_api_parameters,
  *   # 'explain' does not support stepdowns.
  *   does_not_support_stepdowns,
+ *   requires_fcv_70
  * ]
  */
 
@@ -38,10 +39,10 @@ const unstableFieldsForFind = {
 };
 
 // Test that command with unstable fields and 'apiStrict: true' throws.
-function testCommandWithUnstableFields(command, unstableFields) {
-    for (let field in unstableFields) {
+function testCommandWithUnstableFields(command, containsUnstableFields) {
+    for (let field in containsUnstableFields) {
         const cmd = JSON.parse(JSON.stringify(command));
-        const cmdWithUnstableField = Object.assign(cmd, {[field]: unstableFields[field]});
+        const cmdWithUnstableField = Object.assign(cmd, {[field]: containsUnstableFields[field]});
 
         assert.commandFailedWithCode(
             db.runCommand(cmdWithUnstableField), ErrorCodes.APIStrictError, cmdWithUnstableField);
@@ -77,4 +78,11 @@ assert.commandFailedWithCode(
 createIndexesCmd["indexes"] = [{key: {a: "geoHaystack"}, name: "a_1"}];
 assert.commandFailedWithCode(
     db.runCommand(createIndexesCmd), ErrorCodes.CannotCreateIndex, createIndexesCmd);
+
+// Test that collMod command with an unstable field ('prepareUnique') in an inner struct throws when
+// 'apiStrict' is set to true.
+assert.commandWorked(
+    db.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
+let collModCommand = {collMod: "col", apiVersion: "1", apiStrict: true};
+testCommandWithUnstableFields(collModCommand, {index: {name: "a_1", prepareUnique: true}});
 }());

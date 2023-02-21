@@ -255,7 +255,10 @@ public:
     IDLParserContext(StringData fieldName,
                      const IDLParserContext* predecessor,
                      boost::optional<TenantId> tenantId)
-        : _currentField(fieldName), _tenantId(tenantId), _predecessor(predecessor) {
+        : _currentField(fieldName),
+          _apiStrict(predecessor->_apiStrict),
+          _tenantId(tenantId),
+          _predecessor(predecessor) {
         assertTenantIdMatchesPredecessor(predecessor);
     }
 
