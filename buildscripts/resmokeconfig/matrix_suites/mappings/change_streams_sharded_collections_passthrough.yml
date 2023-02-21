@@ -1,0 +1,12 @@
+- suite_name: change_streams_sharded_collections_passthrough
+  base_suite: change_streams
+  overrides:
+    - "change_streams.mongos_passthrough"
+    - "change_streams.sharded_collections_passthrough"
+    - "change_streams.base_eval"
+  eval:
+    - "change_streams.sharded_collections_passthrough_eval"
+    - "change_streams.causal_consistency"
+  excludes:
+    - "change_streams.mongos_passthrough_excludes"
+    - "change_streams.sharded_collections_passthrough_excludes"

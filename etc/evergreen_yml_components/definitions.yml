@@ -4820,26 +4820,8 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
-  name: change_streams_mongos_passthrough
-  tags: ["change_streams", "no_debug_mode"]
-  depends_on:
-  - name: change_streams
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_secondary_reads
+  name: change_streams_secondary_reads_sharded_collections
   tags: ["change_streams", "secondary_reads"]
-  depends_on:
-  - name: change_streams
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_sharded_collections_passthrough
-  tags: ["change_streams"]
   depends_on:
   - name: change_streams
   commands:
@@ -4890,28 +4872,10 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
-  name: change_streams_whole_db_mongos_passthrough
-  tags: ["change_streams", "no_debug_mode"]
-  depends_on:
-  - name: change_streams_mongos_passthrough
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_whole_db_secondary_reads_passthrough
+  name: change_streams_whole_db_secondary_reads_sharded_collections
   tags: ["change_streams", "secondary_reads"]
   depends_on:
-  - name: change_streams_secondary_reads
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_whole_db_sharded_collections_passthrough
-  tags: ["change_streams"]
-  depends_on:
-  - name: change_streams_sharded_collections_passthrough
+  - name: change_streams_secondary_reads_sharded_collections
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -4926,28 +4890,10 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
-  name: change_streams_whole_cluster_mongos_passthrough
-  tags: ["change_streams", "no_debug_mode"]
-  depends_on:
-  - name: change_streams_mongos_passthrough
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_whole_cluster_secondary_reads_passthrough
+  name: change_streams_whole_cluster_secondary_reads_sharded_collections
   tags: ["change_streams", "secondary_reads"]
   depends_on:
-  - name: change_streams_secondary_reads
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_whole_cluster_sharded_collections_passthrough
-  tags: ["change_streams"]
-  depends_on:
-  - name: change_streams_sharded_collections_passthrough
+  - name: change_streams_secondary_reads_sharded_collections
   commands:
   - func: "do setup"
   - func: "run tests"

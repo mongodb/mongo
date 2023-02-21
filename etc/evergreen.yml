@@ -318,7 +318,7 @@ buildvariants:
   - name: .auth !.audit !.multiversion
   - name: sharding_auth_gen
   - name: .causally_consistent !.wo_snapshot
-  - name: .change_streams !.secondary_reads
+  - name: .change_streams
   - name: .clustered_collections
   - name: .misc_js
   - name: disk_wiredtiger
@@ -809,7 +809,7 @@ buildvariants:
   - name: aggregation_expression_optimization_fuzzer_gen
   - name: auth_gen
   - name: .causally_consistent !.sharding
-  - name: .change_streams !.secondary_reads
+  - name: .change_streams
   - name: .misc_js !.non_win_dbg
   - name: .concurrency .debug_only
     distros:

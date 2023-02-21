@@ -2615,7 +2615,7 @@ buildvariants:
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
   - name: .causally_consistent !.sharding
-  - name: .change_streams !.secondary_reads
+  - name: .change_streams
   - name: .misc_js
   - name: .concurrency !.ubsan !.no_txns !.debug_only !.kill_terminate
   - name: disk_wiredtiger
@@ -2669,7 +2669,7 @@ buildvariants:
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
   - name: .causally_consistent !.sharding
-  - name: .change_streams !.secondary_reads
+  - name: .change_streams
   - name: .misc_js
   - name: .concurrency !.ubsan !.no_txns !.debug_only !.kill_terminate
   - name: disk_wiredtiger

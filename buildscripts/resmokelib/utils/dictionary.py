@@ -9,7 +9,8 @@ def merge_dicts(dict1, dict2):
 
     for k in dict2.keys():
         if dict2[k] is None:
-            dict1.pop(k)
+            if k in dict1:
+                dict1.pop(k)
         elif k in dict1:
             dict1[k] = merge_dicts(dict1[k], dict2[k])
         else:

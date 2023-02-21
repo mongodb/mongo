@@ -34,7 +34,7 @@ buildvariants:
   - name: audit
   - name: .auth !.multiversion
   - name: .causally_consistent !.wo_snapshot !.durable_history
-  - name: .change_streams !.secondary_reads
+  - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
   - name: .concurrency !.ubsan !.no_txns !.debug_only !.kill_terminate !.requires_wt
