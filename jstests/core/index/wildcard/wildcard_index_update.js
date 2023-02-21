@@ -1,5 +1,9 @@
 /**
  * Tests that a wildcard index is correctly maintained when document is updated.
+ *
+ * @tags: [
+ *  requires_fcv_63
+ * ]
  */
 
 (function() {
