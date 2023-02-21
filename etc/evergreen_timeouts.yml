@@ -12,10 +12,14 @@
 overrides:
 
   enterprise-macos:
+  - task: concurrency
+    idle_timeout: 15
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
 
   enterprise-macos-arm64:
+  - task: concurrency
+    idle_timeout: 15
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
 
@@ -24,10 +28,14 @@ overrides:
     exec_timeout: 150  # 2.5 hours.
 
   macos:
+  - task: concurrency
+    idle_timeout: 15
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
 
   macos-arm64:
+  - task: concurrency
+    idle_timeout: 15
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
 
