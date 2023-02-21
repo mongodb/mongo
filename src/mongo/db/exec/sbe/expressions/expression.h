@@ -71,9 +71,7 @@ public:
     /**
      * Returns bytecode directly executable by VM.
      */
-    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const {
-        return std::make_unique<vm::CodeFragment>(compileDirect(ctx));
-    }
+    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const;
 
     virtual vm::CodeFragment compileDirect(CompileCtx& ctx) const = 0;
 

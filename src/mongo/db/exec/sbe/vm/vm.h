@@ -38,6 +38,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
+#include "mongo/db/exec/sbe/vm/label.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 
@@ -884,11 +885,11 @@ public:
     void appendIsTimestamp(Instruction::Parameter input);
     void appendTypeMatch(Instruction::Parameter input, uint32_t mask);
     void appendFunction(Builtin f, ArityType arity);
-    void appendJump(int jumpOffset);
-    void appendJumpTrue(int jumpOffset);
-    void appendJumpFalse(int jumpOffset);
-    void appendJumpNothing(int jumpOffset);
-    void appendJumpNotNothing(int jumpOffset);
+    void appendLabelJump(LabelId labelId);
+    void appendLabelJumpTrue(LabelId labelId);
+    void appendLabelJumpFalse(LabelId labelId);
+    void appendLabelJumpNothing(LabelId labelId);
+    void appendLabelJumpNotNothing(LabelId labelId);
     void appendRet();
     void appendAllocStack(uint32_t size);
     void appendFail();
@@ -907,22 +908,31 @@ public:
     // offset.
     void declareFrame(FrameId frameId, int stackOffset);
 
-    // Removes the frame from scope. The frame must exist and must have no outstanding fixups.
-    // That is: have been declared or have never been referenced.
+    // Removes the frame from scope. The frame must have no outstanding fixups.
+    // That is: must be declared or never referenced.
     void removeFrame(FrameId frameId);
 
     // Returns whether the are any frames currently in scope.
     bool hasFrames() const;
+
+    // Associates the current code position with a label.
+    void appendLabel(LabelId labelId);
+
+    // Removes the label from scope. The label must have no outstanding fixups.
+    // That is: must be associated with code position or never referenced.
+    void removeLabel(LabelId labelId);
+
+    void validate();
 
 private:
     // Adjusts all the stack offsets in the outstanding fixups by the provided delta.
     void fixupStackOffsets(int stackOffsetDelta);
 
     // Stores the fixup information for stack frames.
-    // stackPosition - stack depth of where the frame was declared, or kPositionNotSet if not known
-    // yet.
-    // fixupOffsets - offsets in the code where the stack depth of the frame was used and need
-    // fixup.
+    // stackPosition - stack depth of where the frame was declared, or kPositionNotSet if not
+    // known yet.
+    // fixupOffsets - offsets in the code where the stack depth of the frame was used.
+    // and need fixup.
     struct FrameInfo {
         static constexpr int64_t kPositionNotSet = std::numeric_limits<int64_t>::min();
 
@@ -930,8 +940,19 @@ private:
         int64_t stackPosition{kPositionNotSet};
     };
 
+    // Stores the fixup information for labels.
+    // fixupOffsets - offsets in the code where the label was used and need fixup.
+    // definitionOffset - offset in the code where label was defined.
+    struct LabelInfo {
+        static constexpr int64_t kOffsetNotSet = std::numeric_limits<int64_t>::min();
+        absl::InlinedVector<size_t, 2> fixupOffsets;
+        int64_t definitionOffset{kOffsetNotSet};
+    };
+
     template <typename... Ts>
     void appendSimpleInstruction(Instruction::Tags tag, Ts&&... params);
+    void appendLabelJumpInstruction(LabelId labelId, Instruction::Tags tag);
+
     auto allocateSpace(size_t size) {
         auto oldSize = _instrs.size();
         _instrs.resize(oldSize + size);
@@ -951,8 +972,11 @@ private:
         return -var - 1;
     }
 
-    FrameInfo& getOrDefineFrame(FrameId frameId);
+    FrameInfo& getOrDeclareFrame(FrameId frameId);
     void fixupFrame(FrameInfo& frame);
+
+    LabelInfo& getOrDeclareLabel(LabelId labelId);
+    void fixupLabel(LabelInfo& label);
 
     absl::InlinedVector<uint8_t, 16> _instrs;
 
@@ -964,8 +988,17 @@ private:
     // becomes known all fixups are resolved.
     absl::flat_hash_map<FrameId, FrameInfo> _frames;
 
-    size_t _stackSize{0};
-    size_t _maxStackSize{0};
+
+    // A collection of label information for labels that are currently in scope.
+    // Labels can be defined or referenced out of order and at at time of label reference (e.g:
+    // jumps or lambda creation), the exact relative offset may not be yet known.
+    // This tracks both label definition (code offset where label is defined) and use info for jumps
+    // or lambdas (code offset). When code is concatenated the offsets are adjusted, if needed, and
+    // when label definition offset becomes known all fixups are resolved.
+    absl::flat_hash_map<LabelId, LabelInfo> _labels;
+
+    int64_t _stackSize{0};
+    int64_t _maxStackSize{0};
 };
 
 class ByteCode {

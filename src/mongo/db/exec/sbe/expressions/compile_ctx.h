@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/vm/label.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo::sbe {
@@ -61,6 +62,10 @@ struct CompileCtx {
     CompileCtx makeCopyForParallelUse();
     CompileCtx makeCopy() const;
 
+    vm::LabelId newLabelId() {
+        return ++lastLabelId;
+    }
+
     /**
      * Root plan stage is used to resolve slot accessors introduced by PlanStage (optional).
      * - if specified, the root plan stage will be used to resolve the slot accessor.
@@ -72,6 +77,7 @@ struct CompileCtx {
     std::vector<std::pair<value::SlotId, value::SlotAccessor*>> correlated;
     stdx::unordered_map<SpoolId, std::shared_ptr<SpoolBuffer>> spoolBuffers;
     bool aggExpression{false};
+    vm::LabelId lastLabelId{0};
 
 private:
     // Any data that a PlanStage needs from the RuntimeEnvironment should not be accessed directly

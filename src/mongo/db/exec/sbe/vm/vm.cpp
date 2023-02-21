@@ -29,6 +29,7 @@
 
 #include <boost/format.hpp>
 
+#include "mongo/config.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -205,7 +206,7 @@ void CodeFragment::declareFrame(FrameId frameId) {
 }
 
 void CodeFragment::declareFrame(FrameId frameId, int stackOffset) {
-    FrameInfo& frame = getOrDefineFrame(frameId);
+    FrameInfo& frame = getOrDeclareFrame(frameId);
     tassert(7239101,
             str::stream() << "Frame stackPosition is already defined. frameId: " << frameId,
             frame.stackPosition == FrameInfo::kPositionNotSet);
@@ -217,7 +218,10 @@ void CodeFragment::declareFrame(FrameId frameId, int stackOffset) {
 
 void CodeFragment::removeFrame(FrameId frameId) {
     auto p = _frames.find(frameId);
-    tassert(7239102, str::stream() << "Frame not found. frameId: " << frameId, p != _frames.end());
+    if (p == _frames.end()) {
+        return;
+    }
+
     tassert(7239103,
             str::stream() << "Can't remove frame that has outstanding fixups. frameId:" << frameId,
             p->second.fixupOffsets.empty());
@@ -229,7 +233,7 @@ bool CodeFragment::hasFrames() const {
     return !_frames.empty();
 }
 
-CodeFragment::FrameInfo& CodeFragment::getOrDefineFrame(FrameId frameId) {
+CodeFragment::FrameInfo& CodeFragment::getOrDeclareFrame(FrameId frameId) {
     auto [it, r] = _frames.try_emplace(frameId);
     return it->second;
 }
@@ -267,6 +271,67 @@ void CodeFragment::fixupStackOffsets(int stackOffsetDelta) {
     }
 }
 
+void CodeFragment::removeLabel(LabelId labelId) {
+    auto p = _labels.find(labelId);
+    if (p == _labels.end()) {
+        return;
+    }
+
+    tassert(7134601,
+            str::stream() << "Can't remove label that has outstanding fixups. labelId:" << labelId,
+            p->second.fixupOffsets.empty());
+
+    _labels.erase(labelId);
+}
+
+void CodeFragment::appendLabel(LabelId labelId) {
+    auto& label = getOrDeclareLabel(labelId);
+    tassert(7134602,
+            str::stream() << "Label definitionOffset is already defined. labelId: " << labelId,
+            label.definitionOffset == LabelInfo::kOffsetNotSet);
+    label.definitionOffset = _instrs.size();
+    if (!label.fixupOffsets.empty()) {
+        fixupLabel(label);
+    }
+}
+
+void CodeFragment::fixupLabel(LabelInfo& label) {
+    tassert(7134603,
+            "Label must have defined definitionOffset",
+            label.definitionOffset != LabelInfo::kOffsetNotSet);
+
+    for (auto fixupOffset : label.fixupOffsets) {
+        int jumpOffset = readFromMemory<int>(_instrs.data() + fixupOffset);
+        writeToMemory(_instrs.data() + fixupOffset,
+                      jumpOffset + static_cast<int>(label.definitionOffset - fixupOffset));
+    }
+
+    label.fixupOffsets.clear();
+}
+
+CodeFragment::LabelInfo& CodeFragment::getOrDeclareLabel(LabelId labelId) {
+    auto [it, r] = _labels.try_emplace(labelId);
+    return it->second;
+}
+
+void CodeFragment::validate() {
+    if constexpr (kDebugBuild) {
+        for (auto& p : _frames) {
+            auto& frame = p.second;
+            tassert(7134606,
+                    str::stream() << "Unresolved frame fixup offsets. frameId: " << p.first,
+                    frame.fixupOffsets.empty());
+        }
+
+        for (auto& p : _labels) {
+            auto& label = p.second;
+            tassert(7134607,
+                    str::stream() << "Unresolved label fixup offsets. labelId: " << p.first,
+                    label.fixupOffsets.empty());
+        }
+    }
+}
+
 void CodeFragment::copyCodeAndFixup(CodeFragment&& from) {
     auto instrsSize = _instrs.size();
 
@@ -284,11 +349,10 @@ void CodeFragment::copyCodeAndFixup(CodeFragment&& from) {
         auto it = _frames.find(p.first);
         if (it != _frames.end()) {
             auto& frame = it->second;
-            tassert(7239104,
-                    "Duplicate frame stackPosition",
-                    frame.stackPosition == FrameInfo::kPositionNotSet ||
-                        fromFrame.stackPosition == FrameInfo::kPositionNotSet);
             if (fromFrame.stackPosition != FrameInfo::kPositionNotSet) {
+                tassert(7239104,
+                        "Duplicate frame stackPosition",
+                        frame.stackPosition == FrameInfo::kPositionNotSet);
                 frame.stackPosition = fromFrame.stackPosition;
             }
             frame.fixupOffsets.insert(frame.fixupOffsets.end(),
@@ -299,6 +363,34 @@ void CodeFragment::copyCodeAndFixup(CodeFragment&& from) {
             }
         } else {
             _frames.emplace(p.first, std::move(fromFrame));
+        }
+    }
+
+    for (auto& p : from._labels) {
+        auto& fromLabel = p.second;
+        if (fromLabel.definitionOffset != LabelInfo::kOffsetNotSet) {
+            fromLabel.definitionOffset += instrsSize;
+        }
+        for (auto& fixupOffset : fromLabel.fixupOffsets) {
+            fixupOffset += instrsSize;
+        }
+        auto it = _labels.find(p.first);
+        if (it != _labels.end()) {
+            auto& label = it->second;
+            if (fromLabel.definitionOffset != LabelInfo::kOffsetNotSet) {
+                tassert(7134605,
+                        "Duplicate label definitionOffset",
+                        label.definitionOffset == LabelInfo::kOffsetNotSet);
+                label.definitionOffset = fromLabel.definitionOffset;
+            }
+            label.fixupOffsets.insert(label.fixupOffsets.end(),
+                                      fromLabel.fixupOffsets.begin(),
+                                      fromLabel.fixupOffsets.end());
+            if (label.definitionOffset != LabelInfo::kOffsetNotSet) {
+                fixupLabel(label);
+            }
+        } else {
+            _labels.emplace(p.first, std::move(fromLabel));
         }
     }
 }
@@ -321,7 +413,7 @@ size_t CodeFragment::appendParameter(uint8_t* ptr,
     ptr += writeToMemory(ptr, !param.frameId);
 
     if (param.frameId) {
-        auto& frame = getOrDefineFrame(*param.frameId);
+        auto& frame = getOrDeclareFrame(*param.frameId);
 
         // Compute the absolute variable stack offset based on the current stack depth and pop
         // compensation.
@@ -415,7 +507,7 @@ void CodeFragment::appendLocalVal(FrameId frameId, int variable, bool moveFrom) 
     Instruction i;
     i.tag = moveFrom ? Instruction::pushMoveLocalVal : Instruction::pushLocalVal;
 
-    auto& frame = getOrDefineFrame(frameId);
+    auto& frame = getOrDeclareFrame(frameId);
 
     // Compute the absolute variable stack offset based on the current stack depth
     int stackOffset = varToOffset(variable) + _stackSize;
@@ -866,62 +958,49 @@ void CodeFragment::appendFunction(Builtin f, ArityType arity) {
                            : writeToMemory(offset, arity);
 }
 
-void CodeFragment::appendJump(int jumpOffset) {
-    Instruction i;
-    i.tag = Instruction::jmp;
-
-    auto offset = allocateSpace(sizeof(Instruction) + sizeof(jumpOffset));
-
-    offset += writeToMemory(offset, i);
-    offset += writeToMemory(offset, jumpOffset);
-
-    adjustStackSimple(i);
+void CodeFragment::appendLabelJump(LabelId labelId) {
+    appendLabelJumpInstruction(labelId, Instruction::jmp);
 }
 
-void CodeFragment::appendJumpTrue(int jumpOffset) {
-    Instruction i;
-    i.tag = Instruction::jmpTrue;
-
-    auto offset = allocateSpace(sizeof(Instruction) + sizeof(jumpOffset));
-
-    offset += writeToMemory(offset, i);
-    offset += writeToMemory(offset, jumpOffset);
-
-    adjustStackSimple(i);
+void CodeFragment::appendLabelJumpTrue(LabelId labelId) {
+    appendLabelJumpInstruction(labelId, Instruction::jmpTrue);
 }
 
-void CodeFragment::appendJumpFalse(int jumpOffset) {
-    Instruction i;
-    i.tag = Instruction::jmpFalse;
-    adjustStackSimple(i);
-
-    auto offset = allocateSpace(sizeof(Instruction) + sizeof(jumpOffset));
-
-    offset += writeToMemory(offset, i);
-    offset += writeToMemory(offset, jumpOffset);
+void CodeFragment::appendLabelJumpFalse(LabelId labelId) {
+    appendLabelJumpInstruction(labelId, Instruction::jmpFalse);
 }
 
-void CodeFragment::appendJumpNothing(int jumpOffset) {
-    Instruction i;
-    i.tag = Instruction::jmpNothing;
-
-    auto offset = allocateSpace(sizeof(Instruction) + sizeof(jumpOffset));
-
-    offset += writeToMemory(offset, i);
-    offset += writeToMemory(offset, jumpOffset);
-
-    adjustStackSimple(i);
+void CodeFragment::appendLabelJumpNothing(LabelId labelId) {
+    appendLabelJumpInstruction(labelId, Instruction::jmpNothing);
 }
 
-void CodeFragment::appendJumpNotNothing(int jumpOffset) {
-    Instruction i;
-    i.tag = Instruction::jmpNotNothing;
-    adjustStackSimple(i);
+void CodeFragment::appendLabelJumpNotNothing(LabelId labelId) {
+    appendLabelJumpInstruction(labelId, Instruction::jmpNotNothing);
+}
 
+void CodeFragment::appendLabelJumpInstruction(LabelId labelId, Instruction::Tags tag) {
+    auto& label = getOrDeclareLabel(labelId);
+
+    Instruction i;
+    i.tag = tag;
+
+    int jumpOffset;
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(jumpOffset));
+
+    if (label.definitionOffset != LabelInfo::kOffsetNotSet) {
+        jumpOffset = label.definitionOffset - _instrs.size();
+    } else {
+        // Fixup will compute the relative jump as if it was done from the fixup offset itself,
+        // so initialize jumpOffset with the difference between jump offset and the end of
+        // instruction.
+        jumpOffset = -static_cast<int>(sizeof(jumpOffset));
+        label.fixupOffsets.push_back(offset + sizeof(Instruction) - _instrs.data());
+    }
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, jumpOffset);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendRet() {

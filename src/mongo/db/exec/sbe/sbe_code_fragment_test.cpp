@@ -635,7 +635,6 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
     }
 }
 
-
 TEST_F(SBECodeFragmentTest, DeclareFrameNotEmptyStack) {
     auto value = makeInt32(10);
     FrameId frameId = 10;
@@ -690,9 +689,240 @@ TEST_F(SBECodeFragmentTest, DeclareFrameNotEmptyStack) {
             code.appendPop();
         }
 
+        runTest(code);
+    }
+}
+
+TEST_F(SBECodeFragmentTest, LabelJump) {
+    auto value1 = makeInt32(10);
+    auto value2 = makeInt32(20);
+    vm::LabelId label1 = 100;
+    vm::LabelId label2 = 200;
+    vm::LabelId label3 = 300;
+
+    {
+        printVariation("append instr");
+
+        vm::CodeFragment code;
+        code.appendConstVal(value1.first, value1.second);
+        code.appendLabelJump(label1);
+        code.appendLabel(label2);
+        code.appendSub({}, {});
+        code.appendLabelJump(label3);
+        code.appendLabel(label1);
+        code.appendConstVal(value2.first, value2.second);
+        code.appendLabelJump(label2);
+        code.appendLabel(label3);
+
+        code.removeLabel(label1);
+        code.removeLabel(label2);
+        code.removeLabel(label3);
+
+        runTest(code);
+    }
+
+    {
+        printVariation("append code");
+
+        vm::CodeFragment code1;
+        code1.appendConstVal(value1.first, value1.second);
+        code1.appendLabelJump(label1);
+        code1.appendLabel(label2);
+
+        vm::CodeFragment code2;
+        code2.appendSub({}, {});
+        code2.appendLabelJump(label3);
+        code2.appendLabel(label1);
+
+        vm::CodeFragment code3;
+        code3.appendConstVal(value2.first, value2.second);
+        code3.appendLabelJump(label2);
+        code3.appendLabel(label3);
+
+        vm::CodeFragment code;
+        code2.append(std::move(code3));
+        code.append(std::move(code1));
+        code.append(std::move(code2));
+
+        code.removeLabel(label1);
+        code.removeLabel(label2);
+        code.removeLabel(label3);
+
 
         runTest(code);
     }
 }
+
+TEST_F(SBECodeFragmentTest, LabelJumpTrue) {
+    auto value1 = makeInt32(10);
+    auto value2 = makeInt32(20);
+    vm::LabelId label1 = 100;
+    vm::LabelId label2 = 200;
+
+    {
+        printVariation("basic sanity check");
+
+        vm::CodeFragment code1;
+        code1.appendConstVal(value1.first, value1.second);
+        code1.appendConstVal(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
+        code1.appendLabelJumpTrue(label2);
+
+        vm::CodeFragment code2;
+        code2.appendConstVal(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+        code2.appendLabelJumpTrue(label1);
+        code2.appendLabelJump(label2);
+
+        vm::CodeFragment code3;
+        code3.appendLabel(label1);
+        code3.appendConstVal(value2.first, value2.second);
+        code3.appendSub({}, {});
+        code1.appendLabel(label2);
+
+        vm::CodeFragment code;
+        code2.append(std::move(code3));
+        code.append(std::move(code1));
+        code.append(std::move(code2));
+
+        code.removeLabel(label1);
+        code.removeLabel(label2);
+
+        runTest(code);
+    }
+}
+
+TEST_F(SBECodeFragmentTest, LabelJumpFalse) {
+    auto value1 = makeInt32(10);
+    auto value2 = makeInt32(20);
+    vm::LabelId label1 = 100;
+    vm::LabelId label2 = 200;
+
+    {
+        printVariation("basic sanity check");
+
+        vm::CodeFragment code1;
+        code1.appendConstVal(value1.first, value1.second);
+        code1.appendConstVal(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+        code1.appendLabelJumpFalse(label2);
+
+        vm::CodeFragment code2;
+        code2.appendConstVal(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
+        code2.appendLabelJumpFalse(label1);
+        code2.appendLabelJump(label2);
+
+        vm::CodeFragment code3;
+        code3.appendLabel(label1);
+        code3.appendConstVal(value2.first, value2.second);
+        code3.appendSub({}, {});
+        code1.appendLabel(label2);
+
+        vm::CodeFragment code;
+        code2.append(std::move(code3));
+        code.append(std::move(code1));
+        code.append(std::move(code2));
+
+        code.removeLabel(label1);
+        code.removeLabel(label2);
+
+        runTest(code);
+    }
+}
+
+TEST_F(SBECodeFragmentTest, LabelJumpNothing) {
+    auto value1 = makeInt32(10);
+    auto value2 = makeInt32(20);
+    vm::LabelId labelThen1 = 100;
+    vm::LabelId labelThen2 = 200;
+    vm::LabelId labelEnd = 300;
+
+    {
+        printVariation("basic sanity check");
+
+        vm::CodeFragment code;
+        code.appendConstVal(value1.first, value1.second);
+        code.appendConstVal(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+        code.appendLabelJumpNothing(labelThen1);
+
+        vm::CodeFragment else1;
+        else1.appendPop();
+        else1.appendConstVal(value::TypeTags::Nothing, 0);
+        else1.appendLabelJumpNothing(labelThen2);
+
+        vm::CodeFragment else2;
+        else2.appendPop();
+        else2.appendLabelJump(labelEnd);
+
+        vm::CodeFragment then2;
+        then2.appendLabel(labelThen2);
+        then2.appendPop();
+        then2.appendConstVal(value2.first, value2.second);
+        then2.appendSub({}, {});
+
+        else1.append(std::move(else2), std::move(then2));
+        else1.appendLabelJump(labelEnd);
+
+        vm::CodeFragment then1;
+        then1.appendLabel(labelThen1);
+        then1.appendPop();
+
+        code.append(std::move(else1), std::move(then1));
+        code.appendLabel(labelEnd);
+
+        code.removeLabel(labelThen1);
+        code.removeLabel(labelThen2);
+        code.removeLabel(labelEnd);
+
+        runTest(code);
+    }
+}
+
+
+TEST_F(SBECodeFragmentTest, LabelJumpNotNothing) {
+    auto value1 = makeInt32(10);
+    auto value2 = makeInt32(20);
+    vm::LabelId labelThen1 = 100;
+    vm::LabelId labelThen2 = 200;
+    vm::LabelId labelEnd = 300;
+
+    {
+        printVariation("basic sanity check");
+
+        vm::CodeFragment code;
+        code.appendConstVal(value1.first, value1.second);
+        code.appendConstVal(value::TypeTags::Nothing, 0);
+        code.appendLabelJumpNotNothing(labelThen1);
+
+        vm::CodeFragment else1;
+        else1.appendPop();
+        else1.appendConstVal(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+        else1.appendLabelJumpNotNothing(labelThen2);
+
+        vm::CodeFragment else2;
+        else2.appendPop();
+        else2.appendLabelJump(labelEnd);
+
+        vm::CodeFragment then2;
+        then2.appendLabel(labelThen2);
+        then2.appendPop();
+        then2.appendConstVal(value2.first, value2.second);
+        then2.appendSub({}, {});
+
+        else1.append(std::move(else2), std::move(then2));
+        else1.appendLabelJump(labelEnd);
+
+        vm::CodeFragment then1;
+        then1.appendLabel(labelThen1);
+        then1.appendPop();
+
+        code.append(std::move(else1), std::move(then1));
+        code.appendLabel(labelEnd);
+
+        code.removeLabel(labelThen1);
+        code.removeLabel(labelThen2);
+        code.removeLabel(labelEnd);
+
+        runTest(code);
+    }
+}
+
 
 }  // namespace mongo::sbe

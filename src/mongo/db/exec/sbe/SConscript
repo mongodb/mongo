@@ -52,6 +52,7 @@ sbeEnv.Library(
         'values/slot_printer.cpp',
         'vm/arith.cpp',
         'vm/datetime.cpp',
+        'vm/label.cpp',
         'vm/vm.cpp',
         'vm/vm_printer.cpp',
     ],
