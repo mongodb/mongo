@@ -480,10 +480,7 @@ TEST(Optimizer, Collation) {
     }
 
     ASSERT_EXPLAIN_AUTO(
-        "Collation []\n"
-        "  collation: \n"
-        "    a: Ascending\n"
-        "    b: Clustered\n"
+        "Collation [{a: Ascending, b: Clustered}]\n"
         "  Evaluation [{b}]\n"
         "    EvalPath []\n"
         "      PathConstant []\n"

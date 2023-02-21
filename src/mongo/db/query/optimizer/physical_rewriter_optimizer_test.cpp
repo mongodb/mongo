@@ -485,9 +485,7 @@ TEST(PhysRewriter, FilterCollation) {
     // Limit-skip is attached to the collation node by virtue of physical props.
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{pb}]\n"
-        "Collation []\n"
-        "|   |   collation: \n"
-        "|   |       pb: Ascending\n"
+        "Collation [{pb: Ascending}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_1]\n"
@@ -530,9 +528,7 @@ TEST(PhysRewriter, EvalCollation) {
 
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{pa}]\n"
-        "Collation []\n"
-        "|   |   collation: \n"
-        "|   |       pa: Ascending\n"
+        "Collation [{pa: Ascending}]\n"
         "PhysicalScan [{'a': pa}, c1]\n",
         optimized);
 }
@@ -577,9 +573,7 @@ TEST(PhysRewriter, FilterEvalCollation) {
 
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{root}]\n"
-        "Collation []\n"
-        "|   |   collation: \n"
-        "|   |       pa: Ascending\n"
+        "Collation [{pa: Ascending}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [pa]\n"
@@ -1023,9 +1017,7 @@ TEST(PhysRewriter, FilterIndexing3MultiKey) {
         "|   |   Const [true]\n"
         "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'a': pa}, c1]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       rid_0\n"
+        "Unique [{rid_0}]\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const [1"
         " | minKey], Const [1 | maxKey]]}]\n",
         optimized);
@@ -1195,17 +1187,15 @@ TEST(PhysRewriter, FilterIndexing5) {
     // We can cover both fields with the index, and need separate sort on "b".
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{pa, pb}]\n"
-        "Collation []\n"
-        "|   |   collation: \n"
-        "|   |       pb: Ascending\n"
+        "Collation [{pb: Ascending}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [pb]\n"
         "|   PathCompare [Gt]\n"
         "|   Const [0]\n"
         "Evaluation [{pb} = Variable [evalTemp_0]]\n"
-        "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': evalTemp_0}, scanDefName: c1, indexDefNa"
-        "me: index1, interval: {>Const [0 | maxKey]}]\n",
+        "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': evalTemp_0}, scanDefName: c1, "
+        "indexDefName: index1, interval: {>Const [0 | maxKey]}]\n",
         optimized);
 }
 
@@ -2085,9 +2075,7 @@ TEST(PhysRewriter, EvalIndexing) {
         // Index does not have the right collation and now we need a collation node.
         ASSERT_EXPLAIN_V2_AUTO(
             "Root [{pa}]\n"
-            "Collation []\n"
-            "|   |   collation: \n"
-            "|   |       pa: Ascending\n"
+            "Collation [{pa: Ascending}]\n"
             "IndexScan [{'<indexKey> 0': pa}, scanDefName: c1, indexDefName: index1, interval: "
             "{>Const [1]}]\n",
             optimized);
@@ -2279,10 +2267,7 @@ TEST(PhysRewriter, MultiKeyIndex) {
 
         ASSERT_EXPLAIN_V2_AUTO(
             "Root [{root}]\n"
-            "Collation []\n"
-            "|   |   collation: \n"
-            "|   |       pa: Ascending\n"
-            "|   |       pb: Ascending\n"
+            "Collation [{pa: Ascending, pb: Ascending}]\n"
             "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
             "|   |   Const [true]\n"
             "|   LimitSkip [limit: 1, skip: 0]\n"
@@ -2314,7 +2299,8 @@ TEST(PhysRewriter, MultiKeyIndex) {
             "Evaluation [{unionTemp_0} = Variable [pa]]\n"
             "Evaluation [{sideId_0} = Const [0]]\n"
             "IndexScan [{'<indexKey> 0': pa, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
-            "index1, interval: {=Const [1]}]\n",
+            "index1, "
+            "interval: {=Const [1]}]\n",
             optimized);
     }
 
@@ -2962,9 +2948,7 @@ TEST(PhysRewriter, IndexBoundsIntersect2) {
         "|   |   Const [true]\n"
         "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       rid_0\n"
+        "Unique [{rid_0}]\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {(Const "
         "[70], Const [90])}]\n",
         optimized);
@@ -3097,14 +3081,10 @@ TEST(PhysRewriter, IndexBoundsIntersect4) {
         "|   |       rid_0 = rid_1\n"
         "|   Union [{rid_1}]\n"
         "|   Evaluation [{rid_1} = Variable [rid_0]]\n"
-        "|   Unique []\n"
-        "|   |   projections: \n"
-        "|   |       rid_0\n"
+        "|   Unique [{rid_0}]\n"
         "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {>Const "
         "[70]}]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       rid_0\n"
+        "Unique [{rid_0}]\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {<Const "
         "[90]}]\n",
         optimized);
@@ -3370,9 +3350,7 @@ TEST(PhysRewriter, IndexResidualReq2) {
         "|   |   Const [true]\n"
         "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       rid_0\n"
+        "Unique [{rid_0}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_10]\n"
@@ -3430,9 +3408,7 @@ TEST(PhysRewriter, ElemMatchIndex) {
         "|   |   PathArr []\n"
         "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_4}, c1]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       rid_0\n"
+        "Unique [{rid_0}]\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {(Const [7"
         "0], Const [90])}]\n",
         optimized);
@@ -3499,9 +3475,7 @@ TEST(PhysRewriter, ElemMatchIndex1) {
         "|   |   PathArr []\n"
         "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_17}, c1]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       rid_0\n"
+        "Unique [{rid_0}]\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {(Const [1"
         " | 70], Const [1 | 90])}]\n",
         optimized);
@@ -3635,9 +3609,7 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
         "|   |   PathArr []\n"
         "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_3}, c1]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       rid_0\n"
+        "Unique [{rid_0}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_8]\n"
@@ -3851,9 +3823,7 @@ TEST(PhysRewriter, PathObj) {
         "|   |   Const [true]\n"
         "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       rid_0\n"
+        "Unique [{rid_0}]\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const [{"
         "} | minKey], Const [[] | minKey])}]\n",
         optimized);
@@ -4620,9 +4590,7 @@ TEST(PhysRewriter, CollationLimit) {
         "|           type: Centralized\n"
         "|       indexingRequirement: \n"
         "|           Complete, dedupRID\n"
-        "Collation []\n"
-        "|   |   collation: \n"
-        "|   |       pa: Ascending\n"
+        "Collation [{pa: Ascending}]\n"
         "Properties [cost: 0.428487, localCost: 0.428487, adjustedCE: 1000]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
@@ -5791,9 +5759,7 @@ TEST(PhysRewriter, ConjunctionTraverseMultikey1) {
         "|   |   Const [1]\n"
         "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_11}, c1]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       rid_0\n"
+        "Unique [{rid_0}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_9]\n"

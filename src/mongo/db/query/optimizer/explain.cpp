@@ -1829,13 +1829,22 @@ public:
                              ExplainPrinter /*refsResult*/) {
         ExplainPrinter printer("Unique");
         maybePrintProps(printer, node);
-        printer.separator(" []");
-        nodeCEPropsPrint(printer, n, node);
 
-        printer.setChildCount(2);
-        printPropertyProjections(printer, node.getProjections(), false /*directToParent*/);
+        if constexpr (version < ExplainVersion::V3) {
+            printer.separator(" [");
+            printProjectionsOrdered(printer, node.getProjections());
+            printer.separator("]");
+
+            nodeCEPropsPrint(printer, n, node);
+            printer.setChildCount(1, true /*noInline*/);
+        } else if constexpr (version == ExplainVersion::V3) {
+            nodeCEPropsPrint(printer, n, node);
+            printPropertyProjections(printer, node.getProjections(), false /*directToParent*/);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+
         printer.fieldName("child", ExplainVersion::V3).print(childResult);
-
         return printer;
     }
 
@@ -1899,16 +1908,32 @@ public:
                              ExplainPrinter refsResult) {
         ExplainPrinter printer("Collation");
         maybePrintProps(printer, node);
-        printer.separator(" []");
-        nodeCEPropsPrint(printer, n, node);
 
-        printer.setChildCount(3);
-        printCollationProperty(printer, node.getProperty(), false /*directToParent*/);
-        printer.fieldName("references", ExplainVersion::V3)
-            .print(refsResult)
-            .fieldName("child", ExplainVersion::V3)
-            .print(childResult);
+        if constexpr (version < ExplainVersion::V3) {
+            printer.separator(" [{");
+            bool first = true;
+            for (const auto& [projName, op] : node.getProperty().getCollationSpec()) {
+                if (first) {
+                    first = false;
+                } else {
+                    printer.separator(", ");
+                }
+                printer.print(projName).separator(": ").print(
+                    CollationOpEnum::toString[static_cast<int>(op)]);
+            }
+            printer.separator("}]");
 
+            nodeCEPropsPrint(printer, n, node);
+            printer.setChildCount(1, true /*noInline*/);
+        } else if constexpr (version == ExplainVersion::V3) {
+            nodeCEPropsPrint(printer, n, node);
+            printCollationProperty(printer, node.getProperty(), false /*directToParent*/);
+            printer.fieldName("references", ExplainVersion::V3).print(refsResult);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+
+        printer.fieldName("child", ExplainVersion::V3).print(childResult);
         return printer;
     }
 

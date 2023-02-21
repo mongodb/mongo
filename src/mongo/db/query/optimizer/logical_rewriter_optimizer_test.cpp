@@ -241,9 +241,7 @@ TEST(LogicalRewriter, FilterProjectRewrite) {
         "      PathIdentity []\n"
         "      Variable [P1]\n"
         "    Evaluation [{P1} = Variable [ptest]]\n"
-        "      Collation []\n"
-        "        collation: \n"
-        "          ptest: Ascending\n"
+        "      Collation [{ptest: Ascending}]\n"
         "        Scan [test, {ptest}]\n",
         rootNode);
 
@@ -257,9 +255,7 @@ TEST(LogicalRewriter, FilterProjectRewrite) {
 
     ASSERT_EXPLAIN_AUTO(
         "Root []\n"
-        "  Collation []\n"
-        "    collation: \n"
-        "      ptest: Ascending\n"
+        "  Collation [{ptest: Ascending}]\n"
         "    Filter []\n"
         "      EvalFilter []\n"
         "        PathIdentity []\n"
@@ -317,9 +313,7 @@ TEST(LogicalRewriter, FilterProjectComplexRewrite) {
         "|   |   Variable [p1]\n"
         "|   PathIdentity []\n"
         "Evaluation [{p1} = Variable [ptest]]\n"
-        "Collation []\n"
-        "|   |   collation: \n"
-        "|   |       ptest: Ascending\n"
+        "Collation [{ptest: Ascending}]\n"
         "Evaluation [{p3} = Variable [ptest]]\n"
         "Evaluation [{p2} = Variable [ptest]]\n"
         "Scan [test, {ptest}]\n",
@@ -336,9 +330,7 @@ TEST(LogicalRewriter, FilterProjectComplexRewrite) {
     // Note: this assert depends on the order on which we consider rewrites.
     ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
-        "Collation []\n"
-        "|   |   collation: \n"
-        "|   |       ptest: Ascending\n"
+        "Collation [{ptest: Ascending}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [p2]\n"
@@ -543,9 +535,7 @@ TEST(LogicalRewriter, UnwindCollationRewrite) {
 
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{a, b}]\n"
-        "Collation []\n"
-        "|   |   collation: \n"
-        "|   |       b: Ascending\n"
+        "Collation [{b: Ascending}]\n"
         "Unwind [{a, a_pid}]\n"
         "Evaluation [{b} = Variable [ptest]]\n"
         "Evaluation [{a} = Variable [ptest]]\n"

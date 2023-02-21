@@ -2,9 +2,7 @@
 
 ==== VARIATION: Lower unique node with single key ====
 -- INPUT:
-Unique []
-|   projections: 
-|       proj0
+Unique [{proj0}]
 Evaluation [{proj0}]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -18,11 +16,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 ==== VARIATION: Lower unique node with multiple keys ====
 -- INPUT:
-Unique []
-|   projections: 
-|       proj0
-|       proj1
-|       proj2
+Unique [{proj0, proj1, proj2}]
 Evaluation [{proj2}]
 |   FunctionCall [getField]
 |   |   Const ["c"]

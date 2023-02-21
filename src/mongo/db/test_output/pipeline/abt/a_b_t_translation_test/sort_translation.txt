@@ -15,10 +15,7 @@ metadata:
 
 -- OUTPUT:
 Root [{scan_0}]
-Collation []
-|   |   collation: 
-|   |       sort_0: Ascending
-|   |       sort_1: Descending
+Collation [{sort_0: Ascending, sort_1: Descending}]
 Evaluation [{sort_1}]
 |   EvalPath []
 |   |   Variable [scan_0]
@@ -51,9 +48,7 @@ metadata:
 
 -- OUTPUT:
 Root [{scan_0}]
-Collation []
-|   |   collation: 
-|   |       sort_0: Ascending
+Collation [{sort_0: Ascending}]
 Evaluation [{sort_0}]
 |   EvalPath []
 |   |   Variable [scan_0]

@@ -298,9 +298,7 @@ optimization phases:
 
 -- OUTPUT:
 Root [{embedProj_0}]
-Collation []
-|   |   collation: 
-|   |       sort_0: Ascending
+Collation [{sort_0: Ascending}]
 Evaluation [{sort_0} = Variable [unwoundProj_0]]
 Evaluation [{embedProj_0}]
 |   If []
@@ -675,9 +673,7 @@ optimization phases:
 
 -- OUTPUT:
 Root [{scan_0}]
-Collation []
-|   |   collation: 
-|   |       sort_0: Ascending
+Collation [{sort_0: Ascending}]
 NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
 |   LimitSkip [limit: 1, skip: 0]
