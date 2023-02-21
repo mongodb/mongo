@@ -6368,6 +6368,14 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
+  name: sharding_api_strict_passthrough_gen
+  tags: ["sharding"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
   name: sharding_hello_failures_gen
   tags: ["concurrency", "large", "sharded", "no_debug_mode"]
   commands:
