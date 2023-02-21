@@ -99,6 +99,12 @@ public:
      */
     void optimize(ABT& input);
 
+    /**
+     * Similar to optimize, but returns a bool to indicate success or failure. True means success;
+     * false means failure.
+     */
+    [[nodiscard]] bool optimizeNoAssert(ABT& input);
+
     static const PhaseSet& getAllRewritesSet();
 
     MemoPhysicalNodeId getPhysicalNodeId() const;
@@ -140,13 +146,13 @@ private:
                                std::unique_ptr<LogicalRewriter>& logicalRewriter,
                                ABT& input);
 
-    void runMemoPhysicalRewrite(OptPhase phase,
-                                VariableEnvironment& env,
-                                GroupIdType rootGroupId,
-                                std::unique_ptr<LogicalRewriter>& logicalRewriter,
-                                ABT& input);
+    [[nodiscard]] bool runMemoPhysicalRewrite(OptPhase phase,
+                                              VariableEnvironment& env,
+                                              GroupIdType rootGroupId,
+                                              std::unique_ptr<LogicalRewriter>& logicalRewriter,
+                                              ABT& input);
 
-    void runMemoRewritePhases(VariableEnvironment& env, ABT& input);
+    [[nodiscard]] bool runMemoRewritePhases(VariableEnvironment& env, ABT& input);
 
 
     static PhaseSet _allRewrites;

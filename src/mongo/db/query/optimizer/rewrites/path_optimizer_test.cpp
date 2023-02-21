@@ -908,7 +908,7 @@ TEST(Path, LowerPathDrop) {
     auto env = VariableEnvironment::build(tree);
     runPathLowering(env, prefixId, tree);
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "If []\n"
         "  FunctionCall [isObject]\n"
         "    Variable [root]\n"
@@ -930,7 +930,7 @@ TEST(Path, LowerPathKeep) {
     auto env = VariableEnvironment::build(tree);
     runPathLowering(env, prefixId, tree);
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "If []\n"
         "  FunctionCall [isObject]\n"
         "    Variable [root]\n"

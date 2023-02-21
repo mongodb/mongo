@@ -1369,7 +1369,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        std::move(solutions[0]),
                                        std::move(roots[0]),
                                        {},
-                                       collections,
                                        plannerParams.options,
                                        std::move(nss),
                                        std::move(yieldPolicy),
@@ -1587,8 +1586,25 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
         canonicalQuery->setSbeCompatible(isQuerySbeCompatible(&mainColl, canonicalQuery.get()));
 
         if (isEligibleForBonsai(*canonicalQuery, opCtx, mainColl)) {
-            return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
-                getSBEExecutorViaCascadesOptimizer(mainColl, std::move(canonicalQuery)));
+            optimizer::QueryHints queryHints = getHintsFromQueryKnobs();
+            const bool fastIndexNullHandling = queryHints._fastIndexNullHandling;
+            auto maybeExec = getSBEExecutorViaCascadesOptimizer(
+                mainColl, std::move(queryHints), canonicalQuery.get());
+            if (maybeExec) {
+                auto exec = uassertStatusOK(
+                    makeExecFromParams(std::move(canonicalQuery), std::move(*maybeExec)));
+                return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
+                    std::move(exec));
+            } else {
+                const auto queryControl =
+                    ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
+                        "internalQueryFrameworkControl");
+                tassert(7319400,
+                        "Optimization failed either without tryBonsai set, or without a hint.",
+                        queryControl->_data.get() == QueryFrameworkControlEnum::kTryBonsai &&
+                            !canonicalQuery->getFindCommandRequest().getHint().isEmpty() &&
+                            !fastIndexNullHandling);
+            }
         }
 
         // Use SBE if 'canonicalQuery' is SBE compatible.

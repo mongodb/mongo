@@ -1048,9 +1048,8 @@ bool isEligibleCommon(const RequestType& request,
             return !param.isEmpty();
         }
     };
-    bool unsupportedCmdOption = noneOrDefaultEmpty(request.getHint()) ||
-        noneOrDefaultEmpty(request.getCollation()) || noneOrDefaultEmpty(request.getLet()) ||
-        request.getLegacyRuntimeConstants();
+    const bool unsupportedCmdOption = noneOrDefaultEmpty(request.getCollation()) ||
+        noneOrDefaultEmpty(request.getLet()) || request.getLegacyRuntimeConstants();
 
     bool unsupportedIndexType = [&]() {
         if (!collection)

@@ -5,6 +5,7 @@
 //   requires_getmore,
 //   requires_fcv_63,
 //   requires_profiling,
+//   cqf_incompatible,
 // ]
 
 // Confirms that profiled getMore execution contains all expected metrics with proper values.

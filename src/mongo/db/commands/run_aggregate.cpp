@@ -70,6 +70,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -1026,7 +1027,10 @@ Status runAggregate(OperationContext* opCtx,
                 .getAsync([](auto) {});
         }
 
-        if (isEligibleForBonsai(request, *pipeline, opCtx, collections.getMainCollection())) {
+        const bool bonsaiEligible =
+            isEligibleForBonsai(request, *pipeline, opCtx, collections.getMainCollection());
+        bool bonsaiExecSuccess = true;
+        if (bonsaiEligible) {
             uassert(6624344,
                     "Exchanging is not supported in the Cascades optimizer",
                     !request.getExchange().has_value());
@@ -1045,18 +1049,39 @@ Status runAggregate(OperationContext* opCtx,
                         SimpleBSONObjComparator::kInstance.evaluate(*request.getCollation() ==
                                                                     CollationSpec::kSimpleSpec));
 
+            optimizer::QueryHints queryHints = getHintsFromQueryKnobs();
+            const bool fastIndexNullHandling = queryHints._fastIndexNullHandling;
             auto timeBegin = Date_t::now();
-            execs.emplace_back(getSBEExecutorViaCascadesOptimizer(opCtx,
-                                                                  expCtx,
-                                                                  nss,
-                                                                  collections.getMainCollection(),
-                                                                  request.getHint(),
-                                                                  std::move(pipeline)));
+            auto maybeExec = getSBEExecutorViaCascadesOptimizer(opCtx,
+                                                                expCtx,
+                                                                nss,
+                                                                collections.getMainCollection(),
+                                                                std::move(queryHints),
+                                                                request.getHint(),
+                                                                pipeline.get());
+            if (maybeExec) {
+                execs.emplace_back(
+                    uassertStatusOK(makeExecFromParams(nullptr, std::move(*maybeExec))));
+            } else {
+                // If we had an optimization failure, only error if we're not in tryBonsai.
+                bonsaiExecSuccess = false;
+                const auto queryControl =
+                    ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
+                        "internalQueryFrameworkControl");
+                tassert(7319401,
+                        "Optimization failed either without tryBonsai set, or without a hint.",
+                        queryControl->_data.get() == QueryFrameworkControlEnum::kTryBonsai &&
+                            request.getHint() && !request.getHint()->isEmpty() &&
+                            !fastIndexNullHandling);
+            }
+
             auto elapsed =
                 (Date_t::now().toMillisSinceEpoch() - timeBegin.toMillisSinceEpoch()) / 1000.0;
             OPTIMIZER_DEBUG_LOG(
                 6264804, 5, "Cascades optimization time elapsed", "time"_attr = elapsed);
-        } else {
+        }
+
+        if (!bonsaiEligible || !bonsaiExecSuccess) {
             execs = createLegacyExecutor(std::move(pipeline),
                                          liteParsedPipeline,
                                          nss,
@@ -1066,6 +1091,7 @@ Status runAggregate(OperationContext* opCtx,
                                          resetContext);
         }
         tassert(6624353, "No executors", !execs.empty());
+
 
         {
             auto planSummary = execs[0]->getPlanExplainer().getPlanSummary();

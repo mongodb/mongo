@@ -30,31 +30,64 @@
 #pragma once
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 
 namespace mongo {
 
+// Arguments to create a PlanExecutor, except for the CanonicalQuery.
+struct ExecParams {
+    OperationContext* opCtx;
+    std::unique_ptr<QuerySolution> solution;
+    std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root;
+    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData;
+    size_t plannerOptions;
+    NamespaceString nss;
+    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy;
+    bool planIsFromCache;
+    bool generatedByBonsai;
+};
+
 /**
- * Returns a PlanExecutor for the given Pipeline.
+ * Returns hints from the cascades query knobs.
+ */
+optimizer::QueryHints getHintsFromQueryKnobs();
+
+/**
+ * Returns a the arguments to create a PlanExecutor for the given Pipeline, except the
+ * CanonicalQuery which must be provided by the caller.
  *
  * The CanonicalQuery parameter allows for code reuse between functions in this file and should not
  * be set by callers.
  */
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOptimizer(
+boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const NamespaceString& nss,
     const CollectionPtr& collection,
+    optimizer::QueryHints queryHints,
     const boost::optional<BSONObj>& indexHint,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-    std::unique_ptr<CanonicalQuery> = nullptr);
+    const Pipeline* pipeline,
+    const CanonicalQuery* = nullptr);
 
 /**
  * Returns a PlanExecutor for the given CanonicalQuery.
  */
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOptimizer(
-    const CollectionPtr& collection, std::unique_ptr<CanonicalQuery> query);
+boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(const CollectionPtr& collection,
+                                                               optimizer::QueryHints queryHints,
+                                                               const CanonicalQuery* query);
+
+/**
+ * Constructs a plan executor with the given CanonicalQuery and ExecParams.
+ */
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> makeExecFromParams(
+    std::unique_ptr<CanonicalQuery> cq, ExecParams execArgs);
 
 }  // namespace mongo

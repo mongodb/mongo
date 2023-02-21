@@ -12,6 +12,8 @@
  *   # server parameters are stored in-memory only so are not transferred onto the recipient.
  *   tenant_migration_incompatible,
  *   not_allowed_with_security_token,
+ *   # SERVER-73615 should remove this tag.
+ *   cqf_incompatible,
  * ]
  */
 (function() {
