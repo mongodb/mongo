@@ -262,17 +262,17 @@ d4 = RandomDistribution.uniform(range_int_20_30)
 # Sets of strings where characters at different positions have different distances
 string_sets = {}
 # 250 unique strings
-string_sets['string_1112_250'] = generate_str_by_distance(250, 'xxxx', d1, d1, d1, d2)
-string_sets['string_2221_250'] = generate_str_by_distance(250, 'azay', d2, d2, d3, d1)
-string_sets['string_5555_250'] = generate_str_by_distance(250, 'axbz', d4, d4, d4, d4)
+string_sets['set_1112_250'] = generate_str_by_distance(250, 'xxxx', d1, d1, d1, d2)
+string_sets['set_2221_250'] = generate_str_by_distance(250, 'azay', d2, d2, d3, d1)
+string_sets['set_5555_250'] = generate_str_by_distance(250, 'axbz', d4, d4, d4, d4)
 # 1000 unique strings
-string_sets['string_1112_1000'] = generate_str_by_distance(1000, 'xxxx', d1, d1, d1, d2)
-string_sets['string_2221_1000'] = generate_str_by_distance(1000, 'azay', d2, d2, d3, d1)
-string_sets['string_5555_1000'] = generate_str_by_distance(1000, 'axbz', d4, d4, d4, d4)
+string_sets['set_1112_1000'] = generate_str_by_distance(1000, 'xxxx', d1, d1, d1, d2)
+string_sets['set_2221_1000'] = generate_str_by_distance(1000, 'azay', d2, d2, d3, d1)
+string_sets['set_5555_1000'] = generate_str_by_distance(1000, 'axbz', d4, d4, d4, d4)
 # 10000 unique strings
-string_sets['string_1112_10000'] = generate_str_by_distance(10000, 'xxxx', d1, d1, d1, d2)
-string_sets['string_2221_10000'] = generate_str_by_distance(10000, 'azay', d2, d2, d3, d1)
-string_sets['string_5555_10000'] = generate_str_by_distance(10000, 'axbz', d4, d4, d4, d4)
+string_sets['set_1112_10000'] = generate_str_by_distance(10000, 'xxxx', d1, d1, d1, d2)
+string_sets['set_2221_10000'] = generate_str_by_distance(10000, 'azay', d2, d2, d3, d1)
+string_sets['set_5555_10000'] = generate_str_by_distance(10000, 'axbz', d4, d4, d4, d4)
 
 # Weights with different variance. For instance if the smallest weight is 1, and the biggest weight is 5
 # then some values in a choice distribution will be picked with at most 5 times higher probability.
@@ -285,10 +285,10 @@ weight_range_s = RangeGenerator(DataType.INTEGER, 95, 101, 1)
 weight_range_l = RangeGenerator(DataType.INTEGER, 25, 101, 2)
 
 weights = {}
-weights['unif_s'] = RandomDistribution.uniform(weight_range_s)
-weights['unif_l'] = RandomDistribution.uniform(weight_range_l)
-weights['norm_s'] = RandomDistribution.normal(weight_range_s)
-weights['norm_l'] = RandomDistribution.normal(weight_range_l)
+weights['weight_unif_s'] = RandomDistribution.uniform(weight_range_s)
+weights['weight_unif_l'] = RandomDistribution.uniform(weight_range_l)
+weights['weight_norm_s'] = RandomDistribution.normal(weight_range_s)
+weights['weight_norm_l'] = RandomDistribution.normal(weight_range_l)
 
 #weights['chi2_s'] = RandomDistribution.noncentral_chisquare(weight_range_s)
 #weights['chi2_l'] = RandomDistribution.noncentral_chisquare(weight_range_l)

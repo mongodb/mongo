@@ -12,621 +12,228 @@ Loading chunk file: jstests/query_golden/libs/data/ce_data_500_5
 
 
 [jsTest] ----
-[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$gte" : 406, "$lte" : 863 } }
+[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$gte" : 160, "$lte" : 301 } }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 274.6887211078377,
+	"logicalCE" : 133.60027694582075,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 274.6887211078377,
+		"logicalCE" : 133.60027694582075,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 274.6887211078377,
+			"logicalCE" : 133.60027694582075,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 274.6887211078377
+				"logicalCE" : 133.60027694582075
 			}
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$gte" : 406, "$lte" : 863 } }
+[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$gte" : 160, "$lte" : 301 } }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 267.5370374530216,
+	"logicalCE" : 138.30984378314568,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 267.5370374530216,
+		"logicalCE" : 138.30984378314568,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 267.5370374530216,
+			"logicalCE" : 138.30984378314568,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 267.5370374530216
+				"logicalCE" : 138.30984378314568
 			}
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "uniform_int_0-1000-1" : { "$gte" : 406, "$lte" : 863 } }, base = 274.69, sample = 267.54, actual = 225
+[jsTest] CE: { "uniform_int_0-1000-1" : { "$gte" : 160, "$lte" : 301 } }, base = 133.6, sample = 138.31, actual = 60
 [jsTest] ----
 
-Base error: { "absError" : 49.69, "relError" : 0.22, "selError" : 9.94 }
-Sample error: { "absError" : 42.54, "relError" : 0.19, "selError" : 8.51 }
+Base error: { "absError" : 73.6, "relError" : 1.23, "selError" : 14.72 }
+Sample error: { "absError" : 78.31, "relError" : 1.31, "selError" : 15.66 }
 
 [jsTest] ----
-[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$lt" : 406 } }
+[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$lt" : 160 } }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 202.6764705882353,
+	"logicalCE" : 86.99999999999997,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 202.6764705882353,
+		"logicalCE" : 86.99999999999997,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 202.6764705882353
+			"logicalCE" : 86.99999999999997
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$lt" : 406 } }
+[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$lt" : 160 } }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 208.69565217391306,
+	"logicalCE" : 86.95652173913044,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 208.69565217391306,
+		"logicalCE" : 86.95652173913044,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 208.69565217391306
+			"logicalCE" : 86.95652173913044
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "uniform_int_0-1000-1" : { "$lt" : 406 } }, base = 202.68, sample = 208.7, actual = 203
-[jsTest] ----
-
-Base error: { "absError" : -0.32, "relError" : 0, "selError" : -0.06 }
-Sample error: { "absError" : 5.7, "relError" : 0.03, "selError" : 1.14 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$eq" : 406 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 1.5000000000000013,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 1.5000000000000013,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 1.5000000000000013
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$eq" : 406 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 0,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 0,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 0
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: { "uniform_int_0-1000-1" : { "$eq" : 406 } }, base = 1.5, sample = 0, actual = 2
-[jsTest] ----
-
-Base error: { "absError" : -0.5, "relError" : -0.25, "selError" : -0.1 }
-Sample error: { "absError" : -2, "relError" : -1, "selError" : -0.4 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$gte" : 863, "$lte" : 995 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 74.50623962195077,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 74.50623962195077,
-		"child" : {
-			"nodeType" : "Filter",
-			"logicalCE" : 74.50623962195077,
-			"child" : {
-				"nodeType" : "PhysicalScan",
-				"logicalCE" : 74.50623962195077
-			}
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$gte" : 863, "$lte" : 995 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 78.26086956521738,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 78.26086956521738,
-		"child" : {
-			"nodeType" : "Filter",
-			"logicalCE" : 78.26086956521738,
-			"child" : {
-				"nodeType" : "PhysicalScan",
-				"logicalCE" : 78.26086956521738
-			}
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: { "uniform_int_0-1000-1" : { "$gte" : 863, "$lte" : 995 } }, base = 74.51, sample = 78.26, actual = 70
-[jsTest] ----
-
-Base error: { "absError" : 4.51, "relError" : 0.06, "selError" : 0.9 }
-Sample error: { "absError" : 8.26, "relError" : 0.12, "selError" : 1.65 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$lt" : 863 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 425.2692307692308,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 425.2692307692308,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 425.2692307692308
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$lt" : 863 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 421.7391304347826,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 421.7391304347826,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 421.7391304347826
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: { "uniform_int_0-1000-1" : { "$lt" : 863 } }, base = 425.27, sample = 421.74, actual = 426
-[jsTest] ----
-
-Base error: { "absError" : -0.73, "relError" : 0, "selError" : -0.15 }
-Sample error: { "absError" : -4.26, "relError" : -0.01, "selError" : -0.85 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$eq" : 863 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 1.5000000000000013,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 1.5000000000000013,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 1.5000000000000013
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$eq" : 863 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 0,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 0,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 0
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: { "uniform_int_0-1000-1" : { "$eq" : 863 } }, base = 1.5, sample = 0, actual = 2
-[jsTest] ----
-
-Base error: { "absError" : -0.5, "relError" : -0.25, "selError" : -0.1 }
-Sample error: { "absError" : -2, "relError" : -1, "selError" : -0.4 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$gte" : 558, "$lte" : 757 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 173.7250058696188,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 173.7250058696188,
-		"child" : {
-			"nodeType" : "Filter",
-			"logicalCE" : 173.7250058696188,
-			"child" : {
-				"nodeType" : "PhysicalScan",
-				"logicalCE" : 173.7250058696188
-			}
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$gte" : 558, "$lte" : 757 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 181.0138293357258,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 181.0138293357258,
-		"child" : {
-			"nodeType" : "Filter",
-			"logicalCE" : 181.0138293357258,
-			"child" : {
-				"nodeType" : "PhysicalScan",
-				"logicalCE" : 181.0138293357258
-			}
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: { "normal_int_0-1000-1" : { "$gte" : 558, "$lte" : 757 } }, base = 173.73, sample = 181.01, actual = 155
-[jsTest] ----
-
-Base error: { "absError" : 18.73, "relError" : 0.12, "selError" : 3.75 }
-Sample error: { "absError" : 26.01, "relError" : 0.17, "selError" : 5.2 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$lt" : 558 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 321.76190476190476,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 321.76190476190476,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 321.76190476190476
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$lt" : 558 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 317.39130434782606,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 317.39130434782606,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 317.39130434782606
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: { "normal_int_0-1000-1" : { "$lt" : 558 } }, base = 321.76, sample = 317.39, actual = 320
-[jsTest] ----
-
-Base error: { "absError" : 1.76, "relError" : 0.01, "selError" : 0.35 }
-Sample error: { "absError" : -2.61, "relError" : -0.01, "selError" : -0.52 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$eq" : 558 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 1.6666666666666496,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 1.6666666666666496,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 1.6666666666666496
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$eq" : 558 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 0,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 0,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 0
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: { "normal_int_0-1000-1" : { "$eq" : 558 } }, base = 1.67, sample = 0, actual = 2
-[jsTest] ----
-
-Base error: { "absError" : -0.33, "relError" : -0.17, "selError" : -0.07 }
-Sample error: { "absError" : -2, "relError" : -1, "selError" : -0.4 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$gte" : 435, "$lte" : 757 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 322.53534886164977,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 322.53534886164977,
-		"child" : {
-			"nodeType" : "Filter",
-			"logicalCE" : 322.53534886164977,
-			"child" : {
-				"nodeType" : "PhysicalScan",
-				"logicalCE" : 322.53534886164977
-			}
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$gte" : 435, "$lte" : 757 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 318.92912787723117,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 318.92912787723117,
-		"child" : {
-			"nodeType" : "Filter",
-			"logicalCE" : 318.92912787723117,
-			"child" : {
-				"nodeType" : "PhysicalScan",
-				"logicalCE" : 318.92912787723117
-			}
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: { "normal_int_0-1000-1" : { "$gte" : 435, "$lte" : 757 } }, base = 322.54, sample = 318.93, actual = 307
-[jsTest] ----
-
-Base error: { "absError" : 15.54, "relError" : 0.05, "selError" : 3.11 }
-Sample error: { "absError" : 11.93, "relError" : 0.04, "selError" : 2.39 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$lt" : 435 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 169.0857142857143,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 169.0857142857143,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 169.0857142857143
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$lt" : 435 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 178.26086956521735,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 178.26086956521735,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 178.26086956521735
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: { "normal_int_0-1000-1" : { "$lt" : 435 } }, base = 169.09, sample = 178.26, actual = 168
-[jsTest] ----
-
-Base error: { "absError" : 1.09, "relError" : 0.01, "selError" : 0.22 }
-Sample error: { "absError" : 10.26, "relError" : 0.06, "selError" : 2.05 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$eq" : 435 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 1.1999999999999789,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 1.1999999999999789,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 1.1999999999999789
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$eq" : 435 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 0,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 0,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 0
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: { "normal_int_0-1000-1" : { "$eq" : 435 } }, base = 1.2, sample = 0, actual = 1
-[jsTest] ----
-
-Base error: { "absError" : 0.2, "relError" : 0.2, "selError" : 0.04 }
-Sample error: { "absError" : -1, "relError" : -1, "selError" : -0.2 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$gte" : 307, "$lte" : 382 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 229.07815260299267,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 229.07815260299267,
-		"child" : {
-			"nodeType" : "Filter",
-			"logicalCE" : 229.07815260299267,
-			"child" : {
-				"nodeType" : "PhysicalScan",
-				"logicalCE" : 229.07815260299267
-			}
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$gte" : 307, "$lte" : 382 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 242.41734836814254,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 242.41734836814254,
-		"child" : {
-			"nodeType" : "Filter",
-			"logicalCE" : 242.41734836814254,
-			"child" : {
-				"nodeType" : "PhysicalScan",
-				"logicalCE" : 242.41734836814254
-			}
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: { "chi2_int_0-1000-1" : { "$gte" : 307, "$lte" : 382 } }, base = 229.08, sample = 242.42, actual = 226
-[jsTest] ----
-
-Base error: { "absError" : 3.08, "relError" : 0.01, "selError" : 0.62 }
-Sample error: { "absError" : 16.42, "relError" : 0.07, "selError" : 3.28 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$lt" : 307 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 4.0000000000000036,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 4.0000000000000036,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 4.0000000000000036
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$lt" : 307 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 4.347826086956497,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 4.347826086956497,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 4.347826086956497
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: { "chi2_int_0-1000-1" : { "$lt" : 307 } }, base = 4, sample = 4.35, actual = 4
+[jsTest] CE: { "uniform_int_0-1000-1" : { "$lt" : 160 } }, base = 87, sample = 86.96, actual = 87
 [jsTest] ----
 
 Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
-Sample error: { "absError" : 0.35, "relError" : 0.09, "selError" : 0.07 }
+Sample error: { "absError" : -0.04, "relError" : 0, "selError" : -0.01 }
 
 [jsTest] ----
-[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$eq" : 307 } }
+[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$eq" : 160 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 2.0000000000000018,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 2.0000000000000018,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 2.0000000000000018
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$eq" : 160 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 0,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 0,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 0
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: { "uniform_int_0-1000-1" : { "$eq" : 160 } }, base = 2, sample = 0, actual = 2
+[jsTest] ----
+
+Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
+Sample error: { "absError" : -2, "relError" : -1, "selError" : -0.4 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$gte" : 301, "$lte" : 463 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 202.51222185339827,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 202.51222185339827,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 202.51222185339827,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 202.51222185339827
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$gte" : 301, "$lte" : 463 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 213.95392051073762,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 213.95392051073762,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 213.95392051073762,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 213.95392051073762
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: { "uniform_int_0-1000-1" : { "$gte" : 301, "$lte" : 463 } }, base = 202.51, sample = 213.95, actual = 96
+[jsTest] ----
+
+Base error: { "absError" : 106.51, "relError" : 1.11, "selError" : 21.3 }
+Sample error: { "absError" : 117.95, "relError" : 1.23, "selError" : 23.59 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$lt" : 301 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 144.00000000000003,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 144.00000000000003,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 144.00000000000003
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$lt" : 301 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 152.17391304347828,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 152.17391304347828,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 152.17391304347828
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: { "uniform_int_0-1000-1" : { "$lt" : 301 } }, base = 144, sample = 152.17, actual = 144
+[jsTest] ----
+
+Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
+Sample error: { "absError" : 8.17, "relError" : 0.06, "selError" : 1.63 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$eq" : 301 } }
 [jsTest] ----
 
 {
@@ -643,7 +250,7 @@ Sample error: { "absError" : 0.35, "relError" : 0.09, "selError" : 0.07 }
 }
 
 [jsTest] ----
-[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$eq" : 307 } }
+[jsTest] Query: ce_data_500 { "uniform_int_0-1000-1" : { "$eq" : 301 } }
 [jsTest] ----
 
 {
@@ -660,266 +267,104 @@ Sample error: { "absError" : 0.35, "relError" : 0.09, "selError" : 0.07 }
 }
 
 [jsTest] ----
-[jsTest] CE: { "chi2_int_0-1000-1" : { "$eq" : 307 } }, base = 3, sample = 0, actual = 3
+[jsTest] CE: { "uniform_int_0-1000-1" : { "$eq" : 301 } }, base = 3, sample = 0, actual = 3
 [jsTest] ----
 
 Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
 Sample error: { "absError" : -3, "relError" : -1, "selError" : -0.6 }
 
 [jsTest] ----
-[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$gte" : 374, "$lte" : 382 } }
+[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$gte" : 225, "$lte" : 455 } }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 182.26683735666234,
+	"logicalCE" : 173.63824758351802,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 182.26683735666234,
+		"logicalCE" : 173.63824758351802,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 182.26683735666234,
+			"logicalCE" : 173.63824758351802,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 182.26683735666234
+				"logicalCE" : 173.63824758351802
 			}
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$gte" : 374, "$lte" : 382 } }
+[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$gte" : 225, "$lte" : 455 } }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 193.98703310929716,
+	"logicalCE" : 182.84708537076966,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 193.98703310929716,
+		"logicalCE" : 182.84708537076966,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 193.98703310929716,
+			"logicalCE" : 182.84708537076966,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 193.98703310929716
+				"logicalCE" : 182.84708537076966
 			}
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "chi2_int_0-1000-1" : { "$gte" : 374, "$lte" : 382 } }, base = 182.27, sample = 193.99, actual = 44
+[jsTest] CE: { "normal_int_0-1000-1" : { "$gte" : 225, "$lte" : 455 } }, base = 173.64, sample = 182.85, actual = 162
 [jsTest] ----
 
-Base error: { "absError" : 138.27, "relError" : 3.14, "selError" : 27.65 }
-Sample error: { "absError" : 149.99, "relError" : 3.41, "selError" : 30 }
+Base error: { "absError" : 11.64, "relError" : 0.07, "selError" : 2.33 }
+Sample error: { "absError" : 20.85, "relError" : 0.13, "selError" : 4.17 }
 
 [jsTest] ----
-[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$lt" : 374 } }
+[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$lt" : 225 } }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 186,
+	"logicalCE" : 14.500000000000012,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 186,
+		"logicalCE" : 14.500000000000012,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 186
+			"logicalCE" : 14.500000000000012
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$lt" : 374 } }
+[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$lt" : 225 } }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 182.6086956521739,
+	"logicalCE" : 21.739130434782595,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 182.6086956521739,
+		"logicalCE" : 21.739130434782595,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 182.6086956521739
+			"logicalCE" : 21.739130434782595
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "chi2_int_0-1000-1" : { "$lt" : 374 } }, base = 186, sample = 182.61, actual = 186
+[jsTest] CE: { "normal_int_0-1000-1" : { "$lt" : 225 } }, base = 14.5, sample = 21.74, actual = 15
 [jsTest] ----
 
-Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
-Sample error: { "absError" : -3.39, "relError" : -0.02, "selError" : -0.68 }
+Base error: { "absError" : -0.5, "relError" : -0.03, "selError" : -0.1 }
+Sample error: { "absError" : 6.74, "relError" : 0.45, "selError" : 1.35 }
 
 [jsTest] ----
-[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$eq" : 374 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 5.000000000000004,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 5.000000000000004,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 5.000000000000004
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$eq" : 374 } }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 4.347826086956497,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 4.347826086956497,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 4.347826086956497
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: { "chi2_int_0-1000-1" : { "$eq" : 374 } }, base = 5, sample = 4.35, actual = 5
-[jsTest] ----
-
-Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
-Sample error: { "absError" : -0.65, "relError" : -0.13, "selError" : -0.13 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 {
-[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$gte" : 532,
-[jsTest] 		"$lte" : 692
-[jsTest] 	}
-[jsTest] }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 107.66209041829099,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 107.66209041829099,
-		"child" : {
-			"nodeType" : "Filter",
-			"logicalCE" : 107.66209041829099,
-			"child" : {
-				"nodeType" : "PhysicalScan",
-				"logicalCE" : 107.66209041829099
-			}
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 {
-[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$gte" : 532,
-[jsTest] 		"$lte" : 692
-[jsTest] 	}
-[jsTest] }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 101.6571818669668,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 101.6571818669668,
-		"child" : {
-			"nodeType" : "Filter",
-			"logicalCE" : 101.6571818669668,
-			"child" : {
-				"nodeType" : "PhysicalScan",
-				"logicalCE" : 101.6571818669668
-			}
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: {
-[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$gte" : 532,
-[jsTest] 		"$lte" : 692
-[jsTest] 	}
-[jsTest] }, base = 107.66, sample = 101.66, actual = 22
-[jsTest] ----
-
-Base error: { "absError" : 85.66, "relError" : 3.89, "selError" : 17.13 }
-Sample error: { "absError" : 79.66, "relError" : 3.62, "selError" : 15.93 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 {
-[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$lt" : 532
-[jsTest] 	}
-[jsTest] }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 97.20930232558139,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 97.20930232558139,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 97.20930232558139
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 {
-[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$lt" : 532
-[jsTest] 	}
-[jsTest] }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 95.65217391304348,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 95.65217391304348,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 95.65217391304348
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: {
-[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$lt" : 532
-[jsTest] 	}
-[jsTest] }, base = 97.21, sample = 95.65, actual = 96
-[jsTest] ----
-
-Base error: { "absError" : 1.21, "relError" : 0.01, "selError" : 0.24 }
-Sample error: { "absError" : -0.35, "relError" : 0, "selError" : -0.07 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 {
-[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$eq" : 532
-[jsTest] 	}
-[jsTest] }
+[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$eq" : 225 } }
 [jsTest] ----
 
 {
@@ -936,11 +381,7 @@ Sample error: { "absError" : -0.35, "relError" : 0, "selError" : -0.07 }
 }
 
 [jsTest] ----
-[jsTest] Query: ce_data_500 {
-[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$eq" : 532
-[jsTest] 	}
-[jsTest] }
+[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$eq" : 225 } }
 [jsTest] ----
 
 {
@@ -957,37 +398,426 @@ Sample error: { "absError" : -0.35, "relError" : 0, "selError" : -0.07 }
 }
 
 [jsTest] ----
-[jsTest] CE: {
-[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$eq" : 532
-[jsTest] 	}
-[jsTest] }, base = 1, sample = 0, actual = 1
+[jsTest] CE: { "normal_int_0-1000-1" : { "$eq" : 225 } }, base = 1, sample = 0, actual = 1
 [jsTest] ----
 
 Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
 Sample error: { "absError" : -1, "relError" : -1, "selError" : -0.2 }
 
 [jsTest] ----
+[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$gte" : 455, "$lte" : 598 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 275.0302549173937,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 275.0302549173937,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 275.0302549173937,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 275.0302549173937
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$gte" : 455, "$lte" : 598 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 269.1319159161689,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 269.1319159161689,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 269.1319159161689,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 269.1319159161689
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: { "normal_int_0-1000-1" : { "$gte" : 455, "$lte" : 598 } }, base = 275.03, sample = 269.13, actual = 183
+[jsTest] ----
+
+Base error: { "absError" : 92.03, "relError" : 0.5, "selError" : 18.41 }
+Sample error: { "absError" : 86.13, "relError" : 0.47, "selError" : 17.23 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$lt" : 455 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 174.87878787878785,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 174.87878787878785,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 174.87878787878785
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$lt" : 455 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 186.95652173913047,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 186.95652173913047,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 186.95652173913047
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: { "normal_int_0-1000-1" : { "$lt" : 455 } }, base = 174.88, sample = 186.96, actual = 175
+[jsTest] ----
+
+Base error: { "absError" : -0.12, "relError" : 0, "selError" : -0.02 }
+Sample error: { "absError" : 11.96, "relError" : 0.07, "selError" : 2.39 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$eq" : 455 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 1.333333333333353,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 1.333333333333353,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 1.333333333333353
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "normal_int_0-1000-1" : { "$eq" : 455 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 0,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 0,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 0
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: { "normal_int_0-1000-1" : { "$eq" : 455 } }, base = 1.33, sample = 0, actual = 2
+[jsTest] ----
+
+Base error: { "absError" : -0.67, "relError" : -0.33, "selError" : -0.13 }
+Sample error: { "absError" : -2, "relError" : -1, "selError" : -0.4 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$gte" : 364, "$lte" : 393 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 246.67984108961963,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 246.67984108961963,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 246.67984108961963,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 246.67984108961963
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$gte" : 364, "$lte" : 393 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 257.4699721400401,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 257.4699721400401,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 257.4699721400401,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 257.4699721400401
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: { "chi2_int_0-1000-1" : { "$gte" : 364, "$lte" : 393 } }, base = 246.68, sample = 257.47, actual = 146
+[jsTest] ----
+
+Base error: { "absError" : 100.68, "relError" : 0.69, "selError" : 20.14 }
+Sample error: { "absError" : 111.47, "relError" : 0.76, "selError" : 22.29 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$lt" : 364 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 148.00000000000003,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 148.00000000000003,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 148.00000000000003
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$lt" : 364 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 152.17391304347828,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 152.17391304347828,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 152.17391304347828
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: { "chi2_int_0-1000-1" : { "$lt" : 364 } }, base = 148, sample = 152.17, actual = 148
+[jsTest] ----
+
+Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
+Sample error: { "absError" : 4.17, "relError" : 0.03, "selError" : 0.83 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$eq" : 364 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 9.000000000000007,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 9.000000000000007,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 9.000000000000007
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$eq" : 364 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 13.043478260869545,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 13.043478260869545,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 13.043478260869545
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: { "chi2_int_0-1000-1" : { "$eq" : 364 } }, base = 9, sample = 13.04, actual = 9
+[jsTest] ----
+
+Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
+Sample error: { "absError" : 4.04, "relError" : 0.45, "selError" : 0.81 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$gte" : 364, "$lte" : 374 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 168.64846278576036,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 168.64846278576036,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 168.64846278576036,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 168.64846278576036
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$gte" : 364, "$lte" : 374 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 170.43786888143507,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 170.43786888143507,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 170.43786888143507,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 170.43786888143507
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: { "chi2_int_0-1000-1" : { "$gte" : 364, "$lte" : 374 } }, base = 168.65, sample = 170.44, actual = 54
+[jsTest] ----
+
+Base error: { "absError" : 114.65, "relError" : 2.12, "selError" : 22.93 }
+Sample error: { "absError" : 116.44, "relError" : 2.16, "selError" : 23.29 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$lt" : 364 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 148.00000000000003,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 148.00000000000003,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 148.00000000000003
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$lt" : 364 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 152.17391304347828,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 152.17391304347828,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 152.17391304347828
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: { "chi2_int_0-1000-1" : { "$lt" : 364 } }, base = 148, sample = 152.17, actual = 148
+[jsTest] ----
+
+Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
+Sample error: { "absError" : 4.17, "relError" : 0.03, "selError" : 0.83 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$eq" : 364 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 9.000000000000007,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 9.000000000000007,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 9.000000000000007
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 { "chi2_int_0-1000-1" : { "$eq" : 364 } }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 13.043478260869545,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 13.043478260869545,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 13.043478260869545
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: { "chi2_int_0-1000-1" : { "$eq" : 364 } }, base = 9, sample = 13.04, actual = 9
+[jsTest] ----
+
+Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
+Sample error: { "absError" : 4.04, "relError" : 0.45, "selError" : 0.81 }
+
+[jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$gte" : 692,
-[jsTest] 		"$lte" : 6610
+[jsTest] 		"$gte" : 393,
+[jsTest] 		"$lte" : 4030
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 262.86767098830074,
+	"logicalCE" : 197.0652571769232,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 262.86767098830074,
+		"logicalCE" : 197.0652571769232,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 262.86767098830074,
+			"logicalCE" : 197.0652571769232,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 262.86767098830074
+				"logicalCE" : 197.0652571769232
 			}
 		}
 	}
@@ -996,24 +826,24 @@ Sample error: { "absError" : -1, "relError" : -1, "selError" : -0.2 }
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$gte" : 692,
-[jsTest] 		"$lte" : 6610
+[jsTest] 		"$gte" : 393,
+[jsTest] 		"$lte" : 4030
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 240.96768012562796,
+	"logicalCE" : 194.32906960488137,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 240.96768012562796,
+		"logicalCE" : 194.32906960488137,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 240.96768012562796,
+			"logicalCE" : 194.32906960488137,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 240.96768012562796
+				"logicalCE" : 194.32906960488137
 			}
 		}
 	}
@@ -1022,32 +852,32 @@ Sample error: { "absError" : -1, "relError" : -1, "selError" : -0.2 }
 [jsTest] ----
 [jsTest] CE: {
 [jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$gte" : 692,
-[jsTest] 		"$lte" : 6610
+[jsTest] 		"$gte" : 393,
+[jsTest] 		"$lte" : 4030
 [jsTest] 	}
-[jsTest] }, base = 262.87, sample = 240.97, actual = 185
+[jsTest] }, base = 197.07, sample = 194.33, actual = 150
 [jsTest] ----
 
-Base error: { "absError" : 77.87, "relError" : 0.42, "selError" : 15.57 }
-Sample error: { "absError" : 55.97, "relError" : 0.3, "selError" : 11.19 }
+Base error: { "absError" : 47.07, "relError" : 0.31, "selError" : 9.41 }
+Sample error: { "absError" : 44.33, "relError" : 0.3, "selError" : 8.87 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$lt" : 692
+[jsTest] 		"$lt" : 393
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 119.18211673384089,
+	"logicalCE" : 65.96551724137933,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 119.18211673384089,
+		"logicalCE" : 65.96551724137933,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 119.18211673384089
+			"logicalCE" : 65.96551724137933
 		}
 	}
 }
@@ -1055,20 +885,20 @@ Sample error: { "absError" : 55.97, "relError" : 0.3, "selError" : 11.19 }
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$lt" : 692
+[jsTest] 		"$lt" : 393
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 113.04347826086958,
+	"logicalCE" : 47.82608695652174,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 113.04347826086958,
+		"logicalCE" : 47.82608695652174,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 113.04347826086958
+			"logicalCE" : 47.82608695652174
 		}
 	}
 }
@@ -1076,31 +906,31 @@ Sample error: { "absError" : 55.97, "relError" : 0.3, "selError" : 11.19 }
 [jsTest] ----
 [jsTest] CE: {
 [jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$lt" : 692
+[jsTest] 		"$lt" : 393
 [jsTest] 	}
-[jsTest] }, base = 119.18, sample = 113.04, actual = 117
+[jsTest] }, base = 65.97, sample = 47.83, actual = 62
 [jsTest] ----
 
-Base error: { "absError" : 2.18, "relError" : 0.02, "selError" : 0.44 }
-Sample error: { "absError" : -3.96, "relError" : -0.03, "selError" : -0.79 }
+Base error: { "absError" : 3.97, "relError" : 0.06, "selError" : 0.79 }
+Sample error: { "absError" : -14.17, "relError" : -0.23, "selError" : -2.83 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$eq" : 692
+[jsTest] 		"$eq" : 393
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 1.0689655172413937,
+	"logicalCE" : 1.0344827586206695,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 1.0689655172413937,
+		"logicalCE" : 1.0344827586206695,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 1.0689655172413937
+			"logicalCE" : 1.0344827586206695
 		}
 	}
 }
@@ -1108,7 +938,7 @@ Sample error: { "absError" : -3.96, "relError" : -0.03, "selError" : -0.79 }
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$eq" : 692
+[jsTest] 		"$eq" : 393
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
@@ -1129,35 +959,205 @@ Sample error: { "absError" : -3.96, "relError" : -0.03, "selError" : -0.79 }
 [jsTest] ----
 [jsTest] CE: {
 [jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
-[jsTest] 		"$eq" : 692
+[jsTest] 		"$eq" : 393
 [jsTest] 	}
-[jsTest] }, base = 1.07, sample = 0, actual = 1
+[jsTest] }, base = 1.03, sample = 0, actual = 1
 [jsTest] ----
 
-Base error: { "absError" : 0.07, "relError" : 0.07, "selError" : 0.01 }
+Base error: { "absError" : 0.03, "relError" : 0.03, "selError" : 0.01 }
 Sample error: { "absError" : -1, "relError" : -1, "selError" : -0.2 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
-[jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$gte" : 220,
-[jsTest] 		"$lte" : 548
+[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
+[jsTest] 		"$gte" : 573,
+[jsTest] 		"$lte" : 4030
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 103.33530738577579,
+	"logicalCE" : 189.55337190353535,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 103.33530738577579,
+		"logicalCE" : 189.55337190353535,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 103.33530738577579,
+			"logicalCE" : 189.55337190353535,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 103.33530738577579
+				"logicalCE" : 189.55337190353535
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 {
+[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
+[jsTest] 		"$gte" : 573,
+[jsTest] 		"$lte" : 4030
+[jsTest] 	}
+[jsTest] }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 186.70533087893955,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 186.70533087893955,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 186.70533087893955,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 186.70533087893955
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: {
+[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
+[jsTest] 		"$gte" : 573,
+[jsTest] 		"$lte" : 4030
+[jsTest] 	}
+[jsTest] }, base = 189.55, sample = 186.71, actual = 115
+[jsTest] ----
+
+Base error: { "absError" : 74.55, "relError" : 0.65, "selError" : 14.91 }
+Sample error: { "absError" : 71.71, "relError" : 0.62, "selError" : 14.34 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 {
+[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
+[jsTest] 		"$lt" : 573
+[jsTest] 	}
+[jsTest] }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 98.275,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 98.275,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 98.275
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 {
+[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
+[jsTest] 		"$lt" : 573
+[jsTest] 	}
+[jsTest] }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 82.60869565217388,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 82.60869565217388,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 82.60869565217388
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: {
+[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
+[jsTest] 		"$lt" : 573
+[jsTest] 	}
+[jsTest] }, base = 98.28, sample = 82.61, actual = 97
+[jsTest] ----
+
+Base error: { "absError" : 1.28, "relError" : 0.01, "selError" : 0.26 }
+Sample error: { "absError" : -14.39, "relError" : -0.15, "selError" : -2.88 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 {
+[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
+[jsTest] 		"$eq" : 573
+[jsTest] 	}
+[jsTest] }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 1.1249999999999871,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 1.1249999999999871,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 1.1249999999999871
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 {
+[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
+[jsTest] 		"$eq" : 573
+[jsTest] 	}
+[jsTest] }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 0,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 0,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 0
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: {
+[jsTest] 	"mixdist_uniform_int_0-1000-1_uniform_int_7000-8000-1_normal_int_0-10000-10_" : {
+[jsTest] 		"$eq" : 573
+[jsTest] 	}
+[jsTest] }, base = 1.12, sample = 0, actual = 2
+[jsTest] ----
+
+Base error: { "absError" : -0.88, "relError" : -0.44, "selError" : -0.18 }
+Sample error: { "absError" : -2, "relError" : -1, "selError" : -0.4 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 {
+[jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
+[jsTest] 		"$gte" : 477,
+[jsTest] 		"$lte" : 39000
+[jsTest] 	}
+[jsTest] }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 348.63831553673367,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 348.63831553673367,
+		"child" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 348.63831553673367,
+			"child" : {
+				"nodeType" : "PhysicalScan",
+				"logicalCE" : 348.63831553673367
 			}
 		}
 	}
@@ -1166,24 +1166,24 @@ Sample error: { "absError" : -1, "relError" : -1, "selError" : -0.2 }
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$gte" : 220,
-[jsTest] 		"$lte" : 548
+[jsTest] 		"$gte" : 477,
+[jsTest] 		"$lte" : 39000
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 112.44828950834653,
+	"logicalCE" : 365.8885023272332,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 112.44828950834653,
+		"logicalCE" : 365.8885023272332,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 112.44828950834653,
+			"logicalCE" : 365.8885023272332,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 112.44828950834653
+				"logicalCE" : 365.8885023272332
 			}
 		}
 	}
@@ -1192,32 +1192,32 @@ Sample error: { "absError" : -1, "relError" : -1, "selError" : -0.2 }
 [jsTest] ----
 [jsTest] CE: {
 [jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$gte" : 220,
-[jsTest] 		"$lte" : 548
+[jsTest] 		"$gte" : 477,
+[jsTest] 		"$lte" : 39000
 [jsTest] 	}
-[jsTest] }, base = 103.34, sample = 112.45, actual = 94
+[jsTest] }, base = 348.64, sample = 365.89, actual = 290
 [jsTest] ----
 
-Base error: { "absError" : 9.34, "relError" : 0.1, "selError" : 1.87 }
-Sample error: { "absError" : 18.45, "relError" : 0.2, "selError" : 3.69 }
+Base error: { "absError" : 58.64, "relError" : 0.2, "selError" : 11.73 }
+Sample error: { "absError" : 75.89, "relError" : 0.26, "selError" : 15.18 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$lt" : 220
+[jsTest] 		"$lt" : 477
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 37.39081641698433,
+	"logicalCE" : 63.51275751275753,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 37.39081641698433,
+		"logicalCE" : 63.51275751275753,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 37.39081641698433
+			"logicalCE" : 63.51275751275753
 		}
 	}
 }
@@ -1225,20 +1225,20 @@ Sample error: { "absError" : 18.45, "relError" : 0.2, "selError" : 3.69 }
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$lt" : 220
+[jsTest] 		"$lt" : 477
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 5.251270468661751,
+	"logicalCE" : 81.64251207729467,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 5.251270468661751,
+		"logicalCE" : 81.64251207729467,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 5.251270468661751
+			"logicalCE" : 81.64251207729467
 		}
 	}
 }
@@ -1246,31 +1246,31 @@ Sample error: { "absError" : 18.45, "relError" : 0.2, "selError" : 3.69 }
 [jsTest] ----
 [jsTest] CE: {
 [jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$lt" : 220
+[jsTest] 		"$lt" : 477
 [jsTest] 	}
-[jsTest] }, base = 37.39, sample = 5.25, actual = 8
+[jsTest] }, base = 63.51, sample = 81.64, actual = 84
 [jsTest] ----
 
-Base error: { "absError" : 29.39, "relError" : 3.67, "selError" : 5.88 }
-Sample error: { "absError" : -2.75, "relError" : -0.34, "selError" : -0.55 }
+Base error: { "absError" : -20.49, "relError" : -0.24, "selError" : -4.1 }
+Sample error: { "absError" : -2.36, "relError" : -0.03, "selError" : -0.47 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$eq" : 220
+[jsTest] 		"$eq" : 477
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 1.1310344827586416,
+	"logicalCE" : 1.1608391608391444,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 1.1310344827586416,
+		"logicalCE" : 1.1608391608391444,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 1.1310344827586416
+			"logicalCE" : 1.1608391608391444
 		}
 	}
 }
@@ -1278,7 +1278,7 @@ Sample error: { "absError" : -2.75, "relError" : -0.34, "selError" : -0.55 }
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$eq" : 220
+[jsTest] 		"$eq" : 477
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
@@ -1299,35 +1299,35 @@ Sample error: { "absError" : -2.75, "relError" : -0.34, "selError" : -0.55 }
 [jsTest] ----
 [jsTest] CE: {
 [jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$eq" : 220
+[jsTest] 		"$eq" : 477
 [jsTest] 	}
-[jsTest] }, base = 1.13, sample = 4.35, actual = 1
+[jsTest] }, base = 1.16, sample = 4.35, actual = 2
 [jsTest] ----
 
-Base error: { "absError" : 0.13, "relError" : 0.13, "selError" : 0.03 }
-Sample error: { "absError" : 3.35, "relError" : 3.35, "selError" : 0.67 }
+Base error: { "absError" : -0.84, "relError" : -0.42, "selError" : -0.17 }
+Sample error: { "absError" : 2.35, "relError" : 1.17, "selError" : 0.47 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$gte" : 220,
-[jsTest] 		"$lte" : 38400
+[jsTest] 		"$gte" : 542,
+[jsTest] 		"$lte" : 39000
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 360.88525583135817,
+	"logicalCE" : 344.10887251184346,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 360.88525583135817,
+		"logicalCE" : 344.10887251184346,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 360.88525583135817,
+			"logicalCE" : 344.10887251184346,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 360.88525583135817
+				"logicalCE" : 344.10887251184346
 			}
 		}
 	}
@@ -1336,24 +1336,24 @@ Sample error: { "absError" : 3.35, "relError" : 3.35, "selError" : 0.67 }
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$gte" : 220,
-[jsTest] 		"$lte" : 38400
+[jsTest] 		"$gte" : 542,
+[jsTest] 		"$lte" : 39000
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 380.5942106436344,
+	"logicalCE" : 353.88206252605363,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 380.5942106436344,
+		"logicalCE" : 353.88206252605363,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 380.5942106436344,
+			"logicalCE" : 353.88206252605363,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 380.5942106436344
+				"logicalCE" : 353.88206252605363
 			}
 		}
 	}
@@ -1362,32 +1362,32 @@ Sample error: { "absError" : 3.35, "relError" : 3.35, "selError" : 0.67 }
 [jsTest] ----
 [jsTest] CE: {
 [jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$gte" : 220,
-[jsTest] 		"$lte" : 38400
+[jsTest] 		"$gte" : 542,
+[jsTest] 		"$lte" : 39000
 [jsTest] 	}
-[jsTest] }, base = 360.89, sample = 380.59, actual = 368
+[jsTest] }, base = 344.11, sample = 353.88, actual = 268
 [jsTest] ----
 
-Base error: { "absError" : -7.11, "relError" : -0.02, "selError" : -1.42 }
-Sample error: { "absError" : 12.59, "relError" : 0.03, "selError" : 2.52 }
+Base error: { "absError" : 76.11, "relError" : 0.28, "selError" : 15.22 }
+Sample error: { "absError" : 85.88, "relError" : 0.32, "selError" : 17.18 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$lt" : 220
+[jsTest] 		"$lt" : 542
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 37.39081641698433,
+	"logicalCE" : 74.72897372897374,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 37.39081641698433,
+		"logicalCE" : 74.72897372897374,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 37.39081641698433
+			"logicalCE" : 74.72897372897374
 		}
 	}
 }
@@ -1395,73 +1395,20 @@ Sample error: { "absError" : 12.59, "relError" : 0.03, "selError" : 2.52 }
 [jsTest] ----
 [jsTest] Query: ce_data_500 {
 [jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$lt" : 220
+[jsTest] 		"$lt" : 542
 [jsTest] 	}
 [jsTest] }
 [jsTest] ----
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 5.251270468661751,
+	"logicalCE" : 104.34782608695653,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 5.251270468661751,
+		"logicalCE" : 104.34782608695653,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 5.251270468661751
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] CE: {
-[jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$lt" : 220
-[jsTest] 	}
-[jsTest] }, base = 37.39, sample = 5.25, actual = 8
-[jsTest] ----
-
-Base error: { "absError" : 29.39, "relError" : 3.67, "selError" : 5.88 }
-Sample error: { "absError" : -2.75, "relError" : -0.34, "selError" : -0.55 }
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 {
-[jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$eq" : 220
-[jsTest] 	}
-[jsTest] }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 1.1310344827586416,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 1.1310344827586416,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 1.1310344827586416
-		}
-	}
-}
-
-[jsTest] ----
-[jsTest] Query: ce_data_500 {
-[jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$eq" : 220
-[jsTest] 	}
-[jsTest] }
-[jsTest] ----
-
-{
-	"nodeType" : "Root",
-	"logicalCE" : 4.347826086956497,
-	"child" : {
-		"nodeType" : "Filter",
-		"logicalCE" : 4.347826086956497,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 4.347826086956497
+			"logicalCE" : 104.34782608695653
 		}
 	}
 }
@@ -1469,20 +1416,73 @@ Sample error: { "absError" : -2.75, "relError" : -0.34, "selError" : -0.55 }
 [jsTest] ----
 [jsTest] CE: {
 [jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
-[jsTest] 		"$eq" : 220
+[jsTest] 		"$lt" : 542
 [jsTest] 	}
-[jsTest] }, base = 1.13, sample = 4.35, actual = 1
+[jsTest] }, base = 74.73, sample = 104.35, actual = 106
 [jsTest] ----
 
-Base error: { "absError" : 0.13, "relError" : 0.13, "selError" : 0.03 }
-Sample error: { "absError" : 3.35, "relError" : 3.35, "selError" : 0.67 }
+Base error: { "absError" : -31.27, "relError" : -0.29, "selError" : -6.25 }
+Sample error: { "absError" : -1.65, "relError" : -0.02, "selError" : -0.33 }
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 {
+[jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
+[jsTest] 		"$eq" : 542
+[jsTest] 	}
+[jsTest] }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 1.1608391608391444,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 1.1608391608391444,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 1.1608391608391444
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: ce_data_500 {
+[jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
+[jsTest] 		"$eq" : 542
+[jsTest] 	}
+[jsTest] }
+[jsTest] ----
+
+{
+	"nodeType" : "Root",
+	"logicalCE" : 0,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 0,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 0
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] CE: {
+[jsTest] 	"mixdist_normal_int_0-1000-1_normal_int_0-10000-10_normal_int_0-100000-100_" : {
+[jsTest] 		"$eq" : 542
+[jsTest] 	}
+[jsTest] }, base = 1.16, sample = 0, actual = 1
+[jsTest] ----
+
+Base error: { "absError" : 0.16, "relError" : 0.16, "selError" : 0.03 }
+Sample error: { "absError" : -1, "relError" : -1, "selError" : -0.2 }
 
 [jsTest] ----
 [jsTest] Average errors (30 queries):
 [jsTest] ----
 
-Average base error: { "absError" : 15.29, "relError" : 0.51, "selError" : 3.06 }
-Average sample error: { "absError" : 13.74, "relError" : 0.24, "selError" : 2.75 }
+Average base error: { "absError" : 23.54, "relError" : 0.19, "selError" : 4.71 }
+Average sample error: { "absError" : 27, "relError" : 0.09, "selError" : 5.4 }
 
 [jsTest] ----
 [jsTest] Settings after: { "internalQueryFrameworkControl" : "forceBonsai", "ok" : 1 }

@@ -245,14 +245,12 @@ class RandomDistribution:
         range_str = ''
         if hasattr(self, 'values'):
             range_str = print_values(self.values)
-        elif self.values_name != '':
-            range_str = f'{self.values_name}'
-            if self.weights_name != '':
-                range_str += f'_{self.weights_name}'
+        if self.values_name != '':
+            range_str += f'_{self.values_name}'
+        if self.weights_name != '':
+            range_str += f'_{self.weights_name}'
 
         distr_str = f'{str(self.distribution_type)}_{range_str}'
-        if isinstance(self, ArrayRandomDistribution):
-            distr_str += f'array_{str(self.value_distr)}'
         return distr_str
 
     @staticmethod
@@ -426,7 +424,9 @@ class ArrayRandomDistribution(RandomDistribution):
         self.distribution_type = value_distr.distribution_type
 
     def __str__(self):
-        return f'{super().__str__()}'
+        distr_str = f'{super().__str__()}'
+        distr_str += f'array_{str(self.value_distr)}_{str(self.lengths_distr)}'
+        return distr_str
 
     def generate(self, size: int):
         """Generate random array sequence of the given size."""
