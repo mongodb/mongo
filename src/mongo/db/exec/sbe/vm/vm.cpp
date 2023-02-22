@@ -3030,6 +3030,29 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcat(ArityTyp
     return {true, strTag, strValue};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArrays(ArityType arity) {
+    auto [resTag, resVal] = value::makeNewArray();
+    value::ValueGuard resGuard{resTag, resVal};
+    auto resView = value::getArrayView(resVal);
+
+    for (ArityType idx = 0; idx < arity; ++idx) {
+        auto [_, tag, val] = getFromStack(idx);
+        if (!value::isArray(tag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+
+        for (auto ae = value::ArrayEnumerator{tag, val}; !ae.atEnd(); ae.advance()) {
+            auto [elTag, elVal] = ae.getViewOfValue();
+            auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
+            resView->push_back(copyTag, copyVal);
+        }
+    }
+
+    resGuard.reset();
+
+    return {true, resTag, resVal};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggConcatArraysCapped(
     ArityType arity) {
     auto [ownArr, tagArr, valArr] = getFromStack(0);
@@ -4711,6 +4734,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinRound(arity);
         case Builtin::concat:
             return builtinConcat(arity);
+        case Builtin::concatArrays:
+            return builtinConcatArrays(arity);
         case Builtin::aggConcatArraysCapped:
             return builtinAggConcatArraysCapped(arity);
         case Builtin::aggSetUnion:

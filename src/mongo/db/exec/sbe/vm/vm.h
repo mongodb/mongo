@@ -548,6 +548,7 @@ enum class Builtin : uint8_t {
     toLower,
     coerceToString,
     concat,
+    concatArrays,
 
     // Agg function to concatenate arrays, failing when the accumulator reaches a specified size.
     aggConcatArraysCapped,
@@ -1187,6 +1188,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinTanh(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRound(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinConcat(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinConcatArrays(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAggConcatArraysCapped(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAggSetUnion(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAggSetUnionCapped(ArityType arity);
