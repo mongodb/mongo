@@ -40,7 +40,6 @@ const commandsAddedToMongosSinceLastLTS = [
     "rotateCertificates",
     "setAllowMigrations",
     "setClusterParameter",
-    "setProfilingFilterGlobally",  // TODO SERVER-73305
     "setUserWriteBlockMode",
     "testDeprecation",
     "testDeprecationInVersion2",
