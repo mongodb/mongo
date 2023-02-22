@@ -306,9 +306,9 @@ private:
     void _initNextIdIfNeeded(OperationContext* opCtx);
 
     /**
-     * Adjusts the record count and data size metadata for this record store. The function consults
-     * the SizeRecoveryState to determine whether or not to actually change the size metadata if the
-     * server is undergoing recovery.
+     * Adjusts the record count and data size metadata for this record store, respectively. These
+     * functions consult the SizeRecoveryState to determine whether or not to actually change the
+     * size metadata if the server is undergoing recovery.
      *
      * For most record stores, we will not update the size metadata during recovery, as we trust
      * that the values in the SizeStorer are accurate with respect to the end state of recovery.
@@ -322,9 +322,8 @@ private:
      *      are pending writes to this ident as part of the recovery process, and so we must
      *      always adjust size metadata for these idents.
      */
-    void _changeNumRecordsAndDataSize(OperationContext* opCtx,
-                                      int64_t numRecordDiff,
-                                      int64_t dataSizeDiff);
+    void _changeNumRecords(OperationContext* opCtx, int64_t diff);
+    void _increaseDataSize(OperationContext* opCtx, int64_t amount);
 
     const std::string _uri;
     const uint64_t _tableId;  // not persisted

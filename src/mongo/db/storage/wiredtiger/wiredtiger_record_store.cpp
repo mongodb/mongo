@@ -1051,8 +1051,7 @@ bool WiredTigerRecordStore::inShutdown() const {
 }
 
 long long WiredTigerRecordStore::dataSize(OperationContext* opCtx) const {
-    auto dataSize = _sizeInfo->dataSize.load();
-    return dataSize > 0 ? dataSize : 0;
+    return _sizeInfo->dataSize.load();
 }
 
 long long WiredTigerRecordStore::numRecords(OperationContext* opCtx) const {
@@ -1163,7 +1162,8 @@ void WiredTigerRecordStore::doDeleteRecord(OperationContext* opCtx, const Record
     auto keyLength = computeRecordIdSize(id);
     metricsCollector.incrementOneDocWritten(old_length + keyLength);
 
-    _changeNumRecordsAndDataSize(opCtx, -1, -old_length);
+    _changeNumRecords(opCtx, -1);
+    _increaseDataSize(opCtx, -old_length);
 }
 
 Timestamp WiredTigerRecordStore::getPinnedOplog() const {
@@ -1288,7 +1288,8 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
             invariantWTOK(cursor->reset(cursor), cursor->session);
             setKey(cursor, &truncateUpToKey);
             invariantWTOK(session->truncate(session, nullptr, nullptr, cursor, nullptr), session);
-            _changeNumRecordsAndDataSize(opCtx, -stone->records, -stone->bytes);
+            _changeNumRecords(opCtx, -stone->records);
+            _increaseDataSize(opCtx, -stone->bytes);
 
             wuow.commit();
 
@@ -1428,7 +1429,9 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
             metricsCollector.incrementOneDocWritten(value.size + keyLength);
         }
     }
-    _changeNumRecordsAndDataSize(opCtx, nRecords, totalLength);
+
+    _changeNumRecords(opCtx, nRecords);
+    _increaseDataSize(opCtx, totalLength);
 
     if (_oplogStones) {
         _oplogStones->updateCurrentStoneAfterInsertOnCommit(
@@ -1603,7 +1606,7 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
     }
     invariantWTOK(ret, c->session);
 
-    _changeNumRecordsAndDataSize(opCtx, 0, len - old_length);
+    _increaseDataSize(opCtx, len - old_length);
     return Status::OK();
 }
 
@@ -1744,7 +1747,8 @@ Status WiredTigerRecordStore::doTruncate(OperationContext* opCtx) {
     WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
     invariantWTOK(WT_OP_CHECK(session->truncate(session, nullptr, start, nullptr, nullptr)),
                   session);
-    _changeNumRecordsAndDataSize(opCtx, -numRecords(opCtx), -dataSize(opCtx));
+    _changeNumRecords(opCtx, -numRecords(opCtx));
+    _increaseDataSize(opCtx, -dataSize(opCtx));
 
     if (_oplogStones) {
         _oplogStones->clearStonesOnCommit(opCtx);
@@ -1975,9 +1979,7 @@ RecordId WiredTigerRecordStore::_nextId(OperationContext* opCtx) {
     return out;
 }
 
-void WiredTigerRecordStore::_changeNumRecordsAndDataSize(OperationContext* opCtx,
-                                                         int64_t numRecordDiff,
-                                                         int64_t dataSizeDiff) {
+void WiredTigerRecordStore::_changeNumRecords(OperationContext* opCtx, int64_t diff) {
     if (!_tracksSizeAdjustments) {
         return;
     }
@@ -1986,17 +1988,29 @@ void WiredTigerRecordStore::_changeNumRecordsAndDataSize(OperationContext* opCtx
         return;
     }
 
-    opCtx->recoveryUnit()->onRollback([this, numRecordDiff, dataSizeDiff]() {
-        LOGV2_DEBUG(7105300,
-                    3,
-                    "WiredTigerRecordStore: rolling back change to numRecords and dataSize",
-                    "numRecordDiff"_attr = -numRecordDiff,
-                    "dataSizeDiff"_attr = -dataSizeDiff);
-        _sizeInfo->numRecords.addAndFetch(-numRecordDiff);
-        _sizeInfo->dataSize.addAndFetch(-dataSizeDiff);
+    opCtx->recoveryUnit()->onRollback([this, diff]() {
+        LOGV2_DEBUG(
+            22404, 3, "WiredTigerRecordStore: rolling back NumRecordsChange", "diff"_attr = -diff);
+        _sizeInfo->numRecords.addAndFetch(-diff);
     });
-    _sizeInfo->numRecords.addAndFetch(numRecordDiff);
-    _sizeInfo->dataSize.addAndFetch(dataSizeDiff);
+    _sizeInfo->numRecords.addAndFetch(diff);
+}
+
+void WiredTigerRecordStore::_increaseDataSize(OperationContext* opCtx, int64_t amount) {
+    if (!_tracksSizeAdjustments) {
+        return;
+    }
+
+    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(getIdent())) {
+        return;
+    }
+
+    if (opCtx)
+        opCtx->recoveryUnit()->onRollback(
+            [this, amount]() { _increaseDataSize(nullptr, -amount); });
+
+    if (_sizeInfo->dataSize.fetchAndAdd(amount) < 0)
+        _sizeInfo->dataSize.store(std::max(amount, int64_t(0)));
 
     if (_sizeStorer)
         _sizeStorer->store(_uri, _sizeInfo);
@@ -2083,7 +2097,8 @@ void WiredTigerRecordStore::doCappedTruncateAfter(OperationContext* opCtx,
     WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
     invariantWTOK(session->truncate(session, nullptr, start, nullptr, nullptr), session);
 
-    _changeNumRecordsAndDataSize(opCtx, -recordsRemoved, -bytesRemoved);
+    _changeNumRecords(opCtx, -recordsRemoved);
+    _increaseDataSize(opCtx, -bytesRemoved);
 
     wuow.commit();
 

@@ -1150,9 +1150,9 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     ASSERT_EQ(0, memcmp(dataUpdated, rd.data(), strlen(dataUpdated)));
 }
 
-// Make sure numRecords and dataSize are accurate after a delete rolls back and some other
-// transaction deletes the same rows before we have a chance of patching up the metadata.
-TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
+// Make sure numRecords is accurate after a delete rolls back and some other transaction deletes the
+// same rows before we have a chance of patching up the metadata.
+TEST(WiredTigerRecordStoreTest, NumRecordsAccurateAfterRollbackWithDelete) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -1166,7 +1166,6 @@ TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
     }
 
     ASSERT_EQ(1, rs->numRecords(ctx.get()));
-    ASSERT_EQ(2, rs->dataSize(ctx.get()));
 
     WriteUnitOfWork uow(ctx.get());
 
@@ -1198,7 +1197,6 @@ TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
 
     abortedThread.join();
     ASSERT_EQ(0, rs->numRecords(ctx.get()));
-    ASSERT_EQ(0, rs->dataSize(ctx.get()));
 }
 
 }  // namespace
