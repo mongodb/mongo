@@ -167,4 +167,12 @@ assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {a: {$
                              ErrorCodes.BadValue);
 assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {a: {$mod: ["a", "b"]}}}),
                              ErrorCodes.BadValue);
+
+// Confirm expected behavior for NaN and Infinity values.
+assert.commandWorked(coll.insert([
+    {_id: 11, c: NaN},
+    {_id: 12, c: Infinity},
+]));
+assert.eq(0, coll.find({c: {$mod: [11, 10.0]}}).itcount());
+assert.eq(0, coll.find({c: {$mod: [-12, 0]}}).itcount());
 }());

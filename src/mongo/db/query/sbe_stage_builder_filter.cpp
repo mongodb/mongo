@@ -1462,12 +1462,17 @@ EvalExpr generateBitTestExpr(StageBuilderState& state,
                              std::move(numericBitTestExpr)));
 }
 
+/**
+ * Generates the following plan for $mod:
+ * (mod(convert ( trunc(input), int64), divisor) == remainder) ?: false
+ *
+ * When 'inputExpr' is NaN or inf, trunc() remains unmodified and lossless conversion will return
+ * Nothing, so the final result becomes false.
+ */
 EvalExpr generateModExpr(StageBuilderState& state,
                          const ModMatchExpression* expr,
                          EvalExpr inputExpr) {
-    auto frameId = state.frameId();
     auto& dividend = inputExpr;
-    sbe::EVariable dividendConvertedToNumberInt64{frameId, 0};
     auto truncatedArgument = sbe::makeE<sbe::ENumericConvert>(
         makeFunction("trunc"_sd, dividend.getExpr(state.slotVarMap, *state.data->env)),
         sbe::value::TypeTags::NumberInt64);
@@ -1495,21 +1500,10 @@ EvalExpr generateModExpr(StageBuilderState& state,
                                 sbe::value::bitcastFrom<int64_t>(expr->getRemainder()));
         }
     }();
-    auto modExpression = makeFillEmptyFalse(makeBinaryOp(
-        sbe::EPrimBinary::eq,
-        makeFunction("mod"_sd, dividendConvertedToNumberInt64.clone(), std::move(divisorExpr)),
-        std::move(remainderExpr)));
-    return makeBinaryOp(
-        sbe::EPrimBinary::logicAnd,
-        makeNot(makeBinaryOp(sbe::EPrimBinary::logicOr,
-                             makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                          generateNullOrMissing(dividend.clone(), state),
-                                          generateNonNumericCheck(dividend.clone(), state)),
-                             makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                          generateNaNCheck(dividend.clone(), state),
-                                          generateInfinityCheck(dividend.clone(), state)))),
-        sbe::makeE<sbe::ELocalBind>(
-            frameId, sbe::makeEs(std::move(truncatedArgument)), std::move(modExpression)));
+    return makeFillEmptyFalse(
+        makeBinaryOp(sbe::EPrimBinary::eq,
+                     makeFunction("mod"_sd, std::move(truncatedArgument), std::move(divisorExpr)),
+                     std::move(remainderExpr)));
 }
 
 EvalExpr generateRegexExpr(StageBuilderState& state,
