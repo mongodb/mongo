@@ -37,6 +37,7 @@
 #include <memory>
 
 #ifdef _WIN32
+#include <psapi.h>
 #include <windows.h>
 #else
 #include <sys/mman.h>
@@ -145,7 +146,19 @@ void growWorkingSize(std::size_t bytes) {
 
     // Since allocation request is aligned to page size, we can just add it to the current working
     // set size.
-    maxWorkingSetSize = std::max(minWorkingSetSize + bytes + minGap, maxWorkingSetSize);
+    // Note: The default dwMaximumWorkingSetSize for a process is 345 pages on a system with 4k
+    // pages (i.e x64). This is not the same as the current working set of the process. It usually
+    // far lower. The min value is ignored by Windows until the machine is starved for memory or
+    // MongoDB wants to lock pages. The max value is treated as a target working set goal for a
+    // process that Windows should meet. This means that if MongoDB sets the number too low, Windows
+    // will flush the process out to the page file which will cause the process to freeze while this
+    // occurs. MongoDB will set the dwMaximumWorkingSetSize to 90% of physical RAM. On high memory
+    // systems (> 128GB0), this may be too conservative so use 5GB as a threshold.
+    uint64_t physicalRamSize = ProcessInfo::getMemSizeMB() * 1024ULL * 1024ULL;
+
+    maxWorkingSetSize = physicalRamSize -
+        std::min(0.10 * physicalRamSize,
+                 static_cast<double>(5ULL * 1024ULL * 1024ULL * 1024ULL) /* 5 GB */);
 
     // Increase the working set size minimum to the new lower bound.
     if (!SetProcessWorkingSetSizeEx(GetCurrentProcess(),
