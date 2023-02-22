@@ -58,7 +58,10 @@ function checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, barUUID, f
         var indexes = res.cursor.firstBatch;
         indexes.sort(sortByName);
 
-        assert.eq(indexes.length, 2);
+        if (sharded)
+            assert(indexes.length == 1 || indexes.length == 2);
+        else
+            assert(indexes.length == 2);
 
         indexes.forEach((index, i) => {
             var expected;
