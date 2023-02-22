@@ -461,7 +461,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             opCtx,
                             nss(),
                             _critSecReason,
-                            ShardingCatalogClient::kMajorityWriteConcern);
+                            ShardingCatalogClient::kMajorityWriteConcern,
+                            false /* throwIfReasonDiffers */);
 
                     _result = createCollectionResponseOpt;
                     return;
@@ -557,7 +558,11 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
 
                 RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
-                    opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+                    opCtx,
+                    nss(),
+                    _critSecReason,
+                    ShardingCatalogClient::kMajorityWriteConcern,
+                    false /* throwIfReasonDiffers */);
             }
             return status;
         });
