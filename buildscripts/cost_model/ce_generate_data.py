@@ -125,6 +125,7 @@ async def dump_collection(db, dump_path, database_name, coll_name, chunk_size):
 
 async def dump_collections_to_json(db, dump_path, database_name, collections):
     chunk_size = 100  # number of documents per chunk file
+    print(f'Dumping all collections into chunks of size {chunk_size}.')
     all_chunk_names = []
     for coll_name in collections:
         coll_chunk_names = await dump_collection(db, dump_path, database_name, coll_name,

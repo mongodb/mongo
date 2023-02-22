@@ -287,8 +287,9 @@ weight_range_l = RangeGenerator(DataType.INTEGER, 25, 101, 2)
 weights = {}
 weights['weight_unif_s'] = RandomDistribution.uniform(weight_range_s)
 weights['weight_unif_l'] = RandomDistribution.uniform(weight_range_l)
-weights['weight_norm_s'] = RandomDistribution.normal(weight_range_s)
-weights['weight_norm_l'] = RandomDistribution.normal(weight_range_l)
+
+#weights['weight_norm_s'] = RandomDistribution.normal(weight_range_s)
+#weights['weight_norm_l'] = RandomDistribution.normal(weight_range_l)
 
 #weights['chi2_s'] = RandomDistribution.noncentral_chisquare(weight_range_s)
 #weights['chi2_l'] = RandomDistribution.noncentral_chisquare(weight_range_l)
@@ -325,12 +326,12 @@ def add_array_distr(distr_set: Sequence[RandomDistribution], lengths_distr: Rand
 arr_distributions = []
 
 # Arrays with integers
-add_array_distr(arr_distributions, arr_len_dist_s, int_distributions[3])
-add_array_distr(arr_distributions, arr_len_dist_m, int_distributions[3])
-add_array_distr(arr_distributions, arr_len_dist_l, int_distributions[3])
-add_array_distr(arr_distributions, arr_len_dist_s, int_distributions[-1])
-add_array_distr(arr_distributions, arr_len_dist_m, int_distributions[-1])
-add_array_distr(arr_distributions, arr_len_dist_l, int_distributions[-1])
+add_array_distr(arr_distributions, arr_len_dist_s, int_distributions[0])
+add_array_distr(arr_distributions, arr_len_dist_m, int_distributions[0])
+add_array_distr(arr_distributions, arr_len_dist_l, int_distributions[0])
+add_array_distr(arr_distributions, arr_len_dist_s, int_distributions[10])
+add_array_distr(arr_distributions, arr_len_dist_m, int_distributions[10])
+add_array_distr(arr_distributions, arr_len_dist_l, int_distributions[10])
 
 # Arrays with strings
 add_array_distr(arr_distributions, arr_len_dist_s, str_distributions[1])

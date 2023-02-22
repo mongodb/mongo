@@ -34,5 +34,11 @@ for (const collMetadata of dbMetadata) {
     print(`Expected cardinality: ${expectedCard}\n`);
     print(`Actual cardinality: ${actualCard}\n`);
     assert.eq(expectedCard, actualCard);
+    collMetadata.fields.forEach(function(fieldMetadata) {
+        fieldName = fieldMetadata.fieldName;
+        const fieldCard = coll.find({}, {fieldName: 1}).itcount();
+        print(`card(${fieldName}) = ${fieldCard}\n`);
+        assert.eq(fieldCard, actualCard);
+    });
 }
 })();
