@@ -2318,6 +2318,19 @@ functions:
       content_type: text/plain
       display_name: Resmoke.py Invocation for Local Usage
 
+  "attach multiversion exclude tags":
+    command: s3.put
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/generated_resmoke_config/multiversion_exclude_tags.yml
+      remote_file: ${project}/${build_variant}/${revision}/multiversion_exclude_tags-${task_id}-${execution}.yml
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: Generated multiversion exclude tags options
+
 # Pre task steps
 pre:
 - func: "set task expansion macros"
@@ -2328,6 +2341,7 @@ post:
 - func: "f_expansions_write"
 - func: "upload npm logs"
 - func: "attach local resmoke invocation"
+- func: "attach multiversion exclude tags"
 - func: "attach report"
 - func: "attach artifacts"
 - func: "save ec2 task artifacts"
