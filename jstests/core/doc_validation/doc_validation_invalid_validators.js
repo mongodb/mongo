@@ -5,8 +5,6 @@
 //   not_allowed_with_security_token,
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_non_retryable_commands,
-//   # Uses $where operator
-//   requires_scripting,
 // ]
 
 // Verify invalid validator statements won't work and that we

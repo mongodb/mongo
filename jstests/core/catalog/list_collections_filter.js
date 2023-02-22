@@ -9,8 +9,6 @@
  *   assumes_against_mongod_not_mongos,
  *   # Tenant migrations don't support applyOps.
  *   tenant_migration_incompatible,
- *   # Uses $where operator
- *   requires_scripting,
  * ]
  */
 
