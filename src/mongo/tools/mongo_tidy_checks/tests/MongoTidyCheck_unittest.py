@@ -83,18 +83,6 @@ class MongoTidyTests(unittest.TestCase):
             self.config_file.close()
             os.unlink(self.config_file.name)
 
-    def test_MongoTestCheck(self):
-
-        self.write_config(
-            textwrap.dedent("""\
-                Checks: '-*,mongo-test-check'
-                WarningsAsErrors: '*'
-                """))
-
-        self.expected_output = "ran mongo-test-check!"
-
-        self.run_clang_tidy()
-
     def test_MongoHeaderBracketCheck(self):
 
         self.write_config(

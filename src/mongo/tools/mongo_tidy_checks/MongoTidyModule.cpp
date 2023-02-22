@@ -30,7 +30,6 @@
 #include "MongoCctypeCheck.h"
 #include "MongoHeaderBracketCheck.h"
 #include "MongoStdOptionalCheck.h"
-#include "MongoTestCheck.h"
 #include "MongoUninterruptibleLockGuardCheck.h"
 
 #include <clang-tidy/ClangTidy.h>
@@ -49,7 +48,6 @@ public:
         CheckFactories.registerCheck<MongoHeaderBracketCheck>("mongo-header-bracket-check");
         CheckFactories.registerCheck<MongoCctypeCheck>("mongo-cctype-check");
         CheckFactories.registerCheck<MongoStdOptionalCheck>("mongo-std-optional-check");
-        CheckFactories.registerCheck<MongoTestCheck>("mongo-test-check");
     }
 };
 

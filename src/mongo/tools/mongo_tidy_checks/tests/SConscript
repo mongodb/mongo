@@ -25,7 +25,6 @@ if env.GetOption('ninja') == 'disabled':
     # This list represents the test source files, which should contain a single issue which will be flagged
     # by a clang tidy check. The issue should be isolated in as minimal way as possible.
     tests = [
-        'test_MongoTestCheck.cpp',
         'test_MongoHeaderBracketCheck.cpp',
         'test_MongoUninterruptibleLockGuardCheck.cpp',
         'test_MongoCctypeCheck.cpp',
