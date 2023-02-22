@@ -513,7 +513,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             opCtx,
                             nss(),
                             _getCriticalSectionReason(),
-                            ShardingCatalogClient::kMajorityWriteConcern);
+                            ShardingCatalogClient::kMajorityWriteConcern,
+                            false /* throwIfReasonDiffers */);
 
                     _result = createCollectionResponseOpt;
                     return;
@@ -619,7 +620,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     opCtx,
                     nss(),
                     _getCriticalSectionReason(),
-                    ShardingCatalogClient::kMajorityWriteConcern);
+                    ShardingCatalogClient::kMajorityWriteConcern,
+                    false /* throwIfReasonDiffers */);
             }
             return status;
         });
