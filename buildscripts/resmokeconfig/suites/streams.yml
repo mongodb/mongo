@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - src/mongo/db/modules/*/jstests/stream/*.js
+  - src/mongo/db/modules/*/jstests/streams/*.js
 
 executor:
   fixture:
