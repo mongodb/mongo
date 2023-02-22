@@ -58,6 +58,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/idl/command_generic_argument.h"
@@ -249,31 +250,10 @@ Status _createDefaultTimeseriesIndex(OperationContext* opCtx, CollectionWriter& 
     return Status::OK();
 }
 
-Status _createTimeseries(OperationContext* opCtx,
-                         const NamespaceString& ns,
-                         const CollectionOptions& optionsArg) {
-    // This path should only be taken when a user creates a new time-series collection on the
-    // primary. Secondaries replicate individual oplog entries.
-    invariant(!ns.isTimeseriesBucketsCollection());
-    invariant(opCtx->writesAreReplicated());
-
-    auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
-
-    CollectionOptions options = optionsArg;
-
-    Status timeseriesOptionsValidateAndSetStatus =
-        timeseries::validateAndSetBucketingParameters(options.timeseries.get());
-
-    if (!timeseriesOptionsValidateAndSetStatus.isOK()) {
-        return timeseriesOptionsValidateAndSetStatus;
-    }
-
-    // Set the validator option to a JSON schema enforcing constraints on bucket documents.
-    // This validation is only structural to prevent accidental corruption by users and
-    // cannot cover all constraints. Leave the validationLevel and validationAction to their
-    // strict/error defaults.
-    auto timeField = options.timeseries->getTimeField();
-    auto validatorObj = fromjson(fmt::sprintf(R"(
+BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
+    switch (bucketVersion) {
+        case timeseries::kTimeseriesControlCompressedVersion:
+            return fromjson(fmt::sprintf(R"(
 {
 '$jsonSchema' : {
     bsonType: 'object',
@@ -306,10 +286,77 @@ Status _createTimeseries(OperationContext* opCtx,
     additionalProperties: false
 }
 })",
-                                              timeField,
-                                              timeField,
-                                              timeField,
-                                              timeField));
+                                         timeField,
+                                         timeField,
+                                         timeField,
+                                         timeField));
+        case timeseries::kTimeseriesControlUncompressedVersion:
+            return fromjson(fmt::sprintf(R"(
+{
+'$jsonSchema' : {
+    bsonType: 'object',
+    required: ['_id', 'control', 'data'],
+    properties: {
+        _id: {bsonType: 'objectId'},
+        control: {
+            bsonType: 'object',
+            required: ['version', 'min', 'max'],
+            properties: {
+                version: {bsonType: 'number'},
+                min: {
+                    bsonType: 'object',
+                    required: ['%s'],
+                    properties: {'%s': {bsonType: 'date'}}
+                },
+                max: {
+                    bsonType: 'object',
+                    required: ['%s'],
+                    properties: {'%s': {bsonType: 'date'}}
+                },
+                closed: {bsonType: 'bool'}
+            }
+        },
+        data: {bsonType: 'object'},
+        meta: {}
+    },
+    additionalProperties: false
+}
+})",
+                                         timeField,
+                                         timeField,
+                                         timeField,
+                                         timeField));
+        default:
+            MONGO_UNREACHABLE;
+    };
+}
+
+Status _createTimeseries(OperationContext* opCtx,
+                         const NamespaceString& ns,
+                         const CollectionOptions& optionsArg) {
+    // This path should only be taken when a user creates a new time-series collection on the
+    // primary. Secondaries replicate individual oplog entries.
+    invariant(!ns.isTimeseriesBucketsCollection());
+    invariant(opCtx->writesAreReplicated());
+
+    auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
+
+    CollectionOptions options = optionsArg;
+
+    Status timeseriesOptionsValidateAndSetStatus =
+        timeseries::validateAndSetBucketingParameters(options.timeseries.get());
+
+    if (!timeseriesOptionsValidateAndSetStatus.isOK()) {
+        return timeseriesOptionsValidateAndSetStatus;
+    }
+
+    // Set the validator option to a JSON schema enforcing constraints on bucket documents.
+    // This validation is only structural to prevent accidental corruption by users and
+    // cannot cover all constraints. Leave the validationLevel and validationAction to their
+    // strict/error defaults.
+    auto timeField = options.timeseries->getTimeField();
+    int bucketVersion = timeseries::kTimeseriesControlLatestVersion;
+    auto validatorObj = _generateTimeseriesValidator(bucketVersion, timeField);
 
     bool existingBucketCollectionIsCompatible = false;
 
@@ -380,6 +427,21 @@ Status _createTimeseries(OperationContext* opCtx,
                 existingBucketCollectionIsCompatible =
                     coll->getCollectionOptions().matchesStorageOptions(
                         bucketsOptions, CollatorFactoryInterface::get(opCtx->getServiceContext()));
+
+                // We may have a bucket collection created with a previous version of mongod, this
+                // is also OK as we do not convert bucket collections to latest version during
+                // upgrade.
+                while (!existingBucketCollectionIsCompatible &&
+                       bucketVersion > timeseries::kTimeseriesControlMinVersion) {
+                    validatorObj = _generateTimeseriesValidator(--bucketVersion, timeField);
+                    bucketsOptions.validator = validatorObj;
+
+                    existingBucketCollectionIsCompatible =
+                        coll->getCollectionOptions().matchesStorageOptions(
+                            bucketsOptions,
+                            CollatorFactoryInterface::get(opCtx->getServiceContext()));
+                }
+
                 return Status(ErrorCodes::NamespaceExists,
                               str::stream() << "Bucket Collection already exists. NS: " << bucketsNs
                                             << ". UUID: " << coll->uuid());

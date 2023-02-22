@@ -149,7 +149,7 @@ BSONObj generateReopeningMatchFilter(const Date_t& time,
                                      const std::string& maxDataTimeFieldPath,
                                      int64_t bucketMaxSpanSeconds) {
     // The bucket must be uncompressed.
-    auto versionFilter = BSON(kControlVersionPath << kTimeseriesControlDefaultVersion);
+    auto versionFilter = BSON(kControlVersionPath << kTimeseriesControlUncompressedVersion);
 
     // The bucket cannot be closed (aka open for new measurements).
     auto closedFlagFilter =

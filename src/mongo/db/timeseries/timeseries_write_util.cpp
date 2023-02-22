@@ -100,7 +100,7 @@ BSONObj makeNewDocument(const OID& bucketId,
     {
         BSONObjBuilder bucketControlBuilder(builder.subobjStart("control"));
         bucketControlBuilder.append(kBucketControlVersionFieldName,
-                                    kTimeseriesControlDefaultVersion);
+                                    kTimeseriesControlUncompressedVersion);
         bucketControlBuilder.append(kBucketControlMinFieldName, min);
         bucketControlBuilder.append(kBucketControlMaxFieldName, max);
     }

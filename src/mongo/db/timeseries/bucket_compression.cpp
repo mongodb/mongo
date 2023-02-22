@@ -354,7 +354,7 @@ boost::optional<BSONObj> decompressBucket(const BSONObj& bucketDoc) {
                         return boost::none;
                     }
                     builder.append(kBucketControlVersionFieldName,
-                                   kTimeseriesControlDefaultVersion);
+                                   kTimeseriesControlUncompressedVersion);
                 } else if (e.fieldNameStringData() == kBucketControlCountFieldName) {
                     // Omit the count field when decompressing.
                     continue;
