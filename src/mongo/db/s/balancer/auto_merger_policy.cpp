@@ -132,12 +132,6 @@ void AutoMergerPolicy::applyActionResult(OperationContext* opCtx,
                                   [&](const DataSizeInfo& _) {
                                       uasserted(ErrorCodes::BadValue, "Unexpected action type");
                                   },
-                                  [&](const AutoSplitVectorInfo& _) {
-                                      uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                                  },
-                                  [&](const SplitInfoWithKeyPattern& _) {
-                                      uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                                  },
                                   [&](const MigrateInfo& _) {
                                       uasserted(ErrorCodes::BadValue, "Unexpected action type");
                                   },

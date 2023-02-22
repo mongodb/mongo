@@ -39,9 +39,9 @@
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/request_types/auto_split_vector_gen.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
 
@@ -130,40 +130,6 @@ struct SplitInfo {
 
 typedef std::vector<SplitInfo> SplitInfoVector;
 
-struct SplitInfoWithKeyPattern {
-    SplitInfoWithKeyPattern(const ShardId& shardId,
-                            const NamespaceString& nss,
-                            const ChunkVersion& collectionVersion,
-                            const BSONObj& minKey,
-                            const BSONObj& maxKey,
-                            SplitPoints splitKeys,
-                            const UUID& uuid,
-                            const BSONObj& keyPattern);
-    SplitInfo info;
-    UUID uuid;
-    BSONObj keyPattern;
-};
-
-struct AutoSplitVectorInfo {
-    AutoSplitVectorInfo(const ShardId& shardId,
-                        const NamespaceString& nss,
-                        const UUID& uuid,
-                        const ChunkVersion& collectionVersion,
-                        const BSONObj& keyPattern,
-                        const BSONObj& minKey,
-                        const BSONObj& maxKey,
-                        long long maxChunkSizeBytes);
-
-    ShardId shardId;
-    NamespaceString nss;
-    UUID uuid;
-    ChunkVersion collectionVersion;
-    BSONObj keyPattern;
-    BSONObj minKey;
-    BSONObj maxKey;
-    long long maxChunkSizeBytes;
-};
-
 struct MergeInfo {
     MergeInfo(const ShardId& shardId,
               const NamespaceString& nss,
@@ -222,16 +188,10 @@ struct DataSizeResponse {
     bool maxSizeReached;
 };
 
-typedef stdx::variant<MergeInfo,
-                      AutoSplitVectorInfo,
-                      DataSizeInfo,
-                      SplitInfoWithKeyPattern,
-                      MigrateInfo,
-                      MergeAllChunksOnShardInfo>
+typedef stdx::variant<MergeInfo, DataSizeInfo, MigrateInfo, MergeAllChunksOnShardInfo>
     DefragmentationAction;
 
-typedef stdx::variant<Status, StatusWith<AutoSplitVectorResponse>, StatusWith<DataSizeResponse>>
-    DefragmentationActionResponse;
+typedef stdx::variant<Status, StatusWith<DataSizeResponse>> DefragmentationActionResponse;
 
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
 typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;

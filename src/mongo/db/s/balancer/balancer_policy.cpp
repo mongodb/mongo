@@ -737,36 +737,6 @@ std::string SplitInfo::toString() const {
         collectionVersion.toString());
 }
 
-SplitInfoWithKeyPattern::SplitInfoWithKeyPattern(const ShardId& shardId,
-                                                 const NamespaceString& nss,
-                                                 const ChunkVersion& collectionVersion,
-                                                 const BSONObj& minKey,
-                                                 const BSONObj& maxKey,
-                                                 std::vector<BSONObj> splitKeys,
-                                                 const UUID& uuid,
-                                                 const BSONObj& keyPattern)
-    : info(SplitInfo(
-          shardId, nss, collectionVersion, ChunkVersion(), minKey, maxKey, std::move(splitKeys))),
-      uuid(uuid),
-      keyPattern(keyPattern) {}
-
-AutoSplitVectorInfo::AutoSplitVectorInfo(const ShardId& shardId,
-                                         const NamespaceString& nss,
-                                         const UUID& uuid,
-                                         const ChunkVersion& collectionVersion,
-                                         const BSONObj& keyPattern,
-                                         const BSONObj& minKey,
-                                         const BSONObj& maxKey,
-                                         long long maxChunkSizeBytes)
-    : shardId(shardId),
-      nss(nss),
-      uuid(uuid),
-      collectionVersion(collectionVersion),
-      keyPattern(keyPattern),
-      minKey(minKey),
-      maxKey(maxKey),
-      maxChunkSizeBytes(maxChunkSizeBytes) {}
-
 MergeInfo::MergeInfo(const ShardId& shardId,
                      const NamespaceString& nss,
                      const UUID& uuid,

@@ -69,27 +69,6 @@ struct MoveChunkSettings {
     bool waitForDelete;
 };
 
-struct SplitVectorSettings {
-    SplitVectorSettings()
-        : force(false),
-          maxSplitPoints(boost::none),
-          maxChunkObjects(boost::none),
-          maxChunkSizeBytes(boost::none) {}
-    SplitVectorSettings(boost::optional<long long> maxSplitPoints,
-                        boost::optional<long long> maxChunkObjects,
-                        boost::optional<long long> maxChunkSizeBytes,
-                        bool force)
-        : force(force),
-          maxSplitPoints(maxSplitPoints),
-          maxChunkObjects(maxChunkObjects),
-          maxChunkSizeBytes(maxChunkSizeBytes) {}
-
-    bool force;
-    boost::optional<long long> maxSplitPoints;
-    boost::optional<long long> maxChunkObjects;
-    boost::optional<long long> maxChunkSizeBytes;
-};
-
 /**
  * Interface for the asynchronous submission of chunk-related commands.
  * Every method assumes that the ChunkType input parameter is filled up with information about
@@ -122,24 +101,6 @@ public:
                                                 const ShardId& shardId,
                                                 const ChunkRange& chunkRange,
                                                 const ChunkVersion& version) = 0;
-
-    virtual SemiFuture<AutoSplitVectorResponse> requestAutoSplitVector(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const ShardId& shardId,
-        const BSONObj& keyPattern,
-        const BSONObj& minKey,
-        const BSONObj& maxKey,
-        int64_t maxChunkSizeBytes) = 0;
-
-    virtual SemiFuture<void> requestSplitChunk(OperationContext* opCtx,
-                                               const NamespaceString& nss,
-                                               const ShardId& shardId,
-                                               const ChunkVersion& collectionVersion,
-                                               const KeyPattern& keyPattern,
-                                               const BSONObj& minKey,
-                                               const BSONObj& maxKey,
-                                               const SplitPoints& splitPoints) = 0;
 
     virtual SemiFuture<DataSizeResponse> requestDataSize(OperationContext* opCtx,
                                                          const NamespaceString& nss,

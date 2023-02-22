@@ -186,15 +186,6 @@ const std::string DataSizeCommandInfo::kMaxValue = "max";
 const std::string DataSizeCommandInfo::kEstimatedValue = "estimate";
 const std::string DataSizeCommandInfo::kMaxSizeValue = "maxSize";
 
-const std::string SplitChunkCommandInfo::kCommandName = "splitChunk";
-const std::string SplitChunkCommandInfo::kShardName = "from";
-const std::string SplitChunkCommandInfo::kKeyPattern = "keyPattern";
-const std::string SplitChunkCommandInfo::kLowerBound = "min";
-const std::string SplitChunkCommandInfo::kUpperBound = "max";
-const std::string SplitChunkCommandInfo::kEpoch = "epoch";
-const std::string SplitChunkCommandInfo::kTimestamp = "timestamp";
-const std::string SplitChunkCommandInfo::kSplitKeys = "splitKeys";
-
 BalancerCommandsSchedulerImpl::BalancerCommandsSchedulerImpl() {}
 
 BalancerCommandsSchedulerImpl::~BalancerCommandsSchedulerImpl() {
@@ -302,49 +293,6 @@ SemiFuture<void> BalancerCommandsSchedulerImpl::requestMergeChunks(OperationCont
 
     auto commandInfo = std::make_shared<MergeChunksCommandInfo>(
         nss, shardId, chunkRange.getMin(), chunkRange.getMax(), version);
-
-    return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
-        .then([](const executor::RemoteCommandResponse& remoteResponse) {
-            return processRemoteResponse(remoteResponse);
-        })
-        .semi();
-}
-
-SemiFuture<AutoSplitVectorResponse> BalancerCommandsSchedulerImpl::requestAutoSplitVector(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const ShardId& shardId,
-    const BSONObj& keyPattern,
-    const BSONObj& minKey,
-    const BSONObj& maxKey,
-    int64_t maxChunkSizeBytes) {
-    auto commandInfo = std::make_shared<AutoSplitVectorCommandInfo>(
-        nss, shardId, keyPattern, minKey, maxKey, maxChunkSizeBytes);
-    return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
-        .then([](const executor::RemoteCommandResponse& remoteResponse)
-                  -> StatusWith<AutoSplitVectorResponse> {
-            auto responseStatus = processRemoteResponse(remoteResponse);
-            if (!responseStatus.isOK()) {
-                return responseStatus;
-            }
-            return AutoSplitVectorResponse::parse(IDLParserContext("AutoSplitVectorResponse"),
-                                                  std::move(remoteResponse.data));
-        })
-        .semi();
-}
-
-SemiFuture<void> BalancerCommandsSchedulerImpl::requestSplitChunk(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const ShardId& shardId,
-    const ChunkVersion& collectionVersion,
-    const KeyPattern& keyPattern,
-    const BSONObj& minKey,
-    const BSONObj& maxKey,
-    const SplitPoints& splitPoints) {
-
-    auto commandInfo = std::make_shared<SplitChunkCommandInfo>(
-        nss, shardId, keyPattern.toBSON(), minKey, maxKey, collectionVersion, splitPoints);
 
     return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
         .then([](const executor::RemoteCommandResponse& remoteResponse) {

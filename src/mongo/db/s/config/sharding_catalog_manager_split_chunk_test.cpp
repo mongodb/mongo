@@ -590,7 +590,7 @@ TEST_F(SplitChunkTest, SplitPointsWithDollarPrefixShouldFail) {
     test(_nss2, Timestamp(42));
 }
 
-TEST_F(SplitChunkTest, CantCommitSplitFromChunkSplitterDuringDefragmentation) {
+TEST_F(SplitChunkTest, CantCommitSplitDuringDefragmentation) {
     const auto& nss = _nss2;
     const auto collEpoch = OID::gen();
     const Timestamp collTimestamp{1, 0};
@@ -614,7 +614,7 @@ TEST_F(SplitChunkTest, CantCommitSplitFromChunkSplitterDuringDefragmentation) {
 
     setupCollection(nss, _keyPattern, {chunk});
 
-    // Bring collection in the `splitChunks` phase of the defragmentation
+    // Bring collection in defragmentation state
     DBDirectClient dbClient(operationContext());
     write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
     updateOp.setUpdates({[&] {
@@ -638,17 +638,6 @@ TEST_F(SplitChunkTest, CantCommitSplitFromChunkSplitterDuringDefragmentation) {
                                               true /* fromChunkSplitter*/),
                        DBException,
                        ErrorCodes::ConflictingOperationInProgress);
-
-    // The split commit must succeed if the request is sent by the defragmenter
-    uassertStatusOK(ShardingCatalogManager::get(operationContext())
-                        ->commitChunkSplit(operationContext(),
-                                           nss,
-                                           collEpoch,
-                                           collTimestamp,
-                                           ChunkRange(chunkMin, chunkMax),
-                                           splitPoints,
-                                           "shard0000",
-                                           false /* fromChunkSplitter*/));
 }
 
 TEST_F(SplitChunkTest, SplitJumboChunkShouldUnsetJumboFlag) {

@@ -244,61 +244,6 @@ TEST_F(BalancerCommandsSchedulerTest, MergeChunkNonexistentShard) {
     _scheduler.stop();
 }
 
-TEST_F(BalancerCommandsSchedulerTest, SuccessfulAutoSplitVectorCommand) {
-    BSONObjBuilder autoSplitVectorResponse;
-    autoSplitVectorResponse.append("ok", "1");
-    BSONArrayBuilder splitKeys(autoSplitVectorResponse.subarrayStart("splitKeys"));
-    splitKeys.append(BSON("x" << 7));
-    splitKeys.append(BSON("x" << 9));
-    splitKeys.done();
-    autoSplitVectorResponse.append("continuation", false);
-
-    auto remoteResponsesFuture =
-        setRemoteResponses({[&](const executor::RemoteCommandRequest& request) {
-            return autoSplitVectorResponse.obj();
-        }});
-    _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
-
-    ChunkType splitChunk = makeChunk(0, kShardId0);
-    auto futureResponse = _scheduler.requestAutoSplitVector(operationContext(),
-                                                            kNss,
-                                                            splitChunk.getShard(),
-                                                            BSON("x" << 1),
-                                                            splitChunk.getMin(),
-                                                            splitChunk.getMax(),
-                                                            4);
-    auto swAutoSplitVectorResponse = futureResponse.getNoThrow();
-    ASSERT_OK(swAutoSplitVectorResponse.getStatus());
-    auto receivedSplitKeys = swAutoSplitVectorResponse.getValue().getSplitKeys();
-    auto continuation = swAutoSplitVectorResponse.getValue().getContinuation();
-    ASSERT_EQ(receivedSplitKeys.size(), 2);
-    ASSERT_BSONOBJ_EQ(receivedSplitKeys[0], BSON("x" << 7));
-    ASSERT_BSONOBJ_EQ(receivedSplitKeys[1], BSON("x" << 9));
-    ASSERT_FALSE(continuation);
-    remoteResponsesFuture.default_timed_get();
-    _scheduler.stop();
-}
-
-TEST_F(BalancerCommandsSchedulerTest, SuccessfulSplitChunkCommand) {
-    auto remoteResponsesFuture =
-        setRemoteResponses({[&](const executor::RemoteCommandRequest& request) {
-            return OkReply().toBSON();
-        }});
-    _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
-    ChunkType splitChunk = makeChunk(0, kShardId0);
-    auto futureResponse = _scheduler.requestSplitChunk(operationContext(),
-                                                       kNss,
-                                                       splitChunk.getShard(),
-                                                       splitChunk.getVersion(),
-                                                       KeyPattern(BSON("x" << 1)),
-                                                       splitChunk.getMin(),
-                                                       splitChunk.getMax(),
-                                                       std::vector<BSONObj>{BSON("x" << 5)});
-    ASSERT_OK(futureResponse.getNoThrow());
-    remoteResponsesFuture.default_timed_get();
-    _scheduler.stop();
-}
-
 TEST_F(BalancerCommandsSchedulerTest, SuccessfulRequestChunkDataSizeCommand) {
     BSONObjBuilder chunkSizeResponse;
     chunkSizeResponse.append("ok", "1");

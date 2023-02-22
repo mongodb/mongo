@@ -331,12 +331,6 @@ public:
                                 },
                                 [&]() { _abort(getType()); });
                         },
-                        [](const AutoSplitVectorInfo& _) {
-                            uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                        },
-                        [](const SplitInfoWithKeyPattern& _) {
-                            uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                        },
                         [](const MigrateInfo& _) {
                             uasserted(ErrorCodes::BadValue, "Unexpected action type");
                         },
@@ -351,7 +345,7 @@ public:
     }
 
     void userAbort() override {
-        _abort(DefragmentationPhaseEnum::kSplitChunks);
+        _abort(DefragmentationPhaseEnum::kFinished);
     }
 
     BSONObj reportProgress() const override {
@@ -662,12 +656,6 @@ public:
                 [](const DataSizeInfo& dataSizeAction) {
                     uasserted(ErrorCodes::BadValue, "Unexpected action type");
                 },
-                [](const AutoSplitVectorInfo& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                },
-                [](const SplitInfoWithKeyPattern& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                },
                 [](const MergeAllChunksOnShardInfo& _) {
                     uasserted(ErrorCodes::BadValue, "Unexpected action type");
                 }},
@@ -680,7 +668,7 @@ public:
     }
 
     void userAbort() override {
-        _abort(DefragmentationPhaseEnum::kSplitChunks);
+        _abort(DefragmentationPhaseEnum::kFinished);
     }
 
     BSONObj reportProgress() const override {
@@ -1161,12 +1149,6 @@ public:
                               [](const DataSizeInfo& _) {
                                   uasserted(ErrorCodes::BadValue, "Unexpected action type");
                               },
-                              [](const AutoSplitVectorInfo& _) {
-                                  uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                              },
-                              [](const SplitInfoWithKeyPattern& _) {
-                                  uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                              },
                               [](const MigrateInfo& _) {
                                   uasserted(ErrorCodes::BadValue, "Unexpected action type");
                               },
@@ -1181,7 +1163,7 @@ public:
     }
 
     void userAbort() override {
-        _abort(DefragmentationPhaseEnum::kSplitChunks);
+        _abort(DefragmentationPhaseEnum::kFinished);
     }
 
     BSONObj reportProgress() const override {
@@ -1210,236 +1192,6 @@ private:
     const NamespaceString _nss;
     const UUID _uuid;
     stdx::unordered_map<ShardId, std::vector<ChunkRange>> _unmergedRangesByShard;
-    boost::optional<ShardId> _shardToProcess;
-    size_t _outstandingActions{0};
-    bool _aborted{false};
-    DefragmentationPhaseEnum _nextPhase{DefragmentationPhaseEnum::kSplitChunks};
-};
-
-class SplitChunksPhase : public DefragmentationPhase {
-public:
-    static std::unique_ptr<SplitChunksPhase> build(OperationContext* opCtx,
-                                                   const CollectionType& coll) {
-        auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-        auto collectionChunks = uassertStatusOK(
-            catalogClient->getChunks(opCtx,
-                                     BSON(ChunkType::collectionUUID() << coll.getUuid()) /*query*/,
-                                     BSON(ChunkType::min() << 1) /*sort*/,
-                                     boost::none /*limit*/,
-                                     nullptr /*opTime*/,
-                                     coll.getEpoch(),
-                                     coll.getTimestamp(),
-                                     repl::ReadConcernLevel::kLocalReadConcern,
-                                     boost::none));
-
-        stdx::unordered_map<ShardId, PendingActions> pendingActionsByShards;
-
-        uint64_t maxChunkSizeBytes = getCollectionMaxChunkSizeBytes(opCtx, coll);
-
-        // Issue AutoSplitVector for all chunks with estimated size greater than max chunk size or
-        // with no estimated size.
-        for (const auto& chunk : collectionChunks) {
-            auto chunkSize = chunk.getEstimatedSizeBytes();
-            if (!chunkSize || (uint64_t)chunkSize.value() > maxChunkSizeBytes) {
-                pendingActionsByShards[chunk.getShard()].rangesToFindSplitPoints.emplace_back(
-                    chunk.getMin(), chunk.getMax());
-            }
-        }
-
-        return std::unique_ptr<SplitChunksPhase>(
-            new SplitChunksPhase(coll.getNss(),
-                                 coll.getUuid(),
-                                 coll.getKeyPattern().toBSON(),
-                                 maxChunkSizeBytes,
-                                 std::move(pendingActionsByShards)));
-    }
-
-    DefragmentationPhaseEnum getType() const override {
-        return DefragmentationPhaseEnum::kSplitChunks;
-    }
-
-    DefragmentationPhaseEnum getNextPhase() const override {
-        return _nextPhase;
-    }
-
-    boost::optional<DefragmentationAction> popNextStreamableAction(
-        OperationContext* opCtx) override {
-        boost::optional<DefragmentationAction> nextAction = boost::none;
-        if (!_pendingActionsByShards.empty()) {
-            auto it = _shardToProcess ? _pendingActionsByShards.find(*_shardToProcess)
-                                      : _pendingActionsByShards.begin();
-
-            invariant(it != _pendingActionsByShards.end());
-
-            auto& [shardId, pendingActions] = *it;
-            auto shardVersion = getShardVersion(opCtx, shardId, _nss);
-
-            if (!pendingActions.rangesToSplit.empty()) {
-                const auto& [rangeToSplit, splitPoints] = pendingActions.rangesToSplit.back();
-                nextAction = boost::optional<DefragmentationAction>(
-                    SplitInfoWithKeyPattern(shardId,
-                                            _nss,
-                                            shardVersion.placementVersion(),
-                                            rangeToSplit.getMin(),
-                                            rangeToSplit.getMax(),
-                                            splitPoints,
-                                            _uuid,
-                                            _shardKey));
-                pendingActions.rangesToSplit.pop_back();
-            } else if (!pendingActions.rangesToFindSplitPoints.empty()) {
-                const auto& rangeToAutoSplit = pendingActions.rangesToFindSplitPoints.back();
-                nextAction = boost::optional<DefragmentationAction>(
-                    AutoSplitVectorInfo(shardId,
-                                        _nss,
-                                        _uuid,
-                                        shardVersion.placementVersion(),
-                                        _shardKey,
-                                        rangeToAutoSplit.getMin(),
-                                        rangeToAutoSplit.getMax(),
-                                        _maxChunkSizeBytes));
-                pendingActions.rangesToFindSplitPoints.pop_back();
-            }
-            if (nextAction.has_value()) {
-                ++_outstandingActions;
-                if (pendingActions.rangesToFindSplitPoints.empty() &&
-                    pendingActions.rangesToSplit.empty()) {
-                    it = _pendingActionsByShards.erase(it, std::next(it));
-                } else {
-                    ++it;
-                }
-            }
-            if (it != _pendingActionsByShards.end()) {
-                _shardToProcess = it->first;
-            } else {
-                _shardToProcess = boost::none;
-            }
-        }
-        return nextAction;
-    }
-
-    boost::optional<MigrateInfo> popNextMigration(
-        OperationContext* opCtx, stdx::unordered_set<ShardId>* availableShards) override {
-        return boost::none;
-    }
-
-    void applyActionResult(OperationContext* opCtx,
-                           const DefragmentationAction& action,
-                           const DefragmentationActionResponse& response) override {
-        ScopeGuard scopedGuard([&] { --_outstandingActions; });
-        if (_aborted) {
-            return;
-        }
-        stdx::visit(
-            OverloadedVisitor{
-                [&](const MergeInfo& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                },
-                [&](const DataSizeInfo& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                },
-                [&](const AutoSplitVectorInfo& autoSplitVectorAction) {
-                    auto& splitVectorResponse =
-                        stdx::get<StatusWith<AutoSplitVectorResponse>>(response);
-                    handleActionResult(
-                        opCtx,
-                        _nss,
-                        _uuid,
-                        getType(),
-                        splitVectorResponse.getStatus(),
-                        [&]() {
-                            auto& splitPoints = splitVectorResponse.getValue().getSplitKeys();
-                            if (!splitPoints.empty()) {
-                                auto& pendingActions =
-                                    _pendingActionsByShards[autoSplitVectorAction.shardId];
-                                pendingActions.rangesToSplit.push_back(
-                                    std::make_pair(ChunkRange(autoSplitVectorAction.minKey,
-                                                              autoSplitVectorAction.maxKey),
-                                                   splitPoints));
-                                if (splitVectorResponse.getValue().getContinuation()) {
-                                    pendingActions.rangesToFindSplitPoints.emplace_back(
-                                        splitPoints.back(), autoSplitVectorAction.maxKey);
-                                }
-                            }
-                        },
-                        [&]() {
-                            auto& pendingActions =
-                                _pendingActionsByShards[autoSplitVectorAction.shardId];
-                            pendingActions.rangesToFindSplitPoints.emplace_back(
-                                autoSplitVectorAction.minKey, autoSplitVectorAction.maxKey);
-                        },
-                        [&]() { _abort(getType()); });
-                },
-                [&](const SplitInfoWithKeyPattern& splitAction) {
-                    auto& splitResponse = stdx::get<Status>(response);
-                    handleActionResult(
-                        opCtx,
-                        _nss,
-                        _uuid,
-                        getType(),
-                        splitResponse,
-                        []() {},
-                        [&]() {
-                            auto& pendingActions =
-                                _pendingActionsByShards[splitAction.info.shardId];
-                            pendingActions.rangesToSplit.push_back(std::make_pair(
-                                ChunkRange(splitAction.info.minKey, splitAction.info.maxKey),
-                                splitAction.info.splitKeys));
-                        },
-                        [&]() { _abort(getType()); });
-                },
-                [](const MigrateInfo& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                },
-                [](const MergeAllChunksOnShardInfo& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                }},
-            action);
-    }
-
-    bool isComplete() const override {
-        return _pendingActionsByShards.empty() && _outstandingActions == 0;
-    }
-
-    void userAbort() override {}
-
-    BSONObj reportProgress() const override {
-        size_t rangesToFindSplitPoints = 0, rangesToSplit = 0;
-        for (const auto& [shardId, pendingActions] : _pendingActionsByShards) {
-            rangesToFindSplitPoints += pendingActions.rangesToFindSplitPoints.size();
-            rangesToSplit += pendingActions.rangesToSplit.size();
-        }
-        auto remainingChunksToProcess = static_cast<long long>(_outstandingActions) +
-            static_cast<long long>(rangesToFindSplitPoints) + static_cast<long long>(rangesToSplit);
-        return BSON(kRemainingChunksToProcess << remainingChunksToProcess);
-    }
-
-private:
-    struct PendingActions {
-        std::vector<ChunkRange> rangesToFindSplitPoints;
-        std::vector<std::pair<ChunkRange, SplitPoints>> rangesToSplit;
-    };
-    SplitChunksPhase(const NamespaceString& nss,
-                     const UUID& uuid,
-                     const BSONObj& shardKey,
-                     const long long& maxChunkSizeBytes,
-                     stdx::unordered_map<ShardId, PendingActions>&& pendingActionsByShards)
-        : _nss(nss),
-          _uuid(uuid),
-          _shardKey(shardKey),
-          _maxChunkSizeBytes(maxChunkSizeBytes),
-          _pendingActionsByShards(std::move(pendingActionsByShards)) {}
-
-    void _abort(const DefragmentationPhaseEnum nextPhase) {
-        _aborted = true;
-        _nextPhase = nextPhase;
-        _pendingActionsByShards.clear();
-    }
-
-    const NamespaceString _nss;
-    const UUID _uuid;
-    const BSONObj _shardKey;
-    const long long _maxChunkSizeBytes;
-    stdx::unordered_map<ShardId, PendingActions> _pendingActionsByShards;
     boost::optional<ShardId> _shardToProcess;
     size_t _outstandingActions{0};
     bool _aborted{false};
@@ -1472,8 +1224,7 @@ void BalancerDefragmentationPolicyImpl::abortCollectionDefragmentation(Operation
             _defragmentationStates.at(coll.getUuid())->userAbort();
             _onStateUpdated();
         }
-        // Change persisted phase to kSplitChunks
-        _persistPhaseUpdate(opCtx, DefragmentationPhaseEnum::kSplitChunks, coll.getUuid());
+        _persistPhaseUpdate(opCtx, DefragmentationPhaseEnum::kFinished, coll.getUuid());
     }
 }
 
@@ -1664,16 +1415,6 @@ void BalancerDefragmentationPolicyImpl::applyActionResult(
                                       targetState = _defragmentationStates.at(act.uuid).get();
                                   }
                               },
-                              [&](const AutoSplitVectorInfo& act) {
-                                  if (_defragmentationStates.contains(act.uuid)) {
-                                      targetState = _defragmentationStates.at(act.uuid).get();
-                                  }
-                              },
-                              [&](const SplitInfoWithKeyPattern& act) {
-                                  if (_defragmentationStates.contains(act.uuid)) {
-                                      targetState = _defragmentationStates.at(act.uuid).get();
-                                  }
-                              },
                               [&](const MigrateInfo& act) {
                                   if (_defragmentationStates.contains(act.uuid)) {
                                       targetState = _defragmentationStates.at(act.uuid).get();
@@ -1697,10 +1438,6 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
     DefragmentationPhaseEnum nextPhase,
     bool shouldPersistPhase) {
     std::unique_ptr<DefragmentationPhase> nextPhaseObject(nullptr);
-    if (nextPhase == DefragmentationPhaseEnum::kSplitChunks &&
-        feature_flags::gNoMoreAutoSplitter.isEnabled(serverGlobalParams.featureCompatibility)) {
-        nextPhase = DefragmentationPhaseEnum::kFinished;
-    }
 
     try {
         if (shouldPersistPhase) {
@@ -1719,10 +1456,8 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
             case DefragmentationPhaseEnum::kMergeChunks:
                 nextPhaseObject = MergeChunksPhase::build(opCtx, coll);
                 break;
-            case DefragmentationPhaseEnum::kSplitChunks:
-                nextPhaseObject = SplitChunksPhase::build(opCtx, coll);
-                break;
             case DefragmentationPhaseEnum::kFinished:
+            default:  // Exit defragmentation in case of unexpected phase
                 _clearDefragmentationState(opCtx, coll.getUuid());
                 break;
         }

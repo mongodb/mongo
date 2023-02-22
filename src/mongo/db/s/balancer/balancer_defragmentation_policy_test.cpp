@@ -62,9 +62,6 @@ protected:
     const HostAndPort kShardHost2 = HostAndPort("TestHost2", 12347);
     const HostAndPort kShardHost3 = HostAndPort("TestHost3", 12348);
 
-    const int64_t kPhase3DefaultChunkSize =
-        129 * 1024 * 1024;  // > 128MB should trigger AutoSplitVector
-
     const std::vector<ShardType> kShardList{
         ShardType(kShardId0.toString(), kShardHost0.toString()),
         ShardType(kShardId1.toString(), kShardHost1.toString()),
@@ -367,30 +364,10 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneUserCancellationFinishesDe
     // User cancellation of defragmentation
     _defragmentationPolicy.abortCollectionDefragmentation(operationContext(), kNss);
 
-    // Defragmentation should complete since the NoMoreAutoSplitter feature flag is enabled
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction == boost::none);
     ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
     verifyExpectedDefragmentationPhaseOndisk(boost::none);
-}
-
-TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneUserCancellationBeginsPhase3) {
-    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
-        "featureFlagNoMoreAutoSplitter", false};
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry()});
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
-
-    // Collection should be in phase 1
-    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
-
-    // User cancellation of defragmentation
-    _defragmentationPolicy.abortCollectionDefragmentation(operationContext(), kNss);
-
-    // Defragmentation should transition to phase 3
-    auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kSplitChunks);
-    ASSERT_TRUE(nextAction.has_value());
-    auto splitVectorAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestNonRetriableErrorRebuildsCurrentPhase) {
@@ -616,8 +593,6 @@ TEST_F(BalancerDefragmentationPolicyTest, PhaseOneNotConsecutive) {
                                 ++timesMiddleRangeDataSizeFound;
                             }
                         },
-                        [](const AutoSplitVectorInfo& _) { FAIL("Unexpected action type"); },
-                        [](const SplitInfoWithKeyPattern& _) { FAIL("Unexpected action type"); },
                         [](const MigrateInfo& _) { FAIL("Unexpected action type"); },
                         [](const MergeAllChunksOnShardInfo& _) {
                             FAIL("Unexpected action type");
@@ -791,237 +766,6 @@ TEST_F(BalancerDefragmentationPolicyTest,
     auto numOfUsedShards = numOfShards - availableShards.size();
     ASSERT_EQ(4, numOfUsedShards);
     ASSERT_EQ(2, pendingMigrations.size());
-}
-
-/** Phase 3 tests. By passing in DefragmentationPhaseEnum::kSplitChunks to
- * setupCollectionWithPhase, the persisted collection entry will have
- * kDefragmentationPhaseFieldName set to kSplitChunks and defragmentation will be started with
- * phase 3.
- */
-
-TEST_F(BalancerDefragmentationPolicyTest, DefragmentationBeginsWithPhase3FromPersistedSetting) {
-    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
-        "featureFlagNoMoreAutoSplitter", false};
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
-                                         DefragmentationPhaseEnum::kSplitChunks);
-    // Defragmentation does not start until startCollectionDefragmentation is called
-    auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction == boost::none);
-    ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
-
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
-
-    ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
-    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kSplitChunks);
-}
-
-TEST_F(BalancerDefragmentationPolicyTest, SingleLargeChunkCausesAutoSplitAndSplitActions) {
-    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
-        "featureFlagNoMoreAutoSplitter", false};
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
-                                         DefragmentationPhaseEnum::kSplitChunks);
-    auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
-
-    // The new action returned by the stream should be an actionable AutoSplitVector command...
-    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction.has_value());
-    AutoSplitVectorInfo splitVectorAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
-    // with the expected content
-    ASSERT_EQ(coll.getNss(), splitVectorAction.nss);
-    ASSERT_BSONOBJ_EQ(kKeyAtMin, splitVectorAction.minKey);
-    ASSERT_BSONOBJ_EQ(kKeyAtMax, splitVectorAction.maxKey);
-}
-
-TEST_F(BalancerDefragmentationPolicyTest, CollectionMaxChunkSizeIsUsedForPhase3) {
-    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
-        "featureFlagNoMoreAutoSplitter", false};
-    // One chunk > 1KB should trigger AutoSplitVector
-    auto coll = setupCollectionWithPhase(
-        {makeConfigChunkEntry(2 * 1024)}, DefragmentationPhaseEnum::kSplitChunks, 1024);
-
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
-
-    auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-
-    // The action returned by the stream should be now an actionable AutoSplitVector command...
-    ASSERT_TRUE(nextAction.has_value());
-    AutoSplitVectorInfo splitVectorAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
-    // with the expected content
-    ASSERT_EQ(coll.getNss(), splitVectorAction.nss);
-    ASSERT_BSONOBJ_EQ(kKeyAtMin, splitVectorAction.minKey);
-    ASSERT_BSONOBJ_EQ(kKeyAtMax, splitVectorAction.maxKey);
-}
-
-TEST_F(BalancerDefragmentationPolicyTest, TestRetryableFailedAutoSplitActionGetsReissued) {
-    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
-        "featureFlagNoMoreAutoSplitter", false};
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
-                                         DefragmentationPhaseEnum::kSplitChunks);
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
-    auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    AutoSplitVectorInfo failingAutoSplitAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
-    StatusWith<AutoSplitVectorResponse> response(
-        Status(ErrorCodes::NetworkTimeout, "Testing error response"));
-
-    _defragmentationPolicy.applyActionResult(operationContext(), failingAutoSplitAction, response);
-
-    // Under the setup of this test, the stream should only contain one more action - which (version
-    // aside) matches the failed one.
-    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto replayedAutoSplitAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
-    ASSERT_BSONOBJ_EQ(failingAutoSplitAction.minKey, replayedAutoSplitAction.minKey);
-    ASSERT_BSONOBJ_EQ(failingAutoSplitAction.maxKey, replayedAutoSplitAction.maxKey);
-    ASSERT_EQ(failingAutoSplitAction.uuid, replayedAutoSplitAction.uuid);
-    ASSERT_EQ(failingAutoSplitAction.shardId, replayedAutoSplitAction.shardId);
-    ASSERT_EQ(failingAutoSplitAction.nss, replayedAutoSplitAction.nss);
-    ASSERT_BSONOBJ_EQ(failingAutoSplitAction.keyPattern, replayedAutoSplitAction.keyPattern);
-    ASSERT_EQ(failingAutoSplitAction.maxChunkSizeBytes, replayedAutoSplitAction.maxChunkSizeBytes);
-
-    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction == boost::none);
-}
-
-TEST_F(BalancerDefragmentationPolicyTest,
-       TestAcknowledgeAutoSplitActionTriggersSplitOnResultingRange) {
-    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
-        "featureFlagNoMoreAutoSplitter", false};
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
-                                         DefragmentationPhaseEnum::kSplitChunks);
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
-    auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
-
-    std::vector<BSONObj> splitPoints{BSON("x" << 5)};
-    AutoSplitVectorResponse resp{splitPoints, false};
-    _defragmentationPolicy.applyActionResult(operationContext(), autoSplitAction, StatusWith(resp));
-
-    // Under the setup of this test, the stream should only contain only a split action over the
-    // recently AutoSplitVector-ed range.
-    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto splitAction = stdx::get<SplitInfoWithKeyPattern>(*nextAction);
-    ASSERT_BSONOBJ_EQ(splitAction.info.minKey, autoSplitAction.minKey);
-    ASSERT_BSONOBJ_EQ(splitAction.info.maxKey, autoSplitAction.maxKey);
-    ASSERT_EQ(splitAction.uuid, autoSplitAction.uuid);
-    ASSERT_EQ(splitAction.info.shardId, autoSplitAction.shardId);
-    ASSERT_EQ(splitAction.info.nss, autoSplitAction.nss);
-    ASSERT_EQ(splitAction.info.splitKeys.size(), 1);
-    ASSERT_BSONOBJ_EQ(splitAction.info.splitKeys[0], splitPoints[0]);
-
-    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction == boost::none);
-}
-
-TEST_F(BalancerDefragmentationPolicyTest, TestAutoSplitWithNoSplitPointsDoesNotTriggerSplit) {
-    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
-        "featureFlagNoMoreAutoSplitter", false};
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
-                                         DefragmentationPhaseEnum::kSplitChunks);
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
-    auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
-
-    std::vector<BSONObj> splitPoints;
-    AutoSplitVectorResponse resp{splitPoints, false};
-    _defragmentationPolicy.applyActionResult(operationContext(), autoSplitAction, StatusWith(resp));
-
-    // The stream should now be empty
-    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction == boost::none);
-}
-
-TEST_F(BalancerDefragmentationPolicyTest, TestMoreThan16MBSplitPointsTriggersSplitAndAutoSplit) {
-    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
-        "featureFlagNoMoreAutoSplitter", false};
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
-                                         DefragmentationPhaseEnum::kSplitChunks);
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
-    auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
-
-    std::vector<BSONObj> splitPoints{BSON("x" << 5)};
-    AutoSplitVectorResponse resp{splitPoints, true};
-    _defragmentationPolicy.applyActionResult(operationContext(), autoSplitAction, StatusWith(resp));
-
-    // The stream should now contain one Split action with the split points from above and one
-    // AutoSplitVector action from the last split point to the end of the chunk
-    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto splitAction = stdx::get<SplitInfoWithKeyPattern>(*nextAction);
-    ASSERT_BSONOBJ_EQ(splitAction.info.minKey, autoSplitAction.minKey);
-    ASSERT_BSONOBJ_EQ(splitAction.info.maxKey, autoSplitAction.maxKey);
-    ASSERT_EQ(splitAction.info.splitKeys.size(), splitPoints.size());
-    ASSERT_BSONOBJ_EQ(splitAction.info.splitKeys[0], splitPoints[0]);
-    ASSERT_BSONOBJ_EQ(splitAction.info.splitKeys.back(), splitPoints.back());
-    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto nextAutoSplitAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
-    ASSERT_BSONOBJ_EQ(nextAutoSplitAction.minKey, splitPoints.back());
-    ASSERT_BSONOBJ_EQ(nextAutoSplitAction.maxKey, autoSplitAction.maxKey);
-
-    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction == boost::none);
-}
-
-TEST_F(BalancerDefragmentationPolicyTest, TestFailedSplitChunkActionGetsReissued) {
-    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
-        "featureFlagNoMoreAutoSplitter", false};
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
-                                         DefragmentationPhaseEnum::kSplitChunks);
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
-    auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
-
-    std::vector<BSONObj> splitPoints{BSON("x" << 5)};
-    AutoSplitVectorResponse resp{splitPoints, false};
-    _defragmentationPolicy.applyActionResult(operationContext(), autoSplitAction, StatusWith(resp));
-
-    // The stream should now contain the split action for the recently AutoSplitVector-ed range.
-    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto failingSplitAction = stdx::get<SplitInfoWithKeyPattern>(*nextAction);
-    _defragmentationPolicy.applyActionResult(
-        operationContext(),
-        failingSplitAction,
-        Status(ErrorCodes::NetworkTimeout, "Testing error response"));
-    // Under the setup of this test, the stream should only contain one more action - which (version
-    // aside) matches the failed one.
-    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto replayedSplitAction = stdx::get<SplitInfoWithKeyPattern>(*nextAction);
-    ASSERT_EQ(failingSplitAction.uuid, replayedSplitAction.uuid);
-    ASSERT_EQ(failingSplitAction.info.shardId, replayedSplitAction.info.shardId);
-    ASSERT_EQ(failingSplitAction.info.nss, replayedSplitAction.info.nss);
-    ASSERT_BSONOBJ_EQ(failingSplitAction.info.minKey, replayedSplitAction.info.minKey);
-    ASSERT_BSONOBJ_EQ(failingSplitAction.info.maxKey, replayedSplitAction.info.maxKey);
-
-    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction == boost::none);
-}
-
-TEST_F(BalancerDefragmentationPolicyTest,
-       TestAcknowledgeLastSuccessfulSplitActionEndsDefragmentation) {
-    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
-        "featureFlagNoMoreAutoSplitter", false};
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
-                                         DefragmentationPhaseEnum::kSplitChunks);
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
-    auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
-
-    std::vector<BSONObj> splitPoints{BSON("x" << 5)};
-    AutoSplitVectorResponse resp{splitPoints, false};
-    _defragmentationPolicy.applyActionResult(operationContext(), autoSplitAction, StatusWith(resp));
-
-    // The stream should now contain the split action for the recently AutoSplitVector-ed range.
-    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto splitAction = stdx::get<SplitInfoWithKeyPattern>(*nextAction);
-    _defragmentationPolicy.applyActionResult(operationContext(), splitAction, Status::OK());
-
-    // Successful split actions trigger no new actions
-    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction == boost::none);
-
-    // With phase 3 complete, defragmentation should be completed.
-    ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
-    verifyExpectedDefragmentationPhaseOndisk(boost::none);
 }
 
 }  // namespace

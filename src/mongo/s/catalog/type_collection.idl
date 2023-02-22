@@ -44,7 +44,7 @@ enums:
             kMergeAndMeasureChunks : "mergeAndMeasureChunks"
             kMoveAndMergeChunks: "moveAndMergeChunks"
             kMergeChunks : "mergeChunks"
-            kSplitChunks: "splitChunks"
+            kSplitChunks: "splitChunks" # Never used but kept for parsing backwards compatibility
             kFinished: "finished"
 
 structs:

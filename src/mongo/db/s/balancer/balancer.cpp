@@ -602,46 +602,6 @@ void Balancer::_consumeActionStreamLoop() {
                                 applyActionResponseTo(action, swDataSize, stream);
                             });
                 },
-                [&, stream = sourcedStream](AutoSplitVectorInfo&& splitVectorAction) {
-                    auto result =
-                        _commandScheduler
-                            ->requestAutoSplitVector(opCtx.get(),
-                                                     splitVectorAction.nss,
-                                                     splitVectorAction.shardId,
-                                                     splitVectorAction.keyPattern,
-                                                     splitVectorAction.minKey,
-                                                     splitVectorAction.maxKey,
-                                                     splitVectorAction.maxChunkSizeBytes)
-                            .thenRunOn(*executor)
-                            .onCompletion(
-                                [this,
-                                 stream,
-                                 &applyActionResponseTo,
-                                 action = std::move(splitVectorAction)](
-                                    const StatusWith<AutoSplitVectorResponse>& swSplitPoints) {
-                                    applyActionResponseTo(action, swSplitPoints, stream);
-                                });
-                },
-                [&, stream = sourcedStream](SplitInfoWithKeyPattern&& splitAction) {
-                    applyThrottling();
-                    auto result =
-                        _commandScheduler
-                            ->requestSplitChunk(opCtx.get(),
-                                                splitAction.info.nss,
-                                                splitAction.info.shardId,
-                                                splitAction.info.collectionVersion,
-                                                splitAction.keyPattern,
-                                                splitAction.info.minKey,
-                                                splitAction.info.maxKey,
-                                                splitAction.info.splitKeys)
-                            .thenRunOn(*executor)
-                            .onCompletion([this,
-                                           stream,
-                                           &applyActionResponseTo,
-                                           action = std::move(splitAction)](const Status& status) {
-                                applyActionResponseTo(action, status, stream);
-                            });
-                },
                 [&, stream = sourcedStream](MergeAllChunksOnShardInfo&& mergeAllChunksAction) {
                     if (mergeAllChunksAction.applyThrottling) {
                         applyThrottling();
