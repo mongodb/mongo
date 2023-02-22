@@ -33,6 +33,30 @@ function runTest(mongod) {
     });
 
     admin.createRole({
+        role: 'ns1Update',
+        privileges: [{resource: {db: "test", collection: "coll"}, actions: ['update']}],
+        roles: []
+    });
+
+    admin.createRole({
+        role: 'ns2Update',
+        privileges: [{resource: {db: "test1", collection: "coll1"}, actions: ['update']}],
+        roles: []
+    });
+
+    admin.createRole({
+        role: 'ns1Remove',
+        privileges: [{resource: {db: "test", collection: "coll"}, actions: ['remove']}],
+        roles: []
+    });
+
+    admin.createRole({
+        role: 'ns2Remove',
+        privileges: [{resource: {db: "test1", collection: "coll1"}, actions: ['remove']}],
+        roles: []
+    });
+
+    admin.createRole({
         role: 'ns1BypassDocumentValidation',
         privileges:
             [{resource: {db: "test", collection: "coll"}, actions: ['bypassDocumentValidation']}],
@@ -47,17 +71,33 @@ function runTest(mongod) {
     });
 
     // Create users to cover the scenarios where we have partial privileges on
-    // byPassDocumentValidation and Insert for ns1 + ns2.
+    // byPassDocumentValidation and Insert + Update + Remove for ns1 + ns2.
     admin.createUser({
         user: 'user1',
         pwd: 'pass',
-        roles: ['ns1Insert', 'ns2Insert', 'ns1BypassDocumentValidation']
+        roles: [
+            'ns1Insert',
+            'ns2Insert',
+            'ns1Update',
+            'ns2Update',
+            'ns1Remove',
+            'ns2Remove',
+            'ns1BypassDocumentValidation'
+        ]
     });
     admin.createUser({
         user: 'user2',
         pwd: 'pass',
-        roles: ['ns1Insert', 'ns1BypassDocumentValidation', 'ns2BypassDocumentValidation']
+        roles: [
+            'ns1Insert',
+            'ns1Update',
+            'ns1Remove',
+            'ns1BypassDocumentValidation',
+            'ns2BypassDocumentValidation'
+        ]
     });
+    admin.createUser({user: 'user3', pwd: 'pass', roles: ['ns1Update']});
+
     admin.logout();
 
     // Commands to be used in testing.
@@ -68,6 +108,29 @@ function runTest(mongod) {
         ops: [{insert: 0, document: {skey: "MongoDB"}}, {insert: 1, document: {skey: "MongoDB"}}],
         nsInfo: [{ns: "test.coll"}, {ns: "test1.coll1"}],
         bypassDocumentValidation: true,
+    };
+
+    var cmd2 = {
+        bulkWrite: 1,
+        ops: [
+            {update: 0, filter: {skey: "MongoDB"}, updateMods: {field1: 1}},
+            {update: 1, filter: {skey: "MongoDB"}, updateMods: {field1: 1}}
+        ],
+        nsInfo: [{ns: "test.coll"}, {ns: "test1.coll1"}],
+        bypassDocumentValidation: true,
+    };
+
+    var cmd3 = {
+        bulkWrite: 1,
+        ops: [{delete: 0, filter: {skey: "MongoDB"}}, {delete: 1, filter: {skey: "MongoDB"}}],
+        nsInfo: [{ns: "test.coll"}, {ns: "test1.coll1"}],
+        bypassDocumentValidation: true,
+    };
+
+    var cmd4 = {
+        bulkWrite: 1,
+        ops: [{update: 0, filter: {skey: "MongoDB"}, updateMods: {field1: 1}, upsert: true}],
+        nsInfo: [{ns: "test.coll"}]
     };
 
     const runAuthTest = function(test) {
@@ -81,10 +144,30 @@ function runTest(mongod) {
         admin.logout();
     };
 
-    // Tests that we fail authorization when fully authorized on ns1 and missing 'insert' on ns2
+    // Tests that insert fails authorization when fully authorized on ns1 and missing
+    // 'bypassDocumentValidation' on ns2
     runAuthTest({user: "user1", command: cmd1, expectedAuthorized: false});
 
-    // Tests that we fail authorization when fully authorized on ns1 and missing
-    // 'bypassDocumentValidation' on ns2
+    // Tests that insert fails authorization when fully authorized on ns1 and missing 'insert' on
+    // ns2
     runAuthTest({user: "user2", command: cmd1, expectedAuthorized: false});
+
+    // Tests that update fails authorization when fully authorized on ns1 and missing
+    // 'bypassDocumentValidation' on ns2
+    runAuthTest({user: "user1", command: cmd2, expectedAuthorized: false});
+
+    // Tests that update fails authorization when fully authorized on ns1 and missing 'update' on
+    // ns2
+    runAuthTest({user: "user2", command: cmd2, expectedAuthorized: false});
+
+    // Tests that delete fails authorization when fully authorized on ns1 and missing
+    // 'bypassDocumentValidation' on ns2
+    runAuthTest({user: "user1", command: cmd3, expectedAuthorized: false});
+
+    // Tests that delete fails authorization when fully authorized on ns1 and missing 'delete' on
+    // ns2
+    runAuthTest({user: "user2", command: cmd3, expectedAuthorized: false});
+
+    // Tests that update with 'upsert: true' fails without 'insert' on ns1.
+    runAuthTest({user: "user3", command: cmd4, expectedAuthorized: false});
 }

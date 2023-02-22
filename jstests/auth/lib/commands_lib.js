@@ -2235,7 +2235,7 @@ export const authCommandsLib = {
             ops: [
               {insert: 0, document: {skey: "MongoDB"}},
               {insert: 1, document: {skey: "MongoDB"}}],
-            nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}]
+            nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
           testcases: [{
@@ -2267,6 +2267,108 @@ export const authCommandsLib = {
                 actions: ['insert', 'bypassDocumentValidation']
               }
             ]
+          }]
+        },
+        {
+          testname: "bulkWrite_update",
+          command: {
+            bulkWrite: 1,
+            ops: [
+              {update: 0, filter: {skey: "MongoDB"}, updateMods: {field1: 1}},
+              {update: 1, filter: {skey: "MongoDB"}, updateMods: {field1: 1}}],
+            nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
+          },
+          skipSharded: true,
+          testcases: [{
+            runOnDb: adminDbName,
+            privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['update']},
+                         {resource: {db: secondDbName, collection: "coll1"}, actions: ['update']}]
+          }]
+        },
+        {
+          testname: "bulkWrite_updateBypassDocumentValidation",
+          command: {
+            bulkWrite: 1,
+            ops: [
+              {update: 0, filter: {skey: "MongoDB"}, updateMods: {field1: 1}},
+              {update: 1, filter: {skey: "MongoDB"}, updateMods: {field1: 1}}],
+            nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
+            bypassDocumentValidation: true,
+          },
+          skipSharded: true,
+          testcases: [{
+            runOnDb: adminDbName,
+            privileges: [
+              {
+                resource: {db: firstDbName, collection: "coll"},
+                actions: ['update', 'bypassDocumentValidation']
+              },
+              {
+                resource: {db: secondDbName, collection: "coll1"},
+                actions: ['update', 'bypassDocumentValidation']
+              }
+            ]
+          }]
+        },
+        {
+          testname: "bulkWrite_delete",
+          command: {
+            bulkWrite: 1,
+            ops: [
+              {delete: 0, filter: {skey: "MongoDB"}},
+              {delete: 1, filter: {skey: "MongoDB"}}],
+            nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
+          },
+          skipSharded: true,
+          testcases: [{
+            runOnDb: adminDbName,
+            privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['remove']},
+                         {resource: {db: secondDbName, collection: "coll1"}, actions: ['remove']}]
+          }]
+        },
+        {
+          testname: "bulkWrite_deleteBypassDocumentValidation",
+          command: {
+            bulkWrite: 1,
+            ops: [
+              {delete: 0, filter: {skey: "MongoDB"}},
+              {delete: 1, filter: {skey: "MongoDB"}}],
+            nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
+            bypassDocumentValidation: true,
+          },
+          skipSharded: true,
+          testcases: [{
+            runOnDb: adminDbName,
+            privileges: [
+              {
+                resource: {db: firstDbName, collection: "coll"},
+                actions: ['remove', 'bypassDocumentValidation']
+              },
+              {
+                resource: {db: secondDbName, collection: "coll1"},
+                actions: ['remove', 'bypassDocumentValidation']
+              }
+            ]
+          }]
+        },
+        {
+          testname: "bulkWrite_insert_update_delete",
+          command: {
+            bulkWrite: 1,
+            ops: [
+              {insert: 0, document: {skey: "MongoDB"}},
+              {insert: 1, document: {skey: "MongoDB"}},
+              {update: 0, filter: {skey: "MongoDB"}, updateMods: {field1: 1}},
+              {update: 1, filter: {skey: "MongoDB"}, updateMods: {field1: 1}},
+              {delete: 0, filter: {skey: "MongoDB"}},
+              {delete: 1, filter: {skey: "MongoDB"}}],
+            nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
+          },
+          skipSharded: true,
+          testcases: [{
+            runOnDb: adminDbName,
+            privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['insert', 'update', 'remove']},
+                         {resource: {db: secondDbName, collection: "coll1"}, actions: ['insert', 'update', 'remove']}]
           }]
         },
         {

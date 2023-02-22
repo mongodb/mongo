@@ -127,9 +127,15 @@ StatusWith<bool> BulkWriteOp::target(
         // getTargeterFn:
         [&](const WriteOp& writeOp) -> const NSTargeter& {
             const auto opIdx = writeOp.getWriteItem().getItemIndex();
-            // TODO(SERVER-73281): Support bulkWrite update and
-            // delete.
-            const auto nsIdx = _clientRequest.getOps()[opIdx].getInsert();
+            // TODO(SERVER-74155): Support bulkWrite insert, update and
+            // delete in a cleaner way.
+            const auto nsIdx = stdx::visit(
+                OverloadedVisitor{
+                    [](const mongo::BulkWriteInsertOp& value) { return value.getInsert(); },
+                    [](const mongo::BulkWriteUpdateOp& value) { return value.getUpdate(); },
+                    [](const mongo::BulkWriteDeleteOp& value) { return value.getDeleteCommand(); },
+                },
+                _clientRequest.getOps()[opIdx]);
             return *targeters[nsIdx];
         },
         // getWriteSizeFn:

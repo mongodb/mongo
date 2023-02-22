@@ -41,6 +41,13 @@
 
 namespace mongo {
 
+// TODO(SERVER-74155): consider this for the helper class to access variant op.
+// This function was introduced to mitigate an MSVC Internal compiler error around
+// stdx::get<T>(op).getDocument(), see SERVER-72092.
+const mongo::BulkWriteInsertOp& getInsert(const stdx::variant<mongo::BulkWriteInsertOp,
+                                                              mongo::BulkWriteUpdateOp,
+                                                              mongo::BulkWriteDeleteOp>& op);
+
 /**
  * This class wraps the different kinds of command requests into a generically usable write command
  * request that can be passed around.
@@ -263,7 +270,8 @@ public:
             return _batchedRequest->getInsertRequest().getDocuments()[_index];
         } else {
             tassert(7263703, "invalid bulkWrite request reference", _bulkWriteRequest);
-            return _bulkWriteRequest->getOps()[_index].getDocument();
+            const auto& op = _bulkWriteRequest->getOps()[_index];
+            return getInsert(op).getDocument();
         }
     }
     const auto& getUpdate() const {

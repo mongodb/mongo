@@ -165,6 +165,8 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'listDatabasesForAllTenants-reply-tenant',
     'create-param-min',
     'create-param-max',
+    'bulkWrite-param-updateMods',
+    'bulkWrite-param-hint'
 ]
 
 # Do not add user visible fields already released in earlier versions.

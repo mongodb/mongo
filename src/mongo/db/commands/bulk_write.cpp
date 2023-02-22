@@ -214,8 +214,16 @@ private:
 
 enum OperationType { kInsert = 1, kUpdate = 2, kDelete = 3 };
 
-OperationType getOpType(const BulkWriteInsertOp& op) {
-    return OperationType::kInsert;
+OperationType getOpType(const stdx::variant<mongo::BulkWriteInsertOp,
+                                            mongo::BulkWriteUpdateOp,
+                                            mongo::BulkWriteDeleteOp>& op) {
+    return stdx::visit(
+        OverloadedVisitor{
+            [](const mongo::BulkWriteInsertOp& value) { return OperationType::kInsert; },
+            [](const mongo::BulkWriteUpdateOp& value) { return OperationType::kUpdate; },
+            [](const mongo::BulkWriteDeleteOp& value) { return OperationType::kDelete; },
+        },
+        op);
 }
 
 int32_t getStatementId(OperationContext* opCtx,
@@ -241,7 +249,8 @@ bool handleInsertOp(OperationContext* opCtx,
                     size_t currentOpIdx,
                     InsertBatch& batch) {
     const auto& nsInfo = req.getNsInfo();
-    auto& op = req.getOps()[currentOpIdx];
+    // Caller needs to check the type with getOpType or this stdx::get<>() will throw.
+    auto& op = stdx::get<mongo::BulkWriteInsertOp>(req.getOps()[currentOpIdx]);
     auto idx = op.getInsert();
 
     auto stmtId = getStatementId(opCtx, req, currentOpIdx);
@@ -412,10 +421,19 @@ public:
             const auto& nsInfo = req.getNsInfo();
 
             for (const auto& op : ops) {
-                unsigned int nsInfoIdx = op.getInsert();
+                // TODO(SERVER-74155) revisit logging value.toBSON() instead of 'op' once we have a
+                // helper. Issue is that we want to avoid serialization in the happy path so the
+                // visit below is not the correct place to do this right now.
+                unsigned int nsInfoIdx = stdx::visit(
+                    OverloadedVisitor{
+                        [](const mongo::BulkWriteInsertOp& value) { return value.getInsert(); },
+                        [](const mongo::BulkWriteUpdateOp& value) { return value.getUpdate(); },
+                        [](const mongo::BulkWriteDeleteOp& value) {
+                            return value.getDeleteCommand();
+                        }},
+                    op);
                 uassert(ErrorCodes::BadValue,
-                        str::stream() << "BulkWrite ops entry " << op.toBSON()
-                                      << " has an invalid nsInfo index.",
+                        str::stream() << "BulkWrite ops entry has an invalid nsInfo index.",
                         nsInfoIdx < nsInfo.size());
             }
 
@@ -457,17 +475,32 @@ public:
 
             // Iterate over each op and assign the appropriate actions to the namespace privilege.
             for (const auto& op : ops) {
-                unsigned int nsInfoIdx = op.getInsert();
+                // TODO(SERVER-74155) revisit logging value.toBSON() instead of 'op' once we have a
+                // helper. Issue is that we want to avoid serialization in the happy path so the
+                // visit below is not the correct place to do this right now.
+                ActionSet newActions;
+                unsigned int nsInfoIdx = stdx::visit(
+                    OverloadedVisitor{[&newActions](const mongo::BulkWriteInsertOp& value) {
+                                          newActions.addAction(ActionType::insert);
+                                          return value.getInsert();
+                                      },
+                                      [&newActions](const mongo::BulkWriteUpdateOp& value) {
+                                          if (value.getUpsert()) {
+                                              newActions.addAction(ActionType::insert);
+                                          }
+                                          newActions.addAction(ActionType::update);
+                                          return value.getUpdate();
+                                      },
+                                      [&newActions](const mongo::BulkWriteDeleteOp& value) {
+                                          newActions.addAction(ActionType::remove);
+                                          return value.getDeleteCommand();
+                                      }},
+                    op);
                 uassert(ErrorCodes::BadValue,
-                        str::stream() << "BulkWrite ops entry " << op.toBSON()
-                                      << " has an invalid nsInfo index.",
+                        str::stream() << "BulkWrite ops entry has an invalid nsInfo index.",
                         nsInfoIdx < nsInfo.size());
 
                 auto& privilege = privileges[nsInfoIdx];
-                ActionSet newActions;
-
-                // TODO SERVER-72092 Make this logic handle different types of `op`.
-                newActions.addAction(ActionType::insert);
                 privilege.addActions(newActions);
             }
 

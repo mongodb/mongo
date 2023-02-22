@@ -30,12 +30,21 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <string>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/ops/write_ops_gen.h"
 
 namespace mongo {
+
+inline Status validateUpdateReturn(const std::string& value) {
+    if (value != "pre" && value != "post") {
+        return {ErrorCodes::BadValue, "\"return\" should be either \"pre\" or \"post\""};
+    }
+
+    return Status::OK();
+}
 
 /**
  * A single item in a batch of results in a 'bulkWrite' command response.
