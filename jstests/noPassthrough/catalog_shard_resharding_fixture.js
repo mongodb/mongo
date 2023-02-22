@@ -17,7 +17,7 @@ reshardingTest.setup();
 
 const ns = "reshardingDb.coll";
 const donorShardNames = reshardingTest.donorShardNames;
-assert.includes(donorShardNames, "catalogShard");
+assert.includes(donorShardNames, "config");
 const sourceCollection = reshardingTest.createShardedCollection({
     ns,
     shardKeyPattern: {oldKey: 1},
@@ -37,7 +37,7 @@ const docs = [
 assert.commandWorked(sourceCollection.insert(docs));
 
 const recipientShardNames = reshardingTest.recipientShardNames;
-assert.includes(recipientShardNames, "catalogShard");
+assert.includes(recipientShardNames, "config");
 reshardingTest.withReshardingInBackground({
     newShardKeyPattern: {newKey: 1},
     newChunks: [

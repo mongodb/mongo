@@ -105,7 +105,11 @@ public:
             std::map<std::string, std::unique_ptr<BSONObjBuilder>> dbShardInfo;
 
             auto shardIds = shardRegistry->getAllShardIds(opCtx);
-            shardIds.emplace_back(ShardId::kConfigServerId);
+            if (std::find(shardIds.begin(), shardIds.end(), ShardId::kConfigServerId) ==
+                shardIds.end()) {
+                // The config server may be a shard, so only add if it isn't already in shardIds.
+                shardIds.emplace_back(ShardId::kConfigServerId);
+            }
 
             // { filter: matchExpression }.
             auto filteredCmd = applyReadWriteConcern(
@@ -135,11 +139,6 @@ public:
 
                     // If this is the admin db, only collect its stats from the config servers.
                     if (name == "admin" && !s->isConfig()) {
-                        continue;
-                    }
-
-                    // We don't collect config server info for dbs other than "admin" and "config".
-                    if (s->isConfig() && name != "config" && name != "admin") {
                         continue;
                     }
 

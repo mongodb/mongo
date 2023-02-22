@@ -111,8 +111,8 @@ public:
                 candidateShardIds.erase(shardId);
 
                 uassert(ErrorCodes::IllegalOperation,
-                        "Cannot analyze a shard key for a collection on the config server",
-                        shardId != ShardId::kConfigServerId);
+                        "Cannot analyze a shard key for a collection in a fixed database",
+                        !cri.cm.dbVersion().isFixed());
 
                 // Build a versioned command for the selected shard.
                 auto versionedCmdObj = makeVersionedCmdObj(cri, unversionedCmdObj, shardId);

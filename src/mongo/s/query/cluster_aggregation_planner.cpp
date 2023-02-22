@@ -34,6 +34,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -825,7 +826,8 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                                                                            boost::none,
                                                                            overrideBatchSize);
 
-    if (!forPerShardCursor && shardId != ShardId::kConfigServerId) {
+    if (!forPerShardCursor && (!dbVersion || !dbVersion->isFixed())) {
+        // A fixed dbVersion database can't move or be sharded, so we don't attach any version.
         cmdObj = appendShardVersion(std::move(cmdObj), ShardVersion::UNSHARDED());
     }
     if (!forPerShardCursor) {

@@ -612,7 +612,7 @@ void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext
     // Insert a shard identity document. Note we insert with local write concern, so the shard
     // identity may roll back, which will trigger an fassert to clear the in-memory sharding state.
     {
-        auto addShardCmd = add_shard_util::createAddShardCmd(opCtx, ShardId::kCatalogShardId);
+        auto addShardCmd = add_shard_util::createAddShardCmd(opCtx, ShardId::kConfigServerId);
 
         auto shardIdUpsertCmd = add_shard_util::createShardIdentityUpsertForAddShard(
             addShardCmd, ShardingCatalogClient::kLocalWriteConcern);
@@ -765,7 +765,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             "Cannot add catalog shard because it is not supported in featureCompatibilityVersion: {}"_format(
                 multiversion::toString(serverGlobalParams.featureCompatibility.getVersion())),
             gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility) ||
-                shardType.getName() != ShardId::kCatalogShardId.toString());
+                !isCatalogShard);
 
         uassert(5563603,
                 "Cannot add shard while in upgrading/downgrading FCV state",
@@ -1011,7 +1011,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // set monitor is removed, otherwise the shard would be referencing a dropped RSM.
     Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 
-    if (shardId != ShardId::kCatalogShardId) {
+    if (shardId != ShardId::kConfigServerId) {
         // Don't remove the catalog shard's RSM because it is used to target the config server.
         ReplicaSetMonitor::remove(name);
     }

@@ -223,8 +223,8 @@ std::vector<RemoteCursor> establishShardCursors(
         }
     } else {
         // The collection is unsharded. Target only the primary shard for the database.
-        // Don't append shard version info when contacting the config servers.
-        auto versionedCmdObj = cri->cm.dbPrimary() != ShardId::kConfigServerId
+        // Don't append shard version info when contacting a fixed db collection.
+        auto versionedCmdObj = !cri->cm.dbVersion().isFixed()
             ? appendShardVersion(cmdObj, ShardVersion::UNSHARDED())
             : cmdObj;
         versionedCmdObj = appendDbVersionIfPresent(versionedCmdObj, cri->cm.dbVersion());
@@ -845,9 +845,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
             return appendShardVersion(aggregation_request_helper::serializeToCommandObj(request),
                                       cri.getShardVersion(shardId));
         } else {
-            // The collection is unsharded. Don't append shard version info when contacting the
-            // config servers.
-            const auto cmdObjWithShardVersion = (shardId != ShardId::kConfigServerId)
+            // The collection is unsharded. Don't append shard version info when contacting a fixed
+            // db collection.
+            const auto cmdObjWithShardVersion = !cri.cm.dbVersion().isFixed()
                 ? appendShardVersion(aggregation_request_helper::serializeToCommandObj(request),
                                      ShardVersion::UNSHARDED())
                 : aggregation_request_helper::serializeToCommandObj(request);

@@ -37,6 +37,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
@@ -536,7 +537,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 ShardId shardId(std::string(request.getPassthroughToShard()->getShard()));
                 uassert(6273803,
                         "$_passthroughToShard not supported for queries against config replica set",
-                        shardId != ShardId::kConfigServerId);
+                        shardId != ShardId::kConfigServerId ||
+                            gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV());
                 // This is an aggregation pipeline started internally, so it is not eligible for
                 // sampling.
                 const bool eligibleForSampling = false;

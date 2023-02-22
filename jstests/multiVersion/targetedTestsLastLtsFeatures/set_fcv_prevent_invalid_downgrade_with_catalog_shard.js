@@ -28,7 +28,6 @@ st.stop();
 
 /* Attempting to create a catalogShard on an unsupported FCV. */
 jsTest.log("Attempting to create a catalogShard on an unsupported FCV.");
-const kCatalogShardId = "catalogShard";
 st = new ShardingTest({catalogShard: false});
 mongosAdminDB = st.s.getDB("admin");
 

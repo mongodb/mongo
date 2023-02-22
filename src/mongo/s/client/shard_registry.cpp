@@ -188,7 +188,7 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
         invariant(shard);
 
         auto name = shard->getConnString().getSetName();
-        if (shardId != ShardId::kCatalogShardId) {
+        if (shardId != ShardId::kConfigServerId) {
             // Don't remove the catalog shard's RSM because it is used to target the config server.
             ReplicaSetMonitor::remove(name);
         }
@@ -643,10 +643,6 @@ std::pair<ShardRegistryData, Timestamp> ShardRegistryData::createFromCatalogClie
 
     ShardRegistryData data;
     for (auto& shardInfo : shardsInfo) {
-        if (std::get<0>(shardInfo) == "config") {
-            continue;
-        }
-
         auto shard = shardFactory->createShard(std::move(std::get<0>(shardInfo)),
                                                std::move(std::get<1>(shardInfo)));
 

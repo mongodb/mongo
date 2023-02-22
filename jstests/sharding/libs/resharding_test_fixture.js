@@ -212,7 +212,7 @@ var ReshardingTest = class {
             const shard = this._st[`shard${i}`];
             if (this._catalogShard && i == 0) {
                 assert.commandWorked(this._st.s.adminCommand({transitionToCatalogShard: 1}));
-                shard.shardName = "catalogShard";
+                shard.shardName = "config";
             } else {
                 const res = assert.commandWorked(
                     this._st.s.adminCommand({addShard: shard.host, name: shardName}));

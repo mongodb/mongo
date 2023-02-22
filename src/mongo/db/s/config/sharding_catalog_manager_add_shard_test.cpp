@@ -49,6 +49,7 @@
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/idl/cluster_server_parameter_common.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_changelog.h"
@@ -1424,6 +1425,7 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
 TEST_F(AddShardTest, SuccessfullyAddConfigShard) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         std::make_unique<RemoteCommandTargeterMock>());
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagCatalogShard", true);
     ConnectionString connString =
         assertGet(ConnectionString::parse("mySet/host1:12345,host2:12345"));
     targeter->setConnectionStringReturnValue(connString);

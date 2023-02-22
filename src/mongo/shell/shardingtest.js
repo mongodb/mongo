@@ -1816,7 +1816,7 @@ var ShardingTest = function(params) {
 
                 var name;
                 if (isCatalogShardMode && idx == 0) {
-                    name = "catalogShard";
+                    name = "config";
 
                     print("ShardingTest " + testName + " transitioning to catalog shard");
 

@@ -97,7 +97,7 @@ public:
             opCtx,
             ReadPreferenceSetting::get(opCtx),
             dbName.toStringWithTenantId(),
-            cm.dbPrimary() == ShardId::kConfigServerId ? filteredCmdObj : filteredCmdObjWithVersion,
+            cm.dbVersion().isFixed() ? filteredCmdObj : filteredCmdObjWithVersion,
             Shard::RetryPolicy::kIdempotent));
 
         uassert(ErrorCodes::IllegalOperation,

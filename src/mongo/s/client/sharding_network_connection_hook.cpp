@@ -62,26 +62,12 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
     }
 
     long long configServerModeNumber;
-    auto isMasterReplyData = isMasterReply.data;
-    auto status = bsonExtractIntegerField(isMasterReplyData, "configsvr", &configServerModeNumber);
+    auto status = bsonExtractIntegerField(isMasterReply.data, "configsvr", &configServerModeNumber);
 
     switch (status.code()) {
         case ErrorCodes::OK: {
             // The ismaster response indicates remoteHost is a config server.
             if (!shard->isConfig()) {
-                auto isMasterSetName = isMasterReplyData.getStringField("setName");
-                // getSetName() can return an empty string for a non-replica set but config servers
-                // are always a replica set, so we can skip that check here.
-                auto configSetName = Grid::get(getGlobalServiceContext())
-                                         ->shardRegistry()
-                                         ->getConfigShard()
-                                         ->getConnString()
-                                         .getSetName();
-                if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV() &&
-                    isMasterSetName == configSetName) {
-                    return Status::OK();
-                }
-
                 return {ErrorCodes::InvalidOptions,
                         str::stream() << "Surprised to discover that " << remoteHost.toString()
                                       << " believes it is a config server"};

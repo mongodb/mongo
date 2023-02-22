@@ -359,13 +359,13 @@ public:
                     FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
 
                 // If catalogShard is enabled and there is an entry in config.shards with _id:
-                // ShardId::kCatalogShardId then the config server is a catalog shard
+                // ShardId::kConfigServerId then the config server is a catalog shard.
                 auto isCatalogShard = serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
                     serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
                     !ShardingCatalogManager::get(opCtx)
                          ->findOneConfigDocument(opCtx,
                                                  NamespaceString::kConfigsvrShardsNamespace,
-                                                 BSON("_id" << ShardId::kCatalogShardId.toString()))
+                                                 BSON("_id" << ShardId::kConfigServerId.toString()))
                          .isEmpty();
 
                 // TODO SERVER-73784: Update catalog_shard_feature_flag.idl so that the version for
