@@ -35,9 +35,9 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/plan_executor_factory.h"
-
 
 namespace mongo {
 namespace metadata_consistency_util {
@@ -76,12 +76,11 @@ void _appendUUIDMismatchInconsistency(const ShardId& shardId,
 }
 }  // namespace
 
-CheckMetadataConsistencyResponseCursor _makeCursor(
-    OperationContext* opCtx,
-    const std::vector<MetadataInconsistencyItem>& inconsistencies,
-    const NamespaceString& nss,
-    const BSONObj& cmdObj,
-    const boost::optional<SimpleCursorOptions>& cursorOpts) {
+CursorInitialReply makeCursor(OperationContext* opCtx,
+                              const std::vector<MetadataInconsistencyItem>& inconsistencies,
+                              const NamespaceString& nss,
+                              const BSONObj& cmdObj,
+                              const boost::optional<SimpleCursorOptions>& cursorOpts) {
     const auto batchSize = [&] {
         if (cursorOpts && cursorOpts->getBatchSize()) {
             return (long long)*cursorOpts->getBatchSize();
@@ -114,7 +113,7 @@ CheckMetadataConsistencyResponseCursor _makeCursor(
                                                     false, /* whether returned BSON must be owned */
                                                     nss));
 
-    std::vector<MetadataInconsistencyItem> firstBatch;
+    std::vector<BSONObj> firstBatch;
     size_t bytesBuffered = 0;
     for (long long objCount = 0; objCount < batchSize; objCount++) {
         BSONObj nextDoc;
@@ -131,14 +130,16 @@ CheckMetadataConsistencyResponseCursor _makeCursor(
             break;
         }
 
-        const auto objsize = nextDoc.objsize();
-        firstBatch.push_back(MetadataInconsistencyItem::parseOwned(
-            IDLParserContext("MetadataInconsistencyItem"), std::move(nextDoc)));
-        bytesBuffered += objsize;
+        bytesBuffered += nextDoc.objsize();
+        firstBatch.push_back(std::move(nextDoc));
     }
 
     if (exec->isEOF()) {
-        return CheckMetadataConsistencyResponseCursor(0 /* cursorId */, nss, std::move(firstBatch));
+        CursorInitialReply resp;
+        InitialResponseCursor initRespCursor{std::move(firstBatch)};
+        initRespCursor.setResponseCursorBase({0LL /* cursorId */, nss});
+        resp.setCursor(std::move(initRespCursor));
+        return resp;
     }
 
     exec->saveState();
@@ -161,8 +162,11 @@ CheckMetadataConsistencyResponseCursor _makeCursor(
     pinnedCursor->incNBatches();
     pinnedCursor->incNReturnedSoFar(firstBatch.size());
 
-    return CheckMetadataConsistencyResponseCursor(
-        pinnedCursor.getCursor()->cursorid(), nss, std::move(firstBatch));
+    CursorInitialReply resp;
+    InitialResponseCursor initRespCursor{std::move(firstBatch)};
+    initRespCursor.setResponseCursorBase({pinnedCursor.getCursor()->cursorid(), nss});
+    resp.setCursor(std::move(initRespCursor));
+    return resp;
 }
 
 std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(

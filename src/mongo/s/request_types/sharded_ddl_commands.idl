@@ -45,7 +45,7 @@ imports:
     - "mongo/s/sharding_types.idl"
     - "mongo/s/resharding/common_types.idl"
     - "mongo/db/timeseries/timeseries.idl"
-    - "mongo/db/metadata_consistency_types.idl"
+    - "mongo/db/query/cursor_response.idl"
 
 types:
     CollectionType:
@@ -523,7 +523,7 @@ commands:
         namespace: concatenate_with_db
         allow_global_collection_name: true
         api_version: ""
-        reply_type: CheckMetadataConsistencyResponse
+        reply_type: CursorInitialReply
         strict: false
         fields:
             cursor:
@@ -537,7 +537,7 @@ commands:
         namespace: concatenate_with_db
         allow_global_collection_name: true
         api_version: ""
-        reply_type: CheckMetadataConsistencyResponse
+        reply_type: CursorInitialReply
         strict: false
         fields:
             cursor:

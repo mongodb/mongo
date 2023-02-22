@@ -40,14 +40,13 @@ namespace metadata_consistency_util {
 /**
  * Creates a cursor with given inconsistencies.
  *
- * The cursor is returned as a CheckMetadataConsistencyResponseCursor object.
+ * The cursor is returned as a CursorInitialReply object.
  */
-CheckMetadataConsistencyResponseCursor _makeCursor(
-    OperationContext* opCtx,
-    const std::vector<MetadataInconsistencyItem>& inconsistencies,
-    const NamespaceString& nss,
-    const BSONObj& cmdObj,
-    const boost::optional<SimpleCursorOptions>& cursorOpts = boost::none);
+CursorInitialReply makeCursor(OperationContext* opCtx,
+                              const std::vector<MetadataInconsistencyItem>& inconsistencies,
+                              const NamespaceString& nss,
+                              const BSONObj& cmdObj,
+                              const boost::optional<SimpleCursorOptions>& cursorOpts = boost::none);
 
 /**
  * Returns a list of inconsistencies between the collections' metadata on the shard and the

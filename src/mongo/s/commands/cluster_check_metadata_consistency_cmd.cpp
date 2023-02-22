@@ -28,11 +28,16 @@
  */
 
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/s/check_metadata_consistency_gen.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_client_cursor_impl.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
@@ -41,18 +46,26 @@
 namespace mongo {
 namespace {
 
-bool isClusterLevelModeCommand(const NamespaceString& nss) {
-    return nss.isAdminDB();
-}
+// We must allow some amount of overhead per result document, since when we make a cursor response
+// the documents are elements of a BSONArray. The overhead is 1 byte/doc for the type + 1 byte/doc
+// for the field name's null terminator + 1 byte per digit in the array index. The index can be no
+// more than 8 decimal digits since the response is at most 16MB, and 16 * 1024 * 1024 < 1 * 10^8.
+static const int kPerDocumentOverheadBytesUpperBound = 10;
 
-bool isCollectionLevelModeCommand(const NamespaceString& nss) {
-    return !nss.isAdminDB() && !nss.isCollectionlessCursorNamespace();
+MetadataConsistencyCommandLevelEnum getCommandLevel(const NamespaceString& nss) {
+    if (nss.isAdminDB()) {
+        return MetadataConsistencyCommandLevelEnum::kClusterLevel;
+    } else if (nss.isCollectionlessCursorNamespace()) {
+        return MetadataConsistencyCommandLevelEnum::kDatabaseLevel;
+    } else {
+        return MetadataConsistencyCommandLevelEnum::kCollectionLevel;
+    }
 }
 
 class CheckMetadataConsistencyCmd final : public TypedCommand<CheckMetadataConsistencyCmd> {
 public:
     using Request = CheckMetadataConsistency;
-    using Response = CheckMetadataConsistencyResponse;
+    using Response = CursorInitialReply;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -69,50 +82,158 @@ public:
         Response typedRun(OperationContext* opCtx) {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-            const auto& nss = ns();
-
-            // Cluster and Collection level mode command is not implemented
-            //  - db.adminCommand({checkMetadataConsistency: 1})
-            //  - db.runCommand({checkMetadataConsistency: "coll"})
-            uassert(ErrorCodes::NotImplemented,
-                    "cluster and collection level mode command is not implemented",
-                    !isClusterLevelModeCommand(nss) && !isCollectionLevelModeCommand(nss));
-
-            ShardsvrCheckMetadataConsistency shardsvrRequest(nss);
-            shardsvrRequest.setDbName(nss.db());
-            shardsvrRequest.setCursor(request().getCursor());
-
-            auto catalogCache = Grid::get(opCtx)->catalogCache();
-            const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));
-
-            auto cmdResponse = executeCommandAgainstDatabasePrimary(
-                opCtx,
-                nss.db(),
-                dbInfo,
-                shardsvrRequest.toBSON({}),
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kIdempotent);
-
-            auto response = uassertStatusOK(std::move(cmdResponse.swResponse));
-            uassertStatusOK(getStatusFromCommandResult(response.data));
-
-            // TODO: SERVER-72667: Add privileges for getMore()
-            auto transformedResponse = uassertStatusOK(
-                storePossibleCursor(opCtx,
-                                    cmdResponse.shardId,
-                                    *cmdResponse.shardHostAndPort,
-                                    response.data,
-                                    nss,
-                                    Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                                    Grid::get(opCtx)->getCursorManager(),
-                                    {}));
-
-            return CheckMetadataConsistencyResponse::parseOwned(
-                IDLParserContext("checkMetadataConsistencyResponse"),
-                std::move(transformedResponse));
+            const auto nss = ns();
+            switch (getCommandLevel(nss)) {
+                case MetadataConsistencyCommandLevelEnum::kClusterLevel:
+                    return _runClusterLevel(opCtx, nss);
+                case MetadataConsistencyCommandLevelEnum::kDatabaseLevel:
+                    return _runDatabaseLevel(opCtx, nss);
+                case MetadataConsistencyCommandLevelEnum::kCollectionLevel:
+                    return _runCollectionLevel(nss);
+                default:
+                    MONGO_UNREACHABLE;
+            }
         }
 
     private:
+        Response _runClusterLevel(OperationContext* opCtx, const NamespaceString& nss) {
+            uassert(
+                ErrorCodes::InvalidNamespace,
+                "cluster level mode must be run against the 'admin' database with {aggregate: 1}",
+                nss.isCollectionlessCursorNamespace());
+
+            const auto catalogClient = Grid::get(opCtx)->catalogClient();
+            // TODO: SERVER-73978: Retrieve directly from configsvr a list of shards with its
+            // corresponding primary databases.
+            const auto databases =
+                catalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
+            return _sendCommandToDbPrimaries(opCtx, nss, databases);
+        }
+
+        Response _runDatabaseLevel(OperationContext* opCtx, const NamespaceString& nss) {
+            const auto catalogClient = Grid::get(opCtx)->catalogClient();
+            const auto dbInfo = catalogClient->getDatabase(
+                opCtx, nss.db(), repl::ReadConcernLevel::kMajorityReadConcern);
+            return _sendCommandToDbPrimaries(opCtx, nss, {dbInfo});
+        }
+
+        Response _runCollectionLevel(const NamespaceString& nss) {
+            uasserted(ErrorCodes::NotImplemented,
+                      "collection level mode command is not implemented");
+        }
+
+        Response _sendCommandToDbPrimaries(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const std::vector<DatabaseType>& dbs) {
+            const auto& cursorOpts = request().getCursor();
+
+            std::vector<std::pair<ShardId, BSONObj>> requests;
+            ShardsvrCheckMetadataConsistency shardsvrRequest{nss};
+            shardsvrRequest.setDbName(nss.db());
+            shardsvrRequest.setCursor(cursorOpts);
+
+            // Send a unique request per shard that is a primary shard for, at least, one database.
+            std::set<ShardId> shardIds;
+            for (const auto& db : dbs) {
+                const auto insertionRes = shardIds.insert(db.getPrimary());
+                if (insertionRes.second) {
+                    // The shard was not in the set, so we need to send a request to it.
+                    requests.emplace_back(db.getPrimary(), shardsvrRequest.toBSON({}));
+                }
+            }
+
+            ClusterClientCursorParams params(
+                nss,
+                APIParameters::get(opCtx),
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
+
+            // Establish the cursors with a consistent shardVersion across shards.
+            params.remotes = establishCursors(
+                opCtx,
+                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                nss,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()),
+                requests,
+                false /*allowPartialResults*/);
+
+            // Determine whether the cursor we may eventually register will be single- or
+            // multi-target.
+            const auto cursorType = params.remotes.size() > 1
+                ? ClusterCursorManager::CursorType::MultiTarget
+                : ClusterCursorManager::CursorType::SingleTarget;
+
+            // Transfer the established cursors to a ClusterClientCursor.
+            auto ccc = ClusterClientCursorImpl::make(
+                opCtx,
+                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                std::move(params));
+
+            auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
+            size_t bytesBuffered = 0;
+            std::vector<BSONObj> firstBatch;
+            const auto batchSize = [&] {
+                if (cursorOpts && cursorOpts->getBatchSize()) {
+                    return (long long)*cursorOpts->getBatchSize();
+                } else {
+                    return query_request_helper::kDefaultBatchSize;
+                }
+            }();
+
+            for (long long objCount = 0; objCount < batchSize; objCount++) {
+                auto next = uassertStatusOK(ccc->next());
+                if (next.isEOF()) {
+                    // We reached end-of-stream, if all the remote cursors are exhausted, there is
+                    // no hope of returning data and thus we need to close the mongos cursor as
+                    // well.
+                    cursorState = ClusterCursorManager::CursorState::Exhausted;
+                    break;
+                }
+
+                auto nextObj = *next.getResult();
+
+                // If adding this object will cause us to exceed the message size limit, then we
+                // stash it for later.
+                if (!FindCommon::haveSpaceForNext(nextObj, objCount, bytesBuffered)) {
+                    ccc->queueResult(nextObj);
+                    break;
+                }
+
+                bytesBuffered += nextObj.objsize() + kPerDocumentOverheadBytesUpperBound;
+                firstBatch.push_back(std::move(nextObj));
+            }
+
+            ccc->detachFromOperationContext();
+
+            if (cursorState == ClusterCursorManager::CursorState::Exhausted) {
+                CursorInitialReply resp;
+                InitialResponseCursor initRespCursor{std::move(firstBatch)};
+                initRespCursor.setResponseCursorBase({0LL /* cursorId */, nss});
+                resp.setCursor(std::move(initRespCursor));
+                return resp;
+            }
+
+            ccc->incNBatches();
+
+            auto authUser =
+                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
+
+            // Register the cursor with the cursor manager for subsequent getMore's.
+            auto clusterCursorId =
+                uassertStatusOK(Grid::get(opCtx)->getCursorManager()->registerCursor(
+                    opCtx,
+                    ccc.releaseCursor(),
+                    nss,
+                    cursorType,
+                    ClusterCursorManager::CursorLifetime::Mortal,
+                    authUser));
+
+            CursorInitialReply resp;
+            InitialResponseCursor initRespCursor{std::move(firstBatch)};
+            initRespCursor.setResponseCursorBase({clusterCursorId, nss});
+            resp.setCursor(std::move(initRespCursor));
+            return resp;
+        }
+
         NamespaceString ns() const override {
             return request().getNamespace();
         }

@@ -39,6 +39,14 @@ enums:
         values:
             kUUIDMismatch: "UUIDMismatch"
             kHiddenUnshardedCollection: "HiddenUnshardedCollection"
+    
+    MetadataConsistencyCommandLevel:
+        description: "Level mode of the metadata consistency command."
+        type: string
+        values:
+            kClusterLevel: "ClusterLevel"
+            kDatabaseLevel: "DatabaseLevel"
+            kCollectionLevel: "CollectionLevel"
 
 structs:
     MetadataInconsistencyItem:
@@ -57,23 +65,3 @@ structs:
             info:
                 type: object_owned
                 description: "Info about the inconsistency."
-
-    CheckMetadataConsistencyResponseCursor:
-        description: "Cursor object of the checkMetadataConsistency command"
-        strict: false
-        fields:
-            id:
-                type: long
-            ns:
-                type: namespacestring
-            firstBatch:
-                type: array<MetadataInconsistencyItem>
-                description: "Array of inconsistencies found."
-
-    CheckMetadataConsistencyResponse:
-        description: "Response of the check metadata consistency command"
-        is_command_reply: true
-        strict: false
-        fields:
-            cursor:
-                type: CheckMetadataConsistencyResponseCursor

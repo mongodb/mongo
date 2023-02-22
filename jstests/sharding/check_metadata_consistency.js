@@ -27,10 +27,6 @@ function getNewDb() {
     assert.commandWorked(
         st.s.adminCommand({shardCollection: db.coll.getFullName(), key: {_id: 1}}));
 
-    // Cluster level mode command
-    assert.commandFailedWithCode(st.s.adminCommand({checkMetadataConsistency: 1}),
-                                 ErrorCodes.NotImplemented);
-
     // Collection level mode command
     assert.commandFailedWithCode(db.runCommand({checkMetadataConsistency: "coll"}),
                                  ErrorCodes.NotImplemented);
@@ -121,6 +117,53 @@ function getNewDb() {
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();
+})();
+
+(function testClusterLevelMode() {
+    const db_HiddenUnshardedCollection1 = getNewDb();
+    const db_HiddenUnshardedCollection2 = getNewDb();
+    const db_UUIDMismatch = getNewDb();
+
+    // Insert HiddenUnshardedCollection inconsistency in db_HiddenUnshardedCollection1
+    assert.commandWorked(mongos.adminCommand({
+        enableSharding: db_HiddenUnshardedCollection1.getName(),
+        primaryShard: st.shard0.shardName
+    }));
+    assert.commandWorked(
+        st.shard1.getDB(db_HiddenUnshardedCollection1.getName()).coll.insert({_id: 'foo'}));
+
+    // Insert HiddenUnshardedCollection inconsistency in db_HiddenUnshardedCollection2
+    assert.commandWorked(mongos.adminCommand({
+        enableSharding: db_HiddenUnshardedCollection2.getName(),
+        primaryShard: st.shard1.shardName
+    }));
+    assert.commandWorked(
+        st.shard0.getDB(db_HiddenUnshardedCollection2.getName()).coll.insert({_id: 'foo'}));
+
+    // Insert UUIDMismatch inconsistency in db_UUIDMismatch
+    assert.commandWorked(mongos.adminCommand(
+        {enableSharding: db_UUIDMismatch.getName(), primaryShard: st.shard1.shardName}));
+
+    assert.commandWorked(st.shard0.getDB(db_UUIDMismatch.getName()).coll.insert({_id: 'foo'}));
+
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: db_UUIDMismatch.coll.getFullName(), key: {_id: 1}}));
+
+    // Cluster level mode command
+    const inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+
+    // Check that there are 3 inconsistencies: 2 HiddenUnshardedCollection and 1 UUIDMismatch
+    assert.eq(3, inconsistencies.length);
+    const count = inconsistencies.reduce((acc, object) => {
+        return object.type === "HiddenUnshardedCollection" ? acc + 1 : acc;
+    }, 0);
+    assert.eq(2, count);
+    assert(inconsistencies.some(object => object.type === "UUIDMismatch"));
+
+    // Clean up the databases to pass the hooks that detect inconsistencies
+    db_HiddenUnshardedCollection1.dropDatabase();
+    db_HiddenUnshardedCollection2.dropDatabase();
+    db_UUIDMismatch.dropDatabase();
 })();
 
 st.stop();

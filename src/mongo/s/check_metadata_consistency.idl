@@ -31,7 +31,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/metadata_consistency_types.idl"
+    - "mongo/db/query/cursor_response.idl"
 
 commands:
     checkMetadataConsistency:
@@ -41,7 +41,7 @@ commands:
         namespace: concatenate_with_db
         allow_global_collection_name: true
         api_version: ""
-        reply_type: CheckMetadataConsistencyResponse
+        reply_type: CursorInitialReply
         fields:
             cursor:
                 type: SimpleCursorOptions
