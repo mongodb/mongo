@@ -68,6 +68,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -943,6 +944,10 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
                                                               std::move(expCtx),
                                                               ExtensionsCallbackNoop(),
                                                               allowedFeatures);
+
+        // Increment counters to track the usage of schema validators.
+        validatorCounters.incrementCounters(
+            "create", collectionOptions.validator, statusWithMatcher.isOK());
 
         // We check the status of the parse to see if there are any banned features, but we don't
         // actually need the result for now.

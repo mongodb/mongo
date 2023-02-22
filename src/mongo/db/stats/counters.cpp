@@ -302,4 +302,6 @@ OperatorCountersMatchExpressions operatorCountersMatchExpressions;
 Counter64 updateManyCount;
 Counter64 deleteManyCount;
 
+ValidatorCounters validatorCounters;
+
 }  // namespace mongo
