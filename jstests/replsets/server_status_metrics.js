@@ -224,6 +224,12 @@ assert.commandWorked(primary.adminCommand({setParameter: 1, writePeriodicNoops: 
 // numEmptyBatches.
 configureFailPoint(secondary, 'setSmallOplogGetMoreMaxTimeMS');
 
+// Wait for the secondary to sync from the primary before asserting that the secondary increments
+// numTimesChoseSame. Otherwise, the secondary may go into the loop with an empty sync source, which
+// will lead to the loop never exiting as the secondary always treats choosing the primary as a
+// new sync source.
+rt.awaitSyncSource(secondary, primary, 5 * 1000 /* timeout */);
+
 // Repeatedly restart replication and wait for the sync source to be rechosen. If the sync source
 // gets set to empty between stopping and restarting replication, then the secondary won't
 // increment numTimesChoseSame, so we do this in a loop.
@@ -243,7 +249,7 @@ assert.soon(
     },
     "timed out waiting to re-choose same sync source",
     null,
-    3 * 1000 /* 3sec interval to wait for noop */);
+    5 * 1000 /* 5sec interval to wait for noop */);
 
 assert.gt(ssNew.numSelections, ssOld.numSelections, "num selections not incremented");
 assert.gt(ssNew.numTimesChoseSame, ssOld.numTimesChoseSame, "same sync source not chosen");
