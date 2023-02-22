@@ -1981,8 +1981,9 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               const BSONObj& minKey,
                                               boost::optional<int64_t> optMaxChunkSizeBytes) {
-    const auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx, nss));
+    const auto [cm, _] = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx,
+                                                                                              nss));
     auto chunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
 
     try {
@@ -2091,9 +2092,11 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
         // migrations
         Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
-        const auto cm = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx,
-                                                                                           nss));
+        const auto cm =
+            uassertStatusOK(Grid::get(opCtx)
+                                ->catalogCache()
+                                ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss))
+                .cm;
 
         uassert(ErrorCodes::InvalidUUID,
                 str::stream() << "Collection uuid " << collectionUUID

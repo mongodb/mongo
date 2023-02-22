@@ -70,8 +70,8 @@ public:
             const ShardKeyPattern keyPattern(request().getKey());
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-            const auto cm = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(opCtx, ns()));
+            const auto [cm, _] = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, ns()));
             {
                 AutoGetCollectionForReadCommandMaybeLockFree coll{
                     opCtx,

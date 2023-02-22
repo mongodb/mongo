@@ -72,9 +72,10 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-            const auto cm = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
-                    opCtx, ns()));
+            const auto [cm, _] = uassertStatusOK(
+                Grid::get(opCtx)
+                    ->catalogCache()
+                    ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, ns()));
 
             uassert(ErrorCodes::InvalidOptions,
                     "bounds can only have exactly 2 elements",

@@ -124,8 +124,8 @@ public:
             return false;
         }
 
-        auto const cm =
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfo(opCtx, nss);
+        auto const [cm, _] =
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
 
         if (!cm.getShardKeyPattern().isShardKey(minKey) ||
             !cm.getShardKeyPattern().isShardKey(maxKey)) {

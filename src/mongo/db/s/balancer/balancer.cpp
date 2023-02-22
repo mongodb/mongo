@@ -185,13 +185,14 @@ Status processManualMigrationOutcome(OperationContext* opCtx,
     }
 
     auto swCM =
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx, nss);
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx,
+                                                                                              nss);
     if (!swCM.isOK()) {
         return swCM.getStatus();
     }
 
     const auto currentChunkInfo =
-        swCM.getValue().findIntersectingChunkWithSimpleCollation(chunkMin);
+        swCM.getValue().cm.findIntersectingChunkWithSimpleCollation(chunkMin);
     if (currentChunkInfo.getShardId() == destination &&
         outcome != ErrorCodes::BalancerInterrupted) {
         // Migration calls can be interrupted after the metadata is committed but before the command
@@ -434,9 +435,9 @@ Status Balancer::moveRange(OperationContext* opCtx,
     const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
 
     const auto [fromShardId, min] = [&]() {
-        const auto cm = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx,
-                                                                                           nss));
+        const auto [cm, _] = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(
+                opCtx, nss));
         // TODO SERVER-64926 do not assume min always present
         const auto& chunk = cm.findIntersectingChunkWithSimpleCollation(*request.getMin());
         return std::tuple<ShardId, BSONObj>{chunk.getShardId(), chunk.getMin()};
@@ -982,13 +983,13 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
 
     for (const auto& splitInfo : chunksToSplitStatus.getValue()) {
         auto routingInfoStatus =
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(
                 opCtx, splitInfo.nss);
         if (!routingInfoStatus.isOK()) {
             return routingInfoStatus.getStatus();
         }
 
-        const auto& cm = routingInfoStatus.getValue();
+        const auto& [cm, _] = routingInfoStatus.getValue();
 
         auto splitStatus =
             shardutil::splitChunkAtMultiplePoints(opCtx,

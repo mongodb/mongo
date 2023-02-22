@@ -179,11 +179,14 @@ StatusWith<CollectionRoutingInfo> retryUntilConsistentRoutingInfo(
         // A non-empty GlobalIndexesCache implies that the collection is sharded since global
         // indexes cannot be created on unsharded collections.
         while (gii && (!cm.isSharded() || !cm.uuidMatches(gii->getCollectionIndexes().uuid()))) {
-            auto nextGii = catalogCache->getCollectionIndexInfoWithRefresh(opCtx, nss);
+            auto nextGii =
+                uassertStatusOK(catalogCache->getCollectionRoutingInfoWithIndexRefresh(opCtx, nss))
+                    .gii;
             if (gii.is_initialized() && nextGii.is_initialized() &&
                 gii->getCollectionIndexes() == nextGii->getCollectionIndexes()) {
                 cm = uassertStatusOK(
-                    catalogCache->getCollectionPlacementInfoWithRefresh(opCtx, nss));
+                         catalogCache->getCollectionRoutingInfoWithPlacementRefresh(opCtx, nss))
+                         .cm;
             }
             gii = std::move(nextGii);
         }
@@ -423,34 +426,11 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
     }
 }
 
-StatusWith<ChunkManager> CatalogCache::getCollectionPlacementInfo(OperationContext* opCtx,
-                                                                  const NamespaceString& nss,
-                                                                  bool allowLocks) {
-    return _getCollectionPlacementInfoAt(opCtx, nss, boost::none, allowLocks);
-}
-
-StatusWith<ChunkManager> CatalogCache::getCollectionPlacementInfoAt(OperationContext* opCtx,
-                                                                    const NamespaceString& nss,
-                                                                    Timestamp atClusterTime) {
-    return _getCollectionPlacementInfoAt(opCtx, nss, atClusterTime, false);
-}
-
-boost::optional<GlobalIndexesCache> CatalogCache::getCollectionIndexInfo(OperationContext* opCtx,
-                                                                         const NamespaceString& nss,
-                                                                         bool allowLocks) {
-    return _getCollectionIndexInfoAt(opCtx, nss, boost::none, allowLocks);
-}
-
-boost::optional<GlobalIndexesCache> CatalogCache::getCollectionIndexInfoAt(
-    OperationContext* opCtx, const NamespaceString& nss, Timestamp atClusterTime) {
-    return _getCollectionIndexInfoAt(opCtx, nss, atClusterTime, false);
-}
-
 StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoAt(
     OperationContext* opCtx, const NamespaceString& nss, Timestamp atClusterTime) {
     try {
-        auto cm = uassertStatusOK(getCollectionPlacementInfoAt(opCtx, nss, atClusterTime));
-        auto gii = getCollectionIndexInfoAt(opCtx, nss, atClusterTime);
+        auto cm = uassertStatusOK(_getCollectionPlacementInfoAt(opCtx, nss, atClusterTime));
+        auto gii = _getCollectionIndexInfoAt(opCtx, nss);
         return retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(gii));
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -461,8 +441,9 @@ StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(Operati
                                                                          const NamespaceString& nss,
                                                                          bool allowLocks) {
     try {
-        auto cm = uassertStatusOK(getCollectionPlacementInfo(opCtx, nss, allowLocks));
-        auto gii = getCollectionIndexInfo(opCtx, nss, allowLocks);
+        auto cm =
+            uassertStatusOK(_getCollectionPlacementInfoAt(opCtx, nss, boost::none, allowLocks));
+        auto gii = _getCollectionIndexInfoAt(opCtx, nss, allowLocks);
         return retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(gii));
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -470,10 +451,7 @@ StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(Operati
 }
 
 boost::optional<GlobalIndexesCache> CatalogCache::_getCollectionIndexInfoAt(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    boost::optional<Timestamp> atClusterTime,
-    bool allowLocks) {
+    OperationContext* opCtx, const NamespaceString& nss, bool allowLocks) {
 
     if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
         return boost::none;
@@ -568,60 +546,54 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabaseWithRefresh(OperationCon
     return getDatabase(opCtx, dbName);
 }
 
-StatusWith<ChunkManager> CatalogCache::getCollectionPlacementInfoWithRefresh(
-    OperationContext* opCtx, const NamespaceString& nss) {
+void CatalogCache::_triggerPlacementVersionRefresh(OperationContext* opCtx,
+                                                   const NamespaceString& nss) {
     _collectionCache.advanceTimeInStore(
         nss, ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh());
     setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
-    return getCollectionPlacementInfo(opCtx, nss);
 }
 
-boost::optional<GlobalIndexesCache> CatalogCache::getCollectionIndexInfoWithRefresh(
-    OperationContext* opCtx, const NamespaceString& nss) {
+void CatalogCache::_triggerIndexVersionRefresh(OperationContext* opCtx,
+                                               const NamespaceString& nss) {
     _indexCache.advanceTimeInStore(
         nss, ComparableIndexVersion::makeComparableIndexVersionForForcedRefresh());
     setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
-    return getCollectionIndexInfo(opCtx, nss);
 }
 
 StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     try {
-        auto cm = uassertStatusOK(getCollectionPlacementInfoWithRefresh(opCtx, nss));
-        auto gii = getCollectionIndexInfoWithRefresh(opCtx, nss);
-        return retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(gii));
+        _triggerPlacementVersionRefresh(opCtx, nss);
+        _triggerIndexVersionRefresh(opCtx, nss);
+        return getCollectionRoutingInfo(opCtx, nss, false);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
 }
 
-ChunkManager CatalogCache::getShardedCollectionPlacementInfo(OperationContext* opCtx,
-                                                             const NamespaceString& nss) {
-    auto cm = uassertStatusOK(getCollectionPlacementInfo(opCtx, nss));
-
-    uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Expected collection " << nss << " to be sharded",
-            cm.isSharded());
-
-    return cm;
+StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithPlacementRefresh(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    try {
+        _triggerPlacementVersionRefresh(opCtx, nss);
+        return getCollectionRoutingInfo(opCtx, nss, false);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 }
 
-StatusWith<ChunkManager> CatalogCache::getShardedCollectionPlacementInfoWithRefresh(
+StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithIndexRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
-    auto routingInfoStatus = getCollectionPlacementInfoWithRefresh(opCtx, nss);
-    if (routingInfoStatus.isOK() && !routingInfoStatus.getValue().isSharded()) {
-        return {ErrorCodes::NamespaceNotSharded,
-                str::stream() << "Collection " << nss.ns() << " is not sharded."};
+    try {
+        _triggerIndexVersionRefresh(opCtx, nss);
+        return getCollectionRoutingInfo(opCtx, nss, false);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
-    return routingInfoStatus;
 }
 
 CollectionRoutingInfo CatalogCache::getShardedCollectionRoutingInfo(OperationContext* opCtx,
                                                                     const NamespaceString& nss) {
-    auto cm = getShardedCollectionPlacementInfo(opCtx, nss);
-    auto gii = getCollectionIndexInfo(opCtx, nss);
-    auto cri =
-        uassertStatusOK(retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(gii)));
+    auto cri = uassertStatusOK(getCollectionRoutingInfo(opCtx, nss));
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "Expected collection " << nss << " to be sharded",
             cri.cm.isSharded());
@@ -631,10 +603,20 @@ CollectionRoutingInfo CatalogCache::getShardedCollectionRoutingInfo(OperationCon
 StatusWith<CollectionRoutingInfo> CatalogCache::getShardedCollectionRoutingInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     try {
-        auto cm = uassertStatusOK(getShardedCollectionPlacementInfoWithRefresh(opCtx, nss));
-        auto gii = getCollectionIndexInfoWithRefresh(opCtx, nss);
-        auto cri = uassertStatusOK(
-            retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(gii)));
+        auto cri = uassertStatusOK(getCollectionRoutingInfoWithRefresh(opCtx, nss));
+        uassert(ErrorCodes::NamespaceNotSharded,
+                str::stream() << "Expected collection " << nss << " to be sharded",
+                cri.cm.isSharded());
+        return cri;
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+}
+
+StatusWith<CollectionRoutingInfo> CatalogCache::getShardedCollectionRoutingInfoWithPlacementRefresh(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    try {
+        auto cri = uassertStatusOK(getCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
         uassert(ErrorCodes::NamespaceNotSharded,
                 str::stream() << "Expected collection " << nss << " to be sharded",
                 cri.cm.isSharded());

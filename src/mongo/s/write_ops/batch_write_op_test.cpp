@@ -1700,7 +1700,9 @@ public:
     void setUp() override {
         CatalogCacheTestFixture::setUp();
         const ShardKeyPattern shardKeyPattern(BSON("a" << 1));
-        _cm = makeChunkManager(kNss, shardKeyPattern, nullptr, false, {BSON("a" << splitPoint)});
+        _cm = makeCollectionRoutingInfo(
+                  kNss, shardKeyPattern, nullptr, false, {BSON("a" << splitPoint)}, {})
+                  .cm;
     }
 
     ChunkManager getChunkManager() const {

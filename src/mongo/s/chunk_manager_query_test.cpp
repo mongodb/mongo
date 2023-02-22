@@ -54,7 +54,8 @@ protected:
                                     const BSONObj& max,
                                     const std::set<ShardId>& expectedShardIds) {
         const ShardKeyPattern shardKeyPattern(shardKey);
-        auto chunkManager = makeChunkManager(kNss, shardKeyPattern, nullptr, false, splitPoints);
+        auto chunkManager =
+            makeCollectionRoutingInfo(kNss, shardKeyPattern, nullptr, false, splitPoints, {}).cm;
 
         std::set<ShardId> shardIds;
         chunkManager.getShardIdsForRange(min, max, &shardIds);
@@ -72,7 +73,9 @@ protected:
                       bool expectTargetMinKeyToMaxKey) {
         const ShardKeyPattern shardKeyPattern(shardKey);
         auto chunkManager =
-            makeChunkManager(kNss, shardKeyPattern, std::move(defaultCollator), false, splitPoints);
+            makeCollectionRoutingInfo(
+                kNss, shardKeyPattern, std::move(defaultCollator), false, splitPoints, {})
+                .cm;
 
         std::set<ShardId> shardIds;
         std::set<ChunkRange> chunkRanges;

@@ -46,9 +46,9 @@ public:
     CatalogCacheMock(ServiceContext* context, CatalogCacheLoaderMock& loader);
     ~CatalogCacheMock() = default;
 
-    StatusWith<ChunkManager> getCollectionPlacementInfo(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
-                                                        bool allowLocks) override;
+    StatusWith<CollectionRoutingInfo> getCollectionRoutingInfo(OperationContext* opCtx,
+                                                               const NamespaceString& nss,
+                                                               bool allowLocks) override;
 
     void setChunkManagerReturnValue(StatusWith<ChunkManager> statusWithChunks);
     void clearChunkManagerReturnValue();

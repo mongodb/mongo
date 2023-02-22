@@ -42,7 +42,7 @@ ShardId GlobalIndexCloningStateImpl::myShardId(ServiceContext* service) const {
 ChunkManager GlobalIndexCloningStateImpl::getShardedCollectionPlacementInfo(
     OperationContext* opCtx, const NamespaceString& nss) const {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
-    return catalogCache->getShardedCollectionPlacementInfo(opCtx, nss);
+    return catalogCache->getShardedCollectionRoutingInfo(opCtx, nss).cm;
 }
 
 }  // namespace global_index

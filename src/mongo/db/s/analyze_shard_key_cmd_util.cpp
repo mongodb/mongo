@@ -512,7 +512,8 @@ CollStatsMetrics calculateCollStats(OperationContext* opCtx, const NamespaceStri
 
         if (serverGlobalParams.clusterRole.isShardRole()) {
             auto cm = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(opCtx, nss));
+                          Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss))
+                          .cm;
 
             if (cm.isSharded()) {
                 metrics.numOrphanDocs = doc.getField(kNumOrphanDocsFieldName).exactNumberLong();

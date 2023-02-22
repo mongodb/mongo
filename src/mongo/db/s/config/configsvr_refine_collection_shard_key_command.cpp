@@ -125,8 +125,8 @@ public:
                     nss,
                     "validating indexes for refineCollectionShardKey"_sd,
                     [&] {
-                        auto cm =
-                            uassertStatusOK(catalogCache->getCollectionPlacementInfo(opCtx, nss));
+                        auto [cm, _] =
+                            uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
                         std::set<ShardId> shardsIds;
 
                         cm.getAllShardIds(&shardsIds);

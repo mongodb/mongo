@@ -130,7 +130,7 @@ ShardId RecipientStateMachineExternalStateImpl::myShardId(ServiceContext* servic
 void RecipientStateMachineExternalStateImpl::refreshCatalogCache(OperationContext* opCtx,
                                                                  const NamespaceString& nss) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
-    uassertStatusOK(catalogCache->getShardedCollectionPlacementInfoWithRefresh(opCtx, nss));
+    uassertStatusOK(catalogCache->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
 }
 
 CollectionRoutingInfo RecipientStateMachineExternalStateImpl::getShardedCollectionRoutingInfo(
@@ -179,7 +179,7 @@ boost::optional<GlobalIndexesCache>
 RecipientStateMachineExternalStateImpl::getCollectionIndexInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
-    return catalogCache->getCollectionIndexInfoWithRefresh(opCtx, nss);
+    return uassertStatusOK(catalogCache->getCollectionRoutingInfoWithIndexRefresh(opCtx, nss)).gii;
 }
 
 void RecipientStateMachineExternalStateImpl::withShardVersionRetry(

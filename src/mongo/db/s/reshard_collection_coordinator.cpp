@@ -146,9 +146,12 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                             .expectedUUID(_doc.getCollectionUUID())};
                 }
 
-                const auto cmOld = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
-                        opCtx, nss()));
+                const auto cmOld =
+                    uassertStatusOK(
+                        Grid::get(opCtx)
+                            ->catalogCache()
+                            ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss()))
+                        .cm;
 
                 StateDoc newDoc(_doc);
                 newDoc.setOldShardKey(cmOld.getShardKeyPattern().getKeyPattern().toBSON());
@@ -177,9 +180,12 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                 uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse)));
 
                 // Report command completion to the oplog.
-                const auto cm = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
-                        opCtx, nss()));
+                const auto cm =
+                    uassertStatusOK(
+                        Grid::get(opCtx)
+                            ->catalogCache()
+                            ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss()))
+                        .cm;
 
                 if (_doc.getOldCollectionUUID() && _doc.getOldCollectionUUID() != cm.getUUID()) {
                     notifyChangeStreamsOnReshardCollectionComplete(

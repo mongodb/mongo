@@ -105,8 +105,8 @@ public:
         expectCollectionAndIndexesAggregation(
             nss, epoch, timestamp, UUID::gen(), shardKey, boost::none, {});
 
-        const auto cm = future.default_timed_get();
-        ASSERT(cm->isSharded());
+        const auto cri = future.default_timed_get();
+        ASSERT(cri->cm.isSharded());
     }
 
 protected:

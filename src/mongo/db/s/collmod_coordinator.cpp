@@ -137,8 +137,8 @@ void CollModCoordinator::_saveShardingInfoOnCoordinatorIfNecessary(OperationCont
         6522700, "Sharding information must be gathered after collection information", _collInfo);
     if (!_shardingInfo && _collInfo->isSharded) {
         ShardingInfo info;
-        const auto chunkManager =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
+        const auto [chunkManager, _] = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(
                 opCtx, _collInfo->nsForTargeting));
 
         info.primaryShard = chunkManager.dbPrimary();

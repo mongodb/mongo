@@ -62,8 +62,8 @@ namespace mongo {
 using namespace fmt::literals;
 
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    const auto cm =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(opCtx, nss));
+    const auto [cm, _] =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
     return cm.isSharded();
 }
 
@@ -75,7 +75,8 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     auto* catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
 
     // Since we are only checking the epoch, don't advance the time in store of the index cache
-    auto currentGlobalIndexesInfo = catalogCache->getCollectionIndexInfo(expCtx->opCtx, nss);
+    auto currentGlobalIndexesInfo =
+        uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss)).gii;
 
     // Mark the cache entry routingInfo for the 'nss' and 'shardId' if the entry is staler than
     // 'targetCollectionVersion'.
@@ -88,7 +89,7 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
         nss, ignoreIndexVersion, shardId);
 
     const auto routingInfo =
-        uassertStatusOK(catalogCache->getCollectionPlacementInfo(expCtx->opCtx, nss));
+        uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss)).cm;
 
     const auto foundVersion =
         routingInfo.isSharded() ? routingInfo.getVersion() : ChunkVersion::UNSHARDED();

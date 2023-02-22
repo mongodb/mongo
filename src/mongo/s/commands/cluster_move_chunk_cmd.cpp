@@ -100,9 +100,12 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) {
 
             Timer t;
-            const auto chunkManager = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
-                    opCtx, ns()));
+            const auto chunkManager =
+                uassertStatusOK(
+                    Grid::get(opCtx)
+                        ->catalogCache()
+                        ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, ns()))
+                    .cm;
 
             uassert(ErrorCodes::InvalidOptions,
                     "bounds can only have exactly 2 elements",

@@ -128,60 +128,62 @@ public:
             }
 
             // Returns boost::none if there isn't any work to be done by the resharding operation.
-            auto instance = ([&]()
-                                 -> boost::optional<std::shared_ptr<const ReshardingCoordinator>> {
-                FixedFCVRegion fixedFcv(opCtx);
+            auto instance =
+                ([&]() -> boost::optional<std::shared_ptr<const ReshardingCoordinator>> {
+                    FixedFCVRegion fixedFcv(opCtx);
 
-                uassert(ErrorCodes::CommandNotSupported,
-                        "reshardCollection command not enabled",
-                        resharding::gFeatureFlagResharding.isEnabled(
-                            serverGlobalParams.featureCompatibility));
+                    uassert(ErrorCodes::CommandNotSupported,
+                            "reshardCollection command not enabled",
+                            resharding::gFeatureFlagResharding.isEnabled(
+                                serverGlobalParams.featureCompatibility));
 
-                // (Generic FCV reference): To run this command and ensure the consistency of the
-                // metadata we need to make sure we are on a stable state.
-                uassert(ErrorCodes::CommandNotSupported,
+                    // (Generic FCV reference): To run this command and ensure the consistency of
+                    // the metadata we need to make sure we are on a stable state.
+                    uassert(
+                        ErrorCodes::CommandNotSupported,
                         "Resharding is not supported for this version, please update the FCV to "
                         "latest.",
                         !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
 
-                const auto cm = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
-                        opCtx, nss));
+                    const auto [cm, _] = uassertStatusOK(
+                        Grid::get(opCtx)
+                            ->catalogCache()
+                            ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
 
-                auto tempReshardingNss =
-                    resharding::constructTemporaryReshardingNss(nss.db(), cm.getUUID());
+                    auto tempReshardingNss =
+                        resharding::constructTemporaryReshardingNss(nss.db(), cm.getUUID());
 
 
-                if (auto zones = request().getZones()) {
-                    resharding::checkForOverlappingZones(*zones);
-                }
+                    if (auto zones = request().getZones()) {
+                        resharding::checkForOverlappingZones(*zones);
+                    }
 
-                auto coordinatorDoc =
-                    ReshardingCoordinatorDocument(std::move(CoordinatorStateEnum::kUnused),
-                                                  {},   // donorShards
-                                                  {});  // recipientShards
+                    auto coordinatorDoc =
+                        ReshardingCoordinatorDocument(std::move(CoordinatorStateEnum::kUnused),
+                                                      {},   // donorShards
+                                                      {});  // recipientShards
 
-                // Generate the resharding metadata for the ReshardingCoordinatorDocument.
-                auto reshardingUUID = UUID::gen();
-                auto existingUUID = cm.getUUID();
-                auto commonMetadata = CommonReshardingMetadata(std::move(reshardingUUID),
-                                                               ns(),
-                                                               std::move(existingUUID),
-                                                               std::move(tempReshardingNss),
-                                                               request().getKey());
-                commonMetadata.setStartTime(
-                    opCtx->getServiceContext()->getFastClockSource()->now());
+                    // Generate the resharding metadata for the ReshardingCoordinatorDocument.
+                    auto reshardingUUID = UUID::gen();
+                    auto existingUUID = cm.getUUID();
+                    auto commonMetadata = CommonReshardingMetadata(std::move(reshardingUUID),
+                                                                   ns(),
+                                                                   std::move(existingUUID),
+                                                                   std::move(tempReshardingNss),
+                                                                   request().getKey());
+                    commonMetadata.setStartTime(
+                        opCtx->getServiceContext()->getFastClockSource()->now());
 
-                coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
-                coordinatorDoc.setZones(request().getZones());
-                coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
-                coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
+                    coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
+                    coordinatorDoc.setZones(request().getZones());
+                    coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
+                    coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
 
-                opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-                auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);
-                instance->getCoordinatorDocWrittenFuture().get(opCtx);
-                return instance;
-            })();
+                    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+                    auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);
+                    instance->getCoordinatorDocWrittenFuture().get(opCtx);
+                    return instance;
+                })();
 
             if (instance) {
                 // There is work to be done in order to have the collection's shard key match the

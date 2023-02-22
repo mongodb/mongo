@@ -135,17 +135,15 @@ protected:
         const auto coll = makeCollectionType(version);
         const auto scopedCollProv = scopedCollectionProvider(coll);
         const auto scopedChunksProv = scopedChunksProvider(makeChunks(version.placementVersion()));
-
-        const auto swChunkManager =
-            _catalogCache->getCollectionPlacementInfo(operationContext(), coll.getNss());
-        ASSERT_OK(swChunkManager.getStatus());
         auto future = launchAsync([&] {
             onCommand([&](const executor::RemoteCommandRequest& request) {
                 return makeCollectionAndIndexesAggregationResponse(coll, std::vector<BSONObj>());
             });
         });
-        const auto globalIndexesCache =
-            _catalogCache->getCollectionIndexInfo(operationContext(), coll.getNss());
+
+        const auto swCri =
+            _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNss());
+        ASSERT_OK(swCri.getStatus());
         future.default_timed_get();
         return coll;
     }
@@ -154,9 +152,8 @@ protected:
         const auto scopedCollProvider =
             scopedCollectionProvider(Status(ErrorCodes::NamespaceNotFound, "collection not found"));
 
-        const auto swChunkManager =
-            _catalogCache->getCollectionPlacementInfo(operationContext(), nss);
-        ASSERT_OK(swChunkManager.getStatus());
+        const auto swCri = _catalogCache->getCollectionRoutingInfo(operationContext(), nss);
+        ASSERT_OK(swCri.getStatus());
     }
 
     std::vector<ChunkType> makeChunks(ChunkVersion version) {
@@ -296,7 +293,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
     loadCollection(cachedCollVersion);
     _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         kNss, cachedCollVersion, kShards[0]);
-    ASSERT_OK(_catalogCache->getCollectionPlacementInfo(operationContext(), kNss).getStatus());
+    ASSERT_OK(_catalogCache->getCollectionRoutingInfo(operationContext(), kNss).getStatus());
 }
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
@@ -310,7 +307,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
     _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         kNss, boost::none, kShards[0]);
     const auto status =
-        _catalogCache->getCollectionPlacementInfo(operationContext(), kNss).getStatus();
+        _catalogCache->getCollectionRoutingInfo(operationContext(), kNss).getStatus();
     ASSERT(status == ErrorCodes::InternalError);
 }
 
@@ -327,7 +324,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithGreaterPlacementVersion) {
     _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         kNss, wantedCollVersion, kShards[0]);
     const auto status =
-        _catalogCache->getCollectionPlacementInfo(operationContext(), kNss).getStatus();
+        _catalogCache->getCollectionRoutingInfo(operationContext(), kNss).getStatus();
     ASSERT(status == ErrorCodes::InternalError);
 }
 
@@ -352,12 +349,18 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
 
         const auto scopedCollProv = scopedCollectionProvider(coll);
         const auto scopedChunksProv = scopedChunksProvider(chunks);
+        auto future = launchAsync([&] {
+            onCommand([&](const executor::RemoteCommandRequest& request) {
+                return makeCollectionAndIndexesAggregationResponse(coll, std::vector<BSONObj>());
+            });
+        });
 
-        const auto swChunkManager =
-            _catalogCache->getCollectionPlacementInfoWithRefresh(operationContext(), coll.getNss());
-        ASSERT_OK(swChunkManager.getStatus());
+        const auto swCri =
+            _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+        ASSERT_OK(swCri.getStatus());
+        future.default_timed_get();
 
-        const auto& chunkManager = swChunkManager.getValue();
+        const auto& chunkManager = swCri.getValue().cm;
         ASSERT(chunkManager.getTimeseriesFields().has_value());
         ASSERT(chunkManager.getTimeseriesFields()->getGranularity() ==
                BucketGranularityEnum::Seconds);
@@ -377,12 +380,18 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
 
         const auto scopedCollProv = scopedCollectionProvider(coll);
         const auto scopedChunksProv = scopedChunksProvider(std::vector{lastChunk});
+        auto future = launchAsync([&] {
+            onCommand([&](const executor::RemoteCommandRequest& request) {
+                return makeCollectionAndIndexesAggregationResponse(coll, std::vector<BSONObj>());
+            });
+        });
 
-        const auto swChunkManager =
-            _catalogCache->getCollectionPlacementInfoWithRefresh(operationContext(), coll.getNss());
-        ASSERT_OK(swChunkManager.getStatus());
+        const auto swCri =
+            _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+        ASSERT_OK(swCri.getStatus());
+        future.default_timed_get();
 
-        const auto& chunkManager = swChunkManager.getValue();
+        const auto& chunkManager = swCri.getValue().cm;
         ASSERT(chunkManager.getTimeseriesFields().has_value());
         ASSERT(chunkManager.getTimeseriesFields()->getGranularity() ==
                BucketGranularityEnum::Hours);
@@ -403,10 +412,10 @@ TEST_F(CatalogCacheTest, LookupCollectionWithInvalidOptions) {
     const auto scopedChunksProv = scopedChunksProvider(StatusWith<std::vector<ChunkType>>(
         ErrorCodes::InvalidOptions, "Testing error with invalid options"));
 
-    const auto swChunkManager =
-        _catalogCache->getCollectionPlacementInfoWithRefresh(operationContext(), coll.getNss());
+    const auto swCri =
+        _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
 
-    ASSERT_EQUALS(swChunkManager.getStatus(), ErrorCodes::InvalidOptions);
+    ASSERT_EQUALS(swCri.getStatus(), ErrorCodes::InvalidOptions);
 }
 
 
@@ -433,7 +442,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithGreaterIndexVersion) {
         });
     });
 
-    const auto indexInfo = _catalogCache->getCollectionIndexInfo(operationContext(), kNss);
+    const auto routingInfo = _catalogCache->getCollectionRoutingInfo(operationContext(), kNss);
     future.default_timed_get();
 }
 
@@ -460,7 +469,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionIndexVersionBumpNotNone) {
         });
     });
 
-    const auto indexInfo = _catalogCache->getCollectionIndexInfo(operationContext(), kNss);
+    const auto routingInfo = _catalogCache->getCollectionRoutingInfo(operationContext(), kNss);
     future.default_timed_get();
 }
 }  // namespace

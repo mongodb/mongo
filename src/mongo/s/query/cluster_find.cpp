@@ -673,8 +673,8 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
                 if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName, ex.toStatus())) {
                     if (ex.code() == ErrorCodes::ShardInvalidatedForTargeting) {
-                        (void)catalogCache->getCollectionPlacementInfoWithRefresh(opCtx,
-                                                                                  query.nss());
+                        (void)catalogCache->getCollectionRoutingInfoWithPlacementRefresh(
+                            opCtx, query.nss());
                     }
                     throw;
                 }

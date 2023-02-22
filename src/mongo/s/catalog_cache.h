@@ -163,61 +163,17 @@ public:
                                                bool allowLocks = false);
 
     /**
-     * Blocking method to get the placement information for a specific collection at a given cluster
-     * time.
+     * Blocking method to get both the placement information and the index information for a
+     * collection.
      *
-     * If the collection is sharded, returns placement info initialized with a ChunkManager. If the
-     * collection is not sharded, returns placement info initialized with the primary shard for the
-     * specified database. If an error occurs while loading the metadata, returns a failed status.
+     * If the collection is sharded, returns placement info initialized with a ChunkManager and a
+     * list of global indexes that may be empty if no global indexes exist. If the collection is not
+     * sharded, returns placement info initialized with the primary shard for the specified database
+     * and an empty list representing no global indexes. If an error occurs while loading the
+     * metadata, returns a failed status.
      *
      * If the given atClusterTime is so far in the past that it is not possible to construct
      * placement info, returns a StaleClusterTime error.
-     */
-    StatusWith<ChunkManager> getCollectionPlacementInfoAt(OperationContext* opCtx,
-                                                          const NamespaceString& nss,
-                                                          Timestamp atClusterTime);
-
-    /**
-     * Same as the getCollectionPlacementInfoAt call above, but returns the latest known routing
-     * information for the specified namespace.
-     *
-     * While this method may fail under the same circumstances as getCollectionPlacementInfoAt, it
-     * is guaranteed to never return StaleClusterTime, because the latest routing information should
-     * always be available.
-     */
-    virtual StatusWith<ChunkManager> getCollectionPlacementInfo(OperationContext* opCtx,
-                                                                const NamespaceString& nss,
-                                                                bool allowLocks = false);
-
-    /**
-     * Blocking method to get the global index information for a specific collection at a given
-     * cluster time.
-     *
-     * Returns a list of global indexes that may be empty is no global indexes exist. Throws if an
-     * error occurs while loading the metadata, returns a failed status.
-     *
-     * If the given atClusterTime is so far in the past that it is not possible to construct index
-     * info, returns a StaleClusterTime error.
-     */
-    boost::optional<GlobalIndexesCache> getCollectionIndexInfoAt(OperationContext* opCtx,
-                                                                 const NamespaceString& nss,
-                                                                 Timestamp atClusterTime);
-
-    /**
-     * Same as the getCollectionIndexInfoAt call above, but returns the latest known index
-     * information for the specified namespace.
-     *
-     * While this method may fail under the same circumstances as getCollectionIndexInfoAt, it is
-     * guaranteed to never throw StaleClusterTime, because the latest index information should
-     * always be available.
-     */
-    virtual boost::optional<GlobalIndexesCache> getCollectionIndexInfo(OperationContext* opCtx,
-                                                                       const NamespaceString& nss,
-                                                                       bool allowLocks = false);
-
-    /**
-     * Blocking method to get both the placement information and the index information for a
-     * collection.
      */
     StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoAt(OperationContext* opCtx,
                                                                  const NamespaceString& nss,
@@ -226,6 +182,10 @@ public:
     /**
      * Same as the getCollectionRoutingInfoAt call above, but returns the latest known routing
      * information for the specified namespace.
+     *
+     * While this method may fail under the same circumstances as getCollectionRoutingInfoAt, it is
+     * guaranteed to never throw StaleClusterTime, because the latest routing information should
+     * always be available.
      */
     virtual StatusWith<CollectionRoutingInfo> getCollectionRoutingInfo(OperationContext* opCtx,
                                                                        const NamespaceString& nss,
@@ -238,36 +198,27 @@ public:
                                                           StringData dbName);
 
     /**
-     * Same as getCollectionPlacementInfo above, but in addition causes the namespace to be
-     * refreshed.
-     */
-    StatusWith<ChunkManager> getCollectionPlacementInfoWithRefresh(OperationContext* opCtx,
-                                                                   const NamespaceString& nss);
-
-    /**
-     * Same as getCollectionIndexInfo above, but in addition causes the namespace to be refreshed.
-     */
-    boost::optional<GlobalIndexesCache> getCollectionIndexInfoWithRefresh(
-        OperationContext* opCtx, const NamespaceString& nss);
-
-    /**
      * Same as getCollectionRoutingInfo above, but in addition causes the namespace to be refreshed.
      */
     StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoWithRefresh(
         OperationContext* opCtx, const NamespaceString& nss);
 
     /**
-     * Same as getCollectionPlacementInfo above, but throws NamespaceNotSharded error if the
-     * namespace is not sharded.
+     * Same as getCollectionRoutingInfo above, but in addition, causes the placement information for
+     * the namespace to be refreshed. Will only refresh the index information if the collection
+     * uuid from the placement information does not match the collection uuid from the cached index
+     * information.
      */
-    ChunkManager getShardedCollectionPlacementInfo(OperationContext* opCtx,
-                                                   const NamespaceString& nss);
+    StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoWithPlacementRefresh(
+        OperationContext* opCtx, const NamespaceString& nss);
 
     /**
-     * Same as getCollectionPlacementInfoWithRefresh above, but in addition returns a
-     * NamespaceNotSharded error if the collection is not sharded.
+     * Same as getCollectionRoutingInfo above, but in addition, causes the index information for the
+     * namespace to be refreshed. Will only refresh the placement information if the collection uuid
+     * from the index information does not match the collection uuid from the cached placement
+     * information.
      */
-    StatusWith<ChunkManager> getShardedCollectionPlacementInfoWithRefresh(
+    StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoWithIndexRefresh(
         OperationContext* opCtx, const NamespaceString& nss);
 
     /**
@@ -282,6 +233,13 @@ public:
      * NamespaceNotSharded error if the collection is not sharded.
      */
     StatusWith<CollectionRoutingInfo> getShardedCollectionRoutingInfoWithRefresh(
+        OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
+     * Same as getCollectionRoutingInfoWithPlacementRefresh above, but in addition returns a
+     * NamespaceNotSharded error if the collection is not sharded.
+     */
+    StatusWith<CollectionRoutingInfo> getShardedCollectionRoutingInfoWithPlacementRefresh(
         OperationContext* opCtx, const NamespaceString& nss);
 
     /**
@@ -436,11 +394,13 @@ private:
                                                            boost::optional<Timestamp> atClusterTime,
                                                            bool allowLocks = false);
 
-    boost::optional<GlobalIndexesCache> _getCollectionIndexInfoAt(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        boost::optional<Timestamp> atClusterTime,
-        bool allowLocks = false);
+    boost::optional<GlobalIndexesCache> _getCollectionIndexInfoAt(OperationContext* opCtx,
+                                                                  const NamespaceString& nss,
+                                                                  bool allowLocks = false);
+
+    void _triggerPlacementVersionRefresh(OperationContext* opCtx, const NamespaceString& nss);
+
+    void _triggerIndexVersionRefresh(OperationContext* opCtx, const NamespaceString& nss);
 
     // Interface from which chunks will be retrieved
     CatalogCacheLoader& _cacheLoader;

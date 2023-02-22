@@ -151,7 +151,8 @@ public:
 
     void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) override {
         auto catalogCache = Grid::get(opCtx)->catalogCache();
-        uassertStatusOK(catalogCache->getShardedCollectionPlacementInfoWithRefresh(opCtx, nss));
+        uassertStatusOK(
+            catalogCache->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
     }
 
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override {

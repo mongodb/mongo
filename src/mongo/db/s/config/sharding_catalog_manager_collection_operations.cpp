@@ -493,8 +493,9 @@ void ShardingCatalogManager::configureCollectionBalancing(
         // during refresh, so it is safe to release the chunk lock.
     }
 
-    const auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx, nss));
+    const auto [cm, _] = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx,
+                                                                                              nss));
     std::set<ShardId> shardsIds;
     cm.getAllShardIds(&shardsIds);
 
@@ -557,8 +558,9 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
     // Take _kChunkOpLock in exclusive mode to prevent concurrent updates of the collection version.
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
-    const auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx, nss));
+    const auto [cm, _] = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx,
+                                                                                              nss));
     std::set<ShardId> shardIds;
     cm.getAllShardIds(&shardIds);
 

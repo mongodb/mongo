@@ -1003,7 +1003,7 @@ void ParseAndRunCommand::RunAndRetry::_checkRetryForTransaction(Status& status) 
         if (!txnRouter.canContinueOnStaleShardOrDbError(_parc->_commandName, status)) {
             if (status.code() == ErrorCodes::ShardInvalidatedForTargeting) {
                 auto catalogCache = Grid::get(opCtx)->catalogCache();
-                (void)catalogCache->getCollectionPlacementInfoWithRefresh(
+                (void)catalogCache->getCollectionRoutingInfoWithPlacementRefresh(
                     opCtx, status.extraInfo<ShardInvalidatedForTargetingInfo>()->getNss());
             }
 

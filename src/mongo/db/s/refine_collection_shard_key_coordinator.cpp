@@ -130,9 +130,10 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 shardkeyutil::validateShardKeyIsNotEncrypted(
                     opCtx, nss(), ShardKeyPattern(_newShardKey.toBSON()));
 
-                const auto cm = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
-                        opCtx, nss()));
+                const auto [cm, _] = uassertStatusOK(
+                    Grid::get(opCtx)
+                        ->catalogCache()
+                        ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss()));
 
                 _oldShardKey = cm.getShardKeyPattern().getKeyPattern();
                 _collectionUUID = cm.getUUID();

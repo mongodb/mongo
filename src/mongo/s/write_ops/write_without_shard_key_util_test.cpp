@@ -50,8 +50,13 @@ public:
 
         // Shard key is a compound shard key: {a:1, b:1}.
         const ShardKeyPattern shardKeyPattern(BSON("a" << 1 << "b" << 1));
-        _cm = makeChunkManager(
-            kNss, shardKeyPattern, nullptr, false, {BSON("a" << splitPoint << "b" << splitPoint)});
+        _cm = makeCollectionRoutingInfo(kNss,
+                                        shardKeyPattern,
+                                        nullptr,
+                                        false,
+                                        {BSON("a" << splitPoint << "b" << splitPoint)},
+                                        {})
+                  .cm;
     }
 
     ChunkManager getChunkManager() const {
@@ -176,8 +181,8 @@ TEST_F(UnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseProtocol) {
         });
     }
 
-    auto cm = *future.default_timed_get();
-    ASSERT(!cm.isSharded());
+    auto cri = *future.default_timed_get();
+    ASSERT(!cri.cm.isSharded());
 
     auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
         getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("x" << 1), {} /* collation */);

@@ -574,8 +574,9 @@ void writeToConfigIndexesForTempNss(OperationContext* opCtx,
 
     switch (nextState) {
         case CoordinatorStateEnum::kPreparingToDonate: {
-            auto optGii = Grid::get(opCtx)->catalogCache()->getCollectionIndexInfo(
-                opCtx, coordinatorDoc.getSourceNss());
+            auto [_, optGii] =
+                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
+                    opCtx, coordinatorDoc.getSourceNss()));
             if (optGii) {
                 std::vector<BSONObj> indexes;
                 optGii->forEachIndex([&](const auto index) {
@@ -996,7 +997,8 @@ ChunkVersion ReshardingCoordinatorExternalState::calculateChunkVersionForInitial
 
 boost::optional<CollectionIndexes> ReshardingCoordinatorExternalState::getCatalogIndexVersion(
     OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid) {
-    auto optGii = Grid::get(opCtx)->catalogCache()->getCollectionIndexInfo(opCtx, nss);
+    auto [_, optGii] =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
     if (optGii) {
         VectorClock::VectorTime vt = VectorClock::get(opCtx)->getTime();
         auto time = vt.clusterTime().asTimestamp();
@@ -1008,7 +1010,8 @@ boost::optional<CollectionIndexes> ReshardingCoordinatorExternalState::getCatalo
 boost::optional<CollectionIndexes>
 ReshardingCoordinatorExternalState::getCatalogIndexVersionForCommit(OperationContext* opCtx,
                                                                     const NamespaceString& nss) {
-    auto optGii = Grid::get(opCtx)->catalogCache()->getCollectionIndexInfo(opCtx, nss);
+    auto [_, optGii] =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
     if (optGii) {
         return optGii->getCollectionIndexes();
     }
@@ -1045,8 +1048,8 @@ std::vector<RecipientShardEntry> constructRecipientShardEntries(
 ReshardingCoordinatorExternalState::ParticipantShardsAndChunks
 ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
-    const auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
+    const auto [cm, _] = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(
             opCtx, coordinatorDoc.getSourceNss()));
 
     std::set<ShardId> donorShardIds;
@@ -1803,10 +1806,12 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
                            opCtx, _coordinatorDoc.getSourceNss()));
                    cm.emplace(cri.cm);
                } else {
-                   cm.emplace(uassertStatusOK(Grid::get(opCtx)
-                                                  ->catalogCache()
-                                                  ->getShardedCollectionPlacementInfoWithRefresh(
-                                                      opCtx, _coordinatorDoc.getSourceNss())));
+                   cm.emplace(
+                       uassertStatusOK(Grid::get(opCtx)
+                                           ->catalogCache()
+                                           ->getShardedCollectionRoutingInfoWithPlacementRefresh(
+                                               opCtx, _coordinatorDoc.getSourceNss()))
+                           .cm);
                }
 
                const auto currentShardKey = cm->getShardKeyPattern().getKeyPattern();
@@ -2297,9 +2302,9 @@ void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& 
     auto opCtx = cancellableOpCtx.get();
 
     try {
-        auto routingInfo = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx,
-                                                                                           nss));
+        auto [routingInfo, _] = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(
+                opCtx, nss));
 
         const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
         const auto collectionZones =
