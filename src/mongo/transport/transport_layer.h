@@ -37,7 +37,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_metrics.h"
-#include "mongo/transport/session.h"
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
@@ -83,6 +82,7 @@ public:
     static const Status TicketSessionClosedStatus;
 
     friend class Session;
+    using SessionHandle = std::shared_ptr<Session>;
 
     explicit TransportLayer(const WireSpec& wireSpec) : _wireSpec(wireSpec) {}
 

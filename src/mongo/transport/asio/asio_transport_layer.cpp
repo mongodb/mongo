@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/transport/asio/asio_transport_layer.h"
 
 #include <fmt/format.h>
@@ -61,6 +59,7 @@
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
@@ -77,6 +76,7 @@
 #endif
 
 #include "mongo/transport/asio/asio_session.h"
+#include "mongo/transport/asio/asio_session_impl.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -762,7 +762,7 @@ StatusWith<AsioTransportLayer::AsioSessionHandle> AsioTransportLayer::_doSyncCon
             transientSSLContext = std::move(statusOrContext.getValue());
         }
 #endif
-        return std::make_shared<AsioSession>(
+        return std::make_shared<SyncAsioSession>(
             this, std::move(sock), false, *endpoint, transientSSLContext);
     } catch (const asio::system_error& e) {
         return errorCodeToStatus(e.code(), "syncConnect AsioSession constructor");
@@ -918,11 +918,11 @@ Future<SessionHandle> AsioTransportLayer::asyncConnect(
             stdx::unique_lock<Latch> lk(connector->mutex);
             connector->session = [&] {
                 try {
-                    return std::make_shared<AsioSession>(this,
-                                                         std::move(connector->socket),
-                                                         false,
-                                                         *connector->resolvedEndpoint,
-                                                         transientSSLContext);
+                    return std::make_shared<AsyncAsioSession>(this,
+                                                              std::move(connector->socket),
+                                                              false,
+                                                              *connector->resolvedEndpoint,
+                                                              transientSSLContext);
                 } catch (const asio::system_error& e) {
                     iasserted(errorCodeToStatus(e.code(), "asyncConnect AsioSession constructor"));
                 }
@@ -1525,7 +1525,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
 
         try {
             std::shared_ptr<AsioSession> session(
-                new AsioSession(this, std::move(peerSocket), true));
+                new SyncAsioSession(this, std::move(peerSocket), true));
             if (session->isFromLoadBalancer()) {
                 session->parseProxyProtocolHeader(_acceptorReactor)
                     .getAsync([this, session = std::move(session)](Status s) {

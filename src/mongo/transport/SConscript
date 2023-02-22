@@ -71,7 +71,7 @@ tlEnv.Library(
     target='transport_layer',
     source=[
         'asio/asio_networking_baton.cpp' if env.TargetOSIs('linux') else [],
-        'asio/asio_session.cpp',
+        'asio/asio_session_impl.cpp',
         'asio/asio_transport_layer.cpp',
         'asio/asio_utils.cpp',
         'proxy_protocol_header_parser.cpp',

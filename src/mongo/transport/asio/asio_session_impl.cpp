@@ -28,20 +28,21 @@
  */
 
 
-#include "mongo/transport/asio/asio_session.h"
+#include "mongo/transport/asio/asio_session_impl.h"
 
 #include "mongo/config.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/proxy_protocol_header_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/net/socket_utils.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
 
 namespace mongo::transport {
 
@@ -52,7 +53,7 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeAddSession);
 
 namespace {
 
-template <int Name>
+template <int optionName>
 class ASIOSocketTimeoutOption {
 public:
 #ifdef _WIN32
@@ -72,7 +73,7 @@ public:
 
     template <typename Protocol>
     int name(const Protocol&) const {
-        return Name;
+        return optionName;
     }
 
     template <typename Protocol>
@@ -109,11 +110,12 @@ CounterMetric totalIngressTLSHandshakeTimeMillis("network.totalIngressTLSHandsha
 }  // namespace
 
 
-AsioSession::AsioSession(AsioTransportLayer* tl,
-                         GenericSocket socket,
-                         bool isIngressSession,
-                         Endpoint endpoint,
-                         std::shared_ptr<const SSLConnectionContext> transientSSLContext) try
+CommonAsioSession::CommonAsioSession(
+    AsioTransportLayer* tl,
+    GenericSocket socket,
+    bool isIngressSession,
+    Endpoint endpoint,
+    std::shared_ptr<const SSLConnectionContext> transientSSLContext) try
     : _socket(std::move(socket)), _tl(tl), _isIngressSession(isIngressSession) {
     auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
     auto sev = logv2::LogSeverity::Debug(3);
@@ -160,7 +162,7 @@ AsioSession::AsioSession(AsioTransportLayer* tl,
     throw;
 }
 
-void AsioSession::end() {
+void CommonAsioSession::end() {
     if (getSocket().is_open()) {
         std::error_code ec;
         getSocket().shutdown(GenericSocket::shutdown_both, ec);
@@ -173,21 +175,21 @@ void AsioSession::end() {
     }
 }
 
-StatusWith<Message> AsioSession::sourceMessage() noexcept try {
+StatusWith<Message> CommonAsioSession::sourceMessage() noexcept try {
     ensureSync();
     return sourceMessageImpl().getNoThrow();
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Future<Message> AsioSession::asyncSourceMessage(const BatonHandle& baton) noexcept try {
+Future<Message> CommonAsioSession::asyncSourceMessage(const BatonHandle& baton) noexcept try {
     ensureAsync();
     return sourceMessageImpl(baton);
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Status AsioSession::waitForData() noexcept try {
+Status CommonAsioSession::waitForData() noexcept try {
     ensureSync();
     asio::error_code ec;
     getSocket().wait(asio::ip::tcp::socket::wait_read, ec);
@@ -196,28 +198,29 @@ Status AsioSession::waitForData() noexcept try {
     return ex.toStatus();
 }
 
-Future<void> AsioSession::asyncWaitForData() noexcept try {
+Future<void> CommonAsioSession::asyncWaitForData() noexcept try {
     ensureAsync();
     return getSocket().async_wait(asio::ip::tcp::socket::wait_read, UseFuture{});
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Status AsioSession::sinkMessage(Message message) noexcept try {
+Status CommonAsioSession::sinkMessage(Message message) noexcept try {
     ensureSync();
     return sinkMessageImpl(std::move(message)).getNoThrow();
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Future<void> AsioSession::asyncSinkMessage(Message message, const BatonHandle& baton) noexcept try {
+Future<void> CommonAsioSession::asyncSinkMessage(Message message, const BatonHandle& baton) noexcept
+    try {
     ensureAsync();
     return sinkMessageImpl(std::move(message), baton);
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Future<void> AsioSession::sinkMessageImpl(Message message, const BatonHandle& baton) {
+Future<void> CommonAsioSession::sinkMessageImpl(Message message, const BatonHandle& baton) {
     _asyncOpState.start();
     return write(asio::buffer(message.buf(), message.size()), baton)
         .then([this, message /*keep the buffer alive*/]() {
@@ -231,7 +234,7 @@ Future<void> AsioSession::sinkMessageImpl(Message message, const BatonHandle& ba
         });
 }
 
-void AsioSession::cancelAsyncOperations(const BatonHandle& baton) {
+void CommonAsioSession::cancelAsyncOperations(const BatonHandle& baton) {
     LOGV2_DEBUG(4615608,
                 3,
                 "Canceling outstanding I/O operations on connection to {remote}",
@@ -247,12 +250,12 @@ void AsioSession::cancelAsyncOperations(const BatonHandle& baton) {
     getSocket().cancel();
 }
 
-void AsioSession::setTimeout(boost::optional<Milliseconds> timeout) {
+void CommonAsioSession::setTimeout(boost::optional<Milliseconds> timeout) {
     invariant(!timeout || timeout->count() > 0);
     _configuredTimeout = timeout;
 }
 
-bool AsioSession::isConnected() {
+bool CommonAsioSession::isConnected() {
     // socket.is_open() only returns whether the socket is a valid file descriptor and
     // if we haven't marked this socket as closed already.
     if (!getSocket().is_open())
@@ -293,11 +296,11 @@ bool AsioSession::isConnected() {
 
 #ifdef MONGO_CONFIG_SSL
 
-const std::shared_ptr<SSLManagerInterface>& AsioSession::getSSLManager() const {
+const std::shared_ptr<SSLManagerInterface>& CommonAsioSession::getSSLManager() const {
     return _sslContext->manager;
 }
 
-Status AsioSession::buildSSLSocket(const HostAndPort& target) {
+Status CommonAsioSession::buildSSLSocket(const HostAndPort& target) {
     invariant(!_sslSocket, "SSL socket is already constructed");
     if (!_sslContext->egress) {
         return Status(ErrorCodes::SSLHandshakeFailed, "SSL requested but SSL support is disabled");
@@ -306,11 +309,11 @@ Status AsioSession::buildSSLSocket(const HostAndPort& target) {
     return Status::OK();
 }
 
-Future<void> AsioSession::handshakeSSLForEgress(const HostAndPort& target,
-                                                const ReactorHandle& reactor) {
+Future<void> CommonAsioSession::handshakeSSLForEgress(const HostAndPort& target,
+                                                      const ReactorHandle& reactor) {
     invariant(_sslSocket, "SSL Socket expected to be built");
     auto doHandshake = [&] {
-        if (_blockingMode == Sync) {
+        if (_blockingMode == sync) {
             std::error_code ec;
             _sslSocket->handshake(asio::ssl::stream_base::client, ec);
             return futurize(ec);
@@ -329,12 +332,16 @@ Future<void> AsioSession::handshakeSSLForEgress(const HostAndPort& target,
 }
 #endif
 
-void AsioSession::ensureSync() {
+void AsyncAsioSession::ensureSync() {
+    invariant(false, "Attempted to use AsyncAsioSession in sync mode.");
+}
+
+void SyncAsioSession::ensureSync() {
     asio::error_code ec;
-    if (_blockingMode != Sync) {
+    if (_blockingMode != sync) {
         getSocket().non_blocking(false, ec);
         fassert(40490, errorCodeToStatus(ec, "ensureSync non_blocking"));
-        _blockingMode = Sync;
+        _blockingMode = sync;
     }
 
     if (_socketTimeout != _configuredTimeout) {
@@ -359,8 +366,8 @@ void AsioSession::ensureSync() {
     }
 }
 
-void AsioSession::ensureAsync() {
-    if (_blockingMode == Async)
+void AsyncAsioSession::ensureAsync() {
+    if (_blockingMode == async)
         return;
 
     // Socket timeouts currently only effect synchronous calls, so make sure the caller isn't
@@ -370,10 +377,14 @@ void AsioSession::ensureAsync() {
     asio::error_code ec;
     getSocket().non_blocking(true, ec);
     fassert(50706, errorCodeToStatus(ec, "ensureAsync non_blocking"));
-    _blockingMode = Async;
+    _blockingMode = async;
 }
 
-auto AsioSession::getSocket() -> GenericSocket& {
+void SyncAsioSession::ensureAsync() {
+    invariant(false, "Attempted to use SyncAsioSession in async mode.");
+}
+
+auto CommonAsioSession::getSocket() -> GenericSocket& {
 #ifdef MONGO_CONFIG_SSL
     if (_sslSocket) {
         return static_cast<GenericSocket&>(_sslSocket->lowest_layer());
@@ -382,7 +393,7 @@ auto AsioSession::getSocket() -> GenericSocket& {
     return _socket;
 }
 
-ExecutorFuture<void> AsioSession::parseProxyProtocolHeader(const ReactorHandle& reactor) {
+ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHandle& reactor) {
     invariant(_isIngressSession);
     invariant(reactor);
     auto buffer = std::make_shared<std::array<char, kProxyProtocolHeaderSizeUpperBound>>();
@@ -425,7 +436,7 @@ ExecutorFuture<void> AsioSession::parseProxyProtocolHeader(const ReactorHandle& 
         });
 }
 
-Future<Message> AsioSession::sourceMessageImpl(const BatonHandle& baton) {
+Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
     static constexpr auto kHeaderSize = sizeof(MSGHEADER::Value);
 
     auto headerBuffer = SharedBuffer::allocate(kHeaderSize);
@@ -480,7 +491,8 @@ Future<Message> AsioSession::sourceMessageImpl(const BatonHandle& baton) {
 }
 
 template <typename MutableBufferSequence>
-Future<void> AsioSession::read(const MutableBufferSequence& buffers, const BatonHandle& baton) {
+Future<void> CommonAsioSession::read(const MutableBufferSequence& buffers,
+                                     const BatonHandle& baton) {
 #ifdef MONGO_CONFIG_SSL
     if (_sslSocket) {
         return opportunisticRead(*_sslSocket, buffers, baton);
@@ -505,7 +517,8 @@ Future<void> AsioSession::read(const MutableBufferSequence& buffers, const Baton
 }
 
 template <typename ConstBufferSequence>
-Future<void> AsioSession::write(const ConstBufferSequence& buffers, const BatonHandle& baton) {
+Future<void> CommonAsioSession::write(const ConstBufferSequence& buffers,
+                                      const BatonHandle& baton) {
 #ifdef MONGO_CONFIG_SSL
     _ranHandshake = true;
     if (_sslSocket) {
@@ -514,7 +527,7 @@ Future<void> AsioSession::write(const ConstBufferSequence& buffers, const BatonH
         // but fails on other platforms.
         return opportunisticWrite(*_sslSocket, buffers, baton);
 #else
-        if (_blockingMode == Async) {
+        if (_blockingMode == async) {
             // Opportunistic writes are broken for async egress SSL (switching between blocking
             // and non-blocking mode corrupts the TLS exchange).
             return asio::async_write(*_sslSocket, buffers, UseFuture{}).ignoreValue();
@@ -528,16 +541,16 @@ Future<void> AsioSession::write(const ConstBufferSequence& buffers, const BatonH
 }
 
 template <typename Stream, typename MutableBufferSequence>
-Future<void> AsioSession::opportunisticRead(Stream& stream,
-                                            const MutableBufferSequence& buffers,
-                                            const BatonHandle& baton) {
+Future<void> CommonAsioSession::opportunisticRead(Stream& stream,
+                                                  const MutableBufferSequence& buffers,
+                                                  const BatonHandle& baton) {
     std::error_code ec;
     size_t size;
 
     asioTransportLayerBlockBeforeOpportunisticRead.pauseWhileSet();
 
     if (MONGO_unlikely(asioTransportLayerShortOpportunisticReadWrite.shouldFail()) &&
-        _blockingMode == Async) {
+        _blockingMode == async) {
         asio::mutable_buffer localBuffer = buffers;
 
         if (buffers.size()) {
@@ -558,7 +571,7 @@ Future<void> AsioSession::opportunisticRead(Stream& stream,
     }
 
     if (((ec == asio::error::would_block) || (ec == asio::error::try_again)) &&
-        (_blockingMode == Async)) {
+        (_blockingMode == async)) {
         // asio::read is a loop internally, so some of buffers may have been read into already.
         // So we need to adjust the buffers passed into async_read to be offset by size, if
         // size is > 0.
@@ -596,14 +609,14 @@ Future<void> AsioSession::opportunisticRead(Stream& stream,
 }
 
 template <typename Stream, typename ConstBufferSequence>
-Future<void> AsioSession::opportunisticWrite(Stream& stream,
-                                             const ConstBufferSequence& buffers,
-                                             const BatonHandle& baton) {
+Future<void> CommonAsioSession::opportunisticWrite(Stream& stream,
+                                                   const ConstBufferSequence& buffers,
+                                                   const BatonHandle& baton) {
     std::error_code ec;
     std::size_t size;
 
     if (MONGO_unlikely(asioTransportLayerShortOpportunisticReadWrite.shouldFail()) &&
-        _blockingMode == Async) {
+        _blockingMode == async) {
         asio::const_buffer localBuffer = buffers;
 
         if (buffers.size()) {
@@ -623,7 +636,7 @@ Future<void> AsioSession::opportunisticWrite(Stream& stream,
     }
 
     if (((ec == asio::error::would_block) || (ec == asio::error::try_again)) &&
-        (_blockingMode == Async)) {
+        (_blockingMode == async)) {
 
         // asio::write is a loop internally, so some of buffers may have been read into already.
         // So we need to adjust the buffers passed into async_write to be offset by size, if
@@ -667,7 +680,7 @@ Future<void> AsioSession::opportunisticWrite(Stream& stream,
 
 #ifdef MONGO_CONFIG_SSL
 template <typename MutableBufferSequence>
-Future<bool> AsioSession::maybeHandshakeSSLForIngress(const MutableBufferSequence& buffer) {
+Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferSequence& buffer) {
     invariant(asio::buffer_size(buffer) >= sizeof(MSGHEADER::Value));
     MSGHEADER::ConstView headerView(asio::buffer_cast<char*>(buffer));
     auto responseTo = headerView.getResponseToMsgId();
@@ -701,7 +714,7 @@ Future<bool> AsioSession::maybeHandshakeSSLForIngress(const MutableBufferSequenc
 
         _sslSocket.emplace(std::move(_socket), *_sslContext->ingress, "");
         auto doHandshake = [&] {
-            if (_blockingMode == Sync) {
+            if (_blockingMode == sync) {
                 std::error_code ec;
                 _sslSocket->handshake(asio::ssl::stream_base::server, buffer, ec);
                 return futurize(ec, asio::buffer_size(buffer));
@@ -758,13 +771,13 @@ Future<bool> AsioSession::maybeHandshakeSSLForIngress(const MutableBufferSequenc
 #endif  // MONGO_CONFIG_SSL
 
 template <typename Buffer>
-bool AsioSession::checkForHTTPRequest(const Buffer& buffers) {
+bool CommonAsioSession::checkForHTTPRequest(const Buffer& buffers) {
     invariant(asio::buffer_size(buffers) >= 4);
     const StringData bufferAsStr(asio::buffer_cast<const char*>(buffers), 4);
     return (bufferAsStr == "GET "_sd);
 }
 
-Future<Message> AsioSession::sendHTTPResponse(const BatonHandle& baton) {
+Future<Message> CommonAsioSession::sendHTTPResponse(const BatonHandle& baton) {
     constexpr auto userMsg =
         "It looks like you are trying to access MongoDB over HTTP"
         " on the native driver port.\r\n"_sd;

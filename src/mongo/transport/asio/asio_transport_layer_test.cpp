@@ -50,6 +50,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/asio/asio_session.h"
+#include "mongo/transport/baton.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/unittest/assert_that.h"
@@ -763,7 +764,7 @@ public:
 
     transport::AsioTransportLayer& tla() {
         auto tl = getServiceContext()->getTransportLayer();
-        return *dynamic_cast<transport::AsioTransportLayer*>(tl);
+        return *checked_cast<transport::AsioTransportLayer*>(tl);
     }
 };
 
@@ -850,16 +851,29 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
 #ifdef __linux__
 
 /**
+ * Helper constants to be used as template parameters for AsioNetworkingBatonTest. Indicates
+ * whether the test is allowed to accept connections after establishing the first Session associated
+ * with `_client`.
+ */
+enum class AllowMultipleSessions : bool {};
+
+/**
  * Creates a connection between a client and a server, then runs tests against the
  * `AsioNetworkingBaton` associated with the server-side of the connection (i.e., `Client`). The
  * client-side of this connection is associated with `_connThread`, and the server-side is wrapped
  * inside `_client`.
+ *
+ * Instantiated with `shouldAllowMultipleSessions` which indicates whether the listener thread for
+ * this test's transport layer should accept more than the connection initially established by
+ * `_client`.
  */
-class LinuxAsioNetworkingBatonTest : public LockerNoopServiceContextTest {
-    // A service entry point that accepts one, and only one, connection.
-    class SingleSessionSEP : public ServiceEntryPoint {
+template <AllowMultipleSessions shouldAllowMultipleSessions>
+class AsioNetworkingBatonTest : public LockerNoopServiceContextTest {
+    // A service entry point that emplaces a Future with the ingress session corresponding to the
+    // first connection.
+    class FirstSessionSEP : public ServiceEntryPoint {
     public:
-        explicit SingleSessionSEP(Promise<transport::SessionHandle> promise)
+        explicit FirstSessionSEP(Promise<transport::SessionHandle> promise)
             : _promise(std::move(promise)) {}
 
         Status start() override {
@@ -873,7 +887,13 @@ class LinuxAsioNetworkingBatonTest : public LockerNoopServiceContextTest {
         }
 
         void startSession(transport::SessionHandle session) override {
-            _promise.emplaceValue(std::move(session));
+            if (!_isEmplaced) {
+                _promise.emplaceValue(std::move(session));
+                _isEmplaced = true;
+                return;
+            }
+            invariant(static_cast<bool>(shouldAllowMultipleSessions),
+                      "Created a second ingress Session when only one was expected.");
         }
 
         void endAllSessions(transport::Session::TagMask) override {}
@@ -892,6 +912,7 @@ class LinuxAsioNetworkingBatonTest : public LockerNoopServiceContextTest {
 
     private:
         Promise<transport::SessionHandle> _promise;
+        bool _isEmplaced = false;
     };
 
     // Used for setting and canceling timers on the networking baton. Does not offer any timer
@@ -911,7 +932,7 @@ public:
     void setUp() override {
         auto pf = makePromiseFuture<transport::SessionHandle>();
         auto servCtx = getServiceContext();
-        servCtx->setServiceEntryPoint(std::make_unique<SingleSessionSEP>(std::move(pf.promise)));
+        servCtx->setServiceEntryPoint(std::make_unique<FirstSessionSEP>(std::move(pf.promise)));
 
         auto tla = makeTLA(servCtx->getServiceEntryPoint());
         const auto listenerPort = tla->listenerPort();
@@ -943,6 +964,12 @@ private:
     std::unique_ptr<ConnectionThread> _connThread;
 };
 
+class IngressAsioNetworkingBatonTest
+    : public AsioNetworkingBatonTest<AllowMultipleSessions{false}> {};
+
+class EgressAsioNetworkingBatonTest : public AsioNetworkingBatonTest<AllowMultipleSessions{true}> {
+};
+
 // A `JoinThread` that waits for a ready signal from its underlying worker thread before returning
 // from its constructor.
 class MilestoneThread {
@@ -961,7 +988,7 @@ void waitForTimesEntered(const FailPointEnableBlock& fp, FailPoint::EntryCountT 
     fp->waitForTimesEntered(fp.initialTimesEntered() + times);
 }
 
-TEST_F(LinuxAsioNetworkingBatonTest, CanWait) {
+TEST_F(IngressAsioNetworkingBatonTest, CanWait) {
     auto opCtx = client().makeOperationContext();
     BatonHandle baton = opCtx->getBaton();  // ensures the baton outlives its opCtx.
 
@@ -973,7 +1000,7 @@ TEST_F(LinuxAsioNetworkingBatonTest, CanWait) {
     ASSERT_FALSE(netBaton->canWait());
 }
 
-TEST_F(LinuxAsioNetworkingBatonTest, MarkKillOnClientDisconnect) {
+TEST_F(IngressAsioNetworkingBatonTest, MarkKillOnClientDisconnect) {
     auto opCtx = client().makeOperationContext();
     opCtx->markKillOnClientDisconnect();
     ASSERT_FALSE(opCtx->isKillPending());
@@ -985,7 +1012,7 @@ TEST_F(LinuxAsioNetworkingBatonTest, MarkKillOnClientDisconnect) {
     ASSERT_EQ(opCtx->getKillStatus(), ErrorCodes::ClientDisconnect);
 }
 
-TEST_F(LinuxAsioNetworkingBatonTest, Schedule) {
+TEST_F(IngressAsioNetworkingBatonTest, Schedule) {
     // Note that the baton runs all scheduled jobs on the main test thread, so it's safe to use
     // assertions inside tasks scheduled on the baton.
     auto opCtx = client().makeOperationContext();
@@ -1020,7 +1047,7 @@ TEST_F(LinuxAsioNetworkingBatonTest, Schedule) {
     ASSERT_FALSE(pending);
 }
 
-TEST_F(LinuxAsioNetworkingBatonTest, AddAndRemoveSession) {
+TEST_F(IngressAsioNetworkingBatonTest, AddAndRemoveSession) {
     auto opCtx = client().makeOperationContext();
     auto baton = opCtx->getBaton()->networking();
 
@@ -1030,7 +1057,7 @@ TEST_F(LinuxAsioNetworkingBatonTest, AddAndRemoveSession) {
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
 }
 
-TEST_F(LinuxAsioNetworkingBatonTest, AddAndRemoveSessionWhileInPoll) {
+TEST_F(IngressAsioNetworkingBatonTest, AddAndRemoveSessionWhileInPoll) {
     // Attempts to add and remove a session while the baton is polling. This, for example, could
     // happen on `mongos` while an operation is blocked, waiting for `AsyncDBClient` to create an
     // egress connection, and then the connection has to be ended for some reason before the baton
@@ -1056,7 +1083,7 @@ TEST_F(LinuxAsioNetworkingBatonTest, AddAndRemoveSessionWhileInPoll) {
     ASSERT_FALSE(cancelSessionResult.get(opCtx.get()));
 }
 
-TEST_F(LinuxAsioNetworkingBatonTest, WaitAndNotify) {
+TEST_F(IngressAsioNetworkingBatonTest, WaitAndNotify) {
     // Exercises the underlying `wait` and `notify` functionality through `AsioNetworkingBaton::run`
     // and `AsioNetworkingBaton::schedule`, respectively. Here is how this is done: 1) The main
     // thread starts polling (from inside `run`) when waiting on the notification. 2) Once the main
@@ -1091,13 +1118,13 @@ void blockIfBatonPolls(Client& client,
     notification.get(opCtx.get());
 }
 
-TEST_F(LinuxAsioNetworkingBatonTest, BatonWithPendingTasksNeverPolls) {
+TEST_F(IngressAsioNetworkingBatonTest, BatonWithPendingTasksNeverPolls) {
     blockIfBatonPolls(client(), [](const BatonHandle& baton, Notification<void>& notification) {
         baton->schedule([&](Status) { notification.set(); });
     });
 }
 
-TEST_F(LinuxAsioNetworkingBatonTest, BatonWithAnExpiredTimerNeverPolls) {
+TEST_F(IngressAsioNetworkingBatonTest, BatonWithAnExpiredTimerNeverPolls) {
     auto timer = makeDummyTimer();
     auto clkSource = getServiceContext()->getPreciseClockSource();
 
@@ -1117,7 +1144,7 @@ TEST_F(LinuxAsioNetworkingBatonTest, BatonWithAnExpiredTimerNeverPolls) {
     });
 }
 
-TEST_F(LinuxAsioNetworkingBatonTest, WaitUntilWithUncancellableTokenFiresAtDeadline) {
+TEST_F(IngressAsioNetworkingBatonTest, WaitUntilWithUncancellableTokenFiresAtDeadline) {
     auto opCtx = client().makeOperationContext();
     auto baton = opCtx->getBaton()->networking();
     auto deadline = Date_t::now() + Milliseconds(10);
@@ -1130,7 +1157,7 @@ TEST_F(LinuxAsioNetworkingBatonTest, WaitUntilWithUncancellableTokenFiresAtDeadl
     ASSERT_EQ(fut.getNoThrow(opCtx.get()), Status::OK());
 }
 
-TEST_F(LinuxAsioNetworkingBatonTest, WaitUntilWithCanceledTokenIsCanceled) {
+TEST_F(IngressAsioNetworkingBatonTest, WaitUntilWithCanceledTokenIsCanceled) {
     CancellationSource source;
     auto token = source.token();
     auto opCtx = client().makeOperationContext();
@@ -1142,7 +1169,7 @@ TEST_F(LinuxAsioNetworkingBatonTest, WaitUntilWithCanceledTokenIsCanceled) {
     ASSERT_EQ(fut.getNoThrow(opCtx.get()), expectedError);
 }
 
-TEST_F(LinuxAsioNetworkingBatonTest, NotifyInterruptsRunUntilBeforeTimeout) {
+TEST_F(IngressAsioNetworkingBatonTest, NotifyInterruptsRunUntilBeforeTimeout) {
     auto opCtx = client().makeOperationContext();
     MilestoneThread thread([&](Notification<void>& isReady) {
         auto baton = opCtx->getBaton();
@@ -1157,14 +1184,14 @@ TEST_F(LinuxAsioNetworkingBatonTest, NotifyInterruptsRunUntilBeforeTimeout) {
     ASSERT(state == Waitable::TimeoutState::NoTimeout);
 }
 
-TEST_F(LinuxAsioNetworkingBatonTest, RunUntilProperlyTimesout) {
+TEST_F(IngressAsioNetworkingBatonTest, RunUntilProperlyTimesout) {
     auto opCtx = client().makeOperationContext();
     auto clkSource = getServiceContext()->getPreciseClockSource();
     const auto state = opCtx->getBaton()->run_until(clkSource, clkSource->now() + Milliseconds(1));
     ASSERT(state == Waitable::TimeoutState::Timeout);
 }
 
-TEST_F(LinuxAsioNetworkingBatonTest, AddAndRemoveTimerWhileInPoll) {
+TEST_F(IngressAsioNetworkingBatonTest, AddAndRemoveTimerWhileInPoll) {
     auto opCtx = client().makeOperationContext();
     Notification<bool> cancelTimerResult;
 
@@ -1186,7 +1213,7 @@ TEST_F(LinuxAsioNetworkingBatonTest, AddAndRemoveTimerWhileInPoll) {
     ASSERT_FALSE(cancelTimerResult.get(opCtx.get()));
 }
 
-DEATH_TEST_F(LinuxAsioNetworkingBatonTest, AddAnAlreadyAddedSession, "invariant") {
+DEATH_TEST_F(IngressAsioNetworkingBatonTest, AddAnAlreadyAddedSession, "invariant") {
     auto opCtx = client().makeOperationContext();
     auto baton = opCtx->getBaton()->networking();
     auto session = client().session();
@@ -1195,11 +1222,52 @@ DEATH_TEST_F(LinuxAsioNetworkingBatonTest, AddAnAlreadyAddedSession, "invariant"
     baton->addSession(*session, transport::NetworkingBaton::Type::In).getAsync([](Status) {});
 }
 
-// This could be considered a test for either `AsioSession` or `AsioNetworkingBatonLinux`, as it's
+class EgressSessionWithScopedReactor {
+public:
+    EgressSessionWithScopedReactor(ServiceContext* sc)
+        : _sc(sc),
+          _reactor(sc->getTransportLayer()->getReactor(transport::TransportLayer::kNewReactor)),
+          _reactorThread([&] { _reactor->run(); }),
+          _session(_makeEgressSession()) {}
+
+    ~EgressSessionWithScopedReactor() {
+        _reactor->stop();
+        _reactorThread.join();
+    }
+
+    transport::SessionHandle& session() {
+        return _session;
+    }
+
+private:
+    transport::SessionHandle _makeEgressSession() {
+        auto tla = checked_cast<transport::AsioTransportLayer*>(_sc->getTransportLayer());
+
+        HostAndPort localTarget("localhost", tla->listenerPort());
+
+        return _sc->getTransportLayer()
+            ->asyncConnect(localTarget,
+                           transport::ConnectSSLMode::kGlobalSSLMode,
+                           _reactor,
+                           Milliseconds{500},
+                           std::make_shared<ConnectionMetrics>(_sc->getFastClockSource()),
+                           nullptr)
+            .get();
+    }
+
+    ServiceContext* _sc;
+    transport::ReactorHandle _reactor;
+    stdx::thread _reactorThread;
+    transport::SessionHandle _session;
+};
+
+// This could be considered a test for either `AsioSession` or `AsioNetworkingBaton`, as it's
 // testing the interaction between the two when `AsioSession` calls `addSession` and
 // `cancelAsyncOperations` on the networking baton. This is currently added to the
-// `LinuxAsioNetworkingBatonTest` fixture to utilize the existing infrastructure.
-TEST_F(LinuxAsioNetworkingBatonTest, CancelAsyncOperationsInterruptsOngoingOperations) {
+// `EgressAsioNetworkingBatonTest` fixture to utilize the existing infrastructure.
+TEST_F(EgressAsioNetworkingBatonTest, CancelAsyncOperationsInterruptsOngoingOperations) {
+    EgressSessionWithScopedReactor es(getGlobalServiceContext());
+
     MilestoneThread thread([&](Notification<void>& isReady) {
         // Blocks the main thread as it schedules an opportunistic read, but before it starts
         // polling on the networking baton. Then it cancels the operation before unblocking the main
@@ -1207,27 +1275,29 @@ TEST_F(LinuxAsioNetworkingBatonTest, CancelAsyncOperationsInterruptsOngoingOpera
         FailPointEnableBlock fp("asioTransportLayerBlockBeforeOpportunisticRead");
         isReady.set();
         waitForTimesEntered(fp, 1);
-        client().session()->cancelAsyncOperations();
+        es.session()->cancelAsyncOperations();
     });
 
     auto opCtx = client().makeOperationContext();
-    ASSERT_THROWS_CODE(client().session()->asyncSourceMessage(opCtx->getBaton()).get(),
+    ASSERT_THROWS_CODE(es.session()->asyncSourceMessage(opCtx->getBaton()).get(),
                        DBException,
                        ErrorCodes::CallbackCanceled);
 }
 
-TEST_F(LinuxAsioNetworkingBatonTest, AsyncOpsMakeProgressWhenSessionAddedToDetachedBaton) {
+TEST_F(EgressAsioNetworkingBatonTest, AsyncOpsMakeProgressWhenSessionAddedToDetachedBaton) {
+    EgressSessionWithScopedReactor es(getGlobalServiceContext());
+
     Notification<void> ready;
     auto opCtx = client().makeOperationContext();
 
     JoinThread thread([&] {
-        auto session = client().session();
         auto baton = opCtx->getBaton();
         ready.get();
-        session->asyncSourceMessage(baton).ignoreValue().getAsync([session](Status) {
-            // Capturing `session` is necessary as parts of this continuation run at fixture
-            // destruction.
-        });
+        es.session()->asyncSourceMessage(baton).ignoreValue().getAsync(
+            [session = es.session()](Status) {
+                // Capturing `session` is necessary as parts of this continuation run at fixture
+                // destruction.
+            });
     });
 
     FailPointEnableBlock fp("asioTransportLayerBlockBeforeAddSession");

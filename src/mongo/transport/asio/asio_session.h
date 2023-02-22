@@ -29,30 +29,13 @@
 
 #pragma once
 
-#include <utility>
-
 #include "mongo/base/system_error.h"
 #include "mongo/config.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/asio/asio_utils.h"
-#include "mongo/transport/baton.h"
-#include "mongo/transport/ssl_connection_context.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/net/socket_utils.h"
-
-#ifdef MONGO_CONFIG_SSL
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_peer_info.h"
-#include "mongo/util/net/ssl_types.h"
-#endif
-
-#include <asio.hpp>
-
-#ifdef MONGO_CONFIG_SSL
-#include "mongo/util/net/ssl.hpp"
-#endif
 
 namespace mongo::transport {
 
@@ -78,248 +61,46 @@ inline Future<void> futurize(const std::error_code& ec) {
     return Result::makeReady();
 }
 
-class AsioSession final : public Session {
+/**
+ * Extends the interface of transport::Session to include any ASIO-specific functionality. The
+ * intention of this class is to expose any ASIO-specific information necessary to systems outside
+ * of the transport layer, separate from other implementation details.
+ *
+ * NOTE: Moving forward, the expectation is to expand this interface and reduce the interface of
+ * Session:
+ * TODO(SERVER-71100): Move ASIO-specific `remoteAddr` and `localAddr` into AsioSession.
+ */
+class AsioSession : public Session {
 public:
     using GenericSocket = asio::generic::stream_protocol::socket;
-
     using Endpoint = asio::generic::stream_protocol::endpoint;
-
-    // If the socket is disconnected while any of these options are being set, this constructor
-    // may throw, but it is guaranteed to throw a mongo DBException.
-    AsioSession(AsioTransportLayer* tl,
-                GenericSocket socket,
-                bool isIngressSession,
-                Endpoint endpoint = Endpoint(),
-                std::shared_ptr<const SSLConnectionContext> transientSSLContext = nullptr);
-
-    AsioSession(const AsioSession&) = delete;
-    AsioSession& operator=(const AsioSession&) = delete;
-
-    ~AsioSession() {
-        end();
-    }
-
-    TransportLayer* getTransportLayer() const override {
-        return _tl;
-    }
-
-    const HostAndPort& remote() const override {
-        return _remote;
-    }
-
-    const HostAndPort& local() const override {
-        return _local;
-    }
-
-    const SockAddr& remoteAddr() const override {
-        return _remoteAddr;
-    }
-
-    const SockAddr& localAddr() const override {
-        return _localAddr;
-    }
-
-    void end() override;
-
-    StatusWith<Message> sourceMessage() noexcept override;
-
-    Future<Message> asyncSourceMessage(const BatonHandle& baton = nullptr) noexcept override;
-
-    Status waitForData() noexcept override;
-
-    Future<void> asyncWaitForData() noexcept override;
-
-    Status sinkMessage(Message message) noexcept override;
-
-    Future<void> asyncSinkMessage(Message message,
-                                  const BatonHandle& baton = nullptr) noexcept override;
-
-    void cancelAsyncOperations(const BatonHandle& baton = nullptr) override;
-
-    void setTimeout(boost::optional<Milliseconds> timeout) override;
-
-    bool isConnected() override;
-
-    bool isFromLoadBalancer() const override {
-        return _isFromLoadBalancer;
-    }
-
-#ifdef MONGO_CONFIG_SSL
-    const std::shared_ptr<SSLManagerInterface>& getSSLManager() const override;
-#endif
 
 protected:
     friend class AsioTransportLayer;
     friend class AsioNetworkingBaton;
 
+    /** Notifies the Session that it will be used in a synchronous way. */
+    virtual void ensureSync() = 0;
+
+    /** Notifies the Session that it will be used in an asynchronous way. */
+    virtual void ensureAsync() = 0;
+
 #ifdef MONGO_CONFIG_SSL
-    // Constructs a SSL socket required to initiate SSL handshake for egress connections.
-    Status buildSSLSocket(const HostAndPort& target);
-    Future<void> handshakeSSLForEgress(const HostAndPort& target, const ReactorHandle& reactor);
-#endif
-
-    void ensureSync();
-
-    void ensureAsync();
-
-private:
-    /**
-     * Provides the means to track and cancel async I/O operations scheduled through `Session`.
-     * Any I/O operation goes through the following steps:
-     * - `start()`: changes the state from `kNotStarted` to `kRunning`.
-     * - Before scheduling the async operation, checks for cancellation through `isCanceled()`.
-     * - `complete()`: clears the state, and prepares the session for future operations.
-     *
-     * This class is thread-safe.
-     */
-    class AsyncOperationState {
-    public:
-        void start() {
-            const auto prev = _state.swap(State::kRunning);
-            invariant(prev == State::kNotStarted, "Another operation was in progress");
-        }
-
-        bool isCanceled() const {
-            return _state.load() == State::kCanceled;
-        }
-
-        void complete() {
-            const auto prev = _state.swap(State::kNotStarted);
-            invariant(prev != State::kNotStarted, "No operation was running");
-        }
-
-        /**
-         * Instructs an active operation to cancel (if there is any). Otherwise, it does nothing.
-         * Cancellation is non-blocking and `cancel()` doesn't block for completion of ongoing
-         * operations.
-         */
-        void cancel() {
-            auto expected = State::kRunning;
-            _state.compareAndSwap(&expected, State::kCanceled);
-        }
-
-    private:
-        /**
-         * State transition diagram:
-         * -+-> [kNotStarted] --> [kRunning] --> [kCanceled]
-         *  |                          |              |
-         *  +--------------------------+--------------+
-         */
-        enum class State { kNotStarted, kRunning, kCanceled };
-        AtomicWord<State> _state{State::kNotStarted};
-    };
-
-    GenericSocket& getSocket();
-
-    ExecutorFuture<void> parseProxyProtocolHeader(const ReactorHandle& reactor);
-    Future<Message> sourceMessageImpl(const BatonHandle& baton = nullptr);
-    Future<void> sinkMessageImpl(Message message, const BatonHandle& baton = nullptr);
-
-    template <typename MutableBufferSequence>
-    Future<void> read(const MutableBufferSequence& buffers, const BatonHandle& baton = nullptr);
-
-    template <typename ConstBufferSequence>
-    Future<void> write(const ConstBufferSequence& buffers, const BatonHandle& baton = nullptr);
-
-    template <typename Stream, typename MutableBufferSequence>
-    Future<void> opportunisticRead(Stream& stream,
-                                   const MutableBufferSequence& buffers,
-                                   const BatonHandle& baton = nullptr);
+    /** Constructs an SSL socket required to initiate SSL handshake for egress connections. */
+    virtual Status buildSSLSocket(const HostAndPort& target) = 0;
 
     /**
-     * moreToSend checks the ssl socket after an opportunisticWrite.  If there are still bytes to
-     * send, we manually send them off the underlying socket.  Then we hook that up with a future
-     * that gets us back to sending from the ssl side.
-     *
-     * There are two variants because we call opportunisticWrite on generic sockets and ssl sockets.
-     * The generic socket impl never has more to send (because it doesn't have an inner socket it
-     * needs to keep sending).
+     * Instructs the Session to initiate an SSL handshake. Returns a Future that is emplaced once
+     * the handshake is complete, or when some error has arisen.
      */
-    template <typename ConstBufferSequence>
-    boost::optional<Future<void>> moreToSend(GenericSocket& socket,
-                                             const ConstBufferSequence& buffers,
-                                             const BatonHandle& baton) {
-        return boost::none;
-    }
-
-#ifdef MONGO_CONFIG_SSL
-    template <typename ConstBufferSequence>
-    boost::optional<Future<void>> moreToSend(asio::ssl::stream<GenericSocket>& socket,
-                                             const ConstBufferSequence& buffers,
-                                             const BatonHandle& baton) {
-        if (_sslSocket->getCoreOutputBuffer().size()) {
-            return opportunisticWrite(getSocket(), _sslSocket->getCoreOutputBuffer(), baton)
-                .then([this, &socket, buffers, baton] {
-                    return opportunisticWrite(socket, buffers, baton);
-                });
-        }
-
-        return boost::none;
-    }
+    virtual Future<void> handshakeSSLForEgress(const HostAndPort& target,
+                                               const ReactorHandle& reactor) = 0;
 #endif
 
-    template <typename Stream, typename ConstBufferSequence>
-    Future<void> opportunisticWrite(Stream& stream,
-                                    const ConstBufferSequence& buffers,
-                                    const BatonHandle& baton = nullptr);
+    /** Returns the ASIO socket underlying this Session. */
+    virtual GenericSocket& getSocket() = 0;
 
-#ifdef MONGO_CONFIG_SSL
-    template <typename MutableBufferSequence>
-    Future<bool> maybeHandshakeSSLForIngress(const MutableBufferSequence& buffer);
-#endif
-
-    template <typename Buffer>
-    bool checkForHTTPRequest(const Buffer& buffers);
-
-    // Called from read() to send an HTTP response back to a client that's trying to use HTTP
-    // over a native MongoDB port. This returns a Future<Message> to match its only caller, but it
-    // always contains an error, so it could really return Future<Anything>
-    Future<Message> sendHTTPResponse(const BatonHandle& baton = nullptr);
-
-    enum BlockingMode {
-        Unknown,
-        Sync,
-        Async,
-    };
-
-    BlockingMode _blockingMode = Unknown;
-
-    HostAndPort _remote;
-    HostAndPort _local;
-
-    SockAddr _remoteAddr;
-    SockAddr _localAddr;
-
-    boost::optional<Milliseconds> _configuredTimeout;
-    boost::optional<Milliseconds> _socketTimeout;
-
-    GenericSocket _socket;
-#ifdef MONGO_CONFIG_SSL
-    boost::optional<asio::ssl::stream<decltype(_socket)>> _sslSocket;
-    bool _ranHandshake = false;
-    std::shared_ptr<const SSLConnectionContext> _sslContext;
-#endif
-
-    AsioTransportLayer* const _tl;
-    bool _isIngressSession;
-    bool _isFromLoadBalancer = false;
-    boost::optional<SockAddr> _proxiedSrcEndpoint;
-    boost::optional<SockAddr> _proxiedDstEndpoint;
-
-    AsyncOperationState _asyncOpState;
-
-    /**
-     * The following mutex strictly orders the start and cancellation of asynchronous operations:
-     * - Holding the mutex while starting asynchronous operations (e.g., adding the session to the
-     *   networking baton) ensures cancellation either happens before or after scheduling of the
-     *   operation.
-     * - Holding the mutex while canceling asynchronous operations guarantees no operation can start
-     *   while cancellation is in progress.
-     *
-     * Opportunistic read and write are implemented as recursive future continuations, so we may
-     * recursively acquire the mutex when the future is readied inline.
-     */
-    stdx::recursive_mutex _asyncOpMutex;  // NOLINT
+    virtual ExecutorFuture<void> parseProxyProtocolHeader(const ReactorHandle& reactor) = 0;
 };
 
 }  // namespace mongo::transport
