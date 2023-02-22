@@ -275,13 +275,11 @@ variables:
   - name: sharding_auth_audit_gen
   - name: .stitch
   - name: .crypt
-  - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
     distros:
     - ubuntu2004-package
   - name: selinux_rhel7_enterprise
-  - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
 
@@ -1225,9 +1223,7 @@ buildvariants:
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: push
   - name: .crypt
-  - name: .publish_crypt
 
 ###########################################
 #          Embedded SDK buildvariants     #
