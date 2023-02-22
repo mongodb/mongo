@@ -217,7 +217,13 @@ bool handleAutoUpdate(const std::string& expected,
                       const std::string& fileName,
                       const size_t lineNumber,
                       const bool needsEscaping) {
-    if (expected == actual) {
+    const auto config = mongo::unittest::getAutoUpdateConfig();
+    // This function should only be allowed to return early without rewriting the assertion if the
+    // rewriteAllAutoAsserts flag is not set.
+    const bool canReturnEarly = !config.revalidateAll;
+    const bool doesMatch = expected == actual;
+
+    if (canReturnEarly && doesMatch) {
         return true;
     }
 
@@ -229,10 +235,14 @@ bool handleAutoUpdate(const std::string& expected,
     // Compute the macro argument start line.
     const size_t startLineNumber = kIsFirstLine ? (lineNumber + 1) : (lineNumber - expectedDelta);
 
-    std::cout << fileName << ":" << startLineNumber << ": results differ:\n";
-    outputDiff(std::cout, expectedFormatted, actualFormatted, startLineNumber);
+    // Only show the error message if results differ. To avoid outputting empty diffs when rewriting
+    // all assertions.
+    if (!doesMatch) {
+        std::cout << fileName << ":" << startLineNumber << ": results differ:\n";
+        outputDiff(std::cout, expectedFormatted, actualFormatted, startLineNumber);
+    }
 
-    if (!mongo::unittest::getAutoUpdateAsserts()) {
+    if (canReturnEarly && !config.updateFailingAsserts) {
         std::cout << "Auto-updating is disabled.\n";
         return false;
     }

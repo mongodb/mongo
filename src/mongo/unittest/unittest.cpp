@@ -686,11 +686,10 @@ SpawnInfo& getSpawnInfo() {
     return *v;
 }
 
-bool& getAutoUpdateAsserts() {
-    static bool flag = false;
-    return flag;
+AutoUpdateConfig& getAutoUpdateConfig() {
+    static AutoUpdateConfig config{};
+    return config;
 }
-
 namespace {
 // At startup, teach the terminate handler how to print TestAssertionFailureException.
 [[maybe_unused]] const auto earlyCall = [] {

@@ -65,3 +65,7 @@ configs:
         description: 'Auto-update expected output for asserts in unit tests which support auto-updating.'
         arg_vartype: Switch
         default: false
+    rewriteAllAutoAsserts:
+        description: "Rewrite all auto-updating assertions for self-testing purposes."
+        arg_vartype: Switch
+        default: false
