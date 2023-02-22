@@ -789,12 +789,11 @@ struct __wt_cursor {
 #define WT_CURSTD_META_INUSE		0x004000000ull
 #define WT_CURSTD_OPEN			0x008000000ull
 #define WT_CURSTD_OVERWRITE		0x010000000ull
-#define WT_CURSTD_PREFIX_SEARCH		0x020000000ull
-#define WT_CURSTD_RAW			0x040000000ull
-#define WT_CURSTD_RAW_SEARCH		0x080000000ull
-#define WT_CURSTD_VALUE_EXT		0x100000000ull /* Value points out of tree. */
-#define WT_CURSTD_VALUE_INT		0x200000000ull /* Value points into tree. */
-#define WT_CURSTD_VERSION_CURSOR	0x400000000ull /* Version cursor. */
+#define WT_CURSTD_RAW			0x020000000ull
+#define WT_CURSTD_RAW_SEARCH		0x040000000ull
+#define WT_CURSTD_VALUE_EXT		0x080000000ull /* Value points out of tree. */
+#define WT_CURSTD_VALUE_INT		0x100000000ull /* Value points into tree. */
+#define WT_CURSTD_VERSION_CURSOR	0x200000000ull /* Version cursor. */
 /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
 #define	WT_CURSTD_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
 #define	WT_CURSTD_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)

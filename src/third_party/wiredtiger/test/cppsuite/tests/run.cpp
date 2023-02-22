@@ -43,9 +43,6 @@
 #include "hs_cleanup.cpp"
 #include "operations_test.cpp"
 #include "reverse_split.cpp"
-#include "search_near_01.cpp"
-#include "search_near_02.cpp"
-#include "search_near_03.cpp"
 #include "test_template.cpp"
 
 extern "C" {
@@ -158,12 +155,6 @@ run_test(const std::string &test_name, const std::string &config, const std::str
         operations_test(args).run();
     else if (test_name == "reverse_split")
         reverse_split(args).run();
-    else if (test_name == "search_near_01")
-        search_near_01(args).run();
-    else if (test_name == "search_near_02")
-        search_near_02(args).run();
-    else if (test_name == "search_near_03")
-        search_near_03(args).run();
     else if (test_name == "test_template")
         test_template(args).run();
     else {
@@ -192,8 +183,7 @@ main(int argc, char *argv[])
     const std::vector<std::string> all_tests = {"reverse_split", "bounded_cursor_perf",
       "bounded_cursor_prefix_indices", "bounded_cursor_prefix_search_near",
       "bounded_cursor_prefix_stat", "bounded_cursor_stress", "burst_inserts", "cache_resize",
-      "hs_cleanup", "operations_test", "search_near_01", "search_near_02", "search_near_03",
-      "test_template"};
+      "hs_cleanup", "operations_test", "test_template"};
 
     /* Set the program name for error messages. */
     (void)testutil_set_progname(argv);

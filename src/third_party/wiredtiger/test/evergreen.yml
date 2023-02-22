@@ -1287,39 +1287,6 @@ tasks:
           test_config_filename: configs/burst_inserts_default.txt
           test_name: burst_inserts
 
-  - name: cppsuite-search-near-01-default
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config_filename: configs/search_near_01_default.txt
-          test_name: search_near_01
-
-  - name: cppsuite-search-near-02-default
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config_filename: configs/search_near_02_default.txt
-          test_name: search_near_02
-
-  - name: cppsuite-search-near-03-default
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config_filename: configs/search_near_03_default.txt
-          test_name: search_near_03
-
   - name: cppsuite-bounded-cursor-perf-default
     tags: ["pull_request"]
     depends_on:
@@ -1491,39 +1458,6 @@ tasks:
           test_config_filename: configs/bounded_cursor_prefix_indices_stress.txt
           test_name: bounded_cursor_prefix_indices
 
-  - name: cppsuite-search-near-01-stress
-    depends_on:
-      - name: compile
-    tags: ["cppsuite-stress-test"]
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config_filename: configs/search_near_01_stress.txt
-          test_name: search_near_01
-
-  - name: cppsuite-search-near-02-stress
-    depends_on:
-      - name: compile
-    tags: ["cppsuite-stress-test"]
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config_filename: configs/search_near_02_stress.txt
-          test_name: search_near_02
-
-  - name: cppsuite-search-near-03-stress
-    depends_on:
-      - name: compile
-    tags: ["cppsuite-stress-test"]
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config_filename: configs/search_near_03_stress.txt
-          test_name: search_near_03
-
   # This is a perf test and as such doesn't run under the stress test tag.
   - name: cppsuite-bounded-cursor-perf-stress
     depends_on:
@@ -1649,45 +1583,6 @@ tasks:
         vars:
           test_config_filename: configs/bounded_cursor_prefix_indices_stress.txt
           test_name: bounded_cursor_prefix_indices
-
-  - name: cppsuite-search-near-01-stress-nonstandalone
-    depends_on:
-      - name: compile-nonstandalone
-    tags: ["cppsuite-stress-test-nonstandalone"]
-    commands:
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: compile-nonstandalone
-      - func: "cppsuite test"
-        vars:
-          test_config_filename: configs/search_near_01_stress.txt
-          test_name: search_near_01
-
-  - name: cppsuite-search-near-02-stress-nonstandalone
-    depends_on:
-      - name: compile-nonstandalone
-    tags: ["cppsuite-stress-test-nonstandalone"]
-    commands:
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: compile-nonstandalone
-      - func: "cppsuite test"
-        vars:
-          test_config_filename: configs/search_near_02_stress.txt
-          test_name: search_near_02
-
-  - name: cppsuite-search-near-03-stress-nonstandalone
-    depends_on:
-      - name: compile-nonstandalone
-    tags: ["cppsuite-stress-test-nonstandalone"]
-    commands:
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: compile-nonstandalone
-      - func: "cppsuite test"
-        vars:
-          test_config_filename: configs/search_near_03_stress.txt
-          test_name: search_near_03
 
   - name: cppsuite-reverse-split-stress-nonstandalone
     tags: ["cppsuite-stress-test-nonstandalone"]
@@ -5022,9 +4917,6 @@ buildvariants:
     - name: cppsuite-operations-test-default
     - name: cppsuite-hs-cleanup-default
     - name: cppsuite-burst-inserts-default
-    - name: cppsuite-search-near-01-default
-    - name: cppsuite-search-near-02-default
-    - name: cppsuite-search-near-03-default
 
 - name: ubuntu2004-compilers
   display_name: "! Ubuntu 20.04 Compilers"

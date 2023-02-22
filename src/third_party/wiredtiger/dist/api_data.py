@@ -1255,11 +1255,7 @@ cursor_runtime_config = [
         not exist''',
         type='boolean'),
     Config('prefix_search', 'false', r'''
-        when performing a search near for a prefix, if set to true this configuration will allow
-        the search near to exit early if it has left the key range defined by the prefix. This
-        is relevant when the table contains a large number of records which potentially aren't
-        visible to the caller of search near, as such a large number of records could be skipped.
-        The prefix_search configuration provides a fast exit in this scenario.''',
+        this option is no longer supported, retained for backward compatibility.''',
         type='boolean', undoc=True),
 ]
 

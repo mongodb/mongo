@@ -930,8 +930,7 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, uint64_t hash_v
              * For these configuration values, there is no difference in the resulting cursor other
              * than flag values, so fix them up according to the given configuration.
              */
-            F_CLR(cursor,
-              WT_CURSTD_APPEND | WT_CURSTD_OVERWRITE | WT_CURSTD_PREFIX_SEARCH | WT_CURSTD_RAW);
+            F_CLR(cursor, WT_CURSTD_APPEND | WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
             F_SET(cursor, overwrite_flag);
             /*
              * If this is a btree cursor, clear its read_once flag.
@@ -1098,29 +1097,6 @@ __cursor_config_debug(WT_CURSOR *cursor, const char *cfg[])
 }
 
 /*
- * __check_prefix_format --
- *     Check if the schema format is a fixed-length string, variable string or byte array.
- */
-static int
-__check_prefix_format(const char *format)
-{
-    size_t len;
-    const char *p;
-
-    /* Early exit if prefix format is S or u. */
-    if (WT_STREQ(format, "S") || WT_STREQ(format, "u"))
-        return (0);
-    /*
-     * Now check for fixed-length string format through looking at the characters before the nul
-     * character.
-     */
-    for (p = format, len = strlen(format); len > 1; --len, p++)
-        if (!__wt_isdigit((u_char)*p))
-            break;
-    return ((len > 1 || *p != 's') ? EINVAL : 0);
-}
-
-/*
  * __wt_cursor_reconfigure --
  *     Set runtime-configurable settings.
  */
@@ -1157,30 +1133,6 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
             F_SET(cursor, WT_CURSTD_OVERWRITE);
         else
             F_CLR(cursor, WT_CURSTD_OVERWRITE);
-    } else
-        WT_ERR_NOTFOUND_OK(ret, false);
-
-    /* Set the prefix search near flag. */
-    if ((ret = __wt_config_getones(session, config, "prefix_search", &cval)) == 0) {
-        if (cval.val) {
-            /* Prefix search near configuration can only be used for row-store. */
-            if (WT_CURSOR_RECNO(cursor))
-                WT_ERR_MSG(
-                  session, EINVAL, "cannot use prefix key search near for column store formats");
-            /*
-             * Prefix search near configuration can only be used for string or raw byte array
-             * formats.
-             */
-            if ((ret = __check_prefix_format(cursor->key_format)) != 0)
-                WT_ERR_MSG(session, ret,
-                  "prefix key search near can only be used with string, fixed-length string or raw "
-                  "byte array format types");
-            if (CUR2BT(cursor)->collator != NULL)
-                WT_ERR_MSG(
-                  session, EINVAL, "cannot use prefix key search near with a custom collator");
-            F_SET(cursor, WT_CURSTD_PREFIX_SEARCH);
-        } else
-            F_CLR(cursor, WT_CURSTD_PREFIX_SEARCH);
     } else
         WT_ERR_NOTFOUND_OK(ret, false);
 
@@ -1274,9 +1226,6 @@ __wt_cursor_bound(WT_CURSOR *cursor, const char *config)
 
     if (CUR2BT(cursor)->type == BTREE_COL_FIX)
         WT_ERR_MSG(session, EINVAL, "setting bounds is not compatible with fixed column store");
-
-    if (F_ISSET(cursor, WT_CURSTD_PREFIX_SEARCH))
-        WT_ERR_MSG(session, EINVAL, "setting bounds is not compatible with prefix search");
 
     if (config == NULL || config[0] == '\0')
         WT_ERR_MSG(session, EINVAL, "an empty config is not valid when setting or clearing bounds");

@@ -887,7 +887,7 @@ __btcur_search_neighboring(WT_CURSOR_BTREE *cbt, WT_CURFILE_STATE *state, int *e
      * because at low isolation levels, new records could appear as we are stepping through the
      * tree.
      */
-    while ((ret = __wt_btcur_next_prefix(cbt, &state->key, false)) != WT_NOTFOUND) {
+    while ((ret = __wt_btcur_next(cbt, false)) != WT_NOTFOUND) {
         WT_RET(ret);
         if (btree->type == BTREE_ROW)
             WT_RET(__wt_compare(session, btree->collator, &cursor->key, &state->key, exact));
@@ -896,18 +896,6 @@ __btcur_search_neighboring(WT_CURSOR_BTREE *cbt, WT_CURFILE_STATE *state, int *e
         if (*exact >= 0)
             return (ret);
     }
-
-    /*
-     * It is not necessary to go backwards when search_near is used with a prefix, as cursor row
-     * search places us on the first key of the prefix range. All the entries before the key we were
-     * placed on will not match the prefix.
-     *
-     * For example, if we search with the prefix "b", the cursor will be positioned at the first key
-     * starting with "b". All the entries before this one will start with "a", hence not matching
-     * the prefix.
-     */
-    if (F_ISSET(cursor, WT_CURSTD_PREFIX_SEARCH))
-        return (ret);
 
     /*
      * We walked to the end of the tree without finding a match. Walk backwards instead.
@@ -1033,8 +1021,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
     }
 
     /*
-     * If we find a valid key, check if we are performing a prefix search near. If we are, return
-     * the record only if it is a prefix match. If not, return the record.
+     * If we find a valid key return the record.
      *
      * Else, creating a record past the end of the tree in a fixed-length column-store implicitly
      * fills the gap with empty records. In this case, we instantiate the empty record, it's an
@@ -1050,35 +1037,20 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
      */
     if (valid) {
         exact = cbt->compare;
+        WT_ERR(__cursor_kv_return(cbt, cbt->upd_value));
         /*
-         * Set the cursor key before the prefix search near check. If the prefix doesn't match,
-         * restore the cursor state, and continue to search for a valid key. Otherwise set the
-         * cursor value and return the valid record.
+         * This compare is needed for bounded cursors in the event that a valid key is found. The
+         * returned value of exact must reflect the comparison between the found key and the
+         * original search key, not the repositioned bounds key. This comparison ensures that is the
+         * case.
          */
-        WT_ERR(__wt_key_return(cbt));
-        if (F_ISSET(cursor, WT_CURSTD_PREFIX_SEARCH) &&
-          __wt_prefix_match(&state.key, &cursor->key) != 0)
-            __cursor_state_restore(cursor, &state);
-        else {
-            __wt_value_return(cbt, cbt->upd_value);
-            /*
-             * This compare is needed for bounded cursors in the event that a valid key is found.
-             * The returned value of exact must reflect the comparison between the found key and the
-             * original search key, not the repositioned bounds key. This comparison ensures that is
-             * the case.
-             */
-            if (WT_CURSOR_BOUNDS_SET(cursor)) {
-                if (btree->type == BTREE_ROW)
-                    WT_ERR(
-                      __wt_compare(session, btree->collator, &cursor->key, &state.key, &exact));
-                else
-                    exact = cbt->recno < state.recno ? -1 : cbt->recno == state.recno ? 0 : 1;
-            }
-            goto done;
+        if (WT_CURSOR_BOUNDS_SET(cursor)) {
+            if (btree->type == BTREE_ROW)
+                WT_ERR(__wt_compare(session, btree->collator, &cursor->key, &state.key, &exact));
+            else
+                exact = cbt->recno < state.recno ? -1 : cbt->recno == state.recno ? 0 : 1;
         }
-    }
-
-    if (__cursor_fix_implicit(btree, cbt)) {
+    } else if (__cursor_fix_implicit(btree, cbt)) {
         cbt->recno = cursor->recno;
         cbt->v = 0;
         cursor->value.data = &cbt->v;
@@ -1092,7 +1064,6 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
         WT_ERR(ret);
     }
 
-done:
     if (ret == 0)
         WT_ERR(__wt_btcur_evict_reposition(cbt));
 err:

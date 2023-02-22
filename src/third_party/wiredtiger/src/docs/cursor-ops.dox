@@ -70,14 +70,6 @@ WT_CURSOR::search_near method:
 
 @snippet ex_cursor.c cursor search near
 
-The WT_CURSOR::search_near method can also be used with a prefix key by
-setting \c prefix_search=true in the cursor configuration options. This
-optimization ensures that search_near only traverses the relevant key
-range with the matching prefix. Limiting the key range that search_near
-can traverse through is particularly useful when there are a larger number
-of records present outside of the key range which are not visible to the
-search_near caller.
-
 After a transaction is successfully committed, cursors in the session retain
 their position, as well as any currently set keys or values they may have.
 If a transaction is rolled back for any reason, cursors in the session are
