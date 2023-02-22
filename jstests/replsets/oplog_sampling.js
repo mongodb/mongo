@@ -12,7 +12,7 @@ const replSet = new ReplSetTest({
     nodeOptions: {
         setParameter: {
             "maxOplogTruncationPointsDuringStartup": 10,
-            logComponentVerbosity: tojson({storage: {verbosity: 2}}),
+            logComponentVerbosity: tojson({storage: {verbosity: 3}}),
         }
     }
 });
