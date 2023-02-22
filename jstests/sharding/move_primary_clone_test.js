@@ -58,7 +58,12 @@ function checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, barUUID, f
         var indexes = res.cursor.firstBatch;
         indexes.sort(sortByName);
 
-        assert.eq(indexes.length, 2);
+        // TODO SERVER-74252: once 7.0 becomes LastLTS we can assume that the movePrimary will never
+        // copy indexes of sharded collections.
+        if (sharded)
+            assert(indexes.length == 1 || indexes.length == 2);
+        else
+            assert(indexes.length == 2);
 
         indexes.forEach((index, i) => {
             var expected;
