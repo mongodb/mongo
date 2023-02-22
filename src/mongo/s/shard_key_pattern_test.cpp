@@ -90,6 +90,7 @@ TEST_F(ShardKeyPatternTest, SingleFieldShardKeyPatternsValidityCheck) {
     ShardKeyPattern s3(BSON("a" << (long long)1L));
     ShardKeyPattern s4(BSON("a"
                             << "hashed"));
+    ShardKeyPattern s5(BSON("a$" << 1));
 
     ASSERT_THROWS(ShardKeyPattern(BSONObj()), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << -1)), DBException);
@@ -102,6 +103,9 @@ TEST_F(ShardKeyPatternTest, SingleFieldShardKeyPatternsValidityCheck) {
                   DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("" << 1)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("." << 1)), DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSON("$" << 1)), DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSON("$a" << 1)), DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSON("$**" << 1)), DBException);
 }
 
 TEST_F(ShardKeyPatternTest, CompositeShardKeyPatternsValidityCheck) {
@@ -115,6 +119,9 @@ TEST_F(ShardKeyPatternTest, CompositeShardKeyPatternsValidityCheck) {
                   DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << 1 << "b." << 1.0)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << 1 << "" << 1.0)), DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSON("a" << 1 << "$" << 1.0)), DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSON("a" << 1 << "$b" << 1.0)), DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSON("a" << 1 << "$**" << 1.0)), DBException);
 }
 
 TEST_F(ShardKeyPatternTest, NestedShardKeyPatternsValidtyCheck) {
@@ -122,6 +129,7 @@ TEST_F(ShardKeyPatternTest, NestedShardKeyPatternsValidtyCheck) {
     ShardKeyPattern s2(BSON("a.b.c.d" << 1.0));
     ShardKeyPattern s3(BSON("a" << 1 << "c.d" << 1.0 << "e.f.g" << 1.0f));
     ShardKeyPattern s4(BSON("a" << 1 << "a.b" << 1.0 << "a.b.c" << 1.0f));
+    ShardKeyPattern s6(BSON("a.b$" << 1));
 
     ASSERT_THROWS(ShardKeyPattern(BSON("a.b" << -1)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << BSON("b" << 1))), DBException);
@@ -130,6 +138,9 @@ TEST_F(ShardKeyPatternTest, NestedShardKeyPatternsValidtyCheck) {
     ASSERT_THROWS(ShardKeyPattern(BSON("a..b" << 1)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << 1 << "a.b." << 1.0)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << BSON("b" << 1) << "c.d" << 1.0)), DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSON("a.$" << 1)), DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSON("a.$b" << 1)), DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSON("a.$**" << 1)), DBException);
 }
 
 TEST_F(ShardKeyPatternTest, IsShardKey) {
