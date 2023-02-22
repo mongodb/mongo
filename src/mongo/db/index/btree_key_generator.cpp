@@ -29,9 +29,6 @@
 
 #include "mongo/db/index/btree_key_generator.h"
 
-#include <boost/optional.hpp>
-#include <memory>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/field_ref.h"
@@ -57,12 +54,13 @@ const BSONElement undefinedElt = undefinedObj.firstElement();
  * if the path doesn't exist.
  *
  * The 'path' can be specified using a dotted notation in order to traverse through embedded
- * objects.
+ * objects. If 'exist' is specified it should be set to true if the element is present. This output
+ * can help the caller to know whether the 'path' is missing or has a 'null' value.
  *
  * This function must only be used when there is no an array element along the 'path'. Otherwise,
  * an exception will be thrown if encounters any array.
  */
-BSONElement extractNonArrayElementAtPath(const BSONObj& obj, StringData path) {
+std::pair<BSONElement, bool> extractNonArrayElementAtPath(const BSONObj& obj, StringData path) {
     static const auto kEmptyElt = BSONElement{};
 
     auto&& [elt, tail] = [&]() -> std::pair<BSONElement, StringData> {
@@ -76,15 +74,15 @@ BSONElement extractNonArrayElementAtPath(const BSONObj& obj, StringData path) {
             elt.type() != BSONType::Array);
 
     if (elt.eoo()) {
-        return kEmptyElt;
+        return {kEmptyElt, false};
     } else if (tail.empty()) {
-        return elt;
+        return {elt, true};
     } else if (elt.type() == BSONType::Object) {
         return extractNonArrayElementAtPath(elt.embeddedObject(), tail);
     }
     // We found a scalar element, but there is more path to traverse, e.g. {a: 1} with a path of
     // "a.b".
-    return kEmptyElt;
+    return {kEmptyElt, false};
 }
 }  // namespace
 
@@ -320,7 +318,7 @@ void BtreeKeyGenerator::_getKeysWithoutArray(SharedBufferFragmentBuilder& pooled
     size_t numNotFound{0};
 
     for (auto&& fieldName : _fieldNames) {
-        auto elem = extractNonArrayElementAtPath(obj, fieldName);
+        auto [elem, _] = extractNonArrayElementAtPath(obj, fieldName);
         if (elem.eoo()) {
             ++numNotFound;
         }
@@ -344,10 +342,16 @@ void BtreeKeyGenerator::_getKeysWithoutArray(SharedBufferFragmentBuilder& pooled
     keys->insert(keyString.release());
 }
 
-void BtreeKeyGenerator::extractElements(const BSONObj& obj, std::vector<BSONElement>* elems) const {
+boost::dynamic_bitset<size_t> BtreeKeyGenerator::extractElements(
+    const BSONObj& obj, std::vector<BSONElement>* elems) const {
+    boost::dynamic_bitset<size_t> existFields(_fieldNames.size());
+    size_t idx = 0;
     for (auto&& fieldName : _fieldNames) {
-        elems->push_back(extractNonArrayElementAtPath(obj, fieldName));
+        auto [elem, exist] = extractNonArrayElementAtPath(obj, fieldName);
+        elems->push_back(elem);
+        existFields[idx++] = exist;
     }
+    return existFields;
 }
 
 void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,

@@ -322,7 +322,7 @@ WildcardKeyGenerator::WildcardKeyGenerator(BSONObj keyPattern,
     size_t idx = 0;
     bool iteratorIsBeforeWildcard = true;
     for (auto elem : keyPattern) {
-        if (elem.fieldNameStringData().endsWith("$**")) {
+        if (WildcardNames::isWildcardFieldName(elem.fieldNameStringData())) {
             iteratorIsBeforeWildcard = false;
         } else if (iteratorIsBeforeWildcard) {
             preElems.push_back(BSONElement());
@@ -363,17 +363,20 @@ void WildcardKeyGenerator::generateKeys(SharedBufferFragmentBuilder& pooledBuffe
 
     std::vector<BSONElement> preElems;
     std::vector<BSONElement> postElems;
+    boost::dynamic_bitset<size_t> preElemsExist;
+    boost::dynamic_bitset<size_t> postElemsExist;
 
     // Extract elements for regular fields if this is a compound wildcard index.
     if (_preBtreeGenerator) {
-        _preBtreeGenerator->extractElements(inputDoc, &preElems);
+        preElemsExist = _preBtreeGenerator->extractElements(inputDoc, &preElems);
     }
     if (_postBtreeGenerator) {
-        _postBtreeGenerator->extractElements(inputDoc, &postElems);
+        postElemsExist = _postBtreeGenerator->extractElements(inputDoc, &postElems);
     }
 
     FieldRef rootPath;
     auto keysSequence = keys->extract_sequence();
+    auto sequenceSize = keysSequence.size();
     // multikeyPaths is allowed to be nullptr
     KeyStringSet::sequence_type multikeyPathsSequence;
     if (multikeyPaths)
@@ -392,6 +395,32 @@ void WildcardKeyGenerator::generateKeys(SharedBufferFragmentBuilder& pooledBuffe
 
     keyEncoder.traverseWildcard(
         _proj.exec()->applyTransformation(Document{inputDoc}).toBson(), false, &rootPath);
+
+    // If no key is generated for this index at this point, that means the document doesn't have any
+    // field that is indexed by the wildcard field. We should still add index keys for this
+    // document if the document has any regular field of a compound wildcad index. For example,
+    // a document {a: 1} should still be indexed by this compound wildcard index {a:1, "b.$**": 1}.
+    // In this case, we generate an index key {'': 1, '': MinKey, '': MinKey} for this document.
+    if (keysSequence.size() == sequenceSize && (!preElems.empty() || !postElems.empty())) {
+        KeyString::PooledBuilder keyString(pooledBufferBuilder, _keyStringVersion, _ordering);
+
+        if (preElemsExist.any() || postElemsExist.any()) {
+            if (!preElems.empty()) {
+                appendToKeyString(preElems, _collator, &keyString);
+            }
+            // We use 'MinKey' for both the '$_path' field and the wildcard field similar to what we
+            // use in multikey-path index keys.
+            keyString.appendBSONElement(kMinBSONKey.firstElement());
+            keyString.appendBSONElement(kMinBSONKey.firstElement());
+            if (!postElems.empty()) {
+                appendToKeyString(postElems, _collator, &keyString);
+            }
+            if (id) {
+                keyString.appendRecordId(*id);
+            }
+            keysSequence.push_back(keyString.release());
+        }
+    }
 
     if (multikeyPaths)
         multikeyPaths->adopt_sequence(std::move(multikeyPathsSequence));

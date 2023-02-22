@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/dynamic_bitset.hpp>
 #include <memory>
 #include <set>
 #include <vector>
@@ -92,8 +93,11 @@ public:
      * This function does _not_ generate any keys but extract non-array elements for building a key
      * string. It throws an exception if any extracted element is an array. This can be useful when
      * the caller wants to utilize these elements to build a set of index keys.
+     *
+     * This function returns a bit set denoting which fields in '_fieldNames' are existent in 'obj'.
      */
-    void extractElements(const BSONObj& obj, std::vector<BSONElement>* elems) const;
+    boost::dynamic_bitset<size_t> extractElements(const BSONObj& obj,
+                                                  std::vector<BSONElement>* elems) const;
 
 private:
     /**

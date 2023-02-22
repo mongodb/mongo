@@ -925,6 +925,12 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
     // key as opposed to real user data. We shouldn't report any sort orders including "$_path". In
     // fact, $-prefixed path components are illegal in queries in most contexts, so misinterpreting
     // this as a path in user-data could trigger subsequent assertions.
+    //
+    // An expanded compound wildcard index can be used to answer queries on non-wildcard prefix
+    // fields, in this case, the wildcard field is unknown. This expanded IndexEntry holds a key
+    // pattern with the wildcard field being the reserved path, "$_path". All following regular
+    // fields should not support any sort operation, therefore, we should strip all fields starting
+    // from the first "$_path" field.
     if (index.type == IndexType::INDEX_WILDCARD) {
         tassert(7246700,
                 "The bounds did not have as many fields as the key pattern.",
@@ -938,9 +944,22 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
             return {};
         }
 
-        // Strip '$_path' out of 'sortPattern' and then proceed with regular sort analysis.
+        BSONObjBuilder sortPatternStripped;
+        // Strip '$_path' and following fields out of 'sortPattern' and then proceed with regular
+        // sort analysis.
         if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV()) {
-            sortPatternProvidedByIndex = sortPatternProvidedByIndex.removeField("$_path"_sd);
+            bool hasPathField = false;
+            for (auto elem : sortPatternProvidedByIndex) {
+                if (elem.fieldNameStringData() == "$_path"_sd) {
+                    if (hasPathField) {
+                        break;
+                    }
+                    hasPathField = true;
+                } else {
+                    sortPatternStripped.append(elem);
+                }
+            }
+            sortPatternProvidedByIndex = sortPatternStripped.obj();
         } else {
             BSONObjIterator it{sortPatternProvidedByIndex};
             invariant(it.more());

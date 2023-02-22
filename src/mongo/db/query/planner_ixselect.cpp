@@ -366,6 +366,22 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
         return false;
     }
 
+    // Fields after "$_path" of a compound wildcard index should not be used to answer any query,
+    // because wildcard IndexEntry with reserved field, "$_path", present is used only to answer
+    // query on non-wildcard prefix.
+    if (index.type == IndexType::INDEX_WILDCARD) {
+        size_t idx = 0;
+        for (auto&& elt : index.keyPattern) {
+            if (elt.fieldNameStringData() == "$_path") {
+                return false;
+            }
+            if (idx == keyPatternIdx) {
+                break;
+            }
+            idx++;
+        }
+    }
+
     // Historically one could create indices with any particular value for the index spec,
     // including values that now indicate a special index.  As such we have to make sure the
     // index type wasn't overridden before we pay attention to the string in the index key
