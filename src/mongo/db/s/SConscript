@@ -634,6 +634,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
         '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/s/sharding_test_fixture_common',
         'sharding_runtime_d',
@@ -846,6 +847,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/primary_only_service',
         '$BUILD_DIR/mongo/db/repl/primary_only_service_test_fixture',
         '$BUILD_DIR/mongo/db/repl/replication_info',
+        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         '$BUILD_DIR/mongo/db/repl/wait_for_majority_service',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',

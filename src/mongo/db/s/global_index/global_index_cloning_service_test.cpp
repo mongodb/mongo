@@ -35,7 +35,7 @@
 #include "mongo/db/repl/database_cloner_gen.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/global_index/global_index_cloning_external_state.h"
 #include "mongo/db/s/global_index/global_index_cloning_service.h"
 #include "mongo/db/s/global_index/global_index_util.h"
@@ -272,8 +272,8 @@ public:
         repl::PrimaryOnlyServiceMongoDTest::setUp();
 
         auto serviceContext = getServiceContext();
-        auto storageMock = std::make_unique<repl::StorageInterfaceMock>();
-        repl::StorageInterface::set(serviceContext, std::move(storageMock));
+        auto storageImpl = std::make_unique<repl::StorageInterfaceImpl>();
+        repl::StorageInterface::set(serviceContext, std::move(storageImpl));
 
         // The ReadWriteConcernDefaults decoration on the service context won't always be created,
         // so we should manually instantiate it to ensure it exists in our tests.

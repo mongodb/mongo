@@ -52,7 +52,7 @@
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
-#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/shard_local.h"
@@ -233,7 +233,7 @@ void ShardingMongodTestFixture::setUp() {
 
     repl::ReplicationCoordinator::set(service, std::move(replCoordPtr));
 
-    auto storagePtr = std::make_unique<repl::StorageInterfaceMock>();
+    auto storagePtr = std::make_unique<repl::StorageInterfaceImpl>();
 
     repl::DropPendingCollectionReaper::set(
         service, std::make_unique<repl::DropPendingCollectionReaper>(storagePtr.get()));

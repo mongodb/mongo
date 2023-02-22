@@ -204,20 +204,33 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
 
     ActiveTransactionHistory result;
 
-    result.lastTxnRecord = [&]() -> auto {
-        return performReadWithNoTimestampDBDirectClient(
-            opCtx, [&](DBDirectClient* client) -> boost::optional<SessionTxnRecord> {
-                auto result =
-                    client->findOne(NamespaceString::kSessionTransactionsTableNamespace,
-                                    BSON(SessionTxnRecord::kSessionIdFieldName << lsid.toBSON()));
-                if (result.isEmpty()) {
-                    return boost::none;
-                }
-                return SessionTxnRecord::parse(
-                    IDLParserContext("parse latest txn record for session"), result);
-            });
-    }
-    ();
+    result.lastTxnRecord = [&]() -> boost::optional<SessionTxnRecord> {
+        ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
+
+        AutoGetCollectionForRead autoRead(opCtx,
+                                          NamespaceString::kSessionTransactionsTableNamespace);
+
+        BSONObjBuilder bob;
+        bob.append("_id", lsid.toBSON());
+        auto id = bob.obj();
+
+        BSONElement elementKey = id.firstElement();
+
+        auto storageInterface = repl::StorageInterface::get(opCtx);
+        auto swObj = storageInterface->findById(
+            opCtx, NamespaceString::kSessionTransactionsTableNamespace, elementKey);
+        if (!swObj.isOK()) {
+            if (swObj.getStatus() == ErrorCodes::NoSuchKey ||
+                swObj.getStatus() == ErrorCodes::NamespaceNotFound) {
+                return boost::none;
+            }
+
+            uassertStatusOK(swObj.getStatus());
+        }
+
+        return SessionTxnRecord::parse(IDLParserContext("parse latest txn record for session"),
+                                       swObj.getValue());
+    }();
 
     if (!result.lastTxnRecord) {
         return result;

@@ -42,6 +42,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -54,7 +55,14 @@ using unittest::assertGet;
 
 const BSONObj kNestedOplog(BSON("$sessionMigrateInfo" << 1));
 
-using WriteOpsRetryability = ServiceContextMongoDTest;
+class WriteOpsRetryability : public ServiceContextMongoDTest {
+public:
+    void setUp() override {
+        auto serviceContext = getServiceContext();
+        auto storageImpl = std::make_unique<repl::StorageInterfaceImpl>();
+        repl::StorageInterface::set(serviceContext, std::move(storageImpl));
+    }
+};
 
 /**
  * Creates OplogEntry with given field values.

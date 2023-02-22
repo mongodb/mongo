@@ -45,7 +45,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
@@ -281,8 +280,6 @@ protected:
         MockReplCoordServerFixture::setUp();
         const auto service = opCtx()->getServiceContext();
 
-        // Register a temporary storage interface for MongoDSessionCatalog::onStepUp() create the
-        // config.transactions table.
         repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
         MongoDSessionCatalog::set(
             service,
@@ -290,10 +287,6 @@ protected:
                 std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
         mongoDSessionCatalog->onStepUp(opCtx());
-
-        // We use the mocked storage interface here since StorageInterfaceImpl does not support
-        // getPointInTimeReadTimestamp().
-        repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
 
         OpObserverRegistry* opObserverRegistry =
             dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
