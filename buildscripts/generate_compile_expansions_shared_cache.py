@@ -72,8 +72,8 @@ def generate_scons_cache_expansions():
 
         expansions["scons_cache_path"] = default_cache_path
         expansions[
-            "scons_cache_args"] = "--cache={0} --cache-signature-mode=validate --cache-dir={1} --cache-show".format(
-                scons_cache_mode, shlex.quote(default_cache_path))
+            "scons_cache_args"] = "--cache=nolinked --cache-signature-mode=validate --cache-dir={0} --cache-show".format(
+                shlex.quote(default_cache_path))
 
     # Local shared cache - host-based
     elif os.getenv("SCONS_CACHE_SCOPE") == "local":
