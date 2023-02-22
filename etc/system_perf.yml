@@ -1230,7 +1230,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: query,
              include_filter_2: core regression,
@@ -1241,7 +1241,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: query_large_dataset,
              include_filter_2: regression,
@@ -1253,7 +1253,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: query,
              include_filter_2: getmore,
@@ -1264,7 +1264,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: query_identityview,
              include_filter_2: core regression,
@@ -1275,7 +1275,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: aggregation_identityview,
              include_filter_2: regression,
@@ -1286,7 +1286,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: where,
              include_filter_2: core regression,
@@ -1297,7 +1297,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: update,
              include_filter_2: core regression,
@@ -1308,7 +1308,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: insert,
              include_filter_2: core regression,
@@ -1319,7 +1319,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: compound-wildcard-insert,
              include_filter_2: core regression,
@@ -1330,7 +1330,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: wildcard_read,
              include_filter_2: core regression,
@@ -1341,7 +1341,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: wildcard_write,
              include_filter_2: core regression,
@@ -1352,7 +1352,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: geo,
              include_filter_2: core regression,
@@ -1363,7 +1363,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: command multi remove mixed,
              include_filter_2: core regression,
@@ -1374,8 +1374,8 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
-          mongodb_setup: microbenchmarks_standalone_custom_filter_default.2023-01
+          test_control: mongo-perf.2023-02
+          mongodb_setup: mongo-perf-standalone-custom-filter-default.2023-02
           test_control_params: |
             {include_filter_1: command multi remove mixed,
              include_filter_2: core regression,
@@ -1386,8 +1386,8 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
-          mongodb_setup: microbenchmarks_standalone_custom_filter_slow_or_sample.2023-01
+          test_control: mongo-perf.2023-02
+          mongodb_setup: mongo-perf-standalone-custom-filter-slow-or-sample.2023-02
           test_control_params: |
             {include_filter_1: command multi remove mixed,
              include_filter_2: core regression,
@@ -1398,8 +1398,8 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
-          mongodb_setup: microbenchmarks_standalone_custom_filter_complex.2023-01
+          test_control: mongo-perf.2023-02
+          mongodb_setup: mongo-perf-standalone-custom-filter-complex.2023-02
           test_control_params: |
             {include_filter_1: command multi remove mixed,
              include_filter_2: core regression,
@@ -1410,8 +1410,8 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
-          mongodb_setup: microbenchmarks_standalone_custom_filter_whole_doc.2023-01
+          test_control: mongo-perf.2023-02
+          mongodb_setup: mongo-perf-standalone-custom-filter-whole-doc.2023-02
           test_control_params: |
             {include_filter_1: command multi remove mixed,
              include_filter_2: core regression,
@@ -1422,8 +1422,8 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
-          mongodb_setup: microbenchmarks_standalone_slowms_everything.2023-01
+          test_control: mongo-perf.2023-02
+          mongodb_setup: mongo-perf-standalone-slowms-everything.2023-02
           test_control_params: |
             {include_filter_1: command multi remove mixed,
              include_filter_2: core regression,
@@ -1434,7 +1434,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: single_threaded,
              include_filter_2: core regression,
@@ -1445,7 +1445,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: aggregation,
              include_filter_2: regression,
@@ -1456,7 +1456,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: aggregation_large_dataset,
              include_filter_2: regression,
@@ -1468,7 +1468,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: agg_query_comparison,
              include_filter_2: core regression,
@@ -1479,7 +1479,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: pipeline-updates,
              include_filter_2: regression,
@@ -1490,7 +1490,7 @@ tasks:
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: microbenchmarks
+          test_control: mongo-perf.2023-02
           test_control_params: |
             {include_filter_1: js,
              include_filter_2: aggregation,
@@ -3940,7 +3940,7 @@ buildvariants:
     modules: *modules
     expansions: &standalone-arm-expansions
       mongodb_setup_release: 2022-11
-      mongodb_setup: microbenchmarks_standalone.2023-01
+      mongodb_setup: mongo-perf-standalone.2023-02
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: workload_client_mongod_combined.2023-01
       workload_setup: 2022-11
@@ -3987,7 +3987,7 @@ buildvariants:
     modules: *modules
     expansions: &repl-arm-expansions
       mongodb_setup_release: 2022-11
-      mongodb_setup: microbenchmarks_replica.2023-01
+      mongodb_setup: mongo-perf-replica.2023-02
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: workload_client_mongod_combined.2023-01
       workload_setup: 2022-11
@@ -4015,7 +4015,7 @@ buildvariants:
     cron: "0 */4 * * *" # Every 4 hours starting at midnight
     expansions:
       <<: *standalone-arm-expansions
-      mongodb_setup: microbenchmarks_standalone-all-feature-flags.2023-01
+      mongodb_setup: mongo-perf-standalone-all-feature-flags.2023-02
     # Same as standalone tasks, but with compound-wildcard-index-insert added
     tasks: &mirobenchmarks-all-feature-flags-tasks
     - name: big_collection
@@ -4052,7 +4052,7 @@ buildvariants:
     cron: "0 */4 * * *" # Every 4 hours starting at midnight
     expansions:
       <<: *standalone-arm-expansions
-      mongodb_setup: microbenchmarks_standalone-classic-query-engine.2023-01
+      mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
@@ -4064,7 +4064,7 @@ buildvariants:
     cron: "0 */4 * * *" # Every 4 hours starting at midnight
     expansions:
       <<: *standalone-arm-expansions
-      mongodb_setup: microbenchmarks_standalone-sbe.2023-01
+      mongodb_setup: mongo-perf-standalone-sbe.2023-02
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
@@ -4075,7 +4075,7 @@ buildvariants:
     cron: "0 */4 * * *" # Every 4 hours starting at midnight
     expansions:
       <<: *repl-arm-expansions
-      mongodb_setup: microbenchmarks_replica-all-feature-flags.2023-01
+      mongodb_setup: mongo-perf-replica-all-feature-flags.2023-02
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
@@ -4118,7 +4118,7 @@ buildvariants:
     cron: "0 */12 * * *" # Every 12 hours starting at midnight
     expansions:
       <<: *standalone-intel-expansions
-      mongodb_setup: microbenchmarks_standalone-all-feature-flags.2023-01
+      mongodb_setup: mongo-perf-standalone-all-feature-flags.2023-02
     tasks: *mirobenchmarks-all-feature-flags-tasks
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
@@ -4131,7 +4131,7 @@ buildvariants:
     cron: "0 */12 * * *" # Every 12 hours starting at midnight
     expansions:
       <<: *standalone-intel-expansions
-      mongodb_setup: microbenchmarks_standalone-classic-query-engine.2023-01
+      mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
@@ -4143,7 +4143,7 @@ buildvariants:
     cron: "0 */12 * * *" # Every 12 hours starting at midnight
     expansions:
       <<: *standalone-intel-expansions
-      mongodb_setup: microbenchmarks_standalone-sbe.2023-01
+      mongodb_setup: mongo-perf-standalone-sbe.2023-02
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
@@ -4154,7 +4154,7 @@ buildvariants:
     cron: "0 */12 * * *" # Every 12 hours starting at midnight
     expansions:
       <<: *repl-intel-expansions
-      mongodb_setup: microbenchmarks_replica-all-feature-flags.2023-01
+      mongodb_setup: mongo-perf-replica-all-feature-flags.2023-02
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
