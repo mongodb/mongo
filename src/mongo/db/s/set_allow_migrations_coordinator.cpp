@@ -31,6 +31,7 @@
 #include "mongo/db/s/set_allow_migrations_coordinator.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/grid.h"
@@ -110,6 +111,11 @@ ExecutorFuture<void> SetAllowMigrationsCoordinator::_runImpl(
                                                               Shard::RetryPolicy::kIdempotent);
 
             uassertStatusOK(response.toStatus());
+
+            ShardingLogging::get(opCtx)->logChange(opCtx,
+                                                   "setPermitMigrations",
+                                                   nss().ns(),
+                                                   BSON("permitMigrations" << _allowMigrations));
         })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             LOGV2_ERROR(5622700,
