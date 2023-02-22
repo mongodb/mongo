@@ -594,9 +594,9 @@ void processFieldsForInsertV1(FLEQueryInterface* queryImpl,
 
             payload.counts.push_back(count);
 
-            auto escInsertReply = uassertStatusOK(queryImpl->insertDocument(
+            auto escInsertReply = uassertStatusOK(queryImpl->insertDocuments(
                 nssEsc,
-                ESCCollection::generateInsertDocument(tagToken, valueToken, position, count),
+                {ESCCollection::generateInsertDocument(tagToken, valueToken, position, count)},
                 pStmtId,
                 true));
             checkWriteErrors(escInsertReply);
@@ -605,9 +605,9 @@ void processFieldsForInsertV1(FLEQueryInterface* queryImpl,
             const NamespaceString nssEcoc(edcNss.dbName(), efc.getEcocCollection().value());
 
             // TODO - should we make this a batch of ECOC updates?
-            const auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocument(
+            const auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocuments(
                 nssEcoc,
-                ECOCCollection::generateDocument(payload.fieldPathName, encryptedTokens),
+                {ECOCCollection::generateDocument(payload.fieldPathName, encryptedTokens)},
                 pStmtId,
                 false,
                 bypassDocumentValidation));
@@ -683,16 +683,19 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
 
             payload.counts.push_back(count);
 
-            auto escInsertReply = uassertStatusOK(queryImpl->insertDocument(
-                nssEsc, ESCCollection::generateNonAnchorDocument(tagToken, count), pStmtId, true));
+            auto escInsertReply = uassertStatusOK(queryImpl->insertDocuments(
+                nssEsc,
+                {ESCCollection::generateNonAnchorDocument(tagToken, count)},
+                pStmtId,
+                true));
             checkWriteErrors(escInsertReply);
 
             const NamespaceString nssEcoc(edcNss.dbName(), efc.getEcocCollection().value());
 
             // TODO - should we make this a batch of ECOC updates?
-            auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocument(
+            auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocuments(
                 nssEcoc,
-                ECOCCollection::generateDocument(payload.fieldPathName, encryptedTokens),
+                {ECOCCollection::generateDocument(payload.fieldPathName, encryptedTokens)},
                 pStmtId,
                 false,
                 bypassDocumentValidation));
@@ -770,9 +773,9 @@ void processRemovedFieldsHelper(FLEQueryInterface* queryImpl,
         index = alpha.value() + 1;
     }
 
-    auto eccInsertReply = uassertStatusOK(queryImpl->insertDocument(
+    auto eccInsertReply = uassertStatusOK(queryImpl->insertDocuments(
         eccNss,
-        ECCCollection::generateDocument(tagToken, valueToken, index, count),
+        {ECCCollection::generateDocument(tagToken, valueToken, index, count)},
         pStmtId,
         true));
     checkWriteErrors(eccInsertReply);
@@ -782,9 +785,9 @@ void processRemovedFieldsHelper(FLEQueryInterface* queryImpl,
     // TODO - make this a batch of ECOC updates?
     EncryptedStateCollectionTokens tokens(esc, ecc);
     auto encryptedTokens = uassertStatusOK(tokens.serialize(deleteToken.ecocToken));
-    auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocument(
+    auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocuments(
         nssEcoc,
-        ECOCCollection::generateDocument(deletedField.fieldPathName, encryptedTokens),
+        {ECOCCollection::generateDocument(deletedField.fieldPathName, encryptedTokens)},
         pStmtId,
         false));
     checkWriteErrors(ecocInsertReply);
@@ -1006,14 +1009,14 @@ StatusWith<write_ops::InsertCommandReply> processInsert(
     bool bypassDocumentValidation) {
 
     if (serverPayload.empty()) {
-        return queryImpl->insertDocument(edcNss, document, stmtId, false);
+        return queryImpl->insertDocuments(edcNss, {document}, stmtId, false);
     }
 
     processFieldsForInsert(queryImpl, edcNss, serverPayload, efc, stmtId, bypassDocumentValidation);
 
     auto finalDoc = EDCServerCollection::finalizeForInsert(document, serverPayload);
 
-    return queryImpl->insertDocument(edcNss, finalDoc, stmtId, false);
+    return queryImpl->insertDocuments(edcNss, {finalDoc}, stmtId, false);
 }
 
 write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
@@ -1595,14 +1598,15 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
     return static_cast<uint64_t>(signedDocCount);
 }
 
-StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocument(
+StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocuments(
     const NamespaceString& nss,
-    BSONObj obj,
+    std::vector<BSONObj> objs,
     StmtId* pStmtId,
     bool translateDuplicateKey,
     bool bypassDocumentValidation) {
     write_ops::InsertCommandRequest insertRequest(nss);
-    insertRequest.setDocuments({obj});
+    auto documentCount = objs.size();
+    insertRequest.setDocuments(std::move(objs));
 
     const auto tenantId = nss.tenantId();
     if (tenantId && gMultitenancySupport) {
@@ -1617,12 +1621,19 @@ StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocument(
     insertRequest.getWriteCommandRequestBase().setBypassDocumentValidation(
         bypassDocumentValidation);
 
+    std::vector<StmtId> stmtIds;
     int32_t stmtId = *pStmtId;
     if (stmtId != kUninitializedStmtId) {
-        (*pStmtId)++;
+        (*pStmtId) += documentCount;
+
+        stmtIds.reserve(documentCount);
+        for (size_t i = 0; i < documentCount; i++) {
+            stmtIds.push_back(stmtId + i);
+        }
     }
 
-    auto response = _txnClient.runCRUDOp(BatchedCommandRequest(insertRequest), {stmtId}).get();
+
+    auto response = _txnClient.runCRUDOp(BatchedCommandRequest(insertRequest), stmtIds).get();
 
     auto status = response.toStatus();
 

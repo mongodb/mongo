@@ -236,9 +236,9 @@ public:
      * If translateDuplicateKey == true and the insert returns DuplicateKey, returns
      * FLEStateCollectionContention instead.
      */
-    virtual StatusWith<write_ops::InsertCommandReply> insertDocument(
+    virtual StatusWith<write_ops::InsertCommandReply> insertDocuments(
         const NamespaceString& nss,
-        BSONObj obj,
+        std::vector<BSONObj> objs,
         StmtId* pStmtId,
         bool translateDuplicateKey,
         bool bypassDocumentValidation = false) = 0;
@@ -305,10 +305,10 @@ public:
 
     uint64_t countDocuments(const NamespaceString& nss) final;
 
-    StatusWith<write_ops::InsertCommandReply> insertDocument(
+    StatusWith<write_ops::InsertCommandReply> insertDocuments(
         const NamespaceString& nss,
-        BSONObj obj,
-        int32_t* pStmtId,
+        std::vector<BSONObj> objs,
+        StmtId* pStmtId,
         bool translateDuplicateKey,
         bool bypassDocumentValidation = false) final;
 

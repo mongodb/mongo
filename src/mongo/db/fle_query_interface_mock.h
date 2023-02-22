@@ -47,9 +47,9 @@ public:
 
     uint64_t countDocuments(const NamespaceString& nss) final;
 
-    StatusWith<write_ops::InsertCommandReply> insertDocument(
+    StatusWith<write_ops::InsertCommandReply> insertDocuments(
         const NamespaceString& nss,
-        BSONObj obj,
+        std::vector<BSONObj> objs,
         StmtId* pStmtId,
         bool translateDuplicateKey,
         bool bypassDocumentValidation = false) final;

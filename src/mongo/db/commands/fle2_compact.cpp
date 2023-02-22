@@ -172,7 +172,7 @@ void upsertNullDocument(FLEQueryInterface* queryImpl,
     } else {
         // insert the null doc; translate duplicate key error to a FLE contention error
         StmtId stmtId = kUninitializedStmtId;
-        auto reply = uassertStatusOK(queryImpl->insertDocument(nss, newNullDoc, &stmtId, true));
+        auto reply = uassertStatusOK(queryImpl->insertDocuments(nss, {newNullDoc}, &stmtId, true));
         checkWriteErrors(reply);
         statsCtr.addInserts(1);
     }
@@ -289,7 +289,7 @@ ESCPreCompactState prepareESCForCompaction(FLEQueryInterface* queryImpl,
         tagToken, valueToken, state.pos, state.count);
     StmtId stmtId = kUninitializedStmtId;
     auto insertReply =
-        uassertStatusOK(queryImpl->insertDocument(nssEsc, placeholder, &stmtId, true));
+        uassertStatusOK(queryImpl->insertDocuments(nssEsc, {placeholder}, &stmtId, true));
     checkWriteErrors(insertReply);
     stats.addInserts(1);
 
@@ -385,7 +385,7 @@ ECCPreCompactState prepareECCForCompaction(FLEQueryInterface* queryImpl,
             fleCompactHangBeforeECCPlaceholderInsert.pauseWhileSet();
         }
         auto insertReply =
-            uassertStatusOK(queryImpl->insertDocument(nssEcc, placeholder, &stmtId, true));
+            uassertStatusOK(queryImpl->insertDocuments(nssEcc, {placeholder}, &stmtId, true));
         checkWriteErrors(insertReply);
         stats.addInserts(1);
 
@@ -509,10 +509,10 @@ void compactOneFieldValuePair(FLEQueryInterface* queryImpl,
             //  {_id: F(eccTagToken, pos'+ k), value: Enc(eccValueToken, g_prime[k])}
             for (auto k = eccState.g_prime.size(); k > 0; k--) {
                 const auto& range = eccState.g_prime[k - 1];
-                auto insertReply = uassertStatusOK(queryImpl->insertDocument(
+                auto insertReply = uassertStatusOK(queryImpl->insertDocuments(
                     namespaces.eccNss,
-                    ECCCollection::generateDocument(
-                        eccTagToken, eccValueToken, eccState.pos + k, range.start, range.end),
+                    {ECCCollection::generateDocument(
+                        eccTagToken, eccValueToken, eccState.pos + k, range.start, range.end)},
                     &stmtId,
                     true));
                 checkWriteErrors(insertReply);
