@@ -8,9 +8,8 @@ function testMongod(mongod, systemuserpwd = undefined) {
     const admin = mongod.getDB('admin');
     admin.createUser({user: 'admin', pwd: 'admin', roles: ['root']});
 
-    function assertUnauthorized(cmd, msg) {
-        const errmsg =
-            assert.commandFailedWithCode(admin.runCommand(cmd), ErrorCodes.Unauthorized).errmsg;
+    function assertError(cmd, msg, code) {
+        const errmsg = assert.commandFailedWithCode(admin.runCommand(cmd), code).errmsg;
         assert(errmsg.includes(msg), "Error message is missing '" + msg + "': " + errmsg);
     }
 
@@ -18,7 +17,8 @@ function testMongod(mongod, systemuserpwd = undefined) {
 
     // Localhost authbypass is disabled, and we haven't logged in,
     // so normal auth-required commands should fail.
-    assertUnauthorized({usersInfo: 1}, 'Command usersInfo requires authentication');
+    assertError(
+        {usersInfo: 1}, 'Command usersInfo requires authentication', ErrorCodes.Unauthorized);
 
     // Hello command requires no auth, so it works fine.
     assert.commandWorked(admin.runCommand({hello: 1}));
@@ -33,7 +33,8 @@ function testMongod(mongod, systemuserpwd = undefined) {
             "$impersonatedRoles": [{role: 'root', db: 'admin'}],
         }
     };
-    assertUnauthorized(kImpersonatedHello, 'Unauthorized use of impersonation metadata');
+    assertError(
+        kImpersonatedHello, 'Unauthorized use of impersonation metadata', ErrorCodes.Unauthorized);
 
     // TODO SERVER-72448: Remove
     const kImpersonatedHelloLegacy = {
@@ -43,11 +44,41 @@ function testMongod(mongod, systemuserpwd = undefined) {
             "$impersonatedRoles": [{role: 'root', db: 'admin'}],
         }
     };
-    assertUnauthorized(kImpersonatedHelloLegacy, 'Unauthorized use of impersonation metadata');
+    assertError(kImpersonatedHelloLegacy,
+                'Unauthorized use of impersonation metadata',
+                ErrorCodes.Unauthorized);
+
+    // TODO SERVER-72448: Remove, checks that both legacy and new impersonation metadata fields
+    // cannot be set simultaneously.
+    const kImpersonatedHelloBoth = {
+        hello: 1,
+        "$audit": {
+            "$impersonatedUser": {user: 'admin', db: 'admin'},
+            "$impersonatedUsers": [{user: 'admin', db: 'admin'}],
+            "$impersonatedRoles": [{role: 'root', db: 'admin'}],
+        }
+    };
+    assertError(kImpersonatedHelloBoth,
+                'Cannot specify both $impersonatedUser and $impersonatedUsers',
+                ErrorCodes.BadValue);
+
+    // TODO SERVER-72448: Remove, checks that the legacy impersonation metadata field can only
+    // contain at most 1 field if specified.
+    const kImpersonatedHelloLegacyMultiple = {
+        hello: 1,
+        "$audit": {
+            "$impersonatedUsers": [{user: 'admin', db: 'admin'}, {user: 'test', db: 'pwd'}],
+            "$impersonatedRoles": [{role: 'root', db: 'admin'}],
+        }
+    };
+    assertError(kImpersonatedHelloLegacyMultiple,
+                'Can only impersonate up to one user per connection',
+                ErrorCodes.BadValue);
 
     // Try as admin (root role), should still fail.
     admin.auth('admin', 'admin');
-    assertUnauthorized(kImpersonatedHello, 'Unauthorized use of impersonation metadata');
+    assertError(
+        kImpersonatedHello, 'Unauthorized use of impersonation metadata', ErrorCodes.Unauthorized);
     admin.logout();
 
     if (systemuserpwd !== undefined) {
