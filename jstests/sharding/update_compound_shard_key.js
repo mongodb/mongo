@@ -185,16 +185,14 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
     assert.eq(1, updateRes.nModified);
     assert.eq(testColl.find({x: 110, y: 55, z: 3, a: 110}).itcount(), 1);
 
-    // TODO: SERVER-73689 Fix shard key update check in update_stage.cpp to exclude _id queries.
-    assert.commandWorked(
-        st.s.getDB(kDbName).coll.update({_id: 2}, {x: 110, y: 55, z: 3, a: 110}, false));
 } else {
     // When query matches a doc and fails to update because shard key needs to be updated.
     assert.commandFailedWithCode(
         st.s.getDB(kDbName).coll.update({}, {x: 110, y: 55, z: 3, a: 110}, false), 31025);
-    assert.commandFailedWithCode(
-        st.s.getDB(kDbName).coll.update({_id: 2}, {x: 110, y: 55, z: 3, a: 110}, false), 31025);
 }
+
+assert.commandFailedWithCode(
+    st.s.getDB(kDbName).coll.update({_id: 2}, {x: 110, y: 55, z: 3, a: 110}, false), 31025);
 
 //
 // Test upsert-specific behaviours.
