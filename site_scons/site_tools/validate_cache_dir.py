@@ -28,6 +28,7 @@ import pathlib
 import shutil
 import tempfile
 import traceback
+from timeit import default_timer as timer
 
 import SCons
 
@@ -62,6 +63,7 @@ class UnsupportedError(SCons.Errors.BuildError):
 
 class CacheDirValidate(SCons.CacheDir.CacheDir):
     def __init__(self, path):
+
         self.json_log = None
         super().__init__(path)
 
@@ -152,7 +154,7 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         except OSError as ex:
             raise CacheTransferFailed(src, dst_file, f"failed to create hash file: {ex}") from ex
 
-    def log_json_cachedebug(self, node, pushing=False):
+    def log_json_cachedebug(self, node, pushing=False, duration=0):
         if (pushing and (node.nocache or SCons.CacheDir.cache_readonly or 'conftest' in str(node))):
             return
 
@@ -162,15 +164,16 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         else:
             cache_event = 'push' if pushing else 'miss'
 
-        self.CacheDebugJson({'type': cache_event}, node, cachefile)
+        self.CacheDebugJson({'type': cache_event}, node, cachefile, duration)
 
     def retrieve(self, node):
         if not self.is_enabled():
             return False
-
-        self.log_json_cachedebug(node)
         try:
-            return super().retrieve(node)
+            start = timer()
+            result = super().retrieve(node)
+            self.log_json_cachedebug(node, duration=timer() - start)
+            return result
         except InvalidChecksum as ex:
             self.print_cache_issue(node, ex)
             self.clean_bad_cachefile(node, ex.cache_csig, ex.computed_csig)
@@ -182,25 +185,36 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
     def push(self, node):
         if self.is_readonly() or not self.is_enabled():
             return
-        self.log_json_cachedebug(node, pushing=True)
         try:
-            return super().push(node)
+            start = timer()
+            result = super().push(node)
+            self.log_json_cachedebug(node, pushing=True, duration=timer() - start)
+            return result
         except CacheTransferFailed as ex:
             self.print_cache_issue(node, ex)
             return False
 
-    def CacheDebugJson(self, json_data, target, cachefile):
+    def CacheDebugJson(self, json_data, target, cachefile, duration, size=None):
 
         if SCons.CacheDir.cache_debug and SCons.CacheDir.cache_debug != '-' and self.json_log is None:
             self.json_log = open(SCons.CacheDir.cache_debug + '.json', 'a')
 
         if self.json_log is not None:
+
+            if size is None:
+                try:
+                    size = os.path.getsize(cachefile)
+                except FileNotFoundError:
+                    size = 'FileNotFoundError'
+
             cksum_cachefile = str(pathlib.Path(cachefile).parent)
             if cksum_cachefile.endswith(self.get_ext()):
                 cachefile = cksum_cachefile
 
             json_data.update({
                 'timestamp': str(datetime.datetime.now(datetime.timezone.utc)),
+                'duration': duration,
+                'size': size,
                 'realfile': str(target),
                 'cachefile': pathlib.Path(cachefile).name,
                 'cache_dir': str(pathlib.Path(cachefile).parent.parent),
@@ -225,7 +239,7 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
 
     def _log(self, log_msg, json_info, realnode, cachefile):
         self.CacheDebug(log_msg + cache_debug_suffix, realnode, cachefile)
-        self.CacheDebugJson(json_info, realnode, cachefile)
+        self.CacheDebugJson(json_info, realnode, cachefile, 0)
 
     def print_cache_issue(self, node, ex):
 
