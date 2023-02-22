@@ -305,7 +305,11 @@ OperationContext* CurOp::opCtx() {
 }
 
 void CurOp::setOpDescription_inlock(const BSONObj& opDescription) {
-    _opDescription = serializeDollarDbInOpDescription(_nss.tenantId(), opDescription);
+    if (_nss.tenantId()) {
+        _opDescription = serializeDollarDbInOpDescription(_nss.tenantId(), opDescription);
+    } else {
+        _opDescription = opDescription;
+    }
 }
 
 void CurOp::setGenericCursor_inlock(GenericCursor gc) {
