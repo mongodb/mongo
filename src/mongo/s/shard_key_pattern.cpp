@@ -80,7 +80,7 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
             uassert(ErrorCodes::BadValue,
                     str::stream() << "Field " << patternEl.fieldNameStringData()
                                   << " contains parts that start with '$'",
-                    newFieldRef->getPart(i).find("$") != 0);
+                    !newFieldRef->getPart(i).startsWith("$"));
         }
 
         // Numeric and ascending (1.0), or "hashed" with exactly hashed field.
