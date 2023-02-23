@@ -2471,6 +2471,10 @@ insertIntoBucketCatalog(OperationContext* opCtx,
                                 // Run an aggregation to find a suitable bucket to reopen.
                                 AggregateCommandRequest aggRequest(bucketsColl->ns(), *pipeline);
 
+                                // TODO (SERVER-73189): Remove manually setting of the
+                                // Tenant ID.
+                                aggRequest.setDollarTenant(bucketsColl->ns().tenantId());
+
                                 auto cursor = uassertStatusOK(
                                     DBClientCursor::fromAggregationRequest(&client,
                                                                            aggRequest,

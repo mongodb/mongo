@@ -71,8 +71,13 @@ void DatabaseCloner::preStage() {
 
 BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
     BSONObj res;
-    auto collectionInfos =
-        getClient()->getCollectionInfos(_dbName, ListCollectionsFilter::makeTypeCollectionFilter());
+    auto dollarTenant = gMultitenancySupport &&
+            serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)
+        ? _dbName.tenantId()
+        : boost::none;
+    auto collectionInfos = getClient()->getCollectionInfos(
+        _dbName, ListCollectionsFilter::makeTypeCollectionFilter(), dollarTenant);
     const auto storageEngine = getGlobalServiceContext()->getStorageEngine();
 
     stdx::unordered_set<std::string> seen;

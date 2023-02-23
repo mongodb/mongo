@@ -100,14 +100,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
         // we must use a potentially different dbname.
         return [&] {
             try {
-                using VTS = auth::ValidatedTenancyScope;
-                boost::optional<VTS> vts = dbNameForAuthCheck.tenantId()
-                    ? boost::optional<VTS>(VTS(dbNameForAuthCheck.tenantId().value(),
-                                               VTS::TrustedForInnerOpMsgRequestTag{}))
-                    : boost::none;
-
-                auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    dbNameForAuthCheck, vts, o);
+                auto request = OpMsgRequestBuilder::create(dbNameForAuthCheck, o);
                 commandInOplogEntry->parse(opCtx, request)->checkAuthorization(opCtx, request);
                 return Status::OK();
             } catch (const DBException& e) {

@@ -251,7 +251,7 @@ public:
      *
      * This is used in the shell so that cursors can send getMore through the correct connection.
      */
-    std::tuple<bool, DBClientBase*> runCommandWithTarget(const DatabaseName& dbName,
+    std::tuple<bool, DBClientBase*> runCommandWithTarget(const std::string& dbname,
                                                          BSONObj cmd,
                                                          BSONObj& info,
                                                          int options = 0);
@@ -260,7 +260,7 @@ public:
      * See the opMsg overload comment for why this function takes a shared_ptr ostensibly to this.
      */
     std::tuple<bool, std::shared_ptr<DBClientBase>> runCommandWithTarget(
-        const DatabaseName& dbName,
+        const std::string& dbname,
         BSONObj cmd,
         BSONObj& info,
         std::shared_ptr<DBClientBase> me,
@@ -372,8 +372,10 @@ public:
      *   options : { }
      * }
      */
-    std::list<BSONObj> getCollectionInfos(const DatabaseName& dbName,
-                                          const BSONObj& filter = BSONObj());
+    std::list<BSONObj> getCollectionInfos(
+        const DatabaseName& dbName,
+        const BSONObj& filter = BSONObj(),
+        const boost::optional<TenantId>& dollarTenant = boost::none);
 
     /**
      * Drops an entire database.
@@ -411,11 +413,13 @@ public:
      *  'nss': NamespaceString on which to create the index
      *  'keys': Document describing keys and index types. You must provide at least one field and
      *          its direction.
+     * TODO SERVER-73189: Remove 'appendDollarTenant' as parameter.
      */
     void createIndex(const NamespaceString& nss,
                      const BSONObj& keys,
-                     boost::optional<BSONObj> writeConcernObj = boost::none) {
-        return createIndex(nss, IndexSpec().addKeys(keys), writeConcernObj);
+                     boost::optional<BSONObj> writeConcernObj = boost::none,
+                     bool appendDollarTenant = false) {
+        return createIndex(nss, IndexSpec().addKeys(keys), writeConcernObj, appendDollarTenant);
     }
 
     /**
@@ -425,27 +429,32 @@ public:
      *  'nss': NamespaceString on which to create the index
      *  'descriptor': Configuration object describing the index to create. The descriptor must
      *                describe at least one key and index type.
+     * TODO SERVER-73189: Remove 'appendDollarTenant' as parameter.
      */
     virtual void createIndex(const NamespaceString& nss,
                              const IndexSpec& descriptor,
-                             boost::optional<BSONObj> writeConcernObj = boost::none) {
+                             boost::optional<BSONObj> writeConcernObj = boost::none,
+                             bool appendDollarTenant = false) {
         std::vector<const IndexSpec*> toBuild;
         toBuild.push_back(&descriptor);
-        createIndexes(nss, toBuild, writeConcernObj);
+        createIndexes(nss, toBuild, writeConcernObj, appendDollarTenant);
     }
 
     virtual void createIndexes(const NamespaceString& nss,
                                const std::vector<const IndexSpec*>& descriptor,
-                               boost::optional<BSONObj> writeConcernObj = boost::none);
+                               boost::optional<BSONObj> writeConcernObj = boost::none,
+                               bool appendDollarTenant = false);
 
     /**
      * Creates indexes on the collection 'nss' as described by 'specs'.
      *
      * Failure to construct the indexes is reported by throwing an AssertionException.
+     * TODO SERVER-73189: Remove 'appendDollarTenant' as parameter.
      */
     virtual void createIndexes(const NamespaceString& nss,
                                const std::vector<BSONObj>& specs,
-                               boost::optional<BSONObj> writeConcernObj = boost::none);
+                               boost::optional<BSONObj> writeConcernObj = boost::none,
+                               bool appendDollarTenant = false);
 
     /**
      * Lists indexes on the collection 'nsOrUuid'.
@@ -460,17 +469,21 @@ public:
      *
      * If 'includeBuildUUIDs' is false, only the index spec will be returned without a way to
      * distinguish between ready and in-progress index specs.
+     * TODO SERVER-73189: Remove 'appendDollarTenant' as parameter.
      */
     virtual std::list<BSONObj> getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
                                              bool includeBuildUUIDs,
-                                             int options);
+                                             int options,
+                                             bool appendDollarTenant = false);
 
     virtual void dropIndex(const NamespaceString& nss,
                            BSONObj keys,
-                           boost::optional<BSONObj> writeConcernObj = boost::none);
+                           boost::optional<BSONObj> writeConcernObj = boost::none,
+                           bool appendDollarTenant = false);
     virtual void dropIndex(const NamespaceString& nss,
                            const std::string& indexName,
-                           boost::optional<BSONObj> writeConcernObj = boost::none);
+                           boost::optional<BSONObj> writeConcernObj = boost::none,
+                           bool appendDollarTenant = false);
 
     /**
      * Drops all indexes for the collection.
@@ -584,7 +597,8 @@ public:
                             int options = 0,
                             int limit = 0,
                             int skip = 0,
-                            boost::optional<BSONObj> readConcernObj = boost::none);
+                            boost::optional<BSONObj> readConcernObj = boost::none,
+                            const boost::optional<TenantId>& dollarTenant = boost::none);
 
     /**
      * Executes an acknowledged command to insert a vector of documents.
@@ -676,14 +690,6 @@ public:
         return _apiParameters;
     }
 
-    void setAlwaysAppendDollarTenant_forTest() {
-        _alwaysAppendDollarTenant = true;
-    }
-
-    bool isAlwaysAppendDollarTenant_forTest() const {
-        return _alwaysAppendDollarTenant;
-    }
-
 protected:
     /**
      * Returns true if the result of a command is ok.
@@ -700,7 +706,8 @@ protected:
                       int options,
                       int limit,
                       int skip,
-                      boost::optional<BSONObj> readConcernObj);
+                      boost::optional<BSONObj> readConcernObj,
+                      const boost::optional<TenantId>& dollarTenant);
 
     virtual void _auth(const BSONObj& params);
 
@@ -725,12 +732,6 @@ private:
                                       int options);
 
     auth::RunCommandHook _makeAuthRunCommandHook();
-
-    OpMsgRequest _upconvertRequest(const DatabaseName& dbName,
-                                   BSONObj legacyCmdObj,
-                                   int queryFlags = 0);
-
-    bool _alwaysAppendDollarTenant = false;
 
     rpc::RequestMetadataWriter _metadataWriter;
     rpc::ReplyMetadataReader _metadataReader;

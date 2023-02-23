@@ -40,7 +40,6 @@
 #include "mongo/db/auth/security_token_gen.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/bufreader.h"
@@ -265,36 +264,17 @@ boost::optional<TenantId> parseDollarTenant(const BSONObj body) {
     }
 }
 
-bool appendDollarTenant(BSONObjBuilder& builder,
+void appendDollarTenant(BSONObjBuilder& builder,
                         const TenantId& tenant,
-                        boost::optional<TenantId> existingDollarTenant = boost::none) {
-    if (existingDollarTenant) {
+                        boost::optional<TenantId> originalTenant = boost::none) {
+    if (originalTenant) {
         massert(8423373,
                 str::stream() << "Unable to set TenantId '" << tenant
                               << "' on OpMsgRequest as it already has "
-                              << existingDollarTenant->toString(),
-                tenant == existingDollarTenant.value());
-        return true;
-    }
-
-    if (gMultitenancySupport) {
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
-            tenant.serializeToBSON("$tenant", &builder);
-            return true;
-        }
-    }
-    return false;
-}
-
-void appendDollarDbAndTenant(BSONObjBuilder& builder,
-                             const DatabaseName& dbName,
-                             boost::optional<TenantId> existingDollarTenant = boost::none) {
-    if (!dbName.tenantId() ||
-        appendDollarTenant(builder, dbName.tenantId().value(), existingDollarTenant)) {
-        builder.append("$db", dbName.db());
+                              << originalTenant->toString(),
+                tenant == originalTenant.value());
     } else {
-        builder.append("$db", DatabaseNameUtil::serialize(dbName));
+        tenant.serializeToBSON("$tenant", &builder);
     }
 }
 
@@ -321,10 +301,12 @@ OpMsgRequest OpMsgRequestBuilder::createWithValidatedTenancyScope(
         BSONObjBuilder bodyBuilder(std::move(body));
         bodyBuilder.appendElements(extraFields);
         if (dollarTenant) {
-            appendDollarDbAndTenant(bodyBuilder, dbName, dollarTenant);
+            // If already having $tenant, never include the prefix in $db.
+            bodyBuilder.append("$db", dbName.db());
         } else if (validatedTenancyScope && !validatedTenancyScope->hasAuthenticatedUser()) {
             // Add $tenant into the body if the validated tenant id comes from $tenant.
-            appendDollarDbAndTenant(bodyBuilder, dbName);
+            bodyBuilder.append("$db", dbName.db());
+            appendDollarTenant(bodyBuilder, validatedTenancyScope->tenantId());
         } else {
             bodyBuilder.append("$db", DatabaseNameUtil::serialize(dbName));
         }
@@ -341,8 +323,13 @@ OpMsgRequest OpMsgRequestBuilder::create(const DatabaseName& dbName,
     auto dollarTenant = parseDollarTenant(body);
     BSONObjBuilder bodyBuilder(std::move(body));
     bodyBuilder.appendElements(extraFields);
-
-    appendDollarDbAndTenant(bodyBuilder, dbName, dollarTenant);
+    if (dbName.tenantId()) {
+        // If we append $tenant, never include the prefix in $db as well.
+        bodyBuilder.append("$db", dbName.db());
+        appendDollarTenant(bodyBuilder, dbName.tenantId().value(), dollarTenant);
+    } else {
+        bodyBuilder.append("$db", DatabaseNameUtil::serialize(dbName));
+    }
 
     OpMsgRequest request;
     request.body = bodyBuilder.obj();
