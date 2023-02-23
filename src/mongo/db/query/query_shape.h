@@ -51,4 +51,7 @@ constexpr StringData kLiteralArgString = "?"_sd;
  */
 BSONObj predicateShape(const MatchExpression* predicate);
 
+BSONObj predicateShape(const MatchExpression* predicate,
+                       std::function<std::string(StringData)> redactFieldNamesStrategy);
+
 }  // namespace mongo::query_shape

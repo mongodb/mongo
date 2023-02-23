@@ -161,8 +161,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    BSONObj getSerializedRightHandSide(
-        boost::optional<StringData> replacementForLiteralArgs) const final;
+    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -509,8 +508,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide(
-        boost::optional<StringData> replacementForLiteralArgs) const final;
+    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final;
 
     void serializeToBSONTypeRegex(BSONObjBuilder* out) const;
 
@@ -592,8 +590,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide(
-        boost::optional<StringData> replacementForLiteralArgs) const final;
+    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -660,8 +657,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide(
-        boost::optional<StringData> replacementForLiteralArgs) const final;
+    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -695,8 +691,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide(
-        boost::optional<StringData> replacementForLiteralArgs) const final;
+    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -839,8 +834,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide(
-        boost::optional<StringData> replacementForLiteralArgs) const final;
+    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 

@@ -82,8 +82,7 @@ public:
         debug << "\n";
     }
 
-    BSONObj getSerializedRightHandSide(
-        boost::optional<StringData> replacementForLiteralArgs) const final {
+    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final {
         // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
         BSONObjBuilder subBuilder;
         BSONArrayBuilder arrBuilder(subBuilder.subarrayStart(name()));
@@ -256,8 +255,7 @@ public:
         debug << "\n";
     }
 
-    BSONObj getSerializedRightHandSide(
-        boost::optional<StringData> replacementForLiteralArgs) const final {
+    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final {
         // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
         BSONObjBuilder bob;
         bob.append(name(), _binDataSubType);

@@ -46,7 +46,14 @@ std::string defaultRedactionStrategy(StringData s) {
  */
 struct SerializationOptions {
     SerializationOptions() {}
+
     SerializationOptions(bool explain_) : explain(explain_) {}
+
+    SerializationOptions(std::function<std::string(StringData)> redactFieldNamesStrategy_,
+                         boost::optional<StringData> replacementForLiteralArgs_)
+        : replacementForLiteralArgs(replacementForLiteralArgs_),
+          redactFieldNames(redactFieldNamesStrategy_),
+          redactFieldNamesStrategy(redactFieldNamesStrategy_) {}
 
     // 'replacementForLiteralArgs' is an independent option to serialize in a genericized format
     // with the aim of similar "shaped" queries serializing to the same object. For example, if

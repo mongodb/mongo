@@ -29,16 +29,26 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/matcher/parsed_match_expression_for_test.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
-#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_shape.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
+
+/**
+ * Simplistic redaction strategy for testing which appends the field name to the prefix "REDACT_".
+ */
+std::string redactFieldNameForTest(StringData sd) {
+    return "REDACT_" + sd.toString();
+}
+
+static const SerializationOptions literalAndFieldRedactOpts{redactFieldNameForTest,
+                                                            query_shape::kLiteralArgString};
+
 void assertShapeIs(std::string filterJson, BSONObj expectedShape) {
     ParsedMatchExpressionForTest expr(filterJson);
     ASSERT_BSONOBJ_EQ(expectedShape, query_shape::predicateShape(expr.get()));
@@ -48,12 +58,26 @@ void assertShapeIs(std::string filterJson, std::string expectedShapeJson) {
     return assertShapeIs(filterJson, fromjson(expectedShapeJson));
 }
 
+void assertRedactedShapeIs(std::string filterJson, BSONObj expectedShape) {
+    ParsedMatchExpressionForTest expr(filterJson);
+    ASSERT_BSONOBJ_EQ(expectedShape,
+                      query_shape::predicateShape(expr.get(), redactFieldNameForTest));
+}
+
+void assertRedactedShapeIs(std::string filterJson, std::string expectedShapeJson) {
+    return assertRedactedShapeIs(filterJson, fromjson(expectedShapeJson));
+}
+
 }  // namespace
 
 TEST(QueryPredicateShape, Equals) {
     assertShapeIs("{a: 5}", "{a: {$eq: '?'}}");                                   // Implicit equals
     assertShapeIs("{a: {$eq: 5}}", "{a: {$eq: '?'}}");                            // Explicit equals
     assertShapeIs("{a: 5, b: 6}", "{$and: [{a: {$eq: '?'}}, {b: {$eq: '?'}}]}");  // implicit $and
+    assertRedactedShapeIs("{a: 5}", "{REDACT_a: {$eq: '?'}}");                    // Implicit equals
+    assertRedactedShapeIs("{a: {$eq: 5}}", "{REDACT_a: {$eq: '?'}}");             // Explicit equals
+    assertRedactedShapeIs("{a: 5, b: 6}",
+                          "{$and: [{REDACT_a: {$eq: '?'}}, {REDACT_b: {$eq: '?'}}]}");
 }
 
 TEST(QueryPredicateShape, Comparisons) {
@@ -68,6 +92,8 @@ TEST(QueryPredicateShape, Regex) {
     assertShapeIs("{a: /a+/i}",
                   BSON("a" << BSON("$regex" << query_shape::kLiteralArgString << "$options"
                                             << query_shape::kLiteralArgString)));
+    assertRedactedShapeIs("{a: /a+/}",
+                          BSON("REDACT_a" << BSON("$regex" << query_shape::kLiteralArgString)));
 }
 
 TEST(QueryPredicateShape, Mod) {
@@ -120,6 +146,55 @@ TEST(QueryPredicateShape, ElemMatch) {
 
     // ElemMatchValueMatchExpression
     assertShapeIs("{a: {$elemMatch: {$gt: 5, $lt: 10}}}", "{a: {$elemMatch: {$gt: '?', $lt:'?'}}}");
+
+    // Nested
+    assertRedactedShapeIs("{a: {$elemMatch: {$elemMatch: {$gt: 5, $lt: 10}}}}",
+                          "{REDACT_a: {$elemMatch: {$elemMatch: {$gt: '?', $lt:'?'}}}}");
+}
+
+TEST(QueryPredicateShape, InternalBucketGeoWithinMatchExpression) {
+    assertRedactedShapeIs(
+        "{ $_internalBucketGeoWithin: {withinRegion: {$centerSphere: [[0, 0], 10]}, field: \"a\"} "
+        "}",
+        "{ $_internalBucketGeoWithin: { withinRegion: { $centerSphere: \"?\" }, "
+        "field: \"REDACT_a\" } }");
+}
+
+TEST(QueryPredicateShape, NorMatchExpression) {
+    assertRedactedShapeIs("{ $nor: [ { a: {$lt: 5} }, { b: {$gt: 4} } ] }",
+                          "{ $nor: [ { REDACT_a: {$lt: \"?\"} }, { REDACT_b: {$gt: \"?\"} } ] }");
+}
+
+TEST(QueryPredicateShape, NotMatchExpression) {
+    assertRedactedShapeIs("{ price: { $not: { $gt: 1.99 } } }",
+                          "{ REDACT_price: { $not: { $gt: \"?\" } } }");
+    // Test the special case where NotMatchExpression::serialize() reduces to $alwaysFalse.
+    auto emptyAnd = std::make_unique<AndMatchExpression>();
+    const MatchExpression& notExpr = NotMatchExpression(std::move(emptyAnd));
+    auto serialized = notExpr.serialize(literalAndFieldRedactOpts);
+    ASSERT_BSONOBJ_EQ(fromjson("{$alwaysFalse: '?'}"), serialized);
+}
+
+TEST(QueryPredicateShape, SizeMatchExpression) {
+    assertRedactedShapeIs("{ price: { $size: 2 } }", "{ REDACT_price: { $size: \"?\" } }");
+}
+
+TEST(QueryPredicateShape, TextMatchExpression) {
+    TextMatchExpressionBase::TextParams params = {"coffee"};
+    auto expr = ExtensionsCallbackNoop().createText(params);
+    ASSERT_BSONOBJ_EQ(fromjson("{ $text: { $search: \"?\", $language: \"?\", $caseSensitive: "
+                               "\"?\", $diacriticSensitive: \"?\" } }"),
+                      expr->serialize(literalAndFieldRedactOpts));
+}
+
+TEST(QueryPredicateShape, TwoDPtInAnnulusExpression) {
+    const MatchExpression& expr = TwoDPtInAnnulusExpression({}, {});
+    ASSERT_BSONOBJ_EQ(fromjson("{ $TwoDPtInAnnulusExpression: true }"),
+                      expr.serialize(literalAndFieldRedactOpts));
+}
+
+TEST(QueryPredicateShape, WhereMatchExpression) {
+    assertShapeIs("{$where: \"some_code()\"}", "{$where: \"?\"}");
 }
 
 BSONObj queryShapeForOptimizedExprExpression(std::string exprPredicateJson) {

@@ -447,8 +447,7 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
     debug << "\n";
 }
 
-BSONObj GeoMatchExpression::getSerializedRightHandSide(
-    boost::optional<StringData> replacementForLiteralArgs) const {
+BSONObj GeoMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
     BSONObjBuilder subobj;
     // TODO SERVER-73672 looks like we'll need to traverse '_rawObj' if 'replacementForLiteralArgs'
     // is set.
@@ -508,8 +507,7 @@ void GeoNearMatchExpression::debugString(StringBuilder& debug, int indentationLe
     debug << "\n";
 }
 
-BSONObj GeoNearMatchExpression::getSerializedRightHandSide(
-    boost::optional<StringData> replacementForLiteralArgs) const {
+BSONObj GeoNearMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
     // TODO SERVER-73672 looks like we'll need to traverse '_rawObj' if 'replacementForLiteralArgs'
     // is set.
     BSONObjBuilder objBuilder;

@@ -74,8 +74,7 @@ public:
         return _expression->matchesBSONElement(element, details);
     }
 
-    BSONObj getSerializedRightHandSide(
-        boost::optional<StringData> replacementForLiteralArgs) const final;
+    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final;
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 

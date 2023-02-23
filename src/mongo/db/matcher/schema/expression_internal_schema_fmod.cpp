@@ -77,7 +77,7 @@ void InternalSchemaFmodMatchExpression::debugString(StringBuilder& debug,
 }
 
 BSONObj InternalSchemaFmodMatchExpression::getSerializedRightHandSide(
-    boost::optional<StringData> replacementForLiteralArgs) const {
+    SerializationOptions opts) const {
     // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
     BSONObjBuilder objMatchBob;
     BSONArrayBuilder arrBuilder(objMatchBob.subarrayStart("$_internalSchemaFmod"));

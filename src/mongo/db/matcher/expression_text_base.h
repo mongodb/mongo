@@ -60,9 +60,7 @@ public:
      */
     virtual const fts::FTSQuery& getFTSQuery() const = 0;
 
-    BSONObj getSerializedRightHandSide(
-        boost::optional<StringData> replacementForLiteralArgs) const final {
-        // TODO SERVER-73676 is this going to be a problem? I don't see how this is unreachable...
+    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final {
         MONGO_UNREACHABLE;
     }
 

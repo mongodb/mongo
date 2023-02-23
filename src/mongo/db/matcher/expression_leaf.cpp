@@ -94,10 +94,9 @@ void ComparisonMatchExpressionBase::debugString(StringBuilder& debug, int indent
     debug << "\n";
 }
 
-BSONObj ComparisonMatchExpressionBase::getSerializedRightHandSide(
-    boost::optional<StringData> replacementForLiteralArgs) const {
-    if (replacementForLiteralArgs) {
-        return BSON(name() << *replacementForLiteralArgs);
+BSONObj ComparisonMatchExpressionBase::getSerializedRightHandSide(SerializationOptions opts) const {
+    if (opts.replacementForLiteralArgs) {
+        return BSON(name() << *opts.replacementForLiteralArgs);
     } else {
         return BSON(name() << _rhs);
     }
@@ -290,13 +289,12 @@ void RegexMatchExpression::debugString(StringBuilder& debug, int indentationLeve
     debug << "\n";
 }
 
-BSONObj RegexMatchExpression::getSerializedRightHandSide(
-    boost::optional<StringData> replacementForLiteralArgs) const {
+BSONObj RegexMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
     BSONObjBuilder regexBuilder;
-    regexBuilder.append("$regex", replacementForLiteralArgs.value_or(_regex));
+    regexBuilder.append("$regex", opts.replacementForLiteralArgs.value_or(_regex));
 
     if (!_flags.empty()) {
-        regexBuilder.append("$options", replacementForLiteralArgs.value_or(_flags));
+        regexBuilder.append("$options", opts.replacementForLiteralArgs.value_or(_flags));
     }
 
     return regexBuilder.obj();
@@ -372,9 +370,8 @@ void ModMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
     debug << "\n";
 }
 
-BSONObj ModMatchExpression::getSerializedRightHandSide(
-    boost::optional<StringData> replacementForLiteralArgs) const {
-    if (auto str = replacementForLiteralArgs) {
+BSONObj ModMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
+    if (auto str = opts.replacementForLiteralArgs) {
         return BSON("$mod" << *str);
     } else {
         return BSON("$mod" << BSON_ARRAY(_divisor << _remainder));
@@ -413,10 +410,9 @@ void ExistsMatchExpression::debugString(StringBuilder& debug, int indentationLev
     debug << "\n";
 }
 
-BSONObj ExistsMatchExpression::getSerializedRightHandSide(
-    boost::optional<StringData> replacementForLiteralArgs) const {
-    if (replacementForLiteralArgs) {
-        return BSON("$exists" << *replacementForLiteralArgs);
+BSONObj ExistsMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
+    if (opts.replacementForLiteralArgs) {
+        return BSON("$exists" << *opts.replacementForLiteralArgs);
     } else {
         return BSON("$exists" << true);
     }
@@ -503,11 +499,10 @@ void InMatchExpression::debugString(StringBuilder& debug, int indentationLevel) 
     debug << "\n";
 }
 
-BSONObj InMatchExpression::getSerializedRightHandSide(
-    boost::optional<StringData> replacementForLiteralArgs) const {
-    if (replacementForLiteralArgs) {
+BSONObj InMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
+    if (opts.replacementForLiteralArgs) {
         // In this case, treat an '$in' with any number of arguments as equivalent.
-        return BSON("$in" << BSON_ARRAY(*replacementForLiteralArgs));
+        return BSON("$in" << BSON_ARRAY(*opts.replacementForLiteralArgs));
     }
 
     BSONObjBuilder inBob;
@@ -863,8 +858,7 @@ void BitTestMatchExpression::debugString(StringBuilder& debug, int indentationLe
     }
 }
 
-BSONObj BitTestMatchExpression::getSerializedRightHandSide(
-    boost::optional<StringData> replacementForLiteralArgs) const {
+BSONObj BitTestMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
     std::string opString = "";
 
     switch (matchType()) {
@@ -884,8 +878,8 @@ BSONObj BitTestMatchExpression::getSerializedRightHandSide(
             MONGO_UNREACHABLE;
     }
 
-    if (replacementForLiteralArgs) {
-        return BSON(opString << *replacementForLiteralArgs);
+    if (opts.replacementForLiteralArgs) {
+        return BSON(opString << *opts.replacementForLiteralArgs);
     }
 
     BSONArrayBuilder arrBob;

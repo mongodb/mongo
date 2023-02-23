@@ -62,11 +62,11 @@ void InternalSchemaObjectMatchExpression::debugString(StringBuilder& debug,
 }
 
 BSONObj InternalSchemaObjectMatchExpression::getSerializedRightHandSide(
-    boost::optional<StringData> replacementForLiteralArgs) const {
+    SerializationOptions opts) const {
     // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
     BSONObjBuilder objMatchBob;
     BSONObjBuilder subBob(objMatchBob.subobjStart(kName));
-    _sub->serialize(&subBob, {});
+    _sub->serialize(&subBob, opts);
     subBob.doneFast();
     return objMatchBob.obj();
 }

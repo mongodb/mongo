@@ -165,10 +165,16 @@ public:
         // bit confused over 'includePath' semantics here. Before we changed anything for query
         // shape, it looks like 'includePath' was not forwarded through, so it's either not needed
         // or there was a pre-existing bug.
+        auto&& rhs = getSerializedRightHandSide(opts);
         if (opts.includePath) {
-            out->append(path(), getSerializedRightHandSide(opts.replacementForLiteralArgs));
+            if (opts.redactFieldNames) {
+                auto redactedFieldName = opts.redactFieldNamesStrategy(path());
+                out->append(redactedFieldName, rhs);
+            } else {
+                out->append(path(), rhs);
+            }
         } else {
-            out->appendElements(getSerializedRightHandSide(opts.replacementForLiteralArgs));
+            out->appendElements(rhs);
         }
     }
 
@@ -178,12 +184,12 @@ public:
      * line with the expression. For example {x: {$not: {$eq: 1}}}, where $eq is the
      * PathMatchExpression.
      *
-     * If the 'replacementForLiteralArgs' option is set, then any literal argument (like the number
-     * 1 in the example above), should be replaced with this string. 'literal' here is in contrast
-     * to another expression, if that is possible syntactically.
+     * Serialization options should be respected for any descendent expressions. Eg, if the
+     * 'replacementForLiteralArgs' option is set, then any literal argument (like the number 1 in
+     * the example above), should be replaced with this string. 'literal' here is in contrast to
+     * another expression, if that is possible syntactically.
      */
-    virtual BSONObj getSerializedRightHandSide(
-        boost::optional<StringData> replacementForLiteralArgs = boost::none) const = 0;
+    virtual BSONObj getSerializedRightHandSide(SerializationOptions opts = {}) const = 0;
 
 private:
     // ElementPath holds a FieldRef, which owns the underlying path string.

@@ -73,7 +73,7 @@ bool InternalSchemaMatchArrayIndexMatchExpression::equivalent(const MatchExpress
 }
 
 BSONObj InternalSchemaMatchArrayIndexMatchExpression::getSerializedRightHandSide(
-    boost::optional<StringData> replacementForLiteralArgs) const {
+    SerializationOptions opts) const {
     // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
     BSONObjBuilder objBuilder;
     {
@@ -82,7 +82,7 @@ BSONObj InternalSchemaMatchArrayIndexMatchExpression::getSerializedRightHandSide
         matchArrayElemSubobj.append("namePlaceholder", _expression->getPlaceholder().value_or(""));
         {
             BSONObjBuilder subexprSubObj(matchArrayElemSubobj.subobjStart("expression"));
-            _expression->getFilter()->serialize(&subexprSubObj, {});
+            _expression->getFilter()->serialize(&subexprSubObj, opts);
             subexprSubObj.doneFast();
         }
         matchArrayElemSubobj.doneFast();

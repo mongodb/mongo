@@ -48,7 +48,12 @@ public:
         : _obj(fromjson(str)) {
         _expCtx = make_intrusive<ExpressionContextForTest>();
         _expCtx->setCollator(CollatorInterface::cloneCollator(collator));
-        StatusWithMatchExpression result = MatchExpressionParser::parse(_obj, _expCtx);
+        StatusWithMatchExpression result =
+            MatchExpressionParser::parse(_obj,
+                                         _expCtx,
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kDefaultSpecialFeatures |
+                                             MatchExpressionParser::AllowedFeatures::kJavascript);
         ASSERT_OK(result.getStatus());
         _expr = std::move(result.getValue());
     }

@@ -86,8 +86,7 @@ public:
 
     bool equivalent(const MatchExpression* other) const final;
 
-    BSONObj getSerializedRightHandSide(
-        boost::optional<StringData> replacementForLiteralArgs) const final;
+    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final;
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 

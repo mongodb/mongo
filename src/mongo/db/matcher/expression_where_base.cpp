@@ -47,8 +47,11 @@ void WhereMatchExpressionBase::debugString(StringBuilder& debug, int indentation
 }
 
 void WhereMatchExpressionBase::serialize(BSONObjBuilder* out, SerializationOptions opts) const {
-    // TODO SERVER-73676 respect 'opts.'
-    out->appendCode("$where", getCode());
+    if (opts.replacementForLiteralArgs) {
+        out->append("$where", *opts.replacementForLiteralArgs);
+    } else {
+        out->appendCode("$where", getCode());
+    }
 }
 
 bool WhereMatchExpressionBase::equivalent(const MatchExpression* other) const {

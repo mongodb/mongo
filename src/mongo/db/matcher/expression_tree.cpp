@@ -455,9 +455,12 @@ void NotMatchExpression::serializeNotExpressionToNor(MatchExpression* exp,
 }
 
 void NotMatchExpression::serialize(BSONObjBuilder* out, SerializationOptions opts) const {
-    // TODO SERVER-73676 respect 'opts.'
     if (_exp->matchType() == MatchType::AND && _exp->numChildren() == 0) {
-        out->append("$alwaysFalse", 1);
+        if (opts.replacementForLiteralArgs) {
+            out->append("$alwaysFalse", *opts.replacementForLiteralArgs);
+        } else {
+            out->append("$alwaysFalse", 1);
+        }
         return;
     }
 
@@ -492,10 +495,15 @@ void NotMatchExpression::serialize(BSONObjBuilder* out, SerializationOptions opt
     // 1}}.
     if (auto pathMatch = dynamic_cast<PathMatchExpression*>(expressionToNegate);
         pathMatch && !dynamic_cast<TextMatchExpressionBase*>(expressionToNegate)) {
-        const auto path = pathMatch->path();
-        BSONObjBuilder pathBob(out->subobjStart(path));
-        pathBob.append("$not",
-                       pathMatch->getSerializedRightHandSide(opts.replacementForLiteralArgs));
+        auto append = [&](StringData path) {
+            BSONObjBuilder pathBob(out->subobjStart(path));
+            pathBob.append("$not", pathMatch->getSerializedRightHandSide(opts));
+        };
+        if (opts.redactFieldNames) {
+            append(opts.redactFieldNamesStrategy(pathMatch->path()));
+        } else {
+            append(pathMatch->path());
+        }
         return;
     }
     return serializeNotExpressionToNor(expressionToNegate, out, opts);

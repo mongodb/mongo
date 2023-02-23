@@ -193,13 +193,23 @@ bool InternalBucketGeoWithinMatchExpression::_matchesBSONObj(const BSONObj& obj)
 
 void InternalBucketGeoWithinMatchExpression::serialize(BSONObjBuilder* builder,
                                                        SerializationOptions opts) const {
-    // TODO SERVER-73676 respect 'opts'.
     BSONObjBuilder bob(builder->subobjStart(InternalBucketGeoWithinMatchExpression::kName));
+    // Serialize the geometry shape.
     BSONObjBuilder withinRegionBob(
         bob.subobjStart(InternalBucketGeoWithinMatchExpression::kWithinRegion));
-    withinRegionBob.append(_geoContainer->getGeoElement());
+    if (opts.replacementForLiteralArgs) {
+        bob.append(_geoContainer->getGeoElement().fieldName(), *opts.replacementForLiteralArgs);
+    } else {
+        withinRegionBob.append(_geoContainer->getGeoElement());
+    }
     withinRegionBob.doneFast();
-    bob.append(InternalBucketGeoWithinMatchExpression::kField, _field);
+    // Serialize the field which is being searched over.
+    if (opts.redactFieldNames) {
+        bob.append(InternalBucketGeoWithinMatchExpression::kField,
+                   opts.redactFieldNamesStrategy(_field));
+    } else {
+        bob.append(InternalBucketGeoWithinMatchExpression::kField, _field);
+    }
     bob.doneFast();
 }
 

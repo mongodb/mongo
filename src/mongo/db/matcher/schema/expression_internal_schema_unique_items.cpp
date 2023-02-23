@@ -60,7 +60,7 @@ bool InternalSchemaUniqueItemsMatchExpression::equivalent(const MatchExpression*
 }
 
 BSONObj InternalSchemaUniqueItemsMatchExpression::getSerializedRightHandSide(
-    boost::optional<StringData> replacementForLiteralArgs) const {
+    SerializationOptions opts) const {
     // TODO SERVER-73678 respect 'replacementForLiteralArgs.'
     BSONObjBuilder bob;
     bob.append(kName, true);

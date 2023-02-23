@@ -36,4 +36,14 @@ BSONObj predicateShape(const MatchExpression* predicate) {
     opts.replacementForLiteralArgs = kLiteralArgString;
     return predicate->serialize(opts);
 }
+
+BSONObj predicateShape(const MatchExpression* predicate,
+                       std::function<std::string(StringData)> redactFieldNamesStrategy) {
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = kLiteralArgString;
+    opts.redactFieldNamesStrategy = redactFieldNamesStrategy;
+    opts.redactFieldNames = true;
+    return predicate->serialize(opts);
+}
+
 }  // namespace mongo::query_shape

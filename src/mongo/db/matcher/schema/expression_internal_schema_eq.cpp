@@ -70,7 +70,7 @@ void InternalSchemaEqMatchExpression::debugString(StringBuilder& debug,
 }
 
 BSONObj InternalSchemaEqMatchExpression::getSerializedRightHandSide(
-    boost::optional<StringData> replacementForLiteralArgs) const {
+    SerializationOptions opts) const {
     // TODO SERVER-73678 respect 'replacementForLiteralArgs.'
     BSONObjBuilder eqObj;
     eqObj.appendAs(_rhsElem, kName);
