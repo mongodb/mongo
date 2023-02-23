@@ -39,10 +39,30 @@ class test_tiered18(wttest.WiredTigerTestCase, TieredConfigMixin):
     storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered18', tiered_only=True, tiered_shared=True)
     scenarios = make_scenarios(storage_sources)
 
-    uri_non_shared = "table:test_tiered18_shared_default"
-    uri_shared = "table:test_tiered18_shared"
-    uri_local = "table:test_tiered18_local"
-    uri_fail = "table:test_tiered18_fail"
+    shared_default = "test_tiered18_shared_default"
+    shared = "test_tiered18_shared"
+    local = "test_tiered18_local"
+    fail = "test_tiered18_fail"
+
+    uri_shared_default = "table:" + shared_default
+    uri_shared = "table:" + shared
+    uri_local = "table:" + local
+    uri_fail = "table:" + fail
+
+    colgroup_shared_default_active = "colgroup:" + shared_default + ".active"
+    colgroup_shared_default_shared = "colgroup:" + shared_default + ".shared"
+    colgroup_shared_active = "colgroup:" + shared + ".active"
+    colgroup_shared_shared = "colgroup:" + shared + ".shared"
+    colgroup_local = "colgroup:" + local
+
+    file_shared_default = "file:" + shared_default + ".wt"
+    tiered_shared_default = "tiered:" + shared_default
+    file_shared = "file:" + shared + ".wt"
+    tiered_shared = "tiered:" + shared
+    file_local = "file:" + local + ".wt"
+
+    log_enabled_false = "log=(enabled=false)"
+    log_enabled_true = "log=(enabled=true)"
 
     retention = 3
 
@@ -69,24 +89,44 @@ class test_tiered18(wttest.WiredTigerTestCase, TieredConfigMixin):
     def test_tiered_shared(self):
         self.pr("create tiered shared with default")
         base_create = 'key_format=S,value_format=S'
-        self.session.create(self.uri_non_shared, base_create)
-        self.check_metadata(self.uri_non_shared, 'key_format=S')
-        self.check_metadata("colgroup:test_tiered18_shared_default.active", 'file:test_tiered18_shared_default.wt')
-        self.check_metadata("colgroup:test_tiered18_shared_default.shared", 'tiered:test_tiered18_shared_default')
-        self.session.drop(self.uri_non_shared)
+        self.session.create(self.uri_shared_default, base_create)
+        self.check_metadata(self.uri_shared_default, 'key_format=S')
+        self.check_metadata(self.colgroup_shared_default_active, self.file_shared_default)
+        self.check_metadata(self.colgroup_shared_default_shared, self.tiered_shared_default)
+        self.check_metadata(self.file_shared_default, self.log_enabled_true)
+        self.check_metadata(self.tiered_shared_default, self.log_enabled_true)
+
+        # Alter the table and verify.
+        self.session.alter(self.uri_shared_default, self.log_enabled_false)
+        self.check_metadata(self.file_shared_default, self.log_enabled_false)
+        self.check_metadata(self.tiered_shared_default, self.log_enabled_false)
+        self.session.drop(self.uri_shared_default)
 
         self.pr("create non tiered/local")
         conf = ',tiered_storage=(name=none)'
         self.session.create(self.uri_local, base_create + conf)
         self.check_metadata(self.uri_local, 'name=none')
+        self.check_metadata(self.colgroup_local, self.file_local)
+        self.check_metadata(self.file_local, self.log_enabled_true)
+
+        # Alter the table and verify.
+        self.session.alter(self.uri_local, self.log_enabled_false)
+        self.check_metadata(self.file_local, self.log_enabled_false)
         self.session.drop(self.uri_local)
 
         self.pr("create tiered shared")
         conf = ',tiered_storage=(shared=true)'
         self.session.create(self.uri_shared, base_create + conf)
         self.check_metadata(self.uri_shared, 'key_format=S')
-        self.check_metadata("colgroup:test_tiered18_shared.active", 'file:test_tiered18_shared.wt')
-        self.check_metadata("colgroup:test_tiered18_shared.shared", 'tiered:test_tiered18_shared')
+        self.check_metadata(self.colgroup_shared_active, self.file_shared)
+        self.check_metadata(self.colgroup_shared_shared, self.tiered_shared)
+        self.check_metadata(self.file_shared, self.log_enabled_true)
+        self.check_metadata(self.tiered_shared, self.log_enabled_true)
+
+        # Alter the table and verify.
+        self.session.alter(self.uri_shared, self.log_enabled_false)
+        self.check_metadata(self.file_shared, self.log_enabled_false)
+        self.check_metadata(self.tiered_shared, self.log_enabled_false)
         self.session.drop(self.uri_shared)
 
         self.reopen_conn(config = self.saved_conn + ',tiered_storage=(shared=false)')
