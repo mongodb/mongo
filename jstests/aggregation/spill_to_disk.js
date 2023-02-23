@@ -10,6 +10,7 @@
 // @tags: [
 //   requires_collstats,
 //   requires_pipeline_optimization,
+//   requires_persistence,
 // ]
 (function() {
 'use strict';
