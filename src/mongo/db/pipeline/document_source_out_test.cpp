@@ -91,7 +91,7 @@ TEST_F(DocumentSourceOutTest, FailsToParseIncorrectType) {
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 16990);
 
     spec = BSON("$out" << BSONObj());
-    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 16994);
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 40414);
 }
 
 TEST_F(DocumentSourceOutTest, AcceptsStringArgument) {

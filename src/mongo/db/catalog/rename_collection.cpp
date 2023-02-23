@@ -805,7 +805,8 @@ void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
 
 void validateNamespacesForRenameCollection(OperationContext* opCtx,
                                            const NamespaceString& source,
-                                           const NamespaceString& target) {
+                                           const NamespaceString& target,
+                                           const RenameCollectionOptions& options) {
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid source namespace: " << source.ns(),
             source.isValid());
@@ -859,7 +860,7 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
 
     uassert(ErrorCodes::IllegalOperation,
             "Renaming system.buckets collections is not allowed",
-            !source.isTimeseriesBucketsCollection());
+            options.allowBuckets || !source.isTimeseriesBucketsCollection());
 }
 
 void validateAndRunRenameCollection(OperationContext* opCtx,
@@ -868,7 +869,7 @@ void validateAndRunRenameCollection(OperationContext* opCtx,
                                     const RenameCollectionOptions& options) {
     invariant(source != target, "Can't rename a collection to itself");
 
-    validateNamespacesForRenameCollection(opCtx, source, target);
+    validateNamespacesForRenameCollection(opCtx, source, target, options);
 
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
         opCtx);

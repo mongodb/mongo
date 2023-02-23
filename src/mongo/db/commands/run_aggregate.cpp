@@ -920,10 +920,13 @@ Status runAggregate(OperationContext* opCtx,
 
             // Set this operation's shard version for the underlying collection to unsharded.
             // This is prerequisite for future shard versioning checks.
-            ScopedSetShardRole scopedSetShardRole(opCtx,
-                                                  resolvedView.getNamespace(),
-                                                  ShardVersion::UNSHARDED() /* shardVersion */,
-                                                  boost::none /* databaseVersion */);
+            boost::optional<ScopedSetShardRole> scopeSetShardRole;
+            if (serverGlobalParams.clusterRole != ClusterRole::None) {
+                scopeSetShardRole.emplace(opCtx,
+                                          resolvedView.getNamespace(),
+                                          ShardVersion::UNSHARDED() /* shardVersion */,
+                                          boost::none /* databaseVersion */);
+            }
 
             uassert(std::move(resolvedView),
                     "Explain of a resolved view must be executed by mongos",

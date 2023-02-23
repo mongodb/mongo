@@ -176,6 +176,7 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     const NamespaceString& targetNs,
     bool dropTarget,
     bool stayTemp,
+    bool allowBuckets,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
     auto cachedDbInfo =

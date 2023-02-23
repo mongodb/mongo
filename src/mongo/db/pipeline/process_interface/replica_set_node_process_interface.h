@@ -84,6 +84,7 @@ public:
                                                  const NamespaceString& targetNs,
                                                  bool dropTarget,
                                                  bool stayTemp,
+                                                 bool allowBuckets,
                                                  const BSONObj& originalCollectionOptions,
                                                  const std::list<BSONObj>& originalIndexes);
     void createCollection(OperationContext* opCtx,
@@ -93,6 +94,16 @@ public:
     void createIndexesOnEmptyCollection(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         const std::vector<BSONObj>& indexSpecs);
+    void createTimeseries(OperationContext* opCtx,
+                          const NamespaceString& ns,
+                          const BSONObj& options,
+                          bool createView);
+
+    Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            const NamespaceString& ns,
+                            std::vector<BSONObj>&& objs,
+                            const WriteConcernOptions& wc,
+                            boost::optional<OID> targetEpoch);
 
 private:
     /**

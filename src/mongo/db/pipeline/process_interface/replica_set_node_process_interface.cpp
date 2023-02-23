@@ -124,12 +124,41 @@ void ReplicaSetNodeProcessInterface::createIndexesOnEmptyCollection(
     uassertStatusOK(_executeCommandOnPrimary(opCtx, ns, cmd.obj()));
 }
 
+void ReplicaSetNodeProcessInterface::createTimeseries(OperationContext* opCtx,
+                                                      const NamespaceString& ns,
+                                                      const BSONObj& options,
+                                                      bool createView) {
+    if (_canWriteLocally(opCtx, ns)) {
+        return NonShardServerProcessInterface::createTimeseries(opCtx, ns, options, createView);
+    } else {
+        // TODO SERVER-74061 remove uassert.
+        uasserted(7268706, "$out for time-series collections is not supported on secondaries.");
+    }
+}
+
+Status ReplicaSetNodeProcessInterface::insertTimeseries(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& ns,
+    std::vector<BSONObj>&& objs,
+    const WriteConcernOptions& wc,
+    boost::optional<OID> targetEpoch) {
+
+    if (_canWriteLocally(expCtx->opCtx, ns)) {
+        return NonShardServerProcessInterface::insertTimeseries(
+            expCtx, ns, std::move(objs), wc, targetEpoch);
+    } else {
+        // TODO SERVER-74061 remove uassert.
+        uasserted(7268707, "$out for time-series collections is not supported on secondaries.");
+    }
+}
+
 void ReplicaSetNodeProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     OperationContext* opCtx,
     const NamespaceString& sourceNs,
     const NamespaceString& targetNs,
     bool dropTarget,
     bool stayTemp,
+    bool allowBuckets,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
     if (_canWriteLocally(opCtx, targetNs)) {
@@ -139,6 +168,7 @@ void ReplicaSetNodeProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
             targetNs,
             dropTarget,
             stayTemp,
+            allowBuckets,
             originalCollectionOptions,
             originalIndexes);
     }
