@@ -281,3 +281,13 @@ env.AutoInstall(
     AIB_COMPONENTS_EXTRA=['dist', 'dist-test'],
     AIB_ROLE='base',
 )
+
+if env.TargetOSIs('darwin', 'macOS'):
+    env.AutoInstall(
+        target='$PREFIX',
+        source=[
+            env.File('#/etc/macos_mongodb.plist'),
+        ],
+        AIB_COMPONENT='common',
+        AIB_ROLE='base',
+    )
