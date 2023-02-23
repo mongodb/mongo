@@ -90,15 +90,16 @@ boost::optional<DefragmentationAction> AutoMergerPolicy::getNextStreamingAction(
 
     _checkInternalUpdatesWithLock(lk);
 
+    bool applyThrottling = false;
+
     if (_firstAction) {
         _firstAction = false;
+        applyThrottling = true;
         _collectionsToMergePerShard = _getNamespacesWithMergeableChunksPerShard(opCtx);
     }
 
     // Get next <shardId, collection> pair to merge
     for (auto it = _collectionsToMergePerShard.begin(); it != _collectionsToMergePerShard.end();) {
-
-        bool applyThrottling = false;
         auto& [shardId, collections] = *it;
         if (collections.empty()) {
             it = _collectionsToMergePerShard.erase(it);
