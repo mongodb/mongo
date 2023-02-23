@@ -61,7 +61,7 @@ StatusWith<size_t> getProperty(StringData propname) {
 }
 
 Status setProperty(StringData propname, size_t value) {
-    if (!RUNNING_ON_VALGRIND) {
+    if (!RUNNING_ON_VALGRIND) {  // NOLINT
         if (!MallocExtension::instance()->SetNumericProperty(propname.toString().c_str(), value)) {
             return {ErrorCodes::InternalError,
                     str::stream() << "Failed to set internal tcmalloc property " << propname};

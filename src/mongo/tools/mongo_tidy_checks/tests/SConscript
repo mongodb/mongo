@@ -26,6 +26,7 @@ if env.GetOption('ninja') == 'disabled':
     # by a clang tidy check. The issue should be isolated in as minimal way as possible.
     tests = [
         'test_MongoHeaderBracketCheck.cpp',
+        'test_MongoVolatileCheck.cpp',
         'test_MongoUninterruptibleLockGuardCheck.cpp',
         'test_MongoCctypeCheck.cpp',
         'test_MongoStdOptionalCheck.cpp',

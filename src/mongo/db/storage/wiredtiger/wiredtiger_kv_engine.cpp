@@ -737,7 +737,7 @@ void WiredTigerKVEngine::cleanShutdown() {
     bool leak_memory = !kAddressSanitizerEnabled;
     std::string closeConfig = "";
 
-    if (RUNNING_ON_VALGRIND) {
+    if (RUNNING_ON_VALGRIND) {  // NOLINT
         leak_memory = false;
     }
 

@@ -74,41 +74,41 @@ TEST(Decimal128Test, TestConstructor) {
         TEST_CTOR_COMMON_(vn, HIGH64, LOW64)      \
     }
 
-    TEST_CTOR(int8_t{0}, posHigh, 0);  // +0E+0
-    TEST_CTOR(Lim<int8_t>::lowest(), negHigh, uint64_t{1} << 7);
-    TEST_CTOR(Lim<int8_t>::max(), posHigh, (uint64_t{1} << 7) - 1);
-    TEST_CTOR(int8_t{5}, posHigh, 0x5);
+    TEST_CTOR(int8_t{0}, posHigh, 0);                                // NOLINT
+    TEST_CTOR(Lim<int8_t>::lowest(), negHigh, uint64_t{1} << 7);     // NOLINT
+    TEST_CTOR(Lim<int8_t>::max(), posHigh, (uint64_t{1} << 7) - 1);  // NOLINT
+    TEST_CTOR(int8_t{5}, posHigh, 0x5);                              // NOLINT
 
-    TEST_CTOR(uint8_t{0}, posHigh, 0);
-    TEST_CTOR(Lim<uint8_t>::max(), posHigh, (uint64_t{1} << 8) - 1);
-    TEST_CTOR(uint8_t{5}, posHigh, 0x5);
+    TEST_CTOR(uint8_t{0}, posHigh, 0);                                // NOLINT
+    TEST_CTOR(Lim<uint8_t>::max(), posHigh, (uint64_t{1} << 8) - 1);  // NOLINT
+    TEST_CTOR(uint8_t{5}, posHigh, 0x5);                              // NOLINT
 
-    TEST_CTOR(int16_t{0}, posHigh, 0);
-    TEST_CTOR(Lim<int16_t>::lowest(), negHigh, uint64_t{1} << 15);
-    TEST_CTOR(Lim<int16_t>::max(), posHigh, (uint64_t{1} << 15) - 1);
-    TEST_CTOR(int16_t{5}, posHigh, 0x5);
+    TEST_CTOR(int16_t{0}, posHigh, 0);                                 // NOLINT
+    TEST_CTOR(Lim<int16_t>::lowest(), negHigh, uint64_t{1} << 15);     // NOLINT
+    TEST_CTOR(Lim<int16_t>::max(), posHigh, (uint64_t{1} << 15) - 1);  // NOLINT
+    TEST_CTOR(int16_t{5}, posHigh, 0x5);                               // NOLINT
 
-    TEST_CTOR(uint16_t{0}, posHigh, 0);
-    TEST_CTOR(Lim<uint16_t>::max(), posHigh, (uint64_t{1} << 16) - 1);
-    TEST_CTOR(uint16_t{5}, posHigh, 0x5);
+    TEST_CTOR(uint16_t{0}, posHigh, 0);                                 // NOLINT
+    TEST_CTOR(Lim<uint16_t>::max(), posHigh, (uint64_t{1} << 16) - 1);  // NOLINT
+    TEST_CTOR(uint16_t{5}, posHigh, 0x5);                               // NOLINT
 
-    TEST_CTOR(int32_t{0}, posHigh, 0);
-    TEST_CTOR(Lim<int32_t>::lowest(), negHigh, uint64_t{1} << 31);
-    TEST_CTOR(Lim<int32_t>::max(), posHigh, (uint64_t{1} << 31) - 1);
-    TEST_CTOR(int32_t{5}, posHigh, 0x5);
+    TEST_CTOR(int32_t{0}, posHigh, 0);                                 // NOLINT
+    TEST_CTOR(Lim<int32_t>::lowest(), negHigh, uint64_t{1} << 31);     // NOLINT
+    TEST_CTOR(Lim<int32_t>::max(), posHigh, (uint64_t{1} << 31) - 1);  // NOLINT
+    TEST_CTOR(int32_t{5}, posHigh, 0x5);                               // NOLINT
 
-    TEST_CTOR(uint32_t{0}, posHigh, 0);
-    TEST_CTOR(Lim<uint32_t>::max(), posHigh, (uint64_t{1} << 32) - 1);
-    TEST_CTOR(uint32_t{5}, posHigh, 0x5);
+    TEST_CTOR(uint32_t{0}, posHigh, 0);                                 // NOLINT
+    TEST_CTOR(Lim<uint32_t>::max(), posHigh, (uint64_t{1} << 32) - 1);  // NOLINT
+    TEST_CTOR(uint32_t{5}, posHigh, 0x5);                               // NOLINT
 
-    TEST_CTOR(int64_t{0}, posHigh, 0);
-    TEST_CTOR(Lim<int64_t>::lowest(), negHigh, uint64_t{1} << 63);
-    TEST_CTOR(Lim<int64_t>::max(), posHigh, (uint64_t{1} << 63) - 1);
-    TEST_CTOR(int64_t{5}, posHigh, 0x5);
+    TEST_CTOR(int64_t{0}, posHigh, 0);                                 // NOLINT
+    TEST_CTOR(Lim<int64_t>::lowest(), negHigh, uint64_t{1} << 63);     // NOLINT
+    TEST_CTOR(Lim<int64_t>::max(), posHigh, (uint64_t{1} << 63) - 1);  // NOLINT
+    TEST_CTOR(int64_t{5}, posHigh, 0x5);                               // NOLINT
 
-    TEST_CTOR(uint64_t{0}, posHigh, 0);
-    TEST_CTOR(Lim<uint64_t>::max(), posHigh, Lim<uint64_t>::max());
-    TEST_CTOR(uint64_t{5}, posHigh, 0x5);
+    TEST_CTOR(uint64_t{0}, posHigh, 0);                              // NOLINT
+    TEST_CTOR(Lim<uint64_t>::max(), posHigh, Lim<uint64_t>::max());  // NOLINT
+    TEST_CTOR(uint64_t{5}, posHigh, 0x5);                            // NOLINT
 
 #undef TEST_CTOR_COMMON_
 #undef TEST_CTOR

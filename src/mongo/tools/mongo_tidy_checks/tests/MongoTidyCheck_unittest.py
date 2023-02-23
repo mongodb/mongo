@@ -72,7 +72,7 @@ class MongoTidyTests(unittest.TestCase):
                 'buildscripts/clang_tidy.py',
                 '--disable-reporting',
                 f'--check-module={self.TIDY_MODULE}',
-                f'--output-dir={os.path.join(os.path.dirname(compiledb), self._testMethodName + "_out")}',
+                f'--output-dir={os.path.join(os.path.dirname(self.compile_db), self._testMethodName + "_out")}',
                 f'--compile-commands={self.compile_db}',
             ]
         else:
@@ -147,6 +147,22 @@ class MongoTidyTests(unittest.TestCase):
             "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\nstd::optional<std::string> functionReturnTypeDeclTest(StringData name);",
             "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\nstd::optional<T> templateDeclTest;",
             "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\nusing std::optional;",
+        ]
+
+        self.run_clang_tidy()
+
+    def test_MongoVolatileCheck(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-volatile-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = [
+            "Illegal use of the volatile storage keyword, use AtomicWord instead from \"mongo/platform/atomic_word.h\" [mongo-volatile-check,-warnings-as-errors]\nvolatile int varVolatileTest;",
+            "Illegal use of the volatile storage keyword, use AtomicWord instead from \"mongo/platform/atomic_word.h\" [mongo-volatile-check,-warnings-as-errors]\n    volatile int fieldVolatileTest;",
+            "Illegal use of the volatile storage keyword, use AtomicWord instead from \"mongo/platform/atomic_word.h\" [mongo-volatile-check,-warnings-as-errors]\nvoid functionName(volatile int varVolatileTest) {}",
         ]
 
         self.run_clang_tidy()

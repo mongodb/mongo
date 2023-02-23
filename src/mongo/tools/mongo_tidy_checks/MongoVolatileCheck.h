@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,62 +26,23 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#include "mongo/platform/basic.h"
+#include <clang-tidy/ClangTidy.h>
+#include <clang-tidy/ClangTidyCheck.h>
 
-#include <benchmark/benchmark.h>
+namespace mongo::tidy {
 
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
+/**
+ * check for new instances of Volatile
+ * Overrides the default registerMatchers function to add matcher to match the
+ * use of volatile. overrides the default check function to flag the uses of volatile
+ */
+class MongoVolatileCheck : public clang::tidy::ClangTidyCheck {
+public:
+    MongoVolatileCheck(clang::StringRef Name, clang::tidy::ClangTidyContext* Context);
+    void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
+    void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
+};
 
-namespace mongo {
-
-void BM_stdNotifyOne(benchmark::State& state) {
-    std::condition_variable cv;  // NOLINT
-
-    for (auto _ : state) {
-        benchmark::ClobberMemory();
-        cv.notify_one();
-    }
-}
-
-void BM_stdxNotifyOneNoNotifyables(benchmark::State& state) {
-    stdx::condition_variable cv;
-
-    for (auto _ : state) {
-        benchmark::ClobberMemory();
-        cv.notify_one();
-    }
-}
-
-volatile bool alwaysTrue = true;  // NOLINT
-
-void BM_stdWaitWithTruePredicate(benchmark::State& state) {
-    std::condition_variable cv;  // NOLINT
-    stdx::mutex mutex;           // NOLINT
-    stdx::unique_lock<stdx::mutex> lk(mutex);
-
-    for (auto _ : state) {
-        benchmark::ClobberMemory();
-        cv.wait(lk, [&] { return alwaysTrue; });
-    }
-}
-
-void BM_stdxWaitWithTruePredicate(benchmark::State& state) {
-    stdx::condition_variable cv;
-    stdx::mutex mutex;  // NOLINT
-    stdx::unique_lock<stdx::mutex> lk(mutex);
-
-    for (auto _ : state) {
-        benchmark::ClobberMemory();
-        cv.wait(lk, [&] { return alwaysTrue; });
-    }
-}
-
-BENCHMARK(BM_stdNotifyOne);
-BENCHMARK(BM_stdWaitWithTruePredicate);
-BENCHMARK(BM_stdxNotifyOneNoNotifyables);
-BENCHMARK(BM_stdxWaitWithTruePredicate);
-
-}  // namespace mongo
+}  // namespace mongo::tidy

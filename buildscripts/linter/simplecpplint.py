@@ -54,7 +54,6 @@ _RE_LINT = re.compile("//.*NOLINT")
 _RE_COMMENT_STRIP = re.compile("//.*")
 
 _RE_PATTERN_MONGO_POLYFILL = _make_polyfill_regex()
-_RE_VOLATILE = re.compile('[^_]volatile')
 _RE_MUTEX = re.compile('(^|[ ({,])stdx?::mutex[ ({]')
 _RE_ASSERT = re.compile(r'\bassert\s*\(')
 _RE_UNSTRUCTURED_LOG = re.compile(r'\blogd\s*\(')
@@ -154,7 +153,6 @@ class Linter:
             if not self.clean_lines[linenum]:
                 continue
 
-            self._check_for_mongo_volatile(linenum)
             self._check_for_mongo_polyfill(linenum)
             self._check_for_mongo_atomic(linenum)
             self._check_for_mongo_mutex(linenum)
@@ -234,14 +232,6 @@ class Linter:
                         def_line = None
             if def_line is not None:
                 self._error(def_line, 'mongodb/undefmacro', f'Missing "#undef {macro}"')
-
-    def _check_for_mongo_volatile(self, linenum):
-        line = self.clean_lines[linenum]
-        if _RE_VOLATILE.search(line) and not "__asm__" in line:
-            self._error(
-                linenum, 'mongodb/volatile',
-                'Illegal use of the volatile storage keyword, use AtomicWord instead '
-                'from "mongo/platform/atomic_word.h"')
 
     def _check_for_mongo_polyfill(self, linenum):
         line = self.clean_lines[linenum]

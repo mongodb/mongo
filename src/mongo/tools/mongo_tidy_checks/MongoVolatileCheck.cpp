@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,61 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "MongoVolatileCheck.h"
 
-#include <benchmark/benchmark.h>
+namespace mongo::tidy {
 
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
+using namespace clang;
+using namespace clang::ast_matchers;
 
-namespace mongo {
+MongoVolatileCheck::MongoVolatileCheck(StringRef Name, clang::tidy::ClangTidyContext* Context)
+    : ClangTidyCheck(Name, Context) {}
 
-void BM_stdNotifyOne(benchmark::State& state) {
-    std::condition_variable cv;  // NOLINT
+void MongoVolatileCheck::registerMatchers(MatchFinder* Finder) {
 
-    for (auto _ : state) {
-        benchmark::ClobberMemory();
-        cv.notify_one();
+    // Matcher for finding all instances of variables volatile
+    Finder->addMatcher(varDecl(hasType(isVolatileQualified())).bind("var_volatile"), this);
+
+    // Matcher for finding all instances of field volatile
+    Finder->addMatcher(fieldDecl(hasType(isVolatileQualified())).bind("field_volatile"), this);
+}
+
+void MongoVolatileCheck::check(const MatchFinder::MatchResult& Result) {
+    const auto* var_match = Result.Nodes.getNodeAs<VarDecl>("var_volatile");
+    const auto* field_match = Result.Nodes.getNodeAs<FieldDecl>("field_volatile");
+
+    if (var_match) {
+        diag(var_match->getBeginLoc(),
+             "Illegal use of the volatile storage keyword, use AtomicWord instead from "
+             "\"mongo/platform/atomic_word.h\"");
+    }
+    if (field_match) {
+        diag(field_match->getBeginLoc(),
+             "Illegal use of the volatile storage keyword, use AtomicWord instead from "
+             "\"mongo/platform/atomic_word.h\"");
     }
 }
 
-void BM_stdxNotifyOneNoNotifyables(benchmark::State& state) {
-    stdx::condition_variable cv;
-
-    for (auto _ : state) {
-        benchmark::ClobberMemory();
-        cv.notify_one();
-    }
-}
-
-volatile bool alwaysTrue = true;  // NOLINT
-
-void BM_stdWaitWithTruePredicate(benchmark::State& state) {
-    std::condition_variable cv;  // NOLINT
-    stdx::mutex mutex;           // NOLINT
-    stdx::unique_lock<stdx::mutex> lk(mutex);
-
-    for (auto _ : state) {
-        benchmark::ClobberMemory();
-        cv.wait(lk, [&] { return alwaysTrue; });
-    }
-}
-
-void BM_stdxWaitWithTruePredicate(benchmark::State& state) {
-    stdx::condition_variable cv;
-    stdx::mutex mutex;  // NOLINT
-    stdx::unique_lock<stdx::mutex> lk(mutex);
-
-    for (auto _ : state) {
-        benchmark::ClobberMemory();
-        cv.wait(lk, [&] { return alwaysTrue; });
-    }
-}
-
-BENCHMARK(BM_stdNotifyOne);
-BENCHMARK(BM_stdWaitWithTruePredicate);
-BENCHMARK(BM_stdxNotifyOneNoNotifyables);
-BENCHMARK(BM_stdxWaitWithTruePredicate);
-
-}  // namespace mongo
+}  // namespace mongo::tidy

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,62 +26,12 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#include "mongo/platform/basic.h"
-
-#include <benchmark/benchmark.h>
-
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
-
 namespace mongo {
 
-void BM_stdNotifyOne(benchmark::State& state) {
-    std::condition_variable cv;  // NOLINT
-
-    for (auto _ : state) {
-        benchmark::ClobberMemory();
-        cv.notify_one();
-    }
-}
-
-void BM_stdxNotifyOneNoNotifyables(benchmark::State& state) {
-    stdx::condition_variable cv;
-
-    for (auto _ : state) {
-        benchmark::ClobberMemory();
-        cv.notify_one();
-    }
-}
-
-volatile bool alwaysTrue = true;  // NOLINT
-
-void BM_stdWaitWithTruePredicate(benchmark::State& state) {
-    std::condition_variable cv;  // NOLINT
-    stdx::mutex mutex;           // NOLINT
-    stdx::unique_lock<stdx::mutex> lk(mutex);
-
-    for (auto _ : state) {
-        benchmark::ClobberMemory();
-        cv.wait(lk, [&] { return alwaysTrue; });
-    }
-}
-
-void BM_stdxWaitWithTruePredicate(benchmark::State& state) {
-    stdx::condition_variable cv;
-    stdx::mutex mutex;  // NOLINT
-    stdx::unique_lock<stdx::mutex> lk(mutex);
-
-    for (auto _ : state) {
-        benchmark::ClobberMemory();
-        cv.wait(lk, [&] { return alwaysTrue; });
-    }
-}
-
-BENCHMARK(BM_stdNotifyOne);
-BENCHMARK(BM_stdWaitWithTruePredicate);
-BENCHMARK(BM_stdxNotifyOneNoNotifyables);
-BENCHMARK(BM_stdxWaitWithTruePredicate);
+volatile int varVolatileTest;
+class testClass {
+    volatile int fieldVolatileTest;
+};
+void functionName(volatile int varVolatileTest) {}
 
 }  // namespace mongo

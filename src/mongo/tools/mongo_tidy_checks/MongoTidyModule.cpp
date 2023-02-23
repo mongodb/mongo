@@ -31,6 +31,7 @@
 #include "MongoHeaderBracketCheck.h"
 #include "MongoStdOptionalCheck.h"
 #include "MongoUninterruptibleLockGuardCheck.h"
+#include "MongoVolatileCheck.h"
 
 #include <clang-tidy/ClangTidy.h>
 #include <clang-tidy/ClangTidyCheck.h>
@@ -48,6 +49,7 @@ public:
         CheckFactories.registerCheck<MongoHeaderBracketCheck>("mongo-header-bracket-check");
         CheckFactories.registerCheck<MongoCctypeCheck>("mongo-cctype-check");
         CheckFactories.registerCheck<MongoStdOptionalCheck>("mongo-std-optional-check");
+        CheckFactories.registerCheck<MongoVolatileCheck>("mongo-volatile-check");
     }
 };
 
@@ -59,6 +61,6 @@ static clang::tidy::ClangTidyModuleRegistry::Add<MongoTidyModule> X("mongo-tidy-
 
 // This anchor is used to force the linker to link in the generated object file
 // and thus register the MongoTidyModule.
-volatile int MongoTidyModuleAnchorSource = 0;
+volatile int MongoTidyModuleAnchorSource = 0;  // NOLINT
 
 }  // namespace mongo
