@@ -1738,7 +1738,9 @@ TEST(PipelineOptimizationTest, MatchShouldSplitOnUnwind) {
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
-TEST(PipelineOptimizationTest, MatchShouldNotOptimizeWithElemMatch) {
+// The 'a.b' path is a modified one by $unwind and $elemMatch is dependent on it and so we can't
+// swap $elemMatch in this case.
+TEST(PipelineOptimizationTest, MatchShouldNotOptimizeWithElemMatchOnModifiedPathByUnwind) {
     string inputPipe =
         "[{$unwind: {path: '$a.b'}}, "
         "{$match: {a: {$elemMatch: {b: {d: 1}}}}}]";
@@ -1747,6 +1749,51 @@ TEST(PipelineOptimizationTest, MatchShouldNotOptimizeWithElemMatch) {
         "{$match: {a: {$elemMatch: {b: {$eq : {d: 1}}}}}}]";
     string serializedPipe =
         "[{$unwind : {path : '$a.b'}}, {$match : {a : {$elemMatch : {b : {d : 1}}}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+// The 'a.b' path is a modified one by $project and $elemMatch is dependent on it and so we can't
+// swap $elemMatch in this case.
+TEST(PipelineOptimizationTest, MatchShouldNotOptimizeWithElemMatchOnModifiedPathByProject1) {
+    string inputPipe =
+        "[{$project: {x: '$a.b', _id: false}}, "
+        "{$match: {x: {$elemMatch: {d: 1}}}}]";
+    string outputPipe =
+        "[{$project: {x: '$a.b', _id: false}}, "
+        "{$match: {x: {$elemMatch: {d: {$eq: 1}}}}}]";
+    string serializedPipe =
+        "[{$project: {x: '$a.b', _id: false}}, "
+        "{$match: {x: {$elemMatch: {d: 1}}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+// The 'a.b' path is a modified one by $project and $elemMatch is dependent on it and so we can't
+// swap $elemMatch in this case.
+TEST(PipelineOptimizationTest, MatchShouldNotOptimizeWithElemMatchOnModifiedPathByProject2) {
+    string inputPipe =
+        "[{$project: {x: {y: '$a.b'}, _id: false}}, "
+        "{$match: {'x.y': {$elemMatch: {d: 1}}}}]";
+    string outputPipe =
+        "[{$project: {x: {y: '$a.b'}, _id: false}}, "
+        "{$match: {'x.y': {$elemMatch: {d: {$eq: 1}}}}}]";
+    string serializedPipe =
+        "[{$project: {x: {y: '$a.b'}, _id: false}}, "
+        "{$match: {'x.y': {$elemMatch: {d: 1}}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+// The 'a.b' path is a modified one by $project and $elemMatch is dependent on it and so we can't
+// swap $elemMatch in this case.
+TEST(PipelineOptimizationTest, MatchShouldNotOptimizeWithElemMatchOnModifiedPathByProject3) {
+    string inputPipe =
+        "[{$project: {x: {y: {z: '$a.b'}}, _id: false}}, "
+        "{$match: {'x.y.z': {$elemMatch: {d: 1}}}}]";
+    string outputPipe =
+        "[{$project: {x: {y: {z: '$a.b'}}, _id: false}}, "
+        "{$match: {'x.y.z': {$elemMatch: {d: {$eq: 1}}}}}]";
+    string serializedPipe =
+        "[{$project: {x: {y: {z: '$a.b'}}, _id: false}}, "
+        "{$match: {'x.y.z': {$elemMatch: {d: 1}}}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
@@ -2258,6 +2305,135 @@ TEST(PipelineOptimizationTest, MatchOnArrayFieldCanSplitAcrossRenameWithMapAndPr
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
+TEST(PipelineOptimizationTest,
+     MatchElemMatchValueOnArrayFieldCanSplitAcrossRenameWithMapAndProject) {
+    // The $project simply renames 'a.b' & 'a.c' to 'd.e' & 'd.f' and the $match with $elemMatch on
+    // the leaf value can be swapped with $project.
+    string inputPipe = R"(
+[
+    {
+        $project: {
+            d: {
+                $map: {input: '$a', as: 'iter', in : {e: '$$iter.b', f: '$$iter.c'}}
+            }
+        }
+    },
+    {$match: {"d.e": {$elemMatch: {$eq: 1}}, "d.f": {$elemMatch: {$eq: 1}}}}
+]
+        )";
+    string outputPipe = R"(
+[
+    {
+        $match: {$and: [{"a.b": {$elemMatch: {$eq: 1}}}, {"a.c": {$elemMatch: {$eq: 1}}}]}
+    },
+    {
+        $project: {
+            _id: true,
+            d: {
+                $map: {input: '$a', as: 'iter', in : {e: '$$iter.b', f: '$$iter.c'}}
+            }
+        }
+    }
+]
+        )";
+
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+// TODO SERVER-74298 The $match can be swapped with $project after renaming.
+TEST(PipelineOptimizationTest,
+     MatchElemMatchObjectOnArrayFieldCanNotSplitAcrossRenameWithMapAndProject) {
+    // The $project simply renames 'a.b' & 'a.c' to 'd.e' & 'd.f' but the dependency tracker reports
+    // the 'd' for $elemMatch as a modified dependency and so $match cannot be swapped with
+    // $project.
+    string inputPipe = R"(
+[
+    {
+        $project: {
+            d: {
+                $map: {input: '$a', as: 'iter', in : {e: '$$iter.b', f: '$$iter.c'}}
+            }
+        }
+    },
+    {$match: {d: {$elemMatch: {e: 1, f: 1}}}}
+]
+        )";
+    string outputPipe = R"(
+[
+    {
+        $project: {
+            _id: true,
+            d: {
+                $map: {input: "$a", as: "iter", in : {e: "$$iter.b", f: "$$iter.c"}}
+            }
+        }
+    },
+    {$match: {d: {$elemMatch: {$and: [{e: {$eq: 1}}, {f: {$eq: 1}}]}}}}
+]
+        )";
+    string serializedPipe = R"(
+[
+    {
+        $project: {
+            _id: true,
+            d: {
+                $map: {input: '$a', as: 'iter', in : {e: '$$iter.b', f: '$$iter.c'}}
+            }
+        }
+    },
+    {$match: {d: {$elemMatch: {e: 1, f: 1}}}}
+]
+        )";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+// TODO SERVER-74298 The $match can be swapped with $project after renaming.
+TEST(PipelineOptimizationTest, MatchEqObjectCanNotSplitAcrossRenameWithMapAndProject) {
+    // The $project simply renames 'a.b' & 'a.c' to 'd.e' & 'd.f' but the dependency tracker reports
+    // the 'd' for $eq as a modified dependency and so $match cannot be swapped with $project.
+    string inputPipe = R"(
+[
+    {
+        $project: {
+            d: {
+                $map: {input: '$a', as: 'i', in : {e: '$$i.b', f: '$$i.c'}}
+            }
+        }
+    },
+    {$match: {d: {$eq: {e: 1, f: 1}}}}
+]
+        )";
+    string outputPipe = R"(
+[
+    {
+        $project: {
+            _id: true,
+            d: {
+                $map: {input: "$a", as: "i", in : {e: "$$i.b", f: "$$i.c"}}
+            }
+        }
+    },
+    {$match: {d: {$eq: {e: 1, f: 1}}}}
+]
+        )";
+    string serializedPipe = R"(
+[
+    {
+        $project: {
+            _id: true,
+            d: {
+                $map: {input: '$a', as: 'i', in : {e: '$$i.b', f: '$$i.c'}}
+            }
+        }
+    },
+    {$match: {d: {$eq: {e: 1, f: 1}}}}
+]
+        )";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 TEST(PipelineOptimizationTest, MatchOnArrayFieldCanSplitAcrossRenameWithMapAndAddFields) {
     string inputPipe =
         "[{$addFields: {d: {$map: {input: '$a', as: 'iter', in: {e: '$$iter.b', f: {$add: "
@@ -2279,48 +2455,59 @@ TEST(PipelineOptimizationTest, MatchCannotSwapWithSortLimit) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, inputPipe);
 }
 
-// Descriptive test. The following internal match expression *could* participate in pipeline
-// optimizations, but it currently does not.
-TEST(PipelineOptimizationTest, MatchOnMinItemsShouldNotSwapSinceCategoryIsArrayMatching) {
+TEST(PipelineOptimizationTest, MatchOnMinItemsShouldSwapSinceCategoryIsArrayMatching) {
     string inputPipe =
         "[{$project: {_id: true, a: '$b'}}, "
         "{$match: {a: {$_internalSchemaMinItems: 1}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    string outputPipe =
+        "[{$match: {b: {$_internalSchemaMinItems: 1}}}, "
+        "{$project: {_id: true, a: '$b'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 
     inputPipe =
         "[{$project: {redacted: false, _id: true}}, "
         "{$match: {a: {$_internalSchemaMinItems: 1}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe =
+        "[{$match: {a: {$_internalSchemaMinItems: 1}}}, "
+        "{$project: {redacted: false, _id: true}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 
     inputPipe =
         "[{$addFields : {a : {$const: 1}}}, "
         "{$match: {b: {$_internalSchemaMinItems: 1}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe =
+        "[{$match: {b: {$_internalSchemaMinItems: 1}}}, "
+        "{$addFields : {a : {$const: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
-// Descriptive test. The following internal match expression *could* participate in pipeline
-// optimizations, but it currently does not.
-TEST(PipelineOptimizationTest, MatchOnMaxItemsShouldNotSwapSinceCategoryIsArrayMatching) {
+TEST(PipelineOptimizationTest, MatchOnMaxItemsShouldSwapSinceCategoryIsArrayMatching) {
     string inputPipe =
         "[{$project: {_id: true, a: '$b'}}, "
         "{$match: {a: {$_internalSchemaMaxItems: 1}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    string outputPipe =
+        "[{$match: {b: {$_internalSchemaMaxItems: 1}}}, "
+        "{$project: {_id: true, a: '$b'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 
     inputPipe =
         "[{$project: {redacted: false, _id: true}}, "
         "{$match: {a: {$_internalSchemaMaxItems: 1}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe =
+        "[{$match: {a: {$_internalSchemaMaxItems: 1}}}, "
+        "{$project: {redacted: false, _id: true}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 
     inputPipe =
         "[{$addFields : {a : {$const: 1}}}, "
         "{$match: {b: {$_internalSchemaMaxItems: 1}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe =
+        "[{$match: {b: {$_internalSchemaMaxItems: 1}}}, "
+        "{$addFields : {a : {$const: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
-// Descriptive test. The following internal match expression *could* participate in pipeline
-// optimizations, but it currently does not.
-TEST(PipelineOptimizationTest,
-     MatchOnAllElemMatchFromIndexShouldNotSwapSinceCategoryIsArrayMatching) {
+TEST(PipelineOptimizationTest, MatchOnAllElemMatchFromIndexShouldNotSwapBecauseOfNamePlaceHolder) {
     string inputPipe =
         "[{$project: {_id: true, a: '$b'}}, "
         "{$match: {a: {$_internalSchemaAllElemMatchFromIndex: [1, {b: {$gt: 0}}]}}}]";
@@ -2329,17 +2516,21 @@ TEST(PipelineOptimizationTest,
     inputPipe =
         "[{$project: {redacted: false, _id: true}}, "
         "{$match: {a: {$_internalSchemaAllElemMatchFromIndex: [1, {b: {$gt: 0}}]}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    string outputPipe =
+        "[{$match: {a: {$_internalSchemaAllElemMatchFromIndex: [1, {b: {$gt: 0}}]}}}, "
+        "{$project: {redacted: false, _id: true}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 
     inputPipe =
         "[{$addFields : {a : {$const: 1}}}, "
-        "{$match: {a: {$_internalSchemaAllElemMatchFromIndex: [1, {b: {$gt: 0}}]}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+        "{$match: {b: {$_internalSchemaAllElemMatchFromIndex: [1, {b: {$gt: 0}}]}}}]";
+    outputPipe =
+        "[{$match: {b: {$_internalSchemaAllElemMatchFromIndex: [1, {b: {$gt: 0}}]}}}, "
+        "{$addFields : {a : {$const: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
-// Descriptive test. The following internal match expression *could* participate in pipeline
-// optimizations, but it currently does not.
-TEST(PipelineOptimizationTest, MatchOnArrayIndexShouldNotSwapSinceCategoryIsArrayMatching) {
+TEST(PipelineOptimizationTest, MatchOnArrayIndexShouldNotSwapBecauseOfNamePlaceHolder) {
     string inputPipe = R"(
         [{$project: {_id: true, a: '$b'}},
         {$match: {a: {$_internalSchemaMatchArrayIndex:
@@ -2350,32 +2541,47 @@ TEST(PipelineOptimizationTest, MatchOnArrayIndexShouldNotSwapSinceCategoryIsArra
         [{$project: {redacted: false, _id: true}},
         {$match: {a: {$_internalSchemaMatchArrayIndex:
            {index: 0, namePlaceholder: 'i', expression: {i: {$lt: 0}}}}}}])";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    string outputPipe = R"(
+        [{$match: {a: {$_internalSchemaMatchArrayIndex:
+           {index: 0, namePlaceholder: 'i', expression: {i: {$lt: 0}}}}}},
+        {$project: {redacted: false, _id: true}}])";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 
     inputPipe = R"(
         [{$addFields : {a : {$const: 1}}},
-        {$match: {a: {$_internalSchemaMatchArrayIndex:
+        {$match: {b: {$_internalSchemaMatchArrayIndex:
            {index: 0, namePlaceholder: 'i', expression: {i: {$lt: 0}}}}}}])";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe = R"(
+        [{$match: {b: {$_internalSchemaMatchArrayIndex:
+           {index: 0, namePlaceholder: 'i', expression: {i: {$lt: 0}}}}}},
+        {$addFields : {a : {$const: 1}}}])";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
-// Descriptive test. The following internal match expression *could* participate in pipeline
-// optimizations, but it currently does not.
-TEST(PipelineOptimizationTest, MatchOnUniqueItemsShouldNotSwapSinceCategoryIsArrayMatching) {
+TEST(PipelineOptimizationTest, MatchOnUniqueItemsShouldSwapSinceCategoryIsArrayMatching) {
     string inputPipe =
         "[{$project: {_id: true, a: '$b'}}, "
         "{$match: {a: {$_internalSchemaUniqueItems: true}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    string outputPipe =
+        "[{$match: {b: {$_internalSchemaUniqueItems: true}}}, "
+        "{$project: {_id: true, a: '$b'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 
     inputPipe =
         "[{$project: {redacted: false, _id: true}}, "
         "{$match: {a: {$_internalSchemaUniqueItems: true}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe =
+        "[{$match: {a: {$_internalSchemaUniqueItems: true}}}, "
+        "{$project: {redacted: false, _id: true}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 
     inputPipe =
         "[{$addFields : {a : {$const: 1}}}, "
-        "{$match: {a: {$_internalSchemaUniqueItems: true}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+        "{$match: {b: {$_internalSchemaUniqueItems: true}}}]";
+    outputPipe =
+        "[{$match: {b: {$_internalSchemaUniqueItems: true}}}, "
+        "{$addFields : {a : {$const: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
 // Descriptive test. The following internal match expression *could* participate in pipeline

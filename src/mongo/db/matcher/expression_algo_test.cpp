@@ -830,7 +830,7 @@ TEST(IsIndependent, AndIsIndependentOnlyIfChildrenAre) {
     ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"c"}));
 }
 
-TEST(IsIndependent, ElemMatchIsNotIndependent) {
+TEST(IsIndependent, ElemMatchIsIndependent) {
     BSONObj matchPredicate = fromjson("{x: {$elemMatch: {y: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression status =
@@ -840,7 +840,7 @@ TEST(IsIndependent, ElemMatchIsNotIndependent) {
     unique_ptr<MatchExpression> expr = std::move(status.getValue());
     ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"x"}));
     ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"x.y"}));
-    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"y"}));
+    ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"y"}));
 }
 
 TEST(IsIndependent, NorIsIndependentOnlyIfChildrenAre) {
@@ -909,13 +909,9 @@ TEST(IsIndependent, BallIsIndependentOfBalloon) {
 TEST(IsIndependent, NonRenameableExpressionIsNotIndependent) {
     std::vector<std::string> stringExpressions = {
         // Category: kOther.
-        "{$or: [{a: {$size: 3}}, {b: {$size: 4}}]}",
-        // Category: kArrayMatching.
-        "{$or: [{a: {$_internalSchemaMaxItems: 3}}, {b: {$_internalSchemaMaxItems: 4}}]}",
-        "{$or: [{a: {$_internalSchemaMinItems: 3}}, {b: {$_internalSchemaMinItems: 4}}]}",
         "{$or: [{a: {$_internalSchemaObjectMatch: {b: 1}}},"
         "       {a: {$_internalSchemaObjectMatch: {b: 2}}}]}",
-        "{$or: [{a: {$elemMatch: {b: 3}}}, {a: {$elemMatch: {b: 4}}}]}"};
+    };
 
     for (const auto& str : stringExpressions) {
         BSONObj matchPredicate = fromjson(str);
@@ -1176,36 +1172,200 @@ TEST(SplitMatchExpression,
     ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(), fromjson("{a: {$eq: 1}}"));
 }
 
-TEST(SplitMatchExpression, ShouldNotMoveElemMatchObjectAcrossRename) {
+TEST(SplitMatchExpression, ShouldMoveElemMatchObjectAcrossRename) {
     BSONObj matchPredicate = fromjson("{a: {$elemMatch: {b: 3}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "c"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    auto [splitOutExpr, residualExpr] =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
-    ASSERT_FALSE(splitExpr.first.get());
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson("{c: {$elemMatch: {b: {$eq: 3}}}}"));
 
-    ASSERT_TRUE(splitExpr.second.get());
-    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(), fromjson("{a: {$elemMatch: {b: {$eq: 3}}}}"));
+    ASSERT_FALSE(residualExpr.get());
 }
 
-TEST(SplitMatchExpression, ShouldNotMoveElemMatchValueAcrossRename) {
+TEST(SplitMatchExpression, ShouldNotMoveDependentElemMatchObjectAcrossRename) {
+    auto matchPredicateDependentFieldAndExpected = {
+        // Assumes that this match expression follows {$project: {x: "$a.b"}} and the path 'x' is a
+        // modified one.
+        std::make_tuple(fromjson(R"({"x": {$elemMatch: {c: 3}}})"),
+                        "x"s,
+                        fromjson(R"({"x": {$elemMatch: {c: {$eq: 3}}}})")),
+        // Assumes that this match expression follows {$project: {x: {y: {"$a.b"}}}} and the path
+        // 'x.y' is a modified one.
+        std::make_tuple(fromjson(R"({"x.y": {$elemMatch: {c: 3}}})"),
+                        "x.y"s,
+                        fromjson(R"({"x.y": {$elemMatch: {c: {$eq: 3}}}})")),
+        // Assumes that this match expression follows {$project: {x: {y: {z: {"$a.b"}}}}} and the
+        // path 'x.y.z' is a modified one.
+        std::make_tuple(fromjson(R"({"x.y.z": {$elemMatch: {c: 3}}})"),
+                        "x.y.z"s,
+                        fromjson(R"({"x.y.z": {$elemMatch: {c: {$eq: 3}}}})")),
+    };
+
+    for (const auto& [matchPredicate, field, expected] : matchPredicateDependentFieldAndExpected) {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        // The 'x' is a modified path by $project and the match expression is dependent on 'x' and
+        // not splittable.
+        auto [splitOutExpr, residualExpr] =
+            expression::splitMatchExpressionBy(std::move(matcher.getValue()), {field}, {});
+
+        ASSERT_FALSE(splitOutExpr.get());
+
+        ASSERT_TRUE(residualExpr.get());
+        ASSERT_BSONOBJ_EQ(residualExpr->serialize(), expected);
+    }
+}
+
+TEST(SplitMatchExpression, ShouldNotMoveElemMatchObjectOnModifiedDependencyAcrossRename) {
+    // Assumes that this match expression follows {$project: {x: {$map: {input: "$a", as:
+    // "iter", in: {y: "$$iter.b"}}}}}
+    auto matchPredicate = fromjson(R"({"x": {$elemMatch: {y: 3}}})");
+    auto expected = fromjson(R"({"x": {$elemMatch: {y: {$eq: 3}}}})");
+
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    // The 'x' is a modified dependency by $project and the match expression is dependent on 'x' and
+    // not splittable.
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        std::move(matcher.getValue()), {"x"s}, {{"x.y"s, "a.b"s}});
+
+    ASSERT_FALSE(splitOutExpr.get());
+
+    ASSERT_TRUE(residualExpr.get());
+    ASSERT_BSONOBJ_EQ(residualExpr->serialize(), expected);
+}
+
+TEST(SplitMatchExpression, ShouldNotMoveEqAcrossAttemptedButFailedRename) {
+    // Assumes that this match expression follows {$project: {x: {$map: {input: "$a", as: "i", in:
+    // {y: "$$i.b"}}}}}
+    auto matchPredicate = fromjson(R"({x: {y: 3}})");
+    auto expected = fromjson(R"({x: {$eq: {y: 3}}})");
+
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    // Here empty 'fields' means that the previous stage is a simple rename. Due to the limitation
+    // of the current renaming algorithm, 'x' and 'y' are not renamed into 'a' and 'b' respectively
+    // which is classified as "attempted but failed to" rename. In such a case,
+    // splitMatchExpressionBy() returns the original match expression as 'residualExpr'.
+    //
+    // TODO SERVER-74298 Implement renaming by each path component for sub-classes of
+    // PathMatchExpression so that such match expressions can be split out.
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        std::move(matcher.getValue()), /*fields*/ {}, /*renames*/ {{"x.y"s, "a.b"s}});
+
+    ASSERT_FALSE(splitOutExpr.get())
+        << splitOutExpr->serialize()
+        << ", residual: " << (residualExpr ? residualExpr->serialize().toString() : "nullptr"s);
+
+    ASSERT_TRUE(residualExpr.get());
+    ASSERT_BSONOBJ_EQ(residualExpr->serialize(), expected);
+}
+
+TEST(SplitMatchExpression, ShouldNotMoveElemMatchObjectAcrossAttemptedButFailedRename) {
+    // Assumes that this match expression follows {$project: {x: {$map: {input: "$a", as: "i", in:
+    // {y: "$$i.b"}}}}} which is a simple rename.
+    auto matchPredicate = fromjson(R"({"x": {$elemMatch: {y: 3}}})");
+    auto expected = fromjson(R"({"x": {$elemMatch: {y: {$eq: 3}}}})");
+
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    // Here empty 'fields' means that the previous stage is a simple rename. Due to the limitation
+    // of the current renaming algorithm, 'x' and 'y' are not renamed into 'a' and 'b' respectively
+    // which is classified as "attempted but failed to" rename. In such a case,
+    // splitMatchExpressionBy() returns the original match expression as 'residualExpr'.
+    //
+    // TODO SERVER-74298 Implement renaming by each path component for sub-classes of
+    // PathMatchExpression so that such match expressions can be split out.
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        std::move(matcher.getValue()), /*fields*/ {}, /*renames*/ {{"x.y"s, "a.b"s}});
+
+    ASSERT_FALSE(splitOutExpr.get())
+        << splitOutExpr->serialize()
+        << ", residual: " << (residualExpr ? residualExpr->serialize().toString() : "nullptr"s);
+
+    ASSERT_TRUE(residualExpr.get());
+    ASSERT_BSONOBJ_EQ(residualExpr->serialize(), expected);
+}
+
+TEST(SplitMatchExpression, ShouldMoveElemMatchObjectOnRenamedPathForDottedPathAcrossRename) {
+    auto matchPredicateRenameAndExpected = {
+        // Assumes that this match expression follows {$project: {a: "$x"}}} which is a simple
+        // rename.
+        std::make_tuple(fromjson(R"({"a.b": {$elemMatch: {c: 3}}})"),
+                        std::make_pair("a"s, "x"s),
+                        fromjson(R"({"x.b": {$elemMatch: {c: {$eq: 3}}}})")),
+        // Assumes that this match expression follows {$project: {a: {b: {"$x"}}}} which is a simple
+        // rename.
+        std::make_tuple(fromjson(R"({"a.b": {$elemMatch: {c: 3}}})"),
+                        std::make_pair("a.b"s, "x"s),
+                        fromjson(R"({"x": {$elemMatch: {c: {$eq: 3}}}})")),
+        // Assumes that this match expression follows {$project: {a: {b: {c: {"$x"}}}}} which is a
+        // simple rename.
+        std::make_tuple(fromjson(R"({"a.b.c": {$elemMatch: {d: 3}}})"),
+                        std::make_pair("a.b.c"s, "x"s),
+                        fromjson(R"({"x": {$elemMatch: {d: {$eq: 3}}}})")),
+    };
+
+    for (const auto& [matchPredicate, rename, expected] : matchPredicateRenameAndExpected) {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        StringMap<std::string> renames{rename};
+        auto [splitOutExpr, residualExpr] =
+            expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+        ASSERT_TRUE(splitOutExpr.get());
+        ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), expected);
+
+        ASSERT_FALSE(residualExpr.get());
+    }
+}
+
+TEST(SplitMatchExpression, ShouldMoveElemMatchValueAcrossRename) {
     BSONObj matchPredicate = fromjson("{a: {$elemMatch: {$eq: 3}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "c"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    auto [splitOutExpr, residualExpr] =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
-    ASSERT_FALSE(splitExpr.first.get());
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson("{c: {$elemMatch: {$eq: 3}}}"));
 
-    ASSERT_TRUE(splitExpr.second.get());
-    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(), fromjson("{a: {$elemMatch: {$eq: 3}}}"));
+    ASSERT_FALSE(residualExpr.get());
+}
+
+TEST(SplitMatchExpression, ShouldMoveElemMatchValueForDottedPathAcrossRename) {
+    BSONObj matchPredicate = fromjson(R"({"a.b": {$elemMatch: {$eq: 3}}})");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "c"}};
+    auto [splitOutExpr, residualExpr] =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson(R"({"c.b": {$elemMatch: {$eq: 3}}})"));
+
+    ASSERT_FALSE(residualExpr.get());
 }
 
 TEST(SplitMatchExpression, ShouldMoveTypeAcrossRename) {
@@ -1223,57 +1383,74 @@ TEST(SplitMatchExpression, ShouldMoveTypeAcrossRename) {
     ASSERT_FALSE(splitExpr.second.get());
 }
 
-TEST(SplitMatchExpression, ShouldNotMoveSizeAcrossRename) {
+TEST(SplitMatchExpression, ShouldMoveSizeAcrossRename) {
     BSONObj matchPredicate = fromjson("{a: {$size: 3}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "c"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    auto [splitOutExpr, residualExpr] =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
-    ASSERT_FALSE(splitExpr.first.get());
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson("{c: {$size: 3}}"));
 
-    ASSERT_TRUE(splitExpr.second.get());
-    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(), fromjson("{a: {$size: 3}}"));
+    ASSERT_FALSE(residualExpr.get());
 }
 
-TEST(SplitMatchExpression, ShouldNotMoveMinItemsAcrossRename) {
+TEST(SplitMatchExpression, ShouldNotMoveDependentSizeAcrossRename) {
+    // Assumes that this match expression follows {$project: {x: "$a.b"}}.
+    BSONObj matchPredicate = fromjson("{x: {$size: 3}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"x", "a.b"}};
+    // The 'x' is a modified path by $project and the match expression is dependent on 'x' and not
+    // splittable.
+    auto [splitOutExpr, residualExpr] =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {"x"}, renames);
+
+    ASSERT_FALSE(splitOutExpr.get());
+
+    ASSERT_TRUE(residualExpr.get());
+    ASSERT_BSONOBJ_EQ(residualExpr->serialize(), fromjson("{x: {$size: 3}}"));
+}
+
+TEST(SplitMatchExpression, ShouldMoveMinItemsAcrossRename) {
     BSONObj matchPredicate = fromjson("{a: {$_internalSchemaMinItems: 3}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "c"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    auto [splitOutExpr, residualExpr] =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
-    ASSERT_FALSE(splitExpr.first.get());
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson("{c: {$_internalSchemaMinItems: 3}}"));
 
-    ASSERT_TRUE(splitExpr.second.get());
-    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(),
-                      fromjson("{a: {$_internalSchemaMinItems: 3}}"));
+    ASSERT_FALSE(residualExpr.get());
 }
 
-TEST(SplitMatchExpression, ShouldNotMoveMaxItemsAcrossRename) {
+TEST(SplitMatchExpression, ShouldMoveMaxItemsAcrossRename) {
     BSONObj matchPredicate = fromjson("{a: {$_internalSchemaMaxItems: 3}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "c"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    auto [splitOutExpr, residualExpr] =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
-    ASSERT_FALSE(splitExpr.first.get());
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson("{c: {$_internalSchemaMaxItems: 3}}"));
 
-    ASSERT_TRUE(splitExpr.second.get());
-    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(),
-                      fromjson("{a: {$_internalSchemaMaxItems: 3}}"));
+    ASSERT_FALSE(residualExpr.get());
 }
 
-TEST(SplitMatchExpression, ShouldNotMoveMaxItemsInLogicalExpressionAcrossRename) {
+TEST(SplitMatchExpression, ShouldMoveMaxItemsInLogicalExpressionAcrossRename) {
     BSONObj matchPredicate = fromjson(
         "{$or: [{a: {$_internalSchemaMaxItems: 3}},"
         "       {a: {$_internalSchemaMaxItems: 4}}]}");
@@ -1282,15 +1459,15 @@ TEST(SplitMatchExpression, ShouldNotMoveMaxItemsInLogicalExpressionAcrossRename)
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "c"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    auto [splitOutExpr, residualExpr] =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
-    ASSERT_FALSE(splitExpr.first.get());
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(),
+                      fromjson("{$or: [{c: {$_internalSchemaMaxItems: 3}},"
+                               "       {c: {$_internalSchemaMaxItems: 4}}]}"));
 
-    ASSERT_TRUE(splitExpr.second.get());
-    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(),
-                      fromjson("{$or: [{a: {$_internalSchemaMaxItems: 3}},"
-                               "       {a: {$_internalSchemaMaxItems: 4}}]}"));
+    ASSERT_FALSE(residualExpr.get());
 }
 
 TEST(SplitMatchExpression, ShouldNotMoveInternalSchemaObjectMatchInLogicalExpressionAcrossRename) {
@@ -1655,6 +1832,81 @@ TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaPatternByIsOnlyDepen
     // 'splitOutExpr' must be same as the expression after renaming 'a' to 'meta'.
     expression::applyRenamesToExpression(originalExprCopy.get(), {{"a", "meta"}});
     ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), originalExprCopy->serialize());
+
+    ASSERT_FALSE(residualExpr.get());
+}
+
+// Verifies that $jsonSchema 'uniqueItems' is supported by splitMatchExpressionBy().
+TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaUniqueItemsByIsOnlyDependentOn) {
+    ParsedMatchExpressionForTest matcher("{$jsonSchema: {properties: {a: {uniqueItems: true}}}}");
+
+    // $jsonSchema expression will be split out by the meta field "a" and the meta field "a" will be
+    // renamed to "meta".
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        matcher.release(), {"a"}, {{"a", "meta"}}, expression::isOnlyDependentOn);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson(R"(
+{
+    $and: [{
+        $and: [{
+            $or: [
+                {meta: {$not: {$exists: true}}},
+                {
+                    $and: [{
+                        $or: [
+                            {meta: {$not: {$_internalSchemaType: [4]}}},
+                            {meta: {$_internalSchemaUniqueItems: true}}
+                        ]
+                    }]
+                }
+            ]
+        }]
+    }]
+}
+        )"));
+
+    ASSERT_FALSE(residualExpr.get());
+}
+
+// Verifies that $jsonSchema 'minItems' and 'maxItems' is supported by splitMatchExpressionBy().
+TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaMinMaxItemsByIsOnlyDependentOn) {
+    ParsedMatchExpressionForTest matcher(
+        "{$jsonSchema: {properties: {a: {minItems: 1, maxItems: 10}}}}");
+
+    // $jsonSchema expression will be split out by the meta field "a" and the meta field "a" will be
+    // renamed to "meta".
+    auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+        matcher.release(), {"a"}, {{"a", "meta"}}, expression::isOnlyDependentOn);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson(R"(
+{
+    $and: [{
+        $and: [{
+            $or: [
+                {meta: {$not: {$exists: true}}},
+                {
+                    $and: [
+                        {
+                            $or: [
+                                {meta: {$not: {$_internalSchemaType: [4]}}},
+                                {meta: {$_internalSchemaMinItems: 1}}
+                            ]
+                        },
+                        {
+                            $or: [
+                                {meta: {$not: {$_internalSchemaType: [4]}}},
+                                {meta: {$_internalSchemaMaxItems: 10}}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }]
+    }]
+}
+        )"));
 
     ASSERT_FALSE(residualExpr.get());
 }

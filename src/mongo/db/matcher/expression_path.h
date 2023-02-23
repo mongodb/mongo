@@ -104,10 +104,19 @@ public:
      * path. Each pair in 'renameList' specifies a path prefix that should be renamed (as the first
      * element) and the path components that should replace the renamed prefix (as the second
      * element).
+     *
+     * Returns whether there is any attempted but failed to rename. This case can happen when any
+     * renamed path component is part of sub-fields. For example, expr = {x: {$eq: {y: 3}}} and
+     * renames = {{"x.y", "a.b"}}. We should be able to rename 'x' and 'y' to 'a' and 'b'
+     * respectively but due to the current limitation of the algorithm, we cannot rename such match
+     * expressions.
+     *
+     * TODO SERVER-74298 As soon as we implement SERVER-74298, the return value might not be
+     * necessary any more.
      */
-    void applyRename(const StringMap<std::string>& renameList) {
+    bool applyRename(const StringMap<std::string>& renameList) {
         if (!_elementPath) {
-            return;
+            return false;
         }
 
         size_t renamesFound = 0u;
@@ -131,6 +140,10 @@ public:
                 rewrittenPath = str::stream() << rename.second << "." << pathTail.toString();
 
                 ++renamesFound;
+            } else if (pathFieldRef.isPrefixOf(prefixToRename)) {
+                // TODO SERVER-74298 Implement renaming by each path component instead of
+                // incrementing 'attemptedButFailedRenames'.
+                return true;
             }
         }
 
@@ -141,6 +154,8 @@ public:
             // name.
             setPath(rewrittenPath);
         }
+
+        return false;
     }
 
     void serialize(BSONObjBuilder* out, SerializationOptions opts) const override {

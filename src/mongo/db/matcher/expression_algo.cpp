@@ -778,8 +778,7 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
 bool hasOnlyRenameableMatchExpressionChildren(const MatchExpression& expr) {
     if (expr.matchType() == MatchExpression::MatchType::EXPRESSION) {
         return true;
-    } else if (expr.getCategory() == MatchExpression::MatchCategory::kArrayMatching ||
-               expr.getCategory() == MatchExpression::MatchCategory::kOther) {
+    } else if (expr.getCategory() == MatchExpression::MatchCategory::kOther) {
         return false;
     } else if (expr.getCategory() == MatchExpression::MatchCategory::kLogical) {
         for (size_t i = 0; i < expr.numChildren(); i++) {
@@ -901,33 +900,52 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
     const OrderedPathSet& fields,
     const StringMap<std::string>& renames,
     ShouldSplitExprFunc func /*= isIndependentOf */) {
-    auto splitExpr = splitMatchExpressionByFunction(std::move(expr), fields, func);
+    auto splitExpr = splitMatchExpressionByFunction(expr->shallowClone(), fields, func);
     if (splitExpr.first) {
-        applyRenamesToExpression(splitExpr.first.get(), renames);
+        // If we get attemptedButFailedRenames == true, then it means we could not apply renames
+        // though there's sub-path match. In such a case, returns the original expression as the
+        // residual expression so that the match is not mistakenly swapped with the previous stage.
+        // Otherwise, the unrenamed $match would be swapped with the previous stage.
+        //
+        // TODO SERVER-74298 Remove if clause and just call applyRenamesToExpression().
+        if (auto attemptedButFailedRenames =
+                applyRenamesToExpression(splitExpr.first.get(), renames);
+            attemptedButFailedRenames) {
+            return {nullptr, std::move(expr)};
+        }
     }
     return splitExpr;
 }
 
-void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames) {
+// TODO SERVER-74298 Remove the return value.
+// As soon as we find the first attempted but failed rename, we cancel the match expression tree
+// traversal because the caller would return the original match expression.
+bool applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames) {
     if (expr->matchType() == MatchExpression::MatchType::EXPRESSION) {
         ExprMatchExpression* exprExpr = checked_cast<ExprMatchExpression*>(expr);
         exprExpr->applyRename(renames);
-        return;
+        return false;
+    }
+
+    if (expr->getCategory() == MatchExpression::MatchCategory::kOther) {
+        return false;
     }
 
     if (expr->getCategory() == MatchExpression::MatchCategory::kArrayMatching ||
-        expr->getCategory() == MatchExpression::MatchCategory::kOther) {
-        return;
-    }
-
-    if (expr->getCategory() == MatchExpression::MatchCategory::kLeaf) {
-        LeafMatchExpression* leafExpr = checked_cast<LeafMatchExpression*>(expr);
-        leafExpr->applyRename(renames);
+        expr->getCategory() == MatchExpression::MatchCategory::kLeaf) {
+        auto* pathExpr = checked_cast<PathMatchExpression*>(expr);
+        if (pathExpr->applyRename(renames)) {
+            return true;
+        }
     }
 
     for (size_t i = 0; i < expr->numChildren(); ++i) {
-        applyRenamesToExpression(expr->getChild(i), renames);
+        if (applyRenamesToExpression(expr->getChild(i), renames)) {
+            return true;
+        }
     }
+
+    return false;
 }
 
 void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path) {

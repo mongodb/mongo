@@ -161,19 +161,26 @@ using ShouldSplitExprFunc = std::function<bool(const MatchExpression&, const Ord
 /**
  * Attempt to split 'expr' into two MatchExpressions according to 'func'. 'func' describes the
  * conditions under which its argument can be split from 'expr'. Returns two pointers, where each
- * new MatchExpression contains a portion of 'expr'. The first contains the parts of 'expr' which
- * satisfy 'func', and the second are the remaining parts of 'expr', such that applying the matches
- * in sequence is equivalent to applying 'expr'. If 'expr' cannot be split, returns {nullptr, expr}.
- * If 'expr' can be entirely split, returns {expr, nullptr}. Takes ownership of 'expr'.
+ * new MatchExpression contains a portion of 'expr'. The first (split out expression) contains the
+ * parts of 'expr' which satisfy 'func', and the second (residual expression) are the remaining
+ * parts of 'expr', such that applying the matches in sequence is equivalent to applying 'expr'. If
+ * 'expr' cannot be split, returns {nullptr, expr}. If 'expr' can be entirely split, returns {expr,
+ * nullptr}. Takes ownership of 'expr'.
  *
- * For example, the default behavior is to split 'match' into two where the first is not reliant
- * upon any path from 'fields', and the second is the remainder.
+ * For example, the default behavior is to split 'expr' into two where the split out expression is
+ * not reliant upon any path from 'fields', and the residual expression is the remainder.
  *
- * Any paths which should be renamed are encoded in 'renames', which maps from path names in 'expr'
- * to the new values of those paths. If the return value is {exprLeft, exprRight} or {exprLeft,
- * nullptr}, exprLeft will reflect the path renames. For example, suppose the original match
- * expression is {old: {$gt: 3}} and 'renames' contains the mapping "old" => "new". The returned
- * exprLeft value will be {new: {$gt: 3}}, provided that "old" is not in 'fields'.
+ * Any paths which might be renamed are encoded in 'renames', which maps from path names in 'expr'
+ * to the new values of those paths. If the return value is {splitOutExpr, residualExpr} or
+ * {splitOutExpr, nullptr}, splitOutExpr will reflect the path renames. For example, suppose the
+ * original match expression is {old: {$gt: 3}} and 'renames' contains the mapping "old" => "new".
+ * The returned exprLeft value will be {new: {$gt: 3}}, provided that "old" is not in 'fields'.
+ *
+ * If the previous stage is a simple rename, 'fields' should be empty and 'renames' are attempted
+ * but due to the limitation of renaming algorithm, we may fail to rename, when we return the
+ * original expression as residualExpr.
+ *
+ * TODO SERVER-74298 Remove the above comment after the ticket is done.
  *
  * Never returns {nullptr, nullptr}.
  */
@@ -190,8 +197,15 @@ splitMatchExpressionBy(std::unique_ptr<MatchExpression> expr,
  * {new: {$gt: 3}}.
  *
  * The caller should make sure that `expr` is renamable as a whole.
+ *
+ * Returns whether there's any attempted but failed to rename. This case can happen when path
+ * component is part of sub-fields. For example, expr = {x: {$eq: {y: 3}}} and renames = {{"x.y",
+ * "a.b"}}. We should be able to rename 'x' and 'y' to 'a' and 'b' respectively but due to the
+ * current limitation of renaming algorithm, we cannot rename such match expressions.
+ *
+ * TODO SERVER-74298 The return value might be necessary any more after the ticket is done.
  */
-void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames);
+bool applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames);
 
 /**
  * Split a MatchExpression into two parts:
