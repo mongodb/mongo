@@ -29,8 +29,8 @@
 #pragma once
 
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/tick_source.h"
-#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -67,45 +67,49 @@ public:
     enum class Priority { kLow = 0, kNormal, kImmediate };
 
     void start(TickSource* tickSource) {
-        admissions++;
+        admissions.fetchAndAdd(1);
         if (tickSource) {
-            _startProcessingTime = tickSource->getTicks();
+            _startProcessingTime.store(tickSource->getTicks());
         }
     }
 
     TickSource::Tick getStartProcessingTime() const {
-        return _startProcessingTime;
+        return _startProcessingTime.loadRelaxed();
     }
 
     /**
      * Returns the number of times this context has taken a ticket.
      */
     int getAdmissions() const {
-        return admissions;
+        return admissions.loadRelaxed();
     }
 
     void setLockMode(LockMode lockMode) {
-        _lockMode = lockMode;
+        _lockMode.store(lockMode);
     }
 
     LockMode getLockMode() const {
-        return _lockMode;
+        return _lockMode.loadRelaxed();
     }
 
     void setPriority(Priority priority) {
-        _priority = priority;
+        _priority.store(priority);
     }
 
     Priority getPriority() const {
-        invariant(_priority);
-        return _priority.get();
+        return _priority.loadRelaxed();
     }
 
 private:
-    TickSource::Tick _startProcessingTime{0};
-    int admissions{0};
-    LockMode _lockMode = LockMode::MODE_NONE;
-    boost::optional<Priority> _priority{Priority::kNormal};
+    // We wrap these types in AtomicWord to avoid race conditions between reporting metrics and
+    // setting the values.
+    //
+    // Only a single writer thread will modify these variables and the readers allow relaxed memory
+    // semantics.
+    AtomicWord<TickSource::Tick> _startProcessingTime{0};
+    AtomicWord<int32_t> admissions{0};
+    AtomicWord<LockMode> _lockMode{LockMode::MODE_NONE};
+    AtomicWord<Priority> _priority{Priority::kNormal};
 };
 
 StringData toString(AdmissionContext::Priority priority);
