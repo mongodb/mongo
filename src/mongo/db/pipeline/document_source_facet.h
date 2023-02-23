@@ -141,6 +141,7 @@ public:
     void addInvolvedCollections(stdx::unordered_set<NamespaceString>* involvedNssSet) const final;
     void detachFromOperationContext() final;
     void reattachToOperationContext(OperationContext* opCtx) final;
+    bool validateOperationContext(const OperationContext* opCtx) const final;
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
     bool usedDisk() final;
     const SpecificStats* getSpecificStats() const final {

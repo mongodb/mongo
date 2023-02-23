@@ -131,6 +131,8 @@ public:
 
     void reattachToOperationContext(OperationContext* opCtx) final;
 
+    bool validateOperationContext(const OperationContext* opCtx) const final;
+
     static boost::intrusive_ptr<DocumentSourceGraphLookUp> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         NamespaceString fromNs,

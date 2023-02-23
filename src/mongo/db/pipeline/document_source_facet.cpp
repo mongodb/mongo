@@ -222,6 +222,13 @@ void DocumentSourceFacet::reattachToOperationContext(OperationContext* opCtx) {
     }
 }
 
+bool DocumentSourceFacet::validateOperationContext(const OperationContext* opCtx) const {
+    return getContext()->opCtx == opCtx &&
+        std::all_of(_facets.begin(), _facets.end(), [opCtx](const auto& f) {
+               return f.pipeline->validateOperationContext(opCtx);
+           });
+}
+
 StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState) const {
     // Currently we don't split $facet to have a merger part and a shards part (see SERVER-24154).
     // This means that if any stage in any of the $facet pipelines needs to run on the primary shard

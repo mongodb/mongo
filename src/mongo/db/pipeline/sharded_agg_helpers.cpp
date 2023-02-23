@@ -1598,8 +1598,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
 
     if (shardTargetingPolicy == ShardTargetingPolicy::kNotAllowed ||
         shouldAlwaysAttachLocalCursorForNamespace(expCtx->ns)) {
-        // TODO SERVER-74060: Possibly replace with more holistic solution.
-        auto pipelineToTarget = pipeline->clone(expCtx);
+        auto pipelineToTarget = pipeline->clone();
 
         return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
             pipelineToTarget.release());
@@ -1611,8 +1610,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
         "targeting pipeline to attach cursors"_sd,
         [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
             const auto& cm = cri.cm;
-            // TODO SERVER-74060: Possibly replace with more holistic solution.
-            auto pipelineToTarget = pipeline->clone(expCtx);
+            auto pipelineToTarget = pipeline->clone();
 
             if (!cm.isSharded() &&
                 (gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility) ||
@@ -1661,8 +1659,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
 
                 // The local read failed. Recreate 'pipelineToTarget' if it was released above.
                 if (!pipelineToTarget) {
-                    // TODO SERVER-74060: Possibly replace with more holistic solution.
-                    pipelineToTarget = pipeline->clone(expCtx);
+                    pipelineToTarget = pipeline->clone();
                 }
             }
 

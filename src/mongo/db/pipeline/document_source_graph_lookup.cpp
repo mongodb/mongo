@@ -631,6 +631,10 @@ void DocumentSourceGraphLookUp::reattachToOperationContext(OperationContext* opC
     _fromExpCtx->opCtx = opCtx;
 }
 
+bool DocumentSourceGraphLookUp::validateOperationContext(const OperationContext* opCtx) const {
+    return getContext()->opCtx == opCtx && _fromExpCtx->opCtx == opCtx;
+}
+
 DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     NamespaceString from,
@@ -675,10 +679,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
 DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     const DocumentSourceGraphLookUp& original,
     const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
-    : DocumentSource(
-          kStageName,
-          newExpCtx ? newExpCtx
-                    : original.pExpCtx->copyWith(original.pExpCtx->ns, original.pExpCtx->uuid)),
+    : DocumentSource(kStageName, newExpCtx),
       _from(original._from),
       _as(original._as),
       _connectFromField(original._connectFromField),
@@ -697,7 +698,8 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _variables(original._variables),
       _variablesParseState(original._variablesParseState.copyWith(_variables.useIdGenerator())) {
     if (original._unwind) {
-        _unwind = static_cast<DocumentSourceUnwind*>(original._unwind.value()->clone().get());
+        _unwind =
+            static_cast<DocumentSourceUnwind*>(original._unwind.value()->clone(pExpCtx).get());
     }
 }
 

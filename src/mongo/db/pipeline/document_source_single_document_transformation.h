@@ -45,7 +45,7 @@ namespace mongo {
 class DocumentSourceSingleDocumentTransformation final : public DocumentSource {
 public:
     virtual boost::intrusive_ptr<DocumentSource> clone(
-        const boost::intrusive_ptr<ExpressionContext>& newExpCtx = nullptr) const {
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
         auto list = DocumentSource::parse(newExpCtx ? newExpCtx : pExpCtx,
                                           serialize().getDocument().toBson());
         invariant(list.size() == 1);

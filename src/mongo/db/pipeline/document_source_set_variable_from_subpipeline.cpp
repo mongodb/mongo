@@ -137,4 +137,17 @@ void DocumentSourceSetVariableFromSubPipeline::addSubPipelineInitialSource(
     _subPipeline->addInitialSource(std::move(source));
 }
 
+void DocumentSourceSetVariableFromSubPipeline::detachFromOperationContext() {
+    _subPipeline->detachFromOperationContext();
+}
+
+void DocumentSourceSetVariableFromSubPipeline::reattachToOperationContext(OperationContext* opCtx) {
+    _subPipeline->reattachToOperationContext(opCtx);
+}
+
+bool DocumentSourceSetVariableFromSubPipeline::validateOperationContext(
+    const OperationContext* opCtx) const {
+    return getContext()->opCtx == opCtx && _subPipeline->validateOperationContext(opCtx);
+}
+
 }  // namespace mongo

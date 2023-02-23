@@ -158,11 +158,12 @@ Pipeline::~Pipeline() {
 
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::clone(
     const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
+    auto expCtx = newExpCtx ? newExpCtx : getContext();
     SourceContainer clonedStages;
     for (auto&& stage : _sources) {
-        clonedStages.push_back(stage->clone(newExpCtx));
+        clonedStages.push_back(stage->clone(expCtx));
     }
-    return create(clonedStages, newExpCtx ? newExpCtx : getContext());
+    return create(clonedStages, expCtx);
 }
 
 template <class T>
@@ -238,6 +239,8 @@ void Pipeline::validateCommon(bool alreadyOptimized) const {
             str::stream() << "Pipeline length must be no longer than "
                           << internalPipelineLengthLimit << " stages",
             static_cast<int>(_sources.size()) <= internalPipelineLengthLimit);
+
+    checkValidOperationContext();
 
     // Keep track of stages which can only appear once.
     std::set<StringData> singleUseStages;
@@ -349,6 +352,9 @@ void Pipeline::detachFromOperationContext() {
     for (auto&& source : _sources) {
         source->detachFromOperationContext();
     }
+
+    // Check for a null operation context to make sure that all children detached correctly.
+    checkValidOperationContext();
 }
 
 void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
@@ -357,6 +363,24 @@ void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
     for (auto&& source : _sources) {
         source->reattachToOperationContext(opCtx);
     }
+
+    checkValidOperationContext();
+}
+
+bool Pipeline::validateOperationContext(const OperationContext* opCtx) const {
+    return std::all_of(_sources.begin(), _sources.end(), [this, opCtx](const auto& s) {
+        // All sources in a pipeline must share its expression context. Subpipelines may have a
+        // different expression context, but must point to the same operation context. Let the
+        // sources validate this themselves since they don't all have the same subpipelines, etc.
+        return s->getContext() == getContext() && s->validateOperationContext(opCtx);
+    });
+}
+
+void Pipeline::checkValidOperationContext() const {
+    tassert(7406000,
+            str::stream()
+                << "All DocumentSources and subpipelines must have the same operation context",
+            validateOperationContext(getContext()->opCtx));
 }
 
 void Pipeline::dispose(OperationContext* opCtx) {

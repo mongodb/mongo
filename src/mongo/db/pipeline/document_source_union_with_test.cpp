@@ -74,33 +74,26 @@ auto makeUnionFromBson(BSONElement elem, const boost::intrusive_ptr<ExpressionCo
 }
 
 TEST_F(DocumentSourceUnionWithTest, BasicSerialUnions) {
-    const auto docs = std::array{Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}};
-    const auto mock = DocumentSourceMock::createForTest(docs[0], getExpCtx());
-    const auto mockDequeOne = std::deque<DocumentSource::GetNextResult>{Document{docs[1]}};
-    const auto mockDequeTwo = std::deque<DocumentSource::GetNextResult>{Document{docs[2]}};
-    const auto mockCtxOne = getExpCtx()->copyWith({});
-    mockCtxOne->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDequeOne);
-    const auto mockCtxTwo = getExpCtx()->copyWith({});
-    mockCtxTwo->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDequeTwo);
+    const auto doc = Document{{"a", 1}};
+    const auto mock = DocumentSourceMock::createForTest(doc, getExpCtx());
+    const auto mockDeque = std::deque<DocumentSource::GetNextResult>{Document{doc}};
+    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDeque);
     auto unionWithOne =
-        makeUnion(mockCtxOne,
+        makeUnion(getExpCtx(),
                   Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
     auto unionWithTwo =
-        makeUnion(mockCtxTwo,
+        makeUnion(getExpCtx(),
                   Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
     unionWithOne->setSource(mock.get());
     unionWithTwo->setSource(unionWithOne.get());
 
     auto comparator = DocumentComparator();
-    auto results = comparator.makeUnorderedDocumentSet();
-    for (auto& doc [[maybe_unused]] : docs) {
+    const auto expectedResults = 3;
+    for (auto i = 0; i < expectedResults; ++i) {
         auto next = unionWithTwo->getNext();
         ASSERT_TRUE(next.isAdvanced());
-        const auto [ignored, inserted] = results.insert(next.releaseDocument());
-        ASSERT_TRUE(inserted);
+        ASSERT_EQ(comparator.compare(next.releaseDocument(), doc), 0);
     }
-    for (const auto& doc : docs)
-        ASSERT_TRUE(results.find(doc) != results.end());
 
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
@@ -108,33 +101,26 @@ TEST_F(DocumentSourceUnionWithTest, BasicSerialUnions) {
 }
 
 TEST_F(DocumentSourceUnionWithTest, BasicNestedUnions) {
-    const auto docs = std::array{Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}};
-    const auto mock = DocumentSourceMock::createForTest(docs[0], getExpCtx());
-    const auto mockDequeOne = std::deque<DocumentSource::GetNextResult>{Document{docs[1]}};
-    const auto mockDequeTwo = std::deque<DocumentSource::GetNextResult>{Document{docs[2]}};
-    const auto mockCtxOne = getExpCtx()->copyWith({});
-    mockCtxOne->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDequeOne);
-    const auto mockCtxTwo = getExpCtx()->copyWith({});
-    mockCtxTwo->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDequeTwo);
+    const auto doc = Document{{"a", 1}};
+    const auto mock = DocumentSourceMock::createForTest(doc, getExpCtx());
+    const auto mockDeque = std::deque<DocumentSource::GetNextResult>{Document{doc}};
+    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDeque);
     auto unionWithOne = make_intrusive<DocumentSourceUnionWith>(
-        mockCtxOne,
+        getExpCtx(),
         Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
     auto unionWithTwo =
-        makeUnion(mockCtxTwo,
+        makeUnion(getExpCtx(),
                   Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{unionWithOne},
                                    getExpCtx()));
     unionWithTwo->setSource(mock.get());
 
     auto comparator = DocumentComparator();
-    auto results = comparator.makeUnorderedDocumentSet();
-    for (auto& doc [[maybe_unused]] : docs) {
+    const auto expectedResults = 3;
+    for (auto i = 0; i < expectedResults; ++i) {
         auto next = unionWithTwo->getNext();
         ASSERT_TRUE(next.isAdvanced());
-        const auto [ignored, inserted] = results.insert(next.releaseDocument());
-        ASSERT_TRUE(inserted);
+        ASSERT_EQ(comparator.compare(next.releaseDocument(), doc), 0);
     }
-    for (const auto& doc : docs)
-        ASSERT_TRUE(results.find(doc) != results.end());
 
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
@@ -142,22 +128,18 @@ TEST_F(DocumentSourceUnionWithTest, BasicNestedUnions) {
 }
 
 TEST_F(DocumentSourceUnionWithTest, UnionsWithNonEmptySubPipelines) {
-    const auto inputDocs = std::array{Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}};
-    const auto outputDocs = std::array{Document{{"a", 1}}, Document{{"c", 1}, {"d", 1}}};
-    const auto mock = DocumentSourceMock::createForTest(inputDocs[0], getExpCtx());
-    const auto mockDequeOne = std::deque<DocumentSource::GetNextResult>{Document{inputDocs[1]}};
-    const auto mockDequeTwo = std::deque<DocumentSource::GetNextResult>{Document{inputDocs[2]}};
-    const auto mockCtxOne = getExpCtx()->copyWith({});
-    mockCtxOne->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDequeOne);
-    const auto mockCtxTwo = getExpCtx()->copyWith({});
-    mockCtxTwo->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDequeTwo);
-    const auto filter = DocumentSourceMatch::create(BSON("d" << 1), mockCtxOne);
-    const auto proj = DocumentSourceAddFields::create(BSON("d" << 1), mockCtxTwo);
+    const auto inputDoc = Document{{"a", 1}};
+    const auto outputDocs = std::array{Document{{"a", 1}}, Document{{"a", 1}, {"d", 1}}};
+    const auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    const auto mockDeque = std::deque<DocumentSource::GetNextResult>{Document{inputDoc}};
+    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDeque);
+    const auto filter = DocumentSourceMatch::create(BSON("d" << 1), getExpCtx());
+    const auto proj = DocumentSourceAddFields::create(BSON("d" << 1), getExpCtx());
     auto unionWithOne = makeUnion(
-        mockCtxOne,
+        getExpCtx(),
         Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{filter}, getExpCtx()));
     auto unionWithTwo = makeUnion(
-        mockCtxTwo,
+        getExpCtx(),
         Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{proj}, getExpCtx()));
     unionWithOne->setSource(mock.get());
     unionWithTwo->setSource(unionWithOne.get());
@@ -318,17 +300,13 @@ TEST_F(DocumentSourceUnionWithTest, PropagatePauses) {
                                            Document(),
                                            DocumentSource::GetNextResult::makePauseExecution()},
                                           getExpCtx());
-    const auto mockDequeOne = std::deque<DocumentSource::GetNextResult>{};
-    const auto mockDequeTwo = std::deque<DocumentSource::GetNextResult>{};
-    const auto mockCtxOne = getExpCtx()->copyWith({});
-    mockCtxOne->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDequeOne);
-    const auto mockCtxTwo = getExpCtx()->copyWith({});
-    mockCtxTwo->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDequeTwo);
+    const auto mockDeque = std::deque<DocumentSource::GetNextResult>{};
+    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDeque);
     auto unionWithOne =
-        makeUnion(mockCtxOne,
+        makeUnion(getExpCtx(),
                   Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
     auto unionWithTwo =
-        makeUnion(mockCtxTwo,
+        makeUnion(getExpCtx(),
                   Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
     unionWithOne->setSource(mock.get());
     unionWithTwo->setSource(unionWithOne.get());

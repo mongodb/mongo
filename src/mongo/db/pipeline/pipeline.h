@@ -211,6 +211,12 @@ public:
     void reattachToOperationContext(OperationContext* opCtx);
 
     /**
+     * Recursively validate the operation contexts associated with this pipeline. Return true if
+     * all document sources and subpipelines point to the given operation context.
+     */
+    bool validateOperationContext(const OperationContext* opCtx) const;
+
+    /**
      * Releases any resources held by this pipeline such as PlanExecutors or in-memory structures.
      * Must be called before deleting a Pipeline.
      *
@@ -456,6 +462,12 @@ private:
      * why it cannot.
      */
     Status _pipelineCanRunOnMongoS() const;
+
+    /**
+     * Asserts whether operation contexts associated with this pipeline are consistent across
+     * sources.
+     */
+    void checkValidOperationContext() const;
 
     SourceContainer _sources;
 

@@ -277,10 +277,10 @@ MONGO_COMPILER_NOINLINE void DocumentSourceUnionWith::logShardedViewFound(
 Pipeline::SourceContainer::iterator DocumentSourceUnionWith::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     auto duplicateAcrossUnion = [&](auto&& nextStage) {
-        _pipeline->addFinalSource(nextStage->clone());
+        _pipeline->addFinalSource(nextStage->clone(_pipeline->getContext()));
         // Apply the same rewrite to the cached pipeline if available.
         if (pExpCtx->explain >= ExplainOptions::Verbosity::kExecStats) {
-            auto cloneForExplain = nextStage->clone();
+            auto cloneForExplain = nextStage->clone(_pipeline->getContext());
             if (!_cachedPipeline.empty()) {
                 cloneForExplain->setSource(_cachedPipeline.back().get());
             }
@@ -422,6 +422,11 @@ void DocumentSourceUnionWith::reattachToOperationContext(OperationContext* opCtx
     if (_pipeline) {
         _pipeline->reattachToOperationContext(opCtx);
     }
+}
+
+bool DocumentSourceUnionWith::validateOperationContext(const OperationContext* opCtx) const {
+    return getContext()->opCtx == opCtx &&
+        (!_pipeline || _pipeline->validateOperationContext(opCtx));
 }
 
 void DocumentSourceUnionWith::addInvolvedCollections(

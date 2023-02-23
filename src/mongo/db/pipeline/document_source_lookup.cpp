@@ -232,10 +232,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(
 
 DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
                                            const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
-    : DocumentSource(
-          kStageName,
-          newExpCtx ? newExpCtx
-                    : original.pExpCtx->copyWith(original.pExpCtx->ns, original.pExpCtx->uuid)),
+    : DocumentSource(kStageName, newExpCtx),
       _fromNs(original._fromNs),
       _resolvedNs(original._resolvedNs),
       _as(original._as),
@@ -255,10 +252,10 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
         _cache.emplace(internalDocumentSourceCursorBatchSizeBytes.load());
     }
     if (original._matchSrc) {
-        _matchSrc = static_cast<DocumentSourceMatch*>(original._matchSrc->clone().get());
+        _matchSrc = static_cast<DocumentSourceMatch*>(original._matchSrc->clone(pExpCtx).get());
     }
     if (original._unwindSrc) {
-        _unwindSrc = static_cast<DocumentSourceUnwind*>(original._unwindSrc->clone().get());
+        _unwindSrc = static_cast<DocumentSourceUnwind*>(original._unwindSrc->clone(pExpCtx).get());
     }
 }
 
@@ -1173,6 +1170,21 @@ void DocumentSourceLookUp::reattachToOperationContext(OperationContext* opCtx) {
     } else if (_fromExpCtx) {
         _fromExpCtx->opCtx = opCtx;
     }
+}
+
+bool DocumentSourceLookUp::validateOperationContext(const OperationContext* opCtx) const {
+    if (getContext()->opCtx != opCtx || (_fromExpCtx && _fromExpCtx->opCtx != opCtx)) {
+        return false;
+    }
+
+    if (_pipeline) {
+        const auto& sources = _pipeline->getSources();
+        return std::all_of(sources.begin(), sources.end(), [opCtx](const auto& s) {
+            return s->validateOperationContext(opCtx);
+        });
+    }
+
+    return true;
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(

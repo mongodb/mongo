@@ -324,8 +324,8 @@ public:
      * original's 'ExpressionContext'.
      */
     virtual boost::intrusive_ptr<DocumentSource> clone(
-        const boost::intrusive_ptr<ExpressionContext>& newExpCtx = nullptr) const {
-        auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+        tassert(7406001, "expCtx passed to clone must not be null", expCtx);
         std::vector<Value> serializedDoc;
         serializeToArray(serializedDoc);
         tassert(5757900,
@@ -465,6 +465,14 @@ public:
     virtual void detachFromOperationContext() {}
 
     virtual void reattachToOperationContext(OperationContext* opCtx) {}
+
+    /**
+     * Validate that all operation contexts associated with this document source, including any
+     * subpipelines, match the argument.
+     */
+    virtual bool validateOperationContext(const OperationContext* opCtx) const {
+        return getContext()->opCtx == opCtx;
+    }
 
     virtual bool usedDisk() {
         return false;

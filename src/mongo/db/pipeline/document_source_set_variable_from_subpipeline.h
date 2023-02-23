@@ -97,6 +97,10 @@ public:
      */
     void addSubPipelineInitialSource(boost::intrusive_ptr<DocumentSource> source);
 
+    void detachFromOperationContext() final;
+    void reattachToOperationContext(OperationContext* opCtx) final;
+    bool validateOperationContext(const OperationContext* opCtx) const final;
+
 protected:
     DocumentSourceSetVariableFromSubPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                              std::unique_ptr<Pipeline, PipelineDeleter> subpipeline,
