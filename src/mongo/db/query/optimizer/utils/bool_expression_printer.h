@@ -30,6 +30,11 @@
 
 #pragma once
 
+#include <vector>
+
+#include "mongo/db/query/optimizer/bool_expression.h"
+#include "mongo/util/str.h"
+
 namespace mongo::optimizer {
 
 /**
@@ -72,7 +77,7 @@ public:
     }
 
     std::string print(const typename BoolExprType::Node& n) {
-        return algebra::transport<false>(n, *this) + "\n";
+        return algebra::transport<false>(n, *this);
     }
 };
 

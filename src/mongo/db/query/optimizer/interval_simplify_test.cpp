@@ -1057,8 +1057,8 @@ TEST(BoolExprBuilder, Builder1) {
                         .pop()
                         .finish();
 
-        ASSERT_STR_EQ_AUTO(                         // NOLINT
-            "(0.1 ^ 0.2 ^ ((0.4 ^ 0.5) U 0.3))\n",  // NOLINT (test auto-update)
+        ASSERT_STR_EQ_AUTO(                       // NOLINT
+            "(0.1 ^ 0.2 ^ ((0.4 ^ 0.5) U 0.3))",  // NOLINT (test auto-update)
             PrinterType{}.print(*node));
     }
 
@@ -1078,8 +1078,8 @@ TEST(BoolExprBuilder, Builder1) {
                         .pop()
                         .finish();
 
-        ASSERT_STR_EQ_AUTO(                         // NOLINT
-            "(0.1 ^ 0.2 ^ ((0.6 U 0.5) ^ 0.7))\n",  // NOLINT (test auto-update)
+        ASSERT_STR_EQ_AUTO(                       // NOLINT
+            "(0.1 ^ 0.2 ^ ((0.6 U 0.5) ^ 0.7))",  // NOLINT (test auto-update)
             PrinterType{}.print(*node));
     }
 }

@@ -281,8 +281,8 @@ TEST(BoolExpr, BoolExprVisitorTest) {
         });
     });
 
-    ASSERT_STR_EQ_AUTO(               // NOLINT
-        "((2 ^ 3 ^ 4) U (5 ^ 6))\n",  // NOLINT (test auto-update)
+    ASSERT_STR_EQ_AUTO(             // NOLINT
+        "((2 ^ 3 ^ 4) U (5 ^ 6))",  // NOLINT (test auto-update)
         BoolExprPrinter<int>().print(intExprDNF));
 }
 }  // namespace

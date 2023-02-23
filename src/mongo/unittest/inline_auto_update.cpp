@@ -56,17 +56,22 @@ static constexpr bool kIsFirstLine = false;
 
 std::vector<std::string> formatStr(const std::string& str, const bool needsEscaping) {
     std::vector<std::string> replacementLines;
-    std::istringstream lineInput(str);
+    const bool endsWithNewline = str.back() == '\n';
 
     // Account for maximum line length after linting. We need to indent, add quotes, etc.
     static constexpr size_t kEscapedLength = 88;
 
+    std::vector<std::string> inputLines;
+    std::istringstream inputStream(str);
     std::string line;
-    while (std::getline(lineInput, line)) {
-        // Read the string line by line and format it to match the test file's expected format. We
-        // have an initial indentation, followed by quotes and the escaped string itself.
-
-        std::string escaped = needsEscaping ? mongo::str::escapeForJSON(line) : line;
+    while (std::getline(inputStream, line)) {
+        inputLines.push_back(std::move(line));
+    }
+    for (size_t i = 0; i < inputLines.size(); i++) {
+        // Process the string line by line and format it to match the test file's expected format.
+        // We have an initial indentation, followed by quotes and the escaped string itself.
+        std::string escaped =
+            needsEscaping ? mongo::str::escapeForJSON(inputLines[i]) : inputLines[i];
         for (;;) {
             // If the line is estimated to exceed the maximum length allowed by the linter, break it
             // up and make sure to insert '\n' only at the end of the last segment.
@@ -93,7 +98,7 @@ std::vector<std::string> formatStr(const std::string& str, const bool needsEscap
             os << escaped.substr(0, lineLength);
 
             if (needsEscaping) {
-                if (!breakupLine) {
+                if (!breakupLine && (endsWithNewline || i + 1 != inputLines.size())) {
                     os << "\\n";
                 }
                 os << "\"";

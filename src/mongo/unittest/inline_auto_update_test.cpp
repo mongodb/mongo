@@ -96,5 +96,24 @@ TEST(AutoUpdateAssertion, DiffTest) {
     }
     ASSERT(diffStr.empty());
 }
+
+TEST(AutoUpdateAssertion, TestTest) {
+    std::string oneLine = "hello";
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "hello",         // NOLINT (test auto-update)
+        oneLine);
+
+    std::string multiLineNoNewline = "hello\nworld";
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "hello\n"
+        "world",
+        multiLineNoNewline);
+
+    std::string multiLineNewlineEnd = "hello\nworld\n";
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "hello\n"
+        "world\n",
+        multiLineNewlineEnd);
+}
 }  // namespace
 }  // namespace mongo::unittest
