@@ -376,7 +376,14 @@ class _StepdownThread(threading.Thread):
                 try:
                     client = self._create_client(old_primary)
                     client.admin.command("replSetStepUp")
-                    break
+                    is_primary = client.admin.command("isMaster")["ismaster"]
+                    # There is a chance that the old master is still in catchup stage when we issue replSetStepUp
+                    # then it will step down due to term change in the previous election failure. We should ensure the old
+                    # primary becomes a writable primary here, or there will have no primary for a day.
+                    if is_primary:
+                        break
+                    else:
+                        self._wait(0.2)
                 except pymongo.errors.OperationFailure:
                     self._wait(0.2)
                 if time.time() - retry_start_time > retry_time_secs:
