@@ -92,9 +92,10 @@ public:
                            const boost::optional<ResumeIndexInfo>& resumeInfo = boost::none);
 
     /**
-     * Unregisters the builder associated with the given buildUUID from the _builders map.
+     * Unregisters the builder associated with the given buildUUID from the _builders map, causing
+     * the index build in-memory state to be destroyed.
      */
-    void unregisterIndexBuild(const UUID& buildUUID);
+    void tearDownAndUnregisterIndexBuild(const UUID& buildUUID);
 
     /**
      * Runs the scanning/insertion phase of the index build..

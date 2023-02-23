@@ -89,7 +89,7 @@ TEST_F(IndexBuildsManagerTest, IndexBuildsManagerSetUpAndTearDown) {
 
     _indexBuildsManager.abortIndexBuild(
         operationContext(), collection, _buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
-    _indexBuildsManager.unregisterIndexBuild(_buildUUID);
+    _indexBuildsManager.tearDownAndUnregisterIndexBuild(_buildUUID);
 }
 }  // namespace
 

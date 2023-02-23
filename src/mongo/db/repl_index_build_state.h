@@ -114,40 +114,66 @@ std::string indexBuildActionToString(IndexBuildAction action);
  * Valid State transition for primary:
  * ===================================
  * kSetup -> kInProgress
- * kInProgress -> kAborted    // An index build failed due to an indexing error or was aborted
- *                               externally.
- * kInProgress -> kCommitted  // An index build was committed
-
+ * kSetup -> kAwaitPrimaryAbort         // Index setup failure.
+ * kInProgress -> kAborted              // Was aborted externally.
+ * kInProgress -> kAwaitPrimaryAbort    // Failure of index build.
+ * kInProgress -> kCommitted            // An index build was committed.
+ * kAwaitPrimaryAbort -> kAborted       // Primary aborted.
  *
  * Valid State transition for secondaries:
  * =======================================
  * kSetup -> kInProgress
- * kInProgress -> kAborted    // An index build received an abort oplog entry
- * kInProgress -> kPrepareCommit -> kCommitted // An index build received a commit oplog entry
+ * kSetup -> kAwaitPrimaryAbort         // Index setup failure.
+ * kInProgress -> kAborted              // An index build received an abort oplog entry.
+ * kInProgress -> kAwaitPrimaryAbort    // Failure of index build.
+ * kInProgress -> kApplyCommitOplogEntry// Received 'commitIndexBuild', waiting for build to commit.
+ * kApplyCommitOplogEntry -> kCommitted // All phases complete, build committed on secondary.
+ * kAwaitPrimaryAbort -> kAborted       // Received 'abortIndexBuild' oplog entry.
  */
 class IndexBuildState {
 public:
-    enum StateFlag {
-        kSetup = 1 << 0,
+    enum State {
         /**
-         * Once an index build is in-progress it is eligible for being aborted by an external
-         * thread. The kSetup state prevents other threads from observing an inconsistent state of
-         * a build until it transitions to kInProgress.
+         * Initial state, the index build is registered, but still not completely setup. Setup
+         * implies instantiating all the required in-memory state for the index builder thread. For
+         * primaries, it also implies persisting the index build entry to
+         * 'config.system.indexBuilds' and replicating the 'startIndexBuild' oplog entry.
          */
-        kInProgress = 1 << 1,
+        kSetup,
+        /**
+         * This state indicates all in-memory and durable state is prepared, but the index build is
+         * not yet in progress. Some additional verification and configuration is performed, during
+         * which we might end up with a killed index build thread. Transitioning to this state
+         * immediately after setup is crucial to know when it is actually required to perform
+         * teardown. An index build in kPostSetup or later is elegible for being aborted by an
+         * external thread.
+         */
+        kPostSetup,
+        /**
+         * Once an index build is in-progress it is eligible for transition to any of the commit
+         * states. It is also abortable.
+         */
+        kInProgress,
         /**
          * Below state indicates that IndexBuildsCoordinator thread was externally asked to commit.
-         * For kPrepareCommit, this can come from an oplog entry.
+         * For kApplyCommitOplogEntry, this can come from an oplog entry.
          */
-        kPrepareCommit = 1 << 2,
+        kApplyCommitOplogEntry,
         /**
          * Below state indicates that index build was successfully able to commit or abort. For
          * kCommitted, the state is set immediately before it commits the index build. For
          * kAborted, this state is set after the build is cleaned up and the abort oplog entry is
          * replicated.
          */
-        kCommitted = 1 << 3,
-        kAborted = 1 << 4,
+        kCommitted,
+        kAborted,
+        /**
+         * Below state indicates that the index build thread has voted for an abort to the current
+         * primary, and is waiting for the index build to actually be aborted either because the
+         * command is a loopback to itself (vote issuer is primary itself) or due to
+         * 'abortIndexBuild' oplog entry being replicated by the primary.
+         */
+        kAwaitPrimaryAbort,
     };
 
     /**
@@ -156,13 +182,13 @@ public:
      * 'timestamp', 'abortStatus' may be provided for certain states such as 'commit' and
      * 'abort'.
      */
-    void setState(StateFlag state,
+    void setState(State state,
                   bool skipCheck,
                   boost::optional<Timestamp> timestamp = boost::none,
                   boost::optional<Status> abortStatus = boost::none);
 
-    bool isCommitPrepared() const {
-        return _state == kPrepareCommit;
+    bool isApplyingCommitOplogEntry() const {
+        return _state == kApplyCommitOplogEntry;
     }
 
     bool isCommitted() const {
@@ -175,6 +201,14 @@ public:
 
     bool isSettingUp() const {
         return _state == kSetup;
+    }
+
+    bool isPostSetup() const {
+        return _state == kPostSetup;
+    }
+
+    bool isAwaitingPrimaryAbort() const {
+        return _state == kAwaitPrimaryAbort;
     }
 
     boost::optional<Timestamp> getTimestamp() const {
@@ -193,18 +227,22 @@ public:
         return toString(_state);
     }
 
-    static std::string toString(StateFlag state) {
+    static std::string toString(State state) {
         switch (state) {
             case kSetup:
                 return "Setting up";
+            case kPostSetup:
+                return "Post setup";
             case kInProgress:
                 return "In progress";
-            case kPrepareCommit:
-                return "Prepare commit";
+            case kApplyCommitOplogEntry:
+                return "Applying commit oplog entry";
             case kCommitted:
                 return "Committed";
             case kAborted:
                 return "Aborted";
+            case kAwaitPrimaryAbort:
+                return "Await primary abort oplog entry";
         }
         MONGO_UNREACHABLE;
     }
@@ -216,7 +254,7 @@ public:
 
 private:
     // Represents the index build state.
-    StateFlag _state = kSetup;
+    State _state = kSetup;
     // Timestamp will be populated only if the node is secondary.
     // It represents the commit or abort timestamp communicated via
     // commitIndexBuild and abortIndexBuild oplog entry.
@@ -244,16 +282,34 @@ public:
                         IndexBuildProtocol protocol);
 
     /**
-     * The index build is now past the setup stage and in progress. This makes it eligible to be
-     * aborted. Use the current OperationContext's opId as the means for interrupting the index
-     * build.
+     * The index build thread has been scheduled, from now on it should be possible to interrupt the
+     * index build by its opId.
      */
-    void start(OperationContext* opCtx);
+    void onThreadScheduled(OperationContext* opCtx);
+
+    /**
+     * The index build setup is complete, but not yet in progress. From now onwards, teardown of
+     * index build state must be performed. This makes it eligible to be aborted in 'tryAbort'. Use
+     * the current OperationContext's opId as the means for interrupting the index build.
+     */
+    void completeSetup();
+
+    /**
+     * Try to set the index build to in-progress state. Returns true on success, or false if the
+     * build is already aborted / interrupted.
+     */
+    Status tryStart(OperationContext* opCtx);
 
     /**
      * This index build has completed successfully and there is no further work to be done.
      */
     void commit(OperationContext* opCtx);
+
+    /**
+     * Only for two-phase index builds. Requests the primary to abort the build, and transitions
+     * into a waiting state.
+     */
+    void requestAbortFromPrimary(const Status& abortStatus);
 
     /**
      * Returns timestamp for committing this index build.
@@ -284,6 +340,11 @@ public:
      * startup (startup recovery) and startup2 (initial sync).
      */
     void onOplogAbort(OperationContext* opCtx, const NamespaceString& nss) const;
+
+    /**
+     * Returns true if the index build requires reverting the setup after an abort.
+     */
+    bool isAbortCleanUpRequired() const;
 
     /**
      * Returns true if this index build has been aborted.
@@ -318,10 +379,9 @@ public:
     void setSinglePhaseCommit(OperationContext* opCtx);
 
     /**
-     * Attempt to signal the index build to commit and advance the index build to the kPrepareCommit
-     * state.
-     * Returns true if successful and false if the attempt was unnecessful and the caller should
-     * retry.
+     * Attempt to signal the index build to commit and advance the index build to the
+     * kApplyCommitOplogEntry state. Returns true if successful and false if the attempt was
+     * unnecessful and the caller should retry.
      */
     bool tryCommit(OperationContext* opCtx);
 
@@ -470,6 +530,9 @@ private:
     // phase index build, isn't running a hybrid index build, or isn't running during oplog
     // application, this will be null.
     repl::OpTime _lastOpTimeBeforeInterceptors;
+
+    // Set once setup is complete, indicating that a clean up is required in case of abort.
+    bool _cleanUpRequired = false;
 };
 
 }  // namespace mongo

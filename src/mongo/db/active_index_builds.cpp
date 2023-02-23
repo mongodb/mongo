@@ -149,7 +149,7 @@ void ActiveIndexBuilds::unregisterIndexBuild(
                 "buildUUID"_attr = replIndexBuildState->buildUUID,
                 "collectionUUID"_attr = replIndexBuildState->collectionUUID);
 
-    indexBuildsManager->unregisterIndexBuild(replIndexBuildState->buildUUID);
+    indexBuildsManager->tearDownAndUnregisterIndexBuild(replIndexBuildState->buildUUID);
     _indexBuildsCompletedGen++;
     _indexBuildsCondVar.notify_all();
 }

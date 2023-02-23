@@ -144,11 +144,6 @@ private:
     void _refreshReplStateFromPersisted(OperationContext* opCtx, const UUID& buildUUID);
 
     /**
-     * Process voteCommitIndexBuild command's response.
-     */
-    bool _checkVoteCommitIndexCmdSucceeded(const BSONObj& response, const UUID& indexBuildUUID);
-
-    /**
      * Signals index builder to commit.
      */
     void _sendCommitQuorumSatisfiedSignal(OperationContext* opCtx,
@@ -161,6 +156,10 @@ private:
 
     bool _signalIfCommitQuorumNotEnabled(OperationContext* opCtx,
                                          std::shared_ptr<ReplIndexBuildState> replState) override;
+
+    void _signalPrimaryForAbortAndWaitForExternalAbort(OperationContext* opCtx,
+                                                       ReplIndexBuildState* replState,
+                                                       const Status& abortStatus) override;
 
     void _signalPrimaryForCommitReadiness(OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState) override;

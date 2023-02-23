@@ -87,6 +87,9 @@ IndexBuildsCoordinatorEmbedded::resumeIndexBuild(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
+void IndexBuildsCoordinatorEmbedded::_signalPrimaryForAbortAndWaitForExternalAbort(
+    OperationContext* opCtx, ReplIndexBuildState* replState, const Status& abortStatus) {}
+
 void IndexBuildsCoordinatorEmbedded::_signalPrimaryForCommitReadiness(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {}
 

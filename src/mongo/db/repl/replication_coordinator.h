@@ -1138,9 +1138,9 @@ public:
     using OnRemoteCmdCompleteFn = std::function<void(executor::TaskExecutor::CallbackHandle)>;
     /**
      * Runs the given command 'cmdObj' on primary and waits till the response for that command is
-     * received. If the node is primary, then the command will be executed using DBDirectClient to
-     * avoid tcp network calls. Otherwise, the node will execute the remote command using the repl
-     * task executor (AsyncDBClient).
+     * received. The node will execute the remote command using the repl task executor
+     * (AsyncDBClient), even if it is primary itself.
+     *
      * - 'OnRemoteCmdScheduled' will be called once the remote command is scheduled.
      * - 'OnRemoteCmdComplete' will be called once the response for the remote command is received.
      */
