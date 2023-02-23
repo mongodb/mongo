@@ -372,6 +372,12 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 auto* opCtx = opCtxHolder.get();
 
                 // Release source/target critical sections
+                // Note: Use 'throwIfReasonDiffers=false' on the destination collection because as
+                // soon as the critical section is released migrations can start. In case this phase
+                // needs to be retried, we could then encounter a critical section related to a
+                // migration. It is not needed for the source collection because no migration can
+                // start until it first becomes sharded, which cannot happen until the DDLLock is
+                // released.
                 const auto reason =
                     BSON("command"
                          << "rename"
@@ -380,7 +386,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 service->releaseRecoverableCriticalSection(
                     opCtx, fromNss(), reason, ShardingCatalogClient::kLocalWriteConcern);
                 service->releaseRecoverableCriticalSection(
-                    opCtx, toNss(), reason, WriteConcerns::kMajorityWriteConcernNoTimeout);
+                    opCtx, toNss(), reason, WriteConcerns::kMajorityWriteConcernNoTimeout, false);
 
                 LOGV2(5515107, "CRUD unblocked", "fromNs"_attr = fromNss(), "toNs"_attr = toNss());
             }))
