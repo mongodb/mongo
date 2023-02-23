@@ -60,14 +60,20 @@ assert.soon(
                        {
                            $match: {
                                $or: [
-                                   {'command.drop': collName},
-                                   {'command._shardsvrDropCollectionParticipant': collName}
-                               ],
-                               waitingForLock: true
+                                   {
+                                       $or: [
+                                           {'command.drop': collName},
+                                           // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
+                                           {'command._shardsvrDropCollectionParticipant': collName}
+                                       ],
+                                       waitingForLock: true
+                                   },
+                                   {'command._shardsvrParticipantBlock': collName},
+                               ]
                            }
                        }
                    ])
-                   .itcount() === 1;
+                   .itcount() > 0;
     },
     function() {
         return "Failed to find drop in currentOp output: " +

@@ -324,6 +324,18 @@ public:
                     ->waitForCoordinatorsOfGivenTypeToComplete(
                         opCtx, DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible);
             }
+            // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
+            if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+                feature_flags::gDropCollectionHoldingCriticalSection.isEnabledOnVersion(
+                    requestedVersion)) {
+                ShardingDDLCoordinatorService::getService(opCtx)
+                    ->waitForCoordinatorsOfGivenTypeToComplete(
+                        opCtx, DDLCoordinatorTypeEnum::kDropCollectionPre70Compatible);
+
+                ShardingDDLCoordinatorService::getService(opCtx)
+                    ->waitForCoordinatorsOfGivenTypeToComplete(
+                        opCtx, DDLCoordinatorTypeEnum::kDropDatabasePre70Compatible);
+            }
 
             return true;
         }
@@ -455,6 +467,19 @@ public:
                     opCtx, DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible);
         }
 
+        // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+            requestedVersion > actualVersion &&
+            feature_flags::gDropCollectionHoldingCriticalSection.isEnabledOnVersion(
+                requestedVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kDropCollectionPre70Compatible);
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kDropDatabasePre70Compatible);
+        }
+
         LOGV2(6744302,
               "setFeatureCompatibilityVersion succeeded",
               "upgradeOrDowngrade"_attr = upgradeOrDowngrade,
@@ -502,6 +527,18 @@ private:
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(
                     opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
+        }
+
+        // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
+        if (actualVersion > requestedVersion &&
+            !feature_flags::gDropCollectionHoldingCriticalSection.isEnabledOnVersion(
+                requestedVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
+                                                           DDLCoordinatorTypeEnum::kDropCollection);
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
+                                                           DDLCoordinatorTypeEnum::kDropDatabase);
         }
 
         // TODO SERVER-68373 remove once 7.0 becomes last LTS

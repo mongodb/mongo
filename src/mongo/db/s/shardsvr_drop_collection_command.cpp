@@ -33,6 +33,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
+#include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -104,9 +105,14 @@ public:
                     }
                     return ns();
                 }();
+                // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
+                const DDLCoordinatorTypeEnum coordType =
+                    feature_flags::gDropCollectionHoldingCriticalSection.isEnabled(*fixedFcvRegion)
+                    ? DDLCoordinatorTypeEnum::kDropCollection
+                    : DDLCoordinatorTypeEnum::kDropCollectionPre70Compatible;
+
                 auto coordinatorDoc = DropCollectionCoordinatorDocument();
-                coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                    {{targetNss, DDLCoordinatorTypeEnum::kDropCollection}});
+                coordinatorDoc.setShardingDDLCoordinatorMetadata({{targetNss, coordType}});
                 coordinatorDoc.setCollectionUUID(request().getCollectionUUID());
 
                 auto service = ShardingDDLCoordinatorService::getService(opCtx);

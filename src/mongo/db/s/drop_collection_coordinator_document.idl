@@ -45,7 +45,9 @@ enums:
         values:
             kUnset: "unset"
             kFreezeCollection: "freezeCollection"
+            kEnterCriticalSection: "enterCriticalSection"
             kDropCollection: "dropCollection"
+            kReleaseCriticalSection: "releaseCriticalSection"
 
 types:
     CollectionInfo:

@@ -43,7 +43,10 @@ public:
     using Phase = DropCollectionCoordinatorPhaseEnum;
 
     DropCollectionCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
-        : RecoverableShardingDDLCoordinator(service, "DropCollectionCoordinator", initialState) {}
+        : RecoverableShardingDDLCoordinator(service, "DropCollectionCoordinator", initialState),
+          _critSecReason(BSON("command"
+                              << "dropCollection"
+                              << "ns" << originalNss().toString())) {}
 
     ~DropCollectionCoordinator() = default;
 
@@ -60,12 +63,37 @@ public:
                                       bool fromMigrate);
 
 private:
+    const BSONObj _critSecReason;
+
     StringData serializePhase(const Phase& phase) const override {
         return DropCollectionCoordinatorPhase_serializer(phase);
     }
 
+    bool _mustAlwaysMakeProgress() override {
+        return !_isPre70Compatible() && _doc.getPhase() > Phase::kUnset;
+    }
+
+    // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
+    bool _isPre70Compatible() const {
+        return operationType() == DDLCoordinatorTypeEnum::kDropCollectionPre70Compatible;
+    }
+
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
+
+    // TODO SERVER-73627: inline this function once 7.0 becomes last LTS since it should be only
+    // called once.
+    void _saveCollInfo(OperationContext* opCtx);
+
+    void _checkPreconditionsAndSaveArgumentsOnDoc();
+
+    void _freezeMigrations(std::shared_ptr<executor::ScopedTaskExecutor> executor);
+
+    void _enterCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor);
+
+    void _commitDropCollection(std::shared_ptr<executor::ScopedTaskExecutor> executor);
+
+    void _exitCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor);
 };
 
 }  // namespace mongo

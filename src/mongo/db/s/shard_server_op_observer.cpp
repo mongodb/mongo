@@ -308,7 +308,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                             lockCollectionIfNotPrimary.emplace(
                                 opCtx,
                                 insertedNss,
-                                MODE_IX,
+                                fixLockModeForSystemDotViewsChanges(insertedNss, MODE_IX),
                                 AutoGetCollection::Options{}.viewMode(
                                     auto_get_collection::ViewMode::kViewsPermitted));
                         }
@@ -484,7 +484,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
                         lockCollectionIfNotPrimary.emplace(
                             opCtx,
                             updatedNss,
-                            MODE_IX,
+                            fixLockModeForSystemDotViewsChanges(updatedNss, MODE_IX),
                             AutoGetCollection::Options{}.viewMode(
                                 auto_get_collection::ViewMode::kViewsPermitted));
                     }
@@ -719,7 +719,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                         lockCollectionIfNotPrimary.emplace(
                             opCtx,
                             deletedNss,
-                            MODE_IX,
+                            fixLockModeForSystemDotViewsChanges(deletedNss, MODE_IX),
                             AutoGetCollection::Options{}.viewMode(
                                 auto_get_collection::ViewMode::kViewsPermitted));
                     }

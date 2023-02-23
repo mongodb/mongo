@@ -31,6 +31,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/s/drop_database_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -39,6 +40,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -81,19 +83,31 @@ public:
             CurOp::get(opCtx)->raiseDbProfileLevel(
                 CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns().dbName()));
 
-            auto coordinatorDoc = DropDatabaseCoordinatorDocument();
-            coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                {{ns(), DDLCoordinatorTypeEnum::kDropDatabase}});
             auto service = ShardingDDLCoordinatorService::getService(opCtx);
             const auto requestVersion = OperationShardingState::get(opCtx).getDbVersion(ns().db());
             auto dropDatabaseCoordinator = [&]() {
                 while (true) {
+                    // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
+                    boost::optional<FixedFCVRegion> fixedFcvRegion;
+                    fixedFcvRegion.emplace(opCtx);
+
+                    DropDatabaseCoordinatorDocument coordinatorDoc;
+                    const DDLCoordinatorTypeEnum coordType =
+                        feature_flags::gDropCollectionHoldingCriticalSection.isEnabled(
+                            **fixedFcvRegion)
+                        ? DDLCoordinatorTypeEnum::kDropDatabase
+                        : DDLCoordinatorTypeEnum::kDropDatabasePre70Compatible;
+
+                    coordinatorDoc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
+
                     auto currentCoordinator = checked_pointer_cast<DropDatabaseCoordinator>(
                         service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
                     const auto currentDbVersion = currentCoordinator->getDatabaseVersion();
                     if (currentDbVersion == requestVersion) {
                         return currentCoordinator;
                     }
+
+                    fixedFcvRegion.reset();
                     LOGV2_DEBUG(6073000,
                                 2,
                                 "DbVersion mismatch, waiting for existing coordinator to finish",

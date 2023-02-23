@@ -46,8 +46,12 @@ enums:
             # TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
             kMovePrimaryNoResilient: "movePrimaryNoResilient"
             kMovePrimary: "movePrimary"
-            kDropDatabase: "dropDatabase"
-            kDropCollection: "dropCollection"
+            kDropDatabase: "dropDatabase_V2"
+            # TODO SERVER-73627: Remove once 7.0 becomes last LTS.
+            kDropDatabasePre70Compatible: "dropDatabase"
+            kDropCollection: "dropCollection_V2"
+            # TODO SERVER-73627: Remove once 7.0 becomes last LTS.
+            kDropCollectionPre70Compatible: "dropCollection"
             kRenameCollection: "renameCollection_V2"
             # TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
             kRenameCollectionPre63Compatible: "renameCollection"

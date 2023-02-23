@@ -98,3 +98,8 @@ feature_flags:
     description: "Feature flag for checking metadata consistency in the cluster, database or collection"
     cpp_varname: feature_flags::gCheckMetadataConsistency
     default: false
+  # TODO SERVER-73627: Remove once 7.0 becomes last LTS.
+  featureFlagDropCollectionHoldingCriticalSection:
+    description: "Feature flag for enabling the new implementation of the dropCollection DDL operation."
+    cpp_varname: feature_flags::gDropCollectionHoldingCriticalSection
+    default: false

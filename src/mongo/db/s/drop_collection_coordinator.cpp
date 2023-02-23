@@ -35,6 +35,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/global_index_ddl_util.h"
+#include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/sharded_index_catalog_commands_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -142,125 +143,40 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_buildPhaseHandler(
-            Phase::kFreezeCollection,
-            [this, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
+        .then([this, executor = executor, anchor = shared_from_this()] {
+            if (_isPre70Compatible())
+                return;
 
-                try {
-                    auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss());
-                    _doc.setCollInfo(std::move(coll));
-                } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                    // The collection is not sharded or doesn't exist.
-                    _doc.setCollInfo(boost::none);
-                }
+            if (_doc.getPhase() < Phase::kFreezeCollection)
+                _checkPreconditionsAndSaveArgumentsOnDoc();
+        })
+        .then(_buildPhaseHandler(Phase::kFreezeCollection,
+                                 [this, executor = executor, anchor = shared_from_this()] {
+                                     _freezeMigrations(executor);
+                                 }))
 
-                {
-                    AutoGetCollection coll{
-                        opCtx,
-                        nss(),
-                        MODE_IS,
-                        AutoGetCollection::Options{}
-                            .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
-                            .expectedUUID(_doc.getCollectionUUID())};
-                }
+        .then([this, executor = executor, anchor = shared_from_this()] {
+            if (_isPre70Compatible())
+                return;
 
-                BSONObjBuilder logChangeDetail;
-                if (_doc.getCollInfo()) {
-                    logChangeDetail.append("collectionUUID",
-                                           _doc.getCollInfo()->getUuid().toBSON());
-                }
+            _buildPhaseHandler(Phase::kEnterCriticalSection,
+                               [this, executor = executor, anchor = shared_from_this()] {
+                                   _enterCriticalSection(executor);
+                               })();
+        })
+        .then(_buildPhaseHandler(Phase::kDropCollection,
+                                 [this, executor = executor, anchor = shared_from_this()] {
+                                     _commitDropCollection(executor);
+                                 }))
+        .then([this, executor = executor, anchor = shared_from_this()] {
+            if (_isPre70Compatible())
+                return;
 
-                ShardingLogging::get(opCtx)->logChange(
-                    opCtx, "dropCollection.start", nss().ns(), logChangeDetail.obj());
-
-                // Persist the collection info before sticking to using it's uuid. This ensures this
-                // node is still the RS primary, so it was also the primary at the moment we read
-                // the collection metadata.
-                _updateStateDocument(opCtx, StateDoc(_doc));
-
-                if (_doc.getCollInfo()) {
-                    sharding_ddl_util::stopMigrations(opCtx, nss(), _doc.getCollInfo()->getUuid());
-                }
-            }))
-        .then(_buildPhaseHandler(
-            Phase::kDropCollection,
-            [this, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
-                if (!_firstExecution) {
-                    // Perform a noop write on the participants in order to advance the txnNumber
-                    // for this coordinator's lsid so that requests with older txnNumbers can no
-                    // longer execute.
-                    _updateSession(opCtx);
-                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getCurrentSession(), **executor);
-                }
-
-                const auto collIsSharded = bool(_doc.getCollInfo());
-
-                LOGV2_DEBUG(5390504,
-                            2,
-                            "Dropping collection",
-                            "namespace"_attr = nss(),
-                            "sharded"_attr = collIsSharded);
-
-                if (collIsSharded) {
-                    invariant(_doc.getCollInfo());
-                    const auto& coll = _doc.getCollInfo().value();
-                    sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
-                        opCtx, coll, ShardingCatalogClient::kMajorityWriteConcern);
-                }
-
-                // Remove tags even if the collection is not sharded or didn't exist
-                _updateSession(opCtx);
-                sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss(), getCurrentSession());
-
-                // get a Lsid and an incremented txnNumber. Ensures we are the primary
-                _updateSession(opCtx);
-
-                const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-
-                // We need to send the drop to all the shards because both movePrimary and
-                // moveChunk leave garbage behind for sharded collections.
-                auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-
-                // Remove primary shard from participants
-                participants.erase(
-                    std::remove(participants.begin(), participants.end(), primaryShardId),
-                    participants.end());
-
-                sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-                    opCtx,
-                    nss(),
-                    participants,
-                    **executor,
-                    getCurrentSession(),
-                    true /*fromMigrate*/);
-
-                // The sharded collection must be dropped on the primary shard after it has been
-                // dropped on all of the other shards to ensure it can only be re-created as
-                // unsharded with a higher optime than all of the drops.
-                sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-                    opCtx,
-                    nss(),
-                    {primaryShardId},
-                    **executor,
-                    getCurrentSession(),
-                    false /*fromMigrate*/);
-
-                // Remove potential query analyzer document only after purging the collection from
-                // the catalog. This ensures no leftover documents referencing an old incarnation of
-                // a collection.
-                sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(opCtx, nss(), boost::none);
-
-                ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss().ns());
-                LOGV2(5390503, "Collection dropped", "namespace"_attr = nss());
-            }))
+            _buildPhaseHandler(Phase::kReleaseCriticalSection,
+                               [this, executor = executor, anchor = shared_from_this()] {
+                                   _exitCriticalSection(executor);
+                               })();
+        })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (!status.isA<ErrorCategory::NotPrimaryError>() &&
                 !status.isA<ErrorCategory::ShutdownError>()) {
@@ -271,6 +187,182 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
             }
             return status;
         });
+}
+
+void DropCollectionCoordinator::_saveCollInfo(OperationContext* opCtx) {
+
+    try {
+        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss());
+        _doc.setCollInfo(std::move(coll));
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // The collection is not sharded or doesn't exist.
+        _doc.setCollInfo(boost::none);
+    }
+}
+
+void DropCollectionCoordinator::_checkPreconditionsAndSaveArgumentsOnDoc() {
+    auto opCtxHolder = cc().makeOperationContext();
+    auto* opCtx = opCtxHolder.get();
+    getForwardableOpMetadata().setOn(opCtx);
+
+    // If the request had an expected UUID for the collection being dropped, we should verify that
+    // it matches the one from the local catalog
+    {
+        AutoGetCollection coll{opCtx,
+                               nss(),
+                               MODE_IS,
+                               AutoGetCollection::Options{}
+                                   .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
+                                   .expectedUUID(_doc.getCollectionUUID())};
+    }
+
+    _saveCollInfo(opCtx);
+}
+
+void DropCollectionCoordinator::_freezeMigrations(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    auto opCtxHolder = cc().makeOperationContext();
+    auto* opCtx = opCtxHolder.get();
+    getForwardableOpMetadata().setOn(opCtx);
+
+    if (_isPre70Compatible()) {
+        _saveCollInfo(opCtx);
+
+        // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
+        // This check can be removed since it is also present in _checkPreconditions.
+        {
+            AutoGetCollection coll{opCtx,
+                                   nss(),
+                                   MODE_IS,
+                                   AutoGetCollection::Options{}
+                                       .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
+                                       .expectedUUID(_doc.getCollectionUUID())};
+        }
+
+        // Persist the collection info before sticking to using it's uuid. This ensures this node is
+        // still the RS primary, so it was also the primary at the moment we read the collection
+        // metadata.
+        _updateStateDocument(opCtx, StateDoc(_doc));
+    }
+
+    BSONObjBuilder logChangeDetail;
+    if (_doc.getCollInfo()) {
+        logChangeDetail.append("collectionUUID", _doc.getCollInfo()->getUuid().toBSON());
+    }
+
+    ShardingLogging::get(opCtx)->logChange(
+        opCtx, "dropCollection.start", nss().ns(), logChangeDetail.obj());
+
+    if (_doc.getCollInfo()) {
+        sharding_ddl_util::stopMigrations(opCtx, nss(), _doc.getCollInfo()->getUuid());
+    }
+}
+
+void DropCollectionCoordinator::_enterCriticalSection(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    LOGV2_DEBUG(7038100, 2, "Acquiring critical section", "namespace"_attr = nss());
+
+    auto opCtxHolder = cc().makeOperationContext();
+    auto* opCtx = opCtxHolder.get();
+    getForwardableOpMetadata().setOn(opCtx);
+
+    _updateSession(opCtx);
+    ShardsvrParticipantBlock blockCRUDOperationsRequest(nss());
+    blockCRUDOperationsRequest.setBlockType(mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
+    blockCRUDOperationsRequest.setReason(_critSecReason);
+    blockCRUDOperationsRequest.setAllowViews(true);
+
+    const auto cmdObj =
+        CommandHelpers::appendMajorityWriteConcern(blockCRUDOperationsRequest.toBSON({}));
+    sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx,
+        nss().db(),
+        cmdObj.addFields(getCurrentSession().toBSON()),
+        Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+        **executor);
+
+    LOGV2_DEBUG(7038101, 2, "Acquired critical section", "namespace"_attr = nss());
+}
+
+void DropCollectionCoordinator::_commitDropCollection(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    auto opCtxHolder = cc().makeOperationContext();
+    auto* opCtx = opCtxHolder.get();
+    getForwardableOpMetadata().setOn(opCtx);
+
+    const auto collIsSharded = bool(_doc.getCollInfo());
+
+    LOGV2_DEBUG(5390504,
+                2,
+                "Dropping collection",
+                "namespace"_attr = nss(),
+                "sharded"_attr = collIsSharded);
+
+    if (collIsSharded) {
+        invariant(_doc.getCollInfo());
+        const auto& coll = _doc.getCollInfo().value();
+        sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
+            opCtx, coll, ShardingCatalogClient::kMajorityWriteConcern);
+    }
+
+    // Remove tags even if the collection is not sharded or didn't exist
+    _updateSession(opCtx);
+    sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss(), getCurrentSession());
+
+    // get a Lsid and an incremented txnNumber. Ensures we are the primary
+    _updateSession(opCtx);
+
+    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+
+    // We need to send the drop to all the shards because both movePrimary and
+    // moveChunk leave garbage behind for sharded collections.
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    // Remove primary shard from participants
+    participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
+                       participants.end());
+
+    sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
+        opCtx, nss(), participants, **executor, getCurrentSession(), true /*fromMigrate*/);
+
+    // The sharded collection must be dropped on the primary shard after it has been
+    // dropped on all of the other shards to ensure it can only be re-created as
+    // unsharded with a higher optime than all of the drops.
+    sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
+        opCtx, nss(), {primaryShardId}, **executor, getCurrentSession(), false /*fromMigrate*/);
+
+    // Remove potential query analyzer document only after purging the collection from
+    // the catalog. This ensures no leftover documents referencing an old incarnation of
+    // a collection.
+    sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(opCtx, nss(), boost::none);
+
+    ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss().ns());
+    LOGV2(5390503, "Collection dropped", "namespace"_attr = nss());
+}
+
+void DropCollectionCoordinator::_exitCriticalSection(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    LOGV2_DEBUG(7038102, 2, "Releasing critical section", "namespace"_attr = nss());
+
+    auto opCtxHolder = cc().makeOperationContext();
+    auto* opCtx = opCtxHolder.get();
+    getForwardableOpMetadata().setOn(opCtx);
+
+    _updateSession(opCtx);
+    ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
+    unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
+    unblockCRUDOperationsRequest.setReason(_critSecReason);
+    unblockCRUDOperationsRequest.setAllowViews(true);
+
+    const auto cmdObj =
+        CommandHelpers::appendMajorityWriteConcern(unblockCRUDOperationsRequest.toBSON({}));
+    sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx,
+        nss().db(),
+        cmdObj.addFields(getCurrentSession().toBSON()),
+        Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+        **executor);
+
+    LOGV2_DEBUG(7038103, 2, "Released critical section", "namespace"_attr = nss());
 }
 
 }  // namespace mongo
