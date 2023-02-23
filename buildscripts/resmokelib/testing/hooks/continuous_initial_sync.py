@@ -244,8 +244,6 @@ class _InitialSyncThread(threading.Thread):
         self._check_thread()
         # Wait until we all the replica sets have primaries.
         self._await_primaries()
-        # Wait for Mongos to retarget the primary for each shard and the config server.
-        self._do_wait_for_mongos_retarget()
         # Check that fixtures are still running.
         self._check_fixtures()
 
@@ -471,52 +469,3 @@ class _InitialSyncThread(threading.Thread):
 
         self.logger.info("Old primary on port {} in set {} successfully stepped down".format(
             old_primary.port, fixture.replset_name))
-
-    def _do_wait_for_mongos_retarget(self):
-        """Run collStats on each collection in each database on each mongos.
-
-        This is to ensure mongos can target the primary for each shard with data, including the
-        config servers.
-        """
-
-        for mongos_fixture in self._mongos_fixtures:
-            mongos_conn_str = mongos_fixture.get_internal_connection_string()
-            try:
-                client = mongos_fixture.mongo_client()
-            except pymongo.errors.AutoReconnect:
-                pass
-            for db in client.list_database_names():
-                self.logger.info("Waiting for mongos %s to retarget db: %s", mongos_conn_str, db)
-                start_time = time.time()
-                while True:
-                    try:
-                        coll_names = client[db].list_collection_names()
-                        break
-                    except pymongo.errors.NotPrimaryError:
-                        pass
-                    retarget_time = time.time() - start_time
-                    if retarget_time >= 60:
-                        raise RuntimeError(
-                            "Timeout waiting for mongos: {} to retarget to db: {}".format(
-                                mongos_conn_str, db))
-                    time.sleep(0.2)
-                for coll in coll_names:
-                    while True:
-                        try:
-                            client[db].command({"collStats": coll})
-                            break
-                        except pymongo.errors.NotPrimaryError:
-                            pass
-                        except pymongo.errors.OperationFailure as ex:
-                            if ex.code == 166:  # CommandNotSupportedOnView
-                                # listCollections return also views and collStats is not supported on views
-                                break
-                        retarget_time = time.time() - start_time
-                        if retarget_time >= 60:
-                            raise RuntimeError(
-                                "Timeout waiting for mongos: {} to retarget to db: {}".format(
-                                    mongos_conn_str, db))
-                        time.sleep(0.2)
-                retarget_time = time.time() - start_time
-                self.logger.info("Finished waiting for mongos: %s to retarget db: %s, in %d ms",
-                                 mongos_conn_str, db, retarget_time * 1000)
