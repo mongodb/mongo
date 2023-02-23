@@ -43,7 +43,7 @@ public:
     }
 
     transport::TransportLayerMock transportLayer;
-    transport::SessionHandle session = transportLayer.createSession();
+    std::shared_ptr<transport::Session> session = transportLayer.createSession();
     ServiceContext::UniqueOperationContext opCtx;
 };
 

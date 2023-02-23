@@ -370,7 +370,8 @@ public:
      *
      * If supplied, "session" is the transport::Session used for communicating with the client.
      */
-    UniqueClient makeClient(std::string desc, transport::SessionHandle session = nullptr);
+    UniqueClient makeClient(std::string desc,
+                            std::shared_ptr<transport::Session> session = nullptr);
 
     /**
      * Creates a new OperationContext on "client".

@@ -477,7 +477,7 @@ protected:
     AuthorizationManager* _authzManager;
     AuthzManagerExternalStateMock* _managerState;
     transport::TransportLayerMock _transportLayer;
-    transport::SessionHandle _session;
+    std::shared_ptr<transport::Session> _session;
     ServiceContext::UniqueClient _client;
     AuthorizationSession* _authzSession;
 };

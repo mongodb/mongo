@@ -233,7 +233,8 @@ void ServiceExecutorReserved::appendStats(BSONObjBuilder* bob) const {
  * receive the next message and we don't mind blocking on this dedicated
  * worker thread.
  */
-void ServiceExecutorReserved::_runOnDataAvailable(const SessionHandle& session, Task task) {
+void ServiceExecutorReserved::_runOnDataAvailable(const std::shared_ptr<Session>& session,
+                                                  Task task) {
     invariant(session);
     _schedule([this, session, callback = std::move(task)](Status status) {
         yieldIfAppropriate();

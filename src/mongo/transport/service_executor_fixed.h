@@ -89,13 +89,13 @@ private:
     struct Stats;
 
     struct Waiter {
-        SessionHandle session;
+        std::shared_ptr<Session> session;
         Task onCompletionCallback;
     };
 
     void _schedule(Task task);
 
-    void _runOnDataAvailable(const SessionHandle& session, Task onCompletionCallback);
+    void _runOnDataAvailable(const std::shared_ptr<Session>& session, Task onCompletionCallback);
 
     const std::string& _name() const;
 

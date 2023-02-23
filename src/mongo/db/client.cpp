@@ -61,13 +61,13 @@ void invariantNoCurrentClient() {
 }
 }  // namespace
 
-void Client::initThread(StringData desc, transport::SessionHandle session) {
+void Client::initThread(StringData desc, std::shared_ptr<transport::Session> session) {
     initThread(desc, getGlobalServiceContext(), std::move(session));
 }
 
 void Client::initThread(StringData desc,
                         ServiceContext* service,
-                        transport::SessionHandle session) {
+                        std::shared_ptr<transport::Session> session) {
     invariantNoCurrentClient();
 
     std::string fullDesc;
@@ -92,7 +92,9 @@ int64_t generateSeed(const std::string& desc) {
 }
 }  // namespace
 
-Client::Client(std::string desc, ServiceContext* serviceContext, transport::SessionHandle session)
+Client::Client(std::string desc,
+               ServiceContext* serviceContext,
+               std::shared_ptr<transport::Session> session)
     : _serviceContext(serviceContext),
       _session(std::move(session)),
       _desc(std::move(desc)),
@@ -186,7 +188,7 @@ ThreadClient::ThreadClient(ServiceContext* serviceContext)
 
 ThreadClient::ThreadClient(StringData desc,
                            ServiceContext* serviceContext,
-                           transport::SessionHandle session) {
+                           std::shared_ptr<transport::Session> session) {
     invariantNoCurrentClient();
     _originalThreadName = getThreadNameRef();
     Client::initThread(desc, serviceContext, std::move(session));

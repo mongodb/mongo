@@ -115,7 +115,7 @@ public:
         return handleRequestCb(opCtx, request);
     }
 
-    void onEndSession(const SessionHandle& handle) override {
+    void onEndSession(const std::shared_ptr<Session>& handle) override {
         onEndSessionCb(handle);
     }
 
@@ -132,7 +132,7 @@ public:
     }
 
     std::function<Future<DbResponse>(OperationContext*, const Message&)> handleRequestCb;
-    std::function<void(const SessionHandle)> onEndSessionCb;
+    std::function<void(const std::shared_ptr<Session>)> onEndSessionCb;
     std::function<void(Client*)> derivedOnClientDisconnectCb;
     std::function<void(ServiceContext::UniqueClient&, bool)> configureServiceExecutorContextCb;
 };

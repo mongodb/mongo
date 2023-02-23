@@ -82,19 +82,18 @@ public:
     static const Status TicketSessionClosedStatus;
 
     friend class Session;
-    using SessionHandle = std::shared_ptr<Session>;
 
     explicit TransportLayer(const WireSpec& wireSpec) : _wireSpec(wireSpec) {}
 
     virtual ~TransportLayer() = default;
 
-    virtual StatusWith<SessionHandle> connect(
+    virtual StatusWith<std::shared_ptr<Session>> connect(
         HostAndPort peer,
         ConnectSSLMode sslMode,
         Milliseconds timeout,
         boost::optional<TransientSSLParams> transientSSLParams = boost::none) = 0;
 
-    virtual Future<SessionHandle> asyncConnect(
+    virtual Future<std::shared_ptr<Session>> asyncConnect(
         HostAndPort peer,
         ConnectSSLMode sslMode,
         const ReactorHandle& reactor,

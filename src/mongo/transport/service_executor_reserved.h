@@ -73,7 +73,7 @@ private:
 
     void _schedule(Task task);
 
-    void _runOnDataAvailable(const SessionHandle& session, Task task);
+    void _runOnDataAvailable(const std::shared_ptr<Session>& session, Task task);
 
     static thread_local std::deque<Task> _localWorkQueue;
     static thread_local int64_t _localThreadIdleCounter;

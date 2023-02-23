@@ -67,8 +67,8 @@ public:
         return _roles;
     }
 
-    static SSLPeerInfo& forSession(const transport::SessionHandle& session);
-    static const SSLPeerInfo& forSession(const transport::ConstSessionHandle& session);
+    static SSLPeerInfo& forSession(const std::shared_ptr<transport::Session>& session);
+    static const SSLPeerInfo& forSession(const std::shared_ptr<const transport::Session>& session);
 
 private:
     /**

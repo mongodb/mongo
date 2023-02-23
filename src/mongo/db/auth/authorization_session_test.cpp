@@ -188,7 +188,7 @@ protected:
 protected:
     FailureCapableAuthzManagerExternalStateMock* managerState;
     transport::TransportLayerMock transportLayer;
-    transport::SessionHandle _session;
+    std::shared_ptr<transport::Session> _session;
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
     AuthzSessionExternalStateMock* sessionState;

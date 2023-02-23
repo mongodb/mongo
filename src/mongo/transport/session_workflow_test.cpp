@@ -93,7 +93,7 @@ struct FunctionTraits<R(A...)> {
     X(sessionSinkMessage, Status(const Message&))                              \
     /* ServiceEntryPoint functions */                                          \
     X(sepHandleRequest, Future<DbResponse>(OperationContext*, const Message&)) \
-    X(sepEndSession, void(const SessionHandle&))                               \
+    X(sepEndSession, void(const std::shared_ptr<Session>&))                    \
 /**/
 
 /**
@@ -359,7 +359,7 @@ private:
             }
             return _onMockEvent<Event::sepHandleRequest>(std::tie(opCtx, msg));
         };
-        sep->onEndSessionCb = [=](const SessionHandle& session) {
+        sep->onEndSessionCb = [=](const std::shared_ptr<Session>& session) {
             _onMockEvent<Event::sepEndSession>(std::tie(session));
         };
         sep->derivedOnClientDisconnectCb = [&](Client*) {

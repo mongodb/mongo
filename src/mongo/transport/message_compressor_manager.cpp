@@ -322,7 +322,7 @@ void MessageCompressorManager::serverNegotiate(
 }
 
 MessageCompressorManager& MessageCompressorManager::forSession(
-    const transport::SessionHandle& session) {
+    const std::shared_ptr<transport::Session>& session) {
     return getForSession(session.get());
 }
 

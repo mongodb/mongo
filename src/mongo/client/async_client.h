@@ -50,7 +50,7 @@ namespace mongo {
 class AsyncDBClient : public std::enable_shared_from_this<AsyncDBClient> {
 public:
     explicit AsyncDBClient(const HostAndPort& peer,
-                           transport::SessionHandle session,
+                           std::shared_ptr<transport::Session> session,
                            ServiceContext* svcCtx)
         : _peer(std::move(peer)), _session(std::move(session)), _svcCtx(svcCtx) {}
 
@@ -119,7 +119,7 @@ private:
     auth::RunCommandHook _makeAuthRunCommandHook();
 
     const HostAndPort _peer;
-    transport::SessionHandle _session;
+    std::shared_ptr<transport::Session> _session;
     ServiceContext* const _svcCtx;
     MessageCompressorManager _compressorManager;
 };

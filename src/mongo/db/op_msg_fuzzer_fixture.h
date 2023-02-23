@@ -66,7 +66,7 @@ private:
     ServiceContext* _serviceContext;
     ClientStrandPtr _clientStrand;
     transport::TransportLayerMock _transportLayer;
-    transport::SessionHandle _session;
+    std::shared_ptr<transport::Session> _session;
     AuthzManagerExternalStateMock* _externalState;
     AuthorizationManagerImpl* _authzManager;
 };

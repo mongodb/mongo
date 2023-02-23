@@ -51,7 +51,8 @@ public:
                 return _p->scheduleTaskCb(std::move(task));
             }
 
-            void runOnDataAvailable(SessionHandle session, Task onCompletionCallback) override {
+            void runOnDataAvailable(std::shared_ptr<Session> session,
+                                    Task onCompletionCallback) override {
                 _p->runOnDataAvailableCb(session, std::move(onCompletionCallback));
             }
 
@@ -75,7 +76,7 @@ public:
 
     std::function<Status()> startCb;
     std::function<void(Task)> scheduleTaskCb;
-    std::function<void(const SessionHandle&, Task)> runOnDataAvailableCb;
+    std::function<void(const std::shared_ptr<Session>&, Task)> runOnDataAvailableCb;
     std::function<Status(Milliseconds)> shutdownCb;
     std::function<size_t()> getRunningThreadsCb;
     std::function<void(BSONObjBuilder*)> appendStatsCb;

@@ -195,7 +195,8 @@ void ServiceExecutorSynchronous::appendStats(BSONObjBuilder* bob) const {
         .append("clientsWaitingForData", 0);
 }
 
-void ServiceExecutorSynchronous::_runOnDataAvailable(const SessionHandle& session, Task task) {
+void ServiceExecutorSynchronous::_runOnDataAvailable(const std::shared_ptr<Session>& session,
+                                                     Task task) {
     invariant(session);
     yieldIfAppropriate();
     _schedule(std::move(task));

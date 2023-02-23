@@ -157,7 +157,7 @@ public:
     /**
      * pushRecord returns false if the queue was full.  This is ultimately fatal to the recording
      */
-    bool pushRecord(const transport::SessionHandle& ts,
+    bool pushRecord(const std::shared_ptr<transport::Session>& ts,
                     Date_t now,
                     const uint64_t order,
                     const Message& message) {
@@ -307,7 +307,7 @@ void TrafficRecorder::stop() {
     uassertStatusOK(recording->shutdown());
 }
 
-void TrafficRecorder::observe(const transport::SessionHandle& ts,
+void TrafficRecorder::observe(const std::shared_ptr<transport::Session>& ts,
                               Date_t now,
                               const Message& message) {
     if (shouldAlwaysRecordTraffic) {

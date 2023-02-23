@@ -65,12 +65,12 @@ public:
     explicit TransportLayerManager(const WireSpec& wireSpec = WireSpec::instance())
         : TransportLayer(wireSpec) {}
 
-    StatusWith<SessionHandle> connect(
+    StatusWith<std::shared_ptr<Session>> connect(
         HostAndPort peer,
         ConnectSSLMode sslMode,
         Milliseconds timeout,
         boost::optional<TransientSSLParams> transientSSLParams) override;
-    Future<SessionHandle> asyncConnect(
+    Future<std::shared_ptr<Session>> asyncConnect(
         HostAndPort peer,
         ConnectSSLMode sslMode,
         const ReactorHandle& reactor,

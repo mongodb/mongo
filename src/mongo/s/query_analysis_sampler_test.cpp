@@ -879,7 +879,7 @@ TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdExternalClient) {
         "queryAnalysisSamplerBurstMultiplier", 1};
 
     transport::TransportLayerMock transportLayer;
-    transport::SessionHandle session = transportLayer.createSession();
+    std::shared_ptr<transport::Session> session = transportLayer.createSession();
     auto client =
         getGlobalServiceContext()->makeClient("TryGenerateSampleIdExternalClient", session);
     auto opCtxHolder = client->makeOperationContext();
@@ -952,7 +952,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
         "queryAnalysisSamplerBurstMultiplier", 1};
 
     transport::TransportLayerMock transportLayer;
-    transport::SessionHandle session = transportLayer.createSession();
+    std::shared_ptr<transport::Session> session = transportLayer.createSession();
     auto client =
         getGlobalServiceContext()->makeClient("RefreshConfigurationsNewCollectionUuid", session);
     auto opCtxHolder = client->makeOperationContext();
@@ -1055,7 +1055,7 @@ TEST_F(QueryAnalysisSamplerTest, ReportForCurrentOp) {
 
     const double rate = 1000.0;
     transport::TransportLayerMock transportLayer;
-    transport::SessionHandle session = transportLayer.createSession();
+    std::shared_ptr<transport::Session> session = transportLayer.createSession();
     auto client =
         getGlobalServiceContext()->makeClient("RefreshConfigurationsNewCollectionUuid", session);
     auto opCtxHolder = client->makeOperationContext();
@@ -1117,7 +1117,7 @@ TEST_F(QueryAnalysisSamplerTest, ReportForCurrentOpMultipleCollections) {
 
     const double rate = 1000.0;
     transport::TransportLayerMock transportLayer;
-    transport::SessionHandle session = transportLayer.createSession();
+    std::shared_ptr<transport::Session> session = transportLayer.createSession();
     auto client =
         getGlobalServiceContext()->makeClient("RefreshConfigurationsNewCollectionUuid", session);
     auto opCtxHolder = client->makeOperationContext();

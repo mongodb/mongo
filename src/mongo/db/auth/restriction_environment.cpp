@@ -45,7 +45,7 @@ const RestrictionEnvironment& RestrictionEnvironment::get(const Client& client) 
     return *ptr;
 }
 
-void RestrictionEnvironment::set(const transport::SessionHandle& session,
+void RestrictionEnvironment::set(const std::shared_ptr<transport::Session>& session,
                                  std::unique_ptr<RestrictionEnvironment> environment) {
     getRestrictionEnvironment(session.get()) = std::move(environment);
 }

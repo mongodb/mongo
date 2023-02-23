@@ -587,7 +587,7 @@ Status makeConnectError(Status status, const HostAndPort& peer, const WrappedEnd
 }
 
 
-StatusWith<SessionHandle> AsioTransportLayer::connect(
+StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
     HostAndPort peer,
     ConnectSSLMode sslMode,
     Milliseconds timeout,
@@ -626,7 +626,7 @@ StatusWith<SessionHandle> AsioTransportLayer::connect(
 
 #ifndef _WIN32
     if (endpoints.front().family() == AF_UNIX) {
-        return static_cast<SessionHandle>(std::move(session));
+        return static_cast<std::shared_ptr<Session>>(std::move(session));
     }
 #endif
 
@@ -694,11 +694,11 @@ StatusWith<SessionHandle> AsioTransportLayer::connect(
     }
 #endif
 
-    return static_cast<SessionHandle>(std::move(session));
+    return static_cast<std::shared_ptr<Session>>(std::move(session));
 }
 
 template <typename Endpoint>
-StatusWith<AsioTransportLayer::AsioSessionHandle> AsioTransportLayer::_doSyncConnect(
+StatusWith<std::shared_ptr<AsioSession>> AsioTransportLayer::_doSyncConnect(
     Endpoint endpoint,
     const HostAndPort& peer,
     const Milliseconds& timeout,
@@ -771,7 +771,7 @@ StatusWith<AsioTransportLayer::AsioSessionHandle> AsioTransportLayer::_doSyncCon
     }
 }
 
-Future<SessionHandle> AsioTransportLayer::asyncConnect(
+Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
     HostAndPort peer,
     ConnectSSLMode sslMode,
     const ReactorHandle& reactor,
@@ -795,7 +795,7 @@ Future<SessionHandle> AsioTransportLayer::asyncConnect(
     struct AsyncConnectState {
         AsyncConnectState(HostAndPort peer,
                           asio::io_context& context,
-                          Promise<SessionHandle> promise_,
+                          Promise<std::shared_ptr<Session>> promise_,
                           const ReactorHandle& reactor)
             : promise(std::move(promise_)),
               socket(context),
@@ -805,7 +805,7 @@ Future<SessionHandle> AsioTransportLayer::asyncConnect(
               reactor(reactor) {}
 
         AtomicWord<bool> done{false};
-        Promise<SessionHandle> promise;
+        Promise<std::shared_ptr<Session>> promise;
 
         Mutex mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "AsyncConnectState::mutex");
         AsioSession::GenericSocket socket;
@@ -813,15 +813,15 @@ Future<SessionHandle> AsioTransportLayer::asyncConnect(
         WrappedResolver resolver;
         WrappedEndpoint resolvedEndpoint;
         const HostAndPort peer;
-        AsioSessionHandle session;
+        std::shared_ptr<AsioSession> session;
         ReactorHandle reactor;
     };
 
     auto reactorImpl = checked_cast<AsioReactor*>(reactor.get());
-    auto pf = makePromiseFuture<SessionHandle>();
+    auto pf = makePromiseFuture<std::shared_ptr<Session>>();
     auto connector = std::make_shared<AsyncConnectState>(
         std::move(peer), *reactorImpl, std::move(pf.promise), reactor);
-    Future<SessionHandle> mergedFuture = std::move(pf.future);
+    Future<std::shared_ptr<Session>> mergedFuture = std::move(pf.future);
 
     if (connector->peer.host().empty()) {
         return Status{ErrorCodes::HostNotFound, "Hostname or IP address to connect to is empty"};

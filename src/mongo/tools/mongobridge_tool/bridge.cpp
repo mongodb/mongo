@@ -171,11 +171,11 @@ public:
         return _dest.get();
     }
 
-    transport::SessionHandle& getSession() {
+    std::shared_ptr<transport::Session>& getSession() {
         return _dest;
     }
 
-    void setSession(transport::SessionHandle session) {
+    void setSession(std::shared_ptr<transport::Session> session) {
         _dest = std::move(session);
     }
 
@@ -242,13 +242,13 @@ public:
         return _inExhaust;
     }
 
-    static ProxiedConnection& get(const transport::SessionHandle& session);
+    static ProxiedConnection& get(const std::shared_ptr<transport::Session>& session);
 
 private:
     friend class ServiceEntryPointBridge;
 
     static const transport::Session::Decoration<ProxiedConnection> _get;
-    transport::SessionHandle _dest;
+    std::shared_ptr<transport::Session> _dest;
     PseudoRandom _prng;
     boost::optional<HostAndPort> _host;
     bool _seenFirstMessage = false;
@@ -259,7 +259,7 @@ private:
 const transport::Session::Decoration<ProxiedConnection> ProxiedConnection::_get =
     transport::Session::declareDecoration<ProxiedConnection>();
 
-ProxiedConnection& ProxiedConnection::get(const transport::SessionHandle& session) {
+ProxiedConnection& ProxiedConnection::get(const std::shared_ptr<transport::Session>& session) {
     return _get(*session);
 }
 
@@ -300,7 +300,7 @@ Future<DbResponse> ServiceEntryPointBridge::handleRequest(OperationContext* opCt
     });
 
     if (!dest.getSession()) {
-        dest.setSession([]() -> transport::SessionHandle {
+        dest.setSession([]() -> std::shared_ptr<transport::Session> {
             HostAndPort destAddr{mongoBridgeGlobalParams.destUri};
             const Seconds kConnectTimeout(30);
             auto now = getGlobalServiceContext()->getFastClockSource()->now();

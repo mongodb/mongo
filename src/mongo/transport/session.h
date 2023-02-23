@@ -54,9 +54,6 @@ namespace transport {
 class TransportLayer;
 class Session;
 
-using SessionHandle = std::shared_ptr<Session>;
-using ConstSessionHandle = std::shared_ptr<const Session>;
-
 /**
  * This type contains data needed to associate Messages with connections
  * (on the transport side) and Messages with Client objects (on the database side).

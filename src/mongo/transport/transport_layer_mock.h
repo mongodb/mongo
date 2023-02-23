@@ -53,16 +53,16 @@ public:
         : TransportLayer(wireSpec), _shutdown(false) {}
     ~TransportLayerMock();
 
-    SessionHandle createSession();
-    SessionHandle get(Session::Id id);
+    std::shared_ptr<Session> createSession();
+    std::shared_ptr<Session> get(Session::Id id);
     bool owns(Session::Id id);
 
-    StatusWith<SessionHandle> connect(
+    StatusWith<std::shared_ptr<Session>> connect(
         HostAndPort peer,
         ConnectSSLMode sslMode,
         Milliseconds timeout,
         boost::optional<TransientSSLParams> transientSSLParams) override;
-    Future<SessionHandle> asyncConnect(
+    Future<std::shared_ptr<Session>> asyncConnect(
         HostAndPort peer,
         ConnectSSLMode sslMode,
         const ReactorHandle& reactor,
@@ -79,7 +79,7 @@ public:
     virtual ReactorHandle getReactor(WhichReactor which) override;
 
     // Set to a factory function to use your own session type.
-    std::function<SessionHandle(TransportLayer*)> createSessionHook;
+    std::function<std::shared_ptr<Session>(TransportLayer*)> createSessionHook;
 
 #ifdef MONGO_CONFIG_SSL
     Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
@@ -96,7 +96,7 @@ private:
 
     struct Connection {
         bool ended;
-        SessionHandle session;
+        std::shared_ptr<Session> session;
         SSLPeerInfo peerInfo;
     };
     stdx::unordered_map<Session::Id, Connection> _sessions;

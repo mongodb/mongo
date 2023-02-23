@@ -52,7 +52,7 @@ public:
     static void get(Client&&) = delete;
 
     // Set a RestrictionEnvironment on a transport Session
-    static void set(const transport::SessionHandle& session,
+    static void set(const std::shared_ptr<transport::Session>& session,
                     std::unique_ptr<RestrictionEnvironment> environment);
 
     // Returns the source address of the client.

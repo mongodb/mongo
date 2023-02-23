@@ -67,7 +67,7 @@ SSLX509Name buildX509Name() {
         {{{kOID_CommonName.toString(), 19 /* Printable String */, "mongodb.com"}}}));
 }
 
-void setX509PeerInfo(const transport::SessionHandle& session, SSLPeerInfo info) {
+void setX509PeerInfo(const std::shared_ptr<transport::Session>& session, SSLPeerInfo info) {
     auto& sslPeerInfo = SSLPeerInfo::forSession(session);
     sslPeerInfo = info;
 }
@@ -105,7 +105,7 @@ public:
     }
 
     transport::TransportLayerMock transportLayer;
-    transport::SessionHandle session = transportLayer.createSession();
+    std::shared_ptr<transport::Session> session = transportLayer.createSession();
     AuthorizationManager* authzManager;
     AuthzManagerExternalStateMock* externalState;
     BSONObj credentials;

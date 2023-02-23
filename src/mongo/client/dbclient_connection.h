@@ -280,7 +280,7 @@ protected:
     // _stayFailed, although reads are allowed outside the mutex.
     Mutex _sessionMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "DBClientConnection::_sessionMutex");
-    transport::SessionHandle _session;
+    std::shared_ptr<transport::Session> _session;
     boost::optional<Milliseconds> _socketTimeout;
     transport::Session::TagMask _tagMask = transport::Session::kEmptyTagMask;
     uint64_t _sessionCreationMicros = INVALID_SOCK_CREATION_TIME;

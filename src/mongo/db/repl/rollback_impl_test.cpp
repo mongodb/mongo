@@ -586,7 +586,7 @@ TEST_F(RollbackImplTest, RollbackKillsNecessaryOperations) {
     _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
 
     transport::TransportLayerMock transportLayer;
-    transport::SessionHandle session = transportLayer.createSession();
+    std::shared_ptr<transport::Session> session = transportLayer.createSession();
 
     auto writeClient = getGlobalServiceContext()->makeClient("writeClient", session);
     auto writeOpCtx = writeClient->makeOperationContext();

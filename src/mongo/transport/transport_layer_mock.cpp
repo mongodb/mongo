@@ -42,7 +42,7 @@
 namespace mongo {
 namespace transport {
 
-SessionHandle TransportLayerMock::createSession() {
+std::shared_ptr<Session> TransportLayerMock::createSession() {
     auto session = createSessionHook ? createSessionHook(this) : MockSession::create(this);
     Session::Id sessionId = session->id();
 
@@ -51,7 +51,7 @@ SessionHandle TransportLayerMock::createSession() {
     return _sessions[sessionId].session;
 }
 
-SessionHandle TransportLayerMock::get(Session::Id id) {
+std::shared_ptr<Session> TransportLayerMock::get(Session::Id id) {
     if (!owns(id))
         return nullptr;
 
@@ -62,7 +62,7 @@ bool TransportLayerMock::owns(Session::Id id) {
     return _sessions.count(id) > 0;
 }
 
-StatusWith<SessionHandle> TransportLayerMock::connect(
+StatusWith<std::shared_ptr<Session>> TransportLayerMock::connect(
     HostAndPort peer,
     ConnectSSLMode sslMode,
     Milliseconds timeout,
@@ -70,7 +70,7 @@ StatusWith<SessionHandle> TransportLayerMock::connect(
     MONGO_UNREACHABLE;
 }
 
-Future<SessionHandle> TransportLayerMock::asyncConnect(
+Future<std::shared_ptr<Session>> TransportLayerMock::asyncConnect(
     HostAndPort peer,
     ConnectSSLMode sslMode,
     const ReactorHandle& reactor,

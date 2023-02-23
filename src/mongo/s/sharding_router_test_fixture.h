@@ -143,7 +143,7 @@ protected:
 private:
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override;
 
-    transport::SessionHandle _transportSession;
+    std::shared_ptr<transport::Session> _transportSession;
 
     // For the Grid's fixed executor.
     std::shared_ptr<executor::TaskExecutor> _fixedExecutor;

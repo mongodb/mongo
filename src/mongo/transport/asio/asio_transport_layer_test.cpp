@@ -873,7 +873,7 @@ class AsioNetworkingBatonTest : public LockerNoopServiceContextTest {
     // first connection.
     class FirstSessionSEP : public ServiceEntryPoint {
     public:
-        explicit FirstSessionSEP(Promise<transport::SessionHandle> promise)
+        explicit FirstSessionSEP(Promise<std::shared_ptr<transport::Session>> promise)
             : _promise(std::move(promise)) {}
 
         Status start() override {
@@ -886,7 +886,7 @@ class AsioNetworkingBatonTest : public LockerNoopServiceContextTest {
             MONGO_UNREACHABLE;
         }
 
-        void startSession(transport::SessionHandle session) override {
+        void startSession(std::shared_ptr<transport::Session> session) override {
             if (!_isEmplaced) {
                 _promise.emplaceValue(std::move(session));
                 _isEmplaced = true;
@@ -911,7 +911,7 @@ class AsioNetworkingBatonTest : public LockerNoopServiceContextTest {
         }
 
     private:
-        Promise<transport::SessionHandle> _promise;
+        Promise<std::shared_ptr<transport::Session>> _promise;
         bool _isEmplaced = false;
     };
 
@@ -930,7 +930,7 @@ class AsioNetworkingBatonTest : public LockerNoopServiceContextTest {
 
 public:
     void setUp() override {
-        auto pf = makePromiseFuture<transport::SessionHandle>();
+        auto pf = makePromiseFuture<std::shared_ptr<transport::Session>>();
         auto servCtx = getServiceContext();
         servCtx->setServiceEntryPoint(std::make_unique<FirstSessionSEP>(std::move(pf.promise)));
 
@@ -1235,12 +1235,12 @@ public:
         _reactorThread.join();
     }
 
-    transport::SessionHandle& session() {
+    std::shared_ptr<transport::Session>& session() {
         return _session;
     }
 
 private:
-    transport::SessionHandle _makeEgressSession() {
+    std::shared_ptr<transport::Session> _makeEgressSession() {
         auto tla = checked_cast<transport::AsioTransportLayer*>(_sc->getTransportLayer());
 
         HostAndPort localTarget("localhost", tla->listenerPort());
@@ -1258,7 +1258,7 @@ private:
     ServiceContext* _sc;
     transport::ReactorHandle _reactor;
     stdx::thread _reactorThread;
-    transport::SessionHandle _session;
+    std::shared_ptr<transport::Session> _session;
 };
 
 // This could be considered a test for either `AsioSession` or `AsioNetworkingBaton`, as it's

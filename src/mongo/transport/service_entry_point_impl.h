@@ -63,7 +63,7 @@ public:
     ServiceEntryPointImpl(const ServiceEntryPointImpl&) = delete;
     ServiceEntryPointImpl& operator=(const ServiceEntryPointImpl&) = delete;
 
-    void startSession(transport::SessionHandle session) override;
+    void startSession(std::shared_ptr<transport::Session> session) override;
 
     void endAllSessions(transport::Session::TagMask tags) final;
     void endAllSessionsNoTagMask();
@@ -110,7 +110,7 @@ private:
 /*
  * Returns true if a session with remote/local addresses should be exempted from maxConns
  */
-bool shouldOverrideMaxConns(const transport::SessionHandle& session,
+bool shouldOverrideMaxConns(const std::shared_ptr<transport::Session>& session,
                             const std::vector<stdx::variant<CIDR, std::string>>& exemptions);
 
 }  // namespace mongo

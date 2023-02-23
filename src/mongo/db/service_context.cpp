@@ -169,8 +169,8 @@ void onCreate(T* object, const ObserversContainer& observers) {
 
 }  // namespace
 
-ServiceContext::UniqueClient ServiceContext::makeClient(std::string desc,
-                                                        transport::SessionHandle session) {
+ServiceContext::UniqueClient ServiceContext::makeClient(
+    std::string desc, std::shared_ptr<transport::Session> session) {
     std::unique_ptr<Client> client(new Client(std::move(desc), this, std::move(session)));
     onCreate(client.get(), _clientObservers);
     {

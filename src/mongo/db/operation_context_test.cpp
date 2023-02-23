@@ -80,7 +80,7 @@ public:
 class OperationContextTest : public ServiceContextTest {
 public:
     auto makeClient(std::string desc = "OperationContextTest",
-                    transport::SessionHandle session = nullptr) {
+                    std::shared_ptr<transport::Session> session = nullptr) {
         return getServiceContext()->makeClient(desc, session);
     }
 };
@@ -1091,7 +1091,7 @@ TEST_F(OperationContextTest, TestActiveClientOperationsForClientsWithoutSession)
 
 TEST_F(OperationContextTest, TestActiveClientOperations) {
     transport::TransportLayerMock transportLayer;
-    transport::SessionHandle session = transportLayer.createSession();
+    std::shared_ptr<transport::Session> session = transportLayer.createSession();
 
     auto serviceCtx = getServiceContext();
     auto client = serviceCtx->makeClient("OperationContextTest", session);

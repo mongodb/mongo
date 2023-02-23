@@ -388,7 +388,7 @@ public:
      */
     void terminateIfTagsDontMatch(Session::TagMask tags);
 
-    const SessionHandle& session() const {
+    const std::shared_ptr<Session>& session() const {
         return client()->session();
     }
 

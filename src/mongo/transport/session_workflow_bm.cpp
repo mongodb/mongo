@@ -194,7 +194,7 @@ public:
 
         void derivedOnClientDisconnect(Client*) override {}
 
-        void onEndSession(const SessionHandle& session) override {}
+        void onEndSession(const std::shared_ptr<transport::Session>& session) override {}
 
         Future<DbResponse> handleRequest(OperationContext* opCtx,
                                          const Message& request) noexcept override {

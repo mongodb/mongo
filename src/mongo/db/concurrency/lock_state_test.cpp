@@ -149,7 +149,7 @@ TEST_F(LockerImplTest, ConflictUpgradeWithTimeout) {
 
 TEST_F(LockerImplTest, FailPointInLockFailsGlobalNonIntentLocksIfTheyCannotBeImmediatelyGranted) {
     transport::TransportLayerMock transportLayer;
-    transport::SessionHandle session = transportLayer.createSession();
+    std::shared_ptr<transport::Session> session = transportLayer.createSession();
 
     auto newClient = getServiceContext()->makeClient("userClient", session);
     AlternativeClientRegion acr(newClient);
@@ -177,7 +177,7 @@ TEST_F(LockerImplTest, FailPointInLockFailsGlobalNonIntentLocksIfTheyCannotBeImm
 
 TEST_F(LockerImplTest, FailPointInLockFailsNonIntentLocksIfTheyCannotBeImmediatelyGranted) {
     transport::TransportLayerMock transportLayer;
-    transport::SessionHandle session = transportLayer.createSession();
+    std::shared_ptr<transport::Session> session = transportLayer.createSession();
 
     auto newClient = getServiceContext()->makeClient("userClient", session);
     AlternativeClientRegion acr(newClient);

@@ -405,7 +405,7 @@ size_t ServiceExecutorFixed::getRunningThreads() const {
     return _stats->threadsRunning();
 }
 
-void ServiceExecutorFixed::_runOnDataAvailable(const SessionHandle& session,
+void ServiceExecutorFixed::_runOnDataAvailable(const std::shared_ptr<Session>& session,
                                                Task onCompletionCallback) {
     invariant(session);
     yieldIfAppropriate();

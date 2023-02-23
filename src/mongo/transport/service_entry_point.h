@@ -57,7 +57,7 @@ public:
     /**
      * Begin running a new Session. This method returns immediately.
      */
-    virtual void startSession(transport::SessionHandle session) = 0;
+    virtual void startSession(std::shared_ptr<transport::Session> session) = 0;
 
     /**
      * End all sessions that do not match the mask in tags.
@@ -109,7 +109,7 @@ public:
      *
      * This function implies that the Session itself will soon be destructed.
      */
-    virtual void onEndSession(const transport::SessionHandle&) {}
+    virtual void onEndSession(const std::shared_ptr<transport::Session>&) {}
 
     /**
      * Optional handler which is invoked after a client connects.

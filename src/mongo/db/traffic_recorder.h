@@ -61,7 +61,7 @@ public:
     void start(const StartRecordingTraffic& options);
     void stop();
 
-    void observe(const transport::SessionHandle& ts, Date_t now, const Message& message);
+    void observe(const std::shared_ptr<transport::Session>& ts, Date_t now, const Message& message);
 
 private:
     class TrafficRecorderSSS;
