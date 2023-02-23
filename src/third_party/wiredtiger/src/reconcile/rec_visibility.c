@@ -794,11 +794,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
      * The "saved updates" return value is used independently of returning an update we can write,
      * both must be initialized.
      */
-    upd_select->upd = NULL;
-    upd_select->tombstone = NULL;
-    upd_select->upd_saved = false;
-    upd_select->no_ts_tombstone = false;
-    WT_TIME_WINDOW_INIT(&upd_select->tw);
+    WT_UPDATE_SELECT_INIT(upd_select);
 
     page = r->page;
     first_txn_upd = onpage_upd = upd = NULL;
