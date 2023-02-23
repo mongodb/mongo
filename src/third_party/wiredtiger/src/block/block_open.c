@@ -407,7 +407,10 @@ __desc_read(WT_SESSION_IMPL *session, uint32_t allocsize, WT_BLOCK *block)
      */
     if (desc->magic != WT_BLOCK_MAGIC || !checksum_matched) {
         if (strcmp(block->name, WT_METAFILE) == 0 || strcmp(block->name, WT_HS_FILE) == 0)
-            WT_ERR_MSG(session, WT_TRY_SALVAGE, "%s is corrupted", block->name);
+            WT_ERR_MSG(session, WT_TRY_SALVAGE,
+              "%s is corrupted: calculated block checksum of %#" PRIx32
+              " doesn't match expected checksum of %#" PRIx32,
+              block->name, __wt_checksum(desc, allocsize), checksum_tmp);
         /*
          * If we're doing an import, we can't expect to be able to verify checksums since we don't
          * know the allocation size being used. This isn't an error so we should just return success

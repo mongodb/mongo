@@ -156,7 +156,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
             lambda: self.session.verify('table:' + self.tablename, "read_corrupt"),
             "/WT_SESSION.verify/")
         self.assertEqual(self.count_file_contains("stderr.txt",
-            "calculated block checksum doesn't match expected checksum"), 1)
+            "calculated block checksum of"), 1)
 
     def test_verify_api_read_corrupt_pages(self):
         """
@@ -190,7 +190,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         # a corruption if we overwrite free space or overwrite a page that is
         # a child of another page that we overwrite.
         self.assertGreater(self.count_file_contains("stderr.txt",
-            "calculated block checksum doesn't match expected checksum"), 1)
+            "calculated block checksum of"), 1)
 
     def test_verify_process_75pct_null(self):
         """
@@ -207,7 +207,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
             errfilename="verifyerr.out", failure=True)
         self.check_non_empty_file("verifyerr.out")
         self.assertEqual(self.count_file_contains("verifyerr.out",
-            "calculated block checksum doesn't match expected checksum"), 1)
+            "calculated block checksum of"), 1)
 
     def test_verify_process_25pct_junk(self):
         """
@@ -224,7 +224,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
             errfilename="verifyerr.out", failure=True)
         self.check_non_empty_file("verifyerr.out")
         self.assertEqual(self.count_file_contains("verifyerr.out",
-            "calculated block checksum doesn't match expected checksum"), 1)
+            "calculated block checksum of"), 1)
 
     def test_verify_process_read_corrupt_pages(self):
         """
@@ -255,7 +255,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         # a corruption if we overwrite free space or overwrite a page that is
         # a child of another page that we overwrite.
         self.assertGreater(self.count_file_contains("verifyerr.out",
-            "calculated block checksum doesn't match expected checksum"), 1)
+            "calculated block checksum of"), 1)
 
     def test_verify_process_truncated(self):
         """
