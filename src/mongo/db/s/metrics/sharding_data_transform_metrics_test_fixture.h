@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
-#include "mongo/db/s/sharding_data_transform_instance_metrics.h"
+#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"

@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/s/sharding_data_transform_instance_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/field_names/sharding_data_transform_instance_metrics_field_name_provider.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

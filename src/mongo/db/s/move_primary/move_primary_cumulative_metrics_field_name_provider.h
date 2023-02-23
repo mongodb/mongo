@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,18 +29,16 @@
 
 #pragma once
 
-#include "mongo/db/s/sharding_data_transform_metrics.h"
-#include "mongo/util/uuid.h"
+#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/field_names/with_document_copy_field_name_overrides.h"
+#include "mongo/db/s/metrics/field_names/with_oplog_application_count_metrics_field_names.h"
+#include "mongo/db/s/metrics/field_names/with_oplog_application_latency_metrics_field_names.h"
 
 namespace mongo {
-class ShardingDataTransformMetricsObserverInterface {
-public:
-    virtual ~ShardingDataTransformMetricsObserverInterface() = default;
-    virtual boost::optional<Milliseconds> getHighEstimateRemainingTimeMillis() const = 0;
-    virtual boost::optional<Milliseconds> getLowEstimateRemainingTimeMillis() const = 0;
-    virtual Date_t getStartTimestamp() const = 0;
-    virtual const UUID& getUuid() const = 0;
-    virtual ShardingDataTransformMetrics::Role getRole() const = 0;
-};
+
+class MovePrimaryCumulativeMetricsFieldNameProvider
+    : public WithOplogApplicationLatencyMetricsFieldNames<
+          WithOplogApplicationCountFieldNames<WithDocumentCopyFieldNameOverrides<
+              ShardingDataTransformCumulativeMetricsFieldNameProvider>>> {};
 
 }  // namespace mongo

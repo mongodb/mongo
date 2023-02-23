@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -30,38 +30,37 @@
 #pragma once
 
 #include "mongo/db/s/cumulative_metrics_state_holder.h"
-#include "mongo/db/s/global_index/global_index_cloner_gen.h"
-#include "mongo/db/s/global_index/global_index_coordinator_state_enum_placeholder.h"
-#include "mongo/db/s/global_index/global_index_cumulative_metrics_field_name_provider.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_macros.h"
+#include "mongo/db/s/metrics/with_oplog_application_count_metrics.h"
+#include "mongo/db/s/metrics/with_oplog_application_latency_metrics.h"
 #include "mongo/db/s/metrics/with_state_management_for_cumulative_metrics.h"
+#include "mongo/db/s/move_primary/move_primary_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/move_primary/move_primary_state_machine_gen.h"
 
 namespace mongo {
-namespace global_index {
 
-DEFINE_IDL_ENUM_SIZE_TEMPLATE_HELPER(GlobalIndexMetrics,
-                                     GlobalIndexCoordinatorStateEnumPlaceholder,
-                                     GlobalIndexClonerStateEnum)
+namespace move_primary_cumulative_metrics {
+DEFINE_IDL_ENUM_SIZE_TEMPLATE_HELPER(MovePrimaryMetrics,
+                                     MovePrimaryDonorState,
+                                     MovePrimaryRecipientState)
+using Base = WithOplogApplicationLatencyMetrics<WithOplogApplicationCountMetrics<
+    WithStateManagementForCumulativeMetrics<ShardingDataTransformCumulativeMetrics,
+                                            MovePrimaryMetricsEnumSizeTemplateHelper,
+                                            MovePrimaryDonorState,
+                                            MovePrimaryRecipientState>>>;
+}  // namespace move_primary_cumulative_metrics
 
-using Base = WithStateManagementForCumulativeMetrics<ShardingDataTransformCumulativeMetrics,
-                                                     GlobalIndexMetricsEnumSizeTemplateHelper,
-                                                     GlobalIndexCoordinatorStateEnumPlaceholder,
-                                                     GlobalIndexClonerStateEnum>;
-
-
-class GlobalIndexCumulativeMetrics : public Base {
+class MovePrimaryCumulativeMetrics : public move_primary_cumulative_metrics::Base {
 public:
-    GlobalIndexCumulativeMetrics();
-
-    static StringData fieldNameFor(GlobalIndexCoordinatorStateEnumPlaceholder state,
-                                   const GlobalIndexCumulativeMetricsFieldNameProvider* provider);
-    static StringData fieldNameFor(GlobalIndexClonerStateEnum state,
-                                   const GlobalIndexCumulativeMetricsFieldNameProvider* provider);
+    MovePrimaryCumulativeMetrics();
 
 private:
-    const GlobalIndexCumulativeMetricsFieldNameProvider* _fieldNames;
+    virtual void reportActive(BSONObjBuilder* bob) const;
+    virtual void reportLatencies(BSONObjBuilder* bob) const;
+    virtual void reportCurrentInSteps(BSONObjBuilder* bob) const;
+
+    const MovePrimaryCumulativeMetricsFieldNameProvider* _fieldNames;
 };
 
-}  // namespace global_index
 }  // namespace mongo

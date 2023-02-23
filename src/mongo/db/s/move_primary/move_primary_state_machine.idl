@@ -43,10 +43,10 @@ enums:
         values:
             kUninitialized: 0
             kInitializing: 1
-            kDataSync: 2
-            kConsistent: 3
-            kBlocking: 4
-            kCommitting: 5
+            kCloning: 2
+            kWaitingToBlockWrites: 3
+            kBlockingWrites: 4
+            kPrepared: 5
             kAborted: 6
 
     MovePrimaryRecipientState:

@@ -263,136 +263,6 @@ void ReshardingMetrics::restoreCoordinatorSpecificFields(
     restorePhaseDurationFields(document);
 }
 
-ReshardingMetrics::DonorState::DonorState(DonorStateEnum enumVal) : _enumVal(enumVal) {}
-
-ReshardingCumulativeMetrics::DonorStateEnum ReshardingMetrics::DonorState::toMetrics() const {
-    using MetricsEnum = ReshardingCumulativeMetrics::DonorStateEnum;
-
-    switch (_enumVal) {
-        case DonorStateEnum::kUnused:
-            return MetricsEnum::kUnused;
-
-        case DonorStateEnum::kPreparingToDonate:
-            return MetricsEnum::kPreparingToDonate;
-
-        case DonorStateEnum::kDonatingInitialData:
-            return MetricsEnum::kDonatingInitialData;
-
-        case DonorStateEnum::kDonatingOplogEntries:
-            return MetricsEnum::kDonatingOplogEntries;
-
-        case DonorStateEnum::kPreparingToBlockWrites:
-            return MetricsEnum::kPreparingToBlockWrites;
-
-        case DonorStateEnum::kError:
-            return MetricsEnum::kError;
-
-        case DonorStateEnum::kBlockingWrites:
-            return MetricsEnum::kBlockingWrites;
-
-        case DonorStateEnum::kDone:
-            return MetricsEnum::kDone;
-        default:
-            invariant(false,
-                      str::stream() << "Unexpected resharding coordinator state: "
-                                    << DonorState_serializer(_enumVal));
-            MONGO_UNREACHABLE;
-    }
-}
-
-DonorStateEnum ReshardingMetrics::DonorState::getState() const {
-    return _enumVal;
-}
-
-ReshardingMetrics::RecipientState::RecipientState(RecipientStateEnum enumVal) : _enumVal(enumVal) {}
-
-ReshardingCumulativeMetrics::RecipientStateEnum ReshardingMetrics::RecipientState::toMetrics()
-    const {
-    using MetricsEnum = ReshardingCumulativeMetrics::RecipientStateEnum;
-
-    switch (_enumVal) {
-        case RecipientStateEnum::kUnused:
-            return MetricsEnum::kUnused;
-
-        case RecipientStateEnum::kAwaitingFetchTimestamp:
-            return MetricsEnum::kAwaitingFetchTimestamp;
-
-        case RecipientStateEnum::kCreatingCollection:
-            return MetricsEnum::kCreatingCollection;
-
-        case RecipientStateEnum::kCloning:
-            return MetricsEnum::kCloning;
-
-        case RecipientStateEnum::kApplying:
-            return MetricsEnum::kApplying;
-
-        case RecipientStateEnum::kError:
-            return MetricsEnum::kError;
-
-        case RecipientStateEnum::kStrictConsistency:
-            return MetricsEnum::kStrictConsistency;
-
-        case RecipientStateEnum::kDone:
-            return MetricsEnum::kDone;
-
-        default:
-            invariant(false,
-                      str::stream() << "Unexpected resharding coordinator state: "
-                                    << RecipientState_serializer(_enumVal));
-            MONGO_UNREACHABLE;
-    }
-}
-
-RecipientStateEnum ReshardingMetrics::RecipientState::getState() const {
-    return _enumVal;
-}
-
-ReshardingMetrics::CoordinatorState::CoordinatorState(CoordinatorStateEnum enumVal)
-    : _enumVal(enumVal) {}
-
-ReshardingCumulativeMetrics::CoordinatorStateEnum ReshardingMetrics::CoordinatorState::toMetrics()
-    const {
-    using MetricsEnum = ReshardingCumulativeMetrics::CoordinatorStateEnum;
-
-    switch (_enumVal) {
-        case CoordinatorStateEnum::kUnused:
-            return MetricsEnum::kUnused;
-
-        case CoordinatorStateEnum::kInitializing:
-            return MetricsEnum::kInitializing;
-
-        case CoordinatorStateEnum::kPreparingToDonate:
-            return MetricsEnum::kPreparingToDonate;
-
-        case CoordinatorStateEnum::kCloning:
-            return MetricsEnum::kCloning;
-
-        case CoordinatorStateEnum::kApplying:
-            return MetricsEnum::kApplying;
-
-        case CoordinatorStateEnum::kBlockingWrites:
-            return MetricsEnum::kBlockingWrites;
-
-        case CoordinatorStateEnum::kAborting:
-            return MetricsEnum::kAborting;
-
-        case CoordinatorStateEnum::kCommitting:
-            return MetricsEnum::kCommitting;
-
-        case CoordinatorStateEnum::kDone:
-            return MetricsEnum::kDone;
-        default:
-            invariant(false,
-                      str::stream() << "Unexpected resharding coordinator state: "
-                                    << CoordinatorState_serializer(_enumVal));
-            MONGO_UNREACHABLE;
-    }
-}
-
-CoordinatorStateEnum ReshardingMetrics::CoordinatorState::getState() const {
-    return _enumVal;
-}
-
 void ReshardingMetrics::onDeleteApplied() {
     _deletesApplied.addAndFetch(1);
     getReshardingCumulativeMetrics()->onDeleteApplied();
@@ -410,7 +280,8 @@ void ReshardingMetrics::onUpdateApplied() {
 
 void ReshardingMetrics::onOplogEntriesFetched(int64_t numEntries, Milliseconds elapsed) {
     _oplogEntriesFetched.addAndFetch(numEntries);
-    getReshardingCumulativeMetrics()->onOplogEntriesFetched(numEntries, elapsed);
+    getReshardingCumulativeMetrics()->onOplogEntriesFetched(numEntries);
+    getReshardingCumulativeMetrics()->onBatchRetrievedDuringOplogFetching(elapsed);
 }
 
 void ReshardingMetrics::restoreOplogEntriesFetched(int64_t numEntries) {

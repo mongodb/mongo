@@ -31,8 +31,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/global_index/global_index_metrics.h"
-#include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
-#include "mongo/db/s/sharding_data_transform_metrics_test_fixture.h"
+#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/db/s/metrics/sharding_data_transform_metrics_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

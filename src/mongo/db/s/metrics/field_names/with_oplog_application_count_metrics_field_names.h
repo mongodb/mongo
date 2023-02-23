@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,26 +29,39 @@
 
 #pragma once
 
-#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
+#include "mongo/base/string_data.h"
 
 namespace mongo {
-namespace global_index {
 
-class GlobalIndexCumulativeMetricsFieldNameProvider
-    : public ShardingDataTransformCumulativeMetricsFieldNameProvider {
+template <typename Base>
+class WithOplogApplicationCountFieldNames : public Base {
 public:
-    virtual StringData getForDocumentsProcessed() const override;
-    virtual StringData getForBytesWritten() const override;
+    virtual StringData getForOplogEntriesFetched() const {
+        return kOplogEntriesFetched;
+    }
 
-    // TODO: Replace this placeholder method with one method per global index coordinator
-    // role/state combination. See ReshardingCumulativeMetricsFieldNameProvider for an
-    // example implementation.
-    StringData getForCountInstancesInRoleNameStateNStateName() const;
+    virtual StringData getForOplogEntriesApplied() const {
+        return kOplogEntriesApplied;
+    }
 
-    StringData getForCountInstancesInRecipientState1Cloning() const;
-    StringData getForCountInstancesInRecipientState2ReadyToCommit() const;
-    StringData getForCountInstancesInRecipientState3Done() const;
+    virtual StringData getForInsertsApplied() const {
+        return kInsertsApplied;
+    }
+
+    virtual StringData getForUpdatesApplied() const {
+        return kUpdatesApplied;
+    }
+
+    virtual StringData getForDeletesApplied() const {
+        return kDeletesApplied;
+    }
+
+private:
+    static constexpr auto kOplogEntriesFetched = "oplogEntriesFetched";
+    static constexpr auto kOplogEntriesApplied = "oplogEntriesApplied";
+    static constexpr auto kInsertsApplied = "insertsApplied";
+    static constexpr auto kUpdatesApplied = "updatesApplied";
+    static constexpr auto kDeletesApplied = "deletesApplied";
 };
 
-}  // namespace global_index
 }  // namespace mongo

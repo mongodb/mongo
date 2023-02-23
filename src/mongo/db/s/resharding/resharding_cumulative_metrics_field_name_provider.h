@@ -29,49 +29,16 @@
 
 #pragma once
 
-#include "mongo/db/s/sharding_data_transform_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/field_names/with_document_copy_field_name_overrides.h"
+#include "mongo/db/s/metrics/field_names/with_oplog_application_count_metrics_field_names.h"
+#include "mongo/db/s/metrics/field_names/with_oplog_application_latency_metrics_field_names.h"
 
 namespace mongo {
 
 class ReshardingCumulativeMetricsFieldNameProvider
-    : public ShardingDataTransformCumulativeMetricsFieldNameProvider {
-public:
-    virtual StringData getForDocumentsProcessed() const override;
-    virtual StringData getForBytesWritten() const override;
-    StringData getForOplogEntriesFetched() const;
-    StringData getForOplogEntriesApplied() const;
-    StringData getForInsertsApplied() const;
-    StringData getForUpdatesApplied() const;
-    StringData getForDeletesApplied() const;
-    StringData getForOplogFetchingTotalRemoteBatchRetrievalTimeMillis() const;
-    StringData getForOplogFetchingTotalRemoteBatchesRetrieved() const;
-    StringData getForOplogFetchingTotalLocalInsertTimeMillis() const;
-    StringData getForOplogFetchingTotalLocalInserts() const;
-    StringData getForOplogApplyingTotalLocalBatchRetrievalTimeMillis() const;
-    StringData getForOplogApplyingTotalLocalBatchesRetrieved() const;
-    StringData getForOplogApplyingTotalLocalBatchApplyTimeMillis() const;
-    StringData getForOplogApplyingTotalLocalBatchesApplied() const;
-    StringData getForCountInstancesInCoordinatorState1Initializing() const;
-    StringData getForCountInstancesInCoordinatorState2PreparingToDonate() const;
-    StringData getForCountInstancesInCoordinatorState3Cloning() const;
-    StringData getForCountInstancesInCoordinatorState4Applying() const;
-    StringData getForCountInstancesInCoordinatorState5BlockingWrites() const;
-    StringData getForCountInstancesInCoordinatorState6Aborting() const;
-    StringData getForCountInstancesInCoordinatorState7Committing() const;
-    StringData getForCountInstancesInRecipientState1AwaitingFetchTimestamp() const;
-    StringData getForCountInstancesInRecipientState2CreatingCollection() const;
-    StringData getForCountInstancesInRecipientState3Cloning() const;
-    StringData getForCountInstancesInRecipientState4Applying() const;
-    StringData getForCountInstancesInRecipientState5Error() const;
-    StringData getForCountInstancesInRecipientState6StrictConsistency() const;
-    StringData getForCountInstancesInRecipientState7Done() const;
-    StringData getForCountInstancesInDonorState1PreparingToDonate() const;
-    StringData getForCountInstancesInDonorState2DonatingInitialData() const;
-    StringData getForCountInstancesInDonorState3DonatingOplogEntries() const;
-    StringData getForCountInstancesInDonorState4PreparingToBlockWrites() const;
-    StringData getForCountInstancesInDonorState5Error() const;
-    StringData getForCountInstancesInDonorState6BlockingWrites() const;
-    StringData getForCountInstancesInDonorState7Done() const;
-};
+    : public WithOplogApplicationLatencyMetricsFieldNames<
+          WithOplogApplicationCountFieldNames<WithDocumentCopyFieldNameOverrides<
+              ShardingDataTransformCumulativeMetricsFieldNameProvider>>> {};
 
 }  // namespace mongo

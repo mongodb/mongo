@@ -27,28 +27,24 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
-namespace global_index {
 
-class GlobalIndexCumulativeMetricsFieldNameProvider
-    : public ShardingDataTransformCumulativeMetricsFieldNameProvider {
-public:
-    virtual StringData getForDocumentsProcessed() const override;
-    virtual StringData getForBytesWritten() const override;
-
-    // TODO: Replace this placeholder method with one method per global index coordinator
-    // role/state combination. See ReshardingCumulativeMetricsFieldNameProvider for an
-    // example implementation.
-    StringData getForCountInstancesInRoleNameStateNStateName() const;
-
-    StringData getForCountInstancesInRecipientState1Cloning() const;
-    StringData getForCountInstancesInRecipientState2ReadyToCommit() const;
-    StringData getForCountInstancesInRecipientState3Done() const;
+namespace {
+const stdx::unordered_map<ShardingDataTransformMetrics::Role, StringData> roleToName = {
+    {ShardingDataTransformMetrics::Role::kCoordinator, "Coordinator"_sd},
+    {ShardingDataTransformMetrics::Role::kDonor, "Donor"_sd},
+    {ShardingDataTransformMetrics::Role::kRecipient, "Recipient"_sd},
 };
+}
 
-}  // namespace global_index
+StringData ShardingDataTransformMetrics::getRoleName(Role role) {
+    auto it = roleToName.find(role);
+    invariant(it != roleToName.end());
+    return it->second;
+}
+
 }  // namespace mongo

@@ -32,10 +32,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/global_index/global_index_cloner_gen.h"
+#include "mongo/db/s/global_index/global_index_coordinator_state_enum_placeholder.h"
 #include "mongo/db/s/global_index/global_index_cumulative_metrics.h"
 #include "mongo/db/s/global_index/global_index_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/metrics_state_holder.h"
-#include "mongo/db/s/sharding_data_transform_instance_metrics.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -73,45 +74,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    // TODO: Replace with actual Global Index state enums by role
-    enum class GlobalIndexCoordinatorStateEnumPlaceholder : int32_t {
-        kUnused = -1,
-        kInitializing,
-        kPreparingToDonate,
-        kCloning,
-        kApplying,
-        kBlockingWrites,
-        kAborting,
-        kCommitting,
-        kDone
-    };
-
     using State =
         stdx::variant<GlobalIndexCoordinatorStateEnumPlaceholder, GlobalIndexClonerStateEnum>;
-
-    class RecipientState {
-    public:
-        using MetricsType = GlobalIndexCumulativeMetrics::RecipientStateEnum;
-
-        explicit RecipientState(GlobalIndexClonerStateEnum enumVal);
-        MetricsType toMetrics() const;
-        GlobalIndexClonerStateEnum getState() const;
-
-    private:
-        GlobalIndexClonerStateEnum _enumVal;
-    };
-
-    class CoordinatorState {
-    public:
-        using MetricsType = GlobalIndexCumulativeMetrics::CoordinatorStateEnum;
-
-        explicit CoordinatorState(GlobalIndexCoordinatorStateEnumPlaceholder enumVal);
-        MetricsType toMetrics() const;
-        GlobalIndexCoordinatorStateEnumPlaceholder getState() const;
-
-    private:
-        GlobalIndexCoordinatorStateEnumPlaceholder _enumVal;
-    };
 
     GlobalIndexMetrics(UUID instanceId,
                        BSONObj originatingCommand,

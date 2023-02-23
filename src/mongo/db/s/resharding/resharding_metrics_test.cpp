@@ -30,11 +30,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/db/s/metrics/sharding_data_transform_metrics_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/s/resharding/resharding_util.h"
-#include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
-#include "mongo/db/s/sharding_data_transform_metrics_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -639,8 +639,7 @@ TEST_F(ReshardingMetricsTest, OnApplyingBatchAppliedIncrementsCumulativeMetricsB
 TEST_F(ReshardingMetricsTest, OnStateTransitionFromNoneInformsCumulativeMetrics) {
     createMetricsAndAssertIncrementsCumulativeMetricsField(
         [](auto metrics) {
-            metrics->onStateTransition(
-                boost::none, ReshardingMetrics::CoordinatorState{CoordinatorStateEnum::kApplying});
+            metrics->onStateTransition(boost::none, CoordinatorStateEnum::kApplying);
         },
         Section::kCurrentInSteps,
         "countInstancesInCoordinatorState4Applying");
@@ -648,7 +647,7 @@ TEST_F(ReshardingMetricsTest, OnStateTransitionFromNoneInformsCumulativeMetrics)
 
 TEST_F(ReshardingMetricsTest, OnStateTransitionToNoneInformsCumulativeMetrics) {
     auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
-    auto state = ReshardingMetrics::CoordinatorState{CoordinatorStateEnum::kApplying};
+    auto state = CoordinatorStateEnum::kApplying;
     metrics->onStateTransition(boost::none, state);
     assertDecrementsCumulativeMetricsField(
         metrics.get(),
@@ -662,8 +661,8 @@ TEST_F(ReshardingMetricsTest, OnStateTransitionToNoneInformsCumulativeMetrics) {
 
 TEST_F(ReshardingMetricsTest, OnStateTransitionInformsCumulativeMetrics) {
     auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
-    auto initialState = ReshardingMetrics::CoordinatorState{CoordinatorStateEnum::kApplying};
-    auto nextState = ReshardingMetrics::CoordinatorState{CoordinatorStateEnum::kBlockingWrites};
+    auto initialState = CoordinatorStateEnum::kApplying;
+    auto nextState = CoordinatorStateEnum::kBlockingWrites;
     metrics->onStateTransition(boost::none, initialState);
     assertAltersCumulativeMetrics(
         metrics.get(),

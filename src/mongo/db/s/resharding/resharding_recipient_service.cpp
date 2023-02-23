@@ -184,10 +184,6 @@ void setMeticsAfterWrite(ReshardingMetrics* metrics,
     }
 }
 
-ReshardingMetrics::RecipientState toMetricsState(RecipientStateEnum state) {
-    return ReshardingMetrics::RecipientState(state);
-}
-
 }  // namespace
 
 ThreadPool::Limits ReshardingRecipientService::getThreadPoolLimits() const {
@@ -244,7 +240,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       }()) {
     invariant(_externalState);
 
-    _metrics->onStateTransition(boost::none, toMetricsState(_recipientCtx.getState()));
+    _metrics->onStateTransition(boost::none, _recipientCtx.getState());
 }
 
 ExecutorFuture<void>
@@ -444,7 +440,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMand
                        self = shared_from_this(),
                        outerStatus = status,
                        isCanceled = stepdownToken.isCanceled()](Status dataReplicationHaltStatus) {
-            _metrics->onStateTransition(toMetricsState(_recipientCtx.getState()), boost::none);
+            _metrics->onStateTransition(_recipientCtx.getState(), boost::none);
 
             // Destroy metrics early so it's lifetime will not be tied to the lifetime of this
             // state machine. This is because we have future callbacks copy shared pointers to this
@@ -888,7 +884,7 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     _updateRecipientDocument(
         std::move(newRecipientCtx), std::move(cloneDetails), std::move(configStartTime), factory);
 
-    _metrics->onStateTransition(toMetricsState(oldState), toMetricsState(newState));
+    _metrics->onStateTransition(oldState, newState);
 
     LOGV2_INFO(5279506,
                "Transitioned resharding recipient state",

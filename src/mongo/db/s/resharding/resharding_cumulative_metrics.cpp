@@ -32,219 +32,65 @@
 namespace mongo {
 
 namespace {
+
 constexpr auto kResharding = "resharding";
+
+const auto kReportedStateFieldNamesMap = [] {
+    return ReshardingCumulativeMetrics::StateFieldNameMap{
+        {CoordinatorStateEnum::kInitializing, "countInstancesInCoordinatorState1Initializing"},
+        {CoordinatorStateEnum::kPreparingToDonate,
+         "countInstancesInCoordinatorState2PreparingToDonate"},
+        {CoordinatorStateEnum::kCloning, "countInstancesInCoordinatorState3Cloning"},
+        {CoordinatorStateEnum::kApplying, "countInstancesInCoordinatorState4Applying"},
+        {CoordinatorStateEnum::kBlockingWrites, "countInstancesInCoordinatorState5BlockingWrites"},
+        {CoordinatorStateEnum::kAborting, "countInstancesInCoordinatorState6Aborting"},
+        {CoordinatorStateEnum::kCommitting, "countInstancesInCoordinatorState7Committing"},
+        {DonorStateEnum::kPreparingToDonate, "countInstancesInDonorState1PreparingToDonate"},
+        {DonorStateEnum::kDonatingInitialData, "countInstancesInDonorState2DonatingInitialData"},
+        {DonorStateEnum::kDonatingOplogEntries, "countInstancesInDonorState3DonatingOplogEntries"},
+        {DonorStateEnum::kPreparingToBlockWrites,
+         "countInstancesInDonorState4PreparingToBlockWrites"},
+        {DonorStateEnum::kError, "countInstancesInDonorState5Error"},
+        {DonorStateEnum::kBlockingWrites, "countInstancesInDonorState6BlockingWrites"},
+        {DonorStateEnum::kDone, "countInstancesInDonorState7Done"},
+        {RecipientStateEnum::kAwaitingFetchTimestamp,
+         "kCountInstancesInRecipientState1AwaitingFetchTimestamp"},
+        {RecipientStateEnum::kCreatingCollection,
+         "countInstancesInRecipientState2CreatingCollection"},
+        {RecipientStateEnum::kCloning, "countInstancesInRecipientState3Cloning"},
+        {RecipientStateEnum::kApplying, "countInstancesInRecipientState4Applying"},
+        {RecipientStateEnum::kError, "countInstancesInRecipientState5Error"},
+        {RecipientStateEnum::kStrictConsistency,
+         "countInstancesInRecipientState6StrictConsistency"},
+        {RecipientStateEnum::kDone, "countInstancesInRecipientState7Done"},
+    };
+}();
+
+}  // namespace
+
+boost::optional<StringData> ReshardingCumulativeMetrics::fieldNameFor(AnyState state) {
+    return getNameFor(state, kReportedStateFieldNamesMap);
 }
 
 ReshardingCumulativeMetrics::ReshardingCumulativeMetrics()
-    : ShardingDataTransformCumulativeMetrics(
+    : resharding_cumulative_metrics::Base(
           kResharding, std::make_unique<ReshardingCumulativeMetricsFieldNameProvider>()),
       _fieldNames(
           static_cast<const ReshardingCumulativeMetricsFieldNameProvider*>(getFieldNames())) {}
 
-StringData ReshardingCumulativeMetrics::fieldNameFor(
-    CoordinatorStateEnum state, const ReshardingCumulativeMetricsFieldNameProvider* provider) {
-    switch (state) {
-        case CoordinatorStateEnum::kInitializing:
-            return provider->getForCountInstancesInCoordinatorState1Initializing();
-
-        case CoordinatorStateEnum::kPreparingToDonate:
-            return provider->getForCountInstancesInCoordinatorState2PreparingToDonate();
-
-        case CoordinatorStateEnum::kCloning:
-            return provider->getForCountInstancesInCoordinatorState3Cloning();
-
-        case CoordinatorStateEnum::kApplying:
-            return provider->getForCountInstancesInCoordinatorState4Applying();
-
-        case CoordinatorStateEnum::kBlockingWrites:
-            return provider->getForCountInstancesInCoordinatorState5BlockingWrites();
-
-        case CoordinatorStateEnum::kAborting:
-            return provider->getForCountInstancesInCoordinatorState6Aborting();
-
-        case CoordinatorStateEnum::kCommitting:
-            return provider->getForCountInstancesInCoordinatorState7Committing();
-
-        default:
-            uasserted(6438601,
-                      str::stream()
-                          << "no field name for coordinator state " << static_cast<int32_t>(state));
-            break;
-    }
-
-    MONGO_UNREACHABLE;
-}
-
-StringData ReshardingCumulativeMetrics::fieldNameFor(
-    DonorStateEnum state, const ReshardingCumulativeMetricsFieldNameProvider* provider) {
-    switch (state) {
-        case DonorStateEnum::kPreparingToDonate:
-            return provider->getForCountInstancesInDonorState1PreparingToDonate();
-
-        case DonorStateEnum::kDonatingInitialData:
-            return provider->getForCountInstancesInDonorState2DonatingInitialData();
-
-        case DonorStateEnum::kDonatingOplogEntries:
-            return provider->getForCountInstancesInDonorState3DonatingOplogEntries();
-
-        case DonorStateEnum::kPreparingToBlockWrites:
-            return provider->getForCountInstancesInDonorState4PreparingToBlockWrites();
-
-        case DonorStateEnum::kError:
-            return provider->getForCountInstancesInDonorState5Error();
-
-        case DonorStateEnum::kBlockingWrites:
-            return provider->getForCountInstancesInDonorState6BlockingWrites();
-
-        case DonorStateEnum::kDone:
-            return provider->getForCountInstancesInDonorState7Done();
-
-        default:
-            uasserted(6438700,
-                      str::stream()
-                          << "no field name for donor state " << static_cast<int32_t>(state));
-            break;
-    }
-
-    MONGO_UNREACHABLE;
-}
-
-StringData ReshardingCumulativeMetrics::fieldNameFor(
-    RecipientStateEnum state, const ReshardingCumulativeMetricsFieldNameProvider* provider) {
-    switch (state) {
-        case RecipientStateEnum::kAwaitingFetchTimestamp:
-            return provider->getForCountInstancesInRecipientState1AwaitingFetchTimestamp();
-
-        case RecipientStateEnum::kCreatingCollection:
-            return provider->getForCountInstancesInRecipientState2CreatingCollection();
-
-        case RecipientStateEnum::kCloning:
-            return provider->getForCountInstancesInRecipientState3Cloning();
-
-        case RecipientStateEnum::kApplying:
-            return provider->getForCountInstancesInRecipientState4Applying();
-
-        case RecipientStateEnum::kError:
-            return provider->getForCountInstancesInRecipientState5Error();
-
-        case RecipientStateEnum::kStrictConsistency:
-            return provider->getForCountInstancesInRecipientState6StrictConsistency();
-
-        case RecipientStateEnum::kDone:
-            return provider->getForCountInstancesInRecipientState7Done();
-
-        default:
-            uasserted(6438900,
-                      str::stream()
-                          << "no field name for recipient state " << static_cast<int32_t>(state));
-            break;
-    }
-
-    MONGO_UNREACHABLE;
-}
-
 void ReshardingCumulativeMetrics::reportActive(BSONObjBuilder* bob) const {
     ShardingDataTransformCumulativeMetrics::reportActive(bob);
-
-    bob->append(_fieldNames->getForOplogEntriesFetched(), _oplogEntriesFetched.load());
-    bob->append(_fieldNames->getForOplogEntriesApplied(), _oplogEntriesApplied.load());
-    bob->append(_fieldNames->getForInsertsApplied(), _insertsApplied.load());
-    bob->append(_fieldNames->getForUpdatesApplied(), _updatesApplied.load());
-    bob->append(_fieldNames->getForDeletesApplied(), _deletesApplied.load());
+    reportOplogApplicationCountMetrics(_fieldNames, bob);
 }
 
 void ReshardingCumulativeMetrics::reportLatencies(BSONObjBuilder* bob) const {
     ShardingDataTransformCumulativeMetrics::reportLatencies(bob);
-
-    bob->append(_fieldNames->getForOplogFetchingTotalRemoteBatchRetrievalTimeMillis(),
-                _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis.load());
-    bob->append(_fieldNames->getForOplogFetchingTotalRemoteBatchesRetrieved(),
-                _oplogFetchingTotalRemoteBatchesRetrieved.load());
-    bob->append(_fieldNames->getForOplogFetchingTotalLocalInsertTimeMillis(),
-                _oplogFetchingTotalLocalInsertTimeMillis.load());
-    bob->append(_fieldNames->getForOplogFetchingTotalLocalInserts(),
-                _oplogFetchingTotalLocalInserts.load());
-    bob->append(_fieldNames->getForOplogApplyingTotalLocalBatchRetrievalTimeMillis(),
-                _oplogApplyingTotalBatchesRetrievalTimeMillis.load());
-    bob->append(_fieldNames->getForOplogApplyingTotalLocalBatchesRetrieved(),
-                _oplogApplyingTotalBatchesRetrieved.load());
-    bob->append(_fieldNames->getForOplogApplyingTotalLocalBatchApplyTimeMillis(),
-                _oplogBatchAppliedMillis.load());
-    bob->append(_fieldNames->getForOplogApplyingTotalLocalBatchesApplied(),
-                _oplogBatchApplied.load());
+    reportOplogApplicationLatencyMetrics(_fieldNames, bob);
 }
 
 void ReshardingCumulativeMetrics::reportCurrentInSteps(BSONObjBuilder* bob) const {
     ShardingDataTransformCumulativeMetrics::reportCurrentInSteps(bob);
-
-    auto reportState = [this, bob](auto state) {
-        bob->append(fieldNameFor(state, _fieldNames), getStateCounter(state)->load());
-    };
-
-    reportState(CoordinatorStateEnum::kInitializing);
-    reportState(CoordinatorStateEnum::kPreparingToDonate);
-    reportState(CoordinatorStateEnum::kCloning);
-    reportState(CoordinatorStateEnum::kApplying);
-    reportState(CoordinatorStateEnum::kBlockingWrites);
-    reportState(CoordinatorStateEnum::kAborting);
-    reportState(CoordinatorStateEnum::kCommitting);
-
-    reportState(RecipientStateEnum::kAwaitingFetchTimestamp);
-    reportState(RecipientStateEnum::kCreatingCollection);
-    reportState(RecipientStateEnum::kCloning);
-    reportState(RecipientStateEnum::kApplying);
-    reportState(RecipientStateEnum::kError);
-    reportState(RecipientStateEnum::kStrictConsistency);
-    reportState(RecipientStateEnum::kDone);
-
-    reportState(DonorStateEnum::kPreparingToDonate);
-    reportState(DonorStateEnum::kDonatingInitialData);
-    reportState(DonorStateEnum::kDonatingOplogEntries);
-    reportState(DonorStateEnum::kPreparingToBlockWrites);
-    reportState(DonorStateEnum::kError);
-    reportState(DonorStateEnum::kBlockingWrites);
-    reportState(DonorStateEnum::kDone);
-}
-
-void ReshardingCumulativeMetrics::onInsertApplied() {
-    _insertsApplied.fetchAndAdd(1);
-}
-
-void ReshardingCumulativeMetrics::onUpdateApplied() {
-    _updatesApplied.fetchAndAdd(1);
-}
-
-void ReshardingCumulativeMetrics::onDeleteApplied() {
-    _deletesApplied.fetchAndAdd(1);
-}
-
-void ReshardingCumulativeMetrics::onOplogEntriesFetched(int64_t numEntries, Milliseconds elapsed) {
-    _oplogEntriesFetched.fetchAndAdd(numEntries);
-    _oplogFetchingTotalRemoteBatchesRetrieved.fetchAndAdd(1);
-    _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis.fetchAndAdd(
-        durationCount<Milliseconds>(elapsed));
-}
-
-void ReshardingCumulativeMetrics::onOplogEntriesApplied(int64_t numEntries) {
-    _oplogEntriesApplied.fetchAndAdd(numEntries);
-}
-
-void ReshardingCumulativeMetrics::onOplogLocalBatchApplied(Milliseconds elapsed) {
-    _oplogBatchApplied.fetchAndAdd(1);
-    _oplogBatchAppliedMillis.fetchAndAdd(durationCount<Milliseconds>(elapsed));
-}
-
-void ReshardingCumulativeMetrics::onLocalInsertDuringOplogFetching(
-    const Milliseconds& elapsedTime) {
-    _oplogFetchingTotalLocalInserts.fetchAndAdd(1);
-    _oplogFetchingTotalLocalInsertTimeMillis.fetchAndAdd(durationCount<Milliseconds>(elapsedTime));
-}
-
-void ReshardingCumulativeMetrics::onBatchRetrievedDuringOplogApplying(
-    const Milliseconds& elapsedTime) {
-    _oplogApplyingTotalBatchesRetrieved.fetchAndAdd(1);
-    _oplogApplyingTotalBatchesRetrievalTimeMillis.fetchAndAdd(
-        durationCount<Milliseconds>(elapsedTime));
+    reportCountsForAllStates(kReportedStateFieldNamesMap, bob);
 }
 
 }  // namespace mongo

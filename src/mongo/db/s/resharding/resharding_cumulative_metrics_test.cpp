@@ -28,8 +28,8 @@
  */
 
 
+#include "mongo/db/s/metrics/sharding_data_transform_metrics_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
-#include "mongo/db/s/sharding_data_transform_metrics_test_fixture.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -56,13 +56,11 @@ protected:
         return kResharding;
     }
 
-    using CoordinatorStateEnum = ReshardingCumulativeMetrics::CoordinatorStateEnum;
-    using DonorStateEnum = ReshardingCumulativeMetrics::DonorStateEnum;
-    using RecipientStateEnum = ReshardingCumulativeMetrics::RecipientStateEnum;
-
     template <typename T>
     StringData fieldNameFor(T state) {
-        return ReshardingCumulativeMetrics::fieldNameFor(state, _fieldNames.get());
+        auto maybeFieldName = ReshardingCumulativeMetrics::fieldNameFor(state);
+        invariant(maybeFieldName.has_value());
+        return *maybeFieldName;
     }
 
     BSONObj getStateSubObj(const ReshardingCumulativeMetrics* metrics) {
@@ -283,7 +281,8 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsOplogEntriesFetched) {
     ASSERT_EQ(latencies.getIntField("oplogFetchingTotalRemoteBatchesRetrieved"), 0);
     ASSERT_EQ(latencies.getIntField("oplogFetchingTotalRemoteBatchRetrievalTimeMillis"), 0);
 
-    _reshardingCumulativeMetrics->onOplogEntriesFetched(123, Milliseconds(43));
+    _reshardingCumulativeMetrics->onOplogEntriesFetched(123);
+    _reshardingCumulativeMetrics->onBatchRetrievedDuringOplogFetching(Milliseconds(43));
 
     active = getCumulativeMetricsReportForSection(kActive);
     ASSERT_EQ(active.getIntField("oplogEntriesFetched"), 123);

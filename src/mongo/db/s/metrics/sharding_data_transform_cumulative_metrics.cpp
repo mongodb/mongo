@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/global_index/global_index_cumulative_metrics.h"
+#include "mongo/db/s/move_primary/move_primary_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 
 #include <cstdint>
@@ -47,6 +48,7 @@ constexpr auto kEstimateNotAvailable = -1;
 struct Metrics {
     ReshardingCumulativeMetrics _resharding;
     global_index::GlobalIndexCumulativeMetrics _globalIndexes;
+    MovePrimaryCumulativeMetrics _movePrimary;
 };
 using MetricsPtr = std::unique_ptr<Metrics>;
 const auto getMetrics = ServiceContext::declareDecoration<MetricsPtr>();
@@ -67,6 +69,12 @@ ShardingDataTransformCumulativeMetrics* ShardingDataTransformCumulativeMetrics::
     ServiceContext* context) {
     auto& metrics = getMetrics(context);
     return &metrics->_globalIndexes;
+}
+
+ShardingDataTransformCumulativeMetrics* ShardingDataTransformCumulativeMetrics::getForMovePrimary(
+    ServiceContext* context) {
+    auto& metrics = getMetrics(context);
+    return &metrics->_movePrimary;
 }
 
 ShardingDataTransformCumulativeMetrics::ShardingDataTransformCumulativeMetrics(

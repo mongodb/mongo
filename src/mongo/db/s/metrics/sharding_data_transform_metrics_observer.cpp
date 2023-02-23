@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/sharding_data_transform_metrics_observer.h"
+#include "mongo/db/s/metrics/sharding_data_transform_metrics_observer.h"
 
 namespace mongo {
 

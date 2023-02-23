@@ -35,7 +35,7 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
-template <typename Role, size_t SZ>
+template <typename Role, size_t Size>
 class CumulativeMetricsStateHolder {
 public:
     CumulativeMetricsStateHolder() {
@@ -62,32 +62,28 @@ public:
         }
     }
 
-    std::array<AtomicWord<int64_t>, SZ>* getStateArrayFor() {
+    std::array<AtomicWord<int64_t>, Size>* getStateArrayFor() {
         return &_roleStateList;
     }
 
     template <typename T>
     const AtomicWord<int64_t>* getStateCounter(T state) const {
-        if (state == T::kUnused) {
-            return nullptr;
-        }
-
-        invariant(static_cast<size_t>(state) < static_cast<size_t>(T::kNumStates));
-        return &_roleStateList[static_cast<size_t>(state)];
+        auto index = static_cast<size_t>(state);
+        invariant(index >= 0);
+        invariant(index < Size);
+        return &_roleStateList[index];
     }
 
     template <typename T>
     AtomicWord<int64_t>* getMutableStateCounter(T state) {
-        if (state == T::kUnused) {
-            return nullptr;
-        }
-
-        invariant(static_cast<size_t>(state) < static_cast<size_t>(T::kNumStates));
-        return &_roleStateList[static_cast<size_t>(state)];
+        auto index = static_cast<size_t>(state);
+        invariant(index >= 0);
+        invariant(index < Size);
+        return &_roleStateList[index];
     }
 
 
 private:
-    std::array<AtomicWord<int64_t>, SZ> _roleStateList;
+    std::array<AtomicWord<int64_t>, Size> _roleStateList;
 };
 }  // namespace mongo

@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/s/sharding_data_transform_cumulative_metrics_field_name_provider.h"
-#include "mongo/db/s/sharding_data_transform_metrics_observer_interface.h"
+#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/sharding_data_transform_metrics_observer_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
@@ -84,7 +84,7 @@ public:
 
     static ShardingDataTransformCumulativeMetrics* getForResharding(ServiceContext* context);
     static ShardingDataTransformCumulativeMetrics* getForGlobalIndexes(ServiceContext* context);
-
+    static ShardingDataTransformCumulativeMetrics* getForMovePrimary(ServiceContext* context);
 
     ShardingDataTransformCumulativeMetrics(const std::string& rootSectionName,
                                            std::unique_ptr<NameProvider> fieldNameProvider);

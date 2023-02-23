@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,24 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/sharding_data_transform_metrics.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/stdx/unordered_map.h"
+#pragma once
+
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 
-namespace {
-const stdx::unordered_map<ShardingDataTransformMetrics::Role, StringData> roleToName = {
-    {ShardingDataTransformMetrics::Role::kCoordinator, "Coordinator"_sd},
-    {ShardingDataTransformMetrics::Role::kDonor, "Donor"_sd},
-    {ShardingDataTransformMetrics::Role::kRecipient, "Recipient"_sd},
-};
-}
+template <typename Base>
+class WithDocumentCopyFieldNameOverrides : public Base {
+public:
+    virtual StringData getForDocumentsProcessed() const override {
+        return kDocumentsCopied;
+    }
 
-StringData ShardingDataTransformMetrics::getRoleName(Role role) {
-    auto it = roleToName.find(role);
-    invariant(it != roleToName.end());
-    return it->second;
-}
+    virtual StringData getForBytesWritten() const override {
+        return kBytesCopied;
+    }
+
+private:
+    static constexpr auto kDocumentsCopied = "documentsCopied";
+    static constexpr auto kBytesCopied = "bytesCopied";
+};
 
 }  // namespace mongo

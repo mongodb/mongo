@@ -46,22 +46,19 @@ public:
 
     template <typename T>
     void onStateTransition(T before, boost::none_t after) {
-        _cumulativeMetrics->template onStateTransition<typename T::MetricsType>(before.toMetrics(),
-                                                                                after);
+        _cumulativeMetrics->template onStateTransition<T>(before, boost::none);
     }
 
     template <typename T>
     void onStateTransition(boost::none_t before, T after) {
-        setState(after.getState());
-        _cumulativeMetrics->template onStateTransition<typename T::MetricsType>(before,
-                                                                                after.toMetrics());
+        setState(after);
+        _cumulativeMetrics->template onStateTransition<T>(boost::none, after);
     }
 
     template <typename T>
     void onStateTransition(T before, T after) {
-        setState(after.getState());
-        _cumulativeMetrics->template onStateTransition<typename T::MetricsType>(before.toMetrics(),
-                                                                                after.toMetrics());
+        setState(after);
+        _cumulativeMetrics->template onStateTransition<T>(before, after);
     }
 
 private:

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,26 +29,22 @@
 
 #pragma once
 
-#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
+#include <cstdint>
 
 namespace mongo {
-namespace global_index {
 
-class GlobalIndexCumulativeMetricsFieldNameProvider
-    : public ShardingDataTransformCumulativeMetricsFieldNameProvider {
-public:
-    virtual StringData getForDocumentsProcessed() const override;
-    virtual StringData getForBytesWritten() const override;
-
-    // TODO: Replace this placeholder method with one method per global index coordinator
-    // role/state combination. See ReshardingCumulativeMetricsFieldNameProvider for an
-    // example implementation.
-    StringData getForCountInstancesInRoleNameStateNStateName() const;
-
-    StringData getForCountInstancesInRecipientState1Cloning() const;
-    StringData getForCountInstancesInRecipientState2ReadyToCommit() const;
-    StringData getForCountInstancesInRecipientState3Done() const;
+// TODO: Replace with actual Global Index state enums by role
+enum class GlobalIndexCoordinatorStateEnumPlaceholder : int32_t {
+    kUnused,
+    kInitializing,
+    kPreparingToDonate,
+    kCloning,
+    kApplying,
+    kBlockingWrites,
+    kAborting,
+    kCommitting,
+    kDone
 };
+static constexpr uint32_t kNumGlobalIndexCoordinatorStateEnumPlaceholder = 9;
 
-}  // namespace global_index
 }  // namespace mongo

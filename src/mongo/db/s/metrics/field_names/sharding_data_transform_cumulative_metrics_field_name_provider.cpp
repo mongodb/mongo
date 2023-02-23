@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/sharding_data_transform_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
 
 namespace mongo {
 

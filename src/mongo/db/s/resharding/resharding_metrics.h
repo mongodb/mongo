@@ -31,12 +31,12 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/metrics_state_holder.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_field_name_provider.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
-#include "mongo/db/s/sharding_data_transform_instance_metrics.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -44,41 +44,6 @@ namespace mongo {
 class ReshardingMetrics : public ShardingDataTransformInstanceMetrics {
 public:
     using State = stdx::variant<CoordinatorStateEnum, RecipientStateEnum, DonorStateEnum>;
-    class DonorState {
-    public:
-        using MetricsType = ReshardingCumulativeMetrics::DonorStateEnum;
-
-        explicit DonorState(DonorStateEnum enumVal);
-        MetricsType toMetrics() const;
-        DonorStateEnum getState() const;
-
-    private:
-        const DonorStateEnum _enumVal;
-    };
-
-    class RecipientState {
-    public:
-        using MetricsType = ReshardingCumulativeMetrics::RecipientStateEnum;
-
-        explicit RecipientState(RecipientStateEnum enumVal);
-        MetricsType toMetrics() const;
-        RecipientStateEnum getState() const;
-
-    private:
-        RecipientStateEnum _enumVal;
-    };
-
-    class CoordinatorState {
-    public:
-        using MetricsType = ReshardingCumulativeMetrics::CoordinatorStateEnum;
-
-        explicit CoordinatorState(CoordinatorStateEnum enumVal);
-        MetricsType toMetrics() const;
-        CoordinatorStateEnum getState() const;
-
-    private:
-        CoordinatorStateEnum _enumVal;
-    };
 
     struct ExternallyTrackedRecipientFields {
     public:

@@ -37,33 +37,33 @@ constexpr auto kGlobalIndex = "globalIndex";
 }
 
 GlobalIndexCumulativeMetrics::GlobalIndexCumulativeMetrics()
-    : ShardingDataTransformCumulativeMetrics(
-          kGlobalIndex, std::make_unique<GlobalIndexCumulativeMetricsFieldNameProvider>()),
+    : Base(kGlobalIndex, std::make_unique<GlobalIndexCumulativeMetricsFieldNameProvider>()),
       _fieldNames(
           static_cast<const GlobalIndexCumulativeMetricsFieldNameProvider*>(getFieldNames())) {}
 
 StringData GlobalIndexCumulativeMetrics::fieldNameFor(
-    CoordinatorStateEnum state, const GlobalIndexCumulativeMetricsFieldNameProvider* provider) {
+    GlobalIndexCoordinatorStateEnumPlaceholder state,
+    const GlobalIndexCumulativeMetricsFieldNameProvider* provider) {
     switch (state) {
-        case CoordinatorStateEnum::kInitializing:
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kInitializing:
             return provider->getForCountInstancesInRoleNameStateNStateName();
 
-        case CoordinatorStateEnum::kPreparingToDonate:
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kPreparingToDonate:
             return provider->getForCountInstancesInRoleNameStateNStateName();
 
-        case CoordinatorStateEnum::kCloning:
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kCloning:
             return provider->getForCountInstancesInRoleNameStateNStateName();
 
-        case CoordinatorStateEnum::kApplying:
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kApplying:
             return provider->getForCountInstancesInRoleNameStateNStateName();
 
-        case CoordinatorStateEnum::kBlockingWrites:
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kBlockingWrites:
             return provider->getForCountInstancesInRoleNameStateNStateName();
 
-        case CoordinatorStateEnum::kAborting:
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kAborting:
             return provider->getForCountInstancesInRoleNameStateNStateName();
 
-        case CoordinatorStateEnum::kCommitting:
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kCommitting:
             return provider->getForCountInstancesInRoleNameStateNStateName();
 
         default:
@@ -77,15 +77,16 @@ StringData GlobalIndexCumulativeMetrics::fieldNameFor(
 }
 
 StringData GlobalIndexCumulativeMetrics::fieldNameFor(
-    RecipientStateEnum state, const GlobalIndexCumulativeMetricsFieldNameProvider* provider) {
+    GlobalIndexClonerStateEnum state,
+    const GlobalIndexCumulativeMetricsFieldNameProvider* provider) {
     switch (state) {
-        case RecipientStateEnum::kCloning:
+        case GlobalIndexClonerStateEnum::kCloning:
             return provider->getForCountInstancesInRecipientState1Cloning();
 
-        case RecipientStateEnum::kReadyToCommit:
+        case GlobalIndexClonerStateEnum::kReadyToCommit:
             return provider->getForCountInstancesInRecipientState2ReadyToCommit();
 
-        case RecipientStateEnum::kDone:
+        case GlobalIndexClonerStateEnum::kDone:
             return provider->getForCountInstancesInRecipientState3Done();
 
         default:

@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
-#include "mongo/db/s/sharding_data_transform_instance_metrics.h"
 #include <type_traits>
 
 namespace mongo {

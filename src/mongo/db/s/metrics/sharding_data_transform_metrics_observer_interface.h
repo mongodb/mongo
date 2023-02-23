@@ -29,26 +29,18 @@
 
 #pragma once
 
-#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
-namespace global_index {
-
-class GlobalIndexCumulativeMetricsFieldNameProvider
-    : public ShardingDataTransformCumulativeMetricsFieldNameProvider {
+class ShardingDataTransformMetricsObserverInterface {
 public:
-    virtual StringData getForDocumentsProcessed() const override;
-    virtual StringData getForBytesWritten() const override;
-
-    // TODO: Replace this placeholder method with one method per global index coordinator
-    // role/state combination. See ReshardingCumulativeMetricsFieldNameProvider for an
-    // example implementation.
-    StringData getForCountInstancesInRoleNameStateNStateName() const;
-
-    StringData getForCountInstancesInRecipientState1Cloning() const;
-    StringData getForCountInstancesInRecipientState2ReadyToCommit() const;
-    StringData getForCountInstancesInRecipientState3Done() const;
+    virtual ~ShardingDataTransformMetricsObserverInterface() = default;
+    virtual boost::optional<Milliseconds> getHighEstimateRemainingTimeMillis() const = 0;
+    virtual boost::optional<Milliseconds> getLowEstimateRemainingTimeMillis() const = 0;
+    virtual Date_t getStartTimestamp() const = 0;
+    virtual const UUID& getUuid() const = 0;
+    virtual ShardingDataTransformMetrics::Role getRole() const = 0;
 };
 
-}  // namespace global_index
 }  // namespace mongo

@@ -42,12 +42,12 @@
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
-#include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
-#include "mongo/db/s/sharding_data_transform_metrics.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/session/logical_session_cache.h"
@@ -707,10 +707,6 @@ BSONObj makeFlushRoutingTableCacheUpdatesCmd(const NamespaceString& nss) {
         BSON(WriteConcernOptions::kWriteConcernField << kMajorityWriteConcern.toBSON()));
 }
 
-ReshardingMetrics::CoordinatorState toMetricsState(CoordinatorStateEnum state) {
-    return ReshardingMetrics::CoordinatorState(state);
-}
-
 }  // namespace
 
 namespace resharding {
@@ -984,8 +980,7 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
         },
         ShardingCatalogClient::kLocalWriteConcern);
 
-    metrics->onStateTransition(toMetricsState(coordinatorDoc.getState()),
-                               toMetricsState(updatedCoordinatorDoc.getState()));
+    metrics->onStateTransition(coordinatorDoc.getState(), updatedCoordinatorDoc.getState());
 }
 }  // namespace resharding
 
@@ -1245,7 +1240,7 @@ ReshardingCoordinator::ReshardingCoordinator(
         _reshardingCoordinatorObserver->onReshardingParticipantTransition(coordinatorDoc);
     }
 
-    _metrics->onStateTransition(boost::none, toMetricsState(coordinatorDoc.getState()));
+    _metrics->onStateTransition(boost::none, coordinatorDoc.getState());
 }
 
 void ReshardingCoordinator::installCoordinatorDoc(
@@ -1270,8 +1265,7 @@ void ReshardingCoordinator::installCoordinatorDoc(
     const auto previousState = _coordinatorDoc.getState();
     _coordinatorDoc = doc;
 
-    _metrics->onStateTransition(toMetricsState(previousState),
-                                toMetricsState(_coordinatorDoc.getState()));
+    _metrics->onStateTransition(previousState, _coordinatorDoc.getState());
 
     ShardingLogging::get(opCtx)->logChange(opCtx,
                                            "resharding.coordinator.transition",
@@ -1636,7 +1630,7 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
                 .onCompletion([outerStatus](Status) { return outerStatus; });
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
-            _metrics->onStateTransition(toMetricsState(_coordinatorDoc.getState()), boost::none);
+            _metrics->onStateTransition(_coordinatorDoc.getState(), boost::none);
 
             // Destroy metrics early so it's lifetime will not be tied to the lifetime of this
             // state machine. This is because we have future callbacks copy shared pointers to this

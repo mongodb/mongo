@@ -30,138 +30,41 @@
 #pragma once
 
 #include "mongo/db/s/cumulative_metrics_state_holder.h"
+#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/db/s/metrics/sharding_data_transform_metrics_macros.h"
+#include "mongo/db/s/metrics/with_oplog_application_count_metrics.h"
+#include "mongo/db/s/metrics/with_oplog_application_latency_metrics.h"
+#include "mongo/db/s/metrics/with_state_management_for_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics_field_name_provider.h"
-#include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/s/resharding/common_types_gen.h"
 
 namespace mongo {
 
-class ReshardingCumulativeMetrics : public ShardingDataTransformCumulativeMetrics {
+namespace resharding_cumulative_metrics {
+DEFINE_IDL_ENUM_SIZE_TEMPLATE_HELPER(ReshardingMetrics,
+                                     CoordinatorStateEnum,
+                                     DonorStateEnum,
+                                     RecipientStateEnum)
+using Base = WithOplogApplicationLatencyMetrics<WithOplogApplicationCountMetrics<
+    WithStateManagementForCumulativeMetrics<ShardingDataTransformCumulativeMetrics,
+                                            ReshardingMetricsEnumSizeTemplateHelper,
+                                            CoordinatorStateEnum,
+                                            DonorStateEnum,
+                                            RecipientStateEnum>>>;
+}  // namespace resharding_cumulative_metrics
+
+class ReshardingCumulativeMetrics : public resharding_cumulative_metrics::Base {
 public:
-    enum class CoordinatorStateEnum : int32_t {
-        kUnused = -1,
-        kInitializing,
-        kPreparingToDonate,
-        kCloning,
-        kApplying,
-        kBlockingWrites,
-        kAborting,
-        kCommitting,
-        kDone,
-        kNumStates
-    };
-
-    enum class DonorStateEnum : int32_t {
-        kUnused = -1,
-        kPreparingToDonate,
-        kDonatingInitialData,
-        kDonatingOplogEntries,
-        kPreparingToBlockWrites,
-        kError,
-        kBlockingWrites,
-        kDone,
-        kNumStates
-    };
-
-    enum class RecipientStateEnum : int32_t {
-        kUnused = -1,
-        kAwaitingFetchTimestamp,
-        kCreatingCollection,
-        kCloning,
-        kApplying,
-        kError,
-        kStrictConsistency,
-        kDone,
-        kNumStates
-    };
-
     ReshardingCumulativeMetrics();
 
-    static StringData fieldNameFor(CoordinatorStateEnum state,
-                                   const ReshardingCumulativeMetricsFieldNameProvider* provider);
-    static StringData fieldNameFor(DonorStateEnum state,
-                                   const ReshardingCumulativeMetricsFieldNameProvider* provider);
-    static StringData fieldNameFor(RecipientStateEnum state,
-                                   const ReshardingCumulativeMetricsFieldNameProvider* provider);
-    template <typename T>
-    void onStateTransition(boost::optional<T> before, boost::optional<T> after);
-    void onInsertApplied();
-    void onUpdateApplied();
-    void onDeleteApplied();
-    void onOplogEntriesFetched(int64_t numEntries, Milliseconds elapsed);
-    void onOplogEntriesApplied(int64_t numEntries);
-    void onLocalInsertDuringOplogFetching(const Milliseconds& elapsedTime);
-    void onBatchRetrievedDuringOplogApplying(const Milliseconds& elapsedTime);
-    void onOplogLocalBatchApplied(Milliseconds elapsed);
+    static boost::optional<StringData> fieldNameFor(AnyState state);
 
 private:
-    template <typename T>
-    const AtomicWord<int64_t>* getStateCounter(T state) const;
     virtual void reportActive(BSONObjBuilder* bob) const;
     virtual void reportLatencies(BSONObjBuilder* bob) const;
     virtual void reportCurrentInSteps(BSONObjBuilder* bob) const;
 
     const ReshardingCumulativeMetricsFieldNameProvider* _fieldNames;
-
-    AtomicWord<int64_t> _insertsApplied{0};
-    AtomicWord<int64_t> _updatesApplied{0};
-    AtomicWord<int64_t> _deletesApplied{0};
-    AtomicWord<int64_t> _oplogEntriesApplied{0};
-    AtomicWord<int64_t> _oplogEntriesFetched{0};
-
-    AtomicWord<int64_t> _oplogFetchingTotalRemoteBatchesRetrieved{0};
-    AtomicWord<int64_t> _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis{0};
-    AtomicWord<int64_t> _oplogFetchingTotalLocalInserts{0};
-    AtomicWord<int64_t> _oplogFetchingTotalLocalInsertTimeMillis{0};
-    AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrieved{0};
-    AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrievalTimeMillis{0};
-    AtomicWord<int64_t> _oplogBatchApplied{0};
-    AtomicWord<int64_t> _oplogBatchAppliedMillis{0};
-
-    CumulativeMetricsStateHolder<CoordinatorStateEnum,
-                                 static_cast<size_t>(CoordinatorStateEnum::kNumStates)>
-        _coordinatorStateList;
-    CumulativeMetricsStateHolder<DonorStateEnum, static_cast<size_t>(DonorStateEnum::kNumStates)>
-        _donorStateList;
-    CumulativeMetricsStateHolder<RecipientStateEnum,
-                                 static_cast<size_t>(RecipientStateEnum::kNumStates)>
-        _recipientStateList;
-
-    template <typename T>
-    auto getStateListForRole() const {
-        if constexpr (std::is_same<T, CoordinatorStateEnum>::value) {
-            return &_coordinatorStateList;
-        } else if constexpr (std::is_same<T, DonorStateEnum>::value) {
-            return &_donorStateList;
-        } else if constexpr (std::is_same<T, RecipientStateEnum>::value) {
-            return &_recipientStateList;
-        } else {
-            MONGO_UNREACHABLE;
-        }
-    }
-
-    template <typename T>
-    auto getMutableStateListForRole() {
-        if constexpr (std::is_same<T, CoordinatorStateEnum>::value) {
-            return &_coordinatorStateList;
-        } else if constexpr (std::is_same<T, DonorStateEnum>::value) {
-            return &_donorStateList;
-        } else if constexpr (std::is_same<T, RecipientStateEnum>::value) {
-            return &_recipientStateList;
-        } else {
-            MONGO_UNREACHABLE;
-        }
-    }
 };
 
-template <typename T>
-void ReshardingCumulativeMetrics::onStateTransition(boost::optional<T> before,
-                                                    boost::optional<T> after) {
-    getMutableStateListForRole<T>()->onStateTransition(before, after);
-}
-
-
-template <typename T>
-const AtomicWord<int64_t>* ReshardingCumulativeMetrics::getStateCounter(T state) const {
-    return getStateListForRole<T>()->getStateCounter(state);
-}
 }  // namespace mongo

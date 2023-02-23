@@ -56,10 +56,6 @@ namespace {
 
 const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
-GlobalIndexMetrics::RecipientState toMetrics(GlobalIndexClonerStateEnum state) {
-    return GlobalIndexMetrics::RecipientState{state};
-}
-
 }  // namespace
 
 GlobalIndexCloningService::GlobalIndexCloningService(ServiceContext* serviceContext)
@@ -200,8 +196,7 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_cleanup(
                         _cloningService->releaseInstance(instanceId, Status::OK());
                     }
 
-                    _metrics->onStateTransition(toMetrics(GlobalIndexClonerStateEnum::kDone),
-                                                boost::none);
+                    _metrics->onStateTransition(GlobalIndexClonerStateEnum::kDone, boost::none);
                 });
         })
         .onTransientError([](const auto& status) {})
@@ -328,8 +323,7 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_persistSta
                 _mutableState.setState(GlobalIndexClonerStateEnum::kCloning);
             }
 
-            _metrics->onStateTransition(boost::none,
-                                        toMetrics(GlobalIndexClonerStateEnum::kCloning));
+            _metrics->onStateTransition(boost::none, GlobalIndexClonerStateEnum::kCloning);
         })
         .onTransientError([](const Status& status) {})
         .onUnrecoverableError([](const Status& status) {})
@@ -535,7 +529,7 @@ void GlobalIndexCloningService::CloningStateMachine::_updateMutableState(
 
     const auto oldState = _mutableState.getState();
     _mutableState = std::move(newMutableState);
-    _metrics->onStateTransition(toMetrics(oldState), toMetrics(_mutableState.getState()));
+    _metrics->onStateTransition(oldState, _mutableState.getState());
 }
 
 }  // namespace global_index

@@ -192,10 +192,6 @@ public:
     }
 };
 
-ReshardingMetrics::DonorState toMetricsState(DonorStateEnum state) {
-    return ReshardingMetrics::DonorState(state);
-}
-
 }  // namespace
 
 ThreadPool::Limits ReshardingDonorService::getThreadPoolLimits() const {
@@ -245,7 +241,7 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
       }()) {
     invariant(_externalState);
 
-    _metrics->onStateTransition(boost::none, toMetricsState(_donorCtx.getState()));
+    _metrics->onStateTransition(boost::none, _donorCtx.getState());
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockingWritesOrErrored(
@@ -422,7 +418,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
 
 Status ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(
     Status status, const CancellationToken& stepdownToken) {
-    _metrics->onStateTransition(toMetricsState(_donorCtx.getState()), boost::none);
+    _metrics->onStateTransition(_donorCtx.getState(), boost::none);
 
     // Destroy metrics early so it's lifetime will not be tied to the lifetime of this state
     // machine. This is because we have future callbacks copy shared pointers to this state machine
@@ -854,7 +850,7 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(DonorShardConte
 
     _updateDonorDocument(std::move(newDonorCtx));
 
-    _metrics->onStateTransition(toMetricsState(oldState), toMetricsState(newState));
+    _metrics->onStateTransition(oldState, newState);
 
     LOGV2_INFO(5279505,
                "Transitioned resharding donor state",
