@@ -830,6 +830,19 @@ if hygienic:
         AIB_ROLE='base',
     )
 
+if env.TargetOSIs('darwin', 'macOS'):
+    if hygienic:
+        env.AutoInstall(
+            target='$PREFIX',
+            source=[
+                env.File('#/etc/macos_mongodb.plist'),
+            ],
+            AIB_COMPONENT='common',
+            AIB_ROLE='base',
+        )
+    else:
+        env.Install("$DESTDIR", env.File('#/etc/macos_mongodb.plist'),)
+
 # Build a set of directories containing module banners, and use that
 # to build a --transform option for each directory so that the files
 # are tar'ed up to the proper location.
