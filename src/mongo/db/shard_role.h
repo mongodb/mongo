@@ -44,13 +44,13 @@ namespace mongo {
  * taken into account in addition to the ReadConcern of the transaction, which is stored in the
  * OperationContext.
  */
-struct NamespaceOrViewAcquisitionRequest {
+struct CollectionOrViewAcquisitionRequest {
     static const AcquisitionPrerequisites::PlacementConcern kPretendUnshardedDueToDirectConnection;
 
     /**
      * Overload, which acquires a collection by NSS, ignoring the current UUID mapping.
      */
-    NamespaceOrViewAcquisitionRequest(
+    CollectionOrViewAcquisitionRequest(
         NamespaceString nss,
         AcquisitionPrerequisites::PlacementConcern placementConcern,
         repl::ReadConcernArgs readConcern,
@@ -66,7 +66,7 @@ struct NamespaceOrViewAcquisitionRequest {
      * Overload, which acquires a collection by NSS/UUID combination, requiring that the UUID of the
      * namespace matches exactly.
      */
-    NamespaceOrViewAcquisitionRequest(
+    CollectionOrViewAcquisitionRequest(
         NamespaceString nss,
         UUID uuid,
         AcquisitionPrerequisites::PlacementConcern placementConcern,
@@ -84,7 +84,7 @@ struct NamespaceOrViewAcquisitionRequest {
      * Overload, which acquires a collection by NSS or DB/UUID, without imposing an expected
      * relationship between NSS and UUID.
      */
-    NamespaceOrViewAcquisitionRequest(
+    CollectionOrViewAcquisitionRequest(
         NamespaceStringOrUUID nssOrUUID,
         AcquisitionPrerequisites::PlacementConcern placementConcern,
         repl::ReadConcernArgs readConcern,
@@ -102,7 +102,7 @@ struct NamespaceOrViewAcquisitionRequest {
      * Overload, which acquires a collection by NSS, ignoring the current UUID mapping. Takes the
      * placement concern from the opCtx's OperationShardingState.
      */
-    NamespaceOrViewAcquisitionRequest(
+    CollectionOrViewAcquisitionRequest(
         OperationContext* opCtx,
         NamespaceString nss,
         repl::ReadConcernArgs readConcern,
@@ -119,41 +119,98 @@ struct NamespaceOrViewAcquisitionRequest {
     AcquisitionPrerequisites::ViewMode viewMode;
 };
 
-/**
- * See the comments on the TransactionResources class for the semantics of this class.
- */
-class ScopedCollectionOrViewAcquisition {
-public:
-    ScopedCollectionOrViewAcquisition() = delete;
-    ScopedCollectionOrViewAcquisition(const mongo::ScopedCollectionOrViewAcquisition&) = delete;
+struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest {
+    /**
+     * Overload, which acquires a collection by NSS, ignoring the current UUID mapping.
+     */
+    CollectionAcquisitionRequest(NamespaceString nss,
+                                 AcquisitionPrerequisites::PlacementConcern placementConcern,
+                                 repl::ReadConcernArgs readConcern,
+                                 AcquisitionPrerequisites::OperationType operationType)
+        : CollectionOrViewAcquisitionRequest(nss,
+                                             placementConcern,
+                                             readConcern,
+                                             operationType,
+                                             AcquisitionPrerequisites::kMustBeCollection) {}
 
-    ScopedCollectionOrViewAcquisition(mongo::ScopedCollectionOrViewAcquisition&& other)
+    /**
+     * Overload, which acquires a collection by NSS/UUID combination, requiring that the UUID of the
+     * namespace matches exactly.
+     */
+    CollectionAcquisitionRequest(NamespaceString nss,
+                                 UUID uuid,
+                                 AcquisitionPrerequisites::PlacementConcern placementConcern,
+                                 repl::ReadConcernArgs readConcern,
+                                 AcquisitionPrerequisites::OperationType operationType)
+        : CollectionOrViewAcquisitionRequest(nss,
+                                             uuid,
+                                             placementConcern,
+                                             readConcern,
+                                             operationType,
+                                             AcquisitionPrerequisites::kMustBeCollection) {}
+
+    /**
+     * Overload, which acquires a collection by NSS or DB/UUID, without imposing an expected
+     * relationship between NSS and UUID.
+     */
+    CollectionAcquisitionRequest(NamespaceStringOrUUID nssOrUUID,
+                                 AcquisitionPrerequisites::PlacementConcern placementConcern,
+                                 repl::ReadConcernArgs readConcern,
+                                 AcquisitionPrerequisites::OperationType operationType)
+        : CollectionOrViewAcquisitionRequest(nssOrUUID,
+                                             placementConcern,
+                                             readConcern,
+                                             operationType,
+                                             AcquisitionPrerequisites::kMustBeCollection) {}
+
+    /**
+     * Overload, which acquires a collection by NSS, ignoring the current UUID mapping. Takes the
+     * placement concern from the opCtx's OperationShardingState.
+     */
+    CollectionAcquisitionRequest(OperationContext* opCtx,
+                                 NamespaceString nss,
+                                 repl::ReadConcernArgs readConcern,
+                                 AcquisitionPrerequisites::OperationType operationType)
+        : CollectionOrViewAcquisitionRequest(
+              opCtx, nss, readConcern, operationType, AcquisitionPrerequisites::kMustBeCollection) {
+    }
+};
+
+class ScopedCollectionAcquisition {
+public:
+    ScopedCollectionAcquisition(const mongo::ScopedCollectionAcquisition&) = delete;
+
+    ScopedCollectionAcquisition(mongo::ScopedCollectionAcquisition&& other)
         : _opCtx(other._opCtx), _acquiredCollection(other._acquiredCollection) {
         other._opCtx = nullptr;
     }
 
-    ~ScopedCollectionOrViewAcquisition();
+    ~ScopedCollectionAcquisition();
 
-    ScopedCollectionOrViewAcquisition(
-        OperationContext* opCtx, const shard_role_details::AcquiredCollection& acquiredCollection)
+    ScopedCollectionAcquisition(OperationContext* opCtx,
+                                const shard_role_details::AcquiredCollection& acquiredCollection)
         : _opCtx(opCtx), _acquiredCollection(acquiredCollection) {}
 
-    const NamespaceString& nss() const;
-
-    bool isView() const {
-        // TODO: SERVER-73005 Support views
-        return false;
+    const NamespaceString& nss() const {
+        return _acquiredCollection.prerequisites.nss;
     }
 
     // Access to services associated with the specified collection top to bottom on the hierarchical
     // stack
 
     // Sharding services
-    const ScopedCollectionDescription& getShardingDescription() const;
-    const boost::optional<ScopedCollectionFilter>& getCollectionFilter() const;
+    const ScopedCollectionDescription& getShardingDescription() const {
+        return _acquiredCollection.collectionDescription;
+    }
+
+    const boost::optional<ScopedCollectionFilter>& getCollectionFilter() const {
+        return _acquiredCollection.ownershipFilter;
+    }
 
     // StorEx services
-    const CollectionPtr& getCollectionPtr() const;
+    const CollectionPtr& getCollectionPtr() const {
+        return _acquiredCollection.collectionPtr;
+    }
 
 private:
     OperationContext* _opCtx;
@@ -164,6 +221,43 @@ private:
     const shard_role_details::AcquiredCollection& _acquiredCollection;
 };
 
+class ScopedViewAcquisition {
+public:
+    ScopedViewAcquisition(const mongo::ScopedViewAcquisition&) = delete;
+
+    ScopedViewAcquisition(mongo::ScopedViewAcquisition&& other)
+        : _opCtx(other._opCtx), _acquiredView(other._acquiredView) {
+        other._opCtx = nullptr;
+    }
+
+    ~ScopedViewAcquisition();
+
+    ScopedViewAcquisition(OperationContext* opCtx,
+                          const shard_role_details::AcquiredView& acquiredView)
+        : _opCtx(opCtx), _acquiredView(acquiredView) {}
+
+    const NamespaceString& nss() const {
+        return _acquiredView.prerequisites.nss;
+    }
+
+    // StorEx services
+    const ViewDefinition& getViewDefinition() const {
+        invariant(_acquiredView.viewDefinition);
+        return *(_acquiredView.viewDefinition);
+    }
+
+private:
+    OperationContext* _opCtx;
+
+    // Points to the acquired resources that live on the TransactionResources opCtx decoration. The
+    // lifetime of these resources is tied to the lifetime of this
+    // ScopedCollectionOrViewAcquisition.
+    const shard_role_details::AcquiredView& _acquiredView;
+};
+
+using ScopedCollectionOrViewAcquisition =
+    std::variant<ScopedCollectionAcquisition, ScopedViewAcquisition>;
+
 /**
  * Takes into account the specified namespace acquisition requests and if they can be satisfied,
  * adds the acquired collections to the set ot TransactionResources for the current operation.
@@ -171,9 +265,22 @@ private:
  * This method will acquire and 2-phase hold all the necessary hierarchical locks (Global, DB and
  * Collection).
  */
+ScopedCollectionAcquisition acquireCollection(OperationContext* opCtx,
+                                              CollectionAcquisitionRequest acquisitionRequest,
+                                              LockMode mode);
+
+std::vector<ScopedCollectionAcquisition> acquireCollections(
+    OperationContext* opCtx,
+    std::vector<CollectionAcquisitionRequest> acquisitionRequests,
+    LockMode mode);
+
+
+ScopedCollectionOrViewAcquisition acquireCollectionOrView(
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest, LockMode mode);
+
 std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
     OperationContext* opCtx,
-    std::initializer_list<NamespaceOrViewAcquisitionRequest> acquisitionRequests,
+    std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests,
     LockMode mode);
 
 /**
@@ -181,8 +288,7 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
  * 2-phase hierarchical locks.
  */
 std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViewsWithoutTakingLocks(
-    OperationContext* opCtx,
-    std::initializer_list<NamespaceOrViewAcquisitionRequest> acquisitionRequests);
+    OperationContext* opCtx, std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests);
 
 /**
  * Serves as a temporary container for transaction resources which have been yielded via a call to

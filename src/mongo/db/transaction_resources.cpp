@@ -39,12 +39,14 @@ void TransactionResources::releaseAllResourcesOnCommitOrAbort() noexcept {
     locker.reset();
     lockSnapshot.reset();
     acquiredCollections.clear();
+    acquiredViews.clear();
 }
 
 TransactionResources::~TransactionResources() {
     invariant(!locker);
     invariant(!lockSnapshot);
     invariant(acquiredCollections.empty());
+    invariant(acquiredViews.empty());
 }
 
 }  // namespace shard_role_details

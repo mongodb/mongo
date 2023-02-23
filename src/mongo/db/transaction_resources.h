@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/views/view.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/uuid.h"
 
@@ -81,6 +82,15 @@ struct AcquiredCollection {
     ScopedCollectionDescription collectionDescription;
     boost::optional<ScopedCollectionFilter> ownershipFilter;
     CollectionPtr collectionPtr;
+};
+
+struct AcquiredView {
+    AcquisitionPrerequisites prerequisites;
+
+    std::shared_ptr<Lock::DBLock> dbLock;
+    boost::optional<Lock::CollectionLock> collectionLock;
+
+    std::shared_ptr<const ViewDefinition> viewDefinition;
 };
 
 /**
@@ -130,12 +140,15 @@ struct TransactionResources {
 
     ~TransactionResources();
 
-    // void addAcquiredCollection(const NamespaceString& nss, UUID uuid);
     const AcquiredCollection& addAcquiredCollection(AcquiredCollection&& acquiredCollection) {
         return acquiredCollections.emplace_back(std::move(acquiredCollection));
     }
 
     void releaseCollection(UUID uuid);
+
+    const AcquiredView& addAcquiredView(AcquiredView&& acquiredView) {
+        return acquiredViews.emplace_back(std::move(acquiredView));
+    }
 
     void releaseAllResourcesOnCommitOrAbort() noexcept;
 
@@ -169,6 +182,7 @@ struct TransactionResources {
 
     // Set of all collections which are currently acquired
     std::list<AcquiredCollection> acquiredCollections;
+    std::list<AcquiredView> acquiredViews;
 };
 
 }  // namespace shard_role_details
