@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/balancer/auto_merger_policy.h"
+#include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -38,12 +39,7 @@
 namespace mongo {
 
 namespace {
-
 const std::string kPolicyName{"AutoMergerPolicy"};
-
-// TODO SERVER-73515 Make Automerger interval a configurable server parameter.
-const Milliseconds kAutomergerInterval(24 * 60 * 60 * 1000 /* 24 hours */);
-
 }  // namespace
 
 
@@ -153,9 +149,9 @@ void AutoMergerPolicy::_init(WithLock lk) {
 }
 
 void AutoMergerPolicy::_checkInternalUpdatesWithLock(WithLock lk) {
-    // Triggers automerger every `kAutomergerInterval` milliseconds
+    // Triggers automerger every `autoMergerIntervalSecs` seconds
     if (_collectionsToMergePerShard.empty() && _enabled &&
-        _intervalTimer.millis() > durationCount<Milliseconds>(kAutomergerInterval)) {
+        _intervalTimer.seconds() > autoMergerIntervalSecs) {
         _init(lk);
     }
 }

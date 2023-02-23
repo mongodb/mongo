@@ -46,3 +46,10 @@ server_parameters:
         validator:
           gte: 0
         default: 1000
+
+    autoMergerIntervalSecs:
+        description: Time interval in seconds between subsequent auto-merging rounds
+        set_at: [startup, runtime]
+        cpp_vartype: int
+        cpp_varname: autoMergerIntervalSecs
+        default: 86400 # 24 hours

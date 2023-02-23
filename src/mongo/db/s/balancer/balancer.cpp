@@ -739,7 +739,6 @@ void Balancer::_mainThread() {
                       "balancerInterval"_attr = *forcedBalancerRoundInterval);
             });
 
-
             LOGV2_DEBUG(21860,
                         1,
                         "Start balancing round. waitForDelete: {waitForDelete}, "

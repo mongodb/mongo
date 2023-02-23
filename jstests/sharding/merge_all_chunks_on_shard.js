@@ -1,5 +1,5 @@
 /**
- * Tests mergeAllChunksOnShard command
+ * Tests mergeAllChunksOnShard command and auto-merger behavior
  *
  * @tags: [
  *   featureFlagAutoMerger,
@@ -9,6 +9,7 @@
  */
 (function() {
 'use strict';
+load("jstests/sharding/libs/find_chunks_util.js");
 
 /* Create new sharded collection on testDB */
 let _collCounter = 0;
@@ -56,43 +57,19 @@ function setJumboFlag(configDB, coll, chunkQuery) {
     assert.commandWorked(configDB.chunks.update(query, {$set: {jumbo: true}}));
 }
 
-/* Set history window in all config servers */
-let defaultMinSnapshotHistoryWindowInSeconds = null;
-let defaultTransactionLifetimeLimitSeconds = null;
-function setHistoryWindowInConfigServers(st, valueInSeconds) {
-    st.forEachConfigServer((conn) => {
-        const res =
-            conn.adminCommand({setParameter: 1, minSnapshotHistoryWindowInSeconds: valueInSeconds});
-        assert.commandWorked(res);
-        defaultMinSnapshotHistoryWindowInSeconds = res.was;
-    });
-    st.forEachConfigServer((conn) => {
-        const res =
-            conn.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: valueInSeconds});
-        assert.commandWorked(res);
-        defaultTransactionLifetimeLimitSeconds = res.was;
-    });
+function setHistoryWindowInSecs(st, valueInSeconds) {
+    assert.commandWorked(st.configRS.getPrimary().adminCommand({
+        configureFailPoint: 'overrideHistoryWindowInSecs',
+        mode: 'alwaysOn',
+        data: {seconds: valueInSeconds}
+    }));
 }
 
-/* Set back history window to its default value in all config servers */
-function resetHistoryWindowInConfigServers(st) {
-    assert(defaultMinSnapshotHistoryWindowInSeconds);
-    assert(defaultTransactionLifetimeLimitSeconds);
-    st.forEachConfigServer((conn) => {
-        assert.commandWorked(conn.adminCommand({
-            setParameter: 1,
-            minSnapshotHistoryWindowInSeconds: defaultMinSnapshotHistoryWindowInSeconds
-        }));
-    });
-    st.forEachConfigServer((conn) => {
-        assert.commandWorked(conn.adminCommand({
-            setParameter: 1,
-            transactionLifetimeLimitSeconds: defaultTransactionLifetimeLimitSeconds
-        }));
-    });
+function resetHistoryWindowInSecs(st) {
+    assert.commandWorked(st.configRS.getPrimary().adminCommand(
+        {configureFailPoint: 'overrideHistoryWindowInSecs', mode: 'off'}));
 }
 
-/* Set balancer merge throttling */
 let defaultChunkDefragmentationThrottlingMS = null;
 function setBalancerMergeThrottling(st, valueInMS) {
     st.forEachConfigServer((conn) => {
@@ -103,8 +80,12 @@ function setBalancerMergeThrottling(st, valueInMS) {
     });
 }
 
-/* Unset custom throttling parameter so that default gets applied */
 function resetBalancerMergeThrottling(st) {
+    if (!defaultChunkDefragmentationThrottlingMS) {
+        // Default throttling param was never changed, hence no need to reset it
+        return;
+    }
+
     st.forEachConfigServer((conn) => {
         assert.commandWorked(conn.adminCommand({
             setParameter: 1,
@@ -113,7 +94,6 @@ function resetBalancerMergeThrottling(st) {
     });
 }
 
-/* Override balancer round default interval */
 function setBalanceRoundInterval(st, valueInMs) {
     st.forEachConfigServer((conn) => {
         assert.commandWorked(conn.adminCommand({
@@ -124,7 +104,6 @@ function setBalanceRoundInterval(st, valueInMs) {
     });
 }
 
-/* Set balancer round interval to its default value */
 function resetBalanceRoundInterval(st) {
     st.forEachConfigServer((conn) => {
         assert.commandWorked(
@@ -132,10 +111,9 @@ function resetBalanceRoundInterval(st) {
     });
 }
 
-/* Verifies that the expected chunks are on the specified shard */
-function assertExpectedChunks(configDB, coll, shardName, expectedChunks) {
-    const collUuid = configDB.collections.findOne({_id: coll.getFullName()}).uuid;
-    const chunks = configDB.chunks.find({uuid: collUuid, shard: shardName}).toArray();
+function assertExpectedChunksOnShard(configDB, coll, shardName, expectedChunks) {
+    const chunks =
+        findChunksUtil.findChunksByNs(configDB, coll.getFullName(), {shard: shardName}).toArray();
     assert.eq(expectedChunks.length, chunks.length);
     expectedChunks.forEach((expectedChunk) => {
         const chunkFound = chunks.some((chunk) => expectedChunk.min === chunk.min.x &&
@@ -199,11 +177,10 @@ function buildInitialScenario(st, coll, shard0, shard1, historyWindowInSeconds) 
 
     const configDB = st.getDB("config");
 
-    assertExpectedChunks(configDB, coll, shard0, expectedChunksPerShard[shard0]);
-    assertExpectedChunks(configDB, coll, shard1, expectedChunksPerShard[shard1]);
+    assertExpectedChunksOnShard(configDB, coll, shard0, expectedChunksPerShard[shard0]);
+    assertExpectedChunksOnShard(configDB, coll, shard1, expectedChunksPerShard[shard1]);
 
-    const collUuid = configDB.collections.findOne({_id: coll.getFullName()}).uuid;
-    return configDB.chunks.findOne({uuid: collUuid}).onCurrentShardSince;
+    return findChunksUtil.findOneChunkByNs(configDB, coll.getFullName()).onCurrentShardSince;
 }
 
 /* Tests mergeAllChunks command */
@@ -218,7 +195,7 @@ function mergeAllChunksOnShardTest(st, testDB) {
 
     // Set history window to a known value
     const historyWindowInSeconds = 30;
-    setHistoryWindowInConfigServers(st, historyWindowInSeconds);
+    setHistoryWindowInSecs(st, historyWindowInSeconds);
 
     // Distribute deterministically the chunks across the shards
     const now = buildInitialScenario(st, coll, shard0, shard1, historyWindowInSeconds);
@@ -229,16 +206,13 @@ function mergeAllChunksOnShardTest(st, testDB) {
     // Merge all mergeable chunks on shard0
     assert.commandWorked(
         st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard0}));
-    assertExpectedChunks(
+    assertExpectedChunksOnShard(
         configDB, coll, shard0, [{min: MinKey, max: 1}, {min: 3, max: 7}, {min: 10, max: MaxKey}]);
 
     // Merge all mergeable chunks on shard1
     assert.commandWorked(
         st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard1}));
-    assertExpectedChunks(configDB, coll, shard1, [{min: 1, max: 3}, {min: 7, max: 10}]);
-
-    // Set back snapshot history window to its default value
-    resetHistoryWindowInConfigServers(st);
+    assertExpectedChunksOnShard(configDB, coll, shard1, [{min: 1, max: 3}, {min: 7, max: 10}]);
 }
 
 /* Tests mergeAllChunks command considering history window preservation */
@@ -253,7 +227,7 @@ function mergeAllChunksOnShardConsideringHistoryWindowTest(st, testDB) {
 
     // Set history windows to 1 min
     const historyWindowInSeconds = 1000;
-    setHistoryWindowInConfigServers(st, 1000);
+    setHistoryWindowInSecs(st, 1000);
 
     // Distribute deterministically the chunks across the shards
     const now = buildInitialScenario(st, coll, shard0, shard1);
@@ -272,7 +246,7 @@ function mergeAllChunksOnShardConsideringHistoryWindowTest(st, testDB) {
 
     // All chunks must be merged except{min: 1, max: 2} and{min: 2, max: 3} because they
     // must be preserved when history widow is still active on them
-    assertExpectedChunks(configDB, coll, shard0, [
+    assertExpectedChunksOnShard(configDB, coll, shard0, [
         {min: MinKey, max: 1},
         {min: 1, max: 2},
         {min: 2, max: 3},
@@ -283,10 +257,7 @@ function mergeAllChunksOnShardConsideringHistoryWindowTest(st, testDB) {
     // Try to merge all mergeable chunks on shard1 and check expected results
     assert.commandWorked(
         st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard1}));
-    assertExpectedChunks(configDB, coll, shard1, [{min: 7, max: 10}]);
-
-    // Set back history windows to its default value
-    resetHistoryWindowInConfigServers(st);
+    assertExpectedChunksOnShard(configDB, coll, shard1, [{min: 7, max: 10}]);
 }
 
 /* Tests mergeAllChunks command considering jumbo flag */
@@ -301,7 +272,7 @@ function mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB) {
 
     // Set history window to a known value
     const historyWindowInSeconds = 30;
-    setHistoryWindowInConfigServers(st, historyWindowInSeconds);
+    setHistoryWindowInSecs(st, historyWindowInSeconds);
 
     // Distribute deterministically the chunks across the shards
     const now = buildInitialScenario(st, coll, shard0, shard1, historyWindowInSeconds);
@@ -319,7 +290,7 @@ function mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB) {
         st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard0}));
 
     // All chunks should be merged except {min: 3, max: 4}
-    assertExpectedChunks(
+    assertExpectedChunksOnShard(
         configDB,
         coll,
         shard0,
@@ -330,13 +301,11 @@ function mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB) {
         st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard1}));
 
     // All chunks should be merged except {min: 8, max: 9}
-    assertExpectedChunks(configDB,
-                         coll,
-                         shard1,
-                         [{min: 1, max: 3}, {min: 7, max: 8}, {min: 8, max: 9}, {min: 9, max: 10}]);
-
-    // Set back history windows to its default value
-    resetHistoryWindowInConfigServers(st);
+    assertExpectedChunksOnShard(
+        configDB,
+        coll,
+        shard1,
+        [{min: 1, max: 3}, {min: 7, max: 8}, {min: 8, max: 9}, {min: 9, max: 10}]);
 }
 
 /* Tests automerger on first balancer round */
@@ -356,7 +325,7 @@ function balancerTriggersAutomergerWhenIsEnabledTest(st, testDB) {
 
     // Set history window to a known value
     const historyWindowInSeconds = 30;
-    setHistoryWindowInConfigServers(st, historyWindowInSeconds);
+    setHistoryWindowInSecs(st, historyWindowInSeconds);
 
     colls.forEach((coll) => {
         // Distribute deterministically the chunks across the shards
@@ -378,36 +347,70 @@ function balancerTriggersAutomergerWhenIsEnabledTest(st, testDB) {
         st.awaitBalancerRound();
     }
 
-    st.stopBalancer();
-
     // All mergeable chunks should be merged
     colls.forEach((coll) => {
-        assertExpectedChunks(configDB,
-                             coll,
-                             shard0,
-                             [{min: MinKey, max: 1}, {min: 3, max: 7}, {min: 10, max: MaxKey}]);
-        assertExpectedChunks(configDB, coll, shard1, [{min: 1, max: 3}, {min: 7, max: 10}]);
+        assertExpectedChunksOnShard(
+            configDB,
+            coll,
+            shard0,
+            [{min: MinKey, max: 1}, {min: 3, max: 7}, {min: 10, max: MaxKey}]);
+        assertExpectedChunksOnShard(configDB, coll, shard1, [{min: 1, max: 3}, {min: 7, max: 10}]);
     });
+}
 
-    // Set settings to default
-    resetHistoryWindowInConfigServers(st);
-    resetBalanceRoundInterval(st);
-    resetBalancerMergeThrottling(st);
+function testConfigurableAutoMergerIntervalSecs(st, testDB) {
+    // Override default configuration to speed up the test
+    setBalanceRoundInterval(st, 100 /* ms */);
+    setBalancerMergeThrottling(st, 0);
+    setHistoryWindowInSecs(st, 0 /* seconds */);
+
+    // Set automerger interval to 1 second
+    assert.commandWorked(
+        st.configRS.getPrimary().adminCommand({setParameter: 1, autoMergerIntervalSecs: 1}));
+
+    st.startBalancer();
+    // Potentially join previous balancing round with longer round interval from previous test case
+    st.awaitBalancerRound();
+
+    const coll = newShardedColl(st, testDB);
+
+    // Repeatedly split the only chunk and expect the auto-merger to merge it back right away
+    for (var i = 0; i < 3; i++) {
+        splitChunk(st, coll, 0 /* middle */);
+        assert.soon(
+            () =>
+                findChunksUtil.findChunksByNs(st.config, coll.getFullName()).toArray().length == 1,
+            "Automerger unexpectly didn't merge back chunks within a reasonable time",
+            5000 /* timeout */);
+    }
 }
 
 /* Test setup */
 const st = new ShardingTest({mongos: 1, shards: 2, other: {enableBalancer: false}});
-const testDB = st.s.getDB(jsTestName());
 
-// Ensure primary shard is shard0
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+function executeTestCase(testFunc) {
+    // Create database with `shard0` as primary shard
+    const testDB = st.s.getDB(jsTestName());
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+    testFunc(st, testDB);
 
-/* Perform tests */
-mergeAllChunksOnShardTest(st, testDB);
-mergeAllChunksOnShardConsideringHistoryWindowTest(st, testDB);
-mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB);
-balancerTriggersAutomergerWhenIsEnabledTest(st, testDB);
+    // Teardown: stop the balancer, reset configuration and drop db
+    st.stopBalancer();
+    resetHistoryWindowInSecs(st);
+    resetBalanceRoundInterval(st);
+    resetBalancerMergeThrottling(st);
+
+    // The auto-merger considers all collections, drop db so that collections from previous test
+    // cases do not interfere
+    testDB.dropDatabase();
+}
+
+executeTestCase(mergeAllChunksOnShardTest);
+executeTestCase(mergeAllChunksOnShardConsideringHistoryWindowTest);
+executeTestCase(mergeAllChunksOnShardConsideringJumboFlagTest);
+executeTestCase(balancerTriggersAutomergerWhenIsEnabledTest);
+executeTestCase(testConfigurableAutoMergerIntervalSecs);
 
 st.stop();
 })();

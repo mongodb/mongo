@@ -65,6 +65,8 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
+MONGO_FAIL_POINT_DEFINE(overrideHistoryWindowInSecs);
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
@@ -361,6 +363,17 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
 }
 
 unsigned int getHistoryWindowInSeconds() {
+    if (MONGO_unlikely(overrideHistoryWindowInSecs.shouldFail())) {
+        int secs;
+        overrideHistoryWindowInSecs.execute([&](const BSONObj& data) {
+            secs = data["seconds"].numberInt();
+            LOGV2(7351500,
+                  "overrideHistoryWindowInSecs: using customized history window in seconds",
+                  "historyWindowInSeconds"_attr = secs);
+        });
+        return secs;
+    }
+
     // TODO SERVER-73295 review hardcoded 10 seconds minimum history
     return std::max(
         std::max(minSnapshotHistoryWindowInSeconds.load(), gTransactionLifetimeLimitSeconds.load()),
