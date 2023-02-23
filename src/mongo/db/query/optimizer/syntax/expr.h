@@ -363,7 +363,7 @@ public:
 
 /**
  * EvalPath defines one context for path behavior used for manipulation and replacement. Some path
- * elements have special behavior under this conext.
+ * elements have special behavior under this context.
  *
  * EvalPath evaluates its path child according to its context over the result of its expression
  * child. That is, the expression is evaluated first, and it is used as an input value to the root

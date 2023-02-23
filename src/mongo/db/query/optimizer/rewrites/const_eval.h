@@ -67,6 +67,9 @@ public:
     void transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args);
     void transport(ABT& n, const If& op, ABT& cond, ABT& thenBranch, ABT& elseBranch);
 
+    void transport(ABT& n, const EvalPath& op, ABT& path, ABT& input);
+    void transport(ABT& n, const EvalFilter& op, ABT& path, ABT& input);
+
     void transport(ABT& n, const FilterNode& op, ABT& child, ABT& expr);
     void transport(ABT& n, const EvaluationNode& op, ABT& child, ABT& expr);
 

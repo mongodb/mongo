@@ -257,6 +257,12 @@ struct CostAndCE {
     CEType _ce;
 };
 
+/**
+ * Note: Ascending and Descending sorts are performed according to the semantics of BinaryOp
+ * comparisons: gt, lt, etc where for examples arrays sort after all numbers, as opposed to sort
+ * semantics where arrays sort relative to numbers and one another based on their smallest/largest
+ * element as defined by the sort path.
+ */
 #define COLLATIONOP_OPNAMES(F) \
     F(Ascending)               \
     F(Descending)              \

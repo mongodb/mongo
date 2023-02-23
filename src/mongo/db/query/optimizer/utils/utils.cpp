@@ -30,7 +30,6 @@
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
@@ -179,7 +178,7 @@ public:
     PartialSchemaReqConverter(const bool isFilterContext, const PathToIntervalFn& pathToInterval)
         : _isFilterContext(isFilterContext), _pathToInterval(pathToInterval) {}
 
-    ResultType handleEvalPathAndEvalFilter(ResultType pathResult, ResultType inputResult) {
+    ResultType handleEvalContext(ResultType pathResult, ResultType inputResult) {
         if (!pathResult || !inputResult) {
             return {};
         }
@@ -212,14 +211,14 @@ public:
                          const EvalPath& evalPath,
                          ResultType pathResult,
                          ResultType inputResult) {
-        return handleEvalPathAndEvalFilter(std::move(pathResult), std::move(inputResult));
+        return handleEvalContext(std::move(pathResult), std::move(inputResult));
     }
 
     ResultType transport(const ABT& n,
                          const EvalFilter& evalFilter,
                          ResultType pathResult,
                          ResultType inputResult) {
-        return handleEvalPathAndEvalFilter(std::move(pathResult), std::move(inputResult));
+        return handleEvalContext(std::move(pathResult), std::move(inputResult));
     }
 
     template <bool isMultiplicative>
@@ -254,6 +253,17 @@ public:
             if (!intersectPartialSchemaReq(leftReqMap, rightReqMap)) {
                 return {};
             }
+
+            ProjectionRenames renames_unused;
+            const bool hasEmptyInterval =
+                simplifyPartialSchemaReqPaths(boost::none /*scanProjName*/,
+                                              {} /*multikeynessTrie*/,
+                                              leftReqMap,
+                                              renames_unused,
+                                              {} /*constFold*/);
+            tassert(6624168,
+                    "Cannot detect empty intervals without providing a constant folder",
+                    !hasEmptyInterval);
 
             leftResult->_hasIntersected = true;
             return leftResult;
@@ -686,7 +696,7 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
     return result;
 }
 
-bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
+bool simplifyPartialSchemaReqPaths(const boost::optional<ProjectionName>& scanProjName,
                                    const MultikeynessTrie& multikeynessTrie,
                                    PartialSchemaRequirements& reqMap,
                                    ProjectionRenames& projectionRenames,
@@ -704,6 +714,11 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
         return simplified.has_value();
     };
 
+    const auto nextEntryFn = [&](PartialSchemaKey newKey, const PartialSchemaRequirement& req) {
+        resultReqs.atom(std::move(prevEntry->first), std::move(prevEntry->second));
+        prevEntry.reset({std::move(newKey), req});
+    };
+
     // Simplify paths by eliminating unnecessary Traverse elements.
     for (const auto& [key, req] : reqMap.conjuncts()) {
         PartialSchemaKey newKey = key;
@@ -711,43 +726,50 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
         bool simplified = false;
         const bool containedTraverse = checkPathContainsTraverse(newKey._path);
         if (key._projectionName == scanProjName && containedTraverse) {
-            simplified |= simplifyTraverseNonArray(newKey._path, multikeynessTrie);
+            simplified = simplifyTraverseNonArray(newKey._path, multikeynessTrie);
         }
+        // At this point we have simplified the path in newKey.
+
+        if (!prevEntry) {
+            prevEntry.reset({std::move(newKey), req});
+            continue;
+        }
+        if (prevEntry->first != newKey) {
+            nextEntryFn(std::move(newKey), req);
+            continue;
+        }
+
+        auto& prevReq = prevEntry->second;
+        auto resultIntervals = prevReq.getIntervals();
+        combineIntervalsDNF(true /*intersect*/, resultIntervals, req.getIntervals());
 
         // Ensure that Traverse-less keys appear only once: we can move the conjunction into the
-        // intervals and simplify.
-        if (prevEntry) {
-            if ((!containedTraverse || simplified) && prevEntry->first == newKey) {
-                auto& prevReq = prevEntry->second;
-
-                boost::optional<ProjectionName> resultBoundProjName =
-                    prevReq.getBoundProjectionName();
-                auto resultIntervals = prevReq.getIntervals();
-                if (const auto& boundProjName = req.getBoundProjectionName()) {
-                    if (resultBoundProjName) {
-                        // The existing name wins (stays in 'reqMap'). We tell the caller that the
-                        // name "boundProjName" is available under "resultBoundProjName".
-                        projectionRenames.emplace(*boundProjName, *resultBoundProjName);
-                    } else {
-                        resultBoundProjName = boundProjName;
-                    }
-                }
-
-                combineIntervalsDNF(true /*intersect*/, resultIntervals, req.getIntervals());
-                if (!simplifyFn(resultIntervals)) {
-                    return true;
-                }
-
-                prevReq = {std::move(resultBoundProjName),
-                           std::move(resultIntervals),
-                           req.getIsPerfOnly() && prevReq.getIsPerfOnly()};
-            } else {
-                resultReqs.atom(std::move(prevEntry->first), std::move(prevEntry->second));
-                prevEntry.reset({std::move(newKey), req});
-            }
-        } else {
-            prevEntry.reset({std::move(newKey), req});
+        // intervals and simplify. For traversing keys, check if interval is subsumed in the other
+        // and if so, then combine.
+        if (containedTraverse && !simplified &&
+            !(resultIntervals == prevReq.getIntervals() || resultIntervals == req.getIntervals())) {
+            // We cannot combine multikey paths where one interval does not subsume the other.
+            nextEntryFn(std::move(newKey), req);
+            continue;
         }
+
+        auto resultBoundProjName = prevReq.getBoundProjectionName();
+        if (const auto& boundProjName = req.getBoundProjectionName()) {
+            if (resultBoundProjName) {
+                // The existing name wins (stays in 'reqMap'). We tell the caller that the name
+                // "boundProjName" is available under "resultBoundProjName".
+                projectionRenames.emplace(*boundProjName, *resultBoundProjName);
+            } else {
+                resultBoundProjName = boundProjName;
+            }
+        }
+
+        if (constFold && !simplifyFn(resultIntervals)) {
+            return true;
+        }
+        prevReq = {std::move(resultBoundProjName),
+                   std::move(resultIntervals),
+                   req.getIsPerfOnly() && prevReq.getIsPerfOnly()};
     }
     if (prevEntry) {
         resultReqs.atom(std::move(prevEntry->first), std::move(prevEntry->second));
@@ -755,9 +777,10 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
 
     PartialSchemaRequirements newReqs{std::move(*resultReqs.finish())};
 
-    // Intersect and normalize intervals.
-    const bool representable =
-        newReqs.simplify([&](const PartialSchemaKey&, PartialSchemaRequirement& req) -> bool {
+    if (constFold) {
+        // Intersect and normalize intervals.
+        const bool representable = newReqs.simplify([&](const PartialSchemaKey&,
+                                                        PartialSchemaRequirement& req) -> bool {
             auto resultIntervals = req.getIntervals();
             if (!simplifyFn(resultIntervals)) {
                 return false;
@@ -768,10 +791,11 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
             req = {req.getBoundProjectionName(), std::move(resultIntervals), req.getIsPerfOnly()};
             return true;
         });
-    if (!representable) {
-        // It simplifies to an always-false predicate, which we do not represent
-        // as PartialSchemaRequirements.
-        return true;
+        if (!representable) {
+            // It simplifies to an always-false predicate, which we do not represent
+            // as PartialSchemaRequirements.
+            return true;
+        }
     }
 
     reqMap = std::move(newReqs);
@@ -782,20 +806,13 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
  * Try to compute the intersection of a an existing PartialSchemaRequirements object and a new
  * key/requirement pair.
  *
- * Returns false on "failure", which means the result was not representable for some reason.
- * Reasons include:
- * - The intersection predicate is always-false.
- * - There is a def-use dependency that combining into one PartialSchemaRequirements would break.
+ * Returns false on "failure", which means the result was not representable. This happens if there
+ * is a def-use dependency that combining into one PartialSchemaRequirements would break.
  *
  * The implementation works as follows:
- *     1. If the path of the new requirement does not exist in existing requirements, we add it.
- *     2. If the path already exists:
- *         2a. The path is multikey (e.g. Get "a" Traverse Id):
- *             Add the new requirement to the requirements (under the same key)
- *         2b. The path is not multikey (e.g. Get "a" Id):
- *             If we have an entry with the same path, combine intervals,
- *             otherwise add to requirements.
- *     3. We have an entry which binds the variable which the requirement uses.
+ *     1. If the path of the new requirement already exists, we add it to the existing requirements.
+ *     2. If the path does not exist, and does not refer to an existing entry, we add it.
+ *     3. If we have an entry which binds the variable which the requirement uses.
  *        Append the paths (to rephrase the new requirement in terms of bindings
  *        visible in the input of the existing requirements) and retry. We will either
  *        add a new requirement or combine with an existing one.
@@ -805,66 +822,6 @@ static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
                                       PartialSchemaRequirement req) {
     for (;;) {
         bool merged = false;
-
-        const bool pathIsId = key._path.is<PathIdentity>();
-        const bool pathHasTraverse = !pathIsId && checkPathContainsTraverse(key._path);
-        {
-            bool success = false;
-            bool addNewKey = false;
-
-            // Look for exact match on the path, and if found combine intervals.
-            for (auto& [existingKey, existingReq] : reqMap.conjuncts()) {
-                if (existingKey != key) {
-                    continue;
-                }
-
-                auto resultIntervals = existingReq.getIntervals();
-                if (pathHasTraverse) {
-                    combineIntervalsDNF(true /*intersect*/, resultIntervals, req.getIntervals());
-                    if (resultIntervals == existingReq.getIntervals() ||
-                        resultIntervals == req.getIntervals()) {
-                        // Existing interval subsumes the new one or vice versa.
-                        success = true;
-                    }
-                } else {
-                    // Non-multikey path. Directly intersect and simplify intervals.
-                    combineIntervalsDNF(true /*intersect*/, resultIntervals, req.getIntervals());
-                    success = true;
-                }
-
-                if (success) {
-                    boost::optional<ProjectionName> resultBoundProjName =
-                        existingReq.getBoundProjectionName();
-                    if (const auto& boundProjName = req.getBoundProjectionName()) {
-                        if (resultBoundProjName) {
-                            // The new and existing projections both bind a name. Add an entry with
-                            // the new name. We will attempt to simplify later.
-                            addNewKey = true;
-                        } else {
-                            // Only the new projection binds a name, so we'll update 'reqMap' to
-                            // include it.
-                            resultBoundProjName = boundProjName;
-                        }
-                    }
-
-                    existingReq = {std::move(resultBoundProjName),
-                                   std::move(resultIntervals),
-                                   req.getIsPerfOnly() && existingReq.getIsPerfOnly()};
-
-                    // No need to iterate further: we could continue, but the result would not
-                    // change.
-                    break;
-                }
-            }
-
-            if (success) {
-                if (addNewKey) {
-                    reqMap.add(std::move(key), std::move(req));
-                }
-                return true;
-            }
-        }
-
         const bool reqHasBoundProj = req.getBoundProjectionName().has_value();
         for (const auto& [existingKey, existingReq] : reqMap.conjuncts()) {
             uassert(6624150,
@@ -913,12 +870,20 @@ bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
     }
 
     PartialSchemaRequirements intersection = lhs;
-    if (intersectPartialSchemaReq(intersection, rhs)) {
-        return intersection == lhs;
-    }
-    // Intersection was empty-set, and we assume neither input is empty-set.
-    // So intersection != lhs.
-    return false;
+    const bool success = intersectPartialSchemaReq(intersection, rhs);
+    tassert(6624172, "Intersection should succeed since 'rhs' has no projections", success);
+
+    ProjectionRenames renames_unused;
+    const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(boost::none /*scanProjName*/,
+                                                                {} /*multikeynessTrie*/,
+                                                                intersection,
+                                                                renames_unused,
+                                                                {} /*constFold*/);
+    tassert(6624169,
+            "Cannot detect empty intervals without providing a constant folder",
+            !hasEmptyInterval);
+
+    return intersection == lhs;
 }
 
 bool intersectPartialSchemaReq(PartialSchemaRequirements& target,

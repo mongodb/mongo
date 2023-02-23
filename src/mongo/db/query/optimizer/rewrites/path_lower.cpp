@@ -31,6 +31,11 @@
 
 
 namespace mongo::optimizer {
+
+static ABT fillEmpty(ABT n, ABT emptyVal) {
+    return make<BinaryOp>(Operations::FillEmpty, std::move(n), std::move(emptyVal));
+}
+
 bool EvalPathLowering::optimize(ABT& n, bool rebuild) {
     _changed = false;
 
@@ -389,8 +394,7 @@ void EvalFilterLowering::transport(ABT& n, const PathComposeA&, ABT& p1, ABT& p2
     n = make<LambdaAbstraction>(
         name,
         make<If>(
-            make<BinaryOp>(
-                Operations::FillEmpty,
+            fillEmpty(
                 make<LambdaApplication>(std::exchange(p1, make<Blackhole>()), make<Variable>(name)),
                 Constant::boolean(false)),
             Constant::boolean(true),
@@ -408,7 +412,7 @@ void EvalFilterLowering::transport(ABT& n, const EvalFilter&, ABT& path, ABT& in
                                 std::exchange(input, make<Blackhole>()));
 
     // Wrap EvalFilter in fillEmpty to coerce it to a boolean.
-    n = make<BinaryOp>(Operations::FillEmpty, std::move(n), Constant::boolean(false));
+    n = fillEmpty(std::move(n), Constant::boolean(false));
 
     _changed = true;
 }

@@ -1174,18 +1174,19 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n,
     }
 
     const auto& interval = n.getIndexInterval();
-    auto lowerBoundExpr =
-        convertBoundsToExpr(slotMap, true /*isLower*/, indexDef, interval.getLowBound());
-    auto upperBoundExpr =
-        convertBoundsToExpr(slotMap, false /*isLower*/, indexDef, interval.getHighBound());
-    tassert(6624234,
-            "Invalid bounds combination",
-            lowerBoundExpr != nullptr || upperBoundExpr == nullptr);
+    const auto* lowBoundPtr = &interval.getLowBound();
+    const auto* highBoundPtr = &interval.getHighBound();
 
     const bool reverse = n.isIndexReverseOrder();
     if (reverse) {
-        std::swap(lowerBoundExpr, upperBoundExpr);
+        std::swap(lowBoundPtr, highBoundPtr);
     }
+
+    auto lowerBoundExpr = convertBoundsToExpr(slotMap, true /*isLower*/, indexDef, *lowBoundPtr);
+    auto upperBoundExpr = convertBoundsToExpr(slotMap, false /*isLower*/, indexDef, *highBoundPtr);
+    tassert(6624234,
+            "Invalid bounds combination",
+            lowerBoundExpr != nullptr || upperBoundExpr == nullptr);
 
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
 

@@ -154,7 +154,9 @@ public:
     template <typename T, typename... Ts>
     size_t transport(const T& /*node*/, Ts&&...) {
         // Physical nodes do not currently need to implement hash.
-        static_assert(!canBeLogicalNode<T>(), "Logical node must implement its hash.");
+        static_assert(!std::is_base_of_v<PathSyntaxSort, T> &&
+                          !std::is_base_of_v<ExpressionSyntaxSort, T> && !canBeLogicalNode<T>(),
+                      "Logical nodes, paths, and expressions must implement their hash.");
         uasserted(6624142, "must implement custom hash");
     }
 

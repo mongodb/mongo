@@ -451,6 +451,14 @@ void ConstEval::transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args
             auto [tag, val] = sbe::value::makeCopyArray(array);
             swapAndUpdate(n, make<Constant>(tag, val));
         }
+    } else if (op.name() == "traverseP") {
+        // TraverseP with an identity lambda. Replace with the input.
+        if (const auto* lambdaPtr = args.at(1).cast<LambdaAbstraction>()) {
+            if (const auto* varPtr = lambdaPtr->getBody().cast<Variable>();
+                varPtr != nullptr && varPtr->name() == lambdaPtr->varName()) {
+                swapAndUpdate(n, args.front());
+            }
+        }
     }
 }
 
@@ -466,6 +474,20 @@ void ConstEval::transport(ABT& n, const If& op, ABT& cond, ABT& thenBranch, ABT&
             // if false -> elseBranch
             swapAndUpdate(n, std::exchange(elseBranch, make<Blackhole>()));
         }
+    }
+}
+
+void ConstEval::transport(ABT& n, const EvalPath& op, ABT& path, ABT& input) {
+    if (const auto* pathConstPtr = path.cast<PathConstant>()) {
+        // PathConst does not depend on its parent, so replace with the PathConst's child.
+        swapAndUpdate(n, pathConstPtr->getConstant());
+    }
+}
+
+void ConstEval::transport(ABT& n, const EvalFilter& op, ABT& path, ABT& input) {
+    if (const auto* pathConstPtr = path.cast<PathConstant>()) {
+        // PathConst does not depend on its parent, so replace with the PathConst's child.
+        swapAndUpdate(n, pathConstPtr->getConstant());
     }
 }
 

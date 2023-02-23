@@ -28,6 +28,8 @@
  */
 
 #include "mongo/db/pipeline/abt/collation_translation.h"
+#include "mongo/db/pipeline/abt/utils.h"
+
 
 namespace mongo::optimizer {
 
@@ -42,12 +44,13 @@ void generateCollationNode(AlgebrizerContext& ctx, const SortPattern& sortPatter
         const auto& sortProjName = ctx.getNextId("sort");
         collationSpec.emplace_back(
             sortProjName, part.isAscending ? CollationOp::Ascending : CollationOp::Descending);
-        const FieldPath& fieldPath = part.fieldPath.value();
-        ABT sortPath = make<PathIdentity>();
-        for (size_t j = 0; j < fieldPath.getPathLength(); j++) {
-            sortPath = make<PathGet>(FieldNameType{fieldPath.getFieldName(j).toString()},
-                                     std::move(sortPath));
-        }
+
+        ABT sortPath = translateFieldPath(
+            *part.fieldPath,
+            make<PathIdentity>(),
+            [](FieldNameType fieldName, const bool /*isLastElement*/, ABT input) {
+                return make<PathGet>(std::move(fieldName), std::move(input));
+            });
 
         ctx.setNode<EvaluationNode>(
             rootProjection,

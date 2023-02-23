@@ -1367,6 +1367,7 @@ private:
                     case IndexFieldPredType::Unbound:
                         if (reqProjName != projName) {
                             indexSuitable = false;
+                            break;
                         }
                         updateDirectionsFn(indexCollationSpec.at(indexField)._op, reqOp);
                         break;

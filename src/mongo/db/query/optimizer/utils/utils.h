@@ -242,15 +242,17 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
 /**
  * Given a set of non-multikey paths, remove redundant Traverse elements from paths in a Partial
  * Schema Requirement structure. Following that the intervals of any remaining non-multikey paths
- * (following simplification) on the same key are intersected. Returns true if we have an empty
- * result after simplification. Each redundant binding gets an entry in 'projectionRenames', which
- * maps redundant name to the de-duplicated name.
+ * (following simplification) on the same key are intersected. Intervals of multikey paths are
+ * checked for subsumption and if one subsumes the other, the subsuming one is retained. Returns
+ * true if we have an empty result after simplification. Each redundant binding gets an entry in
+ * 'projectionRenames', which maps redundant name to the de-duplicated name.
  */
-bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
-                                   const MultikeynessTrie& multikeynessTrie,
-                                   PartialSchemaRequirements& reqMap,
-                                   ProjectionRenames& projectionRenames,
-                                   const ConstFoldFn& constFold);
+[[nodiscard]] bool simplifyPartialSchemaReqPaths(
+    const boost::optional<ProjectionName>& scanProjName,
+    const MultikeynessTrie& multikeynessTrie,
+    PartialSchemaRequirements& reqMap,
+    ProjectionRenames& projectionRenames,
+    const ConstFoldFn& constFold);
 
 /**
  * Try to check whether the predicate 'lhs' is a subset of 'rhs'.
