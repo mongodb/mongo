@@ -31,6 +31,9 @@ const caseInsensitive = {
     locale: "en",
     strength: 2
 };
+const simple = {
+    locale: "simple"
+};
 
 const docs = [
     {_id: 0, [timeFieldName]: dateTime, [metaFieldName]: "A", str: "HELLO"},
@@ -120,6 +123,36 @@ function runTest({deleteFilter, queryCollation, collectionCollation, nDeleted}) 
         deleteFilter: {[metaFieldName]: "a"},
         queryCollation: caseInsensitive,
         collectionCollation: caseSensitive,
+        nDeleted: 4
+    });
+})();
+
+(function testQueryLevelSimpleCollationOverridesNonSimpleDefault() {
+    // Residual filter.
+    runTest({
+        deleteFilter: {str: "Hello"},
+        queryCollation: simple,
+        collectionCollation: caseInsensitive,
+        nDeleted: 0
+    });
+    runTest({
+        deleteFilter: {str: "hello"},
+        queryCollation: simple,
+        collectionCollation: caseInsensitive,
+        nDeleted: 3
+    });
+
+    // Bucket filter.
+    runTest({
+        deleteFilter: {[metaFieldName]: "a"},
+        queryCollation: simple,
+        collectionCollation: caseInsensitive,
+        nDeleted: 0
+    });
+    runTest({
+        deleteFilter: {[metaFieldName]: "A"},
+        queryCollation: simple,
+        collectionCollation: caseInsensitive,
         nDeleted: 4
     });
 })();
