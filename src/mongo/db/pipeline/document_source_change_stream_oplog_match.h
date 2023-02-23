@@ -51,7 +51,7 @@ public:
     }
 
     boost::intrusive_ptr<DocumentSource> clone(
-        const boost::intrusive_ptr<ExpressionContext>& newExpCtx = nullptr) const final {
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final {
         return new DocumentSourceChangeStreamOplogMatch(*this, newExpCtx);
     }
 

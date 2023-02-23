@@ -72,9 +72,7 @@ public:
 
     DocumentSourceUnionWith(const DocumentSourceUnionWith& original,
                             const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
-        : DocumentSource(kStageName,
-                         newExpCtx ? newExpCtx : original.pExpCtx->copyWith(original.pExpCtx->ns)),
-          _pipeline(original._pipeline->clone()) {}
+        : DocumentSource(kStageName, newExpCtx), _pipeline(original._pipeline->clone()) {}
 
     ~DocumentSourceUnionWith();
 
@@ -129,6 +127,8 @@ public:
     void detachFromOperationContext() final;
 
     void reattachToOperationContext(OperationContext* opCtx) final;
+
+    bool validateOperationContext(const OperationContext* opCtx) const final;
 
     bool usedDisk() final;
 

@@ -150,6 +150,8 @@ public:
 
     void reattachToOperationContext(OperationContext* opCtx) final;
 
+    bool validateOperationContext(const OperationContext* opCtx) const final;
+
     bool usedDisk() final;
 
     const SpecificStats* getSpecificStats() const final {
