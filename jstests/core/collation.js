@@ -1854,4 +1854,11 @@ assert.throws(() => coll.find({}, {_id: 0})
                         .collation({locale: "en_US", strength: 3})
                         .sort({a: 1, b: 1})
                         .itcount());
+
+// Ensure that attempting to create the same view namespace twice, but with different collations,
+// fails with NamespaceExists.
+res = testDb.runCommand({create: 'view', viewOn: 'coll'});
+assert(res.ok == 1 || res.errmsg == ErrorCodes.NamespaceExists);
+res = testDb.runCommand({create: 'view', viewOn: 'coll', collation: {locale: 'en'}});
+assert.commandFailedWithCode(res, ErrorCodes.NamespaceExists);
 })();

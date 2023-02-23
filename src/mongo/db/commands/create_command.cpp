@@ -134,11 +134,14 @@ void checkCollectionOptions(OperationContext* opCtx,
         ? nullptr
         : uassertStatusOK(collatorFactory->makeFromBSON(options.collation));
 
-    uassert(ErrorCodes::NamespaceExists,
-            str::stream() << "namespace " << ns.ns() << " already exists, but with collation: "
-                          << view->defaultCollator()->getSpec().toBSON() << " rather than "
-                          << options.collation,
-            CollatorInterface::collatorsMatch(view->defaultCollator(), newCollator.get()));
+    if (!CollatorInterface::collatorsMatch(view->defaultCollator(), newCollator.get())) {
+        const auto defaultCollatorSpecBSON =
+            view->defaultCollator() ? view->defaultCollator()->getSpec().toBSON() : BSONObj();
+        uasserted(ErrorCodes::NamespaceExists,
+                  str::stream() << "namespace " << ns.ns()
+                                << " already exists, but with collation: "
+                                << defaultCollatorSpecBSON << " rather than " << options.collation);
+    }
 }
 
 class CmdCreate final : public CreateCmdVersion1Gen<CmdCreate> {
