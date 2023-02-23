@@ -411,13 +411,9 @@ CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*()
     return _mapIter->second.get();
 }
 
-Collection* CollectionCatalog::iterator::getWritableCollection(OperationContext* opCtx) {
-    return CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForMetadataWrite(
-        opCtx, operator*()->uuid());
-}
-
-boost::optional<UUID> CollectionCatalog::iterator::uuid() {
-    return _uuid;
+UUID CollectionCatalog::iterator::uuid() const {
+    invariant(_uuid);
+    return *_uuid;
 }
 
 CollectionCatalog::iterator CollectionCatalog::iterator::operator++() {
@@ -1421,7 +1417,6 @@ const Collection* CollectionCatalog::lookupCollectionByUUID(OperationContext* op
 
     // Return any previously instantiated collection on this namespace for this snapshot
     if (auto openedColl = OpenedCollections::get(opCtx).lookupByUUID(uuid)) {
-
         return openedColl.value() ? openedColl->get() : nullptr;
     }
 

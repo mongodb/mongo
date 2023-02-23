@@ -71,9 +71,7 @@ public:
         value_type operator*();
         iterator operator++();
         iterator operator++(int);
-        boost::optional<UUID> uuid();
-
-        Collection* getWritableCollection(OperationContext* opCtx);
+        UUID uuid() const;
 
         /*
          * Equality operators == and != do not attempt to reposition the iterators being compared.

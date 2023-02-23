@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/catalog/collection_catalog_helper.h"
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -68,7 +69,7 @@ void forEachCollectionFromDb(OperationContext* opCtx,
     auto catalogForIteration = CollectionCatalog::get(opCtx);
     for (auto collectionIt = catalogForIteration->begin(opCtx, dbName);
          collectionIt != catalogForIteration->end(opCtx);) {
-        auto uuid = collectionIt.uuid().value();
+        auto uuid = collectionIt.uuid();
         if (predicate && !catalogForIteration->checkIfCollectionSatisfiable(uuid, predicate)) {
             ++collectionIt;
             continue;
