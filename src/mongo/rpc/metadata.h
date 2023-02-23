@@ -65,7 +65,8 @@ using LegacyCommandAndFlags = std::tuple<BSONObj, int>;
 /**
  * Upconverts a legacy command request into an OpMessageRequest.
  */
-OpMsgRequest upconvertRequest(StringData db, BSONObj legacyCmdObj, int queryFlags);
+OpMsgRequest upconvertRequest(const DatabaseName& dbName, BSONObj legacyCmdObj, int queryFlags);
+
 
 /**
  * A function type for writing request metadata. The function takes a pointer to an optional

@@ -61,7 +61,7 @@ OpMsgRequest opMsgRequestFromLegacyRequest(const Message& message) {
             qm.ntoreturn == 1 || qm.ntoreturn == -1);
 
     return upconvertRequest(
-        ns.db(), qm.query.shareOwnershipWith(message.sharedBuffer()), qm.queryOptions);
+        ns.dbName(), qm.query.shareOwnershipWith(message.sharedBuffer()), qm.queryOptions);
 }
 
 }  // namespace rpc

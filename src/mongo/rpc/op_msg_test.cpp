@@ -938,14 +938,32 @@ TEST(OpMsgRequest, GetDatabaseThrowsMissing) {
 }
 
 TEST(OpMsgRequestBuilder, WithTenantInDatabaseName) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",
+                                                                   true);
     const TenantId tenantId(OID::gen());
     auto const body = fromjson("{ping: 1}");
     OpMsgRequest msg = OpMsgRequestBuilder::create({tenantId, "testDb"}, body);
     ASSERT_EQ(msg.body.getField("$tenant").eoo(), false);
     ASSERT_EQ(TenantId::parseFromBSON(msg.body.getField("$tenant")), tenantId);
+    ASSERT_EQ(msg.getDatabase(), "testDb");
+}
+
+TEST(OpMsgRequestBuilder, WithTenantInDatabaseName_FeatureFlagOff) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",
+                                                                   false);
+    const TenantId tenantId(OID::gen());
+    auto const body = fromjson("{ping: 1}");
+    OpMsgRequest msg = OpMsgRequestBuilder::create({tenantId, "testDb"}, body);
+    ASSERT(msg.body.getField("$tenant").eoo());
+    ASSERT_EQ(msg.getDatabase(), tenantId.toString() + "_testDb");
 }
 
 TEST(OpMsgRequestBuilder, WithSameTenantInBody) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",
+                                                                   true);
     const TenantId tenantId(OID::gen());
     auto const body = BSON("ping" << 1 << "$tenant" << tenantId);
     OpMsgRequest msg = OpMsgRequestBuilder::create({tenantId, "testDb"}, body);
@@ -954,6 +972,9 @@ TEST(OpMsgRequestBuilder, WithSameTenantInBody) {
 }
 
 TEST(OpMsgRequestBuilder, WithVTS) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",
+                                                                   true);
     const TenantId tenantId(OID::gen());
     auto const body = fromjson("{ping: 1}");
 
@@ -970,6 +991,9 @@ TEST(OpMsgRequestBuilder, WithVTS) {
 }
 
 TEST(OpMsgRequestBuilder, FailWithDiffTenantInBody) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",
+                                                                   true);
     const TenantId tenantId(OID::gen());
     const TenantId otherTenantId(OID::gen());
 
@@ -978,15 +1002,17 @@ TEST(OpMsgRequestBuilder, FailWithDiffTenantInBody) {
         OpMsgRequestBuilder::create({otherTenantId, "testDb"}, body), DBException, 8423373);
 }
 
-TEST(OpMsgRequestBuilder, FromDatabaseNameAndBodyDoesNotCopy) {
+TEST(OpMsgRequestBuilder, CreateDoesNotCopy) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",
+                                                                   true);
     const TenantId tenantId(OID::gen());
     auto body = fromjson("{ping: 1}");
     const void* const bodyPtr = body.objdata();
     auto msg = OpMsgRequestBuilder::create({tenantId, "db"}, std::move(body));
 
-    auto const newBody = BSON("ping" << 1 << "$db"
-                                     << "db"
-                                     << "$tenant" << tenantId);
+    auto const newBody = BSON("ping" << 1 << "$tenant" << tenantId << "$db"
+                                     << "db");
     ASSERT_BSONOBJ_EQ(msg.body, newBody);
     ASSERT_EQ(static_cast<const void*>(msg.body.objdata()), bodyPtr);
 }
@@ -1001,6 +1027,9 @@ TEST(OpMsgRequest, FromDbAndBodyDoesNotCopy) {
 }
 
 TEST(OpMsgRequest, SetDollarTenantHasSameTenant) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",
+                                                                   true);
     const TenantId tenantId(OID::gen());
     // Set $tenant on a OpMsgRequest which already has the same $tenant.
     OpMsgRequest request;
@@ -1014,6 +1043,9 @@ TEST(OpMsgRequest, SetDollarTenantHasSameTenant) {
 }
 
 TEST(OpMsgRequest, SetDollarTenantHasNoTenant) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",
+                                                                   true);
     const TenantId tenantId(OID::gen());
     // Set $tenant on a OpMsgRequest which has no $tenant.
     OpMsgRequest request;
@@ -1027,6 +1059,9 @@ TEST(OpMsgRequest, SetDollarTenantHasNoTenant) {
 }
 
 TEST(OpMsgRequest, SetDollarTenantFailWithDiffTenant) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",
+                                                                   true);
     const TenantId tenantId(OID::gen());
     auto const body = BSON("ping" << 1 << "$tenant" << tenantId);
     auto request = OpMsgRequest::fromDBAndBody("testDb", body);

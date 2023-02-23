@@ -118,7 +118,7 @@ BSONObj fixQuery(const BSONObj& obj, BsonTemplateEvaluator& btl) {
 }
 
 bool runCommandWithSession(DBClientBase* conn,
-                           const std::string& dbname,
+                           const DatabaseName& dbName,
                            const BSONObj& cmdObj,
                            int options,
                            const boost::optional<LogicalSessionIdToClient>& lsid,
@@ -126,8 +126,7 @@ bool runCommandWithSession(DBClientBase* conn,
                            BSONObj* result) {
     if (!lsid) {
         invariant(!txnNumber);
-        // Shell is not tenant aware, so use boost::none here.
-        return conn->runCommand(DatabaseName(boost::none, dbname), cmdObj, *result);
+        return conn->runCommand(dbName, cmdObj, *result);
     }
 
     BSONObjBuilder cmdObjWithLsidBuilder;
@@ -162,18 +161,16 @@ bool runCommandWithSession(DBClientBase* conn,
         cmdObjWithLsidBuilder.append("startTransaction", true);
     }
 
-    // Shell is not tenant aware, so use boost::none here.
-    return conn->runCommand(
-        DatabaseName(boost::none, dbname), cmdObjWithLsidBuilder.done(), *result);
+    return conn->runCommand(dbName, cmdObjWithLsidBuilder.done(), *result);
 }
 
 bool runCommandWithSession(DBClientBase* conn,
-                           const std::string& dbname,
+                           const DatabaseName& dbName,
                            const BSONObj& cmdObj,
                            int options,
                            const boost::optional<LogicalSessionIdToClient>& lsid,
                            BSONObj* result) {
-    return runCommandWithSession(conn, dbname, cmdObj, options, lsid, boost::none, result);
+    return runCommandWithSession(conn, dbName, cmdObj, options, lsid, boost::none, result);
 }
 
 void abortTransaction(DBClientBase* conn,
@@ -182,7 +179,7 @@ void abortTransaction(DBClientBase* conn,
     BSONObj abortTransactionCmd = BSON("abortTransaction" << 1);
     BSONObj abortCommandResult;
     const bool successful = runCommandWithSession(conn,
-                                                  "admin",
+                                                  DatabaseName(boost::none, "admin"),
                                                   abortTransactionCmd,
                                                   kMultiStatementTransactionOption,
                                                   lsid,
@@ -212,11 +209,8 @@ int runQueryWithReadCommands(DBClientBase* conn,
                              Milliseconds delayBeforeGetMore,
                              BSONObj readPrefObj,
                              BSONObj* objOut) {
-    const auto dbName = findCommand->getNamespaceOrUUID()
-                            .nss()
-                            .value_or(NamespaceString())
-                            .dbName()
-                            .toStringWithTenantId();
+    const auto dbName =
+        findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).dbName();
 
     BSONObj findCommandResult;
     BSONObj findCommandObj = findCommand->toBSON(readPrefObj);
@@ -286,8 +280,6 @@ Timestamp getLatestClusterTime(DBClientBase* conn) {
     findCommand->setLimit(1LL);
     findCommand->setSingleBatch(true);
     invariant(query_request_helper::validateFindCommandRequest(*findCommand));
-    const auto dbName =
-        findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).db().toString();
 
     BSONObj oplogResult;
     int count = runQueryWithReadCommands(conn,
@@ -799,7 +791,9 @@ std::unique_ptr<DBClientBase> BenchRunConfig::createConnectionImpl(
 }
 
 std::unique_ptr<DBClientBase> BenchRunConfig::createConnection() const {
-    return BenchRunConfig::createConnectionImpl(*this);
+    auto conn = BenchRunConfig::createConnectionImpl(*this);
+    conn->setAlwaysAppendDollarTenant_forTest();
+    return conn;
 }
 
 BenchRunState::BenchRunState(unsigned numWorkers)
@@ -1055,13 +1049,14 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
         case OpType::FINDONE: {
             BSONObj fixedQuery = fixQuery(this->query, *state->bsonTemplateEvaluator);
             BSONObj result;
-            auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString(this->ns));
+            auto findCommand =
+                std::make_unique<FindCommandRequest>(NamespaceString(this->tenantId, this->ns));
             findCommand->setFilter(fixedQuery);
             findCommand->setProjection(this->projection);
             findCommand->setLimit(1LL);
             findCommand->setSingleBatch(true);
             findCommand->setSort(this->sort);
-            findCommand->setDollarTenant(this->tenantId);
+
             if (config.useSnapshotReads) {
                 findCommand->setReadConcern(readConcernSnapshot);
             }
@@ -1099,7 +1094,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             {
                 BenchRunEventTrace _bret(&state->stats->commandCounter);
                 ok = runCommandWithSession(conn,
-                                           this->ns,
+                                           DatabaseName(this->tenantId, this->ns),
                                            fixQuery(this->command, *state->bsonTemplateEvaluator),
                                            this->options,
                                            lsid,
@@ -1121,7 +1116,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                             str::stream()
                                 << "getMore command failed; reply was: " << getMoreCommandResult,
                             runCommandWithSession(conn,
-                                                  this->ns,
+                                                  DatabaseName(this->tenantId, this->ns),
                                                   getMoreRequest.toBSON({}),
                                                   kNoOptions,
                                                   lsid,
@@ -1142,7 +1137,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             uassert(
                 28824, "cannot use 'options' in combination with read commands", !this->options);
 
-            auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString(this->ns));
+            auto findCommand =
+                std::make_unique<FindCommandRequest>(NamespaceString(this->tenantId, this->ns));
             findCommand->setFilter(fixedQuery);
             findCommand->setProjection(this->projection);
             if (this->skip) {
@@ -1157,7 +1153,6 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             if (!this->sort.isEmpty()) {
                 findCommand->setSort(this->sort);
             }
-            findCommand->setDollarTenant(this->tenantId);
 
             BSONObjBuilder readConcernBuilder;
             if (config.useSnapshotReads) {
@@ -1214,9 +1209,6 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
 
                 BSONObjBuilder builder;
                 builder.append("update", nsToCollectionSubstring(this->ns));
-                if (this->tenantId) {
-                    this->tenantId->serializeToBSON("$tenant"_sd, &builder);
-                }
 
                 BSONArrayBuilder updateArray(builder.subarrayStart("updates"));
                 {
@@ -1266,7 +1258,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     txnNumberForOp = state->txnNumber;
                 }
                 runCommandWithSession(conn,
-                                      nsToDatabaseSubstring(this->ns).toString(),
+                                      DatabaseName(this->tenantId, nsToDatabaseSubstring(this->ns)),
                                       builder.done(),
                                       kNoOptions,
                                       lsid,
@@ -1284,9 +1276,6 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 BSONObj insertDoc;
                 BSONObjBuilder builder;
                 builder.append("insert", nsToCollectionSubstring(this->ns));
-                if (this->tenantId) {
-                    this->tenantId->serializeToBSON("$tenant"_sd, &builder);
-                }
 
                 BSONArrayBuilder docBuilder(builder.subarrayStart("documents"));
                 if (this->isDocAnArray) {
@@ -1307,7 +1296,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     txnNumberForOp = state->txnNumber;
                 }
                 runCommandWithSession(conn,
-                                      nsToDatabaseSubstring(this->ns).toString(),
+                                      DatabaseName(this->tenantId, nsToDatabaseSubstring(this->ns)),
                                       builder.done(),
                                       kNoOptions,
                                       lsid,
@@ -1324,9 +1313,6 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 BSONObj predicate = fixQuery(this->query, *state->bsonTemplateEvaluator);
                 BSONObjBuilder builder;
                 builder.append("delete", nsToCollectionSubstring(this->ns));
-                if (this->tenantId) {
-                    this->tenantId->serializeToBSON("$tenant"_sd, &builder);
-                }
 
                 BSONArrayBuilder docBuilder(builder.subarrayStart("deletes"));
                 int limit = (this->multi == true) ? 0 : 1;
@@ -1340,7 +1326,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     txnNumberForOp = state->txnNumber;
                 }
                 runCommandWithSession(conn,
-                                      nsToDatabaseSubstring(this->ns).toString(),
+                                      DatabaseName(this->tenantId, nsToDatabaseSubstring(this->ns)),
                                       builder.done(),
                                       kNoOptions,
                                       lsid,
@@ -1353,14 +1339,12 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
         case OpType::CREATEINDEX:
             conn->createIndex(NamespaceString(this->tenantId, this->ns),
                               this->key,
-                              boost::none /* writeConcernObj */,
-                              true);
+                              boost::none /* writeConcernObj */);
             break;
         case OpType::DROPINDEX:
             conn->dropIndex(NamespaceString(this->tenantId, this->ns),
                             this->key,
-                            boost::none /* writeConcernObj */,
-                            true);
+                            boost::none /* writeConcernObj */);
             break;
         case OpType::LET: {
             BSONObjBuilder templateBuilder;
