@@ -1575,6 +1575,12 @@ buildvariants:
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
     - rhel80-medium
+  - name: concurrency_sharded_with_catalog_shard_gen
+    distros:
+    - rhel80-medium
+  - name: concurrency_sharded_with_balancer_and_catalog_shard_gen
+    distros:
+    - rhel80-medium
   - name: .config_fuzzer !.large
   - name: disk_wiredtiger
   - name: .encrypt

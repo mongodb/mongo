@@ -455,8 +455,8 @@ var Cluster = function(options) {
             if (shard.name.includes('/')) {
                 // If the shard is a replica set, the format of st.shard(0).name in ShardingTest is
                 // "test-rs0/localhost:20006,localhost:20007,localhost:20008".
-                var [setName, shards] = shard.name.split('/');
-                cluster.shards[setName] = shards.split(',');
+                var [_, shards] = shard.name.split('/');
+                cluster.shards[shard.shardName] = shards.split(',');
             } else {
                 // If the shard is a standalone mongod, the format of st.shard(0).name in
                 // ShardingTest is "localhost:20006".

@@ -5989,6 +5989,15 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
+  name: concurrency_sharded_with_catalog_shard_gen
+  tags: ["catalog_shard", "large"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
   name: concurrency_sharded_replication_multiversion_gen
   tags: ["multiversion_passthrough", "sharded", "multiversion"]
   commands:
@@ -6000,6 +6009,15 @@ tasks:
 - <<: *gen_task_template
   name: concurrency_sharded_replication_with_balancer_gen
   tags: ["concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
+  name: concurrency_sharded_with_balancer_and_catalog_shard_gen
+  tags: ["catalog_shard", "large"]
   commands:
   - func: "generate resmoke tasks"
     vars:

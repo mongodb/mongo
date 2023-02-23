@@ -149,8 +149,8 @@ class ShardedClusterFixture(interface.Fixture):
             coll.update_one({"_id": "autosplit"}, {"$set": {"enabled": False}}, upsert=True)
 
         # Inform mongos about each of the shards
-        for shard in self.shards:
-            self._add_shard(client, shard)
+        for idx, shard in enumerate(self.shards):
+            self._add_shard(client, shard, self.catalog_shard == idx)
 
         # Ensure that all CSRS nodes are up to date. This is strictly needed for tests that use
         # multiple mongoses. In those cases, the first mongos initializes the contents of the config
@@ -384,7 +384,7 @@ class ShardedClusterFixture(interface.Fixture):
         """Install a mongos. Called by a builder."""
         self.mongos.append(mongos)
 
-    def _add_shard(self, client, shard):
+    def _add_shard(self, client, shard, is_catalog_shard):
         """
         Add the specified program as a shard by executing the addShard command.
 
@@ -392,8 +392,12 @@ class ShardedClusterFixture(interface.Fixture):
         """
 
         connection_string = shard.get_internal_connection_string()
-        self.logger.info("Adding %s as a shard...", connection_string)
-        client.admin.command({"addShard": connection_string})
+        if is_catalog_shard:
+            self.logger.info("Adding %s as catalog shard...", connection_string)
+            client.admin.command({"transitionToCatalogShard": 1})
+        else:
+            self.logger.info("Adding %s as a shard...", connection_string)
+            client.admin.command({"addShard": connection_string})
 
 
 class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixture):
