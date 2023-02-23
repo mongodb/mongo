@@ -331,7 +331,8 @@ LegacyRuntimeConstants Variables::transitionalExtractRuntimeConstants() const {
 }
 
 Variables::Id VariablesParseState::defineVariable(StringData name) {
-    // Caller should have validated before hand by using variableValidationvalidateNameForUserWrite.
+    // Caller should have validated before hand by using
+    // variableValidation::validateNameForUserWrite.
     massert(17275,
             "Can't redefine a non-user-writable variable",
             Variables::kBuiltinVarNameToId.find(name) == Variables::kBuiltinVarNameToId.end());

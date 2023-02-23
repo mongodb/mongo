@@ -2571,14 +2571,20 @@ auto getPrefixAndPath(FieldPath path) {
         return std::make_pair(std::string("$$"), path);
     }
 }
-std::string hashFieldPath(SerializationOptions options, std::string prefix, FieldPath path) {
+std::string hashFieldPath(SerializationOptions options,
+                          std::string prefix,
+                          FieldPath path,
+                          bool redactVariable = false) {
     std::stringstream redacted;
     redacted << prefix;
     size_t startPos = 0;
     // Check if our prefix indicates this path begins with a system variable.
     if (prefix.length() == 2) {
-        // Don't redact a variable reference.
-        redacted << path.getFieldName(0);
+        if (redactVariable) {
+            redacted << options.redactFieldNamesStrategy(path.getFieldName(0));
+        } else {
+            redacted << path.getFieldName(0);
+        }
         ++startPos;
     }
     for (size_t i = startPos; i < path.getPathLength(); ++i) {
@@ -2594,7 +2600,8 @@ std::string hashFieldPath(SerializationOptions options, std::string prefix, Fiel
 Value ExpressionFieldPath::serialize(SerializationOptions options) const {
     auto [prefix, path] = getPrefixAndPath(_fieldPath);
     if (options.redactFieldNames) {
-        return Value(hashFieldPath(options, prefix, path));
+        return Value(hashFieldPath(
+            options, prefix, path, !Variables::isBuiltin(_variable) /*redactVariable*/));
     } else {
         return Value(prefix + path.fullPath());
     }
@@ -2934,7 +2941,11 @@ Value ExpressionLet::serialize(SerializationOptions options) const {
     MutableDocument vars;
     for (VariableMap::const_iterator it = _variables.begin(), end = _variables.end(); it != end;
          ++it) {
-        vars[it->second.name] = it->second.expression->serialize(options);
+        auto key = it->second.name;
+        if (options.redactFieldNames) {
+            key = options.redactFieldNamesStrategy(key);
+        }
+        vars[key] = it->second.expression->serialize(options);
     }
 
     return Value(DOC("$let" << DOC("vars" << vars.freeze() << "in"

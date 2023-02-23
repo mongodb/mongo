@@ -201,6 +201,13 @@ public:
         MONGO_UNREACHABLE_TASSERT(5858104);
     }
 
+    /**
+     * Return true if the passed-in variable ID belongs to a builtin variable.
+     */
+    static auto isBuiltin(Variables::Id variable) {
+        return kIdToBuiltinVarName.find(variable) != kIdToBuiltinVarName.end();
+    }
+
 private:
     struct ValueAndState {
         ValueAndState() = default;

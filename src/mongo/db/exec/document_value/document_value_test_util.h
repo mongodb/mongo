@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/unittest/inline_auto_update.h"
 #include "mongo/unittest/unittest.h"
 
 /**
@@ -59,6 +60,7 @@
 #define _ASSERT_DOCVAL_COMPARISON(NAME, a, b) \
     ::mongo::unittest::assertComparison_##NAME(__FILE__, __LINE__, #a, #b, a, b)
 
+#define ASSERT_VALUE_EQ_AUTO(expected, val) ASSERT_STR_EQ_AUTO(expected, val.toString())
 namespace mongo {
 namespace unittest {
 
