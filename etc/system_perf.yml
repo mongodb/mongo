@@ -646,6 +646,14 @@ tasks:
         vars:
           test_control: "tsbs_query_finance"
 
+  - name: tsbs_query_high_cardinality
+    priority: 5
+    exec_timeout_secs: 432000 # 5 days
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_high_cardinality"
+
   - name: tsbs_query_sharded
     priority: 5
     commands:
@@ -4158,3 +4166,26 @@ buildvariants:
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
+
+  - name: linux-1-node-replSet-longRunning.2023-02
+    display_name: Linux 1-Node ReplSet Long-Running 2023-02
+    cron: "0 0 1 * *"  # 00:00 on the first of each month
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: M60-like-single-large-volume.2023-02
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: tsbs_query_high_cardinality
