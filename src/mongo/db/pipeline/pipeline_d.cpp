@@ -1695,9 +1695,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         bool allowExpressions = !sortStage && !skipThenLimit.getSkip() && !skipThenLimit.getLimit();
         projObj = buildProjectionForPushdown(
             deps, pipeline, allowExpressions, timeseriesBoundedSortOptimization);
-    }
 
-    plannerOpts.options |= QueryPlannerParams::RETURN_OWNED_DATA;
+        plannerOpts.options |= QueryPlannerParams::RETURN_OWNED_DATA;
+    }
 
     if (rewrittenGroupStage) {
         // See if the query system can handle the $group and $sort stage using a DISTINCT_SCAN
@@ -1771,6 +1771,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     // the executor, so we need to recheck whether the executor's layer can still produce an empty
     // document.
     *shouldProduceEmptyDocs = pipeline->getDependencies(unavailableMetadata).hasNoRequirements();
+    if (executor.isOK()) {
+        executor.getValue()->setReturnOwnedData(!*shouldProduceEmptyDocs);
+    }
 
     return executor;
 }

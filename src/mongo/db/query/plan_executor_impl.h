@@ -151,6 +151,10 @@ public:
         return false;
     }
 
+    void setReturnOwnedData(bool returnOwnedData) override final {
+        _mustReturnOwnedBson = returnOwnedData;
+    }
+
 private:
     /**
      *  Executes the underlying PlanStage tree until it indicates EOF. Throws an exception if the
@@ -201,7 +205,7 @@ private:
     Status _killStatus = Status::OK();
 
     // Whether the executor must return owned BSON.
-    const bool _mustReturnOwnedBson;
+    bool _mustReturnOwnedBson;
 
     // What namespace are we operating over?
     NamespaceString _nss;

@@ -408,6 +408,11 @@ public:
      * Returns the query framework that this executor used.
      */
     virtual QueryFramework getQueryFramework() const = 0;
+
+    /**
+     * Sets whether the executor needs to return owned data.
+     */
+    virtual void setReturnOwnedData(bool returnOwnedData){};
 };
 
 }  // namespace mongo

@@ -154,6 +154,10 @@ public:
                                   : PlanExecutor::QueryFramework::kSBEOnly;
     }
 
+    void setReturnOwnedData(bool returnOwnedData) override final {
+        _mustReturnOwnedBson = returnOwnedData;
+    }
+
 private:
     template <typename ObjectType>
     ExecState getNextImpl(ObjectType* out, RecordId* dlOut);
@@ -168,7 +172,7 @@ private:
 
     // Vector of secondary namespaces.
     std::vector<NamespaceStringOrUUID> _secondaryNssVector{};
-    const bool _mustReturnOwnedBson;
+    bool _mustReturnOwnedBson;
 
     // CompileCtx owns the instance pointed by _env, so we must keep it around.
     const std::unique_ptr<sbe::PlanStage> _root;
