@@ -368,9 +368,17 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
 void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(OperationContext* opCtx,
                                                                         std::uint64_t lastCount) {
     invariant(opCtx);
+
+    // It is possible for a prepared transaction to block on bonus eviction inside WiredTiger after
+    // it commits or rolls-back, but this delays it from signalling us to wake up. In the very
+    // worst case that the only evictable page is the one pinned by our cursor, AND there are no
+    // other prepared transactions committing or aborting, we could reach a deadlock. Since the
+    // caller is already expecting spurious wakeups, we impose a large timeout to periodically force
+    // the caller to retry its operation.
+    const auto deadline = Date_t::now() + Seconds(1);
     stdx::unique_lock<Latch> lk(_prepareCommittedOrAbortedMutex);
     if (lastCount == _prepareCommitOrAbortCounter.loadRelaxed()) {
-        opCtx->waitForConditionOrInterrupt(_prepareCommittedOrAbortedCond, lk, [&] {
+        opCtx->waitForConditionOrInterruptUntil(_prepareCommittedOrAbortedCond, lk, deadline, [&] {
             return _prepareCommitOrAbortCounter.loadRelaxed() > lastCount;
         });
     }
