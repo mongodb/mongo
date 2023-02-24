@@ -154,6 +154,16 @@ server_parameters:
         cpp_varname: gMaxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes
         default: 16776216 # BSONObjMaxUserSize - 1000
 
+    collectionSamplingLogIntervalSeconds:
+        description: 'The approximate interval between log messages indicating collection sampling progress. Once interval seconds have elapsed since the last log message, a progress message will be logged after the current sample is completed. A value of zero will disable this logging.'
+        set_at: [ startup, runtime ]
+        cpp_vartype: 'AtomicWord<int>'
+        cpp_varname: gCollectionSamplingLogIntervalSeconds
+        deprecated_name:
+        - oplogSamplingLogIntervalSeconds
+        default: 10
+        validator: { gte: 0 }
+
 feature_flags:
     featureFlagTimeseriesMetricIndexes:
         description: "When enabled, support secondary indexes on time-series measurements"

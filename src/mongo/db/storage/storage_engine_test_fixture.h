@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/iterator/transform_iterator.hpp>
+
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog_raii.h"

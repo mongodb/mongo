@@ -144,65 +144,11 @@ MONGO_FAIL_POINT_DEFINE(WTCompactRecordStoreEBUSY);
 MONGO_FAIL_POINT_DEFINE(WTRecordStoreUassertOutOfOrder);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictException);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
-MONGO_FAIL_POINT_DEFINE(slowOplogSamplingReads);
 
 const std::string kWiredTigerEngineName = "wiredTiger";
 
-class WiredTigerRecordStore::OplogStones::InsertChange final : public RecoveryUnit::Change {
-public:
-    InsertChange(OplogStones* oplogStones,
-                 int64_t bytesInserted,
-                 const Record& highestInsertedRecord,
-                 int64_t countInserted)
-        : _oplogStones(oplogStones),
-          _bytesInserted(bytesInserted),
-          _recordId(highestInsertedRecord.id),
-          _countInserted(countInserted) {
-        // We only want to initialize _wall by parsing BSONObj when we expect to need it in
-        // OplogStone::createNewStoneIfNeeded.
-        int64_t currBytes = _oplogStones->_currentBytes.load() + _bytesInserted;
-        if (currBytes >= _oplogStones->_minBytesPerStone) {
-            BSONObj obj = highestInsertedRecord.data.toBson();
-            BSONElement ele = obj["wall"];
-            if (!ele) {
-                // This shouldn't happen in normal cases, but this is needed because some tests do
-                // not add wall clock times. Note that, with this addition, it's possible that the
-                // oplog may grow larger than expected if --oplogMinRetentionHours is set.
-                _wall = Date_t::now();
-            } else {
-                _wall = ele.Date();
-            }
-        }
-    }
-
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) final {
-        invariant(_bytesInserted >= 0);
-        invariant(_recordId.isValid());
-
-        _oplogStones->_currentRecords.addAndFetch(_countInserted);
-        int64_t newCurrentBytes = _oplogStones->_currentBytes.addAndFetch(_bytesInserted);
-        if (_wall != Date_t() && newCurrentBytes >= _oplogStones->_minBytesPerStone) {
-            // When other InsertChanges commit concurrently, an uninitialized wallTime may delay the
-            // creation of a new stone. This delay is limited to the number of concurrently running
-            // transactions, so the size difference should be inconsequential.
-            _oplogStones->createNewStoneIfNeeded(opCtx, _recordId, _wall);
-        }
-    }
-
-    void rollback(OperationContext* opCtx) final {}
-
-private:
-    OplogStones* _oplogStones;
-    int64_t _bytesInserted;
-    RecordId _recordId;
-    int64_t _countInserted;
-    Date_t _wall;
-};
-
-WiredTigerRecordStore::OplogStones::OplogStones(OperationContext* opCtx, WiredTigerRecordStore* rs)
-    : _rs(rs) {
-    stdx::lock_guard<Latch> reclaimLk(_oplogReclaimMutex);
-    stdx::lock_guard<Latch> lk(_mutex);
+WiredTigerRecordStore::OplogStones WiredTigerRecordStore::OplogStones::createOplogStones(
+    OperationContext* opCtx, WiredTigerRecordStore* rs) {
 
     invariant(rs->_isCapped && rs->_isOplog);
     invariant(rs->_oplogMaxSize && *rs->_oplogMaxSize > 0);
@@ -220,69 +166,63 @@ WiredTigerRecordStore::OplogStones::OplogStones(OperationContext* opCtx, WiredTi
 
     unsigned long long numStones = maxSize / oplogStoneSize;
     size_t numStonesToKeep = std::min(kMaxStonesToKeep, std::max(kMinStonesToKeep, numStones));
-    _minBytesPerStone = maxSize / numStonesToKeep;
+    auto minBytesPerStone = maxSize / numStonesToKeep;
     uassert(7206300,
             fmt::format("Cannot create oplog of size less than {} bytes", numStonesToKeep),
-            _minBytesPerStone > 0);
+            minBytesPerStone > 0);
 
-    _calculateStones(opCtx, numStonesToKeep);
-    _pokeReclaimThreadIfNeeded();  // Reclaim stones if over the limit.
+    auto initialSetOfMarkers = CollectionTruncateMarkers::createFromExistingRecordStore(
+        opCtx, rs, minBytesPerStone, [](const Record& record) {
+            BSONObj obj = record.data.toBson();
+            auto wallTime = obj.hasField("wall") ? obj["wall"].Date() : obj["ts"].timestampTime();
+            return RecordIdAndWallTime(record.id, wallTime);
+        });
+    LOGV2(22382,
+          "WiredTiger record store oplog processing took {duration}ms",
+          "WiredTiger record store oplog processing finished",
+          "duration"_attr = duration_cast<Milliseconds>(initialSetOfMarkers.timeTaken));
+    return WiredTigerRecordStore::OplogStones(std::move(initialSetOfMarkers.markers),
+                                              initialSetOfMarkers.leftoverRecordsCount,
+                                              initialSetOfMarkers.leftoverRecordsBytes,
+                                              minBytesPerStone,
+                                              initialSetOfMarkers.timeTaken,
+                                              initialSetOfMarkers.methodUsed,
+                                              rs);
 }
 
-bool WiredTigerRecordStore::OplogStones::isDead() {
-    stdx::lock_guard<Latch> lk(_oplogReclaimMutex);
-    return _isDead;
-}
+WiredTigerRecordStore::OplogStones::OplogStones(
+    std::deque<CollectionTruncateMarkers::Marker> markers,
+    int64_t partialMarkerRecords,
+    int64_t partialMarkerBytes,
+    int64_t minBytesPerMarker,
+    Microseconds totalTimeSpentBuilding,
+    CollectionTruncateMarkers::MarkersCreationMethod creationMethod,
+    WiredTigerRecordStore* rs)
+    : CollectionTruncateMarkers(std::move(markers),
+                                partialMarkerRecords,
+                                partialMarkerBytes,
+                                minBytesPerMarker,
+                                /* supportsExpiringPartialMarkers */ false),
+      _rs(rs),
+      _totalTimeProcessing(totalTimeSpentBuilding),
+      _processBySampling(creationMethod ==
+                         CollectionTruncateMarkers::MarkersCreationMethod::Sampling) {}
 
-void WiredTigerRecordStore::OplogStones::kill() {
-    stdx::lock_guard<Latch> lk(_oplogReclaimMutex);
-    _isDead = true;
-    _oplogReclaimCv.notify_one();
-}
-
-void WiredTigerRecordStore::OplogStones::awaitHasExcessStonesOrDead() {
-    // Wait until kill() is called or there are too many oplog stones.
-    stdx::unique_lock<Latch> lock(_oplogReclaimMutex);
-    while (!_isDead) {
-        {
-            MONGO_IDLE_THREAD_BLOCK;
-            stdx::lock_guard<Latch> lk(_mutex);
-            if (hasExcessStones_inlock()) {
-                // There are now excess oplog stones. However, there it may be necessary to keep
-                // additional oplog.
-                //
-                // During startup or after rollback, the current state of the data goes "back in
-                // time" and replication recovery replays oplog entries to bring the data to a
-                // desired state. This process may require more oplog than the user dictated oplog
-                // size allotment.
-                auto stone = _stones.front();
-                invariant(stone.lastRecord.isValid());
-
-                LOGV2_DEBUG(5384100,
-                            2,
-                            "Oplog has excess stones",
-                            "lastRecord"_attr = stone.lastRecord,
-                            "wallTime"_attr = stone.wallTime,
-                            "pinnedOplog"_attr = _rs->getPinnedOplog());
-
-                if (static_cast<std::uint64_t>(stone.lastRecord.getLong()) <
-                    _rs->getPinnedOplog().asULL()) {
-                    break;
-                }
-            }
-        }
-        _oplogReclaimCv.wait(lock);
-    }
-}
-
-bool WiredTigerRecordStore::OplogStones::hasExcessStones_inlock() const {
+bool WiredTigerRecordStore::OplogStones::_hasExcessMarkers(OperationContext* opCtx) const {
     int64_t totalBytes = 0;
-    for (auto&& stone : _stones) {
-        totalBytes += stone.bytes;
+    for (const auto& marker : getMarkers()) {
+        totalBytes += marker.bytes;
     }
 
     // check that oplog stones is at capacity
     if (totalBytes <= *_rs->_oplogMaxSize) {
+        return false;
+    }
+
+    const auto& stone = getMarkers().front();
+
+    // The pinned oplog is inside the earliest marker, so we cannot remove the marker range.
+    if (static_cast<std::uint64_t>(stone.lastRecord.getLong()) >= _rs->getPinnedOplog().asULL()) {
         return false;
     }
 
@@ -295,348 +235,14 @@ bool WiredTigerRecordStore::OplogStones::hasExcessStones_inlock() const {
     }
 
     auto nowWall = Date_t::now();
-    auto lastStoneWall = _stones.front().wallTime;
+    auto lastStoneWall = stone.wallTime;
 
     auto currRetentionMS = durationCount<Milliseconds>(nowWall - lastStoneWall);
     double currRetentionHours = currRetentionMS / kNumMSInHour;
     return currRetentionHours >= minRetentionHours;
 }
 
-boost::optional<WiredTigerRecordStore::OplogStones::Stone>
-WiredTigerRecordStore::OplogStones::peekOldestStoneIfNeeded() const {
-    stdx::lock_guard<Latch> lk(_mutex);
-
-    if (!hasExcessStones_inlock()) {
-        return {};
-    }
-
-    return _stones.front();
-}
-
-void WiredTigerRecordStore::OplogStones::popOldestStone() {
-    stdx::lock_guard<Latch> lk(_mutex);
-    _stones.pop_front();
-}
-
-void WiredTigerRecordStore::OplogStones::createNewStoneIfNeeded(OperationContext* opCtx,
-                                                                const RecordId& lastRecord,
-                                                                Date_t wallTime) {
-    auto logFailedLockAcquisition = [&](const std::string& lock) {
-        LOGV2_DEBUG(5384101,
-                    2,
-                    "Failed to acquire lock to check if a new oplog stone is needed",
-                    "lock"_attr = lock);
-    };
-
-    // Try to lock both mutexes, if we fail to lock a mutex then someone else is either already
-    // creating a new stone or popping the oldest one. In the latter case, we let the next insert
-    // trigger the new stone's creation.
-    stdx::unique_lock<Latch> reclaimLk(_oplogReclaimMutex, stdx::try_to_lock);
-    if (!reclaimLk) {
-        logFailedLockAcquisition("_oplogReclaimMutex");
-        return;
-    }
-
-    stdx::unique_lock<Latch> lk(_mutex, stdx::try_to_lock);
-    if (!lk) {
-        logFailedLockAcquisition("_mutex");
-        return;
-    }
-
-    if (_currentBytes.load() < _minBytesPerStone) {
-        // Must have raced to create a new stone, someone else already triggered it.
-        return;
-    }
-
-    if (!_stones.empty() && lastRecord < _stones.back().lastRecord) {
-        // Skip creating a new stone when the record's position comes before the most recently
-        // created stone. We likely raced with another batch of inserts that caused us to try and
-        // make multiples stones.
-        return;
-    }
-
-    auto& stone =
-        _stones.emplace_back(_currentRecords.swap(0), _currentBytes.swap(0), lastRecord, wallTime);
-
-    LOGV2_DEBUG(22381,
-                2,
-                "Created a new oplog stone",
-                "lastRecord"_attr = stone.lastRecord,
-                "wallTime"_attr = stone.wallTime,
-                "numStones"_attr = _stones.size());
-
-    _pokeReclaimThreadIfNeeded();
-}
-
-void WiredTigerRecordStore::OplogStones::updateCurrentStoneAfterInsertOnCommit(
-    OperationContext* opCtx,
-    int64_t bytesInserted,
-    const Record& highestInsertedRecord,
-    int64_t countInserted) {
-    opCtx->recoveryUnit()->registerChange(
-        std::make_unique<InsertChange>(this, bytesInserted, highestInsertedRecord, countInserted));
-}
-
-void WiredTigerRecordStore::OplogStones::clearStonesOnCommit(OperationContext* opCtx) {
-    opCtx->recoveryUnit()->onCommit([this](OperationContext*, boost::optional<Timestamp>) {
-        stdx::lock_guard<Latch> lk(_mutex);
-
-        _currentRecords.store(0);
-        _currentBytes.store(0);
-        _stones.clear();
-    });
-}
-
-void WiredTigerRecordStore::OplogStones::updateStonesAfterCappedTruncateAfter(
-    int64_t recordsRemoved, int64_t bytesRemoved, const RecordId& firstRemovedId) {
-    stdx::lock_guard<Latch> lk(_mutex);
-
-    int64_t numStonesToRemove = 0;
-    int64_t recordsInStonesToRemove = 0;
-    int64_t bytesInStonesToRemove = 0;
-
-    // Compute the number and associated sizes of the records from stones that are either fully or
-    // partially truncated.
-    for (auto it = _stones.rbegin(); it != _stones.rend(); ++it) {
-        if (it->lastRecord < firstRemovedId) {
-            break;
-        }
-        numStonesToRemove++;
-        recordsInStonesToRemove += it->records;
-        bytesInStonesToRemove += it->bytes;
-    }
-
-    // Remove the stones corresponding to the records that were deleted.
-    int64_t offset = _stones.size() - numStonesToRemove;
-    _stones.erase(_stones.begin() + offset, _stones.end());
-
-    // Account for any remaining records from a partially truncated stone in the stone currently
-    // being filled.
-    _currentRecords.addAndFetch(recordsInStonesToRemove - recordsRemoved);
-    _currentBytes.addAndFetch(bytesInStonesToRemove - bytesRemoved);
-}
-
-void WiredTigerRecordStore::OplogStones::setMinBytesPerStone(int64_t size) {
-    invariant(size > 0);
-
-    stdx::lock_guard<Latch> lk(_mutex);
-
-    // Only allow changing the minimum bytes per stone if no data has been inserted.
-    invariant(_stones.size() == 0 && _currentRecords.load() == 0);
-    _minBytesPerStone = size;
-}
-
-void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* opCtx,
-                                                          size_t numStonesToKeep) {
-    const std::uint64_t startWaitTime = curTimeMicros64();
-    ON_BLOCK_EXIT([&] {
-        auto waitTime = curTimeMicros64() - startWaitTime;
-        LOGV2(22382,
-              "WiredTiger record store oplog processing took {duration}ms",
-              "WiredTiger record store oplog processing finished",
-              "duration"_attr = Milliseconds(static_cast<int64_t>(waitTime / 1000)));
-        _totalTimeProcessing.fetchAndAdd(waitTime);
-    });
-    long long numRecords = _rs->numRecords(opCtx);
-    long long dataSize = _rs->dataSize(opCtx);
-
-    LOGV2(22383,
-          "The size storer reports that the oplog contains {numRecords} records totaling to "
-          "{dataSize} bytes",
-          "The size storer reports that the oplog contains",
-          "numRecords"_attr = numRecords,
-          "dataSize"_attr = dataSize);
-
-    // Don't calculate stones if this is a new collection. This is to prevent standalones from
-    // attempting to get a forward scanning oplog cursor on an explicit create of the oplog
-    // collection. These values can be wrong. The assumption is that if they are both observed to be
-    // zero, there must be very little data in the oplog; the cost of being wrong is imperceptible.
-    if (numRecords == 0 && dataSize == 0) {
-        return;
-    }
-
-    // Only use sampling to estimate where to place the oplog stones if the number of samples drawn
-    // is less than 5% of the collection.
-    const uint64_t kMinSampleRatioForRandCursor = 20;
-
-    // If the oplog doesn't contain enough records to make sampling more efficient, then scan the
-    // oplog to determine where to put down stones.
-    if (numRecords < 0 || dataSize < 0 ||
-        uint64_t(numRecords) <
-            kMinSampleRatioForRandCursor * kRandomSamplesPerStone * numStonesToKeep) {
-        _calculateStonesByScanning(opCtx);
-        return;
-    }
-
-    // Use the oplog's average record size to estimate the number of records in each stone, and thus
-    // estimate the combined size of the records.
-    double avgRecordSize = double(dataSize) / double(numRecords);
-    double estRecordsPerStone = std::ceil(_minBytesPerStone / avgRecordSize);
-    double estBytesPerStone = estRecordsPerStone * avgRecordSize;
-
-    _calculateStonesBySampling(opCtx, int64_t(estRecordsPerStone), int64_t(estBytesPerStone));
-}
-
-void WiredTigerRecordStore::OplogStones::_calculateStonesByScanning(OperationContext* opCtx) {
-    _processBySampling.store(false);  // process by scanning
-    LOGV2(22384, "Scanning the oplog to determine where to place markers for truncation");
-
-    long long numRecords = 0;
-    long long dataSize = 0;
-
-    auto cursor = _rs->getCursor(opCtx, true);
-    while (auto record = cursor->next()) {
-        _currentRecords.addAndFetch(1);
-        int64_t newCurrentBytes = _currentBytes.addAndFetch(record->data.size());
-        if (newCurrentBytes >= _minBytesPerStone) {
-            BSONObj obj = record->data.toBson();
-            auto wallTime = obj.hasField("wall") ? obj["wall"].Date() : obj["ts"].timestampTime();
-
-            LOGV2_DEBUG(22385,
-                        1,
-                        "Marking oplog entry as a potential future oplog truncation point",
-                        "wall"_attr = wallTime);
-
-            _stones.emplace_back(
-                _currentRecords.swap(0), _currentBytes.swap(0), record->id, wallTime);
-        }
-
-        numRecords++;
-        dataSize += record->data.size();
-    }
-
-    _rs->updateStatsAfterRepair(opCtx, numRecords, dataSize);
-}
-
-void WiredTigerRecordStore::OplogStones::_calculateStonesBySampling(OperationContext* opCtx,
-                                                                    int64_t estRecordsPerStone,
-                                                                    int64_t estBytesPerStone) {
-    LOGV2(22386, "Sampling the oplog to determine where to place markers for truncation");
-    _processBySampling.store(true);  // process by sampling
-    Timestamp earliestOpTime;
-    Timestamp latestOpTime;
-
-    {
-        const bool forward = true;
-        auto cursor = _rs->getCursor(opCtx, forward);
-        auto record = cursor->next();
-        if (!record) {
-            // This shouldn't really happen unless the size storer values are far off from reality.
-            // The collection is probably empty, but fall back to scanning the oplog just in case.
-            LOGV2(22387,
-                  "Failed to determine the earliest optime, falling back to scanning the oplog");
-            _calculateStonesByScanning(opCtx);
-            return;
-        }
-        earliestOpTime = Timestamp(record->id.getLong());
-    }
-
-    {
-        const bool forward = false;
-        auto cursor = _rs->getCursor(opCtx, forward);
-        auto record = cursor->next();
-        if (!record) {
-            // This shouldn't really happen unless the size storer values are far off from reality.
-            // The collection is probably empty, but fall back to scanning the oplog just in case.
-            LOGV2(22388,
-                  "Failed to determine the latest optime, falling back to scanning the oplog");
-            _calculateStonesByScanning(opCtx);
-            return;
-        }
-        latestOpTime = Timestamp(record->id.getLong());
-    }
-
-    LOGV2(22389,
-          "Sampling from the oplog between {from} and {to} to "
-          "determine where to place markers for truncation",
-          "Sampling from the oplog to determine where to place markers for truncation",
-          "from"_attr = earliestOpTime,
-          "to"_attr = latestOpTime);
-
-    int64_t wholeStones = _rs->numRecords(opCtx) / estRecordsPerStone;
-    int64_t numSamples = kRandomSamplesPerStone * _rs->numRecords(opCtx) / estRecordsPerStone;
-
-    LOGV2(22390,
-          "Taking {numSamples} samples and assuming that each section of oplog contains "
-          "approximately {containsNumRecords} records totaling to {containsNumBytes} bytes",
-          "Taking samples and assuming each oplog section contains",
-          "numSamples"_attr = numSamples,
-          "minBytesPerStone"_attr = _minBytesPerStone,
-          "containsNumRecords"_attr = estRecordsPerStone,
-          "containsNumBytes"_attr = estBytesPerStone);
-
-    // Divide the oplog into 'wholeStones' logical sections, with each section containing
-    // approximately 'estRecordsPerStone'. Do so by oversampling the oplog, sorting the samples in
-    // order of their RecordId, and then choosing the samples expected to be near the right edge of
-    // each logical section.
-    auto cursor = _rs->getRandomCursor(opCtx);
-    std::vector<RecordIdAndWall> oplogEstimates;
-    auto lastProgressLog = Date_t::now();
-    for (int i = 0; i < numSamples; ++i) {
-        auto samplingLogIntervalSeconds = gOplogSamplingLogIntervalSeconds.load();
-        slowOplogSamplingReads.execute(
-            [&](const BSONObj& dataObj) { sleepsecs(dataObj["delay"].numberInt()); });
-        auto record = cursor->next();
-        if (!record) {
-            // This shouldn't really happen unless the size storer values are far off from reality.
-            // The collection is probably empty, but fall back to scanning the oplog just in case.
-            LOGV2(22391, "Failed to get enough random samples, falling back to scanning the oplog");
-            _calculateStonesByScanning(opCtx);
-            return;
-        }
-
-        BSONObj obj = record->data.toBson();
-        oplogEstimates.emplace_back(
-            record->id, obj.hasField("wall") ? obj["wall"].Date() : obj["ts"].timestampTime());
-
-        const auto now = Date_t::now();
-        if (samplingLogIntervalSeconds > 0 &&
-            now - lastProgressLog >= Seconds(samplingLogIntervalSeconds)) {
-            LOGV2(22392,
-                  "Oplog sampling progress: {current} of {total} samples taken",
-                  "Oplog sampling progress",
-                  "completed"_attr = (i + 1),
-                  "total"_attr = numSamples);
-            lastProgressLog = now;
-        }
-    }
-    std::sort(oplogEstimates.begin(),
-              oplogEstimates.end(),
-              [](RecordIdAndWall a, RecordIdAndWall b) { return a.id < b.id; });
-    LOGV2(22393, "Oplog sampling complete");
-
-    for (int i = 1; i <= wholeStones; ++i) {
-        // Use every (kRandomSamplesPerStone)th sample, starting with the
-        // (kRandomSamplesPerStone - 1)th, as the last record for each stone.
-        // If parsing "wall" fails, we crash to allow user to fix their oplog.
-        const auto& [id, wallTime] = oplogEstimates[kRandomSamplesPerStone * i - 1];
-
-        LOGV2_DEBUG(22394,
-                    1,
-                    "Marking oplog entry as a potential future oplog truncation point. wall: "
-                    "{wall}, ts: {ts}",
-                    "Marking oplog entry as a potential future oplog truncation point",
-                    "wall"_attr = wallTime,
-                    "ts"_attr = id);
-
-        _stones.emplace_back(estRecordsPerStone, estBytesPerStone, id, wallTime);
-    }
-
-    // Account for the partially filled chunk.
-    _currentRecords.store(_rs->numRecords(opCtx) - estRecordsPerStone * wholeStones);
-    _currentBytes.store(_rs->dataSize(opCtx) - estBytesPerStone * wholeStones);
-}
-
-void WiredTigerRecordStore::OplogStones::_pokeReclaimThreadIfNeeded() {
-    if (hasExcessStones_inlock()) {
-        _oplogReclaimCv.notify_one();
-    }
-}
-
-void WiredTigerRecordStore::OplogStones::adjust(int64_t maxSize) {
-    stdx::lock_guard<Latch> reclaimLk(_oplogReclaimMutex);
-    stdx::lock_guard<Latch> lk(_mutex);
-
+void WiredTigerRecordStore::OplogStones::adjust(OperationContext* opCtx, int64_t maxSize) {
     const unsigned int oplogStoneSize =
         std::max(gOplogStoneSizeMB * 1024 * 1024, BSONObjMaxInternalSize);
 
@@ -647,9 +253,8 @@ void WiredTigerRecordStore::OplogStones::adjust(int64_t maxSize) {
 
     unsigned long long numStones = maxSize / oplogStoneSize;
     size_t numStonesToKeep = std::min(kMaxStonesToKeep, std::max(kMinStonesToKeep, numStones));
-    _minBytesPerStone = maxSize / numStonesToKeep;
-    invariant(_minBytesPerStone > 0);
-    _pokeReclaimThreadIfNeeded();
+    setMinBytesPerMarker(maxSize / numStonesToKeep);
+    pokeReclaimThreadIfNeeded(opCtx);
 }
 
 StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj options) {
@@ -997,7 +602,7 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
     // OplogCapMaintainerThread does not get started in this instance.
     if (NamespaceString::oplog(ns()) && opCtx->getServiceContext()->userWritesAllowed() &&
         !storageGlobalParams.repair) {
-        _oplogStones = std::make_shared<OplogStones>(opCtx, this);
+        _oplogStones = std::make_shared<OplogStones>(OplogStones::createOplogStones(opCtx, this));
     }
 
     if (_isOplog) {
@@ -1162,7 +767,7 @@ bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* 
     recoveryUnit->beginIdle();
 
     // Wait for an oplog deletion request, or for this record store to have been destroyed.
-    oplogStones->awaitHasExcessStonesOrDead();
+    oplogStones->awaitHasExcessMarkersOrDead(opCtx);
 
     // Reacquire the locks that were released.
     locker->restoreLockState(opCtx, snapshot);
@@ -1171,20 +776,12 @@ bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* 
 }
 
 void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
-    reclaimOplog(opCtx, _kvEngine->getPinnedOplog());
-}
-
-void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayTruncateUpTo) {
+    auto mayTruncateUpTo = _kvEngine->getPinnedOplog();
     invariant(_keyFormat == KeyFormat::Long);
 
     Timer timer;
-    while (auto stone = _oplogStones->peekOldestStoneIfNeeded()) {
+    while (auto stone = _oplogStones->peekOldestMarkerIfNeeded(opCtx)) {
         invariant(stone->lastRecord.isValid());
-
-        if (static_cast<std::uint64_t>(stone->lastRecord.getLong()) >= mayTruncateUpTo.asULL()) {
-            // Do not truncate oplogs needed for replication recovery.
-            return;
-        }
 
         LOGV2_DEBUG(
             22399,
@@ -1265,7 +862,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
             wuow.commit();
 
             // Remove the stone after a successful truncation.
-            _oplogStones->popOldestStone();
+            _oplogStones->popOldestMarker();
 
             // Stash the truncate point for next time to cleanly skip over tombstones, etc.
             _oplogStones->firstRecord = stone->lastRecord;
@@ -1402,8 +999,20 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     _changeNumRecordsAndDataSize(opCtx, nRecords, totalLength);
 
     if (_oplogStones) {
-        _oplogStones->updateCurrentStoneAfterInsertOnCommit(
-            opCtx, totalLength, highestIdRecord, nRecords);
+        auto wall = [&] {
+            BSONObj obj = highestIdRecord.data.toBson();
+            BSONElement ele = obj["wall"];
+            if (!ele) {
+                // This shouldn't happen in normal cases, but this is needed because some tests do
+                // not add wall clock times. Note that, with this addition, it's possible that the
+                // oplog may grow larger than expected if --oplogMinRetentionHours is set.
+                return Date_t::now();
+            } else {
+                return ele.Date();
+            }
+        }();
+        _oplogStones->updateCurrentMarkerAfterInsertOnCommit(
+            opCtx, totalLength, highestIdRecord.id, wall, nRecords);
     }
 
     return Status::OK();
@@ -1722,7 +1331,7 @@ Status WiredTigerRecordStore::doTruncate(OperationContext* opCtx) {
     _changeNumRecordsAndDataSize(opCtx, -numRecords(opCtx), -dataSize(opCtx));
 
     if (_oplogStones) {
-        _oplogStones->clearStonesOnCommit(opCtx);
+        _oplogStones->clearMarkersOnCommit(opCtx);
     }
 
     return Status::OK();
@@ -2121,7 +1730,7 @@ void WiredTigerRecordStore::doCappedTruncateAfter(
     }
 
     if (_oplogStones) {
-        _oplogStones->updateStonesAfterCappedTruncateAfter(
+        _oplogStones->updateMarkersAfterCappedTruncateAfter(
             recordsRemoved, bytesRemoved, firstRemovedId);
     }
 }
@@ -2600,7 +2209,7 @@ RecordId WiredTigerRecordStoreStandardCursor::getKey(WT_CURSOR* cursor) const {
     }
 }
 
-Status WiredTigerRecordStore::updateOplogSize(long long newOplogSize) {
+Status WiredTigerRecordStore::updateOplogSize(OperationContext* opCtx, long long newOplogSize) {
     invariant(_isOplog && _oplogMaxSize);
 
     if (*_oplogMaxSize == newOplogSize) {
@@ -2610,7 +2219,7 @@ Status WiredTigerRecordStore::updateOplogSize(long long newOplogSize) {
     _oplogMaxSize = newOplogSize;
 
     invariant(_oplogStones);
-    _oplogStones->adjust(newOplogSize);
+    _oplogStones->adjust(opCtx, newOplogSize);
     return Status::OK();
 }
 

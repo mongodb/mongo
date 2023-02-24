@@ -67,6 +67,7 @@ env.Library(
 env.Library(
     target='record_store_base',
     source=[
+        'collection_markers.cpp',
         'external_record_store.cpp',
         'multi_bson_stream_cursor.cpp',
         'named_pipe_posix.cpp' if not env.TargetOSIs('windows') else [],
@@ -526,6 +527,7 @@ env.Library(
 env.CppUnitTest(
     target='db_storage_test',
     source=[
+        'collection_markers_test.cpp',
         'external_record_store_test.cpp',
         'disk_space_monitor_test.cpp',
         'flow_control_test.cpp',
@@ -568,6 +570,7 @@ env.CppUnitTest(
         'historical_ident_tracker',
         'key_string',
         'kv/kv_drop_pending_ident_reaper',
+        'record_store_base',
         'storage_engine_common',
         'storage_engine_lock_file',
         'storage_engine_metadata',

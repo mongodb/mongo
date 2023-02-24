@@ -35,6 +35,7 @@
 #include <wiredtiger.h>
 
 #include "mongo/db/catalog/capped_visibility.h"
+#include "mongo/db/storage/collection_markers.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -207,7 +208,7 @@ public:
                                         long long dataSize);
 
 
-    Status updateOplogSize(long long newOplogSize) final;
+    Status updateOplogSize(OperationContext* opCtx, long long newOplogSize) final;
 
     const std::string& getURI() const {
         return _uri;
@@ -242,17 +243,14 @@ public:
 
     bool yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx) override;
 
+    /**
+     * Attempts to truncate oplog entries before the pinned oplog timestamp. Truncation will occur
+     * if the oplog is at capacity and the maximum retention time has elapsed.
+     */
     void reclaimOplog(OperationContext* opCtx) override;
 
     StatusWith<Timestamp> getLatestOplogTimestamp(OperationContext* opCtx) const override;
     StatusWith<Timestamp> getEarliestOplogTimestamp(OperationContext* opCtx) override;
-
-    /**
-     * The `recoveryTimestamp` is when replication recovery would need to replay from for
-     * recoverable rollback, or restart for durable engines. `reclaimOplog` will not
-     * truncate oplog entries in front of this time.
-     */
-    void reclaimOplog(OperationContext* opCtx, Timestamp recoveryTimestamp);
 
     class OplogStones;
 

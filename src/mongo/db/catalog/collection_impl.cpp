@@ -899,7 +899,7 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
     }
 
     if (ns().isOplog() && newCappedSize) {
-        Status status = _shared->_recordStore->updateOplogSize(*newCappedSize);
+        Status status = _shared->_recordStore->updateOplogSize(opCtx, *newCappedSize);
         if (!status.isOK()) {
             return status;
         }

@@ -644,7 +644,7 @@ public:
     /**
      * Storage engines can choose whether to support changing the oplog size online.
      */
-    virtual Status updateOplogSize(long long newOplogSize) {
+    virtual Status updateOplogSize(OperationContext* opCtx, long long newOplogSize) {
         return Status(ErrorCodes::CommandNotSupported,
                       "This storage engine does not support updateOplogSize");
     }

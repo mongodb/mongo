@@ -31,6 +31,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/storage/collection_markers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
@@ -43,124 +44,49 @@ class RecordId;
 
 // Keep "milestones" against the oplog to efficiently remove the old records when the collection
 // grows beyond its desired maximum size.
-class WiredTigerRecordStore::OplogStones {
+class WiredTigerRecordStore::OplogStones final : public CollectionTruncateMarkers {
 public:
-    struct Stone {
-        int64_t records;      // Approximate number of records in a chunk of the oplog.
-        int64_t bytes;        // Approximate size of records in a chunk of the oplog.
-        RecordId lastRecord;  // RecordId of the last record in a chunk of the oplog.
-        Date_t wallTime;      // Walltime of when this chunk of the oplog was created.
-
-        Stone(int64_t records, int64_t bytes, RecordId lastRecord, Date_t wallTime)
-            : records(records),
-              bytes(bytes),
-              lastRecord(std::move(lastRecord)),
-              wallTime(wallTime) {}
-    };
-
-    OplogStones(OperationContext* opCtx, WiredTigerRecordStore* rs);
-
-    bool isDead();
-
-    void kill();
-
-    bool hasExcessStones_inlock() const;
-
-    void awaitHasExcessStonesOrDead();
+    OplogStones(std::deque<CollectionTruncateMarkers::Marker> markers,
+                int64_t partialMarkerRecords,
+                int64_t partialMarkerBytes,
+                int64_t minBytesPerMarker,
+                Microseconds totalTimeSpentBuilding,
+                CollectionTruncateMarkers::MarkersCreationMethod creationMethod,
+                WiredTigerRecordStore* rs);
 
     void getOplogStonesStats(BSONObjBuilder& builder) const {
-        builder.append("totalTimeProcessingMicros", _totalTimeProcessing.load());
-        builder.append("processingMethod", _processBySampling.load() ? "sampling" : "scanning");
+        builder.append("totalTimeProcessingMicros", _totalTimeProcessing.count());
+        builder.append("processingMethod", _processBySampling ? "sampling" : "scanning");
         if (auto oplogMinRetentionHours = storageGlobalParams.oplogMinRetentionHours.load()) {
             builder.append("oplogMinRetentionHours", oplogMinRetentionHours);
         }
     }
 
-    boost::optional<OplogStones::Stone> peekOldestStoneIfNeeded() const;
-
-    void popOldestStone();
-
-    void createNewStoneIfNeeded(OperationContext* opCtx,
-                                const RecordId& lastRecord,
-                                Date_t wallTime);
-
-    void updateCurrentStoneAfterInsertOnCommit(OperationContext* opCtx,
-                                               int64_t bytesInserted,
-                                               const Record& highestInsertedRecord,
-                                               int64_t countInserted);
-
-    void clearStonesOnCommit(OperationContext* opCtx);
-
-    // Updates the metadata about the oplog stones after a rollback occurs.
-    void updateStonesAfterCappedTruncateAfter(int64_t recordsRemoved,
-                                              int64_t bytesRemoved,
-                                              const RecordId& firstRemovedId);
-
     // Resize oplog size
-    void adjust(int64_t maxSize);
+    void adjust(OperationContext* opCtx, int64_t maxSize);
 
     // The start point of where to truncate next. Used by the background reclaim thread to
     // efficiently truncate records with WiredTiger by skipping over tombstones, etc.
     RecordId firstRecord;
 
+    static WiredTigerRecordStore::OplogStones createOplogStones(OperationContext* opCtx,
+                                                                WiredTigerRecordStore* rs);
     //
     // The following methods are public only for use in tests.
     //
 
-    size_t numStones() const {
-        stdx::lock_guard<Latch> lk(_mutex);
-        return _stones.size();
-    }
-
-    int64_t currentBytes() const {
-        return _currentBytes.load();
-    }
-
-    int64_t currentRecords() const {
-        return _currentRecords.load();
-    }
-
-    void setMinBytesPerStone(int64_t size);
-
     bool processedBySampling() const {
-        return _processBySampling.load();
+        return _processBySampling;
     }
 
 private:
-    class InsertChange;
-
-    void _calculateStones(OperationContext* opCtx, size_t size);
-    void _calculateStonesByScanning(OperationContext* opCtx);
-    void _calculateStonesBySampling(OperationContext* opCtx,
-                                    int64_t estRecordsPerStone,
-                                    int64_t estBytesPerStone);
-
-    void _pokeReclaimThreadIfNeeded();
-
-    static const uint64_t kRandomSamplesPerStone = 10;
+    virtual bool _hasExcessMarkers(OperationContext* opCtx) const final;
 
     WiredTigerRecordStore* _rs;
 
-    Mutex _oplogReclaimMutex;
-    stdx::condition_variable _oplogReclaimCv;
-
-    // True if '_rs' has been destroyed, e.g. due to repairDatabase being called on the "local"
-    // database, and false otherwise.
-    bool _isDead = false;
-
-    // Minimum number of bytes the stone being filled should contain before it gets added to the
-    // deque of oplog stones.
-    int64_t _minBytesPerStone;
-
-    AtomicWord<long long> _currentRecords;     // Number of records in the stone being filled.
-    AtomicWord<long long> _currentBytes;       // Number of bytes in the stone being filled.
-    AtomicWord<int64_t> _totalTimeProcessing;  // Amount of time spent scanning and/or sampling the
-                                               // oplog during start up, if any.
-    AtomicWord<bool> _processBySampling;       // Whether the oplog was sampled or scanned.
-
-    // Protects against concurrent access to the deque of oplog stones.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogStones::_mutex");
-    std::deque<OplogStones::Stone> _stones;  // front = oldest, back = newest.
+    Microseconds _totalTimeProcessing;  // Amount of time spent scanning and/or sampling the
+                                        // oplog during start up, if any.
+    bool _processBySampling;            // Whether the oplog was sampled or scanned.
 };
 
 }  // namespace mongo

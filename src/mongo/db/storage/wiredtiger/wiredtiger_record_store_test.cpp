@@ -394,25 +394,25 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CreateNewStone) {
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
 
     WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
-    WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
+    auto oplogStones = wtrs->oplogStones();
 
-    oplogStones->setMinBytesPerStone(100);
+    oplogStones->setMinBytesPerMarker(100);
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        ASSERT_EQ(0U, oplogStones->numStones());
+        ASSERT_EQ(0U, oplogStones->numMarkers());
 
         // Inserting a record smaller than 'minBytesPerStone' shouldn't create a new oplog stone.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 1), 99), RecordId(1, 1));
-        ASSERT_EQ(0U, oplogStones->numStones());
+        ASSERT_EQ(0U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(99, oplogStones->currentBytes());
 
         // Inserting another record such that their combined size exceeds 'minBytesPerStone' should
         // cause a new stone to be created.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 2), 51), RecordId(1, 2));
-        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1U, oplogStones->numMarkers());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
 
@@ -420,21 +420,21 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CreateNewStone) {
         // one exceed 'minBytesPerStone' shouldn't cause a new stone to be created because we've
         // started filling a new stone.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 3), 50), RecordId(1, 3));
-        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(50, oplogStones->currentBytes());
 
         // Inserting a record such that the combined size of this record and the previously inserted
         // one is exactly equal to 'minBytesPerStone' should cause a new stone to be created.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 4), 50), RecordId(1, 4));
-        ASSERT_EQ(2U, oplogStones->numStones());
+        ASSERT_EQ(2U, oplogStones->numMarkers());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
 
         // Inserting a single record that exceeds 'minBytesPerStone' should cause a new stone to
         // be created.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 5), 101), RecordId(1, 5));
-        ASSERT_EQ(3U, oplogStones->numStones());
+        ASSERT_EQ(3U, oplogStones->numMarkers());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
     }
@@ -447,9 +447,9 @@ TEST(WiredTigerRecordStoreTest, OplogStones_UpdateRecord) {
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
 
     WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
-    WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
+    auto oplogStones = wtrs->oplogStones();
 
-    oplogStones->setMinBytesPerStone(100);
+    oplogStones->setMinBytesPerMarker(100);
 
     // Insert two records such that one makes up a full stone and the other is a part of the stone
     // currently being filled.
@@ -459,7 +459,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_UpdateRecord) {
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 1), 100), RecordId(1, 1));
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 2), 50), RecordId(1, 2));
 
-        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(50, oplogStones->currentBytes());
     }
@@ -508,7 +508,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_UpdateRecord) {
             rs->updateRecord(opCtx.get(), RecordId(1, 2), changed2.objdata(), changed2.objsize()));
         wuow.commit();
 
-        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(50, oplogStones->currentBytes());
     }
@@ -521,9 +521,9 @@ TEST(WiredTigerRecordStoreTest, OplogStones_Truncate) {
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
 
     WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
-    WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
+    auto oplogStones = wtrs->oplogStones();
 
-    oplogStones->setMinBytesPerStone(100);
+    oplogStones->setMinBytesPerMarker(100);
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -532,7 +532,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_Truncate) {
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 2), 50), RecordId(1, 2));
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 3), 50), RecordId(1, 3));
 
-        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(50, oplogStones->currentBytes());
     }
@@ -549,7 +549,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_Truncate) {
 
         ASSERT_EQ(0, rs->dataSize(opCtx.get()));
         ASSERT_EQ(0, rs->numRecords(opCtx.get()));
-        ASSERT_EQ(0U, oplogStones->numStones());
+        ASSERT_EQ(0U, oplogStones->numMarkers());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
     }
@@ -563,9 +563,9 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
 
     WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
-    WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
+    auto oplogStones = wtrs->oplogStones();
 
-    oplogStones->setMinBytesPerStone(1000);
+    oplogStones->setMinBytesPerMarker(1000);
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -584,7 +584,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
 
         ASSERT_EQ(9, rs->numRecords(opCtx.get()));
         ASSERT_EQ(2600, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(2U, oplogStones->numStones());
+        ASSERT_EQ(2U, oplogStones->numMarkers());
         ASSERT_EQ(3, oplogStones->currentRecords());
         ASSERT_EQ(300, oplogStones->currentBytes());
     }
@@ -604,7 +604,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
 
         ASSERT_EQ(7, rs->numRecords(opCtx.get()));
         ASSERT_EQ(2350, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(2U, oplogStones->numStones());
+        ASSERT_EQ(2U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(50, oplogStones->currentBytes());
     }
@@ -621,7 +621,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
 
         ASSERT_EQ(5, rs->numRecords(opCtx.get()));
         ASSERT_EQ(1950, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1U, oplogStones->numMarkers());
         ASSERT_EQ(3, oplogStones->currentRecords());
         ASSERT_EQ(750, oplogStones->currentBytes());
     }
@@ -638,7 +638,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
 
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
         ASSERT_EQ(1400, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(200, oplogStones->currentBytes());
     }
@@ -655,7 +655,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(1200, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1U, oplogStones->numMarkers());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
     }
@@ -672,7 +672,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
 
         ASSERT_EQ(1, rs->numRecords(opCtx.get()));
         ASSERT_EQ(400, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(0U, oplogStones->numStones());
+        ASSERT_EQ(0U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(400, oplogStones->currentBytes());
     }
@@ -684,11 +684,14 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
 
     WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
-    WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
+    auto oplogStones = wtrs->oplogStones();
 
-    ASSERT_OK(wtrs->updateOplogSize(230));
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_OK(wtrs->updateOplogSize(opCtx.get(), 230));
+    }
 
-    oplogStones->setMinBytesPerStone(100);
+    oplogStones->setMinBytesPerMarker(100);
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -699,7 +702,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
 
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
         ASSERT_EQ(330, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(3U, oplogStones->numStones());
+        ASSERT_EQ(3U, oplogStones->numMarkers());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
     }
@@ -708,12 +711,13 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
     // before the truncation point (i.e: leaves a gap that replication recovery would rely on).
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        harnessHelper->advanceStableTimestamp(Timestamp(1, 0));
 
-        wtrs->reclaimOplog(opCtx.get(), Timestamp(1, 0));
+        wtrs->reclaimOplog(opCtx.get());
 
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
         ASSERT_EQ(330, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(3U, oplogStones->numStones());
+        ASSERT_EQ(3U, oplogStones->numMarkers());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
     }
@@ -722,11 +726,12 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        wtrs->reclaimOplog(opCtx.get(), Timestamp(1, 3));
+        harnessHelper->advanceStableTimestamp(Timestamp(1, 3));
+        wtrs->reclaimOplog(opCtx.get());
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(230, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(2U, oplogStones->numStones());
+        ASSERT_EQ(2U, oplogStones->numMarkers());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
     }
@@ -740,7 +745,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
 
         ASSERT_EQ(5, rs->numRecords(opCtx.get()));
         ASSERT_EQ(550, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(4U, oplogStones->numStones());
+        ASSERT_EQ(4U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(50, oplogStones->currentBytes());
     }
@@ -749,11 +754,12 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        wtrs->reclaimOplog(opCtx.get(), Timestamp(1, 6));
+        harnessHelper->advanceStableTimestamp(Timestamp(1, 6));
+        wtrs->reclaimOplog(opCtx.get());
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(190, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(50, oplogStones->currentBytes());
     }
@@ -762,11 +768,12 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        wtrs->reclaimOplog(opCtx.get(), Timestamp(1, 6));
+        harnessHelper->advanceStableTimestamp(Timestamp(1, 6));
+        wtrs->reclaimOplog(opCtx.get());
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(190, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(50, oplogStones->currentBytes());
     }
@@ -781,18 +788,19 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
 
         ASSERT_EQ(4, rs->numRecords(opCtx.get()));
         ASSERT_EQ(500, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(3U, oplogStones->numStones());
+        ASSERT_EQ(3U, oplogStones->numMarkers());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
     }
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        wtrs->reclaimOplog(opCtx.get(), Timestamp(1, 8));
+        harnessHelper->advanceStableTimestamp(Timestamp(1, 8));
+        wtrs->reclaimOplog(opCtx.get());
 
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
         ASSERT_EQ(360, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(2U, oplogStones->numStones());
+        ASSERT_EQ(2U, oplogStones->numMarkers());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
     }
@@ -807,18 +815,19 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
 
         ASSERT_EQ(5, rs->numRecords(opCtx.get()));
         ASSERT_EQ(660, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(3U, oplogStones->numStones());
+        ASSERT_EQ(3U, oplogStones->numMarkers());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
     }
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        wtrs->reclaimOplog(opCtx.get(), Timestamp(1, 12));
+        harnessHelper->advanceStableTimestamp(Timestamp(1, 12));
+        wtrs->reclaimOplog(opCtx.get());
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(300, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1U, oplogStones->numMarkers());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
     }
@@ -827,22 +836,25 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
     // truncate-up-to point, that have not yet created a stone.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 12), 90), RecordId(1, 12));
+        // Use timestamp (1, 13) as we can't commit at the stable timestamp (1, 12).
+        auto t = insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 13), 90);
+        ASSERT_EQ(t, RecordId(1, 13));
 
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
         ASSERT_EQ(390, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(90, oplogStones->currentBytes());
     }
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        wtrs->reclaimOplog(opCtx.get(), Timestamp(1, 12));
+        harnessHelper->advanceStableTimestamp(Timestamp(1, 13));
+        wtrs->reclaimOplog(opCtx.get());
 
         ASSERT_EQ(1, rs->numRecords(opCtx.get()));
         ASSERT_EQ(90, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(0U, oplogStones->numStones());
+        ASSERT_EQ(0U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(90, oplogStones->currentBytes());
     }
@@ -855,23 +867,23 @@ TEST(WiredTigerRecordStoreTest, OplogStones_AscendingOrder) {
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
 
     WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
-    WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
+    auto oplogStones = wtrs->oplogStones();
 
-    oplogStones->setMinBytesPerStone(100);
+    oplogStones->setMinBytesPerMarker(100);
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        ASSERT_EQ(0U, oplogStones->numStones());
+        ASSERT_EQ(0U, oplogStones->numMarkers());
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(2, 2), 50), RecordId(2, 2));
-        ASSERT_EQ(0U, oplogStones->numStones());
+        ASSERT_EQ(0U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(50, oplogStones->currentBytes());
 
         // Inserting a record that has a smaller RecordId than the previously inserted record should
         // be able to create a new stone when no stones already exist.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(2, 1), 50), RecordId(2, 1));
-        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1U, oplogStones->numMarkers());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
 
@@ -879,14 +891,14 @@ TEST(WiredTigerRecordStoreTest, OplogStones_AscendingOrder) {
         // stone's last record shouldn't cause a new stone to be created, even if the size of the
         // inserted record exceeds 'minBytesPerStone'.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 1), 100), RecordId(1, 1));
-        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1U, oplogStones->numMarkers());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(100, oplogStones->currentBytes());
 
         // Inserting a record that has a larger RecordId than the most recently created stone's last
         // record should then cause a new stone to be created.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(2, 3), 50), RecordId(2, 3));
-        ASSERT_EQ(2U, oplogStones->numStones());
+        ASSERT_EQ(2U, oplogStones->numMarkers());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
     }
@@ -925,21 +937,23 @@ TEST(WiredTigerRecordStoreTest, OplogStones_Duplicates) {
         wtrs->postConstructorInit(opCtx.get());
     }
 
-    WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
+    auto oplogStones = wtrs->oplogStones();
 
     // Confirm that sampling occurred and that some stones were generated.
     ASSERT(oplogStones->processedBySampling());
-    auto stonesBefore = oplogStones->numStones();
+    auto stonesBefore = oplogStones->numMarkers();
     ASSERT_GT(stonesBefore, 0U);
+    ASSERT_GT(oplogStones->currentBytes(), 0);
 
     {
         // Reclaiming should do nothing because the data size is still under the maximum.
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        wtrs->reclaimOplog(opCtx.get(), Timestamp(4, 0));
-        ASSERT_EQ(stonesBefore, oplogStones->numStones());
+        wtHarnessHelper->advanceStableTimestamp(Timestamp(4, 0));
+        wtrs->reclaimOplog(opCtx.get());
+        ASSERT_EQ(stonesBefore, oplogStones->numMarkers());
 
         // Reduce the oplog size to ensure we create a stone and truncate on the next insert.
-        ASSERT_OK(wtrs->updateOplogSize(400));
+        ASSERT_OK(wtrs->updateOplogSize(opCtx.get(), 400));
 
         // Inserting these records should meet the requirements for truncation. That is: there is a
         // record, 5, after the last stone, 4, and before the truncation point, 6.
@@ -947,8 +961,9 @@ TEST(WiredTigerRecordStoreTest, OplogStones_Duplicates) {
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(6, 0), 100), RecordId(6, 0));
 
         // Ensure every stone has been cleaned up except for the last one ending in 6.
-        wtrs->reclaimOplog(opCtx.get(), Timestamp(6, 0));
-        ASSERT_EQ(1, oplogStones->numStones());
+        wtHarnessHelper->advanceStableTimestamp(Timestamp(6, 0));
+        wtrs->reclaimOplog(opCtx.get());
+        ASSERT_EQ(1, oplogStones->numMarkers());
 
         // The original oplog should have rolled over and the size and count should be accurate.
         ASSERT_EQ(1, wtrs->numRecords(opCtx.get()));

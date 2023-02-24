@@ -30,6 +30,7 @@ const replSet = new ReplSetTest({
         setParameter: {
             "maxOplogTruncationPointsDuringStartup": 10,
             "oplogSamplingLogIntervalSeconds": kLoggingIntervalSeconds,
+            // TODO SERVER-74250: Change to slowCollectionSamplingReads when 7.0 releases
             "failpoint.slowOplogSamplingReads":
                 tojson({mode: "alwaysOn", data: {"delay": kOplogSampleReadDelay}}),
             logComponentVerbosity: tojson({storage: {verbosity: 2}}),
@@ -68,8 +69,10 @@ assert.commandWorked(replSet.getPrimary().getDB(testDB).serverStatus());
 const maxSamplesPerLog = Math.ceil(kLoggingIntervalSeconds / kOplogSampleReadDelay);
 const minExpectedLogs = Math.floor(kNumOplogSamples / maxSamplesPerLog);
 
-checkLog.containsWithAtLeastCount(replSet.getPrimary(), "Oplog sampling progress", minExpectedLogs);
-assert(checkLog.checkContainsOnce(replSet.getPrimary(), "Oplog sampling complete"));
+checkLog.containsWithAtLeastCount(
+    replSet.getPrimary(), RegExp("(Collection|Oplog) sampling progress"), minExpectedLogs);
+assert(checkLog.checkContainsOnce(replSet.getPrimary(),
+                                  RegExp("(Collection|Oplog) sampling complete")));
 
 replSet.stopSet();
 })();

@@ -25,7 +25,7 @@ let res = replSet.getPrimary().getDB("test").serverStatus();
 assert.commandWorked(res);
 
 // Small (or empty) oplogs should be processed by scanning.
-assert.gt(res.oplogTruncation.totalTimeProcessingMicros, 0);
+assert.gte(res.oplogTruncation.totalTimeProcessingMicros, 0);
 assert.eq(res.oplogTruncation.processingMethod, "scanning");
 
 // Insert enough documents to force oplog sampling to occur on the following start up.
