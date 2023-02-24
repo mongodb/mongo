@@ -29,12 +29,8 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/status.h"
-#include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/timeseries/timeseries_gen.h"
 
 namespace mongo {
 
@@ -63,24 +59,12 @@ class ParsedDelete {
 
 public:
     /**
-     * Constructs a parsed delete for a regular delete which does not involve a time-series
-     * collection.
+     * Constructs a parsed delete.
      *
      * The object pointed to by "request" must stay in scope for the life of the constructed
      * ParsedDelete.
      */
-    ParsedDelete(OperationContext* opCtx, const DeleteRequest* request)
-        : ParsedDelete(opCtx, request, boost::none) {}
-
-    /**
-     * Constructs a parsed delete which may involve a time-series collection.
-     *
-     * The object pointed to by "request" must stay in scope for the life of the constructed
-     * ParsedDelete.
-     */
-    ParsedDelete(OperationContext* opCtx,
-                 const DeleteRequest* request,
-                 boost::optional<TimeseriesOptions> timeseriesOptions);
+    ParsedDelete(OperationContext* opCtx, const DeleteRequest* request);
 
     /**
      * Parses the delete request to a canonical query. On success, the parsed delete can be
@@ -133,25 +117,6 @@ public:
 
     void setCollator(std::unique_ptr<CollatorInterface> collator);
 
-    /**
-     * Returns the non-modifiable residual MatchExpression.
-     *
-     * Note: see _timeseriesDeleteDetails._residualExpr for more details.
-     */
-    const MatchExpression* getResidualExpr() const {
-        return _timeseriesDeleteDetails ? _timeseriesDeleteDetails->_residualExpr.get() : nullptr;
-    }
-
-    /**
-     * Releases the ownership of the residual MatchExpression.
-     *
-     * Note: see _timeseriesDeleteDetails._bucketMatchExpr for more details.
-     */
-    std::unique_ptr<MatchExpression> releaseResidualExpr() {
-        return _timeseriesDeleteDetails ? std::move(_timeseriesDeleteDetails->_residualExpr)
-                                        : nullptr;
-    }
-
 private:
     // Transactional context.  Not owned by us.
     OperationContext* _opCtx;
@@ -163,27 +128,6 @@ private:
     std::unique_ptr<CanonicalQuery> _canonicalQuery;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
-
-    Status splitOutBucketMatchExpression(const ExtensionsCallback& extensionsCallback);
-
-    // Time-series deletes take some special handling to make sure we delete the buckets collection,
-    // but interact with the documents as if they were unpacked.
-    struct TimeseriesDeleteDetails {
-        TimeseriesDeleteDetails(const TimeseriesOptions& timeseriesOptions)
-            : _timeseriesOptions(timeseriesOptions) {}
-
-        TimeseriesOptions _timeseriesOptions;
-
-        // The bucket-level match expressions.
-        std::unique_ptr<MatchExpression> _bucketMatchExpr = nullptr;
-
-        // The residual expression after splitting out metaField-dependent match expressions.
-        // TODO SERVER-73077: Currently, _residualExpr is not being used but the '_residualExpr' is
-        // supposed to be passed to the TS_WRITE stage.
-        std::unique_ptr<MatchExpression> _residualExpr = nullptr;
-    };
-
-    std::unique_ptr<TimeseriesDeleteDetails> _timeseriesDeleteDetails = nullptr;
 };
 
 }  // namespace mongo

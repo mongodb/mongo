@@ -33,18 +33,13 @@
 #include "mongo/db/ops/parsed_delete.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -53,16 +48,8 @@
 
 namespace mongo {
 
-ParsedDelete::ParsedDelete(OperationContext* opCtx,
-                           const DeleteRequest* request,
-                           boost::optional<TimeseriesOptions> timeseriesOptions)
-    : _opCtx(opCtx), _request(request) {
-    if (feature_flags::gTimeseriesUpdatesDeletesSupport.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
-        timeseriesOptions) {
-        _timeseriesDeleteDetails = std::make_unique<TimeseriesDeleteDetails>(*timeseriesOptions);
-    }
-}
+ParsedDelete::ParsedDelete(OperationContext* opCtx, const DeleteRequest* request)
+    : _opCtx(opCtx), _request(request) {}
 
 Status ParsedDelete::parseRequest() {
     dassert(!_canonicalQuery.get());
@@ -98,78 +85,15 @@ Status ParsedDelete::parseRequest() {
     return parseQueryToCQ();
 }
 
-namespace {
-void assertQueryFieldIsMetaField(bool isMetaField, StringData metaField) {
-    uassert(ErrorCodes::InvalidOptions,
-            fmt::format("Cannot perform an update or delete on a time-series collection "
-                        "when querying on a field that is not the metaField '{}'",
-                        metaField),
-            isMetaField);
-}
-}  // namespace
-
-Status ParsedDelete::splitOutBucketMatchExpression(const ExtensionsCallback& extensionsCallback) {
-    tassert(7307300,
-            "Can split out the bucket-level match expression only for timeseries deletes",
-            _timeseriesDeleteDetails);
-
-    auto& details = _timeseriesDeleteDetails;
-    const auto& timeseriesOptions = details->_timeseriesOptions;
-
-    uassert(ErrorCodes::InvalidOptions,
-            "Cannot perform a delete with a non-empty query on a time-series collection that "
-            "does not have a metaField",
-            timeseriesOptions.getMetaField() || _request->getQuery().isEmpty());
-    uassert(ErrorCodes::IllegalOperation,
-            "Cannot perform a non-multi delete on a time-series collection",
-            _request->getMulti());
-
-    if (auto optMetaField = timeseriesOptions.getMetaField(); optMetaField) {
-        auto swMatchExpr =
-            MatchExpressionParser::parse(_request->getQuery(),
-                                         _expCtx,
-                                         extensionsCallback,
-                                         MatchExpressionParser::kAllowAllSpecialFeatures);
-        if (!swMatchExpr.isOK()) {
-            return swMatchExpr.getStatus();
-        }
-
-        auto metaField = optMetaField->toString();
-        std::tie(details->_bucketMatchExpr, details->_residualExpr) =
-            expression::splitMatchExpressionBy(
-                swMatchExpr.getValue()->shallowClone(),
-                {metaField},
-                {{metaField, timeseries::kBucketMetaFieldName.toString()}},
-                expression::isOnlyDependentOn);
-
-        assertQueryFieldIsMetaField(details->_residualExpr.get() == nullptr, metaField);
-    }
-
-    return Status::OK();
-}
-
 Status ParsedDelete::parseQueryToCQ() {
     dassert(!_canonicalQuery.get());
 
     const ExtensionsCallbackReal extensionsCallback(_opCtx, &_request->getNsString());
 
-    // If we're deleting documents from a time-series collection, splits the match expression into
-    // a bucket-level match expression and a residual expression so that we can push down the
-    // bucket-level match expression to the system bucket collection scan or fetch.
-    if (_timeseriesDeleteDetails) {
-        if (auto status = splitOutBucketMatchExpression(extensionsCallback); !status.isOK()) {
-            return status;
-        }
-    }
-
     // The projection needs to be applied after the delete operation, so we do not specify a
     // projection during canonicalization.
     auto findCommand = std::make_unique<FindCommandRequest>(_request->getNsString());
-    if (auto& details = _timeseriesDeleteDetails; details && details->_bucketMatchExpr) {
-        findCommand->setFilter(details->_bucketMatchExpr->serialize().getOwned());
-    } else {
-        findCommand->setFilter(_request->getQuery().getOwned());
-    }
+    findCommand->setFilter(_request->getQuery().getOwned());
     findCommand->setSort(_request->getSort().getOwned());
     findCommand->setCollation(_request->getCollation().getOwned());
     findCommand->setHint(_request->getHint());
@@ -181,13 +105,6 @@ Status ParsedDelete::parseQueryToCQ() {
     // has not actually deleted a document. This behavior is fine for findAndModify, but should
     // not apply to deletes in general.
     if (!_request->getMulti() && !_request->getSort().isEmpty()) {
-        // TODO: Due to the complexity which is related to the efficient sort support, we don't
-        // support yet findAndModify with a query and sort but it should not be impossible.
-        // This code assumes that in findAndModify code path, the parsed delete constructor should
-        // be called with source == kTimeseriesDelete for a time-series collection.
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot perform a findAndModify with a query and sort on a time-series collection.",
-                !_timeseriesDeleteDetails);
         findCommand->setLimit(1);
     }
 

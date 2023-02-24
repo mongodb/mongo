@@ -1318,32 +1318,23 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                     *timeseriesOptions, request.getHint())));
         }
 
-        // TODO SERVER-73077 Remove this if block entirely.
-        if (!feature_flags::gTimeseriesUpdatesDeletesSupport.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            uassert(
-                ErrorCodes::InvalidOptions,
+        uassert(ErrorCodes::InvalidOptions,
                 "Cannot perform a delete with a non-empty query on a time-series collection that "
                 "does not have a metaField",
                 timeseriesOptions->getMetaField() || request.getQuery().isEmpty());
 
-            uassert(ErrorCodes::IllegalOperation,
-                    "Cannot perform a non-multi delete on a time-series collection",
-                    request.getMulti());
-            if (auto metaField = timeseriesOptions->getMetaField()) {
-                request.setQuery(timeseries::translateQuery(request.getQuery(), *metaField));
-            }
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot perform a non-multi delete on a time-series collection",
+                request.getMulti());
+        if (auto metaField = timeseriesOptions->getMetaField()) {
+            request.setQuery(timeseries::translateQuery(request.getQuery(), *metaField));
         }
 
         documentCounter =
             timeseries::numMeasurementsForBucketCounter(timeseriesOptions->getTimeField());
     }
 
-    ParsedDelete parsedDelete(opCtx,
-                              &request,
-                              source == OperationSource::kTimeseriesDelete && collection
-                                  ? collection->getTimeseriesOptions()
-                                  : boost::none);
+    ParsedDelete parsedDelete(opCtx, &request);
     uassertStatusOK(parsedDelete.parseRequest());
 
     if (collection.getDb()) {
