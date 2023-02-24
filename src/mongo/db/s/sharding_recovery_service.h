@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-namespace recoverable_critical_section_util {
+namespace sharding_recovery_util {
 
 bool inRecoveryMode(OperationContext* opCtx);
 

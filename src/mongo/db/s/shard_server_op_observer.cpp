@@ -285,7 +285,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
         }
 
         if (nss == NamespaceString::kCollectionCriticalSectionsNamespace &&
-            !recoverable_critical_section_util::inRecoveryMode(opCtx)) {
+            !sharding_recovery_util::inRecoveryMode(opCtx)) {
             const auto collCSDoc = CollectionCriticalSectionDocument::parse(
                 IDLParserContext("ShardServerOpObserver"), insertedDoc);
             invariant(!collCSDoc.getBlockReads());
@@ -459,7 +459,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
     }
 
     if (args.coll->ns() == NamespaceString::kCollectionCriticalSectionsNamespace &&
-        !recoverable_critical_section_util::inRecoveryMode(opCtx)) {
+        !sharding_recovery_util::inRecoveryMode(opCtx)) {
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             IDLParserContext("ShardServerOpObserver"), args.updateArgs->updatedDoc);
         invariant(collCSDoc.getBlockReads());
@@ -532,6 +532,11 @@ void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
 
 void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
     OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid, BSONObj indexDoc) {
+    // If we are in recovery mode (STARTUP or ROLLBACK) let the sharding recovery service to take
+    // care of the in-memory state.
+    if (sharding_recovery_util::inRecoveryMode(opCtx)) {
+        return;
+    }
     LOGV2_DEBUG(
         6712303,
         1,
@@ -687,7 +692,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
     }
 
     if (nss == NamespaceString::kCollectionCriticalSectionsNamespace &&
-        !recoverable_critical_section_util::inRecoveryMode(opCtx)) {
+        !sharding_recovery_util::inRecoveryMode(opCtx)) {
         const auto& deletedDoc = documentId;
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             IDLParserContext("ShardServerOpObserver"), deletedDoc);

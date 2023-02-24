@@ -54,7 +54,7 @@
 
 namespace mongo {
 
-namespace recoverable_critical_section_util {
+namespace sharding_recovery_util {
 
 bool inRecoveryMode(OperationContext* opCtx) {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -66,7 +66,7 @@ bool inRecoveryMode(OperationContext* opCtx) {
     return memberState.startup2() || memberState.rollback();
 }
 
-}  // namespace recoverable_critical_section_util
+}  // namespace sharding_recovery_util
 
 namespace {
 const StringData kGlobalIndexesFieldName = "globalIndexes"_sd;
