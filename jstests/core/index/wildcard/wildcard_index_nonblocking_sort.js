@@ -12,7 +12,7 @@ load("jstests/libs/fixture_helpers.js");      // For numberOfShardsForCollection
 
 // TODO SERVER-68303: Remove the feature flag and update corresponding tests.
 const allowCompoundWildcardIndexes =
-    FeatureFlagUtil.isPresentAndEnabled(db, "CompoundWildcardIndexes");
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
 
 const coll = db.wildcard_nonblocking_sort;
 coll.drop();
