@@ -1999,20 +1999,23 @@ void WiredTigerRecordStore::_changeNumRecordsAndDataSize(OperationContext* opCtx
         return;
     }
 
-    opCtx->recoveryUnit()->onRollback([this, numRecordDiff, dataSizeDiff]() {
+    const auto updateAndStoreSizeInfo = [this](int64_t numRecordDiff, int64_t dataSizeDiff) {
+        _sizeInfo->numRecords.addAndFetch(numRecordDiff);
+        _sizeInfo->dataSize.addAndFetch(dataSizeDiff);
+
+        if (_sizeStorer)
+            _sizeStorer->store(_uri, _sizeInfo);
+    };
+
+    opCtx->recoveryUnit()->onRollback([updateAndStoreSizeInfo, numRecordDiff, dataSizeDiff]() {
         LOGV2_DEBUG(7105300,
                     3,
                     "WiredTigerRecordStore: rolling back change to numRecords and dataSize",
                     "numRecordDiff"_attr = -numRecordDiff,
                     "dataSizeDiff"_attr = -dataSizeDiff);
-        _sizeInfo->numRecords.addAndFetch(-numRecordDiff);
-        _sizeInfo->dataSize.addAndFetch(-dataSizeDiff);
+        updateAndStoreSizeInfo(-numRecordDiff, -dataSizeDiff);
     });
-    _sizeInfo->numRecords.addAndFetch(numRecordDiff);
-    _sizeInfo->dataSize.addAndFetch(dataSizeDiff);
-
-    if (_sizeStorer)
-        _sizeStorer->store(_uri, _sizeInfo);
+    updateAndStoreSizeInfo(numRecordDiff, dataSizeDiff);
 }
 
 void WiredTigerRecordStore::setNumRecords(long long numRecords) {

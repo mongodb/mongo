@@ -201,5 +201,45 @@ TEST_F(SizeStorerUpdateTest, Basic) {
     ASSERT_EQUALS(getDataSize(opCtx.get()), val);
 }
 
+// Verify that the size storer contains accurate data after a transaction rollback just before a
+// flush (simulating a shutdown). That is, that the rollback marks the size info as dirty, and is
+// properly flushed to disk.
+TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    // Do an op for which the sizeInfo is persisted, for safety so we don't check against 0.
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        auto rId = rs->insertRecord(opCtx.get(), "12345", 5, Timestamp{1});
+        ASSERT_TRUE(rId.isOK());
+
+        uow.commit();
+    }
+
+    // An operation to rollback, with a flush between the original modification and the rollback.
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        auto rId = rs->insertRecord(opCtx.get(), "12345", 5, Timestamp{2});
+        ASSERT_TRUE(rId.isOK());
+
+        ASSERT_EQ(getNumRecords(opCtx.get()), 2);
+        ASSERT_EQ(getDataSize(opCtx.get()), 10);
+        // Mark size info as clean, before rollback is done.
+        sizeStorer->flush(false);
+    }
+
+    // Simulate a shutdown and restart, which loads the size storer from disk.
+    sizeStorer->flush(true);
+    sizeStorer.reset(new WiredTigerSizeStorer(harnessHelper->conn(),
+                                              WiredTigerKVEngine::kTableUriPrefix + "sizeStorer"));
+    WiredTigerRecordStore* wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
+    wtrs->setSizeStorer(sizeStorer.get());
+
+    // As the operation was rolled back, numRecords and dataSize should be for the first op only. If
+    // rollback does not properly mark the sizeInfo as dirty, on load sizeInfo will account for the
+    // two operations, as the rollback sizeInfo update has not been flushed.
+    ASSERT_EQ(getNumRecords(opCtx.get()), 1);
+    ASSERT_EQ(getDataSize(opCtx.get()), 5);
+};
+
 }  // namespace
 }  // namespace mongo
