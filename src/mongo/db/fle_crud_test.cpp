@@ -260,10 +260,14 @@ protected:
 
     TestKeyVault _keyVault;
 
-    NamespaceString _edcNs = NamespaceString::createNamespaceString_forTest("test.edc");
-    NamespaceString _escNs = NamespaceString::createNamespaceString_forTest("test.esc");
-    NamespaceString _eccNs = NamespaceString::createNamespaceString_forTest("test.ecc");
-    NamespaceString _ecocNs = NamespaceString::createNamespaceString_forTest("test.ecoc");
+    NamespaceString _edcNs =
+        NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.edc");
+    NamespaceString _escNs =
+        NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.esc");
+    NamespaceString _eccNs =
+        NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.ecc");
+    NamespaceString _ecocNs =
+        NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.ecoc");
 };
 
 void FleCrudTest::setUp() {
@@ -418,9 +422,9 @@ EncryptedFieldConfig getTestEncryptedFieldConfig(
     Fle2AlgorithmInt alg = Fle2AlgorithmInt::kEquality) {
 
     constexpr auto schema = R"({
-    "escCollection": "esc",
-    "eccCollection": "ecc",
-    "ecocCollection": "ecoc",
+    "escCollection": "enxcol_.coll.esc",
+    "eccCollection": "enxcol_.coll.ecc",
+    "ecocCollection": "enxcol_.coll.ecoc",
     "fields": [
         {
             "keyId":
@@ -437,9 +441,9 @@ EncryptedFieldConfig getTestEncryptedFieldConfig(
 })";
 
     constexpr auto rangeSchema = R"({
-    "escCollection": "esc",
-    "eccCollection": "ecc",
-    "ecocCollection": "ecoc",
+    "escCollection": "enxcol_.coll.esc",
+    "eccCollection": "enxcol_.coll.ecc",
+    "ecocCollection": "enxcol_.coll.ecoc",
     "fields": [
         {
             "keyId":
@@ -459,6 +463,34 @@ EncryptedFieldConfig getTestEncryptedFieldConfig(
         return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(schema));
     }
     return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(rangeSchema));
+}
+
+void parseEncryptedInvalidFieldConfig(StringData esc, StringData ecc, StringData ecoc) {
+
+    auto invalidCollectionNameSchema =
+        // "{" +
+        fmt::format(
+            "{{\"escCollection\": \"{}\", \"eccCollection\": \"{}\", \"ecocCollection\": \"{}\", ",
+            esc,
+            ecc,
+            ecoc) +
+        R"(
+        "fields": [
+            {
+                "keyId":
+                                {
+                                    "$uuid": "12345678-1234-9876-1234-123456789012"
+                                }
+                            ,
+                "path": "encrypted",
+                "bsonType": "int",
+                "queries": {"queryType": "rangePreview", "min": 0, "max": 15, "sparsity": 1}
+
+            }
+        ]
+    })";
+
+    EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(invalidCollectionNameSchema));
 }
 
 void FleCrudTest::assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t ecc, uint64_t ecoc) {
@@ -754,21 +786,21 @@ protected:
             auto s = getTestESCDataToken(obj);
             auto c = getTestECCDataToken(obj);
             auto d = getTestEDCDataToken(obj);
-            auto esc = CollectionReader("test.esc", *_queryImpl);
-            auto ecc = CollectionReader("test.ecc", *_queryImpl);
+            auto esc = CollectionReader("test.enxcol_.coll.esc", *_queryImpl);
+            auto ecc = CollectionReader("test.enxcol_.coll.ecc", *_queryImpl);
             return mongo::fle::readTagsWithContention(esc, ecc, s, c, d, contention, 100, {});
         }
         auto s = getTestESCDataToken(obj);
         auto d = getTestEDCDataToken(obj);
-        auto esc = CollectionReader("test.esc", *_queryImpl);
+        auto esc = CollectionReader("test.enxcol_.coll.esc", *_queryImpl);
         return mongo::fle::readTagsWithContentionV2(esc, s, d, contention, 100, {});
     }
     std::vector<PrfBlock> readTags(BSONObj obj, uint64_t cm = 0) {
         auto s = getTestESCDataToken(obj);
         auto c = getTestECCDataToken(obj);
         auto d = getTestEDCDataToken(obj);
-        auto nssEsc = NamespaceString("test.esc");
-        auto nssEcc = NamespaceString("test.ecc");
+        auto nssEsc = NamespaceString("test.enxcol_.coll.esc");
+        auto nssEcc = NamespaceString("test.enxcol_.coll.ecc");
         return mongo::fle::readTags(_queryImpl.get(), nssEsc, nssEcc, s, c, d, cm);
     }
 };
@@ -1528,6 +1560,23 @@ TEST_F(FleCrudTest, testValidateEncryptedFieldConfig) {
                        6666200);
 }
 
+// Test that EDCServerCollection::validateEncryptedFieldInfo throws an error when collection names
+// do not match naming rules.
+TEST_F(FleCrudTest, testValidateEncryptedFieldConfigFields) {
+    ASSERT_THROWS_CODE(parseEncryptedInvalidFieldConfig(
+                           "enxcol_.coll.esc1", "enxcol_.coll.ecc", "enxcol_.coll.ecoc"),
+                       DBException,
+                       7406900);
+    ASSERT_THROWS_CODE(parseEncryptedInvalidFieldConfig(
+                           "enxcol_.coll.esc", "enxcol_.coll.ecc1", "enxcol_.coll.ecoc"),
+                       DBException,
+                       7406901);
+    ASSERT_THROWS_CODE(parseEncryptedInvalidFieldConfig(
+                           "enxcol_.coll.esc", "enxcol_.coll.ecc", "enxcol_.coll.ecoc1"),
+                       DBException,
+                       7406902);
+}
+
 // Update one document via findAndModify
 TEST_F(FleCrudTest, FindAndModify_UpdateOne) {
 
@@ -1871,9 +1920,9 @@ TEST_F(FleTagsTest, InsertAndUpdate) {
 
 TEST_F(FleTagsTest, ContentionFactor) {
     auto efc = EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(R"({
-        "escCollection": "esc",
-        "eccCollection": "ecc",
-        "ecocCollection": "ecoc",
+        "escCollection": "enxcol_.coll.esc",
+        "eccCollection": "enxcol_.coll.ecc",
+        "ecocCollection": "enxcol_.coll.ecoc",
         "fields": [{
             "keyId": { "$uuid": "12345678-1234-9876-1234-123456789012"},
             "path": "encrypted",
@@ -1912,9 +1961,9 @@ TEST_F(FleTagsTest, ContentionFactor) {
 TEST_F(FleTagsTest, ContentionFactorV2) {
     RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
     auto efc = EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(R"({
-        "escCollection": "esc",
-        "eccCollection": "ecc",
-        "ecocCollection": "ecoc",
+        "escCollection": "enxcol_.coll.esc",
+        "eccCollection": "enxcol_.coll.ecc",
+        "ecocCollection": "enxcol_.coll.ecoc",
         "fields": [{
             "keyId": { "$uuid": "12345678-1234-9876-1234-123456789012"},
             "path": "encrypted",

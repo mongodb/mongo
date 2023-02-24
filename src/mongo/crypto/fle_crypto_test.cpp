@@ -2290,9 +2290,9 @@ bool vectorContains(const std::vector<T>& vec, Func func) {
 EncryptedFieldConfig getTestEncryptedFieldConfig() {
 
     constexpr auto schema = R"({
-        "escCollection": "esc",
-        "eccCollection": "ecc",
-        "ecocCollection": "ecoc",
+        "escCollection": "enxcol_.coll.esc",
+        "eccCollection": "enxcol_.coll.ecc",
+        "ecocCollection": "enxcol_.coll.ecoc",
         "fields": [
             {
                 "keyId": {
