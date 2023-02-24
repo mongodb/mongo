@@ -81,7 +81,10 @@ coll.find({v: {$gt: 0, $lt: 2}}).toArray();
                 find: R,
                 filter: {v: {$gt: R, $lt: R}},
                 readConcern: {level: R, provenance: R},
-            }
+            },
+            namespace: `test.${coll.getName()}`,
+            readConcern: {level: "local", provenance: "implicitDefault"},
+            applicationName: "MongoDB Shell"
         },
         key,
     );

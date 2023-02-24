@@ -360,7 +360,6 @@ void appendWithRedactedLiterals(BSONObjBuilder& builder, const BSONElement& el) 
         auto fieldName = fleSafeFieldNameRedactor(el);
         builder.append(fieldName, "###"_sd);
     }
-    builder.done();
 }
 
 }  // namespace
@@ -464,6 +463,7 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
         for (auto&& stage : request.getPipeline()) {
             BSONObjBuilder stageBuilder = pipelineBuilder.subobjStart("stage"_sd);
             appendWithRedactedLiterals(stageBuilder, stage.firstElement());
+            stageBuilder.done();
         }
         pipelineBuilder.done();
         telemetryKey.append("namespace", request.getNamespace().toString());

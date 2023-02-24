@@ -43,6 +43,8 @@ assert.commandWorked(bulk.execute());
     // Assert there is only one entry.
     assert.eq(telemetryResults.length, 1, telemetryResults);
     const telemetryEntry = telemetryResults[0];
+    assert.eq(telemetryEntry.key.namespace, `test.${jsTestName()}`);
+    assert.eq(telemetryEntry.key.applicationName, "MongoDB Shell");
 
     // Assert we update execution count for identically shaped queries.
     assert.eq(telemetryEntry.metrics.execCount, 2);
@@ -79,9 +81,14 @@ const fooNeBatchSize = 3;
     // This filters telemetry entires to just the ones entered when running above find queries.
     const telemetryResults =
         testDB.getSiblingDB("admin")
-            .aggregate([{$telemetry: {}}, {$match: {"key.find.find": {$eq: "###"}}}])
+            .aggregate(
+                [{$telemetry: {}}, {$match: {"key.find.find": {$eq: "###"}}}, {$sort: {key: 1}}])
             .toArray();
     assert.eq(telemetryResults.length, 2, telemetryResults);
+    assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
+    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
+    assert.eq(telemetryResults[1].key.namespace, `test.${jsTestName()}`);
+    assert.eq(telemetryResults[1].key.applicationName, "MongoDB Shell");
 
     assert.eq(telemetryResults[0].metrics.execCount, 1);
     assert.eq(telemetryResults[1].metrics.execCount, 1);
@@ -118,6 +125,8 @@ const fooNeBatchSize = 3;
             .aggregate([{$telemetry: {}}, {$match: {"key.find.sort": {$eq: {"foo": "###"}}}}])
             .toArray();
     assert.eq(telemetryResults.length, 1, telemetryResults);
+    assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
+    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
     assert.eq(telemetryResults[0].metrics.execCount, 1);
     assert.eq(telemetryResults[0].metrics.docsReturned.sum, numDocs);
 
@@ -128,6 +137,8 @@ const fooNeBatchSize = 3;
             .aggregate([{$telemetry: {}}, {$match: {"key.find.limit": {$eq: "###"}}}])
             .toArray();
     assert.eq(telemetryResults.length, 1, telemetryResults);
+    assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
+    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
     assert.eq(telemetryResults[0].metrics.execCount, 1);
     assert.eq(telemetryResults[0].metrics.docsReturned.sum, query2Limit);
 
@@ -145,6 +156,8 @@ const fooNeBatchSize = 3;
                            ])
                            .toArray();
     assert.eq(telemetryResults.length, 1, telemetryResults);
+    assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
+    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
     assert.eq(telemetryResults[0].metrics.execCount, 2);
     assert.eq(telemetryResults[0].metrics.docsReturned.sum, numDocs / 2 + 2 * fooEqBatchSize);
     assert.eq(telemetryResults[0].metrics.docsReturned.max, numDocs / 2);
@@ -165,6 +178,8 @@ const fooNeBatchSize = 3;
             ])
             .toArray();
     assert.eq(telemetryResults.length, 1, telemetryResults);
+    assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
+    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
     assert.gt(telemetryResults[0].metrics.keysScanned.sum, 0);
     verifyMetrics(telemetryResults);
 }

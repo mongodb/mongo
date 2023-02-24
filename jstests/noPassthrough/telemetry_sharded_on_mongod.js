@@ -34,7 +34,7 @@ coll.insert(documents);
 // Run a query that pretends to be from mongos. For the purposes of this test we don't care about
 // the results. If the command worked, it should show up in the telemetry store.
 
-const queryHashForTestBinA = new BinData(5, "Tfo0EBc0wbGscAbGuj7goA==");
+const queryHashForTestBinA = new BinData(5, "Q4fGyPrguloyCjEQ/JJk9Q==");
 assert.commandWorked(db.runCommand({
     aggregate: coll.getName(),
     pipeline: [{$match: {_id: 5}}, {$project: {val: false}}],
@@ -44,7 +44,7 @@ assert.commandWorked(db.runCommand({
     cursor: {},
 }));
 
-const queryHashForTestBinB = new BinData(5, "d4Tk/HbrrGSpWrib6hY+IQ==");
+const queryHashForTestBinB = new BinData(5, "Tfo0EBc0wbGscAbGuj7goA==");
 // Do the same, but a find command.
 assert.commandWorked(db.runCommand({
     find: coll.getName(),
