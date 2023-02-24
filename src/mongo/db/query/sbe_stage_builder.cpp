@@ -2225,14 +2225,23 @@ std::tuple<sbe::value::SlotVector, EvalStage, std::unique_ptr<sbe::EExpression>>
 
     auto groupByEvalExpr = generateGroupByKeyImpl(state, idExpr, outputs, rootSlot);
 
-    // The group-by field may end up being 'Nothing' and in that case _id: null will be
-    // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
-    auto fillEmptyNullExpr = makeFillEmptyNull(groupByEvalExpr.extractExpr(state));
-    auto [slot, projectStage] = projectEvalExpr(
-        std::move(fillEmptyNullExpr), std::move(stage), nodeId, slotIdGenerator, state);
-    stage = std::move(projectStage);
+    auto groupByExpr = groupByEvalExpr.extractExpr(state);
+    if (auto groupByExprConstant = groupByExpr->as<sbe::EConstant>(); groupByExprConstant) {
+        // When the group id is Nothing (with $$REMOVE for example), we use null instead.
+        auto tag = groupByExprConstant->getConstant().first;
+        if (tag == sbe::value::TypeTags::Nothing) {
+            groupByExpr = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0);
+        }
+        return {sbe::value::SlotVector{}, std::move(stage), std::move(groupByExpr)};
+    } else {
+        // The group-by field may end up being 'Nothing' and in that case _id: null will be
+        // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
+        auto fillEmptyNullExpr = makeFillEmptyNull(std::move(groupByExpr));
+        auto [slot, projectStage] = projectEvalExpr(
+            std::move(fillEmptyNullExpr), std::move(stage), nodeId, slotIdGenerator, state);
 
-    return {sbe::value::SlotVector{slot}, std::move(stage), nullptr};
+        return {sbe::value::SlotVector{slot}, std::move(projectStage), nullptr};
+    }
 }
 
 sbe::value::SlotVector generateAccumulator(StageBuilderState& state,
@@ -2299,7 +2308,7 @@ sbe::SlotExprPairVector generateMergingExpressions(StageBuilderState& state,
 std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generateGroupFinalStage(
     StageBuilderState& state,
     EvalStage groupEvalStage,
-    std::unique_ptr<sbe::EExpression> idDocExpr,
+    std::unique_ptr<sbe::EExpression> idFinalExpr,
     sbe::value::SlotVector dedupedGroupBySlots,
     const std::vector<AccumulationStatement>& accStmts,
     const std::vector<sbe::value::SlotVector>& aggSlotsVec,
@@ -2315,15 +2324,15 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
     std::sort(groupOutSlots.begin() + dedupedGroupBySlots.size(), groupOutSlots.end());
 
     tassert(5995100,
-            "The _id expression must either produce a document or a scalar value",
-            idDocExpr || dedupedGroupBySlots.size() == 1);
+            "The _id expression must either produce an expression or a scalar value",
+            idFinalExpr || dedupedGroupBySlots.size() == 1);
 
     auto finalGroupBySlot = [&]() {
-        if (!idDocExpr) {
+        if (!idFinalExpr) {
             return dedupedGroupBySlots[0];
         } else {
             auto slot = slotIdGenerator->generate();
-            prjSlotToExprMap.emplace(slot, std::move(idDocExpr));
+            prjSlotToExprMap.emplace(slot, std::move(idFinalExpr));
             return slot;
         }
     }();
@@ -2532,7 +2541,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         childEvalStage = makeProject(std::move(childEvalStage), std::move(fpMap), nodeId);
     }
 
-    auto [groupBySlots, groupByEvalStage, idDocExpr] = generateGroupByKey(
+    auto [groupBySlots, groupByEvalStage, idFinalExpr] = generateGroupByKey(
         _state, idExpr, childOutputs, std::move(childEvalStage), nodeId, &_slotIdGenerator);
 
     // Translates accumulators which are executed inside the group stage and gets slots for
@@ -2589,7 +2598,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto [fieldNames, finalSlots, groupFinalEvalStage] =
         generateGroupFinalStage(_state,
                                 std::move(groupEvalStage),
-                                std::move(idDocExpr),
+                                std::move(idFinalExpr),
                                 dedupedGroupBySlots,
                                 accStmts,
                                 aggSlotsVec,
