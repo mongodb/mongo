@@ -385,8 +385,8 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
     const NamespaceString& nss,
     const BSONObj& reason,
     const WriteConcernOptions& writeConcern,
-    bool allowViews,
-    bool throwIfReasonDiffers) {
+    bool throwIfReasonDiffers,
+    bool allowViews) {
     LOGV2_DEBUG(5656606,
                 3,
                 "Releasing recoverable critical section",

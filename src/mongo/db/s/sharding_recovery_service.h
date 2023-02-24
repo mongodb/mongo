@@ -119,9 +119,9 @@ public:
                                            const NamespaceString& nss,
                                            const BSONObj& reason,
                                            const WriteConcernOptions& writeConcern,
+                                           bool throwIfReasonDiffers = true,
                                            // TODO SERVER-68084 remove allowViews parameter
-                                           bool allowViews = false,
-                                           bool throwIfReasonDiffers = true);
+                                           bool allowViews = false);
 
     /**
      * Recovers all sharding related in memory states from disk.

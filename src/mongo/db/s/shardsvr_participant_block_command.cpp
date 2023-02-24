@@ -97,6 +97,7 @@ public:
                             ns(),
                             reason,
                             ShardingCatalogClient::kLocalWriteConcern,
+                            /* throwIfReasonDiffers */ true,
                             allowViews);
                         break;
                     case CriticalSectionBlockTypeEnum::kWrites:
