@@ -37,6 +37,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/ns_targeter.h"
@@ -132,6 +133,27 @@ public:
         const BSONObj& doc,
         const ShardKeyPattern& pattern,
         const TimeseriesOptions& timeseriesOptions);
+
+    /**
+     * This returns "does the query have an _id field" and "is the _id field querying for a direct
+     * value like _id : 3 and not _id : { $gt : 3 }"
+     *
+     * If the query does not use the collection default collation, the _id field cannot contain
+     * strings, objects, or arrays.
+     *
+     * Ex: { _id : 1 } => true
+     *     { foo : <anything>, _id : 1 } => true
+     *     { _id : { $lt : 30 } } => false
+     *     { foo : <anything> } => false
+     */
+    static bool isExactIdQuery(OperationContext* opCtx,
+                               const CanonicalQuery& query,
+                               const ChunkManager& cm);
+    static bool isExactIdQuery(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const BSONObj& query,
+                               const BSONObj& collation,
+                               const ChunkManager& cm);
 
 private:
     CollectionRoutingInfo _init(OperationContext* opCtx, bool refresh);

@@ -153,58 +153,6 @@ BSONObj getUpdateExprForTargeting(const boost::intrusive_ptr<ExpressionContext> 
 }
 
 /**
- * This returns "does the query have an _id field" and "is the _id field querying for a direct
- * value like _id : 3 and not _id : { $gt : 3 }"
- *
- * If the query does not use the collection default collation, the _id field cannot contain strings,
- * objects, or arrays.
- *
- * Ex: { _id : 1 } => true
- *     { foo : <anything>, _id : 1 } => true
- *     { _id : { $lt : 30 } } => false
- *     { foo : <anything> } => false
- */
-bool isExactIdQuery(OperationContext* opCtx, const CanonicalQuery& query, const ChunkManager& cm) {
-    auto shardKey = extractShardKeyFromQuery(kVirtualIdShardKey, query);
-    BSONElement idElt = shardKey["_id"];
-
-    if (!idElt) {
-        return false;
-    }
-
-    if (CollationIndexKey::isCollatableType(idElt.type()) && cm.isSharded() &&
-        !query.getFindCommandRequest().getCollation().isEmpty() &&
-        !CollatorInterface::collatorsMatch(query.getCollator(), cm.getDefaultCollator())) {
-
-        // The collation applies to the _id field, but the user specified a collation which doesn't
-        // match the collection default.
-        return false;
-    }
-
-    return true;
-}
-
-bool isExactIdQuery(OperationContext* opCtx,
-                    const NamespaceString& nss,
-                    const BSONObj query,
-                    const BSONObj collation,
-                    const ChunkManager& cm) {
-    auto findCommand = std::make_unique<FindCommandRequest>(nss);
-    findCommand->setFilter(query);
-    if (!collation.isEmpty()) {
-        findCommand->setCollation(collation);
-    }
-    const auto cq = CanonicalQuery::canonicalize(opCtx,
-                                                 std::move(findCommand),
-                                                 false, /* isExplain */
-                                                 nullptr,
-                                                 ExtensionsCallbackNoop(),
-                                                 MatchExpressionParser::kAllowAllSpecialFeatures);
-
-    return cq.isOK() && isExactIdQuery(opCtx, *cq.getValue(), cm);
-}
-
-/**
  * Whether or not the manager/primary pair is different from the other manager/primary pair.
  */
 bool isMetadataDifferent(const CollectionRoutingInfo& managerA,
@@ -337,6 +285,48 @@ BSONObj CollectionRoutingInfoTargeter::extractBucketsShardKeyFromTimeseriesDoc(
 
     auto docWithShardKey = builder.obj();
     return pattern.extractShardKeyFromDoc(docWithShardKey);
+}
+
+bool CollectionRoutingInfoTargeter::isExactIdQuery(OperationContext* opCtx,
+                                                   const CanonicalQuery& query,
+                                                   const ChunkManager& cm) {
+    auto shardKey = extractShardKeyFromQuery(kVirtualIdShardKey, query);
+    BSONElement idElt = shardKey["_id"];
+
+    if (!idElt) {
+        return false;
+    }
+
+    if (CollationIndexKey::isCollatableType(idElt.type()) && cm.isSharded() &&
+        !query.getFindCommandRequest().getCollation().isEmpty() &&
+        !CollatorInterface::collatorsMatch(query.getCollator(), cm.getDefaultCollator())) {
+
+        // The collation applies to the _id field, but the user specified a collation which doesn't
+        // match the collection default.
+        return false;
+    }
+
+    return true;
+}
+
+bool CollectionRoutingInfoTargeter::isExactIdQuery(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const BSONObj& query,
+                                                   const BSONObj& collation,
+                                                   const ChunkManager& cm) {
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
+    findCommand->setFilter(query);
+    if (!collation.isEmpty()) {
+        findCommand->setCollation(collation);
+    }
+    const auto cq = CanonicalQuery::canonicalize(opCtx,
+                                                 std::move(findCommand),
+                                                 false, /* isExplain */
+                                                 nullptr,
+                                                 ExtensionsCallbackNoop(),
+                                                 MatchExpressionParser::kAllowAllSpecialFeatures);
+
+    return cq.isOK() && isExactIdQuery(opCtx, *cq.getValue(), cm);
 }
 
 ShardEndpoint CollectionRoutingInfoTargeter::targetInsert(OperationContext* opCtx,

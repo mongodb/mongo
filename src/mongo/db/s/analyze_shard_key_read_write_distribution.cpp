@@ -31,6 +31,7 @@
 
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/internal_plans.h"
@@ -269,16 +270,31 @@ void WriteDistributionMetricsCalculator::_addUpdateQuery(
     for (const auto& updateOp : cmd.getUpdates()) {
         _numUpdate++;
         auto primaryFilter = updateOp.getQ();
+        auto collation = write_ops::collationOf(updateOp);
         // If this is a non-upsert replacement update, the replacement document can be used as a
         // filter.
-        auto secondaryFilter = !updateOp.getUpsert() &&
-                updateOp.getU().type() == write_ops::UpdateModification::Type::kReplacement
-            ? updateOp.getU().getUpdateReplacement()
-            : BSONObj();
+        auto secondaryFilter = [&] {
+            auto isReplacementUpdate = !updateOp.getUpsert() &&
+                updateOp.getU().type() == write_ops::UpdateModification::Type::kReplacement;
+            auto isExactIdQuery = [&] {
+                return CollectionRoutingInfoTargeter::isExactIdQuery(
+                    opCtx, cmd.getNamespace(), primaryFilter, collation, _getChunkManager());
+            };
+
+            // Currently, targeting by replacement document is only done when an updateOne without
+            // shard key is not supported or when the query targets an exact id value.
+            if (isReplacementUpdate &&
+                (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
+                     serverGlobalParams.featureCompatibility) ||
+                 isExactIdQuery())) {
+                return updateOp.getU().getUpdateReplacement();
+            }
+            return BSONObj();
+        }();
         _incrementMetricsForQuery(opCtx,
                                   primaryFilter,
                                   secondaryFilter,
-                                  write_ops::collationOf(updateOp),
+                                  collation,
                                   updateOp.getMulti(),
                                   cmd.getLegacyRuntimeConstants(),
                                   cmd.getLet());

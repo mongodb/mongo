@@ -1544,19 +1544,26 @@ TEST_F(WriteDistributionFilterByShardKeyRangeTest, ShardKeyRangeHashed) {
 class WriteDistributionFilterByShardKeyRangeReplacementUpdateTest
     : public ReadWriteDistributionTest {
 protected:
-    SampledQueryDocument makeSampledUpdateQueryDocument(const BSONObj& filter,
-                                                        const BSONObj& updateMod,
-                                                        bool upsert) const {
+    SampledQueryDocument makeSampledUpdateQueryDocument(
+        const BSONObj& filter,
+        const BSONObj& updateMod,
+        bool upsert,
+        const BSONObj& collation = BSONObj()) const {
         auto updateOp = write_ops::UpdateOpEntry(filter, write_ops::UpdateModification(updateMod));
         updateOp.setMulti(false);  // replacement-style update cannot be multi.
         updateOp.setUpsert(upsert);
+        updateOp.setCollation(collation);
         return ReadWriteDistributionTest::makeSampledUpdateQueryDocument({updateOp});
     }
+
+private:
+    RAIIServerParameterControllerForTest _featureFlagController{
+        "featureFlagUpdateOneWithoutShardKey", true};
 };
 
 TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsert) {
     auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
-    auto filter = BSON("a.x" << BSON("$lt" << 0));
+    auto filter = BSON("a.x" << BSON("$lt" << 0) << "_id" << 0);
     auto updateMod = BSON("a" << BSON("x" << 0) << "b"
                               << BSON("y"
                                       << "A")
@@ -1571,7 +1578,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsert) {
 
 TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertEveryFieldIsNull) {
     auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
-    auto filter = BSON("a.x" << BSON("$lt" << 0));
+    auto filter = BSON("a.x" << BSON("$lt" << 0) << "_id" << 0);
     auto updateMod = BSON("a" << BSON("x" << 0));
 
     WriteMetrics metrics;
@@ -1583,7 +1590,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertEve
 
 TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertPrefixFieldIsNull) {
     auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
-    auto filter = BSON("a.x" << BSON("$lt" << 0));
+    auto filter = BSON("a.x" << BSON("$lt" << 0) << "_id" << 0);
     auto updateMod = BSON("b" << BSON("y"
                                       << "A"));
 
@@ -1596,7 +1603,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertPre
 
 TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertSuffixFieldIsNull) {
     auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
-    auto filter = BSON("a.x" << BSON("$lt" << 0));
+    auto filter = BSON("a.x" << BSON("$lt" << 0) << "_id" << 0);
     auto updateMod = BSON("a" << BSON("x" << 0));
 
     WriteMetrics metrics;
@@ -1604,6 +1611,31 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertSuf
     metrics.numByRange = std::vector<int64_t>({0, 1, 0});
     assertMetricsForWriteQuery(
         targeter, makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */), metrics);
+}
+
+TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NonUpsertNotExactIdQuery) {
+    auto runTest = [&](const BSONObj& filter, const BSONObj& collation = BSONObj()) {
+        auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+        auto updateMod = BSON("a" << BSON("x" << 0) << "b"
+                                  << BSON("y"
+                                          << "A")
+                                  << "c" << 0);
+
+        WriteMetrics metrics;
+        metrics.numMultiShard = 1;
+        metrics.numByRange = std::vector<int64_t>({1, 1, 0});
+        metrics.numSingleWritesWithoutShardKey = 1;
+        assertMetricsForWriteQuery(
+            targeter,
+            makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */, collation),
+            metrics);
+    };
+
+    runTest(BSON("a.x" << BSON("$lt" << 0)));
+    runTest(BSON("a.x" << BSON("$lt" << 0) << "_id" << BSON("$lt" << 0)));
+    runTest(BSON("a.x" << BSON("$lt" << 0) << "_id"
+                       << "0"),
+            caseInsensitiveCollation);
 }
 
 TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, Upsert) {
