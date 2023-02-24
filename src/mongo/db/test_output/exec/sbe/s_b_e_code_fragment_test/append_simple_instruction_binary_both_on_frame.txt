@@ -1,7 +1,7 @@
 # Golden test output of SBECodeFragmentTest/AppendSimpleInstruction_Binary_BothOnFrame
 ==== VARIATION append instr
 -- CODE:
-[0x0000-0x002f]
+[0x0000-0x002f] stackSize: 1, maxStackSize: 4
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: 20);
 0x0014: pushConstVal(value: Nothing);
@@ -18,7 +18,7 @@
 
 ==== VARIATION append code 1
 -- CODE:
-[0x0000-0x002f]
+[0x0000-0x002f] stackSize: 1, maxStackSize: 4
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: 20);
 0x0014: pushConstVal(value: Nothing);
@@ -35,7 +35,7 @@
 
 ==== VARIATION append code 2
 -- CODE:
-[0x0000-0x002f]
+[0x0000-0x002f] stackSize: 1, maxStackSize: 4
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: 20);
 0x0014: pushConstVal(value: Nothing);

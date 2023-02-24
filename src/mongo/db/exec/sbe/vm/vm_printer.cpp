@@ -124,9 +124,14 @@ public:
         auto pcBegin = code.instrs().data();
         auto pcEnd = pcBegin + code.instrs().size();
 
-        os << "[" << _formatter.pcPointer(pcBegin) << "-" << _formatter.pcPointer(pcEnd) << "]\n";
+        // Prints code address range, delta stack size, and max stack size for this CodeFragment.
+        os << "[" << _formatter.pcPointer(pcBegin) << "-" << _formatter.pcPointer(pcEnd) << "]"
+           << " stackSize: " << code.stackSize() << ", maxStackSize: " << code.maxStackSize()
+           << "\n";
 
         auto pcPointer = pcBegin;
+        auto sortedFixupOffsets = getSortedFixupOffsetsWithFrameIds(code);
+        auto nextFixup = sortedFixupOffsets.begin();
         while (pcPointer < pcEnd) {
             Instruction i = readFromMemory<Instruction>(pcPointer);
             os << _formatter.pcPointer(pcPointer) << ": " << i.toString() << "(";
@@ -345,10 +350,48 @@ public:
                     os << "unknown";
             }
             os << ");\n";
-        }
+
+            // Prints any outstanding fixups in 'code' that apply to the current instruction. The
+            // next instruction, if there is one, is at offset 'pcPointer'.
+            while (nextFixup != sortedFixupOffsets.end() &&
+                   static_cast<long>((*nextFixup)->fixupOffset) < pcPointer - pcBegin) {
+                os << _formatter.pcPointer(pcBegin + (*nextFixup)->fixupOffset)
+                   << ":   fixup: frameId: " << (*nextFixup)->frameId << "\n";
+                ++nextFixup;
+            }
+        }  // while (pcPointer < pcEnd)
     }
 
 private:
+    // Used for sorting fixup offsets while remembering their FrameIds.
+    struct FixupOffsetAndFrameId {
+        FixupOffsetAndFrameId(size_t fix, FrameId fid) : fixupOffset(fix), frameId(fid) {}
+
+        size_t fixupOffset;
+        FrameId frameId;
+    };
+
+    // Returns a vector of FixupOffsetAndFrameId for all fixupOffsets of all frames in 'code'
+    // sorted by fixupOffset.
+    std::vector<std::unique_ptr<FixupOffsetAndFrameId>> getSortedFixupOffsetsWithFrameIds(
+        const CodeFragment& code) const {
+        auto sorted = std::vector<std::unique_ptr<FixupOffsetAndFrameId>>();  // return value
+
+        for (const auto& frameIdInfoPair : code.frames()) {
+            for (auto fixupOffset : frameIdInfoPair.second.fixupOffsets) {
+                sorted.emplace_back(
+                    std::make_unique<FixupOffsetAndFrameId>(fixupOffset, frameIdInfoPair.first));
+            }
+        }
+        std::sort(sorted.begin(),
+                  sorted.end(),
+                  [](std::unique_ptr<FixupOffsetAndFrameId> const& a,
+                     std::unique_ptr<FixupOffsetAndFrameId> const& b) {
+                      return a->fixupOffset < b->fixupOffset;
+                  });
+        return sorted;
+    }
+
     Formatter _formatter;
 };
 

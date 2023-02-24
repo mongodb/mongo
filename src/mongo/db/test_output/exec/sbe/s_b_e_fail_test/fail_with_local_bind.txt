@@ -8,7 +8,7 @@
 
 
 -- COMPILED EXPRESSION:
-[0x0000-0x0021]
+[0x0000-0x0021] stackSize: 1, maxStackSize: 3
 0x0000: pushConstVal(value: NumberDecimal(123));
 0x000a: pushConstVal(value: 2ll);
 0x0014: pushConstVal(value: "test");

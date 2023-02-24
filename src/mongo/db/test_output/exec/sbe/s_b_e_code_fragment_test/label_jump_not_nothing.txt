@@ -1,7 +1,7 @@
 # Golden test output of SBECodeFragmentTest/LabelJumpNotNothing
 ==== VARIATION basic sanity check
 -- CODE:
-[0x0000-0x0043]
+[0x0000-0x0043] stackSize: 1, maxStackSize: 2
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: Nothing);
 0x0014: jmpNotNothing(target: 0x0042);

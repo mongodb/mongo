@@ -252,7 +252,6 @@ void CodeFragment::fixupFrame(FrameInfo& frame) {
     frame.fixupOffsets.clear();
 }
 
-
 void CodeFragment::fixupStackOffsets(int stackOffsetDelta) {
     if (stackOffsetDelta == 0) {
         return;

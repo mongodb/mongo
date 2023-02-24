@@ -1,5 +1,5 @@
 # Golden test output of SBEVM/CodeFragmentPrintStable
-[0x0000-0x0048]
+[0x0000-0x0048] stackSize: -1, maxStackSize: 0
 0x0000: fillEmptyImm(k: Null);
 0x0002: fillEmptyImm(k: False);
 0x0004: fillEmptyImm(k: True);

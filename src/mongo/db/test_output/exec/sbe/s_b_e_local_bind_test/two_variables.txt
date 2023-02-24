@@ -9,7 +9,7 @@
 
 
 -- COMPILED EXPRESSION:
-[0x0000-0x0023]
+[0x0000-0x0023] stackSize: 1, maxStackSize: 3
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: 20);
 0x0014: add(popLhs: 0, offsetLhs: 1, popRhs: 0, offsetRhs: 0);

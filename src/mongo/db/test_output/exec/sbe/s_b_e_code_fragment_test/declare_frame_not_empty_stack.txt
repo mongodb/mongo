@@ -1,7 +1,7 @@
 # Golden test output of SBECodeFragmentTest/DeclareFrameNotEmptyStack
 ==== VARIATION append code
 -- CODE:
-[0x0000-0x0041]
+[0x0000-0x0041] stackSize: 1, maxStackSize: 6
 0x0000: pushConstVal(value: Nothing);
 0x000a: pushConstVal(value: Nothing);
 0x0014: pushConstVal(value: Nothing);
@@ -24,7 +24,7 @@
 
 ==== VARIATION append instr
 -- CODE:
-[0x0000-0x0041]
+[0x0000-0x0041] stackSize: 1, maxStackSize: 6
 0x0000: pushConstVal(value: Nothing);
 0x000a: pushConstVal(value: Nothing);
 0x0014: pushConstVal(value: Nothing);

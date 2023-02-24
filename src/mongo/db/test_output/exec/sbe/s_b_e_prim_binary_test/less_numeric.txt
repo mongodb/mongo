@@ -3,7 +3,7 @@
 (s1 < s2) 
 
 -- COMPILED EXPRESSION:
-[0x0000-0x0015]
+[0x0000-0x0015] stackSize: 1, maxStackSize: 2
 0x0000: pushAccessVal(accessor: <accessor>);
 0x0009: pushAccessVal(accessor: <accessor>);
 0x0012: less(popLhs: 1, offsetLhs: 0, popRhs: 1, offsetRhs: 0);

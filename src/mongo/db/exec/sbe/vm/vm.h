@@ -376,8 +376,8 @@ struct Instruction {
      * An instruction parameter descriptor. Values (instruction arguments) live on the VM stack and
      * the descriptor tells where to find it. The position on the stack is expressed as an offset
      * from the top of stack.
-     * Optionally, an instruction can "consume" the value by poping the stack. All non-named
-     * temporaries are poped after the use. Naturally, only the top of stack (offset 0) can be
+     * Optionally, an instruction can "consume" the value by popping the stack. All non-named
+     * temporaries are popped after the use. Naturally, only the top of stack (offset 0) can be
      * popped. We do not support an arbitrary erasure from the middle of stack.
      */
     struct Parameter {
@@ -778,6 +778,9 @@ using ArityType = uint32_t;
 
 class CodeFragment {
 public:
+    const auto& frames() const {
+        return _frames;
+    }
     auto& instrs() {
         return _instrs;
     }
@@ -906,7 +909,7 @@ public:
     // variable reference and frame declaration is allowed to happen in any order.
     void declareFrame(FrameId frameId);
 
-    // Declares and defines a local variable frame at the current stack depth modifies by the gives
+    // Declares and defines a local variable frame at the current stack depth modifies by the given
     // offset.
     void declareFrame(FrameId frameId, int stackOffset);
 
@@ -927,14 +930,19 @@ public:
     void validate();
 
 private:
-    // Adjusts all the stack offsets in the outstanding fixups by the provided delta.
+    // Adjusts all the stack offsets in the outstanding fixups by the provided delta as follows: for
+    // a given 'stackOffsetDelta' of frames in this CodeFragment:
+    //   1. Adds this delta to the 'stackPosition' of all frames having a defined stack position.
+    //   2. Adds this delta to all uses of frame stack posn's in code (located at 'fixupOffset's).
+    // The net effect is to change the stack offsets of all frames with defined stack positions and
+    // all code references to frame offsets in this CodeFragment by 'stackOffsetDelta'.
     void fixupStackOffsets(int stackOffsetDelta);
 
     // Stores the fixup information for stack frames.
-    // stackPosition - stack depth of where the frame was declared, or kPositionNotSet if not
-    // known yet.
-    // fixupOffsets - offsets in the code where the stack depth of the frame was used.
-    // and need fixup.
+    // fixupOffsets - byte offsets in the code where the stack depth of the frame was used and need
+    //   fixup.
+    // stackPosition - stack depth in elements of where the frame was declared, or kPositionNotSet
+    //   if not known yet.
     struct FrameInfo {
         static constexpr int64_t kPositionNotSet = std::numeric_limits<int64_t>::min();
 
@@ -974,22 +982,27 @@ private:
         return -var - 1;
     }
 
+    // Returns the frame with ID 'frameId' if it already exists, else creates and returns it.
     FrameInfo& getOrDeclareFrame(FrameId frameId);
+
+    // For a given 'frame' in this CodeFragment, subtracts the frame's 'stackPosition' from all the
+    // refs to this frame in code (located at 'fixupOffset's). This is done once the true stack
+    // position of the frame is known, so code refs point to the correct location in the frame.
     void fixupFrame(FrameInfo& frame);
 
     LabelInfo& getOrDeclareLabel(LabelId labelId);
     void fixupLabel(LabelInfo& label);
 
+    // The sequence of byte code instructions this CodeFragment represents.
     absl::InlinedVector<uint8_t, 16> _instrs;
 
     // A collection of frame information for local variables.
     // Variables can be declared or referenced out of order and at the time of variable reference
-    // it may not be known the relative stack offset of variable daclaration w.r.t to the its use.
+    // it may not be known the relative stack offset of variable declaration w.r.t to its use.
     // This tracks both declaration info (stack depth) and use info (code offset).
     // When code is concatenated the offsets are adjusted if needed and when declaration stack depth
     // becomes known all fixups are resolved.
     absl::flat_hash_map<FrameId, FrameInfo> _frames;
-
 
     // A collection of label information for labels that are currently in scope.
     // Labels can be defined or referenced out of order and at at time of label reference (e.g:
@@ -999,11 +1012,15 @@ private:
     // when label definition offset becomes known all fixups are resolved.
     absl::flat_hash_map<LabelId, LabelInfo> _labels;
 
+    // Delta number of '_argStack' entries effect of this CodeFragment; may be negative.
     int64_t _stackSize{0};
+
+    // Maximum absolute number of entries in '_argStack' from this CodeFragment.
     int64_t _maxStackSize{0};
 };
 
 class ByteCode {
+    // The number of bytes per stack entry.
     static constexpr size_t sizeOfElement =
         sizeof(bool) + sizeof(value::TypeTags) + sizeof(value::Value);
     static_assert(sizeOfElement == 10);
@@ -1474,8 +1491,13 @@ private:
     void allocStack(size_t size) noexcept;
     void swapStack();
 
+    // The top entry in '_argStack', or one element before the stack when empty.
     uint8_t* _argStackTop{nullptr};
+
+    // The byte following '_argStack's current memory block.
     uint8_t* _argStackEnd{nullptr};
+
+    // Expression execution stack of (owned, tag, value) tuples each of 'sizeOfElement' bytes.
     uint8_t* _argStack{nullptr};
 };
 }  // namespace vm

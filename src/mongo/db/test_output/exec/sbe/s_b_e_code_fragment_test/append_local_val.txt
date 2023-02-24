@@ -1,7 +1,7 @@
 # Golden test output of SBECodeFragmentTest/AppendLocalVal
 ==== VARIATION append code
 -- CODE:
-[0x0000-0x001d]
+[0x0000-0x001d] stackSize: 1, maxStackSize: 3
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: Nothing);
 0x0014: pushLocalVal(arg: 1);
@@ -15,7 +15,7 @@
 
 ==== VARIATION append instr
 -- CODE:
-[0x0000-0x001d]
+[0x0000-0x001d] stackSize: 1, maxStackSize: 3
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: Nothing);
 0x0014: pushLocalVal(arg: 1);

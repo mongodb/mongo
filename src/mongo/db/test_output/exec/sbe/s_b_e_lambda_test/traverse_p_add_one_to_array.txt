@@ -3,7 +3,7 @@
 traverseP(s1, lambda(l10.0) { (l10.0 + 1) }, Nothing) 
 
 -- COMPILED EXPRESSION:
-[0x0000-0x002b]
+[0x0000-0x002b] stackSize: 1, maxStackSize: 1
 0x0000: jmp(target: 0x001c);
 0x0005: allocStack(size:1);
 0x000a: pushConstVal(value: 1);

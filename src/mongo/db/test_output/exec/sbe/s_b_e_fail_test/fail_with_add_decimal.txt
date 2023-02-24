@@ -3,7 +3,7 @@
 (NumberDecimal(123) + fail(2, "test")) 
 
 -- COMPILED EXPRESSION:
-[0x0000-0x0022]
+[0x0000-0x0022] stackSize: 1, maxStackSize: 3
 0x0000: pushConstVal(value: NumberDecimal(123));
 0x000a: pushConstVal(value: 2ll);
 0x0014: pushConstVal(value: "test");

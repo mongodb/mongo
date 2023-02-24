@@ -1,7 +1,7 @@
 # Golden test output of SBECodeFragmentTest/AppendLocalVal2
 ==== VARIATION append code 1
 -- CODE:
-[0x0000-0x0031]
+[0x0000-0x0031] stackSize: 1, maxStackSize: 5
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: 20);
 0x0014: pushConstVal(value: Nothing);
@@ -20,7 +20,7 @@
 
 ==== VARIATION append code 2
 -- CODE:
-[0x0000-0x0031]
+[0x0000-0x0031] stackSize: 1, maxStackSize: 5
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: 20);
 0x0014: pushConstVal(value: Nothing);
@@ -39,7 +39,7 @@
 
 ==== VARIATION append code 3
 -- CODE:
-[0x0000-0x0031]
+[0x0000-0x0031] stackSize: 1, maxStackSize: 5
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: 20);
 0x0014: pushConstVal(value: Nothing);
@@ -58,7 +58,7 @@
 
 ==== VARIATION append code 4
 -- CODE:
-[0x0000-0x0031]
+[0x0000-0x0031] stackSize: 1, maxStackSize: 5
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: 20);
 0x0014: pushConstVal(value: Nothing);
@@ -77,7 +77,7 @@
 
 ==== VARIATION append code 5
 -- CODE:
-[0x0000-0x0031]
+[0x0000-0x0031] stackSize: 1, maxStackSize: 5
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: 20);
 0x0014: pushConstVal(value: Nothing);
@@ -96,7 +96,7 @@
 
 ==== VARIATION append instr
 -- CODE:
-[0x0000-0x0031]
+[0x0000-0x0031] stackSize: 1, maxStackSize: 5
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: 20);
 0x0014: pushConstVal(value: Nothing);

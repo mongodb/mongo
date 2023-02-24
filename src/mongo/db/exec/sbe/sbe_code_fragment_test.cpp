@@ -41,11 +41,11 @@ class SBECodeFragmentTest : public GoldenSBETestFixture {
 public:
     SBECodeFragmentTest() : GoldenSBETestFixture() {}
 
+    // Pretty prints 'code', executes it, and pretty prints the result.
     void runTest(const vm::CodeFragment& code) {
-        auto& os = gctx->outStream();
-        os << "-- CODE:" << std::endl;
-        makeCodeFragmentPrinter().print(os, code);
-        os << std::endl;
+        std::ostream& os = gctx->outStream();
+
+        printCodeFragment(code);
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -54,6 +54,15 @@ public:
         os << "-- RESULT:" << std::endl;
         makeValuePrinter(os).writeValueToStream(tag, val);
         os << std::endl << std::endl;
+    }
+
+    // Pretty prints 'code' without attempting to execute it.
+    void printCodeFragment(const vm::CodeFragment& code) {
+        std::ostream& os = gctx->outStream();
+
+        os << "-- CODE:" << std::endl;
+        makeCodeFragmentPrinter().print(os, code);
+        os << std::endl;
     }
 
     std::pair<value::TypeTags, value::Value> makeInt32(int value) {
@@ -441,11 +450,32 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal) {
             code.appendPop();
         }
 
-
         runTest(code);
     }
 }
 
+// Tests vm::CodeFragmentPrinter's ability to print fixups in unresolved CodeFragments.
+TEST_F(SBECodeFragmentTest, AppendLocalValWithFixups) {
+    FrameId frameId = 10;
+
+    {
+        printVariation("append local val with fixups");
+
+        vm::CodeFragment code;
+        code.declareFrame(frameId);
+
+        vm::CodeFragment code2;
+        code2.appendLocalVal(frameId, 10, false);
+        code2.appendLocalVal(frameId, 20, false);
+        code2.appendLocalVal(frameId, 0, false);
+        code2.appendLocalVal(frameId, 0, false);
+        code2.appendLocalVal(frameId, 100, false);
+
+        code.removeFrame(frameId);
+
+        printCodeFragment(code2);
+    }
+}
 
 TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
     auto lhsValue = makeInt32(10);

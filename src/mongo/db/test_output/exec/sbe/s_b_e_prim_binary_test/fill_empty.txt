@@ -3,7 +3,7 @@
 (s1 ?: s2) 
 
 -- COMPILED EXPRESSION:
-[0x0000-0x0018]
+[0x0000-0x0018] stackSize: 1, maxStackSize: 1
 0x0000: pushAccessVal(accessor: <accessor>);
 0x0009: jmpNotNothing(target: 0x0018);
 0x000e: pop();

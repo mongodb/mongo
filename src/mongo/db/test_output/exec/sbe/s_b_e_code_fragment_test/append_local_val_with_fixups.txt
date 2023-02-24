@@ -1,0 +1,15 @@
+# Golden test output of SBECodeFragmentTest/AppendLocalValWithFixups
+==== VARIATION append local val with fixups
+-- CODE:
+[0x0000-0x0019] stackSize: 5, maxStackSize: 5
+0x0000: pushLocalVal(arg: -11);
+0x0001:   fixup: frameId: 10
+0x0005: pushLocalVal(arg: -20);
+0x0006:   fixup: frameId: 10
+0x000a: pushLocalVal(arg: 1);
+0x000b:   fixup: frameId: 10
+0x000f: pushLocalVal(arg: 2);
+0x0010:   fixup: frameId: 10
+0x0014: pushLocalVal(arg: -97);
+0x0015:   fixup: frameId: 10
+

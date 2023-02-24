@@ -3,7 +3,7 @@
 (s1 || s2) 
 
 -- COMPILED EXPRESSION:
-[0x0000-0x002b]
+[0x0000-0x002b] stackSize: 1, maxStackSize: 1
 0x0000: pushAccessVal(accessor: <accessor>);
 0x0009: jmpNothing(target: 0x002b);
 0x000e: jmpTrue(target: 0x0021);

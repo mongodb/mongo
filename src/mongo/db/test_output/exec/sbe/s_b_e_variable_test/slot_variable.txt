@@ -3,7 +3,7 @@
 s1 
 
 -- COMPILED EXPRESSION:
-[0x0000-0x0009]
+[0x0000-0x0009] stackSize: 1, maxStackSize: 1
 0x0000: pushAccessVal(accessor: <accessor>);
 
 

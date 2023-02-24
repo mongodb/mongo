@@ -8,7 +8,7 @@
 
 
 -- COMPILED EXPRESSION:
-[0x0000-0x0017]
+[0x0000-0x0017] stackSize: 1, maxStackSize: 2
 0x0000: pushConstVal(value: 10);
 0x000a: add(popLhs: 0, offsetLhs: 0, popRhs: 0, offsetRhs: 0);
 0x0015: swap();

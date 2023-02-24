@@ -1,7 +1,7 @@
 # Golden test output of SBECodeFragmentTest/LabelJumpTrue
 ==== VARIATION basic sanity check
 -- CODE:
-[0x0000-0x003a]
+[0x0000-0x003a] stackSize: 1, maxStackSize: 2
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: false);
 0x0014: jmpTrue(target: 0x0019);
