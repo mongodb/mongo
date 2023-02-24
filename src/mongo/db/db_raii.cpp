@@ -1113,11 +1113,6 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
                                       callerExpectedToConflictWithSecondaryBatchApplication,
                                       shouldReadAtLastApplied);
 
-        if (resolvedSecondaryNamespaces) {
-            assertAllNamespacesAreCompatibleForReadTimestamp(
-                opCtx, catalogBeforeSnapshot.get(), *resolvedSecondaryNamespaces, readTimestamp);
-        }
-
         // TODO (SERVER-71660): Use a catalog version instead of pointer comparison for catalog
         // before and after snapshot.
         const auto catalogAfterSnapshot = CollectionCatalog::get(opCtx);
