@@ -41,6 +41,9 @@
 namespace mongo {
 namespace {
 
+constexpr size_t ivAndHmacLen = 16 + 32;
+constexpr size_t cbcBlockLen = 16;
+
 // The first test is to ensure that the length of the cipher is correct when
 // calling AEAD encrypt.
 TEST(AEAD, aeadCipherOutputLength) {
@@ -145,69 +148,34 @@ TEST(AEAD, EncryptAndDecrypt) {
         crypto::aeadDecrypt(key, {cryptoBuffer}, {associatedData}, {plainText}).getStatus());
 }
 
-TEST(AEADFLE2, Fle2AeadRandom) {
-    mongo::PseudoRandom rnd(SecureRandom().nextInt64());
+TEST(AEADFLE2, Fle2AeadCipherOutputLength) {
+    size_t plainTextLen = 16;
+    auto ctrCipherLen = crypto::fle2AeadCipherOutputLength(plainTextLen, crypto::aesMode::ctr);
+    auto cbcCipherLen = crypto::fle2AeadCipherOutputLength(plainTextLen, crypto::aesMode::cbc);
+    ASSERT_EQ(ctrCipherLen, (ivAndHmacLen + plainTextLen));
+    ASSERT_EQ(cbcCipherLen, (ivAndHmacLen + plainTextLen + cbcBlockLen));
 
-    std::vector<uint8_t> key(mongo::crypto::kFieldLevelEncryption2KeySize);
-    rnd.fill(&key[0], key.size());
-
-    std::vector<uint8_t> associatedData(18);
-    rnd.fill(&associatedData[0], associatedData.size());
-
-    std::vector<uint8_t> plainText(956);
-    rnd.fill(&plainText[0], plainText.size());
-    std::vector<uint8_t> encryptedBytes(plainText.size() + 16 + 32);
-    DataRange encrypted(encryptedBytes);
-
-    std::vector<uint8_t> blankIv;
-    auto encryptStatus =
-        mongo::crypto::fle2AeadEncrypt({key}, {plainText}, {blankIv}, {associatedData}, encrypted);
-    ASSERT_OK(encryptStatus);
-
-    auto planTextLength = mongo::fle2AeadGetPlainTextLength(encrypted.length());
-    ASSERT_OK(planTextLength);
-    ASSERT_EQ(plainText.size(), planTextLength.getValue());
-
-    std::vector<uint8_t> decryptedBytes(planTextLength.getValue());
-    auto decryptStatus =
-        mongo::crypto::fle2AeadDecrypt({key}, encrypted, associatedData, DataRange(decryptedBytes));
-    ASSERT_OK(decryptStatus);
-    ASSERT_TRUE(std::equal(
-        decryptedBytes.begin(), decryptedBytes.end(), plainText.begin(), plainText.end()));
+    plainTextLen = 10;
+    ctrCipherLen = crypto::fle2AeadCipherOutputLength(plainTextLen, crypto::aesMode::ctr);
+    cbcCipherLen = crypto::fle2AeadCipherOutputLength(plainTextLen, crypto::aesMode::cbc);
+    ASSERT_EQ(ctrCipherLen, (ivAndHmacLen + plainTextLen));
+    ASSERT_EQ(cbcCipherLen, (ivAndHmacLen + cbcBlockLen));
 }
 
-TEST(AEADFLE2, Fle2AeadDetectTampering) {
-    mongo::PseudoRandom rnd(SecureRandom().nextInt64());
+TEST(AEADFLE2, Fle2AeadGetMaximumPlainTextLength) {
+    size_t cipherTextLen = 234;
+    auto plainTextLen = mongo::fle2AeadGetMaximumPlainTextLength(cipherTextLen);
+    ASSERT_OK(plainTextLen);
+    ASSERT_EQ(plainTextLen.getValue(), cipherTextLen - ivAndHmacLen);
 
-    std::vector<uint8_t> key(mongo::crypto::kFieldLevelEncryption2KeySize);
-    rnd.fill(&key[0], key.size());
+    cipherTextLen = (cbcBlockLen * 3) + ivAndHmacLen;
+    plainTextLen = mongo::fle2AeadGetMaximumPlainTextLength(cipherTextLen);
+    ASSERT_OK(plainTextLen);
+    ASSERT_EQ(plainTextLen.getValue(), cipherTextLen - ivAndHmacLen);
 
-    std::vector<uint8_t> associatedData(18);
-    rnd.fill(&associatedData[0], associatedData.size());
-
-    std::vector<uint8_t> plainText(956);
-    rnd.fill(&plainText[0], plainText.size());
-    std::vector<uint8_t> encryptedBytes(plainText.size() + 16 + 32);
-    DataRange encrypted(encryptedBytes);
-
-    std::vector<uint8_t> blankIv;
-    auto encryptStatus =
-        mongo::crypto::fle2AeadEncrypt({key}, {plainText}, {blankIv}, {associatedData}, encrypted);
-    ASSERT_OK(encryptStatus);
-
-    auto planTextLength = mongo::fle2AeadGetPlainTextLength(encrypted.length());
-    ASSERT_OK(planTextLength);
-    ASSERT_EQ(plainText.size(), planTextLength.getValue());
-
-    std::vector<uint8_t> decryptedBytes(planTextLength.getValue());
-    auto decryptStatus1 =
-        mongo::crypto::fle2AeadDecrypt({key}, encrypted, associatedData, DataRange(decryptedBytes));
-    ASSERT_OK(decryptStatus1);
-
-    encryptedBytes[rnd.nextInt32() % encryptedBytes.size()]++;
-    auto decryptStatus2 =
-        mongo::crypto::fle2AeadDecrypt({key}, encrypted, associatedData, DataRange(decryptedBytes));
-    ASSERT_NOT_OK(decryptStatus2);
+    cipherTextLen = ivAndHmacLen;
+    plainTextLen = mongo::fle2AeadGetMaximumPlainTextLength(cipherTextLen);
+    ASSERT_NOT_OK(plainTextLen);
 }
 
 TEST(EncryptFLE2, Fle2EncryptRandom) {
@@ -241,7 +209,6 @@ public:
     struct TestVector {
         StringData ad;
         StringData c;
-        StringData cc;
         StringData iv;
         StringData ke;
         StringData km;
@@ -250,66 +217,151 @@ public:
         StringData t;
     };
 
-    void evaluate(const TestVector& vector) {
+    /*
+     * Runs fle2AeadEncrypt with the given parameters, and with an output buffer
+     * of correct length. Returns a StatusWith containing the resulting ciphertext.
+     */
+    StatusWith<std::vector<uint8_t>> doAeadEncryption(ConstDataRange key,
+                                                      ConstDataRange iv,
+                                                      ConstDataRange associatedData,
+                                                      ConstDataRange plainText,
+                                                      mongo::crypto::aesMode mode) {
+        auto expectedCipherTextLen =
+            mongo::crypto::fle2AeadCipherOutputLength(plainText.length(), mode);
+        std::vector<uint8_t> encryptedBytes(expectedCipherTextLen);
+        DataRange encrypted(encryptedBytes);
+
+        auto encryptStatus =
+            mongo::crypto::fle2AeadEncrypt(key, plainText, iv, associatedData, encrypted, mode);
+        if (!encryptStatus.isOK()) {
+            return encryptStatus;
+        }
+        return encryptedBytes;
+    }
+
+    StatusWith<std::vector<uint8_t>> doAeadDecryption(ConstDataRange key,
+                                                      ConstDataRange iv,
+                                                      ConstDataRange associatedData,
+                                                      ConstDataRange cipherText,
+                                                      mongo::crypto::aesMode mode) {
+        auto plainTextLength = mongo::fle2AeadGetMaximumPlainTextLength(cipherText.length());
+        ASSERT_OK(plainTextLength);
+        ASSERT_EQ(plainTextLength.getValue(), cipherText.length() - ivAndHmacLen);
+
+        std::vector<uint8_t> decryptedBytes(plainTextLength.getValue());
+        auto decryptStatus = mongo::crypto::fle2AeadDecrypt(
+            key, cipherText, associatedData, DataRange(decryptedBytes), mode);
+        if (!decryptStatus.isOK()) {
+            return decryptStatus.getStatus();
+        }
+
+        if (mode == crypto::aesMode::cbc) {
+            decryptedBytes.resize(decryptStatus.getValue());
+        }
+        return decryptedBytes;
+    }
+
+    void roundTrip(ConstDataRange key,
+                   ConstDataRange iv,
+                   ConstDataRange associatedData,
+                   ConstDataRange plainText,
+                   boost::optional<ConstDataRange> expectedCipherText,
+                   mongo::crypto::aesMode mode) {
+
+        auto swEncryptedBytes = doAeadEncryption(key, iv, associatedData, plainText, mode);
+        ASSERT_OK(swEncryptedBytes.getStatus());
+
+        auto& encryptedBytes = swEncryptedBytes.getValue();
+        DataRange encrypted(encryptedBytes);
+
+        if (expectedCipherText) {
+            ASSERT_EQ(expectedCipherText->length(), encrypted.length());
+            ASSERT_TRUE(std::equal(
+                encryptedBytes.begin(), encryptedBytes.end(), expectedCipherText->data<uint8_t>()));
+        }
+
+        auto swDecryptedBytes = doAeadDecryption(key, iv, associatedData, encrypted, mode);
+        ASSERT_OK(swDecryptedBytes.getStatus());
+
+        auto& decryptedBytes = swDecryptedBytes.getValue();
+        ASSERT_EQ(plainText.length(), decryptedBytes.size());
+        ASSERT_TRUE(
+            std::equal(decryptedBytes.begin(), decryptedBytes.end(), plainText.data<uint8_t>()));
+    }
+
+    void evaluate(const TestVector& vector, crypto::aesMode mode) {
         std::string associatedData = hexblob::decode(vector.ad);
-        std::string in = hexblob::decode(vector.m);
         std::string iv = hexblob::decode(vector.iv);
         std::string key = hexblob::decode(vector.ke) + hexblob::decode(vector.km);
         std::string plainText = hexblob::decode(vector.m);
+        std::string expectedCipherText = hexblob::decode(vector.c);
+        std::vector<uint8_t> blankIv;
 
-        {
-            // Test with IV provided with test vector. Verify intermediate values
-            std::vector<uint8_t> encryptedBytes(in.length() ? in.length() + 16 + 32 : 0);
-            DataRange encrypted(encryptedBytes);
+        // Test with IV provided with test vector. Verify intermediate values
+        roundTrip({key}, {iv}, {associatedData}, {plainText}, {{expectedCipherText}}, mode);
 
-            auto encryptStatus =
-                mongo::crypto::fle2AeadEncrypt({key}, {in}, {iv}, {associatedData}, encrypted);
-            ASSERT_OK(encryptStatus);
-
-            std::string expect = hexblob::decode(vector.c);
-            ASSERT_EQ(expect.size(), encrypted.length());
-            ASSERT_TRUE(std::equal(encryptedBytes.begin(),
-                                   encryptedBytes.end(),
-                                   reinterpret_cast<uint8_t*>(expect.data())));
-
-            auto planTextLength = mongo::fle2AeadGetPlainTextLength(encrypted.length());
-            ASSERT_OK(planTextLength);
-            ASSERT_EQ(plainText.length(), planTextLength.getValue());
-
-            std::vector<uint8_t> decryptedBytes(planTextLength.getValue());
-            auto decryptStatus = mongo::crypto::fle2AeadDecrypt(
-                {key}, encrypted, associatedData, DataRange(decryptedBytes));
-            ASSERT_OK(decryptStatus);
-            ASSERT_EQ(plainText.length(), decryptStatus.getValue());
-            ASSERT_TRUE(std::equal(decryptedBytes.begin(),
-                                   decryptedBytes.end(),
-                                   reinterpret_cast<uint8_t*>(plainText.data())));
-        }
-        {
-            // Test with random IV. Intermediate values are undetermined
-            std::vector<uint8_t> encryptedBytes(in.length() ? in.length() + 16 + 32 : 0);
-            DataRange encrypted(encryptedBytes);
-
-            std::vector<uint8_t> blankIv;
-            auto encryptStatus =
-                mongo::crypto::fle2AeadEncrypt({key}, {in}, {blankIv}, {associatedData}, encrypted);
-            ASSERT_OK(encryptStatus);
-
-            auto planTextLength = mongo::fle2AeadGetPlainTextLength(encrypted.length());
-            ASSERT_OK(planTextLength);
-            ASSERT_EQ(plainText.length(), planTextLength.getValue());
-
-            std::vector<uint8_t> decryptedBytes(planTextLength.getValue());
-            auto decryptStatus = mongo::crypto::fle2AeadDecrypt(
-                {key}, encrypted, associatedData, DataRange(decryptedBytes));
-            ASSERT_OK(decryptStatus);
-            ASSERT_EQ(plainText.length(), decryptStatus.getValue());
-            ASSERT_TRUE(std::equal(decryptedBytes.begin(),
-                                   decryptedBytes.end(),
-                                   reinterpret_cast<uint8_t*>(plainText.data())));
-        }
+        // Test with random IV. Intermediate values are undetermined
+        roundTrip({key}, {blankIv}, {associatedData}, {plainText}, boost::none, mode);
     }
 };
+
+TEST_F(Fle2AeadTestVectors, Fle2AeadRandom) {
+    auto seed = SecureRandom().nextInt64();
+    mongo::PseudoRandom rnd(seed);
+
+    std::cout << "Fle2AeadRandom using seed: " << seed << std::endl;
+
+    std::vector<uint8_t> key(mongo::crypto::kFieldLevelEncryption2KeySize);
+    rnd.fill(&key[0], key.size());
+
+    std::vector<uint8_t> associatedData(18);
+    rnd.fill(&associatedData[0], associatedData.size());
+
+    std::vector<uint8_t> plainText(956);
+    rnd.fill(&plainText[0], plainText.size());
+
+    std::vector<uint8_t> blankIv;
+
+    roundTrip({key}, {blankIv}, {associatedData}, {plainText}, boost::none, crypto::aesMode::ctr);
+
+    roundTrip({key}, {blankIv}, {associatedData}, {plainText}, boost::none, crypto::aesMode::cbc);
+}
+
+TEST_F(Fle2AeadTestVectors, Fle2AeadDetectTampering) {
+    auto seed = SecureRandom().nextInt64();
+    mongo::PseudoRandom rnd(seed);
+
+    std::cout << "Fle2AeadDetectTampering using seed: " << seed << std::endl;
+
+    std::vector<uint8_t> key(mongo::crypto::kFieldLevelEncryption2KeySize);
+    rnd.fill(&key[0], key.size());
+
+    std::vector<uint8_t> associatedData(18);
+    rnd.fill(&associatedData[0], associatedData.size());
+
+    std::vector<uint8_t> plainText(956);
+    rnd.fill(&plainText[0], plainText.size());
+
+    std::vector<uint8_t> blankIv;
+
+    for (auto mode : {crypto::aesMode::ctr, crypto::aesMode::cbc}) {
+        auto swEncryptedBytes =
+            doAeadEncryption({key}, {blankIv}, {associatedData}, {plainText}, mode);
+        ASSERT_OK(swEncryptedBytes.getStatus());
+
+        auto& encrypted = swEncryptedBytes.getValue();
+
+        // test decrypt works before tampering the ciphertext
+        auto swDecryptedBytes =
+            doAeadDecryption({key}, {blankIv}, {associatedData}, {encrypted}, mode);
+        ASSERT_OK(swDecryptedBytes.getStatus());
+
+        // test decrypt fails after tampering the ciphertext
+        encrypted[rnd.nextInt32() % encrypted.size()]++;
+        swDecryptedBytes = doAeadDecryption({key}, {blankIv}, {associatedData}, {encrypted}, mode);
+        ASSERT_NOT_OK(swDecryptedBytes.getStatus());
+    }
+}
 
 // echo -n "Old McDonald had a farm, ei-eio" | aead_encryption_fle2_test_vectors.sh
 TEST_F(Fle2AeadTestVectors, Fle2AeadTestCaseMcdonald) {
@@ -324,7 +376,19 @@ TEST_F(Fle2AeadTestVectors, Fle2AeadTestCaseMcdonald) {
     vector.s = "48dc4ad9108190bc13193cfd9dddbb5bd680989e4d73d53af4f9bcd5d8a499"_sd;
     vector.t = "29cacaf3220359babeb9a8f66ff236683055e26ee21b0bb5a2dd45eabd8ecd63"_sd;
     // clang-format on
-    evaluate(vector);
+    evaluate(vector, crypto::aesMode::ctr);
+
+    // clang-format off
+    vector.ad = "69d1b6b5042ec1fc675cd1195434a0ac4720"_sd;
+    vector.c = "0d52d4d1f12f7f9a4e2693b7271c631b4c7a679a7a046ade560ffa7dd3451acd513bdb1d0a7d217462854c6b93abb5f8dde8dbfc94293c8eb9577699096a29eaad227fd7a212604bedb0f03fddbd4167"_sd;
+    vector.iv = "0d52d4d1f12f7f9a4e2693b7271c631b"_sd;
+    vector.ke = "a3f3fb0451fb85d29bca5902539ecc5ce8970b8242c7dacac60f7bdfd0a555e0"_sd;
+    vector.km = "7ce25815235a850e1c2a27efcfef05495fe0a1375889772cf080010ce58e6cbb"_sd;
+    vector.m = "4f6c64204d63446f6e616c64206861642061206661726d2c2065692d65696f"_sd;
+    vector.s = "4c7a679a7a046ade560ffa7dd3451acd513bdb1d0a7d217462854c6b93abb5f8"_sd;
+    vector.t = "dde8dbfc94293c8eb9577699096a29eaad227fd7a212604bedb0f03fddbd4167"_sd;
+    // clang-format on
+    evaluate(vector, crypto::aesMode::cbc);
 }
 
 TEST_F(Fle2AeadTestVectors, Fle2AeadTestCaseUnusualAdLength) {
@@ -339,7 +403,19 @@ TEST_F(Fle2AeadTestVectors, Fle2AeadTestCaseUnusualAdLength) {
     vector.s = "d34bc190c9de5f2c5cbefcab085fd263221971843280"_sd;
     vector.t = "28f408c85171caa7e00e2d9819a861562563f905857d0f9ca791a4de6028e1e1"_sd;
     // clang-format on
-    evaluate(vector);
+    evaluate(vector, crypto::aesMode::ctr);
+
+    // clang-format off
+    vector.ad = "600e4abf31e88262731dda95fbd6c10017435f1b31fad9fdae20e24bedd0027c7761e36dba373f7f88ffc60f54f39f2a1547e029cb95d481"_sd;
+    vector.c = "a1a3c0bc4c17bafdffd04f320dea258ded1a349e4bb5d4836b508cced0f4529a1c8158c38991b04ef86b47c1b7f27a743b6e40a998922d7ac8773db09afa6c2abf41d8f9e7a2aa392bc438bcd103d262"_sd;
+    vector.iv = "a1a3c0bc4c17bafdffd04f320dea258d"_sd;
+    vector.ke = "507dfcec3aca6edf1403f4c3a0392003c59bedaa0b6dd7f363e7d5530ee3c070"_sd;
+    vector.km = "d580befcfe9cf5940af1d175879fe0b8a19ddcd52d59944641c02fffee928fc4"_sd;
+    vector.m = "8adf5d4744a17f1b4dddd4cbf4840aae4c4fa5c8a653"_sd;
+    vector.s = "ed1a349e4bb5d4836b508cced0f4529a1c8158c38991b04ef86b47c1b7f27a74"_sd;
+    vector.t = "3b6e40a998922d7ac8773db09afa6c2abf41d8f9e7a2aa392bc438bcd103d262"_sd;
+    // clang-format on
+    evaluate(vector, crypto::aesMode::cbc);
 }
 
 TEST_F(Fle2AeadTestVectors, Fle2AeadTestCaseOneByte) {
@@ -354,7 +430,19 @@ TEST_F(Fle2AeadTestVectors, Fle2AeadTestCaseOneByte) {
     vector.s = "3e"_sd;
     vector.t = "0bd168f97f6cd44bd3998a886ec23f495d352467e8b29b9babef2702eb7b3331"_sd;
     // clang-format on
-    evaluate(vector);
+    evaluate(vector, crypto::aesMode::ctr);
+
+    // clang-format off
+    vector.ad = "32f04022327d1f19874fa098c09ed0475ea4"_sd;
+    vector.c = "05af2f9c948ad45da80907cd954816a0a954c997e8c648e6311a524af1a3f4d6a21f72fbf57df9f16d5bec2633662fbadab21fc71b117625ee4d790557721a29"_sd;
+    vector.iv = "05af2f9c948ad45da80907cd954816a0"_sd;
+    vector.ke = "86072c82a91986dca10bfc52fb230d745f3acccbf854536c6239e401861f4bee"_sd;
+    vector.km = "c8296ced862246a219ea97e9e8795229237b5689ea3e78896cd122d0e99dfc98"_sd;
+    vector.m = "2e"_sd;
+    vector.s = "a954c997e8c648e6311a524af1a3f4d6"_sd;
+    vector.t = "a21f72fbf57df9f16d5bec2633662fbadab21fc71b117625ee4d790557721a29"_sd;
+    // clang-format on
+    evaluate(vector, crypto::aesMode::cbc);
 }
 
 TEST_F(Fle2AeadTestVectors, Fle2AeadTestCaseShort) {
@@ -369,7 +457,19 @@ TEST_F(Fle2AeadTestVectors, Fle2AeadTestCaseShort) {
     vector.s = "2db4f752d184ee72a60b18f7a6f74a9ef699a08c99de75b613d2be1c07c3f808"_sd;
     vector.t = "65a33940ce789a5674952896e72cde9e0cd1d4d90d8d02f774f484215a18c1d2"_sd;
     // clang-format on
-    evaluate(vector);
+    evaluate(vector, crypto::aesMode::ctr);
+
+    // clang-format off
+    vector.ad = "e222c8b73ffa3d223c7c67dc560d6e27c2dc"_sd;
+    vector.c = "bc78351eebd86baab3e7f1d53994b157ae5323d5da814acaf196a93b372a78432c33fe5ddca455289e13b23b2075af28c703daf8e1578606a35f985edb1e22a813604724c10ea4b1149e079f912c01dc5bd79aa1c01c324d479f9733310ffddd"_sd;
+    vector.iv = "bc78351eebd86baab3e7f1d53994b157"_sd;
+    vector.ke = "1cad05cb3526e70dc4798f7c714db9b45a039892ff0fca5866cb7d8d7ef4795c"_sd;
+    vector.km = "75b1aaab45c2b2df310a9108f89cb07764d660c02a010aafe9416482966c24ef"_sd;
+    vector.m = "e920e9663f4058f0a15e2b15efe34d6fc75fbc32096c338a795068ff5e6b40b2"_sd;
+    vector.s = "ae5323d5da814acaf196a93b372a78432c33fe5ddca455289e13b23b2075af28c703daf8e1578606a35f985edb1e22a8"_sd;
+    vector.t = "13604724c10ea4b1149e079f912c01dc5bd79aa1c01c324d479f9733310ffddd"_sd;
+    // clang-format on
+    evaluate(vector, crypto::aesMode::cbc);
 }
 
 TEST_F(Fle2AeadTestVectors, Fle2AeadTestCaseMedium) {
@@ -384,7 +484,19 @@ TEST_F(Fle2AeadTestVectors, Fle2AeadTestCaseMedium) {
     vector.s = "a9b52874937eb0bafb823c3f8091860e0401aa28f7323b53bcffc0394bad45530e186096ddc4769ed17d6c8e08c7cb3072e068633b5afd9d80443b9cdce96d027c0ba4c3102b2bbc0ea78f628c7dc2390176eb76e33d26530109d0582bcb8de8ad74aff5ee3f4457b8c9252d009e0f6f3e674cfaa3a4326ee105f0fe58489b1aefbea783baee2461debb6598f32cdfa0939fc0865534c31d6d8ce0b7bebf6fe060a482b5473a1cf5377063a039958bc4793b3604d3dfb6e3ad4fd54ec4276f9f7a414cae690ed048ae126ae97017299a67328f2afde3f62e969199e501c04c7359dbbb9b602f78c8fe"_sd;
     vector.t = "fc157ec8e8833265e40e3199ad77f291821c7874f1370955d0d67494565daccb"_sd;
     // clang-format on
-    evaluate(vector);
+    evaluate(vector, crypto::aesMode::ctr);
+
+    // clang-format off
+    vector.ad = "94e50883e0bbd77b479a1735048665d60cfd"_sd;
+    vector.c = "775ed609544ba9c7b31be9d9eaebb4b9f271e04fc0be0460cb1fd67037a75712a17fdd9cefb5f2f881c8cd27e157375b3c5855638592c7836a04aec5cd9615b35e2798f83620ec7533635efff40e999fbf95d21fe0f9c91c9d055e790236573554f082145fcce58a2e702d2ba359d4b7f57ddf1ddd5648ad149cc205616c68590e10b2386cc7271caa2d06acff851a48ebba82ed0e40a7a46fc92f0577a4c04fbecad48087582be9c724186a27868d4a1d193cd7d82914441053af1841b02b95950841a407bd00e51920362dc0e831447f3ebf1a3428a7ad1bf965f7970d1ef958a70600f3ffb9f4570e6845e8859321ba14a4d6887d3dfe842eb19e0a63431849db5648703d9bfbfa3b9bb0265fb141175f8af1d6c21ce1704d105c6168e08f"_sd;
+    vector.iv = "775ed609544ba9c7b31be9d9eaebb4b9"_sd;
+    vector.ke = "1804d2d1a106a80b0965b4ca6db1b8c6def116951c6cbe077056fce7390b90a8"_sd;
+    vector.km = "ef7ae8f92b5ce8a23652174b46b6d85b5d68acbec7630df949d39b223de87e5a"_sd;
+    vector.m = "e8062f1b86e3b1346d8400379afc518ae65c0ead8a349fc0d0fe3d85b88831475331b4cdf86ce953adfd69e2bea9e3e11f319757aa9bcf14eeb4b12c3835cd793f116f2d582e9680cc644cd69df73e3e8639fc2e500cf60959fd40fe1e5d782266e0d5ccba7d01bd05de371f179bf8ea901629742254d0950c790f845822570a6dcc817a78f35109879ca6b4c113f498574f0daca792d09b47e0d467b33d104b44274991a193e23d132eda51dbd6d235735187c9735421844970e09f573b76a9e850f1c2262920fbb2eb43443527fa36bb37c5f005ca33379dfb4a40d6dd5f7439de2a33c4ca0db0c1"_sd;
+    vector.s = "f271e04fc0be0460cb1fd67037a75712a17fdd9cefb5f2f881c8cd27e157375b3c5855638592c7836a04aec5cd9615b35e2798f83620ec7533635efff40e999fbf95d21fe0f9c91c9d055e790236573554f082145fcce58a2e702d2ba359d4b7f57ddf1ddd5648ad149cc205616c68590e10b2386cc7271caa2d06acff851a48ebba82ed0e40a7a46fc92f0577a4c04fbecad48087582be9c724186a27868d4a1d193cd7d82914441053af1841b02b95950841a407bd00e51920362dc0e831447f3ebf1a3428a7ad1bf965f7970d1ef958a70600f3ffb9f4570e6845e8859321ba14a4d6887d3dfe842eb19e0a634318"_sd;
+    vector.t = "49db5648703d9bfbfa3b9bb0265fb141175f8af1d6c21ce1704d105c6168e08f"_sd;
+    // clang-format on
+    evaluate(vector, crypto::aesMode::cbc);
 }
 
 TEST_F(Fle2AeadTestVectors, Fle2AeadTestCaseLonger) {
@@ -399,7 +511,19 @@ TEST_F(Fle2AeadTestVectors, Fle2AeadTestCaseLonger) {
     vector.s = "c637b389df1f9357776a8b2030162e595f15b087d3414e81395479c5143cd0f32c6fa18688b9ed765f5b1087cef3bd4bf9e243bc4fea978ee69b6a1a768eb18643e998b9f32b4d1f2c196d5bd9eaf89f69b2b81b3e5fc90f21aa863ac4463f924a42772a73fb271a312fd2832f3ed9adfa1fb1b506aa47b92f5edb57dce9b0ea4c1410829c2229204c4e4dbad8f909ccacbc738151f091e791215a346d96f75e498b20f6cb891d3bbf8bf42e342f27df4cc6b80fa14a1ab47af6fba005e76d4b3364de37877d8c664e70792655444c910e094f55b8edd2e541f0bf2164fdd4b2497c7c914d6a1590bc2319541439151139a10e4f422b0fb227887edd75e191bd2b70483f16bde4ca25a17c6c5457a34348ef0601179e51aa83ee141d799377277a464b6c0b4616c1fa1612cf73077b2a3f5fd2f0c87e7d75d575c2e362ebe4b32ce307ff577ffc672a97effb59d236d6d5fc05a2262e9b26e7b366398135326ffa5efbe28df13c903c0aabd15001a86afca854ca3f4c92ba78d69708b12f9c299990c620d3c50b1e42934defb5df594bb66ad222838caa3061ee46df166bf019ce473d13f58ec826b88167dc43f71a074e6f05639501827203a7ba0aac1eb58d065536a99987a3e93d06d7e4c5f184adde5023ffd57704d313103a9dd41702d514f99f8f14561718c1b06891c979345b408d3ea65312b8b57eb8fd37d6633092571c9f833bd497bc8196b450c420f186a87f4c57e27280a1e0c3f4858a87efc73df01677fe8ce9df63ac7c54fa8858f2ae26f0bcc4fa28477545c349b0555d6efdd93f371c8a90de57c167d6e5edc6f8da57282c9a70a86241ed559b96b404cc06b2db9c10bcac612cf3d281cf12b06a962304fcd2bedf28ebc4afed700a6dce775a34b3bd6e874da5e19997cb818f2a1d49e19431eaf0ff6f308ae6fd8d8103778c252034282cb2f9587750ec53e46f91d06894a0c8007a8d2ed9f9942e373d27d0693e40925ddc4da48a17f63e2a3bbc20a6a91a3ff14b311523beec8442a9d4b27aa9419b645f14372b0942ad68a563ccb9baeeedff02f73ee30c1d1a67b910993cc15865451b8fa0d475a473eab98b74bdd3a63139375ea2e6edec58a2625328437922164b8735b4e0babe437edb3fe8a254fed52f750dd6e41af1891df9c2ec7a80b265f2fc21acaba658b57e669cd32ee5a502f71c9e510e953ac9248d06ee225d359234d907a16272efadbebd65830e5761232fc1fe3197f95b9127eacd024842022f2526a1af84fae825d7e86ab1f480783092b790b57e07a33dce7b7c3fc550d9c69e2dd5162dfc48fc7defc79e848a6a548656635f9948ee4dca6339afcf7261e4b665a40996570c04dd0f1e1bcb01c76f06eaf26d790dba34e34952a98ca82ade3eed318d7761db9e0506099b13a7cc2eef6aac7a2e90f8bd628eb34307378fbd48d23b44fd797d476569dcf9533bfd0c73bb436d10a0136aef77e3523ca26646a6dea3ae217bee87223b15097932d32411d991477c75db1099ec144520a1c57836e35ea34607f251b679293f31339b15e3d40f234db116c73981a13677d4037caeec632ecc234aa35eb76e01e08f5dc766f511a7841b9310411b769f4ff274be92e2f44a1d2b00b1914f3ac2a64fbb406398d20b4427bf5c238ecec63103ba288e6211c9b41f90b32ae951062d14b15b8b44f2e592e2cad38b66c0b7a30666063eebb1b35bfe8b792b758895843ec309b6e831667bace68dddd3874bc6b277277bf3570d0052af0656bf97878efc157ae098c277d83ef0d8948d893462c4d6e0e2918f460ce998de3b9af3dac1e730ba66332993e220eb21"_sd;
     vector.t = "0d95c50578b014ea8aa9c0bd7805fe95a708a29c6fda43549a967b9fd5053a93"_sd;
     // clang-format on
-    evaluate(vector);
+    evaluate(vector, crypto::aesMode::ctr);
+
+    // clang-format off
+    vector.ad = "af98046696b1399fe692c3ff5741b594eb19"_sd;
+    vector.c = "c90302f87c3c9373cf32c98e390004b5cdffbdaede53fb178ab08158bc0c80cdf672de16ebd3d680cc6bd4d51a6a7f34556379ad4f3f586b0ba5d3d2d3a540796c8e29aaae7ea2aae905da410f476b4346da8b095da97cddacfdfe7e5ff9596ecaa49f7f0dad669a078c90b5d72d123069173df563bea932337f2b0a58619947edd2bafd8bb0a530da38106c1bd7629715bfed0b1824b42f556ee9c72e0c5c30c33896303c9cbc0323a02fc463800e42405eb1cc4d24d6789ce1d507434c55b8f996abbbbdddf68ac06c7271720ceff17911fbd5720f5836d405c2c9b4e9e789c7a6e4c9cf590f06df6382503c61148446f4e266a82aeebde5dc0a50e96e523b3208694f3e0c2d50e816f66919c4ae2a58c7db523e617bf86e3ef20752a68b5d30d4b07414181127a2967e967fa3f23fd465980b416a5ab1a97f5ce74d8efa6f4813a5c4a5aa116d8472db1de1af0deee97a1b37d872a1432f158169ec54922e82e944ac10f31ef0c9964fec5a1f4387d44e74df5d4030efa12dc3d616a609c22bef4231341147639a9b719ac78f567a06ab03ac664d10f2db9b6594cac80e484edcdca29bc5411f4d190ff33999edeceaaf395c73dcfd4c490005a01b10a3623cb46ae848c2d8d811347f9361233bc8fd9d53f1677b57ca41784a1e1e9634f0e1978eeee86db890395811af3752554baec32ae100377ccb3d365be3d764b4a9b74dc0c24f32c81a09bf3711096488897f956129e33dd4dd1b95a78eb5f7c58167fa7e2ef40ab6a15d70f042a9de38e9e5408fe941fa07a325892bd9cdc862ee5cbd2e3d011891dee5abddbdd342e93973f54dab2ea5406284fa1938cd0a4b0abcf01f7644841d84e87e5fb9e00f3e9c4936839d6a7bad15ae223c00ebd804d4df200477354b6514d065cfa5fa20e8516b4952591b440087a7735a283065f8a67448096e8cdf08213f21c523c8623ce0248620ff68e7ab430a1f3d10fba9b0eee195f1f71a0b52fafb43168977dbaf3a614de2867428e1c580feea8a59fc04bf80b80bbb2db60bb129e647021015507db8f9ce3e95e99ccb5659841dce3c631a5e79c47a1d9985030cbe00c7ff5122fd4dd7a95d518153cc6c1a185193c3e7e3f9dc86ca955c443b21f2225dc826540fce2a1ca49bbd1100f8cd356182340a19fc4d2ee56a486ddcb61e4d5f9236c7facf298399a0da41dad8c0ccd739d765952ffd211840b7fb6521e1f68d47dd6250095cac77856c943e146aabdad79e7a50e2f629a59a160c70954581e207c5744de5071f4fd0bedf478c746ca4d4fc48c2cbcd5c9f00638838cf84530c8466035c917eca86318f23d511e3a96caa7e4e3b432c6cfa3faffd3fbd7dd599c24ee7bba6377f7df5325e730302da7623288aebcc1503360b2ade9e05450a4629755a6a6ff5e237c61efbd1128c915bd335b2bf1a399fb64abba1ed6ea52409d4e5f2eefaba68158252eb40d9494282dfa4ea8b533fa0e17d829d80543ea76ea9e3f3e2164abb96477e0c0290d4c6039927d4d20455cb48f4a7e35cdab5fadf1197db9827deb6e0e7474d08b4ebfc07438039e47ed8e6c3ccbb0369da01fd05cd8e01b50e4e4fed75e672394f2ddf5bb9410db2d90108456c3977c3bc9337e6873df83bbaa43b2b2eaad61f4c85ac595284ac76b8eb38af2db5c006ed94f5fe6bc9d6c18691dc93d159755a33378ac13257c4d20ec4649d963df96dd4599bcd3496f45b8f4d79d2f26d29d5ba52a6ed935bac40880e0c227f58ee62c38b519f300d39fe204c41124219fe463ada2b1a916960d6e1a5107326982e8248d60dcc62dd42c1b1694a5d665efd69147d855545d4c6ee0f3fac087fde6ec49dac82107ec9c7589d97f9e168becb2de11c079587ac1ea7676cdf90ad43fe746967dc29ac966ec7"_sd;
+    vector.iv = "c90302f87c3c9373cf32c98e390004b5"_sd;
+    vector.ke = "98f06e7d50f044c23471139962355281eced5b04dac3e6cd9b908c0e883dccc9"_sd;
+    vector.km = "5879d5f29b1ffb3102a7f5e99c9b0fa3160f74ca63f30b4f6d95f1a0edd3d7e5"_sd;
+    vector.m = "186ba19e23fe2fd9a8bed3b667edf41dcaa505cab266390eca74dc659d690197c76d2a5e97d941a7bbab412f81d476a97259a9c29f2960c1c26821bbecf7f2bcb3dbdb1f1a8d5bf741e7e82fc419608ceeebf9013a85aef1bf9d886c0579ea9cb79773d441294bdd716ca08284d6e0c67ea084ceb18c1d8681f58d64e2c74ac32e9a6de68e79bab202bc97d89a3a41b5c8a52ed6ad47842871e19e9aceb2e67ffde02578619ef411e7138cfae934aa83334e17fa630f4531ef4eb9bb0c8cce858ce8afb37098ed3c7df70438fdb716b967696464b0c7176fce9cd8b43496fe1161a92a61400c110bcd30843d389749acf39c56a85f5eae31754aceee63f99ac6fcbd419d781d595bb616f2f6d95684ee163519707c70060880db598cb99688a07ba84ebd1634cb7164d8ffdaef9ca83a81bc7c24a83aab0ce92e4d919142194a9f5f78cefdaea283226090307680c747d4505ff917cab8350a98c5d172f096f9003cbd45bb0034a79b23b83b18f88aa396f7d9f6a7216f2dc7660662220060cf3ca9c573b86b8c9bdd466af9ff0deed4fdffa6e46aa551205923aa7bf356602a9996c0b7c8891517bb5fbfd312fbe360619312bb1b8b1c3a59ff5a3ff16cdfb06c5f3fc48eefee1e26b2dbcc19e40da4ead14d3dfe97ffbe6908a39d43b419400abd8c0dc96ad7df2e219582647adf04530e6690450a07ca264c17d67d07d0d76b20600388f74fbd577e61b72d5240abbd36a118ab1d34210f8a120bce9cda175ea71ef0dc80353118260bed34f039c602ffa2aa24e5cce83553895ec9944a6d3e706a302fa9b832f871a1807023f4ff467b20d695622d4915b6744711d35a82680188744a9fe88ed794fb31c1e27de25e57aa7d4a9805bced58014940067973fe929f1fe0d212f57356628d8e79db53d7254ea378eb21ad23a0c0626d56a7cae2dc29ac0ca8918d881e9ddae2ed5aa0ff7f956f010d87619b1a95f007715b4e5add2f4a3df81d4ffbd91b5120860bd41cf60fedae500fa89d1c9e49fb8b704052dfe963629cd34a7065d6e394bc1b3ae0644d3924efa06a3fa81888a695ec2c33a88528d559be9cb391b6abcba4d0e83f56e21c819ac2612ba3bc76f1441572832b0721fbbcc57bc1daee6016673d4f3662555ab60140e217024d6f18196ea94b271289171c691d8017a81a9b4a3679ed06b302e4de2d94d2e04caf20c6745eb0773560305aa87134fa27eccff9286da53c9848e204bf24e43b349edf37aa683306fcc3bc0fe793cca600ee08c5420c81398b9298a9c8f66f912f37bb917f29a785f567b124abeee5807365e92ddd86858d768957615098d68f52605e279a36481f7f6f019bb22bd540e8c6cfa1ba57f0f79a6fac968ef8dc59fe0578ce391a46d15550c21e3c07d52862d12c8e620bf9ad449308403ebffd02b1ab99eaaadc7442f668156f5cbc0cbfdbbc394b85e4f4224eec7a8a82771b90b9b3da7417d10e194ac71234829e138402763a73756986eb4b74f2f0b2a8b67441af66ed75c39c91ca42a88523ed70100b00f4ac123113c46d9d4a68bd0c8299f0235ef65271ea46774a4cc8847e9ad084bcfe40c3632012ec63cf23296eee7b485f8039fd51657fc7d12d171ba59bebf05b1e90cbbefdf5d615f607f15dd7d9bbad5295bbc6e345cc618ee6bf41f843528ae267a6d9283590e000c32a7199feb9eeae1fe70c38a0d4a50072bf46cb447ff0431dc57b472f2b775c30337dc9ea85cd96ec59c61680cba3323861e017c6226990ce4b20d59b572e49535199874fe3c3f70639d1bdee7e8b53e901bacfd320ce3e0666f68a8f355f8e2282e98e58d26f371f"_sd;
+    vector.s = "cdffbdaede53fb178ab08158bc0c80cdf672de16ebd3d680cc6bd4d51a6a7f34556379ad4f3f586b0ba5d3d2d3a540796c8e29aaae7ea2aae905da410f476b4346da8b095da97cddacfdfe7e5ff9596ecaa49f7f0dad669a078c90b5d72d123069173df563bea932337f2b0a58619947edd2bafd8bb0a530da38106c1bd7629715bfed0b1824b42f556ee9c72e0c5c30c33896303c9cbc0323a02fc463800e42405eb1cc4d24d6789ce1d507434c55b8f996abbbbdddf68ac06c7271720ceff17911fbd5720f5836d405c2c9b4e9e789c7a6e4c9cf590f06df6382503c61148446f4e266a82aeebde5dc0a50e96e523b3208694f3e0c2d50e816f66919c4ae2a58c7db523e617bf86e3ef20752a68b5d30d4b07414181127a2967e967fa3f23fd465980b416a5ab1a97f5ce74d8efa6f4813a5c4a5aa116d8472db1de1af0deee97a1b37d872a1432f158169ec54922e82e944ac10f31ef0c9964fec5a1f4387d44e74df5d4030efa12dc3d616a609c22bef4231341147639a9b719ac78f567a06ab03ac664d10f2db9b6594cac80e484edcdca29bc5411f4d190ff33999edeceaaf395c73dcfd4c490005a01b10a3623cb46ae848c2d8d811347f9361233bc8fd9d53f1677b57ca41784a1e1e9634f0e1978eeee86db890395811af3752554baec32ae100377ccb3d365be3d764b4a9b74dc0c24f32c81a09bf3711096488897f956129e33dd4dd1b95a78eb5f7c58167fa7e2ef40ab6a15d70f042a9de38e9e5408fe941fa07a325892bd9cdc862ee5cbd2e3d011891dee5abddbdd342e93973f54dab2ea5406284fa1938cd0a4b0abcf01f7644841d84e87e5fb9e00f3e9c4936839d6a7bad15ae223c00ebd804d4df200477354b6514d065cfa5fa20e8516b4952591b440087a7735a283065f8a67448096e8cdf08213f21c523c8623ce0248620ff68e7ab430a1f3d10fba9b0eee195f1f71a0b52fafb43168977dbaf3a614de2867428e1c580feea8a59fc04bf80b80bbb2db60bb129e647021015507db8f9ce3e95e99ccb5659841dce3c631a5e79c47a1d9985030cbe00c7ff5122fd4dd7a95d518153cc6c1a185193c3e7e3f9dc86ca955c443b21f2225dc826540fce2a1ca49bbd1100f8cd356182340a19fc4d2ee56a486ddcb61e4d5f9236c7facf298399a0da41dad8c0ccd739d765952ffd211840b7fb6521e1f68d47dd6250095cac77856c943e146aabdad79e7a50e2f629a59a160c70954581e207c5744de5071f4fd0bedf478c746ca4d4fc48c2cbcd5c9f00638838cf84530c8466035c917eca86318f23d511e3a96caa7e4e3b432c6cfa3faffd3fbd7dd599c24ee7bba6377f7df5325e730302da7623288aebcc1503360b2ade9e05450a4629755a6a6ff5e237c61efbd1128c915bd335b2bf1a399fb64abba1ed6ea52409d4e5f2eefaba68158252eb40d9494282dfa4ea8b533fa0e17d829d80543ea76ea9e3f3e2164abb96477e0c0290d4c6039927d4d20455cb48f4a7e35cdab5fadf1197db9827deb6e0e7474d08b4ebfc07438039e47ed8e6c3ccbb0369da01fd05cd8e01b50e4e4fed75e672394f2ddf5bb9410db2d90108456c3977c3bc9337e6873df83bbaa43b2b2eaad61f4c85ac595284ac76b8eb38af2db5c006ed94f5fe6bc9d6c18691dc93d159755a33378ac13257c4d20ec4649d963df96dd4599bcd3496f45b8f4d79d2f26d29d5ba52a6ed935bac40880e0c227f58ee62c38b519f300d39fe204c41124219fe463ada2b1a916960d6e1a5107326982e8248d60dcc62dd42c1b1694a5d665efd69147d855545d4c6ee0f3fac087fde6ec49dac82107ec9c758"_sd;
+    vector.t = "9d97f9e168becb2de11c079587ac1ea7676cdf90ad43fe746967dc29ac966ec7"_sd;
+    // clang-format on
+    evaluate(vector, crypto::aesMode::cbc);
 }
 
 class Fle2EncryptTestVectors : public unittest::Test {

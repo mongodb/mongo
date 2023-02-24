@@ -12,7 +12,7 @@ dd status=none if=/dev/urandom of=IV.bin bs=16 count=1
 dd status=none if=/dev/urandom of=Ke.bin bs=32 count=1
 dd status=none if=/dev/urandom of=Km.bin bs=32 count=1
 
-openssl enc -aes-256-ctr -in M.bin -K $(xxd -c 100 -p Ke.bin) -iv $(xxd -c 100 -p IV.bin) -out S.bin
+openssl enc -aes-256-${MODE:-ctr} -in M.bin -K $(xxd -c 100 -p Ke.bin) -iv $(xxd -c 100 -p IV.bin) -out S.bin
 
 # digest tested per: https://datatracker.ietf.org/doc/html/rfc4231#section-4.3
 # echo -n "what do ya want for nothing?" | openssl dgst -sha256 -mac hmac -macopt hexkey:4a656665 -hex

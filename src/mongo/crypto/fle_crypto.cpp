@@ -528,11 +528,13 @@ FLEToken<TokenT> FLETokenFromCDR(ConstDataRange cdr) {
  */
 StatusWith<std::vector<uint8_t>> encryptDataWithAssociatedData(ConstDataRange key,
                                                                ConstDataRange associatedData,
-                                                               ConstDataRange plainText) {
-    std::vector<uint8_t> out(crypto::fle2AeadCipherOutputLength(plainText.length()));
+                                                               ConstDataRange plainText,
+                                                               crypto::aesMode mode) {
+    std::vector<uint8_t> out(crypto::fle2AeadCipherOutputLength(plainText.length(), mode));
 
     auto k = key.slice(crypto::kFieldLevelEncryption2KeySize);
-    auto status = crypto::fle2AeadEncrypt(k, plainText, ConstDataRange(0, 0), associatedData, out);
+    auto status =
+        crypto::fle2AeadEncrypt(k, plainText, ConstDataRange(0, 0), associatedData, out, mode);
     if (!status.isOK()) {
         return status;
     }
@@ -561,21 +563,25 @@ StatusWith<std::vector<uint8_t>> encryptData(ConstDataRange key, uint64_t value)
 
 StatusWith<std::vector<uint8_t>> decryptDataWithAssociatedData(ConstDataRange key,
                                                                ConstDataRange associatedData,
-                                                               ConstDataRange cipherText) {
-    auto swLen = fle2AeadGetPlainTextLength(cipherText.length());
+                                                               ConstDataRange cipherText,
+                                                               crypto::aesMode mode) {
+    auto swLen = fle2AeadGetMaximumPlainTextLength(cipherText.length());
     if (!swLen.isOK()) {
         return swLen.getStatus();
     }
-    std::vector<uint8_t> out(static_cast<size_t>(swLen.getValue()));
+
+    std::vector<uint8_t> out(swLen.getValue());
 
     auto k = key.slice(crypto::kFieldLevelEncryption2KeySize);
-    auto swOutLen = crypto::fle2AeadDecrypt(k, cipherText, associatedData, out);
+    auto swOutLen = crypto::fle2AeadDecrypt(k, cipherText, associatedData, out, mode);
     if (!swOutLen.isOK()) {
         return swOutLen.getStatus();
     }
 
-    if (out.size() != swOutLen.getValue()) {
-        return {ErrorCodes::InternalError, "Data length mismatch for AES-CTR-HMAC256-AEAD."};
+    if (mode == crypto::aesMode::cbc) {
+        // In CBC mode, the plaintext may end up shorter than the max possible
+        // length because of padding, so the output buffer must be resized.
+        out.resize(swOutLen.getValue());
     }
 
     return out;
@@ -796,20 +802,25 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
 class KeyIdAndValue {
 public:
     static StatusWith<std::vector<uint8_t>> serialize(FLEUserKeyAndId userKey,
-                                                      ConstDataRange value);
+                                                      ConstDataRange value,
+                                                      crypto::aesMode mode = crypto::aesMode::cbc);
     /**
      * Read the key id from the payload.
      */
     static StatusWith<UUID> readKeyId(ConstDataRange cipherText);
 
-    static StatusWith<std::vector<uint8_t>> decrypt(FLEUserKey userKey, ConstDataRange cipherText);
+    static StatusWith<std::vector<uint8_t>> decrypt(FLEUserKey userKey,
+                                                    ConstDataRange cipherText,
+                                                    crypto::aesMode mode = crypto::aesMode::cbc);
 };
 
 StatusWith<std::vector<uint8_t>> KeyIdAndValue::serialize(FLEUserKeyAndId userKey,
-                                                          ConstDataRange value) {
+                                                          ConstDataRange value,
+                                                          crypto::aesMode mode) {
     auto cdrKeyId = userKey.keyId.toCDR();
 
-    auto swEncryptedData = encryptDataWithAssociatedData(userKey.key.toCDR(), cdrKeyId, value);
+    auto swEncryptedData =
+        encryptDataWithAssociatedData(userKey.key.toCDR(), cdrKeyId, value, mode);
     if (!swEncryptedData.isOK()) {
         return swEncryptedData;
     }
@@ -837,7 +848,8 @@ StatusWith<UUID> KeyIdAndValue::readKeyId(ConstDataRange cipherText) {
 }
 
 StatusWith<std::vector<uint8_t>> KeyIdAndValue::decrypt(FLEUserKey userKey,
-                                                        ConstDataRange cipherText) {
+                                                        ConstDataRange cipherText,
+                                                        crypto::aesMode mode) {
 
     ConstDataRangeCursor baseCdrc(cipherText);
 
@@ -848,7 +860,7 @@ StatusWith<std::vector<uint8_t>> KeyIdAndValue::decrypt(FLEUserKey userKey,
 
     UUID keyId = UUID::fromCDR(swKeyId.getValue());
 
-    return decryptDataWithAssociatedData(userKey.toCDR(), keyId.toCDR(), baseCdrc);
+    return decryptDataWithAssociatedData(userKey.toCDR(), keyId.toCDR(), baseCdrc, mode);
 }
 
 /**
@@ -938,7 +950,7 @@ FLE2InsertUpdatePayload EDCClientPayload::serializeInsertUpdatePayload(FLEIndexK
     iupayload.setEncryptedTokens(swEncryptedTokens.getValue());
 
 
-    auto swCipherText = KeyIdAndValue::serialize(userKey, value);
+    auto swCipherText = KeyIdAndValue::serialize(userKey, value, crypto::aesMode::ctr);
     uassertStatusOK(swCipherText);
     iupayload.setValue(swCipherText.getValue());
     iupayload.setType(element.type());
@@ -1227,7 +1239,7 @@ FLE2InsertUpdatePayload EDCClientPayload::serializeInsertUpdatePayloadForRange(
     uassertStatusOK(swEncryptedTokens);
     iupayload.setEncryptedTokens(swEncryptedTokens.getValue());
 
-    auto swCipherText = KeyIdAndValue::serialize(userKey, value);
+    auto swCipherText = KeyIdAndValue::serialize(userKey, value, crypto::aesMode::ctr);
     uassertStatusOK(swCipherText);
     iupayload.setValue(swCipherText.getValue());
     iupayload.setType(element.type());
@@ -3816,7 +3828,7 @@ std::vector<uint8_t> FLE2UnindexedEncryptedValue::serialize(const FLEUserKeyAndI
     auto cdrKeyId = userKey.keyId.toCDR();
     auto cdrKey = userKey.key.toCDR();
 
-    auto cipherTextSize = crypto::fle2AeadCipherOutputLength(value.length());
+    auto cipherTextSize = crypto::fle2AeadCipherOutputLength(value.length(), crypto::aesMode::ctr);
     std::vector<uint8_t> buf(assocDataSize + cipherTextSize);
     DataRangeCursor adc(buf);
     adc.writeAndAdvance(static_cast<uint8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue));
@@ -3824,7 +3836,8 @@ std::vector<uint8_t> FLE2UnindexedEncryptedValue::serialize(const FLEUserKeyAndI
     adc.writeAndAdvance(static_cast<uint8_t>(bsonType));
 
     ConstDataRange assocData(buf.data(), assocDataSize);
-    auto cipherText = uassertStatusOK(encryptDataWithAssociatedData(cdrKey, assocData, value));
+    auto cipherText = uassertStatusOK(
+        encryptDataWithAssociatedData(cdrKey, assocData, value, crypto::aesMode::ctr));
     uassert(6379106, "Cipher text size mismatch", cipherTextSize == cipherText.size());
     adc.writeAndAdvance(ConstDataRange(cipherText));
 
@@ -3850,8 +3863,8 @@ std::pair<BSONType, std::vector<uint8_t>> FLE2UnindexedEncryptedValue::deseriali
             "Invalid BSON data type for Queryable Encryption",
             isFLE2UnindexedSupportedType(bsonType));
 
-    auto data = uassertStatusOK(
-        decryptDataWithAssociatedData(userKey.key.toCDR(), assocDataCdr, cipherTextCdr));
+    auto data = uassertStatusOK(decryptDataWithAssociatedData(
+        userKey.key.toCDR(), assocDataCdr, cipherTextCdr, crypto::aesMode::ctr));
     return {bsonType, data};
 }
 

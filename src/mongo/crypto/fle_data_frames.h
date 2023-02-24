@@ -51,9 +51,16 @@ inline StatusWith<size_t> aeadGetMaximumPlainTextLength(size_t cipherTextLen) {
 }
 
 /**
- * Returns the length of the plaintext output given the ciphertext length. Only for FLE2 AEAD.
+ * Returns the maximum expected length of the plaintext output given the ciphertext length.
+ * Only for FLE2 AEAD. Valid for modes aesMode::ctr and aesMode::cbc.
  */
-inline StatusWith<size_t> fle2AeadGetPlainTextLength(size_t cipherTextLen) {
+inline StatusWith<size_t> fle2AeadGetMaximumPlainTextLength(size_t cipherTextLen) {
+
+    // For CTR mode, the expected plaintext length is always equal to the length of the
+    // ciphertext after the IV and HMAC signature are removed.
+    // For CBC mode, the expected plaintext length is bounded above by the length of the
+    // ciphertext (always block aligned) after the IV and HMAC signature are removed.
+    static_assert(crypto::aesCTRIVSize == crypto::aesCBCIVSize);
     if (cipherTextLen > (crypto::aesCTRIVSize + kHmacOutSize)) {
         return cipherTextLen - crypto::aesCTRIVSize - kHmacOutSize;
     }

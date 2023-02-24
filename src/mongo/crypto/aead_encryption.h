@@ -57,7 +57,7 @@ size_t aeadCipherOutputLength(size_t plainTextLen);
 /**
  * Returns the length of the ciphertext output given the plaintext length. Only for FLE2 AEAD.
  */
-size_t fle2AeadCipherOutputLength(size_t plainTextLen);
+size_t fle2AeadCipherOutputLength(size_t plainTextLen, aesMode mode);
 
 /**
  * Returns the length of the ciphertext output given the plaintext length. Only for FLE2.
@@ -100,7 +100,8 @@ Status fle2AeadEncrypt(ConstDataRange key,
                        ConstDataRange in,
                        ConstDataRange iv,
                        ConstDataRange associatedData,
-                       DataRange out);
+                       DataRange out,
+                       aesMode mode);
 
 /**
  * Internal call for FLE2 encryption algorithm.
@@ -122,7 +123,8 @@ StatusWith<std::size_t> aeadDecrypt(const SymmetricKey& key,
 StatusWith<std::size_t> fle2AeadDecrypt(ConstDataRange key,
                                         ConstDataRange in,
                                         ConstDataRange associatedData,
-                                        DataRange out);
+                                        DataRange out,
+                                        aesMode mode);
 
 /**
  * Internal call for FLE2 decryption algorithm.
