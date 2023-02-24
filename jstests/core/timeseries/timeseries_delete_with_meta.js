@@ -228,17 +228,35 @@ TimeseriesTest.run((insert) => {
 
     const nestedMetaObj = {[timeFieldName]: ISODate(), [metaFieldName]: {[metaFieldName]: "A"}};
 
-    // Query for documents using $jsonSchema with the metaField required and a required subfield of
-    // the metaField with the same name as the metaField.
-    testDelete([objA, nestedMetaObj], [objA], 1, [{
-                   q: {
-                       "$jsonSchema": {
-                           "required": [metaFieldName],
-                           "properties": {[metaFieldName]: {"required": [metaFieldName]}}
-                       }
-                   },
-                   limit: 0
-               }]);
+    // TODO SERVER-73077 Remove this feature flag guard.
+    if (!isArbitraryDeleteEnabled) {
+        // Query for documents using $jsonSchema with the metaField required and a required subfield
+        // of the metaField with the same name as the metaField.
+        testDelete([objA, nestedMetaObj], [objA], 1, [{
+                       q: {
+                           "$jsonSchema": {
+                               "required": [metaFieldName],
+                               "properties": {[metaFieldName]: {"required": [metaFieldName]}}
+                           }
+                       },
+                       limit: 0
+                   }]);
+    } else {
+        // With arbitrary delete enabled, this delete should be supported eventually.
+        testDelete([objA, nestedMetaObj],
+                   [objA, nestedMetaObj],
+                   0,
+                   [{
+                       q: {
+                           "$jsonSchema": {
+                               "required": [metaFieldName],
+                               "properties": {[metaFieldName]: {"required": [metaFieldName]}}
+                           }
+                       },
+                       limit: 0
+                   }],
+                   {expectedErrorCode: ErrorCodes.InvalidOptions});
+    }
 
     if (!isArbitraryDeleteEnabled) {
         // Query for documents using $jsonSchema with the metaField required and an optional field
