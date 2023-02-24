@@ -48,6 +48,32 @@ void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* opCtx,
     *b << name << _data.first;
 }
 
+Status validateExtraDiagnostics(const std::vector<std::string>& value,
+                                const boost::optional<TenantId>& tenantId) {
+    try {
+        std::set<std::string> flagArr = {"all",
+                                         "concurrent_access",
+                                         "data_validation",
+                                         "invalid_op",
+                                         "out_of_order",
+                                         "panic",
+                                         "slow_operation",
+                                         "visibility"};
+        for (const auto& diagFlag : value) {
+            bool exists = std::find(flagArr.begin(), flagArr.end(), diagFlag) != flagArr.end();
+
+            if (!exists) {
+                return Status(ErrorCodes::BadValue,
+                              fmt::format("'{}' is not a valid flag option", diagFlag));
+            }
+        }
+    } catch (...) {
+        return exceptionToStatus();
+    }
+
+    return Status::OK();
+}
+
 Status WiredTigerEngineRuntimeConfigParameter::setFromString(StringData str,
                                                              const boost::optional<TenantId>&) {
     size_t pos = str.find('\0');

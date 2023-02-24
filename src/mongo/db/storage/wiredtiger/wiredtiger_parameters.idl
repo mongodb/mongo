@@ -150,6 +150,18 @@ server_parameters:
       validator:
         gte: 1
 
+    wiredTigerExtraDiagnostics:
+      description: >-
+          Extra diagnostics that can be enabled in release mode including diagnostic assertions that can cause WiredTiger to abort upon
+          detected invalid state. Valid options include: ["all", "concurrent_access", "data_validation", "invalid_op", "out_of_order",
+          "panic", "slow_operation", "visibility"]. In order to make runtime changes, this will need to be reconfigured using
+          wiredTigerEngineRuntimeConfigParameter.
+      set_at: [startup]
+      cpp_vartype: 'std::vector<std::string>'
+      cpp_varname: "gWiredTigerExtraDiagnostics"
+      validator:
+          callback: validateExtraDiagnostics
+
     wiredTigerFileHandleCloseMinimum:
       description: >-
         The number of handles open before the WiredTiger file manager will look for handles to close.
