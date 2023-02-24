@@ -4057,7 +4057,7 @@ buildvariants:
     name: linux-microbenchmarks-standalone-classic-query-engine-arm.2023-01
     display_name: MicroBenchmarks Arm Standalone inMemory (Classic Query Engine).2023-01
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-    cron: "0 */4 * * *" # Every 4 hours starting at midnight
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
@@ -4069,7 +4069,7 @@ buildvariants:
     name: linux-microbenchmarks-standalone-sbe-arm.2023-01
     display_name: MicroBenchmarks Arm Standalone inMemory (SBE).2023-01
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-    cron: "0 */4 * * *" # Every 4 hours starting at midnight
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-sbe.2023-02
@@ -4136,7 +4136,7 @@ buildvariants:
     name: linux-microbenchmarks-standalone-classic-query-engine.2023-01
     display_name: MicroBenchmarks Intel Standalone inMemory (Classic Query Engine).2023-01
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-    cron: "0 */12 * * *" # Every 12 hours starting at midnight
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
     expansions:
       <<: *standalone-intel-expansions
       mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
@@ -4148,7 +4148,7 @@ buildvariants:
     name: linux-microbenchmarks-standalone-sbe.2023-01
     display_name: MicroBenchmarks Intel Standalone inMemory (SBE).2023-01
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-    cron: "0 */12 * * *" # Every 12 hours starting at midnight
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
     expansions:
       <<: *standalone-intel-expansions
       mongodb_setup: mongo-perf-standalone-sbe.2023-02
