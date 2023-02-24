@@ -1028,24 +1028,25 @@ Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
     invariant(opCtx->writesAreReplicated());
 
     auto op = entryOrGroupedInserts.getOp();
-    if (op.isIndexCommandType() && op.getCommandType() != OplogEntry::CommandType::kCreateIndexes &&
-        op.getCommandType() != OplogEntry::CommandType::kDropIndexes) {
+    if (op->isIndexCommandType() &&
+        op->getCommandType() != OplogEntry::CommandType::kCreateIndexes &&
+        op->getCommandType() != OplogEntry::CommandType::kDropIndexes) {
         LOGV2_ERROR(488610,
                     "Index creation, except createIndex on empty collections, is not supported in "
                     "tenant migration",
                     "protocol"_attr = _protocol,
                     "migrationId"_attr = _migrationUuid,
-                    "op"_attr = redact(op.toBSONForLogging()));
+                    "op"_attr = redact(op->toBSONForLogging()));
 
         uasserted(5434700,
                   "Index creation, except createIndex on empty collections, is not supported in "
                   "tenant migration");
     }
-    if (op.getCommandType() == OplogEntry::CommandType::kCreateIndexes) {
-        auto uuid = op.getUuid();
+    if (op->getCommandType() == OplogEntry::CommandType::kCreateIndexes) {
+        auto uuid = op->getUuid();
         uassert(5652700, "Missing UUID from createIndex oplog entry", uuid);
         try {
-            AutoGetCollectionForRead autoColl(opCtx, {op.getNss().db().toString(), *uuid});
+            AutoGetCollectionForRead autoColl(opCtx, {op->getNss().db().toString(), *uuid});
             uassert(ErrorCodes::NamespaceNotFound, "Collection does not exist", autoColl);
             // During tenant migration oplog application, we only need to apply createIndex on empty
             // collections. Otherwise, the index is guaranteed to be dropped after. This is because
@@ -1054,7 +1055,7 @@ Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
                 LOGV2_DEBUG(5652701,
                             2,
                             "Tenant migration ignoring createIndex for non-empty collection",
-                            "op"_attr = redact(op.toBSONForLogging()),
+                            "op"_attr = redact(op->toBSONForLogging()),
                             "protocol"_attr = _protocol,
                             "migrationId"_attr = _migrationUuid);
                 return Status::OK();
@@ -1079,7 +1080,7 @@ Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
                 "protocol"_attr = _protocol,
                 "migrationId"_attr = _migrationUuid,
                 "error"_attr = status,
-                "op"_attr = redact(op.toBSONForLogging()));
+                "op"_attr = redact(op->toBSONForLogging()));
     return status;
 }
 

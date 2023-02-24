@@ -40,14 +40,14 @@ namespace mongo {
  * Apply `commitTransaction` oplog entry.
  */
 Status applyCommitTransaction(OperationContext* opCtx,
-                              const repl::OplogEntry& entry,
+                              const repl::ApplierOperation& op,
                               repl::OplogApplication::Mode mode);
 
 /**
  * Apply `abortTransaction` oplog entry.
  */
 Status applyAbortTransaction(OperationContext* opCtx,
-                             const repl::OplogEntry& entry,
+                             const repl::ApplierOperation& op,
                              repl::OplogApplication::Mode mode);
 
 /**
@@ -79,7 +79,7 @@ std::pair<std::vector<repl::OplogEntry>, bool> _readTransactionOperationsFromOpl
  * Apply `prepareTransaction` oplog entry.
  */
 Status applyPrepareTransaction(OperationContext* opCtx,
-                               const repl::OplogEntry& entry,
+                               const repl::ApplierOperation& op,
                                repl::OplogApplication::Mode mode);
 
 /*

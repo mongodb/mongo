@@ -72,17 +72,17 @@ InsertGroup::InsertGroup(std::vector<ApplierOperation>* ops,
 
 StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
     ConstIterator it) noexcept {
-    const auto& entry = **it;
+    const auto& op = *it;
 
     // The following conditions must be met before attempting to group the oplog entries starting
     // at 'oplogEntriesIterator':
     // 1) The CRUD operation must an insert;
     // 2) The namespace that we are inserting into cannot be a capped collection;
     // 3) We have not attempted to group this insert during a previous call to this function.
-    if (entry.getOpType() != OpTypeEnum::kInsert) {
+    if (op->getOpType() != OpTypeEnum::kInsert) {
         return Status(ErrorCodes::TypeMismatch, "Can only group insert operations.");
     }
-    if (entry.isForCappedCollection()) {
+    if (op->isForCappedCollection()) {
         return Status(ErrorCodes::InvalidOptions,
                       "Cannot group insert operations on capped collections.");
     }
@@ -95,9 +95,9 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
     std::vector<BSONObj> toInsert;
 
     // Make sure to include the first op in the group size.
-    size_t groupSize = entry.getObject().objsize();
+    size_t groupSize = op->getObject().objsize();
     auto opCount = std::vector<ApplierOperation>::size_type(1);
-    auto groupNamespace = entry.getNss();
+    auto groupNamespace = op->getNss();
 
     /**
      * Search for the op that delimits this insert group, and save its position
@@ -114,14 +114,14 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
      * will point to the first op that *can't* be added to the current insert group.
      */
     auto endOfGroupableOpsIterator =
-        std::find_if(it + 1, _end, [&](ApplierOperation nextEntry) -> bool {
-            auto opNamespace = nextEntry->getNss();
-            groupSize += nextEntry->getObject().objsize();
+        std::find_if(it + 1, _end, [&](const ApplierOperation& nextOp) -> bool {
+            auto opNamespace = nextOp->getNss();
+            groupSize += nextOp->getObject().objsize();
             opCount += 1;
 
             // Only add the op to this group if it passes the criteria.
-            return nextEntry->getOpType() != OpTypeEnum::kInsert  // Must be an insert.
-                || opNamespace != groupNamespace                  // Must be in the same namespace.
+            return nextOp->getOpType() != OpTypeEnum::kInsert  // Must be an insert.
+                || opNamespace != groupNamespace               // Must be in the same namespace.
                 || groupSize > kInsertGroupMaxGroupSize  // Must not create too large an object.
                 || opCount > kInsertGroupMaxOpCount;     // Limit number of ops in a single group.
         });
@@ -155,13 +155,13 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
                         message,
                         "error"_attr = redact(status),
                         "groupedInserts"_attr = redact(groupedInserts.toBSON()),
-                        "firstInsert"_attr = redact(entry.toBSONForLogging()));
+                        "firstInsert"_attr = redact(op->toBSONForLogging()));
         } else {
             LOGV2_ERROR(21204,
                         message,
                         "error"_attr = redact(status),
                         "groupedInserts"_attr = redact(groupedInserts.toBSON()),
-                        "firstInsert"_attr = redact(entry.toBSONForLogging()));
+                        "firstInsert"_attr = redact(op->toBSONForLogging()));
         }
 
         // Avoid quadratic run time from failed insert by not retrying until we

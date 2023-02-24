@@ -166,8 +166,11 @@ uint32_t OplogApplierUtils::addToWriterVector(
     return addToWriterVectorImpl(opCtx, op, writerVectors, collPropertiesCache, forceWriterId);
 }
 
-void OplogApplierUtils::stableSortByNamespace(std::vector<ApplierOperation>* oplogEntryPointers) {
-    auto nssComparator = [](ApplierOperation l, ApplierOperation r) {
+void OplogApplierUtils::stableSortByNamespace(std::vector<ApplierOperation>* ops) {
+    auto isPreparedTxnCommand = [](const ApplierOperation& op) {
+        return op->isPreparedCommit() || op->isPreparedAbort() || op->shouldPrepare();
+    };
+    auto nssComparator = [](const ApplierOperation& l, const ApplierOperation& r) {
         if (l->getNss().isCommand()) {
             if (r->getNss().isCommand())
                 // l == r; now compare the namespace
@@ -180,7 +183,18 @@ void OplogApplierUtils::stableSortByNamespace(std::vector<ApplierOperation>* opl
             return false;
         return l->getNss() < r->getNss();
     };
-    std::stable_sort(oplogEntryPointers->begin(), oplogEntryPointers->end(), nssComparator);
+
+    // Walk through the vector, if a prepared transaction command is encountered, sort
+    // the ops between the previous prepared transaction command and the current one.
+    auto startIt = ops->begin();
+    for (auto endIt = ops->begin(); endIt <= ops->end(); ++endIt) {
+        // The end iterator acts as a dummy prepared transaction command, so we would
+        // also sort the ops after the last real one encountered.
+        if ((endIt == ops->end()) || isPreparedTxnCommand(*endIt)) {
+            std::stable_sort(startIt, endIt, nssComparator);
+            startIt = endIt + 1;
+        }
+    }
 }
 
 void OplogApplierUtils::addDerivedOps(OperationContext* opCtx,
@@ -218,7 +232,6 @@ void OplogApplierUtils::addDerivedPrepares(
 
     // For empty (read-only) prepares, we use the namespace of the original prepare oplog entry
     // (admin.$cmd) to decide which writer thread to apply it, and assigned it a split session.
-    //
     // The reason that we also split an empty prepare instead of treating it as some standalone
     // prepare op (as the prepares in initial sync or recovery mode) is so that we can keep a
     // logical invariant that all prepares in secondary mode are split, and thus we can apply
@@ -318,18 +331,18 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     OpCounters* opCounters) {
     invariant(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
 
-    auto op = entryOrGroupedInserts.getOp();
+    const auto& op = entryOrGroupedInserts.getOp();
     // Count each log op application as a separate operation, for reporting purposes
     CurOp individualOp;
     individualOp.push(opCtx);
-    const NamespaceString nss(op.getNss());
-    auto opType = op.getOpType();
+    const NamespaceString nss(op->getNss());
+    auto opType = op->getOpType();
 
     if ((gMultitenancySupport && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
          gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
-        invariant(op.getTid() == nss.tenantId());
+        invariant(op->getTid() == nss.tenantId());
     } else {
-        invariant(op.getTid() == boost::none);
+        invariant(op->getTid() == boost::none);
     }
 
     if (opType == OpTypeEnum::kNoop) {
@@ -341,7 +354,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                 // Need to throw instead of returning a status for it to be properly ignored.
                 try {
                     AutoGetCollection autoColl(opCtx,
-                                               getNsOrUUID(nss, op),
+                                               getNsOrUUID(nss, *op),
                                                fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
                     auto db = autoColl.getDb();
                     uassert(ErrorCodes::NamespaceNotFound,
@@ -402,7 +415,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                 incrementOpsAppliedStats();
                 return status;
             });
-        if (op.getCommandType() == mongo::repl::OplogEntry::CommandType::kDrop) {
+        if (op->getCommandType() == mongo::repl::OplogEntry::CommandType::kDrop) {
             hangAfterApplyingCollectionDropOplogEntry.executeIf(
                 [&](const BSONObj&) {
                     hangAfterApplyingCollectionDropOplogEntry.pauseWhileSet();
@@ -435,7 +448,7 @@ Status OplogApplierUtils::applyOplogBatchCommon(
         ops, opCtx, oplogApplicationMode, isDataConsistent, applyOplogEntryOrGroupedInserts);
 
     for (auto it = ops->cbegin(); it != ops->cend(); ++it) {
-        const OplogEntry& entry = **it;
+        const auto& op = *it;
 
         // If we are successful in grouping and applying inserts, advance the current iterator
         // past the end of the inserted group of entries.
@@ -447,8 +460,8 @@ Status OplogApplierUtils::applyOplogBatchCommon(
 
         // If we didn't create a group, try to apply the op individually.
         try {
-            const Status status = applyOplogEntryOrGroupedInserts(
-                opCtx, ApplierOperation{&entry}, oplogApplicationMode, isDataConsistent);
+            const Status status =
+                applyOplogEntryOrGroupedInserts(opCtx, op, oplogApplicationMode, isDataConsistent);
 
             if (!status.isOK()) {
                 // Tried to apply an update operation but the document is missing, there must be
@@ -462,14 +475,14 @@ Status OplogApplierUtils::applyOplogBatchCommon(
                 LOGV2_FATAL_CONTINUE(21237,
                                      "Error applying operation ({oplogEntry}): {error}",
                                      "Error applying operation",
-                                     "oplogEntry"_attr = redact(entry.toBSONForLogging()),
+                                     "oplogEntry"_attr = redact(op->toBSONForLogging()),
                                      "error"_attr = causedBy(redact(status)));
                 return status;
             }
         } catch (const DBException& e) {
             // SERVER-24927 If we have a NamespaceNotFound exception, then this document will be
             // dropped before initial sync or recovery ends anyways and we should ignore it.
-            if (e.code() == ErrorCodes::NamespaceNotFound && entry.isCrudOpType() &&
+            if (e.code() == ErrorCodes::NamespaceNotFound && op->isCrudOpType() &&
                 allowNamespaceNotFoundErrorsOnCrudOps) {
                 continue;
             }
@@ -478,7 +491,7 @@ Status OplogApplierUtils::applyOplogBatchCommon(
                                  "writer worker caught exception: {error} on: {oplogEntry}",
                                  "Writer worker caught exception",
                                  "error"_attr = redact(e),
-                                 "oplogEntry"_attr = redact(entry.toBSONForLogging()));
+                                 "oplogEntry"_attr = redact(op->toBSONForLogging()));
             return e.toStatus();
         }
     }
