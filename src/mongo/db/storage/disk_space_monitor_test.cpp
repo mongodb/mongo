@@ -47,7 +47,7 @@ public:
         return 1024;
     }
 
-    void act(int64_t availableBytes) noexcept override {
+    void act(OperationContext* opCtx, int64_t availableBytes) noexcept override {
         hits += 1;
     }
 
@@ -55,20 +55,21 @@ public:
 };
 
 TEST_F(DiskSpaceMonitorTest, Threshold) {
+    OperationContext* opCtx = nullptr;
     auto action = std::make_unique<SimpleAction>();
     auto actionPtr = action.get();
     monitor.registerAction(std::move(action));
 
-    monitor.takeAction(2000);
+    monitor.takeAction(opCtx, 2000);
     ASSERT_EQ(0, actionPtr->hits);
 
-    monitor.takeAction(1024);
+    monitor.takeAction(opCtx, 1024);
     ASSERT_EQ(1, actionPtr->hits);
 
-    monitor.takeAction(1000);
+    monitor.takeAction(opCtx, 1000);
     ASSERT_EQ(2, actionPtr->hits);
 
-    monitor.takeAction(2000);
+    monitor.takeAction(opCtx, 2000);
     ASSERT_EQ(2, actionPtr->hits);
 }
 }  // namespace

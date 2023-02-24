@@ -67,3 +67,14 @@ server_parameters:
     cpp_vartype: long long
     cpp_varname: gResumableIndexBuildMajorityOpTimeTimeoutMillis
     default: 10000
+
+  indexBuildMinAvailableDiskSpaceMB:
+    description: Minimum disk space required to build an index
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<long long>
+    cpp_varname: gIndexBuildMinAvailableDiskSpaceMB
+    default: 100
+    validator:
+      gte: 0
+      # This is equal to std::numeric_limits<int64_t>::max() / (1024 * 1024)
+      lte: 8796093022207

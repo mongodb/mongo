@@ -814,6 +814,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         startFLECrud(serviceContext);
 
         DiskSpaceMonitor::start(serviceContext);
+        auto diskMonitor = DiskSpaceMonitor::get(serviceContext);
+        diskMonitor->registerAction(
+            IndexBuildsCoordinator::get(serviceContext)->makeKillIndexBuildOnLowDiskSpaceAction());
     }
 
     startClientCursorMonitor();

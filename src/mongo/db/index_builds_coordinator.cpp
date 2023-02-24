@@ -494,6 +494,45 @@ IndexBuildsCoordinator* IndexBuildsCoordinator::get(OperationContext* OperationC
     return get(OperationContext->getServiceContext());
 }
 
+
+std::unique_ptr<DiskSpaceMonitor::Action>
+IndexBuildsCoordinator::makeKillIndexBuildOnLowDiskSpaceAction() {
+    class KillIndexBuildsAction : public DiskSpaceMonitor::Action {
+    public:
+        KillIndexBuildsAction(IndexBuildsCoordinator* coordinator) : _coord(coordinator) {}
+
+        int64_t getThresholdBytes() noexcept final {
+            // This parameter's validator ensures that this multiplication will not overflow.
+            return gIndexBuildMinAvailableDiskSpaceMB.load() * 1024 * 1024;
+        }
+
+        void act(OperationContext* opCtx, int64_t availableBytes) noexcept final {
+            if (_coord->noIndexBuildInProgress()) {
+                // Avoid excessive logging when no index builds are in progress. Nothing prevents an
+                // index build from starting after this check.  Subsequent calls will see any
+                // newly-registered builds.
+                return;
+            }
+            LOGV2(7333502,
+                  "Attempting to kill index builds because remaining disk space is less than "
+                  "required minimum",
+                  "availableBytes"_attr = availableBytes,
+                  "requiredBytes"_attr = getThresholdBytes());
+            try {
+                // Only aborts index builds on primaries. This will always fail on secondaries.
+                // TODO SERVER-74194: Allow secondaries to cancel index builds.
+                _coord->abortAllIndexBuildsDueToDiskSpace(opCtx);
+            } catch (...) {
+                LOGV2(7333503, "Failed to kill index builds", "reason"_attr = exceptionToStatus());
+            }
+        }
+
+    private:
+        IndexBuildsCoordinator* _coord;
+    };
+    return std::make_unique<KillIndexBuildsAction>(this);
+};
+
 std::vector<std::string> IndexBuildsCoordinator::extractIndexNames(
     const std::vector<BSONObj>& specs) {
     std::vector<std::string> indexNames;
@@ -906,6 +945,29 @@ void IndexBuildsCoordinator::abortAllIndexBuildsForInitialSync(OperationContext*
                   "database"_attr = replState->dbName,
                   "collectionUUID"_attr = replState->collectionUUID);
         }
+    }
+}
+
+void IndexBuildsCoordinator::abortAllIndexBuildsDueToDiskSpace(OperationContext* opCtx) {
+    auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
+        auto indexBuildFilter = [](const auto& replState) {
+            return true;
+        };
+        return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
+    }();
+    for (const auto& replState : builds) {
+        if (!abortIndexBuildByBuildUUID(opCtx,
+                                        replState->buildUUID,
+                                        IndexBuildAction::kPrimaryAbort,
+                                        "Insufficient disk space")) {
+            // The index build may already be in the midst of tearing down.
+            LOGV2(7333501,
+                  "Index build: failed to abort index build",
+                  "buildUUID"_attr = replState->buildUUID,
+                  "db"_attr = replState->dbName,
+                  "collectionUUID"_attr = replState->collectionUUID);
+        }
+        indexBuildsSSS.killedDueToInsufficentDiskSpace.addAndFetch(1);
     }
 }
 

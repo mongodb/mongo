@@ -30,17 +30,23 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/db/storage/disk_space_monitor.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 
-namespace {
-static const auto _decoration = ServiceContext::declareDecoration<DiskSpaceMonitor>();
+CounterMetric monitorPasses("diskSpaceMonitor.passes");
+CounterMetric tookAction("diskSpaceMonitor.tookAction");
 
+namespace {
+MONGO_FAIL_POINT_DEFINE(simulateAvailableDiskSpace);
+
+static const auto _decoration = ServiceContext::declareDecoration<DiskSpaceMonitor>();
 int64_t getAvailableDiskSpaceBytes(const std::string& path) {
     boost::filesystem::path fsPath(path);
     boost::system::error_code ec;
@@ -79,6 +85,10 @@ void DiskSpaceMonitor::stop(ServiceContext* svcCtx) {
     _decoration(svcCtx)._stop();
 }
 
+DiskSpaceMonitor* DiskSpaceMonitor::get(ServiceContext* svcCtx) {
+    return &_decoration(svcCtx);
+}
+
 void DiskSpaceMonitor::_start(ServiceContext* svcCtx) {
     LOGV2(7333401, "Starting the DiskSpaceMonitor");
     invariant(!_job, "DiskSpaceMonitor is already started");
@@ -100,20 +110,29 @@ void DiskSpaceMonitor::registerAction(std::unique_ptr<Action> action) {
     _actions.push_back(std::move(action));
 }
 
-void DiskSpaceMonitor::takeAction(int64_t availableBytes) {
+void DiskSpaceMonitor::takeAction(OperationContext* opCtx, int64_t availableBytes) {
     stdx::lock_guard<Latch> lock(_mutex);
 
     for (auto& action : _actions) {
         if (availableBytes <= action->getThresholdBytes()) {
-            action->act(availableBytes);
+            action->act(opCtx, availableBytes);
+            tookAction.increment();
         }
     }
 }
 
 void DiskSpaceMonitor::_run(Client* client) try {
-    const auto availableBytes = getAvailableDiskSpaceBytes(storageGlobalParams.dbpath);
+    auto opCtx = client->makeOperationContext();
+
+    const auto availableBytes = []() {
+        if (auto fp = simulateAvailableDiskSpace.scoped(); fp.isActive()) {
+            return static_cast<int64_t>(fp.getData()["bytes"].numberLong());
+        }
+        return getAvailableDiskSpaceBytes(storageGlobalParams.dbpath);
+    }();
     LOGV2_DEBUG(7333405, 2, "Available disk space", "bytes"_attr = availableBytes);
-    takeAction(availableBytes);
+    takeAction(opCtx.get(), availableBytes);
+    monitorPasses.increment();
 } catch (...) {
     LOGV2(7333404, "Caught exception in DiskSpaceMonitor", "error"_attr = exceptionToStatus());
 }

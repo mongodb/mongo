@@ -44,6 +44,7 @@ class DiskSpaceMonitor final {
 public:
     static void start(ServiceContext* svcCtx);
     static void stop(ServiceContext* svcCtx);
+    static DiskSpaceMonitor* get(ServiceContext* svcCtx);
 
     /**
      * An Action defines a function that should be called when the available disk space falls below
@@ -62,7 +63,7 @@ public:
          * Takes action when the defined threshold is reached. This function may be called an
          * indefinite number of times when the disk falls below its threshold.
          */
-        virtual void act(int64_t availableBytes) noexcept = 0;
+        virtual void act(OperationContext* opCtx, int64_t availableBytes) noexcept = 0;
     };
 
     /**
@@ -73,7 +74,7 @@ public:
     /**
      * Immediately take action based on the provided available disk space in bytes.
      */
-    void takeAction(int64_t availableBytes);
+    void takeAction(OperationContext* opCtx, int64_t availableBytes);
 
 private:
     void _start(ServiceContext* svcCtx);

@@ -51,6 +51,7 @@
 #include "mongo/db/repl_index_build_state.h"
 #include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/serverless/serverless_types_gen.h"
+#include "mongo/db/storage/disk_space_monitor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/platform/mutex.h"
@@ -262,6 +263,8 @@ public:
                                   const DatabaseName& dbName,
                                   const std::string& reason);
 
+    void abortUserIndexBuildsForUserWriteBlocking(OperationContext* opCtx);
+
     /**
      * Signals all of the index builds belonging to the specified tenant to abort and then waits
      * until the index builds are no longer running. The provided 'reason' will be used in the
@@ -296,14 +299,14 @@ public:
     void abortAllIndexBuildsForInitialSync(OperationContext* opCtx, const std::string& reason);
 
     /**
-     * Signals all index builds on non-internal databases to abort and waits until they are no
-     * longer running.
+     * Signals all index builds to abort because there is not enough disk space. Returns when index
+     * builds have been killed.
      *
      * Does not require holding locks.
      *
      * Does not stop new index builds from starting. Caller must make that guarantee.
      */
-    void abortUserIndexBuildsForUserWriteBlocking(OperationContext* opCtx);
+    void abortAllIndexBuildsDueToDiskSpace(OperationContext* opCtx);
 
     /**
      * Aborts an index build by index build UUID. Returns when the index build thread exits.
@@ -446,6 +449,12 @@ public:
      */
     void appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const;
 
+    /**
+     * Returns an Action for the DiskSpaceMonitor that kills all index builds when the disk space
+     * drops below a certain threshold.
+     */
+    std::unique_ptr<DiskSpaceMonitor::Action> makeKillIndexBuildOnLowDiskSpaceAction();
+
     //
     // Helper functions for creating indexes that do not have to be managed by the
     // IndexBuildsCoordinator.
@@ -528,10 +537,12 @@ public:
         BSONObj generateSection(OperationContext* opCtx,
                                 const BSONElement& configElement) const final {
             BSONObjBuilder indexBuilds;
-            BSONObjBuilder phases;
 
             indexBuilds.append("total", registered.loadRelaxed());
+            indexBuilds.append("killedDueToInsufficientDiskSpace",
+                               killedDueToInsufficentDiskSpace.loadRelaxed());
 
+            BSONObjBuilder phases;
             phases.append("scanCollection", scanCollection.loadRelaxed());
             phases.append("drainSideWritesTable", drainSideWritesTable.loadRelaxed());
             phases.append("drainSideWritesTablePreCommit",
@@ -542,13 +553,13 @@ public:
             phases.append("processConstraintsViolatonTableOnCommit",
                           processConstraintsViolatonTableOnCommit.loadRelaxed());
             phases.append("commit", commit.loadRelaxed());
-
             indexBuilds.append("phases", phases.obj());
 
             return indexBuilds.obj();
         }
 
         AtomicWord<int> registered;
+        AtomicWord<int> killedDueToInsufficentDiskSpace;
         AtomicWord<int> scanCollection;
         AtomicWord<int> drainSideWritesTable;
         AtomicWord<int> drainSideWritesTablePreCommit;
