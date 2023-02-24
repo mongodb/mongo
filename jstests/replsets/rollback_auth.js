@@ -171,8 +171,11 @@ replTest.stop(1);
 replTest.restart(0);
 assert.soon(function() {
     try {
-        return A_admin.hello().isWritablePrimary;
+        const helloResponse = A_admin.hello();
+        jsTestLog("A hello response: " + tojson(helloResponse));
+        return helloResponse.isWritablePrimary;
     } catch (e) {
+        jsTestLog("hello() threw an exception when waiting for A to become primary: " + tojson(e));
         return false;
     }
 }, "A didn't become primary");
