@@ -225,7 +225,7 @@ assert.eq(1, sessionDB.coll.find(updateDocTxn).itcount());
 
 // Shard key field modifications do not have to specify full shard key.
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-    // TODO: SERVER-69918 Implement upsert behavior for _clusterQueryWithoutShardKey
+    // TODO: SERVER-73057 Implement upsert behavior for _clusterQueryWithoutShardKey
 } else {
     // Full shard key not specified in query.
 
@@ -348,7 +348,7 @@ assert.eq(1, sessionDB.coll.find(upsertDocTxn["$set"]).itcount());
 
 // Shard key field modifications do not have to specify full shard key.
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-    // TODO: SERVER-69918 Implement upsert behavior for _clusterQueryWithoutShardKey
+    // TODO: SERVER-73057 Implement upsert behavior for _clusterQueryWithoutShardKey
 } else {
     // Full shard key not specified in query.
 
@@ -501,7 +501,7 @@ assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(1, sessionDB.coll.find(upsertProjectTxnDoc).itcount());
 
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-    // TODO: SERVER-69918 Implement upsert behavior for _clusterQueryWithoutShardKey
+    // TODO: SERVER-73057 Implement upsert behavior for _clusterQueryWithoutShardKey
 } else {
     // Full shard key not specified in query.
     assert.commandFailedWithCode(

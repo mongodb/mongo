@@ -48,6 +48,10 @@ structs:
         description: "The shard id of the target shard."
         type: string
         optional: true
+      upsertRequired:
+        description: "True if the targetDoc should be upserted."
+        type: bool
+        default: false
   clusterWriteWithoutShardKeyResponse: 
     description: "The response for the '_clusterWriteWithoutShardKeyFind' command."
     is_command_reply: true

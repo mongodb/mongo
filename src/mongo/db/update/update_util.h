@@ -48,5 +48,12 @@ void produceDocumentForUpsert(OperationContext* opCtx,
 void ensureIdFieldIsFirst(mutablebson::Document* doc, bool generateOIDIfMissing);
 void assertPathsNotArray(const mutablebson::Document& document, const FieldRefSet& paths);
 
+/**
+ * Parse FindAndModify update command request into an updateRequest.
+ */
+void makeUpdateRequest(OperationContext* opCtx,
+                       const write_ops::FindAndModifyCommandRequest& request,
+                       boost::optional<ExplainOptions::Verbosity> explain,
+                       UpdateRequest* requestOut);
 }  // namespace update
 }  // namespace mongo

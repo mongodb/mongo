@@ -27,9 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/ops/update_request.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
+#include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/unittest/unittest.h"
@@ -81,6 +83,23 @@ protected:
     OperationContext* getOpCtx() {
         return operationContext();
     }
+};
+
+class ProduceUpsertDocumentTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        auto service = getServiceContext();
+        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+        _opCtx = makeOperationContext();
+    }
+
+    OperationContext* getOpCtx() const {
+        return _opCtx.get();
+    }
+
+protected:
+    ServiceContext::UniqueOperationContext _opCtx;
 };
 
 TEST_F(WriteWithoutShardKeyUtilTest, WriteQueryContainingFullShardKeyCanTargetSingleDocument) {
@@ -260,6 +279,83 @@ TEST_F(WriteWithoutShardKeyUtilTest,
                                                      BSON("_id" << BSON("$gt" << 1)),
                                                      {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
+}
+
+TEST_F(ProduceUpsertDocumentTest, produceUpsertDocumentUsingReplacementUpdate) {
+    write_ops::UpdateOpEntry entry;
+    entry.setQ(BSON("_id" << 3));
+    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON("x" << 2)));
+
+    write_ops::UpdateCommandRequest updateCommandRequest(kNss);
+    updateCommandRequest.setUpdates({entry});
+    UpdateRequest updateRequest(updateCommandRequest.getUpdates().front());
+
+    auto doc = write_without_shard_key::generateUpsertDocument(getOpCtx(), updateRequest);
+    ASSERT_BSONOBJ_EQ(doc, fromjson("{ _id: 3, x: 2 }"));
+}
+
+TEST_F(ProduceUpsertDocumentTest, produceUpsertDocumentUsingLetConstantAndPipelineUpdate) {
+    write_ops::UpdateOpEntry entry;
+    entry.setQ(BSON("_id" << 4 << "x" << 3));
+
+    std::vector<BSONObj> pipelineUpdate;
+    pipelineUpdate.push_back(fromjson("{$set: {'x': '$$constOne'}}"));
+    pipelineUpdate.push_back(fromjson("{$set: {'y': 3}}"));
+    entry.setU(pipelineUpdate);
+
+    BSONObj constants = fromjson("{constOne: 'foo'}");
+    entry.setC(constants);
+
+    write_ops::UpdateCommandRequest updateCommandRequest(kNss);
+    updateCommandRequest.setUpdates({entry});
+    UpdateRequest updateRequest(updateCommandRequest.getUpdates().front());
+
+    auto doc = write_without_shard_key::generateUpsertDocument(getOpCtx(), updateRequest);
+    ASSERT_BSONOBJ_EQ(doc, fromjson("{ _id: 4, x: 'foo', y: 3 }"));
+}
+
+TEST_F(ProduceUpsertDocumentTest, produceUpsertDocumentUsingArrayFilterAndModificationUpdate) {
+    write_ops::UpdateOpEntry entry;
+    BSONArrayBuilder arrayBuilder;
+    arrayBuilder.append(BSON("a" << 90));
+    entry.setQ(BSON("_id" << 4 << "x" << arrayBuilder.arr()));
+    entry.setU(
+        write_ops::UpdateModification::parseFromClassicUpdate(fromjson("{$inc: {'x.$[b].a': 3}}")));
+
+    auto arrayFilter = std::vector<BSONObj>{fromjson("{'b.a': {$gt: 85}}")};
+    entry.setArrayFilters(arrayFilter);
+
+    write_ops::UpdateCommandRequest updateCommandRequest(kNss);
+    updateCommandRequest.setUpdates({entry});
+    UpdateRequest updateRequest(updateCommandRequest.getUpdates().front());
+
+    auto doc = write_without_shard_key::generateUpsertDocument(getOpCtx(), updateRequest);
+    ASSERT_BSONOBJ_EQ(doc, fromjson("{ _id: 4, x: [ { a: 93 } ] }"));
+}
+
+TEST_F(ProduceUpsertDocumentTest, produceUpsertDocumentUsingCollation) {
+    write_ops::UpdateOpEntry entry;
+    BSONArrayBuilder arrayBuilder;
+    arrayBuilder.append(BSON("a"
+                             << "BAR"));
+    arrayBuilder.append(BSON("a"
+                             << "bar"));
+    arrayBuilder.append(BSON("a"
+                             << "foo"));
+    entry.setQ(BSON("_id" << 4 << "x" << arrayBuilder.arr()));
+    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+        fromjson("{$set: {'x.$[b].a': 'FOO'}}")));
+
+    auto arrayFilter = std::vector<BSONObj>{fromjson("{'b.a': {$eq: 'bar'}}")};
+    entry.setArrayFilters(arrayFilter);
+    entry.setCollation(fromjson("{locale: 'en_US', strength: 2}"));
+
+    write_ops::UpdateCommandRequest updateCommandRequest(kNss);
+    updateCommandRequest.setUpdates({entry});
+    UpdateRequest updateRequest(updateCommandRequest.getUpdates().front());
+
+    auto doc = write_without_shard_key::generateUpsertDocument(getOpCtx(), updateRequest);
+    ASSERT_BSONOBJ_EQ(doc, fromjson("{ _id: 4, x: [ { a: 'FOO' }, { a: 'FOO' }, { a: 'foo' } ] }"));
 }
 
 }  // namespace

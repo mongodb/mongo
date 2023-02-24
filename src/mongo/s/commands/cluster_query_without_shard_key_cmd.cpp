@@ -26,11 +26,12 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/update/update_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -39,6 +40,7 @@
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/write_ops/batch_write_op.h"
+#include "mongo/s/write_ops/write_without_shard_key_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -48,10 +50,9 @@ namespace {
 struct ParsedCommandInfo {
     BSONObj query;
     BSONObj collation;
-    int stmtId;
-
-    ParsedCommandInfo(BSONObj query, BSONObj collation, int stmtId)
-        : query(query), collation(collation), stmtId(stmtId) {}
+    bool upsert = false;
+    int stmtId = kUninitializedStmtId;
+    boost::optional<UpdateRequest> updateRequest;
 };
 
 struct AsyncRequestSenderResponseData {
@@ -111,6 +112,65 @@ BSONObj createAggregateCmdObj(OperationContext* opCtx,
     return aggregate.toBSON({});
 }
 
+ParsedCommandInfo parseWriteCommand(OperationContext* opCtx,
+                                    StringData commandName,
+                                    const BSONObj& writeCmdObj) {
+    ParsedCommandInfo parsedInfo;
+    if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
+        auto updateRequest = write_ops::UpdateCommandRequest::parse(
+            IDLParserContext("_clusterQueryWithoutShardKeyForUpdate"), writeCmdObj);
+        parsedInfo.query = updateRequest.getUpdates().front().getQ();
+
+        // In the batch write path, when the request is reconstructed to be passed to
+        // the two phase write protocol, only the stmtIds field is used.
+        if (auto stmtIds = updateRequest.getStmtIds()) {
+            parsedInfo.stmtId = stmtIds->front();
+        }
+
+        if ((parsedInfo.upsert = updateRequest.getUpdates().front().getUpsert())) {
+            parsedInfo.updateRequest = updateRequest.getUpdates().front();
+        }
+
+        if (auto parsedCollation = updateRequest.getUpdates().front().getCollation()) {
+            parsedInfo.collation = *parsedCollation;
+        }
+    } else if (commandName == write_ops::DeleteCommandRequest::kCommandName) {
+        auto deleteRequest = write_ops::DeleteCommandRequest::parse(
+            IDLParserContext("_clusterQueryWithoutShardKeyForDelete"), writeCmdObj);
+        parsedInfo.query = deleteRequest.getDeletes().front().getQ();
+
+        // In the batch write path, when the request is reconstructed to be passed to
+        // the two phase write protocol, only the stmtIds field is used.
+        if (auto stmtIds = deleteRequest.getStmtIds()) {
+            parsedInfo.stmtId = stmtIds->front();
+        }
+
+        if (auto parsedCollation = deleteRequest.getDeletes().front().getCollation()) {
+            parsedInfo.collation = *parsedCollation;
+        }
+    } else if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
+               commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
+        auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
+            IDLParserContext("_clusterQueryWithoutShardKeyFindAndModify"), writeCmdObj);
+        parsedInfo.query = findAndModifyRequest.getQuery();
+        parsedInfo.stmtId = findAndModifyRequest.getStmtId().value_or(kUninitializedStmtId);
+
+        if ((parsedInfo.upsert = findAndModifyRequest.getUpsert().get_value_or(false))) {
+            parsedInfo.updateRequest = UpdateRequest{};
+            parsedInfo.updateRequest->setNamespaceString(findAndModifyRequest.getNamespace());
+            update::makeUpdateRequest(
+                opCtx, findAndModifyRequest, boost::none, parsedInfo.updateRequest.get_ptr());
+        }
+
+        if (auto parsedCollation = findAndModifyRequest.getCollation()) {
+            parsedInfo.collation = *parsedCollation;
+        }
+    } else {
+        uasserted(ErrorCodes::InvalidOptions, "Not a supported batch write command");
+    }
+    return parsedInfo;
+}
+
 class ClusterQueryWithoutShardKeyCmd : public TypedCommand<ClusterQueryWithoutShardKeyCmd> {
 public:
     using Request = ClusterQueryWithoutShardKey;
@@ -134,63 +194,15 @@ public:
                 CommandHelpers::parseNsCollectionRequired(ns().dbName(), request().getWriteCmd()));
             const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
 
-            auto parsedInfoFromRequest = [&] {
-                const auto commandName = request().getWriteCmd().firstElementFieldNameStringData();
+            // Parse into OpMsgRequest to append the $db field, which is required for command
+            // parsing.
+            const auto opMsgRequest =
+                OpMsgRequest::fromDBAndBody(nss.db(), request().getWriteCmd());
 
-                // Parse into OpMsgRequest to append the $db field, which is required for command
-                // parsing.
-                const auto opMsgRequest =
-                    OpMsgRequest::fromDBAndBody(nss.db(), request().getWriteCmd());
-                BSONObj query;
-                BSONObj collation;
-                int stmtId = kUninitializedStmtId;
-
-                if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
-                    auto updateRequest = write_ops::UpdateCommandRequest::parse(
-                        IDLParserContext("_clusterQueryWithoutShardKeyForUpdate"),
-                        opMsgRequest.body);
-                    query = updateRequest.getUpdates().front().getQ();
-
-                    // In the batch write path, when the request is reconstructed to be passed to
-                    // the two phase write protocol, only the stmtIds field is used.
-                    if (auto stmtIds = updateRequest.getStmtIds()) {
-                        stmtId = stmtIds->front();
-                    }
-
-                    if (auto parsedCollation = updateRequest.getUpdates().front().getCollation()) {
-                        collation = *parsedCollation;
-                    }
-                } else if (commandName == write_ops::DeleteCommandRequest::kCommandName) {
-                    auto deleteRequest = write_ops::DeleteCommandRequest::parse(
-                        IDLParserContext("_clusterQueryWithoutShardKeyForDelete"),
-                        opMsgRequest.body);
-                    query = deleteRequest.getDeletes().front().getQ();
-
-                    // In the batch write path, when the request is reconstructed to be passed to
-                    // the two phase write protocol, only the stmtIds field is used.
-                    if (auto stmtIds = deleteRequest.getStmtIds()) {
-                        stmtId = stmtIds->front();
-                    }
-
-                    if (auto parsedCollation = deleteRequest.getDeletes().front().getCollation()) {
-                        collation = *parsedCollation;
-                    }
-                } else if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
-                           commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
-                    auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
-                        IDLParserContext("_clusterQueryWithoutShardKeyFindAndModify"),
-                        opMsgRequest.body);
-                    query = findAndModifyRequest.getQuery();
-                    stmtId = findAndModifyRequest.getStmtId().value_or(kUninitializedStmtId);
-
-                    if (auto parsedCollation = findAndModifyRequest.getCollation()) {
-                        collation = *parsedCollation;
-                    }
-                } else {
-                    uasserted(ErrorCodes::InvalidOptions, "Not a supported batch write command");
-                }
-                return ParsedCommandInfo(query.getOwned(), collation.getOwned(), stmtId);
-            }();
+            auto parsedInfoFromRequest =
+                parseWriteCommand(opCtx,
+                                  request().getWriteCmd().firstElementFieldNameStringData(),
+                                  opMsgRequest.body);
 
             auto allShardsContainingChunksForNs =
                 getShardsToTarget(opCtx, cri.cm, nss, parsedInfoFromRequest);
@@ -241,6 +253,13 @@ public:
                     res.setShardId(boost::optional<mongo::StringData>(shardId));
                 }
             }
+
+            if (!res.getTargetDoc() && parsedInfoFromRequest.upsert) {
+                res.setTargetDoc(write_without_shard_key::generateUpsertDocument(
+                    opCtx, parsedInfoFromRequest.updateRequest.get()));
+                res.setUpsertRequired(true);
+            }
+
             return res;
         }
 

@@ -139,6 +139,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_commands_idl',
         '$BUILD_DIR/mongo/db/initialize_api_parameters',
         '$BUILD_DIR/mongo/db/internal_transactions_feature_flag',
+        '$BUILD_DIR/mongo/db/ops/parsed_update',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/cursor_response_idl',
         '$BUILD_DIR/mongo/db/query/map_reduce_output_format',

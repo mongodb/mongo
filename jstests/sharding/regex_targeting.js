@@ -195,7 +195,7 @@ assert.commandWorked(collNested.update({'a.b': /abcde-1/}, {a: {b: /abcde.*/}}, 
 // Sharded updateOnes that do not directly target a shard can now use the two phase write
 // protocol to execute.
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-    // TODO: SERVER-69918 Implement upsert behavior for _clusterQueryWithoutShardKey
+    // TODO: SERVER-73057 Implement upsert behavior for _clusterQueryWithoutShardKey
 } else {
     //
     //

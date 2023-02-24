@@ -32,10 +32,16 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/parsed_update.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 
 namespace mongo {
 namespace write_without_shard_key {
+
+/**
+ * Uses updateDriver to produce the document to insert. Only use when {upsert: true}.
+ */
+BSONObj generateUpsertDocument(OperationContext* opCtx, const UpdateRequest& updateRequest);
 
 /**
  * Returns true if we can use the two phase protocol to complete a single write without shard

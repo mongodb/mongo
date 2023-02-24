@@ -44,16 +44,11 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -69,6 +64,7 @@
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
+#include "mongo/db/update/update_util.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
@@ -145,32 +141,6 @@ void validate(const write_ops::FindAndModifyCommandRequest& request) {
         request.getArrayFilters()) {
         uasserted(ErrorCodes::FailedToParse, "Cannot specify arrayFilters and a pipeline update");
     }
-}
-
-void makeUpdateRequest(OperationContext* opCtx,
-                       const write_ops::FindAndModifyCommandRequest& request,
-                       boost::optional<ExplainOptions::Verbosity> explain,
-                       UpdateRequest* requestOut) {
-    requestOut->setQuery(request.getQuery());
-    requestOut->setProj(request.getFields().value_or(BSONObj()));
-    invariant(request.getUpdate());
-    requestOut->setUpdateModification(*request.getUpdate());
-    requestOut->setLegacyRuntimeConstants(
-        request.getLegacyRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
-    requestOut->setLetParameters(request.getLet());
-    requestOut->setSort(request.getSort().value_or(BSONObj()));
-    requestOut->setHint(request.getHint());
-    requestOut->setCollation(request.getCollation().value_or(BSONObj()));
-    requestOut->setArrayFilters(request.getArrayFilters().value_or(std::vector<BSONObj>()));
-    requestOut->setUpsert(request.getUpsert().value_or(false));
-    requestOut->setReturnDocs((request.getNew().value_or(false)) ? UpdateRequest::RETURN_NEW
-                                                                 : UpdateRequest::RETURN_OLD);
-    requestOut->setMulti(false);
-    requestOut->setExplain(explain);
-
-    requestOut->setYieldPolicy(opCtx->inMultiDocumentTransaction()
-                                   ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
-                                   : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 }
 
 void makeDeleteRequest(OperationContext* opCtx,
@@ -602,7 +572,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     } else {
         auto updateRequest = UpdateRequest();
         updateRequest.setNamespaceString(nss);
-        makeUpdateRequest(opCtx, request, verbosity, &updateRequest);
+        update::makeUpdateRequest(opCtx, request, verbosity, &updateRequest);
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest.getNamespaceString());
         ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
@@ -726,7 +696,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                 auto updateRequest = UpdateRequest();
                 updateRequest.setNamespaceString(nsString);
                 const auto verbosity = boost::none;
-                makeUpdateRequest(opCtx, req, verbosity, &updateRequest);
+                update::makeUpdateRequest(opCtx, req, verbosity, &updateRequest);
 
                 if (opCtx->getTxnNumber()) {
                     updateRequest.setStmtIds({stmtId});

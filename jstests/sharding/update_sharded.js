@@ -58,7 +58,7 @@ for (let i = 0; i < 2; i++) {
     assert.commandWorked(coll.update({_id: 2}, {key: 2, other: 2}));
     assert.commandWorked(coll.update({_id: 3}, {key: 3, other: 3}));
 
-    // TODO: SERVER-69918 Implement upsert behavior for _clusterQueryWithoutShardKey
+    // TODO: SERVER-73057 Implement upsert behavior for _clusterQueryWithoutShardKey
     if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(sessionDb)) {
         // do a replacement-style update which queries the shard key and keeps it constant
         assert.commandWorked(coll.update({key: 4}, {_id: 4, key: 4}, {upsert: true}));
@@ -80,7 +80,7 @@ for (let i = 0; i < 2; i++) {
 
     assert.commandWorked(coll.update({_id: 1, key: 1}, {$set: {foo: 2}}));
 
-    // TODO: SERVER-69918 Implement upsert behavior for _clusterQueryWithoutShardKey
+    // TODO: SERVER-73057 Implement upsert behavior for _clusterQueryWithoutShardKey
     if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(sessionDb)) {
         coll.update({key: 17}, {$inc: {x: 5}}, true);
         assert.eq(5, coll.findOne({key: 17}).x, "up1");

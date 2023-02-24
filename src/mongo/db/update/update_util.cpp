@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/update/produce_document_for_upsert.h"
+#include "mongo/db/update/update_util.h"
 
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -142,6 +142,32 @@ void ensureIdFieldIsFirst(mutablebson::Document* doc, bool generateOIDIfMissing)
         uassertStatusOK(idElem.remove());
         uassertStatusOK(doc->root().pushFront(idElem));
     }
+}
+
+void makeUpdateRequest(OperationContext* opCtx,
+                       const write_ops::FindAndModifyCommandRequest& request,
+                       boost::optional<ExplainOptions::Verbosity> explain,
+                       UpdateRequest* requestOut) {
+    requestOut->setQuery(request.getQuery());
+    requestOut->setProj(request.getFields().value_or(BSONObj()));
+    invariant(request.getUpdate());
+    requestOut->setUpdateModification(*request.getUpdate());
+    requestOut->setLegacyRuntimeConstants(
+        request.getLegacyRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
+    requestOut->setLetParameters(request.getLet());
+    requestOut->setSort(request.getSort().value_or(BSONObj()));
+    requestOut->setHint(request.getHint());
+    requestOut->setCollation(request.getCollation().value_or(BSONObj()));
+    requestOut->setArrayFilters(request.getArrayFilters().value_or(std::vector<BSONObj>()));
+    requestOut->setUpsert(request.getUpsert().value_or(false));
+    requestOut->setReturnDocs((request.getNew().value_or(false)) ? UpdateRequest::RETURN_NEW
+                                                                 : UpdateRequest::RETURN_OLD);
+    requestOut->setMulti(false);
+    requestOut->setExplain(explain);
+
+    requestOut->setYieldPolicy(opCtx->inMultiDocumentTransaction()
+                                   ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
+                                   : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 }
 
 }  // namespace update

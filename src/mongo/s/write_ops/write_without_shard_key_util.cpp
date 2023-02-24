@@ -34,6 +34,7 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/transaction/transaction_api.h"
+#include "mongo/db/update/update_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
@@ -48,6 +49,7 @@ namespace write_without_shard_key {
 namespace {
 
 constexpr auto kIdFieldName = "_id"_sd;
+const FieldRef idFieldRef(kIdFieldName);
 
 // Used to do query validation for the _id field.
 const ShardKeyPattern kVirtualIdShardKey(BSON(kIdFieldName << 1));
@@ -103,6 +105,25 @@ bool shardKeyHasCollatableType(const BSONObj& shardKey) {
     return false;
 }
 }  // namespace
+
+BSONObj generateUpsertDocument(OperationContext* opCtx, const UpdateRequest& updateRequest) {
+    ExtensionsCallbackNoop extensionsCallback = ExtensionsCallbackNoop();
+    ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
+    uassertStatusOK(parsedUpdate.parseRequest());
+
+    const CanonicalQuery* canonicalQuery =
+        parsedUpdate.hasParsedQuery() ? parsedUpdate.getParsedQuery() : nullptr;
+    FieldRefSet immutablePaths;
+    immutablePaths.insert(&idFieldRef);
+    update::produceDocumentForUpsert(opCtx,
+                                     &updateRequest,
+                                     parsedUpdate.getDriver(),
+                                     canonicalQuery,
+                                     immutablePaths,
+                                     parsedUpdate.getDriver()->getDocument());
+
+    return parsedUpdate.getDriver()->getDocument().getObject();
+}
 
 bool useTwoPhaseProtocol(OperationContext* opCtx,
                          NamespaceString nss,
