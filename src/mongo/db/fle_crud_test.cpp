@@ -676,8 +676,13 @@ void FleCrudTest::doSingleDelete(int id, Fle2AlgorithmInt alg) {
 
     auto efc = getTestEncryptedFieldConfig(alg);
 
-    auto doc = EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
-        _edcNs, efc, &_keyVault);
+    auto doc = EncryptionInformationHelpers::encryptionInformationSerialize(_edcNs, efc);
+
+    // TODO: SERVER-73303 delete when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabledAndIgnoreFCV()) {
+        doc = EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
+            _edcNs, efc, &_keyVault);
+    }
 
     auto ei = EncryptionInformation::parse(IDLParserContext("test"), doc);
 
@@ -1082,7 +1087,8 @@ TEST_F(FleCrudTest, InsertV1PayloadAgainstV2Protocol) {
     }
 
 // Insert and delete one document
-TEST_F(FleCrudTest, InsertAndDeleteOne) {
+// TODO: SERVER-73303 delete when v2 is enabled by default
+TEST_F(FleCrudTest, InsertAndDeleteOneV1) {
     auto doc = BSON("encrypted"
                     << "secret");
     auto element = doc.firstElement();
@@ -1103,7 +1109,29 @@ TEST_F(FleCrudTest, InsertAndDeleteOne) {
 }
 
 // Insert and delete one document
-TEST_F(FleCrudTest, InsertAndDeleteOneRange) {
+TEST_F(FleCrudTest, InsertAndDeleteOne) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    auto doc = BSON("encrypted"
+                    << "secret");
+    auto element = doc.firstElement();
+
+    doSingleInsert(1, element, Fle2AlgorithmInt::kEquality);
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    ASSERT_FALSE(
+        _queryImpl->getById(_escNs, ESCCollection::generateNonAnchorId(getTestESCToken(element), 1))
+            .isEmpty());
+
+    doSingleDelete(1, Fle2AlgorithmInt::kEquality);
+
+    assertDocumentCounts(0, 1, 0, 1);
+    assertECOCDocumentCountByField("encrypted", 1);
+}
+
+// Insert and delete one document
+// TODO: SERVER-73303 delete when v2 is enabled by default
+TEST_F(FleCrudTest, InsertAndDeleteOneRangeV1) {
     RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
     auto doc = BSON("encrypted" << 5);
     auto element = doc.firstElement();
@@ -1118,8 +1146,25 @@ TEST_F(FleCrudTest, InsertAndDeleteOneRange) {
     assertECOCDocumentCountByField("encrypted", 10);
 }
 
+// Insert and delete one document
+TEST_F(FleCrudTest, InsertAndDeleteOneRange) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    auto doc = BSON("encrypted" << 5);
+    auto element = doc.firstElement();
+
+    doSingleInsert(1, element, Fle2AlgorithmInt::kRange);
+
+    assertDocumentCounts(1, 5, 0, 5);
+
+    doSingleDelete(1, Fle2AlgorithmInt::kRange);
+
+    assertDocumentCounts(0, 5, 0, 5);
+    assertECOCDocumentCountByField("encrypted", 5);
+}
+
 // Insert two documents, and delete both
-TEST_F(FleCrudTest, InsertTwoSamAndDeleteTwo) {
+// TODO: SERVER-73303 delete when v2 is enabled by default
+TEST_F(FleCrudTest, InsertTwoSamAndDeleteTwoV1) {
     auto doc = BSON("encrypted"
                     << "secret");
     auto element = doc.firstElement();
@@ -1141,8 +1186,32 @@ TEST_F(FleCrudTest, InsertTwoSamAndDeleteTwo) {
     ASSERT_ECC_DOC(element, 2, 1, 1);
 }
 
+// Insert two documents, and delete both
+TEST_F(FleCrudTest, InsertTwoSameAndDeleteTwo) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    auto doc = BSON("encrypted"
+                    << "secret");
+    auto element = doc.firstElement();
+
+    doSingleInsert(1, element, Fle2AlgorithmInt::kEquality);
+    doSingleInsert(2, element, Fle2AlgorithmInt::kEquality);
+
+    assertDocumentCounts(2, 2, 0, 2);
+
+    ASSERT_FALSE(
+        _queryImpl->getById(_escNs, ESCCollection::generateNonAnchorId(getTestESCToken(element), 1))
+            .isEmpty());
+
+    doSingleDelete(2, Fle2AlgorithmInt::kEquality);
+    doSingleDelete(1, Fle2AlgorithmInt::kEquality);
+
+    assertDocumentCounts(0, 2, 0, 2);
+    assertECOCDocumentCountByField("encrypted", 2);
+}
+
 // Insert two documents with different values and delete them
-TEST_F(FleCrudTest, InsertTwoDifferentAndDeleteTwo) {
+// TODO: SERVER-73303 delete when v2 is enabled by default
+TEST_F(FleCrudTest, InsertTwoDifferentAndDeleteTwoV1) {
 
     doSingleInsert(1,
                    BSON("encrypted"
@@ -1173,9 +1242,43 @@ TEST_F(FleCrudTest, InsertTwoDifferentAndDeleteTwo) {
                    1);
 }
 
+// Insert two documents with different values and delete them
+TEST_F(FleCrudTest, InsertTwoDifferentAndDeleteTwo) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+    doSingleInsert(2,
+                   BSON("encrypted"
+                        << "topsecret"));
+
+    assertDocumentCounts(2, 2, 0, 2);
+
+    doSingleDelete(2, Fle2AlgorithmInt::kEquality);
+    doSingleDelete(1, Fle2AlgorithmInt::kEquality);
+
+    assertDocumentCounts(0, 2, 0, 2);
+    assertECOCDocumentCountByField("encrypted", 2);
+}
+
+// Insert one document but delete another document
+// TODO: SERVER-73303 delete when v2 is enabled by default
+TEST_F(FleCrudTest, InsertOneButDeleteAnotherV1) {
+
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+    assertDocumentCounts(1, 1, 0, 1);
+
+    doSingleDelete(2, Fle2AlgorithmInt::kEquality);
+
+    assertDocumentCounts(1, 1, 0, 1);
+    assertECOCDocumentCountByField("encrypted", 1);
+}
+
 // Insert one document but delete another document
 TEST_F(FleCrudTest, InsertOneButDeleteAnother) {
-
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
     doSingleInsert(1,
                    BSON("encrypted"
                         << "secret"));

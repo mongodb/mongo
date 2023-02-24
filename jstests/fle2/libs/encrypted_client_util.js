@@ -20,6 +20,9 @@ var EncryptedClient = class {
         // use
         this.useImplicitSharding = !(typeof (ImplicitlyShardAccessCollSettings) === "undefined");
 
+        // TODO: SERVER-73303 remove when v2 is enabled by default
+        this.ecocCountMatchesEscCount = false;
+
         const localKMS = {
             key: BinData(
                 0,
@@ -247,7 +250,7 @@ var EncryptedClient = class {
 
         const actualEcoc = countDocuments(sessionDB, ef.ecocCollection, tenantId);
         assert.eq(actualEcoc,
-                  expectedEcoc,
+                  this.ecocCountMatchesEscCount ? expectedEsc : expectedEcoc,
                   `ECOC document count is wrong: Actual ${actualEcoc} vs Expected ${expectedEcoc}`);
     }
 

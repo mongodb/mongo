@@ -361,11 +361,14 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
         auto deletes = deleteRequest.getDeletes();
         uassert(6371302, "Only single document deletes are permitted", deletes.size() == 1);
 
-        auto deleteOpEntry = deletes[0];
+        // TODO: SERVER-73303 delete when v2 is enabled by default
+        if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+            auto deleteOpEntry = deletes[0];
 
-        uassert(6371303,
-                "FLE only supports single document deletes",
-                deleteOpEntry.getMulti() == false);
+            uassert(6371303,
+                    "FLE only supports single document deletes",
+                    deleteOpEntry.getMulti() == false);
+        }
     }
 
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
@@ -1027,7 +1030,15 @@ write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
     auto ei = deleteRequest.getEncryptionInformation().value();
 
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
-    auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
+
+    // TODO: SERVER-73303 delete when v2 is enabled by default
+    StringMap<FLEDeleteToken> tokenMap;
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
+    } else if (ei.getDeleteTokens().has_value()) {
+        uasserted(7293102, "Illegal delete tokens encountered in EncryptionInformation");
+    }
+
     int32_t stmtId = getStmtIdForWriteAt(deleteRequest, 0);
 
     auto newDeleteRequest = deleteRequest;
@@ -1039,24 +1050,32 @@ write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
     newDeleteRequest.setDeletes({newDeleteOp});
 
     newDeleteRequest.getWriteCommandRequestBase().setStmtIds(boost::none);
-    newDeleteRequest.getWriteCommandRequestBase().setStmtId(stmtId);
-    ++stmtId;
 
-    auto [deleteReply, deletedDocument] =
-        queryImpl->deleteWithPreimage(edcNss, ei, newDeleteRequest);
-    checkWriteErrors(deleteReply);
+    // TODO: SERVER-73303 delete when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        newDeleteRequest.getWriteCommandRequestBase().setStmtId(stmtId);
+        ++stmtId;
 
-    // If the delete did not actually delete anything, we are done
-    if (deletedDocument.isEmpty()) {
-        write_ops::DeleteCommandReply reply;
-        reply.getWriteCommandReplyBase().setN(0);
-        return reply;
+        auto [deleteReply, deletedDocument] =
+            queryImpl->deleteWithPreimage(edcNss, ei, newDeleteRequest);
+        checkWriteErrors(deleteReply);
+
+        // If the delete did not actually delete anything, we are done
+        if (deletedDocument.isEmpty()) {
+            write_ops::DeleteCommandReply reply;
+            reply.getWriteCommandReplyBase().setN(0);
+            return reply;
+        }
+        auto deletedFields = EDCServerCollection::getEncryptedIndexedFields(deletedDocument);
+
+        processRemovedFields(queryImpl, edcNss, efc, tokenMap, deletedFields, &stmtId);
+        return deleteReply;
     }
 
-
-    auto deletedFields = EDCServerCollection::getEncryptedIndexedFields(deletedDocument);
-
-    processRemovedFields(queryImpl, edcNss, efc, tokenMap, deletedFields, &stmtId);
+    newDeleteRequest.getWriteCommandRequestBase().setStmtId(boost::none);
+    newDeleteRequest.getWriteCommandRequestBase().setEncryptionInformation(boost::none);
+    auto deleteReply = queryImpl->deleteDocument(edcNss, stmtId, newDeleteRequest);
+    checkWriteErrors(deleteReply);
 
     return deleteReply;
 }
@@ -1691,6 +1710,18 @@ std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryInterfaceImpl::deleteW
     }
 
     return {deleteReply, returnObj};
+}
+
+write_ops::DeleteCommandReply FLEQueryInterfaceImpl::deleteDocument(
+    const NamespaceString& nss, int32_t stmtId, write_ops::DeleteCommandRequest& deleteRequest) {
+
+    dassert(!deleteRequest.getWriteCommandRequestBase().getEncryptionInformation());
+    dassert(deleteRequest.getStmtIds().value_or(std::vector<int32_t>()).empty());
+
+    auto response = _txnClient.runCRUDOp(BatchedCommandRequest(deleteRequest), {stmtId}).get();
+    write_ops::DeleteCommandReply reply;
+    responseToReply(response, reply.getWriteCommandReplyBase());
+    return {reply};
 }
 
 std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceImpl::updateWithPreimage(

@@ -1426,6 +1426,7 @@ public:
     static BSONObj encryptionInformationSerialize(const NamespaceString& nss,
                                                   const BSONObj& encryptedFields);
 
+    // TODO: SERVER-73303 remove when v2 is enabled by default
     /**
      * Serialize EncryptionInformation with EncryptionInformation.schema and a map of delete tokens
      * for each field in EncryptedFieldConfig.
@@ -1440,6 +1441,7 @@ public:
     static EncryptedFieldConfig getAndValidateSchema(const NamespaceString& nss,
                                                      const EncryptionInformation& ei);
 
+    // TODO: SERVER-73303 remove when v2 is enabled by default
     /**
      * Get a set of delete tokens for a given nss from EncryptionInformation.
      */

@@ -105,6 +105,11 @@ std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryInterfaceMock::deleteW
     return {write_ops::DeleteCommandReply(), uassertStatusOK(swDoc)};
 }
 
+write_ops::DeleteCommandReply FLEQueryInterfaceMock::deleteDocument(
+    const NamespaceString& nss, int32_t stmtId, write_ops::DeleteCommandRequest& deleteRequest) {
+    return deleteWithPreimage(nss, {}, deleteRequest).first;
+}
+
 std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceMock::updateWithPreimage(
     const NamespaceString& nss,
     const EncryptionInformation& ei,
