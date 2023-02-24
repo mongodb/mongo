@@ -807,6 +807,17 @@ bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
         return false;
     }
 
+    // Don't need to open the collection if it was already previously instantiated.
+    if (nsOrUUID.nss()) {
+        if (OpenedCollections::get(opCtx).lookupByNamespace(*nsOrUUID.nss())) {
+            return false;
+        }
+    } else {
+        if (OpenedCollections::get(opCtx).lookupByUUID(*nsOrUUID.uuid())) {
+            return false;
+        }
+    }
+
     if (readTimestamp) {
         auto coll = lookupCollectionByNamespaceOrUUID(opCtx, nsOrUUID);
         return !coll || *readTimestamp < coll->getMinimumValidSnapshot();
