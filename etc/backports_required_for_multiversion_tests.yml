@@ -316,6 +316,8 @@ last-continuous:
     ticket: SERVER-73110
   - test_file: jstests/replsets/quiesce_mode_fails_elections.js
     ticket: SERVER-72774
+  - test_file: jstests/core/doc_validation_with_now_variable.js
+    ticket: SERVER-73125
   - test_file: jstests/core/timeseries/timeseries_predicates.js
     ticket: SERVER-73697
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
@@ -717,6 +719,8 @@ last-lts:
     ticket: SERVER-73110
   - test_file: jstests/replsets/quiesce_mode_fails_elections.js
     ticket: SERVER-72774
+  - test_file: jstests/core/doc_validation_with_now_variable.js
+    ticket: SERVER-73125
   - test_file: jstests/core/timeseries/timeseries_predicates.js
     ticket: SERVER-73697
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
