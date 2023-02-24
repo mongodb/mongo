@@ -2,7 +2,7 @@
  * Compute cardinality estimation errors for a testcase and CE strategy.
  * Example testcase:
  * { _id: 2, pipeline: [...], nReturned: 2, "heuristic": 4.47, "histogram": 2, ...}
- * Returns : {"absError": 2.47, "relError": 1.23, "selError": 12.35}
+ * Returns : {"qError": 2.23, "relError": 1.23, "selError": 12.35}
  */
 function computeStrategyErrors(testcase, strategy, collSize) {
     const absError = testcase[strategy] - testcase.nReturned;
@@ -15,13 +15,12 @@ function computeStrategyErrors(testcase, strategy, collSize) {
         relError = 0.1 * testcase[strategy];
     }
 
+    const min = Math.min(testcase[strategy], testcase.nReturned);
+    const max = Math.max(testcase[strategy], testcase.nReturned);
+    const qError = (min > 0) ? max / min : max;
     // Selectivity error wrt collection size.
     const selError = 100.0 * absError / collSize;
-    return {
-        "absError": round2(absError),
-        "relError": round2(relError),
-        "selError": round2(selError)
-    };
+    return {"qError": round2(qError), "relError": round2(relError), "selError": round2(selError)};
 }
 
 /**
@@ -43,7 +42,7 @@ function computeAndPrintErrors(testcase, ceStrategies, collSize, isComplex) {
         const errors = computeStrategyErrors(testcase, strategy, collSize);
         errorDoc[strategy] = errors;
         print(`${strategy}: ${testcase[strategy]} `);
-        print(`AbsError: ${errors["absError"]}, RelError: ${errors["relError"]}, SelError: ${
+        print(`QError: ${errors["qError"]}, RelError: ${errors["relError"]}, SelError: ${
             errors["selError"]}%\n`);
     });
     return errorDoc;
@@ -84,7 +83,7 @@ function aggregateErrorsPerCategory(errorColl, groupFields, ceStrategies) {
     const groupKey = makeGroupKey(groupFields);
     jsTestLog(`Mean errors per ${tojsononeline(groupFields)}:`);
     for (const strategy of ceStrategies) {
-        const absError = "$" + strategy + ".absError";
+        const qError = "$" + strategy + ".qError";
         const relError = "$" + strategy + ".relError";
         const selError = "$" + strategy + ".selError";
         const res =
@@ -93,7 +92,7 @@ function aggregateErrorsPerCategory(errorColl, groupFields, ceStrategies) {
                     {
                         $project: {
                             category: groupKey,
-                            absError2: {$pow: [absError, 2]},
+                            qError2: {$pow: [qError, 2]},
                             relError2: {$pow: [relError, 2]},
                             absSelError: {$abs: selError}
                         }
@@ -101,7 +100,7 @@ function aggregateErrorsPerCategory(errorColl, groupFields, ceStrategies) {
                     {
                         $group: {
                             _id: "$category",
-                            cumAbsError2: {$sum: "$absError2"},
+                            cumQError2: {$sum: "$qError2"},
                             cumRelError2: {$sum: "$relError2"},
                             cumSelError: {$sum: "$absSelError"},
                             sz: {$count: {}}
@@ -112,8 +111,7 @@ function aggregateErrorsPerCategory(errorColl, groupFields, ceStrategies) {
                             "category": "$_id",
                             "queryCount": "$sz",
                             "_id": 0,
-                            "RMSAbsError":
-                                {$round: [{$sqrt: {$divide: ["$cumAbsError2", "$sz"]}}, 3]},
+                            "RMSQError": {$round: [{$sqrt: {$divide: ["$cumQError2", "$sz"]}}, 3]},
                             "RMSRelError":
                                 {$round: [{$sqrt: {$divide: ["$cumRelError2", "$sz"]}}, 3]},
                             "meanSelError": {$round: [{$divide: ["$cumSelError", "$sz"]}, 3]}
@@ -135,9 +133,12 @@ function aggregateErrorsPerCategory(errorColl, groupFields, ceStrategies) {
  * aggregate only the error documents which satisfy the predicate.
  */
 function aggregateErrorsPerStrategy(errorColl, ceStrategies, predicate = {}) {
-    jsTestLog(`Mean errors per strategy for predicate ${tojsononeline(predicate)}:`);
+    const msg = (Object.keys(predicate).length == 0) ? "all queries"
+                                                     : `predicate ${tojsononeline(predicate)}:`;
+    jsTestLog(`Mean errors per strategy for ${msg}:`);
+
     for (const strategy of ceStrategies) {
-        const absError = "$" + strategy + ".absError";
+        const qError = "$" + strategy + ".qError";
         const relError = "$" + strategy + ".relError";
         const selError = "$" + strategy + ".selError";
         const res =
@@ -146,7 +147,7 @@ function aggregateErrorsPerStrategy(errorColl, ceStrategies, predicate = {}) {
                     {$match: predicate},
                     {
                         $project: {
-                            absError2: {$pow: [absError, 2]},
+                            qError2: {$pow: [qError, 2]},
                             relError2: {$pow: [relError, 2]},
                             absSelError: {$abs: selError}
                         }
@@ -154,7 +155,7 @@ function aggregateErrorsPerStrategy(errorColl, ceStrategies, predicate = {}) {
                     {
                         $group: {
                             _id: null,
-                            cumAbsError2: {$sum: "$absError2"},
+                            cumQError2: {$sum: "$qError2"},
                             cumRelError2: {$sum: "$relError2"},
                             cumSelError: {$sum: "$absSelError"},
                             sz: {$count: {}}
@@ -163,8 +164,7 @@ function aggregateErrorsPerStrategy(errorColl, ceStrategies, predicate = {}) {
                     {
                         $project: {
                             _id: 0,
-                            "RMSAbsError":
-                                {$round: [{$sqrt: {$divide: ["$cumAbsError2", "$sz"]}}, 3]},
+                            "RMSQError": {$round: [{$sqrt: {$divide: ["$cumQError2", "$sz"]}}, 3]},
                             "RMSRelError":
                                 {$round: [{$sqrt: {$divide: ["$cumRelError2", "$sz"]}}, 3]},
                             "meanSelError": {$round: [{$divide: ["$cumSelError", "$sz"]}, 3]}
@@ -174,58 +174,6 @@ function aggregateErrorsPerStrategy(errorColl, ceStrategies, predicate = {}) {
                 .toArray();
 
         print(`${strategy}: `);
-        for (const doc of res) {
-            print(`${tojsononeline(doc)}\n`);
-        }
-    }
-}
-
-/**
- * Aggregate errors in the 'errorColl' for each CE strategy per data distribution.
- * The function groups fieldNames with common prefix ending with a "_". In the CE tests we use this
- * prefix to encode the type of data distribution 'uniform_int_100', 'normal_int_1000'.
- */
-function aggregateErrorsPerDataDistribution(errorColl, ceStrategies) {
-    jsTestLog('Mean errors per data distribution:');
-    for (const strategy of ceStrategies) {
-        const absError = "$" + strategy + ".absError";
-        const relError = "$" + strategy + ".relError";
-        const selError = "$" + strategy + ".selError";
-        const res =
-            errorColl
-                .aggregate([
-                    {
-                        $project: {
-                            "distr":
-                                {$substr: ["$fieldName", 0, {$indexOfCP: ["$fieldName", "_"]}]},
-                            absError2: {$pow: [absError, 2]},
-                            relError2: {$pow: [relError, 2]},
-                            absSelError: {$abs: selError}
-                        }
-                    },
-                    {
-                        $group: {
-                            _id: "$distr",
-                            cumAbsError2: {$sum: "$absError2"},
-                            cumRelError2: {$sum: "$relError2"},
-                            cumSelError: {$sum: "$absSelError"},
-                            sz: {$count: {}}
-                        }
-                    },
-                    {
-                        $project: {
-                            "RMSAbsErr":
-                                {$round: [{$sqrt: {$divide: ["$cumAbsError2", "$sz"]}}, 3]},
-                            "RMSRelErr":
-                                {$round: [{$sqrt: {$divide: ["$cumRelError2", "$sz"]}}, 3]},
-                            "meanSelErr": {$round: [{$divide: ["$cumSelError", "$sz"]}, 3]}
-                        }
-                    },
-                    {$sort: {_id: 1}}
-                ])
-                .toArray();
-
-        print(`${strategy}:\n`);
         for (const doc of res) {
             print(`${tojsononeline(doc)}\n`);
         }
@@ -252,6 +200,6 @@ function printQueriesWithBadAccuracy(errorColl, testCases, strategy, errorField,
         const i = doc["_id"];
         const test = testCases[i];
         print(`Id: ${test._id}: ${tojsononeline(test.pipeline)}, qtype: ${test.qtype}, data type: ${test.dtype}, 
-cardinality: ${test.nReturned}, Histogram estimation: ${test[strategy]}, errors: ${tojsononeline(doc[strategy])}\n`);
+cardinality: ${test.nReturned}, ${strategy} estimation: ${test[strategy]}, errors: ${tojsononeline(doc[strategy])}\n`);
     }
 }

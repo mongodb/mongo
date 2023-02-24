@@ -149,9 +149,10 @@ function createIndexes(coll, fields) {
 /**
  * Creates statistics for each field in the 'fields' array.
  */
-function analyzeFields(db, coll, fields) {
+function analyzeFields(db, coll, fields, bucketCnt = 100) {
     for (const field of fields) {
-        assert.commandWorked(db.runCommand({analyze: coll.getName(), key: field}));
+        assert.commandWorked(
+            db.runCommand({analyze: coll.getName(), key: field, numberBuckets: bucketCnt}));
     }
 }
 /**
