@@ -547,6 +547,21 @@ commands:
                 description: "The shard id of the db primary shard"
                 type: shard_id
 
+    _configsvrCheckClusterMetadataConsistency:
+          description: "Internal command sent to the config server to check cluster metadata 
+                        consistency."
+          command_name: _configsvrCheckClusterMetadataConsistency
+          cpp_name: ConfigsvrCheckClusterMetadataConsistency
+          namespace: concatenate_with_db
+          allow_global_collection_name: true
+          api_version: ""
+          reply_type: CursorInitialReply
+          strict: false
+          fields:
+              cursor:
+                  type: SimpleCursorOptions
+                  optional: true
+
     _configsvrSetClusterParameter:
         command_name: _configsvrSetClusterParameter
         cpp_name: ConfigsvrSetClusterParameter

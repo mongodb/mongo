@@ -142,6 +142,14 @@ public:
                 }
             }
 
+            // Send a request to the configsvr to check cluster metadata consistency.
+            if (getCommandLevel(nss) == MetadataConsistencyCommandLevelEnum::kClusterLevel) {
+                ConfigsvrCheckClusterMetadataConsistency configsvrRequest(nss);
+                configsvrRequest.setDbName(nss.db());
+                configsvrRequest.setCursor(cursorOpts);
+                requests.emplace_back(ShardId::kConfigServerId, configsvrRequest.toBSON({}));
+            }
+
             ClusterClientCursorParams params(
                 nss,
                 APIParameters::get(opCtx),
