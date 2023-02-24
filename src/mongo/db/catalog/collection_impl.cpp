@@ -213,10 +213,10 @@ bool doesMinMaxHaveMixedSchemaData(const BSONObj& min, const BSONObj& max) {
 
 StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opCtx,
                                                            StorageEngine* storageEngine,
-                                                           Collection* collection,
+                                                           const Collection* collection,
                                                            StringData ident) {
     // First check the index catalog of the existing collection for the index entry.
-    auto latestEntry = [&]() -> std::shared_ptr<IndexCatalogEntry> {
+    auto latestEntry = [&]() -> std::shared_ptr<const IndexCatalogEntry> {
         if (!collection)
             return nullptr;
 
@@ -390,7 +390,7 @@ void CollectionImpl::init(OperationContext* opCtx) {
 }
 
 Status CollectionImpl::initFromExisting(OperationContext* opCtx,
-                                        const std::shared_ptr<Collection>& collection,
+                                        const std::shared_ptr<const Collection>& collection,
                                         const DurableCatalogEntry& catalogEntry,
                                         boost::optional<Timestamp> readTimestamp) {
     // We are per definition committed if we initialize from an existing collection.
@@ -400,7 +400,7 @@ Status CollectionImpl::initFromExisting(OperationContext* opCtx,
         // Use the shared state from the existing collection.
         LOGV2_DEBUG(
             6825402, 1, "Initializing collection using shared state", logAttrs(collection->ns()));
-        _shared = static_cast<CollectionImpl*>(collection.get())->_shared;
+        _shared = static_cast<const CollectionImpl*>(collection.get())->_shared;
     } else {
         _initShared(opCtx, catalogEntry.metadata->options);
     }

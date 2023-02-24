@@ -230,7 +230,7 @@ public:
      * Returns the SnapshotTooOld error if the underlying data files have already been removed.
      */
     virtual Status initFromExisting(OperationContext* opCtx,
-                                    const std::shared_ptr<Collection>& collection,
+                                    const std::shared_ptr<const Collection>& collection,
                                     const DurableCatalogEntry& catalogEntry,
                                     boost::optional<Timestamp> readTimestamp) = 0;
 

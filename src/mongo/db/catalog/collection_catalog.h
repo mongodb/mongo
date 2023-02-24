@@ -715,7 +715,7 @@ private:
      */
     std::shared_ptr<Collection> _createCompatibleCollection(
         OperationContext* opCtx,
-        const std::shared_ptr<Collection>& latestCollection,
+        const std::shared_ptr<const Collection>& latestCollection,
         boost::optional<Timestamp> readTimestamp,
         const DurableCatalogEntry& catalogEntry) const;
 

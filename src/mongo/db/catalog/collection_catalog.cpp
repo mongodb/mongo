@@ -918,22 +918,38 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespace(
 
     auto metadata = DurableCatalog::getMetadataFromCatalogEntry(catalogEntry);
 
+    if (latestCollection && latestCollection->isMetadataEqual(metadata)) {
+        openedCollections.store(latestCollection, nss, uuid);
+        return latestCollection.get();
+    }
+
     // Use the pendingCollection if there is no latestCollection or if the metadata of the
     // latestCollection doesn't match the durable catalogEntry.
-    if (!latestCollection || !latestCollection->isMetadataEqual(metadata)) {
+    if (pendingCollection && pendingCollection->isMetadataEqual(metadata)) {
         // If the latest collection doesn't exist then the pending collection must exist as it's
         // being created in this snapshot. Otherwise, if the latest collection is incompatible
         // with this snapshot, then the change came from an uncommitted update by an operation
         // operating on this snapshot.
-        invariant(pendingCollection && pendingCollection->isMetadataEqual(metadata));
         // TODO(SERVER-72193): Test this code path.
         openedCollections.store(pendingCollection, nss, uuid);
         return pendingCollection.get();
     }
 
-    invariant(latestCollection->isMetadataEqual(metadata));
-    openedCollections.store(latestCollection, nss, uuid);
-    return latestCollection.get();
+    // If neither `latestCollection` or `pendingCollection` match the metadata we fully instantiate
+    // a new collection instance from durable storage that is guaranteed to match. This can happen
+    // when multikey is not consistent with the storage snapshot.
+    invariant(latestCollection || pendingCollection);
+    auto durableCatalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
+    invariant(durableCatalogEntry);
+    auto compatibleCollection =
+        _createCompatibleCollection(opCtx,
+                                    latestCollection ? latestCollection : pendingCollection,
+                                    /*readTimestamp=*/boost::none,
+                                    durableCatalogEntry.get());
+    invariant(compatibleCollection);
+    openedCollections.store(
+        compatibleCollection, compatibleCollection->ns(), compatibleCollection->uuid());
+    return compatibleCollection.get();
 }
 
 const Collection* CollectionCatalog::_openCollectionAtLatestByUUID(OperationContext* opCtx,
@@ -999,22 +1015,39 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByUUID(OperationCont
     // pending collection instances. Make sure that the metadata is as expected in this case.
     auto metadata = DurableCatalog::getMetadataFromCatalogEntry(catalogEntry);
 
+    if (latestCollection && latestCollection->isMetadataEqual(metadata)) {
+        openedCollections.store(latestCollection, nss, uuid);
+        return latestCollection.get();
+    }
+
     // Use the pendingCollection if there is no latestCollection or if the metadata of the
     // latestCollection doesn't match the durable catalogEntry.
-    if (!latestCollection || !latestCollection->isMetadataEqual(metadata)) {
+    if (pendingCollection && pendingCollection->isMetadataEqual(metadata)) {
         // If the latest collection doesn't exist then the pending collection must exist as it's
         // being created in this snapshot. Otherwise, if the latest collection is incompatible
         // with this snapshot, then the change came from an uncommitted update by an operation
         // operating on this snapshot.
-        invariant(pendingCollection && pendingCollection->isMetadataEqual(metadata));
         openedCollections.store(pendingCollection, nss, uuid);
         return pendingCollection.get();
     }
 
-    invariant(latestCollection->isMetadataEqual(metadata));
-    openedCollections.store(latestCollection, nss, uuid);
-    return latestCollection.get();
+    // If neither `latestCollection` or `pendingCollection` match the metadata we fully instantiate
+    // a new collection instance from durable storage that is guaranteed to match. This can happen
+    // when multikey is not consistent with the storage snapshot.
+    invariant(latestCollection || pendingCollection);
+    auto durableCatalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
+    invariant(durableCatalogEntry);
+    auto compatibleCollection =
+        _createCompatibleCollection(opCtx,
+                                    latestCollection ? latestCollection : pendingCollection,
+                                    /*readTimestamp=*/boost::none,
+                                    durableCatalogEntry.get());
+    invariant(compatibleCollection);
+    openedCollections.store(
+        compatibleCollection, compatibleCollection->ns(), compatibleCollection->uuid());
+    return compatibleCollection.get();
 }
+
 const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespaceOrUUID(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nssOrUUID,
@@ -1151,7 +1184,7 @@ boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
 
 std::shared_ptr<Collection> CollectionCatalog::_createCompatibleCollection(
     OperationContext* opCtx,
-    const std::shared_ptr<Collection>& latestCollection,
+    const std::shared_ptr<const Collection>& latestCollection,
     boost::optional<Timestamp> readTimestamp,
     const DurableCatalogEntry& catalogEntry) const {
     // Check if the collection is drop pending, not expired, and compatible with the read timestamp.

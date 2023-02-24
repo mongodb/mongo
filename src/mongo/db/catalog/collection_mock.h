@@ -67,7 +67,7 @@ public:
     }
 
     Status initFromExisting(OperationContext* opCtx,
-                            const std::shared_ptr<Collection>& collection,
+                            const std::shared_ptr<const Collection>& collection,
                             const DurableCatalogEntry& catalogEntry,
                             boost::optional<Timestamp> readTimestamp) {
         MONGO_UNREACHABLE;
