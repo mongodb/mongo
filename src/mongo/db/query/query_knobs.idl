@@ -34,6 +34,7 @@ global:
   cpp_includes:
     - "mongo/db/query/cost_model/cost_model_on_update.h"
     - "mongo/db/query/ce_mode_parameter.h"
+    - "mongo/db/query/explain_version_validator.h"
     - "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
     - "mongo/db/query/telemetry_util.h"
     - "mongo/platform/atomic_proxy.h"
@@ -846,6 +847,16 @@ server_parameters:
     cpp_varname: "internalCascadesOptimizerStdCoutDebugOutput"
     cpp_vartype: AtomicWord<bool>
     default: false
+    test_only: true
+
+  internalCascadesOptimizerExplainVersion:
+    description: "Selects the explain version of the plans from the Cascades optimizer. The default is 'bson', other supported versions are 'v1', 'v2', and 'v2compact'"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerExplainVersion"
+    cpp_vartype: synchronized_value<std::string>
+    default: "bson"
+    validator:
+        callback: optimizer::validateOptimizerExplainVersion
     test_only: true
 
   internalCascadesOptimizerUseDescriptiveVarNames:

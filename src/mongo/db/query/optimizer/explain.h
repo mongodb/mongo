@@ -40,21 +40,22 @@
 
 namespace mongo::optimizer {
 
+enum class ExplainVersion { V1, V2, V2Compact, V3, Vmax };
+
 /**
- * This structure holds any data that is required by the BSON version of explain. It is
- * self-sufficient and separate because it must outlive the other optimizer state as it is used by
- * the runtime plan executor.
+ * This structure holds any data that is required by the explain. It is self-sufficient and separate
+ * because it must outlive the other optimizer state as it is used by the runtime plan executor.
  */
 class ABTPrinter : public AbstractABTPrinter {
 public:
-    ABTPrinter(ABT abtTree, NodeToGroupPropsMap nodeToPropsMap)
-        : _abtTree(std::move(abtTree)), _nodeToPropsMap(std::move(nodeToPropsMap)) {}
+    ABTPrinter(ABT abt, NodeToGroupPropsMap nodeToPropsMap, ExplainVersion explainVersion);
 
     BSONObj explainBSON() const override final;
 
 private:
-    ABT _abtTree;
+    ABT _abt;
     NodeToGroupPropsMap _nodeToPropsMap;
+    ExplainVersion _explainVersion;
 };
 
 class ExplainGenerator {

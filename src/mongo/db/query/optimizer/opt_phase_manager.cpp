@@ -54,9 +54,11 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  std::unique_ptr<CostEstimator> costEstimator,
                                  PathToIntervalFn pathToInterval,
                                  ConstFoldFn constFold,
+                                 const bool supportExplain,
                                  DebugInfo debugInfo,
                                  QueryHints queryHints)
     : _phaseSet(std::move(phaseSet)),
+      _supportExplain(supportExplain),
       _debugInfo(std::move(debugInfo)),
       _hints(std::move(queryHints)),
       _metadata(std::move(metadata)),
@@ -68,6 +70,7 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
       _pathToInterval(std::move(pathToInterval)),
       _constFold(std::move(constFold)),
       _physicalNodeId(),
+      _postMemoPlan(),
       _requireRID(requireRID),
       _ridProjections(),
       _prefixId(prefixId) {
@@ -238,6 +241,9 @@ bool OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
     _physicalNodeId = {rootGroupId, optGroupResult._index};
     std::tie(input, _nodeToGroupPropsMap) =
         extractPhysicalPlan(_physicalNodeId, _metadata, _ridProjections, _memo);
+    if (_supportExplain) {
+        _postMemoPlan = input;
+    }
 
     env.rebuild(input);
     if (env.hasFreeVariables()) {
@@ -336,6 +342,10 @@ MemoPhysicalNodeId OptPhaseManager::getPhysicalNodeId() const {
     return _physicalNodeId;
 }
 
+const boost::optional<ABT>& OptPhaseManager::getPostMemoPlan() const {
+    return _postMemoPlan;
+}
+
 const QueryHints& OptPhaseManager::getHints() const {
     return _hints;
 }
@@ -356,20 +366,12 @@ const Metadata& OptPhaseManager::getMetadata() const {
     return _metadata;
 }
 
-PrefixId& OptPhaseManager::getPrefixId() const {
-    return _prefixId;
-}
-
 const NodeToGroupPropsMap& OptPhaseManager::getNodeToGroupPropsMap() const {
     return _nodeToGroupPropsMap;
 }
 
 NodeToGroupPropsMap& OptPhaseManager::getNodeToGroupPropsMap() {
     return _nodeToGroupPropsMap;
-}
-
-const RIDProjectionsMap& OptPhaseManager::getRIDProjections() const {
-    return _ridProjections;
 }
 
 }  // namespace mongo::optimizer

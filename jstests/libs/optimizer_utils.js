@@ -276,6 +276,21 @@ function prettyOp(op) {
     }
 }
 
+/**
+ * Helper function to remove UUIDs of collections in the supplied database from a V1 or V2 optimizer
+ * explain.
+ */
+function removeUUIDsFromExplain(db, explain) {
+    const listCollsRes = db.runCommand({listCollections: 1}).cursor.firstBatch;
+    let plan = explain.queryPlanner.winningPlan.optimizerPlan.plan.toString();
+
+    for (let entry of listCollsRes) {
+        const uuidStr = entry.info.uuid.toString().slice(6).slice(0, -2);
+        plan = plan.replace(uuidStr, "");
+    }
+    return plan;
+}
+
 function navigateToPath(doc, path) {
     let result;
     let field;

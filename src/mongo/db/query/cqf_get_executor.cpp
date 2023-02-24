@@ -44,6 +44,7 @@
 #include "mongo/db/query/cost_model/cost_model_manager.h"
 #include "mongo/db/query/cost_model/on_coefficients_change_updater_impl.h"
 #include "mongo/db/query/cqf_command_utils.h"
+#include "mongo/db/query/explain_version_validator.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/node.h"
@@ -269,7 +270,8 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
                                  const NamespaceString& nss,
                                  const CollectionPtr& collection,
                                  const bool requireRID,
-                                 const ScanOrder scanOrder) {
+                                 const ScanOrder scanOrder,
+                                 const bool needsExplain) {
     auto env = VariableEnvironment::build(abt);
     SlotVarMap slotMap;
     auto runtimeEnvironment = std::make_unique<sbe::RuntimeEnvironment>();  // TODO use factory
@@ -299,7 +301,7 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
     }
 
     sbePlan->attachToOperationContext(opCtx);
-    if (expCtx->explain || expCtx->mayDbProfile) {
+    if (needsExplain || expCtx->mayDbProfile) {
         sbePlan->markShouldCollectTimingInfo();
     }
 
@@ -311,13 +313,41 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
                                              nullptr,
                                              std::make_unique<YieldPolicyCallbacksImpl>(nss));
 
+    std::unique_ptr<ABTPrinter> abtPrinter;
+    if (needsExplain) {
+        // By default, we print the optimized ABT. For test-only versions we output the post-memo
+        // phan instead.
+        ABT toExplain = std::move(abt);
+
+        ExplainVersion explainVersion = ExplainVersion::Vmax;
+        const auto& explainVersionStr = internalCascadesOptimizerExplainVersion.get();
+        if (explainVersionStr == "v1"_sd) {
+            explainVersion = ExplainVersion::V1;
+            toExplain = *phaseManager.getPostMemoPlan();
+        } else if (explainVersionStr == "v2"_sd) {
+            explainVersion = ExplainVersion::V2;
+            toExplain = *phaseManager.getPostMemoPlan();
+        } else if (explainVersionStr == "v2compact"_sd) {
+            explainVersion = ExplainVersion::V2Compact;
+            toExplain = *phaseManager.getPostMemoPlan();
+        } else if (explainVersionStr == "bson"_sd) {
+            explainVersion = ExplainVersion::V3;
+        } else {
+            // Should have been validated.
+            MONGO_UNREACHABLE;
+        }
+
+        abtPrinter = std::make_unique<ABTPrinter>(
+            std::move(toExplain), phaseManager.getNodeToGroupPropsMap(), explainVersion);
+    }
+
     sbePlan->prepare(data.ctx);
     CurOp::get(opCtx)->stopQueryPlanningTimer();
 
     return {opCtx,
             nullptr /*solution*/,
             {std::move(sbePlan), std::move(data)},
-            std::make_unique<ABTPrinter>(std::move(abt), phaseManager.getNodeToGroupPropsMap()),
+            std::move(abtPrinter),
             QueryPlannerParams::Options::DEFAULT,
             nss,
             std::move(yieldPolicy),
@@ -530,6 +560,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                                           const bool requireRID,
                                           Metadata metadata,
                                           const ConstFoldFn& constFold,
+                                          const bool supportExplain,
                                           QueryHints hints) {
     switch (mode) {
         case CEMode::kSampling: {
@@ -549,6 +580,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                                                     std::make_unique<CostEstimatorImpl>(costModel),
                                                     defaultConvertPathToInterval,
                                                     constFold,
+                                                    supportExplain,
                                                     DebugInfo::kDefaultForProd,
                                                     {} /*hints*/};
             return {OptPhaseManager::getAllRewritesSet(),
@@ -563,6 +595,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                     std::make_unique<CostEstimatorImpl>(costModel),
                     defaultConvertPathToInterval,
                     constFold,
+                    supportExplain,
                     DebugInfo::kDefaultForProd,
                     std::move(hints)};
         }
@@ -579,6 +612,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                     std::make_unique<CostEstimatorImpl>(costModel),
                     defaultConvertPathToInterval,
                     constFold,
+                    supportExplain,
                     DebugInfo::kDefaultForProd,
                     std::move(hints)};
 
@@ -592,6 +626,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                     std::make_unique<CostEstimatorImpl>(costModel),
                     defaultConvertPathToInterval,
                     constFold,
+                    supportExplain,
                     DebugInfo::kDefaultForProd,
                     std::move(hints)};
 
@@ -688,6 +723,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     }
 
     auto costModel = cost_model::costModelManager(opCtx->getServiceContext()).getCoefficients();
+    const bool needsExplain = expCtx->explain.has_value();
 
     OptPhaseManager phaseManager = createPhaseManager(mode,
                                                       costModel,
@@ -698,6 +734,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                                                       requireRID,
                                                       std::move(metadata),
                                                       constFold,
+                                                      needsExplain,
                                                       std::move(queryHints));
     if (!phaseManager.optimizeNoAssert(abt)) {
         return boost::none;
@@ -737,7 +774,8 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                           nss,
                           collection,
                           requireRID,
-                          scanOrder);
+                          scanOrder,
+                          needsExplain);
 }
 
 boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(const CollectionPtr& collection,

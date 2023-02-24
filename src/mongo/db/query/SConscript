@@ -256,6 +256,7 @@ env.Library(
     source=[
         'ce_mode_parameter.cpp',
         'cost_model/cost_model_on_update.cpp',
+        'explain_version_validator.cpp',
         'framework_control.cpp',
         'query_feature_flags.idl',
         'query_knobs.idl',

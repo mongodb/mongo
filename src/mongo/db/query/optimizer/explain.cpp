@@ -39,12 +39,44 @@
 
 namespace mongo::optimizer {
 
-BSONObj ABTPrinter::explainBSON() const {
-    return ExplainGenerator::explainBSONObj(
-        _abtTree, true /*displayProperties*/, nullptr /*memoInterface*/, _nodeToPropsMap);
-}
+ABTPrinter::ABTPrinter(ABT abt,
+                       NodeToGroupPropsMap nodeToPropsMap,
+                       const ExplainVersion explainVersion)
+    : _abt(std::move(abt)),
+      _nodeToPropsMap(std::move(nodeToPropsMap)),
+      _explainVersion(explainVersion) {}
 
-enum class ExplainVersion { V1, V2, V2Compact, V3, Vmax };
+BSONObj ABTPrinter::explainBSON() const {
+    const auto explainPlanStr = [&](std::string planStr) {
+        BSONObjBuilder builder;
+        builder.append("plan", std::move(planStr));
+        return builder.done().getOwned();
+    };
+
+    switch (_explainVersion) {
+        case ExplainVersion::V1:
+            return explainPlanStr(ExplainGenerator::explain(
+                _abt, false /*displayProperties*/, nullptr /*memoInterface*/, _nodeToPropsMap));
+
+        case ExplainVersion::V2:
+            return explainPlanStr(ExplainGenerator::explainV2(
+                _abt, false /*displayProperties*/, nullptr /*memoInterface*/, _nodeToPropsMap));
+
+        case ExplainVersion::V2Compact:
+            return explainPlanStr(ExplainGenerator::explainV2Compact(
+                _abt, false /*displayProperties*/, nullptr /*memoInterface*/, _nodeToPropsMap));
+
+        case ExplainVersion::V3:
+            return ExplainGenerator::explainBSONObj(
+                _abt, true /*displayProperties*/, nullptr /*memoInterface*/, _nodeToPropsMap);
+
+        case ExplainVersion::Vmax:
+            // Should not be seeing this value here.
+            break;
+    }
+
+    MONGO_UNREACHABLE;
+}
 
 bool constexpr operator<(const ExplainVersion v1, const ExplainVersion v2) {
     return static_cast<int>(v1) < static_cast<int>(v2);
