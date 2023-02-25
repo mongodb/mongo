@@ -1576,6 +1576,8 @@ buildvariants:
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
     - rhel80-medium
+  - name: sharding_catalog_shard_gen
+  - name: sharding_auth_catalog_shard_gen
   - name: concurrency_sharded_with_catalog_shard_gen
     distros:
     - rhel80-medium

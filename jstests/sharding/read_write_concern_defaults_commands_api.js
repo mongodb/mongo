@@ -343,7 +343,7 @@ jsTestLog("Testing standalone replica set with implicit default write concern {w
 
 jsTestLog("Testing sharded cluster with implicit default write concern majority...");
 {
-    let st = new ShardingTest({shards: 1, rs: {nodes: 2}});
+    let st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 
     // Mongos succeeds.
     verifyDefaultState(st.s, true /* isImplicitDefaultWCMajority */);
@@ -351,12 +351,12 @@ jsTestLog("Testing sharded cluster with implicit default write concern majority.
     verifyDefaultRWCommandsInvalidInput(st.s);
 
     // Shard node fails.
-    verifyDefaultRWCommandsFailWithCode(st.rs0.getPrimary(), {failureCode: 51301});
-    assert.commandFailedWithCode(st.rs0.getSecondary().adminCommand({getDefaultRWConcern: 1}),
+    verifyDefaultRWCommandsFailWithCode(st.rs1.getPrimary(), {failureCode: 51301});
+    assert.commandFailedWithCode(st.rs1.getSecondary().adminCommand({getDefaultRWConcern: 1}),
                                  51301);
     // Secondaries fail setDefaultRWConcern before executing the command.
     assert.commandFailedWithCode(
-        st.rs0.getSecondary().adminCommand(
+        st.rs1.getSecondary().adminCommand(
             {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}),
         ErrorCodes.NotWritablePrimary);
 

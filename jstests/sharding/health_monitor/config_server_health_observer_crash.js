@@ -44,6 +44,7 @@ var st = new ShardingTest({
     shards: 1,
     mongos: [mongosParams, {}],
     other: {useBridge: true},
+    config: 3,
 });
 
 assert.commandWorked(st.s0.adminCommand(

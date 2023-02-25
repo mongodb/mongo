@@ -1,3 +1,5 @@
+// Requires no shards.
+// @tags: [catalog_shard_incompatible]
 (function() {
 'use strict';
 
@@ -32,7 +34,6 @@ jsTest.log('Only system.sessions may be sharded');
 
 st.stop();
 
-// Cannot shard things in config without shards.
 {
     var st = new ShardingTest({shards: 0});
     var admin = st.s.getDB('admin');

@@ -1,7 +1,7 @@
 /*
  * Tests basic support for internal sessions.
  *
- * @tags: [requires_fcv_60, uses_transactions]
+ * @tags: [requires_fcv_60, uses_transactions, temporary_catalog_shard_incompatible]
  */
 (function() {
 'use strict';

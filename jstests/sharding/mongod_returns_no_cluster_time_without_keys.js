@@ -56,7 +56,15 @@ adminDB.auth(adminUser.username, adminUser.password);
 assert(st.s.getDB("admin").system.keys.count() >= 2);
 
 let priRSConn = st.rs0.getPrimary().getDB("admin");
+if (TestData.catalogShard) {
+    // In catalog shard mode we've already used up the localhost exception on the first shard, so we
+    // have to auth to create the user below.
+    priRSConn.auth(adminUser.username, adminUser.password);
+}
 priRSConn.createUser({user: rUser.username, pwd: rUser.password, roles: ["root"]});
+if (TestData.catalogShard) {
+    priRSConn.logout();
+}
 priRSConn.auth(rUser.username, rUser.password);
 
 // use assert.soon since it's possible the shard primary may not have refreshed

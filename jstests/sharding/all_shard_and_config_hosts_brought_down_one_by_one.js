@@ -1,5 +1,7 @@
 /**
  * Shuts down config server and shard replica set nodes one by one and ensures correct behaviour.
+ *
+ * @tags: [temporary_catalog_shard_incompatible]
  */
 
 // Checking UUID and index consistency involves talking to the config servers, which are shut down

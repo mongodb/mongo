@@ -52,7 +52,7 @@ function getShardName(rsTest) {
 var s = new ShardingTest({
     name: "auth",
     mongos: 1,
-    shards: 0,
+    shards: TestData.catalogShard ? 1 : 0,
     other: {keyFile: "jstests/libs/key1", chunkSize: 1, enableAutoSplit: false},
 });
 

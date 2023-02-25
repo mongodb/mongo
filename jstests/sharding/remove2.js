@@ -164,7 +164,7 @@ assert.eq(1, st.s.getDB('test2').foo.find().itcount());
 // Can't shut down with rst2 in the set or ShardingTest will fail trying to cleanup on shutdown.
 // Have to take out rst2 and put rst1 back into the set so that it can clean up.
 jsTestLog("Resetting the sharding test to its initial state to allow the test to shut down.");
-assert.commandWorked(st.admin.runCommand({movePrimary: 'test2', to: st.rs0.name}));
+assert.commandWorked(st.admin.runCommand({movePrimary: 'test2', to: st.shard0.shardName}));
 removeShardAndCleanup(st, coll, rst2);
 rst2.stopSet();
 

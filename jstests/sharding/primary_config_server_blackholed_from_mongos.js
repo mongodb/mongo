@@ -11,7 +11,7 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-var st = new ShardingTest({shards: 2, mongos: 1, useBridge: true});
+var st = new ShardingTest({shards: 2, mongos: 1, useBridge: true, config: 3});
 
 var testDB = st.s.getDB('BlackHoleDB');
 var configDB = st.s.getDB('config');

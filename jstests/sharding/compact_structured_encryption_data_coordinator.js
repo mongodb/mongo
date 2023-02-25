@@ -1,5 +1,5 @@
 // Basic test that the CompactStructuredEncryptionDataCoordinator runs.
-// @tags: [requires_sharding,requires_fcv_60]
+// @tags: [requires_sharding,requires_fcv_60, temporary_catalog_shard_incompatible]
 
 (function() {
 'use strict';

@@ -5,6 +5,7 @@
  *  @tags: [
  *   # The SBE plan cache was enabled by default in 6.3.
  *   requires_fcv_63,
+ *   temporary_catalog_shard_incompatible,
  * ]
  */
 

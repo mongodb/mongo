@@ -42,7 +42,7 @@ const parentLsid = {
     id: sessionUUID
 };
 
-const kInternalTxnNumber = NumberLong(0);
+const kInternalTxnNumber = NumberLong(50123);
 
 let numTransactionsCollEntries = 0;
 let numImageCollEntries = 0;
@@ -66,9 +66,12 @@ assert.commandWorked(testDB.adminCommand(
     {commitTransaction: 1, lsid: childLsid0, txnNumber: kInternalTxnNumber, autocommit: false}));
 numTransactionsCollEntries++;
 
-assert.eq(numTransactionsCollEntries, transactionsCollOnPrimary.find().itcount());
+// Use a filter to skip transactions from internal metadata operations if we're running in catalog
+// shard mode.
+assert.eq(numTransactionsCollEntries,
+          transactionsCollOnPrimary.find({txnNum: kInternalTxnNumber}).itcount());
 
-const parentTxnNumber1 = NumberLong(1);
+const parentTxnNumber1 = NumberLong(55123);
 
 assert.commandWorked(testDB.runCommand({
     update: kCollName,
@@ -99,7 +102,9 @@ assert.commandWorked(testDB.adminCommand(
 numTransactionsCollEntries++;
 numImageCollEntries++;
 
-assert.eq(numTransactionsCollEntries, transactionsCollOnPrimary.find().itcount());
+assert.eq(numTransactionsCollEntries,
+          transactionsCollOnPrimary.find({txnNum: {$in: [kInternalTxnNumber, parentTxnNumber1]}})
+              .itcount());
 assert.eq(numImageCollEntries, imageCollOnPrimary.find().itcount());
 
 assert.commandWorked(shard0Primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
@@ -115,8 +120,9 @@ jsTest.log(
     "Verify that the config.transactions entries and config.image_collection got reaped " +
     "since the config.system.sessions entry for the parent session had already been deleted");
 assert.eq(0,
-          transactionsCollOnPrimary.find().itcount(),
-          tojson(transactionsCollOnPrimary.find().toArray()));
+          transactionsCollOnPrimary.find({txnNum: {$in: [kInternalTxnNumber, parentTxnNumber1]}})
+              .itcount(),
+          tojson(transactionsCollOnPrimary.find({txnNum: kInternalTxnNumber}).toArray()));
 assert.eq(0, imageCollOnPrimary.find().itcount());
 
 st.stop();

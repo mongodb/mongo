@@ -10,7 +10,9 @@ var st = new ShardingTest({
     other: {
         rs: true,
         rs0: {nodes: 1},
-    }
+    },
+    // The config server needs enough nodes to allow a custom write concern default of w:2
+    config: 3,
 });
 
 const mongosAndConfigNodes = [st.s0, st.s1, st.s2, ...st.configRS.nodes];

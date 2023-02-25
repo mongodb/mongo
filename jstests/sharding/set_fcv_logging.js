@@ -5,7 +5,11 @@
  *      FCV is upgrading or downgrading     (6744301)
  *      FCV upgrade or downgrade success    (6744302).
  *
- * @tags: [multiversion_incompatible, does_not_support_stepdowns]
+ * @tags: [
+ *   multiversion_incompatible,
+ *   does_not_support_stepdowns,
+ *   temporary_catalog_shard_incompatible,
+ * ]
  */
 
 (function() {

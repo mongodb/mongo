@@ -103,7 +103,9 @@ config.getCollectionInfos().forEach(function(c) {
             "system.indexBuilds",
             "system.preimages",
             "system.change_collection",
-            "cache.chunks.config.system.sessions"
+            "cache.chunks.config.system.sessions",
+            "system.sessions",
+            "system.sharding_ddl_coordinators",
         ].includes(c.name)) {
         return;
     }

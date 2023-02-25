@@ -3,11 +3,13 @@
 //
 // This test triggers a compiler bug that causes a crash when compiling with optimizations on, see
 // SERVER-36321.
+//
 // @tags: [
 //   denylist_from_rhel_67_s390x,
 //   requires_majority_read_concern,
 //   requires_persistence,
 //   uses_change_streams,
+//   temporary_catalog_shard_incompatible,
 // ]
 (function() {
 "use strict";

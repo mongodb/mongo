@@ -1,6 +1,9 @@
 /**
  * Test that running a $changeStream aggregation on a cluster with no shards returns an empty result
  * set with a cursorID of zero.
+ *
+ * Requires no shards so there can't be a catalog shard.
+ * @tags: [catalog_shard_incompatible]
  */
 (function() {
 const st = new ShardingTest({shards: 0});

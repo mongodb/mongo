@@ -10,7 +10,7 @@ load("jstests/sharding/libs/create_sharded_collection_util.js");
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallel_shell_helpers.js');
 
-const st = new ShardingTest({mongos: 1, config: 1, shards: 2, rs: {nodes: 2}});
+const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 2}});
 const interruptBeforeProcessingPrePostImageOriginatingOpFP =
     configureFailPoint(st.rs1.getPrimary(), "interruptBeforeProcessingPrePostImageOriginatingOp");
 

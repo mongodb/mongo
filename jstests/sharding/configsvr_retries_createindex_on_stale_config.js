@@ -1,6 +1,7 @@
 /**
  * Verifies creating the logical sessions collection TTL index retries on stale version errors.
  * @tags: [
+ *   temporary_catalog_shard_incompatible,
  * ]
  */
 

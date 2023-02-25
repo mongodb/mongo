@@ -4,6 +4,7 @@
  * @tags: [
  *   requires_sharding,
  *   uses_change_streams,
+ *   temporary_catalog_shard_incompatible,
  * ]
  */
 (function() {

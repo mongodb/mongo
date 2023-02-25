@@ -13,6 +13,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 
 var st = new ShardingTest({
     shards: 1,
+    config: 3,
     other: {
         c0: {},  // Make sure 1st config server is primary
         c1: {rsConfig: {priority: 0}},
@@ -37,9 +38,18 @@ assert.neq(null, mongos2);
 var testOps = function(mongos) {
     jsTestLog("Doing ops that don't require metadata writes and thus should succeed against: " +
               mongos);
-    var initialCount = mongos.getDB('test').foo.count();
-    assert.commandWorked(mongos.getDB('test').foo.insert({a: 1}));
-    assert.eq(initialCount + 1, mongos.getDB('test').foo.count());
+    if (TestData.catalogShard) {
+        // In catalog shard mode there's also only one shard node up with no primary, so just verify
+        // we can still do ops on a secondary that don't require metadata.
+        mongos.setSecondaryOk(true);
+        assert.eq(1, mongos.getDB('test').foo.count());
+        mongos.setSecondaryOk(false);
+    } else {
+        var initialCount = mongos.getDB('test').foo.count();
+        // In catalog shard mode there's no primary.
+        assert.commandWorked(mongos.getDB('test').foo.insert({a: 1}));
+        assert.eq(initialCount + 1, mongos.getDB('test').foo.count());
+    }
 
     assert.throws(function() {
         mongos.getDB('config').shards.findOne();

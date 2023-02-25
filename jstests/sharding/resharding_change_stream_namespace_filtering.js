@@ -3,7 +3,8 @@
  * on collection Y. Exercises the fix for SERVER-64780.
  * @tags: [
  *     uses_change_streams,
- *     requires_fcv_50
+ *     requires_fcv_50,
+ *     temporary_catalog_shard_incompatible,
  * ]
  */
 

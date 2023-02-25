@@ -1,7 +1,11 @@
 /**
  * Tests that the global indexes API correctly creates and drops an index from the catalog.
  *
- * @tags: [multiversion_incompatible, featureFlagGlobalIndexesShardingCatalog]
+ * @tags: [
+ *   multiversion_incompatible,
+ *   featureFlagGlobalIndexesShardingCatalog,
+ *   temporary_catalog_shard_incompatible,
+ * ]
  */
 
 (function() {

@@ -1,7 +1,7 @@
 /**
  * Tests for the connPoolStats command.
  *
- * @tags: [requires_fcv_63]
+ * @tags: [requires_fcv_63, temporary_catalog_shard_incompatible]
  */
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/conn_pool_helpers.js");

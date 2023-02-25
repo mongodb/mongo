@@ -1,6 +1,8 @@
 /**
  * Tests that the 'allowPartialResults' option to find is respected, and that aggregation does not
  * accept the 'allowPartialResults' option.
+ *
+ * @tags: [temporary_catalog_shard_incompatible]
  */
 
 // This test shuts down a shard.

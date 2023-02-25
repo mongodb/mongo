@@ -14,6 +14,11 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
+const shard0Name = TestData.catalogShard ? "config" : "txn_addingParticipantParameter-rs0";
+const shard1Name = "txn_addingParticipantParameter-rs1";
+const shard2Name = "txn_addingParticipantParameter-rs2";
+const shard3Name = "txn_addingParticipantParameter-rs3";
+
 const checkParticipantListMatches = function(
     coordinatorConn, lsid, txnNumber, expectedParticipantList) {
     let coordDoc = coordinatorConn.getDB("config")
@@ -139,8 +144,7 @@ const testAddingParticipant = function(turnFailPointOn, expectedParticipantList,
 
 jsTestLog("===Additional Participants Fail Point is OFF===");
 
-let expectedParticipantListNormal =
-    ["txn_addingParticipantParameter-rs0", "txn_addingParticipantParameter-rs1"];
+let expectedParticipantListNormal = [shard0Name, shard1Name];
 testAddingParticipant(false, expectedParticipantListNormal);
 
 jsTestLog("===Additional Participants Fail Point is ON===");
@@ -151,11 +155,7 @@ const fpDataOne = {
     "ns": ns,
     "shardId": ["txn_addingParticipantParameter-rs2"]
 };
-let expectedParticipantListOne = [
-    "txn_addingParticipantParameter-rs0",
-    "txn_addingParticipantParameter-rs1",
-    "txn_addingParticipantParameter-rs2"
-];
+let expectedParticipantListOne = [shard0Name, shard1Name, shard2Name];
 testAddingParticipant(true, expectedParticipantListOne, fpDataOne);
 
 print("Adding multiple additional participants:");
@@ -164,11 +164,6 @@ const fpDataMultiple = {
     "ns": ns,
     "shardId": ["txn_addingParticipantParameter-rs2", "txn_addingParticipantParameter-rs3"]
 };
-let expectedParticipantListMultiple = [
-    "txn_addingParticipantParameter-rs0",
-    "txn_addingParticipantParameter-rs1",
-    "txn_addingParticipantParameter-rs2",
-    "txn_addingParticipantParameter-rs3"
-];
+let expectedParticipantListMultiple = [shard0Name, shard1Name, shard2Name, shard3Name];
 testAddingParticipant(true, expectedParticipantListMultiple, fpDataMultiple);
 })();

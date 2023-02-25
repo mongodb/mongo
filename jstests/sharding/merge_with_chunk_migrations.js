@@ -1,5 +1,9 @@
 // Tests that the $merge aggregation stage is resilient to chunk migrations in both the source and
 // output collection during execution.
+//
+// Fails waiting for a specific aggregation in currentOp, which probably isn't working when we
+// change the cluster topology.
+// @tags: [temporary_catalog_shard_incompatible]
 (function() {
 'use strict';
 

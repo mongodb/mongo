@@ -1,5 +1,7 @@
 // Tests that the $merge aggregation stage is resilient to drop shard in both the source and
 // output collection during execution.
+//
+// @tags: [temporary_catalog_shard_incompatible]
 (function() {
 'use strict';
 

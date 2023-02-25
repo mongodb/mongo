@@ -1,6 +1,6 @@
 // SERVER-32255 This test ensures a node started with --shardsvr and added to a replica set receives
 // UUIDs upon re-initiation.
-// @tags: [multiversion_incompatible]
+// @tags: [multiversion_incompatible, temporary_catalog_shard_incompatible]
 (function() {
 "use strict";
 load("jstests/libs/check_uuids.js");

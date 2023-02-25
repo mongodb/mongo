@@ -7,6 +7,7 @@
  * @tags: [
  *   requires_persistence,
  *   uses_atclustertime,
+ *   temporary_catalog_shard_incompatible,
  * ]
  */
 (function() {

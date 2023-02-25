@@ -7,6 +7,7 @@
  *   does_not_support_stepdowns,
  *   # Require persistence to restart nodes
  *   requires_persistence,
+ *   temporary_catalog_shard_incompatible,
  * ]
  */
 

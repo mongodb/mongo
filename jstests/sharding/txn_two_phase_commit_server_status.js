@@ -1,4 +1,5 @@
 // Basic test that the two-phase commit coordinator metrics fields appear in serverStatus output.
+// @tags: [temporary_catalog_shard_incompatible]
 (function() {
 "use strict";
 

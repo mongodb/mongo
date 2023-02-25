@@ -93,6 +93,15 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
         });
     }
 
+    if (TestData.catalogShard) {
+        // A config server does internal txns, so clear the transaction table to make sure it's
+        // empty before dropping the index, otherwise it can't be recreated automatically. Disable
+        // implicit sessions we can directly write to config.transactions.
+        TestData.disableImplicitSessions = true;
+        assert.commandWorked(st.rs0.getPrimary().getCollection(kConfigTxnNs).remove({}));
+        TestData.disableImplicitSessions = false;
+    }
+
     // If the collection is empty and the index does not exist, we should always create the partial
     // index on stepup,
     indexRecreationTest(true /* expectRecreateAfterDrop */);

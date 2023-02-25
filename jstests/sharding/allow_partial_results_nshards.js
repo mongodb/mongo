@@ -4,6 +4,7 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
+ *   temporary_catalog_shard_incompatible,
  * ]
  */
 

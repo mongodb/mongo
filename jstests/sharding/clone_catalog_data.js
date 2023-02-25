@@ -164,15 +164,24 @@
 
     const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
 
-    // Check that the command fails when attempting to run on a config server that doesn't support
-    // catalog shard mode.
-    if (isCatalogShardEnabled) {
+    if (TestData.catalogShard) {
+        // The config server is a shard and already has collections for the database.
+        assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
+            _shardsvrCloneCatalogData: 'test',
+            from: fromShard.host,
+            writeConcern: {w: "majority"}
+        }),
+                                     ErrorCodes.NamespaceExists);
+    } else if (isCatalogShardEnabled) {
+        // The config server is dedicated but supports catalog shard mode, so it can accept shaded
+        // commands.
         assert.commandWorked(st.configRS.getPrimary().adminCommand({
             _shardsvrCloneCatalogData: 'test',
             from: fromShard.host,
             writeConcern: {w: "majority"}
         }));
     } else {
+        // A dedicated non-catalog shard supporting config server cannot run the command.
         assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
             _shardsvrCloneCatalogData: 'test',
             from: fromShard.host,

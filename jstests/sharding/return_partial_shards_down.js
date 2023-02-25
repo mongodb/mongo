@@ -85,4 +85,12 @@ checkDocCount(collAllShards, returnPartialFlag, true, 0);
 
 jsTest.log("DONE!");
 
+if (TestData.catalogShard) {
+    // Sharding test stop requires the config server to be up, so restart the first shard if it's
+    // the config server.
+    st.rs0.startSet({restart: true});
+    st.rs0.initiate();
+    st.rs0.awaitReplication();
+}
+
 st.stop();

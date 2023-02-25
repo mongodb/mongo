@@ -21,7 +21,7 @@ var assertAddShardFailed = function(res, shardName) {
 };
 
 var st = new ShardingTest({
-    shards: 0,
+    shards: TestData.catalogShard ? 1 : 0,
     mongos: 1,
 });
 

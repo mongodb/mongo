@@ -5,6 +5,9 @@
  * - If called on a sharded collection, the request is broadcast to shards with chunks.
  *
  * This test verifies this behavior.
+ *
+ * Shuts down shard0, which also shuts down the config server. See if the test can be reworked.
+ * @tags: [temporary_catalog_shard_incompatible]
  */
 
 // This test shuts down a shard's node and because of this consistency checking

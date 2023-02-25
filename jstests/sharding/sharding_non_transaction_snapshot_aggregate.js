@@ -5,6 +5,7 @@
  * @tags: [
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   temporary_catalog_shard_incompatible,
  * ]
  */
 

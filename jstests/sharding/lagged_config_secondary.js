@@ -1,6 +1,8 @@
 /**
  * Test that mongos times out when the config server replica set only contains nodes that
  * are behind the majority opTime.
+ *
+ * @tags: [temporary_catalog_shard_incompatible]
  */
 
 load("jstests/libs/write_concern_util.js");

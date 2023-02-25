@@ -2,7 +2,7 @@
  * Tests that $_internalOwningShard expression correctly computes the shard id the document belongs
  * to, while executing on mongod.
  *
- * @tags: [requires_fcv_63]
+ * @tags: [requires_fcv_63, temporary_catalog_shard_incompatible]
  */
 (function() {
 "use strict";

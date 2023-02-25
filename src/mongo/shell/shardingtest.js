@@ -1016,12 +1016,14 @@ var ShardingTest = function(params) {
      * @param {int} shard server number (0, 1, 2, ...) to be restarted
      */
     this.restartShardRS = function(n, options, signal, wait) {
+        const prevShardName = this._connections[n].shardName;
         for (let i = 0; i < this["rs" + n].nodeList().length; i++) {
             this["rs" + n].restart(i);
         }
 
         this["rs" + n].awaitSecondaryNodes();
         this._connections[n] = new Mongo(this["rs" + n].getURL());
+        this._connections[n].shardName = prevShardName;
         this["shard" + n] = this._connections[n];
     };
 
@@ -1181,11 +1183,11 @@ var ShardingTest = function(params) {
     var numShards = otherParams.hasOwnProperty('shards') ? otherParams.shards : 2;
     var mongosVerboseLevel = otherParams.hasOwnProperty('verbose') ? otherParams.verbose : 1;
     var numMongos = otherParams.hasOwnProperty('mongos') ? otherParams.mongos : 1;
+    const usedDefaultNumConfigs = !otherParams.hasOwnProperty('config');
     var numConfigs = otherParams.hasOwnProperty('config') ? otherParams.config : 3;
 
     let isCatalogShardMode =
         otherParams.hasOwnProperty('catalogShard') ? otherParams.catalogShard : false;
-
     isCatalogShardMode = isCatalogShardMode || jsTestOptions().catalogShard;
 
     if ("shardAsReplicaSet" in otherParams) {
@@ -1242,12 +1244,14 @@ var ShardingTest = function(params) {
     }
 
     if (Array.isArray(numConfigs)) {
+        assert(!usedDefaultNumConfigs);
         for (var i = 0; i < numConfigs.length; i++) {
             otherParams["c" + i] = numConfigs[i];
         }
 
         numConfigs = numConfigs.length;
     } else if (isObject(numConfigs)) {
+        assert(!usedDefaultNumConfigs);
         var tempCount = 0;
         for (var i in numConfigs) {
             otherParams[i] = numConfigs[i];
@@ -1408,7 +1412,9 @@ var ShardingTest = function(params) {
             numReplicas = 1;
         }
 
-        if (isCatalogShardMode && i == 0) {
+        // Unless explicitly given a number of config servers, a catalog shard uses the shard's
+        // number of nodes to increase odds of compatibility with test assertions.
+        if (isCatalogShardMode && i == 0 && !usedDefaultNumConfigs) {
             numReplicas = numConfigs;
         }
 
@@ -1810,6 +1816,7 @@ var ShardingTest = function(params) {
         if (!otherParams.manualAddShard) {
             var testName = this._testName;
             var admin = this.admin;
+            var keyFile = this.keyFile;
 
             this._connections.forEach(function(z, idx) {
                 var n = z.name || z.host || z;
@@ -1820,8 +1827,21 @@ var ShardingTest = function(params) {
 
                     print("ShardingTest " + testName + " transitioning to catalog shard");
 
-                    var result =
-                        assert.commandWorked(admin.runCommand({transitionToCatalogShard: 1}));
+                    function transitionToCatalogShard() {
+                        return assert.commandWorked(
+                            admin.runCommand({transitionToCatalogShard: 1}));
+                    }
+
+                    // TODO SERVER-74448: Investigate if transitionToCatalogShard should be added to
+                    // the localhost bypass exception like addShard.
+                    if (keyFile) {
+                        authutil.asCluster(admin.getMongo(), keyFile, transitionToCatalogShard);
+                    } else if (mongosOptions[0] && mongosOptions[0].keyFile) {
+                        authutil.asCluster(
+                            admin.getMongo(), mongosOptions[0].keyFile, transitionToCatalogShard);
+                    } else {
+                        transitionToCatalogShard();
+                    }
 
                     z.shardName = name;
                 } else {

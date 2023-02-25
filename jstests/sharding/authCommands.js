@@ -23,6 +23,12 @@ var st = new ShardingTest({
     other: {keyFile: 'jstests/libs/key1', useHostname: false, chunkSize: 2},
 });
 
+// This test relies on shard1 having no chunks in config.system.sessions.
+authutil.asCluster(st.s, "jstests/libs/key1", function() {
+    assert.commandWorked(st.s.adminCommand(
+        {moveChunk: "config.system.sessions", find: {_id: 0}, to: st.shard0.shardName}));
+});
+
 var mongos = st.s;
 var adminDB = mongos.getDB('admin');
 var configDB = mongos.getDB('config');
@@ -50,8 +56,12 @@ var authenticatedConn = new Mongo(mongos.host);
 authenticatedConn.getDB('admin').auth(rwUser, password);
 
 // Add user to shards to prevent localhost connections from having automatic full access
-st.rs0.getPrimary().getDB('admin').createUser(
-    {user: 'user', pwd: 'password', roles: jsTest.basicUserRoles}, {w: 3, wtimeout: 30000});
+if (!TestData.catalogShard) {
+    // In catalog shard mode, the first shard is the config server, so the user we made via mongos
+    // already used up this shard's localhost bypass.
+    st.rs0.getPrimary().getDB('admin').createUser(
+        {user: 'user', pwd: 'password', roles: jsTest.basicUserRoles}, {w: 3, wtimeout: 30000});
+}
 st.rs1.getPrimary().getDB('admin').createUser(
     {user: 'user', pwd: 'password', roles: jsTest.basicUserRoles}, {w: 3, wtimeout: 30000});
 
@@ -213,7 +223,8 @@ var checkAdminOps = function(hasAuth) {
         checkCommandSucceeded(adminDB, {ismaster: 1});
         checkCommandSucceeded(adminDB, {hello: 1});
         checkCommandSucceeded(adminDB, {split: 'test.foo', find: {i: 1, j: 1}});
-        var chunk = findChunksUtil.findOneChunkByNs(configDB, 'test.foo', {shard: st.rs0.name});
+        var chunk =
+            findChunksUtil.findOneChunkByNs(configDB, 'test.foo', {shard: st.shard0.shardName});
         checkCommandSucceeded(
             adminDB,
             {moveChunk: 'test.foo', find: chunk.min, to: st.rs1.name, _waitForDelete: true});

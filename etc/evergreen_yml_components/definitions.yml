@@ -6355,6 +6355,14 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
+  name: sharding_catalog_shard_gen
+  tags: []
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
   name: sharding_multiversion_gen
   tags: ["random_multiversion_ds", "multiversion"]
   commands:
@@ -6402,6 +6410,14 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_auth_gen
+  tags: []
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: sharding_auth_catalog_shard_gen
   tags: []
   commands:
   - func: "generate resmoke tasks"

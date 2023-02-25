@@ -5,7 +5,8 @@
  * - manual key rotation is possible by deleting existing keys and restarting the cluster.
  *
  * Manual key rotation requires restarting a shard, so a persistent storage engine is necessary.
- * @tags: [requires_persistence]
+ * Shuts down shard0, which also shuts down the config server. See if the test can be reworked.
+ * @tags: [requires_persistence, temporary_catalog_shard_incompatible]
  */
 
 // This test restarts a shard replica set, potentially changing the primary node, while

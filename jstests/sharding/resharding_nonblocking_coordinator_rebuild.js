@@ -1,6 +1,9 @@
 /**
  * Tests that resharding participants do not block replication while waiting for the
  * ReshardingCoordinatorService to be rebuilt.
+ *
+ * Looks like a test incompatibility, but should be verified and maybe rework the test.
+ * @tags: [temporary_catalog_shard_incompatible]
  */
 (function() {
 "use strict";

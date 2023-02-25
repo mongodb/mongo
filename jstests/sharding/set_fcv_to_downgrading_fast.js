@@ -2,7 +2,14 @@
  * Tests that FCV downgrade will reach the transitional kDowngrading state quickly (within a few
  * seconds).
  *
- * @tags: [featureFlagDowngradingToUpgrading, multiversion_incompatible, does_not_support_stepdowns]
+ * Catalog shard incompatible because we do not currently allow downgrading FCV with a catalog
+ * shard. TODO SERVER-73279: Enable in catalog shard mode when it supports FCV downgrade.
+ * @tags: [
+ *   featureFlagDowngradingToUpgrading,
+ *   multiversion_incompatible,
+ *   does_not_support_stepdowns,
+ *   catalog_shard_incompatible,
+ * ]
  */
 (function() {
 "use strict";

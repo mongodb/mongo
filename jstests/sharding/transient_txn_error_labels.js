@@ -2,6 +2,7 @@
  * Test TransientTransactionErrors error label in transactions.
  * @tags: [
  *   uses_transactions,
+ *   temporary_catalog_shard_incompatible,
  * ]
  */
 

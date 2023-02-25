@@ -5,6 +5,7 @@
  *   featureFlagAutoMerger,
  *   # Balancer is stopped when stepping down
  *   does_not_support_stepdowns,
+ *   temporary_catalog_shard_incompatible,
  * ]
  */
 (function() {

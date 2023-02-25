@@ -1,7 +1,10 @@
 /**
  * Tests that the config server connection string in the shard identity document of both the
  * primary and secondary will get updated whenever the config server membership changes.
- * @tags: [requires_persistence]
+ *
+ * Shuts down the first shard but expects the config server to still be up. See if we can rework to
+ * get coverage in catalog shard mode.
+ * @tags: [requires_persistence, temporary_catalog_shard_incompatible]
  */
 
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown

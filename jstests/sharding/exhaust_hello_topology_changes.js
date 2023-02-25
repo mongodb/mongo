@@ -6,7 +6,7 @@
  * hit. A replica set node should send a response to the mongos as soon as it processes a topology
  * change, so "immediately"/"quickly" can vary - we specify 5 seconds in this test ('timeoutMS').
  *
- * @tags: [requires_streamable_rsm]
+ * @tags: [requires_streamable_rsm, temporary_catalog_shard_incompatible]
  */
 
 // This test shuts down a shard's node and because of this consistency checking

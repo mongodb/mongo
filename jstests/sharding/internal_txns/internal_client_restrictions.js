@@ -78,8 +78,8 @@ jsTestLog("Verify internal session and txnRetryCounter require internal privileg
 // Auth as a user with enough privileges to read from any collection, but not to identify as an
 // internal client.
 const shardDB = st.rs0.getPrimary().getDB("admin");
-shardDB.createUser({user: "shardAdmin", pwd: "password", roles: jsTest.adminUserRoles});
-assert(shardDB.auth("shardAdmin", "password"));
+shardDB.createUser({user: "admin", pwd: "password", roles: jsTest.adminUserRoles});
+assert(shardDB.auth("admin", "password"));
 
 verifyTxnRetryCounterForExternalClients(shardDB, {expectFail: true});
 verifyInternalSessionsForExternalClients(shardDB, {expectFail: true});
@@ -90,7 +90,10 @@ jsTestLog("Verify internal session and txnRetryCounter require internal privileg
 // Auth as a user with enough privileges to read from any collection, but not to identify as an
 // internal client.
 const mongosDB = st.s.getDB("admin");
-mongosDB.createUser({user: "admin", pwd: "password", roles: jsTest.adminUserRoles});
+if (!TestData.catalogShard) {
+    // In catalog shard mode, the user made on the shard above is also a cluster global user.
+    mongosDB.createUser({user: "admin", pwd: "password", roles: jsTest.adminUserRoles});
+}
 assert(mongosDB.auth("admin", "password"));
 
 verifyTxnRetryCounterForExternalClients(mongosDB, {expectFail: true});

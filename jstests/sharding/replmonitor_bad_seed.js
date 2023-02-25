@@ -22,8 +22,15 @@
 'use strict';
 load("jstests/replsets/rslib.js");
 
-var st = new ShardingTest({shards: 1, rs: {oplogSize: 10}});
-var replTest = st.rs0;
+var st, replTest;
+if (TestData.catalogShard) {
+    // Use a second shard so we don't shut down the config server.
+    st = new ShardingTest({shards: 2, rs: {oplogSize: 10}});
+    replTest = st.rs1;
+} else {
+    st = new ShardingTest({shards: 1, rs: {oplogSize: 10}});
+    replTest = st.rs0;
+}
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {x: 1}}));

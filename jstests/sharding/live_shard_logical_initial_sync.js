@@ -3,7 +3,8 @@
  * shards using logical initial sync.
  *
  * We control our own failovers, and we also need the RSM to react reasonably quickly to those.
- * @tags: [does_not_support_stepdowns, requires_streamable_rsm]
+ * @tags: [does_not_support_stepdowns, requires_streamable_rsm,
+ * temporary_catalog_shard_incompatible]
  */
 
 (function() {

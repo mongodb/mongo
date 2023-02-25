@@ -1,6 +1,9 @@
 /**
  * Tests adding shard to sharded cluster will fail if the implicitDefaultWriteConcern is
  * w:1 and CWWC is not set.
+ *
+ * For some reason fails in the check shard filtering metadata hook when shutting down the cluster.
+ * @tags: [temporary_catalog_shard_incompatible]
  */
 
 (function() {
@@ -38,7 +41,7 @@ function testAddShard(CWWCSet, isPSASet, fixAddShard) {
     shardServer.initiate();
 
     const st = new ShardingTest({
-        shards: 0,
+        shards: TestData.catalogShard ? 1 : 0,
         mongos: 1,
     });
     var admin = st.getDB('admin');

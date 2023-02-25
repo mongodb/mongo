@@ -13,6 +13,7 @@
  * @tags: [
  *   uses_multi_shard_transaction,
  *   uses_transactions,
+ *   temporary_catalog_shard_incompatible,
  * ]
  */
 

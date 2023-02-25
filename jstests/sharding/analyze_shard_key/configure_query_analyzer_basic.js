@@ -98,7 +98,11 @@ function testExistingCollection(conn, ns) {
     configSecondaries.forEach(node => {
         testNotSupported(node, ErrorCodes.NotWritablePrimary);
     });
-    testNotSupported(shard0Primary, ErrorCodes.IllegalOperation);
+    if (!TestData.catalogShard) {
+        // If there's a catalog shard, shard0 will be the config server and can accept
+        // configureQueryAnalyzer.
+        testNotSupported(shard0Primary, ErrorCodes.IllegalOperation);
+    }
     shard0Secondaries.forEach(node => {
         testNotSupported(node, ErrorCodes.NotWritablePrimary);
     });

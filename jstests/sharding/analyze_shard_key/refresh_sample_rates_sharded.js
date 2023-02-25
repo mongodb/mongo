@@ -2,7 +2,7 @@
  * Tests that the _refreshQueryAnalyzerConfiguration command is only supported on the config
  * server's primary and that it returns correct sample rates.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey, temporary_catalog_shard_incompatible]
  */
 (function() {
 "use strict";

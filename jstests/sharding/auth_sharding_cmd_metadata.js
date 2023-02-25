@@ -29,7 +29,15 @@ const shardAdminDB = st.rs0.getPrimary().getDB('admin');
 const shardTestDB = st.rs0.getPrimary().getDB('test');
 
 // ConfigOpTime can't be advanced from external clients
+if (TestData.catalogShard) {
+    // We've already used up the localhost bypass in catalog shard mode, so we have to log in to
+    // create the user below.
+    shardAdminDB.auth('foo', 'bar');
+}
 shardAdminDB.createUser({user: 'user', pwd: 'pwd', roles: jsTest.adminUserRoles});
+if (TestData.catalogShard) {
+    shardAdminDB.logout();
+}
 shardAdminDB.auth('user', 'pwd');
 const newTimestamp = Timestamp(getConfigOpTime().getTime() + 1000, 0);
 assert.commandWorked(shardTestDB.runCommand({ping: 1, $configTime: newTimestamp}));

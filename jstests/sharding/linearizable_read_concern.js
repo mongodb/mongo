@@ -19,6 +19,8 @@
  * document. This test is mainly trying to ensure that system behavior is
  * reasonable when executing linearizable reads in a sharded cluster, so as to
  * exercise possible (invalid) user behavior.
+ *
+ * @tags: [temporary_catalog_shard_incompatible]
  */
 
 load("jstests/replsets/rslib.js");

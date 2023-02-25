@@ -154,9 +154,11 @@ const chunksColl = st.config.chunks;
 const testDB = st.s.getDB(jsTestName());
 
 /* Perform tests */
-upgradeFCVTest(st, chunksColl, testDB);
-moveAndMergeChunksTest(st, chunksColl, testDB);
-splitChunksTest(st, chunksColl, testDB);
+if (!TestData.catalogShard) {
+    upgradeFCVTest(st, chunksColl, testDB);
+    moveAndMergeChunksTest(st, chunksColl, testDB);
+    splitChunksTest(st, chunksColl, testDB);
+}
 
 st.stop();
 })();

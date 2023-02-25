@@ -1,6 +1,8 @@
 /**
  * Test basic retryable write without errors by checking that the resulting collection after the
  * retry is as expected and it does not create additional oplog entries.
+ *
+ * @tags: [temporary_catalog_shard_incompatible]
  */
 (function() {
 "use strict";

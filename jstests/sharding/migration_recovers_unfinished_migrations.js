@@ -7,6 +7,7 @@
  *     # that migration by sending a new `moveChunk` command to the donor shard causing the test to
  *     # hang.
  *     does_not_support_stepdowns,
+ *     temporary_catalog_shard_incompatible,
  * ]
  */
 (function() {

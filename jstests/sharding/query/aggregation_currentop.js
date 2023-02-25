@@ -84,7 +84,11 @@ function createUsers(conn) {
 }
 
 // Create necessary users at both cluster and shard-local level.
-createUsers(shardConn);
+if (!TestData.catalogShard) {
+    // In catalog shard mode, the first shard is the config server, so creating the users via mongos
+    // below will also create them on the shard.
+    createUsers(shardConn);
+}
 createUsers(mongosConn);
 
 // Create a test database and some dummy data on rs0.
@@ -94,7 +98,7 @@ for (let i = 0; i < 5; i++) {
     assert.commandWorked(clusterTestDB.test.insert({_id: i, a: i}));
 }
 
-st.ensurePrimaryShard(clusterTestDB.getName(), shardRS.name);
+st.ensurePrimaryShard(clusterTestDB.getName(), st.shard0.shardName);
 
 // Restarts a replset with a different set of parameters. Explicitly set the keyFile to null,
 // since if ReplSetTest#stopSet sees a keyFile property, it attempts to auth before dbhash
@@ -417,7 +421,7 @@ function runCommonTests(conn, curOpSpec) {
     if (isRemoteShardCurOp) {
         assert.docEq(expectedStages, explainPlan.splitPipeline.shardsPart);
         for (let i = 0; i < stParams.shards; i++) {
-            let shardName = st["rs" + i].name;
+            let shardName = st["shard" + i].shardName;
             assert.docEq(expectedStages, explainPlan.shards[shardName].stages);
         }
     } else if (isLocalMongosCurOp) {
@@ -474,6 +478,17 @@ assert.commandFailedWithCode(clusterAdminDB.currentOp({$ownOps: true}), ErrorCod
 assert(clusterAdminDB.logout());
 assert(clusterAdminDB.auth("user_inprog", "pwd"));
 
+const expectedOutput = TestData.catalogShard ?
+[
+    {_id: {shard: "aggregation_currentop-rs1", host: st.rs1.getPrimary().host}},
+    {_id: {shard: "aggregation_currentop-rs2", host: st.rs2.getPrimary().host}},
+    {_id: {shard: "config", host: st.rs0.getPrimary().host}}
+] :
+[
+    {_id: {shard: "aggregation_currentop-rs0", host: st.rs0.getPrimary().host}},
+    {_id: {shard: "aggregation_currentop-rs1", host: st.rs1.getPrimary().host}},
+    {_id: {shard: "aggregation_currentop-rs2", host: st.rs2.getPrimary().host}}
+];
 assert.eq(clusterAdminDB
               .aggregate([
                   {$currentOp: {allUsers: true, idleConnections: true}},
@@ -481,11 +496,7 @@ assert.eq(clusterAdminDB
                   {$sort: {_id: 1}}
               ])
               .toArray(),
-          [
-              {_id: {shard: "aggregation_currentop-rs0", host: st.rs0.getPrimary().host}},
-              {_id: {shard: "aggregation_currentop-rs1", host: st.rs1.getPrimary().host}},
-              {_id: {shard: "aggregation_currentop-rs2", host: st.rs2.getPrimary().host}}
-          ]);
+          expectedOutput);
 
 // Test that a $currentOp pipeline with {localOps:true} returns operations from the mongoS
 // itself rather than the shards.
@@ -871,7 +882,7 @@ runNoAuthTests(mongosConn, {localOps: true});
 //
 
 // Take the replica set out of the cluster.
-shardConn = restartReplSet(st.rs0, {shardsvr: null});
+shardConn = restartReplSet(st.rs1, {shardsvr: null});
 shardTestDB = shardConn.getDB(jsTestName());
 shardAdminDB = shardConn.getDB("admin");
 
@@ -932,6 +943,6 @@ assert.commandWorked(shardAdminDB.killOp(op.opid));
 awaitShell();
 
 // Add the shard back into the replset so that it can be validated by st.stop().
-shardConn = restartReplSet(st.rs0, {shardsvr: ""});
+shardConn = restartReplSet(st.rs1, {shardsvr: ""});
 st.stop();
 })();

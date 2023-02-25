@@ -1,5 +1,6 @@
 // SERVER-34954 This test ensures a node started with --shardsvr and added to a replica set has
 // the correct version of unique indexes upon re-initiation.
+// @tags: [temporary_catalog_shard_incompatible]
 (function() {
 "use strict";
 load("jstests/libs/check_unique_indexes.js");

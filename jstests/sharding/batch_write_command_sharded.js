@@ -14,7 +14,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 (function() {
 "use strict";
 
-var st = new ShardingTest({shards: 2});
+var st = new ShardingTest({shards: 2, config: 3});
 
 jsTest.log("Starting sharding batch write tests...");
 

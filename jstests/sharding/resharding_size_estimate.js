@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   uses_atclustertime,
+ *   temporary_catalog_shard_incompatible,
  * ]
  */
 

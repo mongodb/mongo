@@ -1,3 +1,4 @@
+// @tags: [temporary_catalog_shard_incompatible]
 (function() {
 'use strict';
 var test = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});

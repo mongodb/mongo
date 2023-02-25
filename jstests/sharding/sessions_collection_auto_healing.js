@@ -1,5 +1,7 @@
 /**
+ * Requires no shards.
  * @tags: [
+ *   catalog_shard_incompatible,
  * ]
  */
 load('jstests/libs/sessions_collection.js');

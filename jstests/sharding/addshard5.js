@@ -31,6 +31,14 @@ assert.commandWorked(mongos.adminCommand(
 assert.commandWorked(mongos.adminCommand(
     {moveChunk: coll + '', find: {_id: 0}, to: st.shard0.shardName, _waitForDelete: true}));
 
+// Guarantee the sessions collection chunk isn't on shard1.
+assert.commandWorked(mongos.adminCommand({
+    moveChunk: "config.system.sessions",
+    find: {_id: 0},
+    to: st.shard0.shardName,
+    _waitForDelete: true
+}));
+
 // Drop and re-add shard with the same name but a new host.
 removeShard(st, st.shard1.shardName);
 

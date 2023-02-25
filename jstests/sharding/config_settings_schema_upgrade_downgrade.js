@@ -4,7 +4,12 @@
  * Tests that a schema is added to the config.settings collection on upgrade and removed on
  * downgrade.
  *
- * @tags: [multiversion_incompatible, featureFlagConfigSettingsSchema, does_not_support_stepdowns]
+ * @tags: [
+ *   multiversion_incompatible,
+ *   featureFlagConfigSettingsSchema,
+ *   does_not_support_stepdowns,
+ *   temporary_catalog_shard_incompatible,
+ * ]
  */
 (function() {
 'use strict';

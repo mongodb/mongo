@@ -9,7 +9,8 @@
  *
  * This test is labeled resource intensive because its total io_write is 70MB compared to a median
  * of 5MB across all sharding tests in wiredTiger.
- * @tags: [resource_intensive]
+ *
+ * @tags: [resource_intensive, temporary_catalog_shard_incompatible]
  */
 load('jstests/libs/write_concern_util.js');
 load('jstests/multiVersion/libs/auth_helpers.js');

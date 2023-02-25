@@ -3,7 +3,7 @@
  * upgrading.
  *
  * @tags: [multiversion_incompatible, featureFlagGlobalIndexesShardingCatalog,
- * featureFlagDowngradingToUpgrading]
+ * featureFlagDowngradingToUpgrading, temporary_catalog_shard_incompatible]
  */
 
 (function() {

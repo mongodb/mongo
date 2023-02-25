@@ -1,6 +1,8 @@
 /**
  * Tests that query options are not dropped by mongos when a query against a view is rewritten as an
  * aggregation against the underlying collection.
+ *
+ * @tags: [temporary_catalog_shard_incompatible]
  */
 (function() {
 "use strict";

@@ -1,7 +1,8 @@
 /*
  * Tests to validate the correct behaviour of checkMetadataConsistency command.
  *
- * @tags: [featureFlagCheckMetadataConsistency]
+ * TODO SERVER-74445: Fix cluster level checkMetadataConsistency command with a catalog shard.
+ * @tags: [featureFlagCheckMetadataConsistency, temporary_catalog_shard_incompatible]
  */
 
 (function() {

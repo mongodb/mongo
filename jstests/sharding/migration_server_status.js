@@ -2,7 +2,7 @@
  * Tests that serverStatus includes a migration status when called on the source shard of an active
  * migration.
  *
- * @tags: [requires_fcv_63]
+ * @tags: [requires_fcv_63, temporary_catalog_shard_incompatible]
  */
 
 load('./jstests/libs/chunk_manipulation_util.js');

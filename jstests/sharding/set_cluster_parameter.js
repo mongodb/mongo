@@ -4,9 +4,12 @@
  * We have a restart in the test with some stored values that must be preserved so it cannot run in
  * inMemory variants
  *
+ * TODO SERVER-74447: Verify cluster parameters added to dedicated config server work correctly
+ * when config is added as a shard.
  * @tags: [
  *   does_not_support_stepdowns,
  *   requires_persistence,
+ *   temporary_catalog_shard_incompatible,
  *  ]
  */
 (function() {

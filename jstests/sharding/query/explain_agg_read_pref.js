@@ -1,5 +1,7 @@
 /**
  * Tests that readPref applies on an explain for an aggregation command.
+ *
+ * @tags: [temporary_catalog_shard_incompatible]
  */
 (function() {
 "use strict";

@@ -1,8 +1,10 @@
 /**
  * Tests that single shard transactions succeed against replica sets that contain arbiters.
  *
+ * A config server can't have arbiter nodes.
  * @tags: [
  *   uses_transactions,
+ *   catalog_shard_incompatible,
  * ]
  */
 

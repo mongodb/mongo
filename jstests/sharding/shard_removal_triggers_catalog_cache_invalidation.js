@@ -1,6 +1,8 @@
 /**
  * Tests that shard removal triggers an update of the catalog cache so that routers don't continue
  * to target shards that have been removed.
+ *
+ * @tags: [temporary_catalog_shard_incompatible]
  */
 (function() {
 'use strict';

@@ -74,7 +74,11 @@ var warmUpDisabledConnPoolStatsCheck = function(connPoolStats, currentShard) {
     return undefined === connPoolStats["hosts"][currentShard];
 };
 
-runTest(warmUpDisabledParams, warmUpDisabledConnPoolStatsCheck);
+if (!TestData.catalogShard) {
+    // In catalog shard mode we have RSM entries for the catalog shard without warming up its conn
+    // pool.
+    runTest(warmUpDisabledParams, warmUpDisabledConnPoolStatsCheck);
+}
 
 jsTest.log("Tests establishes more connections when parameter is set.");
 // Increase the amount of time to establish more connections to avoid timing out
@@ -117,5 +121,9 @@ var shutdownNodeExtraOptions = function(test) {
     return {connString: nodeList[pId], nodeId: pId};
 };
 
-runTest(shutdownNodeParams, shutdownNodeConnPoolStatsCheck, shutdownNodeExtraOptions);
+if (!TestData.catalogShard) {
+    // In catalog shard mode this shuts down the config server, which prevents mongos from starting
+    // up.
+    runTest(shutdownNodeParams, shutdownNodeConnPoolStatsCheck, shutdownNodeExtraOptions);
+}
 })();

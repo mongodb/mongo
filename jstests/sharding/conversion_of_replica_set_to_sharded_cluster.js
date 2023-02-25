@@ -307,7 +307,7 @@ checkCRUDCommands(rst0.getPrimary().getDB(dbName));
 checkDDLCommands(rst0.getPrimary().getDB(DDLDbName));
 
 let st = new ShardingTest({
-    shards: 0,
+    shards: TestData.catalogShard ? 1 : 0,
     mongos: 1,
 });
 
