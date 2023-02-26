@@ -78,7 +78,7 @@ public:
     OplogEntryOrGroupedInserts() = delete;
 
     // This initializes it as a single oplog entry.
-    OplogEntryOrGroupedInserts(ApplierOperation op) : _entryOrGroupedInserts({std::move(op)}) {}
+    OplogEntryOrGroupedInserts(ApplierOperation op) : _entryOrGroupedInserts({op}) {}
 
     // This initializes it as grouped inserts.
     OplogEntryOrGroupedInserts(ConstIterator begin, ConstIterator end)
@@ -94,8 +94,8 @@ public:
     }
 
     // Return the oplog entry to be applied or the first oplog entry of the grouped inserts.
-    const ApplierOperation& getOp() const {
-        return _entryOrGroupedInserts.front();
+    const OplogEntry& getOp() const {
+        return *(_entryOrGroupedInserts.front());
     }
 
     bool isGroupedInserts() const {

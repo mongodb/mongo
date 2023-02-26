@@ -63,28 +63,13 @@ private:
 class OplogApplierUtils {
 public:
     /**
-     * Sort operations by their namespaces. There are some special rules for sorting:
-     *
-     * 1. Prepared transaction commands (prepare/commit/abort) act as delimiters, which
-     *    creates partitions in the ops vector so that any reordering can only happen
-     *    within each partition but not across partitions.
-     * 2. Within each partition, DDL ops (with the '$cmd' collection name) are ordered
-     *    before all other CRUD ops since DDL ops need to be run before CRUD ops.
-     *
-     * As an example, the right side below is a possible output after calling this:
-     * [                                         [
-     *     insert(ns2, docA),                        create(ns1),          -
-     *     create(ns1),                              insert(ns1, docB),    |
-     *     insert(ns1, docB),          sort          insert(ns1, docC),    |- sorted
-     *     update(ns2, docA),       ==========>      insert(ns2, docA),    |
-     *     insert(ns1, docC),                        update(ns2, docA),    -
-     *     prepare(sess1, txn1),                     prepare(sess1, txn1),
-     *     insert(ns1, docD),                        insert(ns1, docD),    -
-     *     delete(ns2, docA),                        update(ns1, docB),    |- sorted
-     *     update(ns1, docB),                        delete(ns2, docA),    -
-     * ]                                         ]
+     * Specially sort collections that are $cmd first, before everything else.  This will
+     * move commands with the special $cmd collection name to the beginning, rather than sorting
+     * them potentially in the middle of the sorted vector of insert/update/delete ops.
+     * This special sort behavior is required because DDL operations need to run before
+     * create/update/delete operations in a multi-doc transaction.
      */
-    static void stableSortByNamespace(std::vector<ApplierOperation>* ops);
+    static void stableSortByNamespace(std::vector<ApplierOperation>* oplogEntryPointers);
 
     /**
      * Updates a CRUD op's hash and isForCappedCollection field if necessary.

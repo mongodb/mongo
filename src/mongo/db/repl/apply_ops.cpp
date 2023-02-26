@@ -124,13 +124,12 @@ Status _applyOps(OperationContext* opCtx,
                             // This method is explicitly called without locks in spite of the
                             // _inlock suffix. dropDatabase cannot hold any locks for execution
                             // of the operation due to potential replication waits.
-                            uassertStatusOK(applyCommand_inlock(
-                                opCtx, ApplierOperation{&entry}, oplogApplicationMode));
+                            uassertStatusOK(
+                                applyCommand_inlock(opCtx, entry, oplogApplicationMode));
                             return Status::OK();
                         }
                         invariant(opCtx->lockState()->isW());
-                        uassertStatusOK(applyCommand_inlock(
-                            opCtx, ApplierOperation{&entry}, oplogApplicationMode));
+                        uassertStatusOK(applyCommand_inlock(opCtx, entry, oplogApplicationMode));
                         return Status::OK();
                     }
 

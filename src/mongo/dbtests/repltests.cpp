@@ -240,8 +240,7 @@ protected:
             // Handle the case of batched writes which generate command-type (applyOps) oplog
             // entries.
             if (entry.getOpType() == repl::OpTypeEnum::kCommand) {
-                uassertStatusOK(applyCommand_inlock(
-                    &_opCtx, ApplierOperation{&entry}, getOplogApplicationMode()));
+                uassertStatusOK(applyCommand_inlock(&_opCtx, entry, getOplogApplicationMode()));
             } else {
                 WriteUnitOfWork wunit(&_opCtx);
                 auto lastApplied = repl::ReplicationCoordinator::get(_opCtx.getServiceContext())

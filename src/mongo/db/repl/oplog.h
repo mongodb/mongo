@@ -223,7 +223,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
  * Returns failure status if the op that could not be applied.
  */
 Status applyCommand_inlock(OperationContext* opCtx,
-                           const ApplierOperation& op,
+                           const OplogEntry& entry,
                            OplogApplication::Mode mode);
 
 /**

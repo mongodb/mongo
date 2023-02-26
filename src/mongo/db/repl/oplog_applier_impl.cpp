@@ -98,7 +98,7 @@ Status finishAndLogApply(OperationContext* opCtx,
             logv2::DynamicAttributes attrs;
 
             auto redacted = redact(entryOrGroupedInserts.toBSON());
-            if (entryOrGroupedInserts.getOp()->getOpType() == OpTypeEnum::kCommand) {
+            if (entryOrGroupedInserts.getOp().getOpType() == OpTypeEnum::kCommand) {
                 attrs.add("command", redacted);
             } else {
                 attrs.add("CRUD", redacted);
@@ -576,6 +576,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         }
 
         {
+
             std::vector<Status> statusVector(_writerPool->getStats().options.maxThreads,
                                              Status::OK());
             // Doles out all the work to the writer pool threads. writerVectors is not modified,
@@ -901,16 +902,16 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                                                                            &replOpCounters);
 
     auto op = entryOrGroupedInserts.getOp();
-    if (op->getOpType() == OpTypeEnum::kNoop) {
+    if (op.getOpType() == OpTypeEnum::kNoop) {
         // No-ops should never fail application, since there's nothing to do.
         invariant(status.isOK());
 
-        auto opObj = op->getObject();
+        auto opObj = op.getObject();
         if (opObj.hasField(ReplicationCoordinator::newPrimaryMsgField) &&
             opObj.getField(ReplicationCoordinator::newPrimaryMsgField).str() ==
                 ReplicationCoordinator::newPrimaryMsg) {
 
-            ReplicationMetrics::get(opCtx).setParticipantNewTermDates(op->getWallClockTime(),
+            ReplicationMetrics::get(opCtx).setParticipantNewTermDates(op.getWallClockTime(),
                                                                       applyStartTime);
         }
 
