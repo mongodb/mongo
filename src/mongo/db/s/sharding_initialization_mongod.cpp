@@ -137,7 +137,9 @@ public:
         {
             stdx::lock_guard lock(_mutex);
             if (!_hasUpdateState(lock, setName)) {
-                _updateStates.emplace(setName, ReplSetConfigUpdateState());
+                _updateStates.emplace(std::piecewise_construct,
+                                      std::forward_as_tuple(setName),
+                                      std::forward_as_tuple());
             }
 
             auto& updateState = _updateStates.at(setName);
@@ -247,7 +249,7 @@ private:
         {
             stdx::lock_guard lock(_mutex);
             invariant(_hasUpdateState(lock, setName));
-            auto updateState = _updateStates.at(setName);
+            auto& updateState = _updateStates.at(setName);
             updateState.updateInProgress = false;
             moreUpdates = (updateState.nextUpdateToSend != boost::none);
             if (!moreUpdates) {
@@ -271,6 +273,10 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingReplicaSetChangeListenerMongod::mutex");
 
     struct ReplSetConfigUpdateState {
+        ReplSetConfigUpdateState() = default;
+        ReplSetConfigUpdateState(const ReplSetConfigUpdateState&) = delete;
+        ReplSetConfigUpdateState& operator=(const ReplSetConfigUpdateState&) = delete;
+
         bool updateInProgress = false;
         boost::optional<ConnectionString> nextUpdateToSend;
     };
