@@ -55,6 +55,13 @@ struct SerializationOptions {
           redactFieldNames(redactFieldNamesStrategy_),
           redactFieldNamesStrategy(redactFieldNamesStrategy_) {}
 
+    std::string serializeFieldName(StringData str) const {
+        if (redactFieldNames) {
+            return redactFieldNamesStrategy(str);
+        }
+        return str.toString();
+    }
+
     // 'replacementForLiteralArgs' is an independent option to serialize in a genericized format
     // with the aim of similar "shaped" queries serializing to the same object. For example, if
     // set to '?' then the serialization of {a: {$gt: 2}} will result in {a: {$gt: '?'}}, as

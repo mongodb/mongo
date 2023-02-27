@@ -78,8 +78,8 @@ public:
 
     void optimize() final;
 
-    Document serializeTransformation(
-        boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Document serializeTransformation(boost::optional<ExplainOptions::Verbosity> explain,
+                                     SerializationOptions options = {}) const final;
 
     DepsTracker::State addDependencies(DepsTracker* deps) const final;
 

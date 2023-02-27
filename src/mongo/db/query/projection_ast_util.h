@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_ast.h"
 
 namespace mongo {
@@ -37,5 +38,7 @@ namespace projection_ast {
  * This is intended to be used for debug output, not for serialization.
  */
 BSONObj astToDebugBSON(const ASTNode* root);
+
+BSONObj serialize(const Projection& ast, SerializationOptions options);
 }  // namespace projection_ast
 }  // namespace mongo
