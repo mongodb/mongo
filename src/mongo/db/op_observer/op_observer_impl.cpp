@@ -1027,16 +1027,14 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
         if (inRetryableInternalTransaction) {
             operation.setInitializedStatementIds({stmtId});
-            if (args.retryableFindAndModifyLocation != RetryableFindAndModifyLocation::kNone) {
+            if (args.retryableFindAndModifyLocation ==
+                RetryableFindAndModifyLocation::kSideCollection) {
                 tassert(6054000,
                         "Deleted document must be present for pre-image recording",
                         args.deletedDoc);
                 operation.setPreImage(args.deletedDoc->getOwned());
                 operation.setPreImageRecordedForRetryableInternalTransaction();
-                if (args.retryableFindAndModifyLocation ==
-                    RetryableFindAndModifyLocation::kSideCollection) {
-                    operation.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
-                }
+                operation.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
             }
         }
 
