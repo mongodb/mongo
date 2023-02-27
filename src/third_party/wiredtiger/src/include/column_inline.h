@@ -21,7 +21,7 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
      *
      * Place a read barrier to avoid this issue.
      */
-    WT_ORDERED_READ(ins, WT_SKIP_LAST(ins_head));
+    WT_ORDERED_READ_WEAK_MEMORDER(ins, WT_SKIP_LAST(ins_head));
 
     /* If there's no insert chain to search, we're done. */
     if (ins == NULL)
@@ -38,8 +38,11 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
     ret_ins = NULL;
     for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
         /*
-         * Use a local variable to access the insert because the skip list can change across
-         * references.
+         * CPUs with weak memory ordering may reorder the reads which may lead us to read a stale
+         * and inconsistent value in the lower level. Place a read barrier to avoid this issue.
+         *
+         * This should use WT_ORDERED_READ_WEAK_MEMORDER. But to lower the risk of the change, we
+         * keep this as before for now.
          */
         WT_ORDERED_READ(ins, *insp);
         if (ins != NULL && recno >= WT_INSERT_RECNO(ins)) {
@@ -66,14 +69,14 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
         ins = WT_SKIP_FIRST(ins_head);
     while (recno >= WT_INSERT_RECNO(ins))
         /*
-         * CPU may reorder the read and we may read a stale next value and incorrectly skip a key
-         * that is concurrently inserted. For example, if we have A -> C -> E initially, D is
-         * inserted, then B is inserted. If the current thread sees B, it would be consistent to not
-         * see D.
+         * CPUs with weak memory ordering may reorder the read and we may read a stale next value
+         * and incorrectly skip a key that is concurrently inserted. For example, if we have A -> C
+         * -> E initially, D is inserted, then B is inserted. If the current thread sees B, it would
+         * be consistent to not see D.
          *
          * Place a read barrier to avoid this issue.
          */
-        WT_ORDERED_READ(ins, WT_SKIP_NEXT(ins));
+        WT_ORDERED_READ_WEAK_MEMORDER(ins, WT_SKIP_NEXT(ins));
     return (ins);
 }
 
@@ -92,7 +95,7 @@ __col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
      *
      * Place a read barrier to avoid this issue.
      */
-    WT_ORDERED_READ(ins, WT_SKIP_FIRST(ins_head));
+    WT_ORDERED_READ_WEAK_MEMORDER(ins, WT_SKIP_FIRST(ins_head));
 
     /* If there's no insert chain to search, we're done. */
     if (ins == NULL)
@@ -109,8 +112,11 @@ __col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
     ret_ins = NULL;
     for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
         /*
-         * Use a local variable to access the insert because the skip list can change across
-         * references.
+         * CPUs with weak memory ordering may reorder the reads which may lead us to read a stale
+         * and inconsistent value in the lower level. Place a read barrier to avoid this issue.
+         *
+         * This should use WT_ORDERED_READ_WEAK_MEMORDER. But to lower the risk of the change, we
+         * keep this as before for now.
          */
         WT_ORDERED_READ(ins, *insp);
         if (ins != NULL && recno > WT_INSERT_RECNO(ins)) {
@@ -142,7 +148,7 @@ __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
      *
      * Place a read barrier to avoid this issue.
      */
-    WT_ORDERED_READ(ins, WT_SKIP_LAST(ins_head));
+    WT_ORDERED_READ_WEAK_MEMORDER(ins, WT_SKIP_LAST(ins_head));
 
     /* If there's no insert chain to search, we're done. */
     if (ins == NULL)
@@ -160,8 +166,11 @@ __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
      */
     for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
         /*
-         * Use a local variable to access the insert because the skip list can change across
-         * references.
+         * CPUs with weak memory ordering may reorder the reads which may lead us to read a stale
+         * and inconsistent value in the lower level. Place a read barrier to avoid this issue.
+         *
+         * This should use WT_ORDERED_READ_WEAK_MEMORDER. But to lower the risk of the change, we
+         * keep this as before for now.
          */
         WT_ORDERED_READ(ins, *insp);
         if (ins == NULL) {
@@ -203,7 +212,7 @@ __col_insert_search(
      *
      * Place a read barrier to avoid this issue.
      */
-    WT_ORDERED_READ(ret_ins, WT_SKIP_LAST(ins_head));
+    WT_ORDERED_READ_WEAK_MEMORDER(ret_ins, WT_SKIP_LAST(ins_head));
 
     /* If there's no insert chain to search, we're done. */
     if (ret_ins == NULL)
@@ -226,13 +235,14 @@ __col_insert_search(
      */
     for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
         /*
-         * Compiler and CPU may reorder the reads causing us to read a stale value here. Different
-         * to the row store version, it is generally OK here to read a stale value as we don't have
-         * prefix search optimization for column store. Therefore, we cannot wrongly skip the prefix
-         * comparison. However, we should still place a read barrier here to ensure we see
-         * consistent values in the lower levels to prevent any unexpected behavior.
+         * Compiler and CPUs with weak memory ordering may reorder the reads causing us to read a
+         * stale value here. Different to the row store version, it is generally OK here to read a
+         * stale value as we don't have prefix search optimization for column store. Therefore, we
+         * cannot wrongly skip the prefix comparison. However, we should still place a read barrier
+         * here to ensure we see consistent values in the lower levels to prevent any unexpected
+         * behavior.
          */
-        WT_ORDERED_READ(ret_ins, *insp);
+        WT_ORDERED_READ_WEAK_MEMORDER(ret_ins, *insp);
         if (ret_ins == NULL) {
             next_stack[i] = NULL;
             ins_stack[i--] = insp--;
@@ -256,10 +266,10 @@ __col_insert_search(
             for (; i >= 0; i--) {
                 /*
                  * It is possible that we read an old value that is inconsistent to the higher
-                 * levels of the skip list due to CPU read reordering. Add a read barrier to avoid
-                 * this issue.
+                 * levels of the skip list due to read reordering on CPUs with weak memory ordering.
+                 * Add a read barrier to avoid this issue.
                  */
-                WT_ORDERED_READ(next_stack[i], ret_ins->next[i]);
+                WT_ORDERED_READ_WEAK_MEMORDER(next_stack[i], ret_ins->next[i]);
                 ins_stack[i] = &ret_ins->next[i];
             }
         else { /* Drop down a level */

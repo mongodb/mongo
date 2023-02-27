@@ -84,11 +84,12 @@ restart:
             cbt->next_stack[i] = NULL;
             /*
              * Compiler may replace the usage of the variable with another read in the following
-             * code.
+             * code. Here we don't need to worry about CPU reordering as we are reading a thread
+             * local value.
              *
              * Place a read barrier to avoid this issue.
              */
-            WT_ORDERED_READ(ins, cbt->ins_head->head[i]);
+            WT_ORDERED_READ_WEAK_MEMORDER(ins, cbt->ins_head->head[i]);
             if (ins != NULL && ins != current)
                 break;
         }
@@ -105,8 +106,8 @@ restart:
             goto restart;
         }
         /*
-         * CPU may reorder the read and return a stale value. This can lead us to wrongly skip a
-         * value in the lower levels of the skip list.
+         * CPUs with weak memory ordering may reorder the read and return a stale value. This can
+         * lead us to wrongly skip a value in the lower levels of the skip list.
          *
          * For example, if we have A -> C initially for both level 0 and level 1 and we concurrently
          * insert B into both level 0 and level 1. If B is visible on level 1 to this thread, it
@@ -114,15 +115,11 @@ restart:
          *
          * Place a read barrier to avoid this issue.
          */
-        WT_ORDERED_READ(next_ins, ins->next[i]);
+        WT_ORDERED_READ_WEAK_MEMORDER(next_ins, ins->next[i]);
         if (next_ins != current) /* Stay at this level */
             ins = next_ins;
         else { /* Drop down a level */
-            /*
-             * It is possible that we read an old value that is inconsistent to the higher levels of
-             * the skip list due to CPU read reordering. Add a read barrier to avoid this issue.
-             */
-            WT_ORDERED_READ(cbt->next_stack[i], ins->next[i]);
+            cbt->next_stack[i] = next_ins;
             cbt->ins_stack[i] = &ins->next[i];
             --i;
         }
