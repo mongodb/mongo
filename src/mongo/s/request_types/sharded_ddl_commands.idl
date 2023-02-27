@@ -561,6 +561,20 @@ commands:
               cursor:
                   type: SimpleCursorOptions
                   optional: true
+                  
+    _configsvrCheckMetadataConsistency:
+         description: "Internal command sent to the config server to check metadata consistency."
+         command_name: _configsvrCheckMetadataConsistency
+         cpp_name: ConfigsvrCheckMetadataConsistency
+         namespace: concatenate_with_db
+         allow_global_collection_name: true
+         api_version: ""
+         reply_type: CursorInitialReply
+         strict: false
+         fields:
+             cursor:
+                 type: SimpleCursorOptions
+                 optional: true
 
     _configsvrSetClusterParameter:
         command_name: _configsvrSetClusterParameter

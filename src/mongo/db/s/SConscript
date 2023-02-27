@@ -431,6 +431,7 @@ env.Library(
         'config/configsvr_add_shard_to_zone_command.cpp',
         'config/configsvr_balancer_collection_status_command.cpp',
         'config/configsvr_check_cluster_metadata_consistency_command.cpp',
+        'config/configsvr_check_metadata_consistency_command.cpp',
         'config/configsvr_cleanup_reshard_collection_command.cpp',
         'config/configsvr_clear_jumbo_flag_command.cpp',
         'config/configsvr_collmod_command.cpp',

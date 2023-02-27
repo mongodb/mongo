@@ -153,7 +153,6 @@ public:
         // returned.
         std::vector<MetadataInconsistencyItem> _checkMetadataConsistencyOnParticipants(
             OperationContext* opCtx, const NamespaceString& nss) {
-            std::vector<MetadataInconsistencyItem> inconsistenciesMerged;
             const auto primaryShardId = ShardingState::get(opCtx)->shardId();
             std::vector<AsyncRequestsSender::Response> responses;
 
@@ -164,24 +163,36 @@ public:
                 const auto dbDDLLock = ddlLockManager->lock(
                     opCtx, nss.db(), lockReason, DDLLockManager::kDefaultLockTimeout);
 
-                // Send command to all shards
+                std::vector<AsyncRequestsSender::Request> requests;
+
+                // Shard requests
                 ShardsvrCheckMetadataConsistencyParticipant participantRequest{nss};
                 participantRequest.setPrimaryShardId(primaryShardId);
                 const auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-                responses = sharding_util::sendCommandToShards(
+                for (const auto& shardId : participants) {
+                    requests.emplace_back(shardId, participantRequest.toBSON({}));
+                }
+
+                // Config server request
+                ConfigsvrCheckMetadataConsistency configRequest{nss};
+                requests.emplace_back(ShardId::kConfigServerId, configRequest.toBSON({}));
+
+                responses = sharding_util::processShardResponses(
                     opCtx,
                     nss.db(),
                     participantRequest.toBSON({}),
-                    participants,
-                    Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
+                    requests,
+                    Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                    true /* throwOnError */);
             }
 
-            // Merge responses from shards
+            const auto cursorManager = Grid::get(opCtx)->getCursorManager();
+
+            // Merge responses
+            std::vector<MetadataInconsistencyItem> inconsistenciesMerged;
             for (auto&& cmdResponse : responses) {
                 auto response = uassertStatusOK(std::move(cmdResponse.swResponse));
                 uassertStatusOK(getStatusFromCommandResult(response.data));
-
-                const auto cursorManager = Grid::get(opCtx)->getCursorManager();
 
                 // TODO: SERVER-72667: Add privileges for getMore()
                 auto transformedResponse = uassertStatusOK(

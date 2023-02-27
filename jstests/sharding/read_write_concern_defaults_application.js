@@ -88,6 +88,7 @@ let testCases = {
     _configsvrBalancerStatus: {skip: "internal command"},
     _configsvrBalancerStop: {skip: "internal command"},
     _configsvrCheckClusterMetadataConsistency: {skip: "internal command"},
+    _configsvrCheckMetadataConsistency: {skip: "internal command"},
     _configsvrCleanupReshardCollection: {skip: "internal command"},
     _configsvrCollMod: {skip: "internal command"},
     _configsvrClearJumboFlag: {skip: "internal command"},

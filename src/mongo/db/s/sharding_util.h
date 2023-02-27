@@ -51,6 +51,18 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
                                    const std::shared_ptr<executor::TaskExecutor>& executor);
 
 /**
+ * Process the responses received from a set of requests sent to the shards. If `throwOnError=true`,
+ * throws in case one of the commands fails.
+ */
+std::vector<AsyncRequestsSender::Response> processShardResponses(
+    OperationContext* opCtx,
+    StringData dbName,
+    const BSONObj& command,
+    const std::vector<AsyncRequestsSender::Request>& requests,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    bool throwOnError);
+
+/**
  * Generic utility to send a command to a list of shards. If `throwOnError=true`, throws in case one
  * of the commands fails.
  */

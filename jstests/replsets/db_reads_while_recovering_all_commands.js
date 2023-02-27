@@ -35,6 +35,7 @@ const allCommands = {
     _configsvrBalancerStatus: {skip: isPrimaryOnly},
     _configsvrBalancerStop: {skip: isPrimaryOnly},
     _configsvrCheckClusterMetadataConsistency: {skip: isPrimaryOnly},
+    _configsvrCheckMetadataConsistency: {skip: isPrimaryOnly},
     _configsvrCleanupReshardCollection: {skip: isPrimaryOnly},
     _configsvrCollMod: {skip: isAnInternalCommand},
     _configsvrClearJumboFlag: {skip: isPrimaryOnly},
