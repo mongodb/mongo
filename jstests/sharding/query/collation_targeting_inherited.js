@@ -380,10 +380,13 @@ assert.commandWorked(collCaseInsensitive.insert(a_100));
 // Sharded deleteOne that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
-    // TODO: SERVER-72224 Add testing to validate that this remove correctly finds a document to
-    // target.
-    assert.commandWorked(
-        collCaseInsensitive.remove({_id: "foo"}, {justOne: true, collation: {locale: "simple"}}));
+    // Isolate the insert-remove within the scope of this feature flag check to prevent side effects
+    // on the collection.
+    assert.commandWorked(collCaseInsensitive.insert({_id: "foo_scoped", a: "bar"}));
+    writeRes = collCaseInsensitive.remove({_id: "foo_scoped"},
+                                          {justOne: true, collation: {locale: "simple"}});
+    assert.commandWorked(writeRes);
+    assert.eq(1, writeRes.nRemoved);
 } else {
     // Single remove on string _id with non-collection-default collation should fail, because it is
     // not an exact-ID query.

@@ -35,6 +35,9 @@ const incompatibleCollation = {
     locale: "fr_CA",
     strength: 2
 };
+const simpleCollation = {
+    locale: "simple",
+};
 
 assert.commandWorked(db.createCollection(
     collatedName, {clusteredIndex: {key: {_id: 1}, unique: true}, collation: defaultCollation}));
@@ -166,11 +169,24 @@ const testBounds = function(coll, expected, defaultCollation) {
     verifyNoBoundsAndFindsN(coll, expected, {data: ["A", "b"]});
     verifyNoBoundsAndFindsN(coll, expected, {data: ["a", "B"]});
 
-    // Test non compatible query collations don't generate bounds
+    // Test non compatible query collations don't generate exact bounds. This means, the bounds
+    // generated are with respect to the KeyString encoding of the data type of the query. For
+    // example, an _id: <string> query will be bounded by min and max values for type 'string', but
+    // not bounded by the exact value of <string>.
     verifyNoTightBoundsAndFindsN(coll, expected, {_id: "A"}, incompatibleCollation);
     verifyNoTightBoundsAndFindsN(coll, expected, {_id: {str: "A"}}, incompatibleCollation);
     verifyNoTightBoundsAndFindsN(coll, expected, {_id: {strs: ["A", "b"]}}, incompatibleCollation);
     verifyNoTightBoundsAndFindsN(coll, expected, {_id: {strs: ["a", "B"]}}, incompatibleCollation);
+
+    if (defaultCollation != undefined && defaultCollation.locale != simpleCollation.locale) {
+        // 'Simple' collations are treated differently than non-simple queries since they are the
+        // default 'locale' when a collation is not specified. Test that the 'simple' collation is
+        // not compatible when the clustered collection has a non-simple collation.
+        verifyNoTightBoundsAndFindsN(coll, expected, {_id: "A"}, simpleCollation);
+        verifyNoTightBoundsAndFindsN(coll, expected, {_id: {str: "A"}}, simpleCollation);
+        verifyNoTightBoundsAndFindsN(coll, expected, {_id: {strs: ["A", "b"]}}, simpleCollation);
+        verifyNoTightBoundsAndFindsN(coll, expected, {_id: {strs: ["a", "B"]}}, simpleCollation);
+    }
 
     // Test compatible query collations generate bounds
     verifyHasBoundsAndFindsN(coll, expected, {_id: "A"}, defaultCollation);
