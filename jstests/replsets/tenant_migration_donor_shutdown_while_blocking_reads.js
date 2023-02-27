@@ -47,15 +47,17 @@ assert.neq(null, donorDoc);
 let readThread = new Thread((host, dbName, collName, afterClusterTime) => {
     const node = new Mongo(host);
     const db = node.getDB(dbName);
-    const res = db.runCommand({
+    // The primary will shut down and might throw an unhandled exception that needs to be caught by
+    // our test to verify that we indeed failed with the expected network errors.
+    const res = executeNoThrowNetworkError(() => db.runCommand({
         find: collName,
         readConcern: {afterClusterTime: Timestamp(afterClusterTime.t, afterClusterTime.i)}
-    });
+    }));
     // In some cases (ASAN builds) we could end up closing the connection before stopping the
     // worker thread. This race condition would result in HostUnreachable instead of
-    // InterruptedDueToReplStateChange.
-    assert(res.code == ErrorCodes.InterruptedAtShutdown || res.code == ErrorCodes.HostUnreachable,
-           tojson(res.code));
+    // InterruptedAtShutdown. Since the error is uncaught we need to catch it here.
+    assert.commandFailedWithCode(
+        res, [ErrorCodes.InterruptedAtShutdown, ErrorCodes.HostUnreachable], tojson(res.code));
 }, donorPrimary.host, kDbName, kCollName, donorDoc.blockTimestamp);
 readThread.start();
 

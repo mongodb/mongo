@@ -34,6 +34,8 @@ assert.commandWorked(testDb.runCommand({insert: kCollName, documents: [{_id: 0}]
 
 let fp = configureFailPoint(donorPrimary, "pauseShardSplitAfterBlocking");
 const operation = test.createSplitOperation(kTenantIds);
+// We expect the splitThread to throw an unhandled exception related to network. We want to catch it
+// and test that the exception is the network exception we expect.
 const splitThread = operation.commitAsync();
 
 fp.wait();
@@ -44,27 +46,26 @@ assert.neq(null, donorDoc);
 let readThread = new Thread((host, dbName, collName, afterClusterTime) => {
     const node = new Mongo(host);
     const db = node.getDB(dbName);
-    const res = db.runCommand({
+    // The primary will shut down and might throw an unhandled exception that needs to be caught by
+    // our test to verify that we indeed failed with the expected network errors.
+    const res = executeNoThrowNetworkError(() => db.runCommand({
         find: collName,
         readConcern: {afterClusterTime: Timestamp(afterClusterTime.t, afterClusterTime.i)}
-    });
-    assert.commandFailedWithCode(res, ErrorCodes.InterruptedAtShutdown);
+    }));
+    // In some cases (ASAN builds) we could end up closing the connection before stopping the
+    // worker thread. This race condition would result in HostUnreachable instead of
+    // InterruptedAtShutdown. Since the error is uncaught we need to catch it here.
+    assert.commandFailedWithCode(
+        res, [ErrorCodes.InterruptedAtShutdown, ErrorCodes.HostUnreachable], tojson(res.code));
 }, donorPrimary.host, kDbName, kCollName, donorDoc.blockOpTime.ts);
 readThread.start();
 
 // Shut down the donor after the read starts blocking.
 assert.soon(() => ShardSplitTest.getNumBlockedReads(donorPrimary, kTenantIds[0]) == 1);
 donorRst.stop(donorPrimary);
-readThread.join();
 
+readThread.join();
 splitThread.join();
-// In some cases (ASAN builds) we could end up closing the connection before stopping the worker
-// thread. This race condition would result in HostUnreachable instead of
-// InterruptedDueToReplStateChange.
-const res = splitThread.returnData();
-assert(res.code == ErrorCodes.InterruptedDueToReplStateChange ||
-           res.code == ErrorCodes.HostUnreachable,
-       tojson(res.code));
 
 // Shut down all the other nodes.
 test.donor.nodes.filter(node => node.port != donorPrimary.port)

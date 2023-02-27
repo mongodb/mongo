@@ -252,7 +252,11 @@ export function runTenantMigrationCommand(cmdObj, rst, {
             // run() with commandWorked() as retrying on retryable writeConcernErrors can
             // cause the retry attempt to fail with writeErrors.
             res = undefined;
-            res = run();
+            // In some tests we expects the command to fail due to a network error. We want to
+            // catch the error OR the unhandled exception here and return the error to the
+            // caller to assert on the result. Otherwise if this is not a network exception
+            // it will be caught in the outter catch and either be retried or thrown.
+            res = executeNoThrowNetworkError(() => run());
             assert.commandWorked(res);
             return shouldStopFunc(res);
         } catch (e) {
