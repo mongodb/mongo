@@ -7,9 +7,20 @@ env = env.Clone()
 env.Library(
     target='grpc_transport_layer',
     source=[
+        'client_cache.cpp',
         'wire_version_provider.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/wire_version',
+    ],
+)
+
+env.CppUnitTest(
+    target='grpc_transport_layer_test',
+    source=[
+        'client_cache_test.cpp',
+    ],
+    LIBDEPS=[
+        'grpc_transport_layer',
     ],
 )
