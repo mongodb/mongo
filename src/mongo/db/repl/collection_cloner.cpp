@@ -181,18 +181,12 @@ BaseCloner::AfterStageBehavior CollectionCloner::CollectionClonerStage::run() {
 }
 
 BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
-    const auto dollarTenant = gMultitenancySupport &&
-            serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)
-        ? _sourceNss.tenantId()
-        : boost::none;
     auto count = getClient()->count(_sourceDbAndUuid,
                                     {} /* Query */,
                                     QueryOption_SecondaryOk,
                                     0 /* limit */,
                                     0 /* skip */,
-                                    ReadConcernArgs::kLocal,
-                                    dollarTenant);
+                                    ReadConcernArgs::kLocal);
 
     // The count command may return a negative value after an unclean shutdown,
     // so we set it to zero here to avoid aborting the collection clone.
@@ -215,12 +209,8 @@ BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
 BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
     const bool includeBuildUUIDs = true;
 
-    const auto appendDollarTenant = gMultitenancySupport &&
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility);
-
-    auto indexSpecs = getClient()->getIndexSpecs(
-        _sourceDbAndUuid, includeBuildUUIDs, QueryOption_SecondaryOk, appendDollarTenant);
+    auto indexSpecs =
+        getClient()->getIndexSpecs(_sourceDbAndUuid, includeBuildUUIDs, QueryOption_SecondaryOk);
     if (indexSpecs.empty()) {
         LOGV2_WARNING(21143,
                       "No indexes found for collection {namespace} while cloning from {source}",

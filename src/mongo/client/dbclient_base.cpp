@@ -189,12 +189,6 @@ void appendMetadata(OperationContext* opCtx,
     }
 
     request.body = bob.obj();
-
-    if (opCtx) {
-        if (auto validatedTenancyScope = auth::ValidatedTenancyScope::get(opCtx)) {
-            request.validatedTenancyScope = validatedTenancyScope;
-        }
-    }
 }
 }  // namespace
 
@@ -220,6 +214,7 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
 
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
     appendMetadata(opCtx, _metadataWriter, _apiParameters, request);
+
     auto requestMsg = request.serialize();
     Message replyMsg;
 
@@ -250,35 +245,35 @@ std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientBase::runComm
     return {std::move(out.first), std::move(me)};
 }
 
-std::tuple<bool, DBClientBase*> DBClientBase::runCommandWithTarget(const string& dbname,
+std::tuple<bool, DBClientBase*> DBClientBase::runCommandWithTarget(const DatabaseName& dbName,
                                                                    BSONObj cmd,
                                                                    BSONObj& info,
                                                                    int options) {
     // TODO: This will be downconverted immediately if the underlying
     // requestBuilder is a legacyRequest builder. Not sure what the best
     // way to get around that is without breaking the abstraction.
-    auto result = runCommandWithTarget(rpc::upconvertRequest(dbname, std::move(cmd), options));
+    auto request = _upconvertRequest(dbName, cmd, options);
+    auto result = runCommandWithTarget(request);
 
     info = result.first->getCommandReply().getOwned();
     return std::make_tuple(isOk(info), result.second);
 }
 
 std::tuple<bool, std::shared_ptr<DBClientBase>> DBClientBase::runCommandWithTarget(
-    const string& dbname,
+    const DatabaseName& dbName,
     BSONObj cmd,
     BSONObj& info,
     std::shared_ptr<DBClientBase> me,
     int options) {
-    auto result =
-        runCommandWithTarget(rpc::upconvertRequest(dbname, std::move(cmd), options), std::move(me));
+    auto request = _upconvertRequest(dbName, cmd, options);
+    auto result = runCommandWithTarget(request, std::move(me));
 
     info = result.first->getCommandReply().getOwned();
     return std::make_tuple(isOk(info), result.second);
 }
 
 bool DBClientBase::runCommand(const DatabaseName& dbName, BSONObj cmd, BSONObj& info, int options) {
-    auto res =
-        runCommandWithTarget(DatabaseNameUtil::serialize(dbName), std::move(cmd), info, options);
+    auto res = runCommandWithTarget(dbName, std::move(cmd), info, options);
     return std::get<0>(res);
 }
 
@@ -287,16 +282,10 @@ long long DBClientBase::count(const NamespaceStringOrUUID nsOrUuid,
                               int options,
                               int limit,
                               int skip,
-                              boost::optional<BSONObj> readConcernObj,
-                              const boost::optional<TenantId>& dollarTenant) {
+                              boost::optional<BSONObj> readConcernObj) {
     auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbName() : (*nsOrUuid.nss()).dbName());
-    massert(7043201,
-            str::stream() << "TenantIds in dbName and $tenant must match. dbName: "
-                          << dbName->tenantId()->toString()
-                          << ", $tenant: " << dollarTenant->toString(),
-            (dbName->tenantId() && dollarTenant) ? (dbName->tenantId() == dollarTenant) : true);
 
-    BSONObj cmd = _countCmd(nsOrUuid, query, options, limit, skip, readConcernObj, dollarTenant);
+    BSONObj cmd = _countCmd(nsOrUuid, query, options, limit, skip, readConcernObj);
     BSONObj res;
     if (!runCommand(*dbName, cmd, res, options)) {
         auto status = getStatusFromCommandResult(res);
@@ -311,8 +300,7 @@ BSONObj DBClientBase::_countCmd(const NamespaceStringOrUUID nsOrUuid,
                                 int options,
                                 int limit,
                                 int skip,
-                                boost::optional<BSONObj> readConcernObj,
-                                const boost::optional<TenantId>& dollarTenant) {
+                                boost::optional<BSONObj> readConcernObj) {
     BSONObjBuilder b;
     if (nsOrUuid.uuid()) {
         const auto uuid = *nsOrUuid.uuid();
@@ -328,9 +316,7 @@ BSONObj DBClientBase::_countCmd(const NamespaceStringOrUUID nsOrUuid,
     if (readConcernObj) {
         b.append(repl::ReadConcernArgs::kReadConcernFieldName, *readConcernObj);
     }
-    if (dollarTenant) {
-        dollarTenant->serializeToBSON("$tenant", &b);
-    }
+
     return b.obj();
 }
 
@@ -506,24 +492,12 @@ bool DBClientBase::createCollection(const NamespaceString& nss,
     return runCommand(nss.dbName(), b.done(), *info);
 }
 
-list<BSONObj> DBClientBase::getCollectionInfos(const DatabaseName& dbName,
-                                               const BSONObj& filter,
-                                               const boost::optional<TenantId>& dollarTenant) {
-    massert(7043202,
-            str::stream() << "TenantIds in dbName and $tenant must match. dbName: "
-                          << dbName.tenantId()->toString()
-                          << ", $tenant: " << dollarTenant->toString(),
-            (dbName.tenantId() && dollarTenant) ? (dbName.tenantId() == dollarTenant) : true);
-
+list<BSONObj> DBClientBase::getCollectionInfos(const DatabaseName& dbName, const BSONObj& filter) {
     list<BSONObj> infos;
     BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << filter << "cursor" << BSONObj());
-    BSONObjBuilder b(cmdObj);
-    if (dollarTenant) {
-        dbName.tenantId()->serializeToBSON("$tenant", &b);
-    }
 
     BSONObj res;
-    if (runCommand(dbName, b.obj(), res, QueryOption_SecondaryOk)) {
+    if (runCommand(dbName, cmdObj, res, QueryOption_SecondaryOk)) {
         BSONObj cursorObj = res["cursor"].Obj();
         BSONObj collections = cursorObj["firstBatch"].Obj();
         BSONObjIterator it(collections);
@@ -784,9 +758,7 @@ namespace {
 /**
  * Constructs command object for listIndexes.
  */
-BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid,
-                               bool includeBuildUUIDs,
-                               bool appendDollarTenant) {
+BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid, bool includeBuildUUIDs) {
     BSONObjBuilder bob;
     if (nsOrUuid.nss()) {
         bob.append("listIndexes", (*nsOrUuid.nss()).coll());
@@ -799,10 +771,7 @@ BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid,
     if (includeBuildUUIDs) {
         bob.appendBool("includeBuildUUIDs", true);
     }
-    const auto& dbName = nsOrUuid.dbName() ? nsOrUuid.dbName().value() : nsOrUuid.nss()->dbName();
-    if (dbName.tenantId() && appendDollarTenant) {
-        dbName.tenantId()->serializeToBSON("$tenant", &bob);
-    }
+
     return bob.obj();
 }
 
@@ -810,10 +779,8 @@ BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid,
 
 std::list<BSONObj> DBClientBase::getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
                                                bool includeBuildUUIDs,
-                                               int options,
-                                               bool appendDollarTenant) {
-    return _getIndexSpecs(
-        nsOrUuid, makeListIndexesCommand(nsOrUuid, includeBuildUUIDs, appendDollarTenant), options);
+                                               int options) {
+    return _getIndexSpecs(nsOrUuid, makeListIndexesCommand(nsOrUuid, includeBuildUUIDs), options);
 }
 
 std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
@@ -867,24 +834,19 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
 
 void DBClientBase::dropIndex(const NamespaceString& nss,
                              BSONObj keys,
-                             boost::optional<BSONObj> writeConcernObj,
-                             bool appendDollarTenant) {
-    dropIndex(nss, genIndexName(keys), writeConcernObj, appendDollarTenant);
+                             boost::optional<BSONObj> writeConcernObj) {
+    dropIndex(nss, genIndexName(keys), writeConcernObj);
 }
 
 
 void DBClientBase::dropIndex(const NamespaceString& nss,
                              const string& indexName,
-                             boost::optional<BSONObj> writeConcernObj,
-                             bool appendDollarTenant) {
+                             boost::optional<BSONObj> writeConcernObj) {
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append("dropIndexes", nss.coll());
     cmdBuilder.append("index", indexName);
     if (writeConcernObj) {
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
-    }
-    if (nss.tenantId() && appendDollarTenant) {
-        nss.tenantId()->serializeToBSON("$tenant", &cmdBuilder);
     }
 
     BSONObj info;
@@ -942,13 +904,9 @@ string DBClientBase::genIndexName(const BSONObj& keys) {
 
 void DBClientBase::createIndexes(const NamespaceString& nss,
                                  const std::vector<const IndexSpec*>& descriptors,
-                                 boost::optional<BSONObj> writeConcernObj,
-                                 bool appendDollarTenant) {
+                                 boost::optional<BSONObj> writeConcernObj) {
     BSONObjBuilder command;
     command.append("createIndexes", nss.coll());
-    if (nss.tenantId() && appendDollarTenant) {
-        nss.tenantId()->serializeToBSON("$tenant", &command);
-    }
 
     {
         BSONArrayBuilder indexes(command.subarrayStart("indexes"));
@@ -971,13 +929,9 @@ void DBClientBase::createIndexes(const NamespaceString& nss,
 
 void DBClientBase::createIndexes(const NamespaceString& nss,
                                  const std::vector<BSONObj>& specs,
-                                 boost::optional<BSONObj> writeConcernObj,
-                                 bool appendDollarTenant) {
+                                 boost::optional<BSONObj> writeConcernObj) {
     BSONObjBuilder command;
     command.append("createIndexes", nss.coll());
-    if (nss.tenantId() && appendDollarTenant) {
-        nss.tenantId()->serializeToBSON("$tenant", &command);
-    }
 
     {
         BSONArrayBuilder indexes(command.subarrayStart("indexes"));
@@ -996,6 +950,18 @@ void DBClientBase::createIndexes(const NamespaceString& nss,
         invariant(!runCommandStatus.isOK());
         uassertStatusOK(runCommandStatus);
     }
+}
+
+OpMsgRequest DBClientBase::_upconvertRequest(const DatabaseName& dbName,
+                                             BSONObj legacyCmdObj,
+                                             int options) {
+    if (isAlwaysAppendDollarTenant_forTest() && dbName.tenantId()) {
+        BSONObjBuilder bob = BSONObjBuilder(std::move(legacyCmdObj));
+        dbName.tenantId()->serializeToBSON("$tenant", &bob);
+        legacyCmdObj = bob.obj();
+    }
+
+    return rpc::upconvertRequest(dbName, std::move(legacyCmdObj), options);
 }
 
 BSONElement getErrField(const BSONObj& o) {

@@ -199,10 +199,9 @@ long long DBDirectClient::count(const NamespaceStringOrUUID nsOrUuid,
                                 int options,
                                 int limit,
                                 int skip,
-                                boost::optional<BSONObj> readConcernObj,
-                                const boost::optional<TenantId>& dollarTenant) {
+                                boost::optional<BSONObj> readConcernObj) {
     invariant(!readConcernObj, "passing readConcern to DBDirectClient functions is not supported");
-    BSONObj cmdObj = _countCmd(nsOrUuid, query, options, limit, skip, boost::none, dollarTenant);
+    BSONObj cmdObj = _countCmd(nsOrUuid, query, options, limit, skip, boost::none);
 
     auto& dbName = (nsOrUuid.uuid() ? nsOrUuid.dbName().value() : (*nsOrUuid.nss()).dbName());
     auto request = OpMsgRequestBuilder::create(dbName, cmdObj);

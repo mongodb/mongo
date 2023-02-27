@@ -90,8 +90,7 @@ public:
                     int options = 0,
                     int limit = 0,
                     int skip = 0,
-                    boost::optional<BSONObj> readConcernObj = boost::none,
-                    const boost::optional<TenantId>& dollarTenant = boost::none) override;
+                    boost::optional<BSONObj> readConcernObj = boost::none) override;
 
     ConnectionString::ConnectionType type() const override;
 

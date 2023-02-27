@@ -97,6 +97,7 @@ EncryptedDBClientBase::EncryptedDBClientBase(std::unique_ptr<DBClientBase> conn,
     : _conn(std::move(conn)), _encryptionOptions(std::move(encryptionOptions)), _cx(cx) {
     validateCollection(cx, collection);
     _collection = JS::Heap<JS::Value>(collection);
+    _conn->setAlwaysAppendDollarTenant_forTest();
 };
 
 std::string EncryptedDBClientBase::getServerAddress() const {
@@ -113,7 +114,7 @@ void EncryptedDBClientBase::say(Message& toSend, bool isRetry, std::string* actu
 
 BSONObj EncryptedDBClientBase::encryptDecryptCommand(const BSONObj& object,
                                                      bool encrypt,
-                                                     const StringData databaseName) {
+                                                     const DatabaseName& dbName) {
     std::stack<std::pair<BSONObjIterator, BSONObjBuilder>> frameStack;
 
     // The encryptDecryptCommand frameStack requires a guard because  if encryptMarking or
@@ -164,7 +165,12 @@ BSONObj EncryptedDBClientBase::encryptDecryptCommand(const BSONObj& object,
         }
     }
     invariant(frameStack.size() == 1);
-    frameStack.top().second.append("$db", databaseName);
+    // Append '$db' which shouldn't contain tenantid.
+    frameStack.top().second.append("$db", dbName.toString());
+    // If encrypt request, append '$tenant' which contains tenantid.
+    if (encrypt && dbName.tenantId() && !object.hasField("$tenant")) {
+        dbName.tenantId()->serializeToBSON("$tenant", &frameStack.top().second);
+    }
     return frameStack.top().second.obj();
 }
 
@@ -194,9 +200,9 @@ void EncryptedDBClientBase::decryptPayload(ConstDataRange data,
 }
 
 EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::processResponseFLE1(
-    EncryptedDBClientBase::RunCommandReturn result, const StringData databaseName) {
+    EncryptedDBClientBase::RunCommandReturn result, const DatabaseName& dbName) {
     auto rawReply = result.returnReply->getCommandReply();
-    return prepareReply(std::move(result), encryptDecryptCommand(rawReply, false, databaseName));
+    return prepareReply(std::move(result), encryptDecryptCommand(rawReply, false, dbName));
 }
 
 EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::processResponseFLE2(
@@ -230,8 +236,11 @@ EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::doRunCommand(
 
 EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::handleEncryptionRequest(
     EncryptedDBClientBase::RunCommandParams params) {
-    auto commandName = params.request.getCommandName().toString();
-    auto databaseName = params.request.getDatabase().toString();
+    auto& request = params.request;
+    auto commandName = request.getCommandName().toString();
+    const DatabaseName dbName = request.body.hasField("$tenant")
+        ? DatabaseName(TenantId(request.body["$tenant"].OID()), request.getDatabase())
+        : DatabaseName(boost::none, request.getDatabase());
 
     if (std::find(kEncryptedCommands.begin(), kEncryptedCommands.end(), StringData(commandName)) ==
         std::end(kEncryptedCommands)) {
@@ -239,7 +248,7 @@ EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::handleEncryptionR
     }
 
     EncryptedDBClientBase::RunCommandReturn result(doRunCommand(std::move(params)));
-    return processResponseFLE1(processResponseFLE2(std::move(result)), databaseName);
+    return processResponseFLE1(processResponseFLE2(std::move(result)), dbName);
 }
 
 std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::runCommandWithTarget(

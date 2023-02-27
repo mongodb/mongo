@@ -200,13 +200,13 @@ protected:
 
     virtual RunCommandReturn handleEncryptionRequest(RunCommandParams params);
 
-    RunCommandReturn processResponseFLE1(RunCommandReturn result, StringData databaseName);
+    RunCommandReturn processResponseFLE1(RunCommandReturn result, const DatabaseName& databaseName);
 
     RunCommandReturn processResponseFLE2(RunCommandReturn result);
 
     RunCommandReturn prepareReply(RunCommandReturn result, BSONObj decryptedDoc);
 
-    BSONObj encryptDecryptCommand(const BSONObj& object, bool encrypt, StringData databaseName);
+    BSONObj encryptDecryptCommand(const BSONObj& object, bool encrypt, const DatabaseName& dbName);
 
     JS::Value getCollection() const;
 

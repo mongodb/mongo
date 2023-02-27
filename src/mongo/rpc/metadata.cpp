@@ -133,7 +133,8 @@ bool isArrayOfObjects(BSONElement array) {
 }
 }  // namespace
 
-OpMsgRequest upconvertRequest(StringData db, BSONObj cmdObj, int queryFlags) {
+
+OpMsgRequest upconvertRequest(const DatabaseName& dbName, BSONObj cmdObj, int queryFlags) {
     cmdObj = cmdObj.getOwned();  // Usually this is a no-op since it is already owned.
 
     auto readPrefContainer = BSONObj();
@@ -168,13 +169,13 @@ OpMsgRequest upconvertRequest(StringData db, BSONObj cmdObj, int queryFlags) {
         ? BSONElement()
         : cmdObj[docSequenceIt->second];
     if (!isArrayOfObjects(docSequenceElem))
-        return OpMsgRequest::fromDBAndBody(db, std::move(cmdObj));
+        return OpMsgRequestBuilder::create(dbName, std::move(cmdObj));
 
     auto docSequenceName = docSequenceElem.fieldNameStringData();
 
     // Note: removing field before adding "$db" to avoid the need to copy the potentially large
     // array.
-    auto out = OpMsgRequest::fromDBAndBody(db, cmdObj.removeField(docSequenceName));
+    auto out = OpMsgRequestBuilder::create(dbName, cmdObj.removeField(docSequenceName));
     out.sequences.push_back({docSequenceName.toString()});
     for (auto elem : docSequenceElem.Obj()) {
         out.sequences[0].objs.push_back(elem.Obj().shareOwnershipWith(cmdObj));
