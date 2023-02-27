@@ -248,7 +248,7 @@ bool compatibleCollator(const QueryPlannerParams& params,
                         const CollatorInterface* queryCollator,
                         const BSONElement& element) {
     auto const collCollator = params.clusteredCollectionCollator;
-    bool compatible = !queryCollator || (collCollator && *queryCollator == *collCollator);
+    bool compatible = CollatorInterface::collatorsMatch(queryCollator, collCollator);
     return compatible || !affectedByCollator(element);
 }
 
