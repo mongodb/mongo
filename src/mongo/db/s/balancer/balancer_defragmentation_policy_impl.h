@@ -49,15 +49,15 @@ public:
 
     virtual DefragmentationPhaseEnum getNextPhase() const = 0;
 
-    virtual boost::optional<DefragmentationAction> popNextStreamableAction(
+    virtual boost::optional<BalancerStreamAction> popNextStreamableAction(
         OperationContext* opCtx) = 0;
 
     virtual boost::optional<MigrateInfo> popNextMigration(
         OperationContext* opCtx, stdx::unordered_set<ShardId>* availableShards) = 0;
 
     virtual void applyActionResult(OperationContext* opCtx,
-                                   const DefragmentationAction& action,
-                                   const DefragmentationActionResponse& response) = 0;
+                                   const BalancerStreamAction& action,
+                                   const BalancerStreamActionResponse& response) = 0;
 
     virtual BSONObj reportProgress() const = 0;
 
@@ -93,11 +93,11 @@ public:
 
     StringData getName() const override;
 
-    boost::optional<DefragmentationAction> getNextStreamingAction(OperationContext* opCtx) override;
+    boost::optional<BalancerStreamAction> getNextStreamingAction(OperationContext* opCtx) override;
 
     void applyActionResult(OperationContext* opCtx,
-                           const DefragmentationAction& action,
-                           const DefragmentationActionResponse& response) override;
+                           const BalancerStreamAction& action,
+                           const BalancerStreamActionResponse& response) override;
 
     void startCollectionDefragmentation(OperationContext* opCtx,
                                         const CollectionType& coll) override;

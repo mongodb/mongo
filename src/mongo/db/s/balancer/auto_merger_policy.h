@@ -59,10 +59,10 @@ public:
      * ActionsStreamPolicy overridden methods.
      */
     StringData getName() const override;
-    boost::optional<DefragmentationAction> getNextStreamingAction(OperationContext* opCtx) override;
+    boost::optional<BalancerStreamAction> getNextStreamingAction(OperationContext* opCtx) override;
     void applyActionResult(OperationContext* opCtx,
-                           const DefragmentationAction& action,
-                           const DefragmentationActionResponse& result) override;
+                           const BalancerStreamAction& action,
+                           const BalancerStreamActionResponse& result) override;
 
 private:
     void _init(WithLock lk);

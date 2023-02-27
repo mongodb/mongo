@@ -47,7 +47,7 @@ public:
      * invoke the related acknowledge() method on the defragmentation policy once the result is
      * available (this will allow to update the progress of the algorithm).
      */
-    virtual boost::optional<DefragmentationAction> getNextStreamingAction(
+    virtual boost::optional<BalancerStreamAction> getNextStreamingAction(
         OperationContext* opCtx) = 0;
 
     /**
@@ -57,8 +57,8 @@ public:
      * error will be thrown.
      */
     virtual void applyActionResult(OperationContext* opCtx,
-                                   const DefragmentationAction& action,
-                                   const DefragmentationActionResponse& result) = 0;
+                                   const BalancerStreamAction& action,
+                                   const BalancerStreamActionResponse& result) = 0;
 };
 
 }  // namespace mongo

@@ -214,9 +214,9 @@ public:
         return _nextPhase;
     }
 
-    boost::optional<DefragmentationAction> popNextStreamableAction(
+    boost::optional<BalancerStreamAction> popNextStreamableAction(
         OperationContext* opCtx) override {
-        boost::optional<DefragmentationAction> nextAction = boost::none;
+        boost::optional<BalancerStreamAction> nextAction = boost::none;
         if (!_pendingActionsByShards.empty()) {
             auto it = _shardToProcess ? _pendingActionsByShards.find(*_shardToProcess)
                                       : _pendingActionsByShards.begin();
@@ -228,7 +228,7 @@ public:
 
             if (pendingActions.rangesWithoutDataSize.size() > pendingActions.rangesToMerge.size()) {
                 const auto& rangeToMeasure = pendingActions.rangesWithoutDataSize.back();
-                nextAction = boost::optional<DefragmentationAction>(
+                nextAction = boost::optional<BalancerStreamAction>(
                     DataSizeInfo(shardId,
                                  _nss,
                                  _uuid,
@@ -240,7 +240,7 @@ public:
                 pendingActions.rangesWithoutDataSize.pop_back();
             } else if (!pendingActions.rangesToMerge.empty()) {
                 const auto& rangeToMerge = pendingActions.rangesToMerge.back();
-                nextAction = boost::optional<DefragmentationAction>(
+                nextAction = boost::optional<BalancerStreamAction>(
                     MergeInfo(shardId, _nss, _uuid, shardVersion.placementVersion(), rangeToMerge));
                 pendingActions.rangesToMerge.pop_back();
             }
@@ -268,8 +268,8 @@ public:
     }
 
     void applyActionResult(OperationContext* opCtx,
-                           const DefragmentationAction& action,
-                           const DefragmentationActionResponse& response) override {
+                           const BalancerStreamAction& action,
+                           const BalancerStreamActionResponse& response) override {
         ScopeGuard scopedGuard([&] { --_outstandingActions; });
         if (_aborted) {
             return;
@@ -432,7 +432,7 @@ public:
         return _nextPhase;
     }
 
-    boost::optional<DefragmentationAction> popNextStreamableAction(
+    boost::optional<BalancerStreamAction> popNextStreamableAction(
         OperationContext* opCtx) override {
         if (_actionableMerges.empty()) {
             return boost::none;
@@ -442,7 +442,7 @@ public:
         _actionableMerges.pop_front();
         const auto& nextRequest = _outstandingMerges.back();
         auto version = getShardVersion(opCtx, nextRequest.getDestinationShard(), _nss);
-        return boost::optional<DefragmentationAction>(
+        return boost::optional<BalancerStreamAction>(
             nextRequest.asMergeInfo(_uuid, _nss, version.placementVersion()));
     }
 
@@ -492,8 +492,8 @@ public:
     }
 
     void applyActionResult(OperationContext* opCtx,
-                           const DefragmentationAction& action,
-                           const DefragmentationActionResponse& response) override {
+                           const BalancerStreamAction& action,
+                           const BalancerStreamActionResponse& response) override {
         stdx::visit(
             OverloadedVisitor{
                 [&](const MigrateInfo& migrationAction) {
@@ -1080,7 +1080,7 @@ public:
         return _nextPhase;
     }
 
-    boost::optional<DefragmentationAction> popNextStreamableAction(
+    boost::optional<BalancerStreamAction> popNextStreamableAction(
         OperationContext* opCtx) override {
         if (_unmergedRangesByShard.empty()) {
             return boost::none;
@@ -1095,7 +1095,7 @@ public:
         invariant(!unmergedRanges.empty());
         auto shardVersion = getShardVersion(opCtx, shardId, _nss);
         const auto& rangeToMerge = unmergedRanges.back();
-        boost::optional<DefragmentationAction> nextAction = boost::optional<DefragmentationAction>(
+        boost::optional<BalancerStreamAction> nextAction = boost::optional<BalancerStreamAction>(
             MergeInfo(shardId, _nss, _uuid, shardVersion.placementVersion(), rangeToMerge));
         unmergedRanges.pop_back();
         ++_outstandingActions;
@@ -1119,8 +1119,8 @@ public:
     }
 
     void applyActionResult(OperationContext* opCtx,
-                           const DefragmentationAction& action,
-                           const DefragmentationActionResponse& response) override {
+                           const BalancerStreamAction& action,
+                           const BalancerStreamActionResponse& response) override {
         ScopeGuard scopedGuard([&] { --_outstandingActions; });
         if (_aborted) {
             return;
@@ -1331,7 +1331,7 @@ StringData BalancerDefragmentationPolicyImpl::getName() const {
     return StringData(kPolicyName);
 }
 
-boost::optional<DefragmentationAction> BalancerDefragmentationPolicyImpl::getNextStreamingAction(
+boost::optional<BalancerStreamAction> BalancerDefragmentationPolicyImpl::getNextStreamingAction(
     OperationContext* opCtx) {
     stdx::lock_guard<Latch> lk(_stateMutex);
     // Visit the defrag state in round robin fashion starting from a random one
@@ -1399,8 +1399,8 @@ bool BalancerDefragmentationPolicyImpl::_advanceToNextActionablePhase(OperationC
 
 void BalancerDefragmentationPolicyImpl::applyActionResult(
     OperationContext* opCtx,
-    const DefragmentationAction& action,
-    const DefragmentationActionResponse& response) {
+    const BalancerStreamAction& action,
+    const BalancerStreamActionResponse& response) {
     {
         stdx::lock_guard<Latch> lk(_stateMutex);
         DefragmentationPhase* targetState = nullptr;

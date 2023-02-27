@@ -489,8 +489,8 @@ void Balancer::_consumeActionStreamLoop() {
         Grid::get(opCtx.get())->getExecutorPool()->getFixedExecutor());
 
     // Lambda function for applying action response
-    auto applyActionResponseTo = [this](const DefragmentationAction& action,
-                                        const DefragmentationActionResponse& response,
+    auto applyActionResponseTo = [this](const BalancerStreamAction& action,
+                                        const BalancerStreamActionResponse& response,
                                         ActionsStreamPolicy* policy) {
         invariant(_outstandingStreamingOps.addAndFetch(-1) >= 0);
         ThreadClient tc("BalancerSecondaryThread::applyActionResponse", getGlobalServiceContext());
@@ -546,7 +546,7 @@ void Balancer::_consumeActionStreamLoop() {
 
         // Get next action from a random stream together with its stream
         auto [nextAction, sourcedStream] =
-            [&]() -> std::tuple<boost::optional<DefragmentationAction>, ActionsStreamPolicy*> {
+            [&]() -> std::tuple<boost::optional<BalancerStreamAction>, ActionsStreamPolicy*> {
             std::shuffle(activeStreams.begin(), activeStreams.end(), _random);
             for (auto stream : activeStreams) {
                 auto action = stream->getNextStreamingAction(opCtx.get());

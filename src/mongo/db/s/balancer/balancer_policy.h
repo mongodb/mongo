@@ -189,9 +189,9 @@ struct DataSizeResponse {
 };
 
 typedef stdx::variant<MergeInfo, DataSizeInfo, MigrateInfo, MergeAllChunksOnShardInfo>
-    DefragmentationAction;
+    BalancerStreamAction;
 
-typedef stdx::variant<Status, StatusWith<DataSizeResponse>> DefragmentationActionResponse;
+typedef stdx::variant<Status, StatusWith<DataSizeResponse>> BalancerStreamActionResponse;
 
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
 typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;

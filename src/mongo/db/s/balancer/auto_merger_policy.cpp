@@ -75,7 +75,7 @@ StringData AutoMergerPolicy::getName() const {
     return kPolicyName;
 }
 
-boost::optional<DefragmentationAction> AutoMergerPolicy::getNextStreamingAction(
+boost::optional<BalancerStreamAction> AutoMergerPolicy::getNextStreamingAction(
     OperationContext* opCtx) {
     stdx::unique_lock<Latch> lk(_mutex);
 
@@ -107,15 +107,15 @@ boost::optional<DefragmentationAction> AutoMergerPolicy::getNextStreamingAction(
         mergeAction.applyThrottling = applyThrottling;
 
         collections.pop_back();
-        return boost::optional<DefragmentationAction>(mergeAction);
+        return boost::optional<BalancerStreamAction>(mergeAction);
     }
 
     return boost::none;
 }
 
 void AutoMergerPolicy::applyActionResult(OperationContext* opCtx,
-                                         const DefragmentationAction& action,
-                                         const DefragmentationActionResponse& response) {
+                                         const BalancerStreamAction& action,
+                                         const BalancerStreamActionResponse& response) {
     stdx::visit(OverloadedVisitor{[&](const MergeAllChunksOnShardInfo& action) {
                                       const auto& status = stdx::get<Status>(response);
                                       if (!status.isOK()) {
