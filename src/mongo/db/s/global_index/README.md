@@ -13,14 +13,40 @@ global uniqueness enforcement.
 Unlike local indexes, global indexes are maintained in the sharding catalog, and are known to the
 entire cluster rather than individually by each shard. The sharding catalog is responsible for
 mapping a [base collection](#glossary) to its global indexes and vice-versa, for storing the index
-specifications, and for routing index key writes to the owning shards. TODO (SERVER-60626) expand
-this section.
+specifications, and for routing index key writes to the owning shards. 
 
 The global index keys are stored locally in a shard in an internal system collection referred
 to as the [global index container](#glossary). Unlike local index tables, a global index container
 has a UUID and a namespace. The namespace is `system.globalIndex.<uuid>`, where
 `<uuid>` is the UUID of the global index. The same UUID is used as the UUID of the internal system
 collection.
+
+For global indexes, the catalog's authoritative source of information is the shard. The index metadata
+information will be stored in the `config.shard.indexes` collection, and there will be an index version
+stored in `config.shard.collections`. For routing purposes, in the config server, the index version
+will be stored in the `config.collections` collection and the indexes will be stored in the
+`config.csrs.indexes` collection. Any global index change will trigger an index version change,
+which will be relayed to other nodes via the shard versioning protocol.
+
+## Shard Versioning protocol changes
+
+The index version will be added as a new component to the shard version, this way, a stale router will
+receive a Stale Shard Version error and refresh the index cache if the index version it possesses
+is different to the current index version. What was referred to as 'chunk version' will now be known
+as 'placement version', because it indicates the shard key range distribution within a cluster at a
+given point.
+
+## Existing DDL changes
+
+In order to maintain catalog consistency, every time there is an UUID change or a shard is the destination
+of a migration for the first time, there must be some index catalog consolidation. In order to preserve
+the shard as authoritative model, this consolidation must happen inside of a critical section for most cases.
+
+Rename collection, resharding, drop collection (and drop database by extension) have to update the index
+version accordingly so the shard versioning protocol can ensure index catalog consistency.
+
+The new collections creation, the ddl changes and the shard versioning protocol changes commented in this
+section will happen once SERVER-60628 is committed.
 
 # Storage format
 
