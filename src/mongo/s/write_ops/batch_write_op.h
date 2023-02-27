@@ -80,8 +80,7 @@ struct ShardWCError {
     WriteConcernErrorDetail error;
 };
 
-using TargetedBatchMap =
-    std::map<const ShardEndpoint*, std::unique_ptr<TargetedWriteBatch>, EndpointComp>;
+using TargetedBatchMap = std::map<ShardId, std::unique_ptr<TargetedWriteBatch>>;
 
 /**
  * The BatchWriteOp class manages the lifecycle of a batched write received by mongos.  Each
@@ -135,10 +134,9 @@ public:
      * If a write without a shard key is detected, return an OK StatusWith that has 'true' as the
      * value.
      */
-    StatusWith<bool> targetBatch(
-        const NSTargeter& targeter,
-        bool recordTargetErrors,
-        std::map<ShardId, std::unique_ptr<TargetedWriteBatch>>* targetedBatches);
+    StatusWith<bool> targetBatch(const NSTargeter& targeter,
+                                 bool recordTargetErrors,
+                                 TargetedBatchMap* targetedBatches);
 
     /**
      * Fills a BatchCommandRequest from a TargetedWriteBatch for this BatchWriteOp.

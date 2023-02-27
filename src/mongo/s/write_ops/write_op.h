@@ -248,10 +248,10 @@ class TargetedWriteBatch {
     TargetedWriteBatch& operator=(const TargetedWriteBatch&) = delete;
 
 public:
-    TargetedWriteBatch(const ShardEndpoint& endpoint) : _endpoint(endpoint) {}
+    TargetedWriteBatch(const ShardId& shardId) : _shardId(shardId) {}
 
-    const ShardEndpoint& getEndpoint() const {
-        return _endpoint;
+    const ShardId& getShardId() const {
+        return _shardId;
     }
 
     const std::vector<std::unique_ptr<TargetedWrite>>& getWrites() const {
@@ -273,7 +273,7 @@ public:
 
 private:
     // Where to send the batch
-    const ShardEndpoint _endpoint;
+    const ShardId _shardId;
 
     // Where the responses go
     // TargetedWrite*s are owned by the TargetedWriteBatch

@@ -34,6 +34,7 @@
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/s/ns_targeter.h"
+#include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_op.h"
 
 namespace mongo {
@@ -101,10 +102,9 @@ public:
      * If a write without a shard key is detected, return an OK StatusWith that has 'true' as the
      * value.
      */
-    StatusWith<bool> target(
-        const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-        bool recordTargetErrors,
-        stdx::unordered_map<ShardId, std::unique_ptr<TargetedWriteBatch>>& targetedBatches);
+    StatusWith<bool> target(const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+                            bool recordTargetErrors,
+                            TargetedBatchMap& targetedBatches);
 
     /**
      * Returns false if the bulk write op needs more processing.

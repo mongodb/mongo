@@ -120,6 +120,13 @@ protected:
 
 using BatchWriteOpTest = WriteOpTestFixture;
 
+// For BatchWriteOp, all writes in the batch should share the same endpoint since they
+// target the same shard and namespace. So we just use the endpoint from the first write.
+const ShardEndpoint& getFirstTargetedWriteEndpoint(
+    const std::unique_ptr<TargetedWriteBatch>& targetedBatch) {
+    return targetedBatch->getWrites()[0]->endpoint;
+}
+
 TEST_F(BatchWriteOpTest, SingleOp) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
@@ -139,7 +146,7 @@ TEST_F(BatchWriteOpTest, SingleOp) {
     ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
     BatchedCommandResponse response;
     buildResponse(1, &response);
@@ -171,7 +178,7 @@ TEST_F(BatchWriteOpTest, SingleError) {
     ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
     BatchedCommandResponse response;
     buildErrResponse(ErrorCodes::UnknownError, "message", &response);
@@ -243,7 +250,7 @@ TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
     ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
     BatchedCommandRequest targetBatch =
         batchOp.buildBatchRequest(*targeted.begin()->second, targeter);
@@ -351,7 +358,7 @@ TEST_F(BatchWriteOpTest, MultiOpSameShardOrdered) {
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 2u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
     BatchedCommandResponse response;
     buildResponse(2, &response);
@@ -392,7 +399,7 @@ TEST_F(BatchWriteOpTest, MultiOpSameShardUnordered) {
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 2u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
     BatchedCommandResponse response;
     buildResponse(2, &response);
@@ -429,7 +436,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsOrdered) {
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpointA);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpointA);
 
     BatchedCommandResponse response;
     buildResponse(1, &response);
@@ -444,7 +451,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsOrdered) {
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpointB);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpointB);
 
     // Respond to second targeted batch
     batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
@@ -464,10 +471,11 @@ void verifyTargetedBatches(std::map<ShardId, size_t> expected,
     // contains a batch of the correct size.
     // Finally, we ensure that no additional ShardIds are present in 'targeted' than 'expected'.
     for (auto it = targeted.begin(); it != targeted.end(); ++it) {
-        ASSERT_EQUALS(expected[it->second->getEndpoint().shardName],
+        ASSERT_EQUALS(expected[getFirstTargetedWriteEndpoint(it->second).shardName],
                       it->second->getWrites().size());
-        ASSERT_EQUALS(ShardVersion::IGNORED(), *it->second->getEndpoint().shardVersion);
-        expected.erase(expected.find(it->second->getEndpoint().shardName));
+        ASSERT_EQUALS(ShardVersion::IGNORED(),
+                      *getFirstTargetedWriteEndpoint(it->second).shardVersion);
+        expected.erase(expected.find(getFirstTargetedWriteEndpoint(it->second).shardName));
     }
     ASSERT(expected.empty());
 }
@@ -651,7 +659,7 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsOrdered) {
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 2u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpointA);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpointA);
 
     BatchedCommandResponse response;
     // Emulate one-write-per-delete-per-host
@@ -698,7 +706,7 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsOrdered) {
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 2u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpointB);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpointB);
 
     // Emulate one-write-per-delete-per-host
     buildResponse(2, &response);
@@ -764,6 +772,81 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsUnordered) {
     batchOp.buildClientResponse(&clientResponse);
     ASSERT(clientResponse.getOk());
     ASSERT_EQUALS(clientResponse.getN(), 8);
+}
+
+// Multi-op (unordered) targeting test where first two ops go to one shard, second two ops go to two
+// shards and the last two ops go to the other shard. Multi-target ops will override the endpoint to
+// have ignored shard version. If a shard is already targeted with a different shardVersion, a new
+// batch is required. So this test should result in three batches:
+// 1. shardA: [op1, op2]
+// 2. shardA: [op3, op4], shardB: [op3, op4]
+// 3. shardB: [op5, op6]
+TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsUnorderedWithDifferentEndpoints) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    ShardId shardIdA("shardA");
+    ShardId shardIdB("shardB");
+    ShardEndpoint endpointA(
+        shardIdA,
+        ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
+                                  boost::optional<CollectionIndexes>(boost::none)),
+        boost::none);
+    ShardEndpoint endpointB(
+        shardIdB,
+        ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
+                                  boost::optional<CollectionIndexes>(boost::none)),
+        boost::none);
+    ShardEndpoint endpointAVersionIgnored(shardIdA, ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpointBVersionIgnored(shardIdB, ShardVersion::IGNORED(), boost::none);
+
+    auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
+
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
+            wcb.setOrdered(false);
+            return wcb;
+        }());
+        updateOp.setUpdates({// These go to the same shard
+                             buildUpdate(BSON("x" << -1), false),
+                             buildUpdate(BSON("x" << -2), false),
+                             // These go to both shards
+                             buildUpdate(BSON("x" << GTE << -1 << LT << 2), true),
+                             buildUpdate(BSON("x" << GTE << -2 << LT << 1), true),
+                             // These go to the same shard
+                             buildUpdate(BSON("x" << 1), false),
+                             buildUpdate(BSON("x" << 2), false)});
+        return updateOp;
+    }());
+
+    BatchWriteOp batchOp(_opCtx, request);
+
+    TargetedBatchMap targeted;
+    // First batch: shardA: [op1, op2].
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
+    ASSERT_EQUALS(targeted.size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 2u);
+    assertEndpointsEqual(targeted[shardIdA]->getWrites()[0]->endpoint, endpointA);
+    assertEndpointsEqual(targeted[shardIdA]->getWrites()[1]->endpoint, endpointA);
+
+    targeted.clear();
+    // Second batch: shardA: [op3, op4], shardB: [op3, op4].
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
+    ASSERT_EQUALS(targeted.size(), 2u);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 2u);
+    assertEndpointsEqual(targeted[shardIdA]->getWrites()[0]->endpoint, endpointAVersionIgnored);
+    assertEndpointsEqual(targeted[shardIdA]->getWrites()[1]->endpoint, endpointAVersionIgnored);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 2u);
+    assertEndpointsEqual(targeted[shardIdB]->getWrites()[0]->endpoint, endpointBVersionIgnored);
+    assertEndpointsEqual(targeted[shardIdB]->getWrites()[1]->endpoint, endpointBVersionIgnored);
+
+    targeted.clear();
+    // Third batch: shardB: [op5, op6].
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
+    ASSERT_EQUALS(targeted.size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 2u);
+    assertEndpointsEqual(targeted[shardIdB]->getWrites()[0]->endpoint, endpointB);
+    assertEndpointsEqual(targeted[shardIdB]->getWrites()[1]->endpoint, endpointB);
 }
 
 // Multi-op targeting test where two ops go to two separate shards and there's an error on one op on
@@ -1466,7 +1549,7 @@ TEST_F(BatchWriteOpTest, AttachingStmtIds) {
         ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
         ASSERT(!batchOp.isFinished());
         ASSERT_EQUALS(targeted.size(), 1u);
-        assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+        assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
         BatchedCommandRequest targetedRequest =
             batchOp.buildBatchRequest(*targeted.begin()->second, targeter);
@@ -1738,7 +1821,7 @@ TEST_F(WriteWithoutShardKeyFixture, SingleUpdateWithoutShardKey) {
     ASSERT_EQUALS(status.getValue(), true);
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 }
 
 TEST_F(WriteWithoutShardKeyFixture, MultipleOrderedUpdateWithoutShardKey) {
@@ -1768,7 +1851,7 @@ TEST_F(WriteWithoutShardKeyFixture, MultipleOrderedUpdateWithoutShardKey) {
     ASSERT_EQUALS(status.getValue(), true);
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
     BatchedCommandResponse response;
     buildResponse(1, &response);
@@ -1785,7 +1868,7 @@ TEST_F(WriteWithoutShardKeyFixture, MultipleOrderedUpdateWithoutShardKey) {
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
     // Respond to second targeted batch
     batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
@@ -1819,7 +1902,7 @@ TEST_F(WriteWithoutShardKeyFixture, MultipleUnorderedUpdateWithoutShardKey) {
     ASSERT_EQUALS(status.getValue(), true);
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
     BatchedCommandResponse response;
     buildResponse(1, &response);
@@ -1836,7 +1919,7 @@ TEST_F(WriteWithoutShardKeyFixture, MultipleUnorderedUpdateWithoutShardKey) {
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
     // Respond to second targeted batch
     batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
@@ -1864,7 +1947,7 @@ TEST_F(WriteWithoutShardKeyFixture, SingleDeleteWithoutShardKey) {
     ASSERT_EQUALS(status.getValue(), true);
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 }
 
 
@@ -1895,7 +1978,7 @@ TEST_F(WriteWithoutShardKeyFixture, MultipleOrderedDeletesWithoutShardKey) {
     ASSERT_EQUALS(status.getValue(), true);
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
     BatchedCommandResponse response;
     buildResponse(1, &response);
@@ -1912,7 +1995,7 @@ TEST_F(WriteWithoutShardKeyFixture, MultipleOrderedDeletesWithoutShardKey) {
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
     // Respond to second targeted batch
     batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
@@ -1946,7 +2029,7 @@ TEST_F(WriteWithoutShardKeyFixture, MultipleUnorderedDeletesWithoutShardKey) {
     ASSERT_EQUALS(status.getValue(), true);
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
     BatchedCommandResponse response;
     buildResponse(1, &response);
@@ -1963,7 +2046,7 @@ TEST_F(WriteWithoutShardKeyFixture, MultipleUnorderedDeletesWithoutShardKey) {
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+    assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
     // Respond to second targeted batch
     batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);

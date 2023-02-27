@@ -82,7 +82,7 @@ BSONObj upgradeWriteConcern(const BSONObj& origWriteConcern) {
 bool isNewBatchRequiredOrdered(const std::vector<std::unique_ptr<TargetedWrite>>& writes,
                                const TargetedBatchMap& batchMap) {
     for (auto&& write : writes) {
-        if (batchMap.find(&write->endpoint) == batchMap.end()) {
+        if (batchMap.find(write->endpoint.shardName) == batchMap.end()) {
             return true;
         }
     }
@@ -92,20 +92,34 @@ bool isNewBatchRequiredOrdered(const std::vector<std::unique_ptr<TargetedWrite>>
 
 /**
  * Helper to determine whether a shard is already targeted with a different shardVersion, which
- * necessitates a new batch. This happens when a batch write incldues a multi target write and
+ * necessitates a new batch. This happens when a batch write includes a multi target write and
  * a single target write.
  */
-bool isNewBatchRequiredUnordered(const std::vector<std::unique_ptr<TargetedWrite>>& writes,
-                                 const TargetedBatchMap& batchMap,
-                                 const std::set<ShardId>& targetedShards) {
+bool isNewBatchRequiredUnordered(
+    const NamespaceString& nss,
+    const std::vector<std::unique_ptr<TargetedWrite>>& writes,
+    const std::map<NamespaceString, std::set<ShardId>>& nsShardIdMap,
+    const std::map<NamespaceString, std::set<const ShardEndpoint*, EndpointComp>>& nsEndpointMap) {
+    auto endpointSetIt = nsEndpointMap.find(nss);
+    if (endpointSetIt == nsEndpointMap.end()) {
+        // We haven't targeted this namespace yet.
+        return false;
+    }
+
     for (auto&& write : writes) {
-        if (batchMap.find(&write->endpoint) == batchMap.end()) {
-            if (targetedShards.find((&write->endpoint)->shardName) != targetedShards.end()) {
+        if (endpointSetIt->second.find(&write->endpoint) == endpointSetIt->second.end()) {
+            // This is a new endpoint for this namespace.
+            auto shardIdSetIt = nsShardIdMap.find(nss);
+            invariant(shardIdSetIt != nsShardIdMap.end());
+            if (shardIdSetIt->second.find(write->endpoint.shardName) !=
+                shardIdSetIt->second.end()) {
+                // And because we have targeted this shardId for this namespace before, this implies
+                // a shard is already targeted under a different endpoint/shardVersion, necessitates
+                // a new batch.
                 return true;
             }
         }
     }
-
     return false;
 }
 
@@ -116,7 +130,7 @@ bool wouldMakeBatchesTooBig(const std::vector<std::unique_ptr<TargetedWrite>>& w
                             int writeSizeBytes,
                             const TargetedBatchMap& batchMap) {
     for (auto&& write : writes) {
-        TargetedBatchMap::const_iterator it = batchMap.find(&write->endpoint);
+        TargetedBatchMap::const_iterator it = batchMap.find(write->endpoint.shardName);
         if (it == batchMap.end()) {
             // If this is the first item in the batch, it can't be too big
             continue;
@@ -282,8 +296,8 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
 
     bool isWriteWithoutShardKeyOrId = false;
 
-    // Used to track the set of shardIds (w/o shardVersion) we targeted.
-    std::set<ShardId> targetedShards;
+    std::map<NamespaceString, std::set<const ShardEndpoint*, EndpointComp>> nsEndpointMap;
+    std::map<NamespaceString, std::set<ShardId>> nsShardIdMap;
 
     for (auto& writeOp : writeOps) {
         // Only target Ready op.
@@ -375,8 +389,8 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
 
         // If writes are unordered and we already have targeted endpoints, make sure we don't target
         // the same shard with a different shardVersion.
-        if (!ordered && !batchMap.empty() &&
-            isNewBatchRequiredUnordered(writes, batchMap, targetedShards)) {
+        if (!ordered &&
+            isNewBatchRequiredUnordered(targeter.getNS(), writes, nsShardIdMap, nsEndpointMap)) {
             writeOp.cancelWrites(nullptr);
             break;
         }
@@ -417,18 +431,17 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
             };
         }
 
-        //
         // Targeting went ok, add to appropriate TargetedBatch
-        //
-
         for (auto&& write : writes) {
-            TargetedBatchMap::iterator batchIt = batchMap.find(&write->endpoint);
+            const auto& shardId = write->endpoint.shardName;
+            TargetedBatchMap::iterator batchIt = batchMap.find(shardId);
             if (batchIt == batchMap.end()) {
-                auto newBatch = std::make_unique<TargetedWriteBatch>(write->endpoint);
-                auto endpoint = &newBatch->getEndpoint();
-                batchIt = batchMap.emplace(endpoint, std::move(newBatch)).first;
-                targetedShards.insert(endpoint->shardName);
+                auto newBatch = std::make_unique<TargetedWriteBatch>(shardId);
+                batchIt = batchMap.emplace(shardId, std::move(newBatch)).first;
             }
+
+            nsEndpointMap[targeter.getNS()].insert(&write->endpoint);
+            nsShardIdMap[targeter.getNS()].insert(shardId);
 
             batchIt->second->addWrite(std::move(write), estWriteSizeBytes);
         }
@@ -436,11 +449,8 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
         // Relinquish ownership of TargetedWrites, now the TargetedBatches own them
         writes.clear();
 
-        //
         // Break if we're ordered and we have more than one endpoint - later writes cannot be
         // enforced as ordered across multiple shard endpoints.
-        //
-
         if (ordered && batchMap.size() > 1u)
             break;
     }
@@ -461,15 +471,10 @@ BatchWriteOp::BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest&
     }
 }
 
-StatusWith<bool> BatchWriteOp::targetBatch(
-    const NSTargeter& targeter,
-    bool recordTargetErrors,
-    std::map<ShardId, std::unique_ptr<TargetedWriteBatch>>* targetedBatches) {
+StatusWith<bool> BatchWriteOp::targetBatch(const NSTargeter& targeter,
+                                           bool recordTargetErrors,
+                                           TargetedBatchMap* targetedBatches) {
     const bool ordered = _clientRequest.getWriteCommandRequestBase().getOrdered();
-
-    // Used to track the shard endpoints (w/ shardVersion) we targeted and the batches to each of
-    // these shard endpoints.
-    TargetedBatchMap batchMap;
 
     auto targetStatus = targetWriteOps(
         _opCtx,
@@ -503,27 +508,10 @@ StatusWith<bool> BatchWriteOp::targetBatch(
                 ordered ? 0 : write_ops::kWriteCommandBSONArrayPerElementOverheadBytes + 272;
             return std::max(writeSizeBytes, errorResponsePotentialSizeBytes);
         },
-        batchMap);
+        *targetedBatches);
 
     if (!targetStatus.isOK()) {
         return targetStatus;
-    }
-
-    //
-    // Send back our targeted batches
-    //
-
-    for (TargetedBatchMap::iterator it = batchMap.begin(); it != batchMap.end(); ++it) {
-        auto batch = std::move(it->second);
-        if (batch->getWrites().empty())
-            continue;
-
-        // Remember targeted batch for reporting
-        _targeted.insert(batch.get());
-
-        // Send the handle back to caller
-        invariant(targetedBatches->find(batch->getEndpoint().shardName) == targetedBatches->end());
-        targetedBatches->emplace(batch->getEndpoint().shardName, std::move(batch));
     }
 
     _nShardsOwningChunks = targeter.getNShardsOwningChunks();
@@ -633,12 +621,15 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& 
         return wcb;
     }());
 
+    // For BatchWriteOp, all writes in the batch should share the same endpoint since they target
+    // the same shard and namespace. So we just use the endpoint from the first write.
+    const auto& endpoint = targetedBatch.getWrites()[0]->endpoint;
 
-    auto shardVersion = targetedBatch.getEndpoint().shardVersion;
+    auto shardVersion = endpoint.shardVersion;
     if (shardVersion)
         request.setShardVersion(*shardVersion);
 
-    auto dbVersion = targetedBatch.getEndpoint().databaseVersion;
+    auto dbVersion = endpoint.databaseVersion;
     if (dbVersion)
         request.setDbVersion(*dbVersion);
 
@@ -684,7 +675,10 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
 
     // Special handling for write concern errors, save for later
     if (response.isWriteConcernErrorSet()) {
-        _wcErrors.emplace_back(targetedBatch.getEndpoint(), *response.getWriteConcernError());
+        // For BatchWriteOp, all writes in the batch should share the same endpoint since they
+        // target the same shard and namespace. So we just use the endpoint from the first write.
+        _wcErrors.emplace_back(targetedBatch.getWrites()[0]->endpoint,
+                               *response.getWriteConcernError());
     }
 
     std::vector<write_ops::WriteError> itemErrors;
@@ -742,7 +736,9 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
 
     // Track errors we care about, whether batch or individual errors
     if (nullptr != trackedErrors) {
-        trackErrors(targetedBatch.getEndpoint(), itemErrors, trackedErrors);
+        // For BatchWriteOp, all writes in the batch should share the same endpoint since they
+        // target the same shard and namespace. So we just use the endpoint from the first write.
+        trackErrors(targetedBatch.getWrites()[0]->endpoint, itemErrors, trackedErrors);
     }
 
     // Track upserted ids if we need to

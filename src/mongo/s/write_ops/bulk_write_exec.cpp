@@ -36,7 +36,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -61,7 +60,7 @@ void execute(OperationContext* opCtx,
     while (!bulkWriteOp.isFinished()) {
         // 1: Target remaining ops with the appropriate targeter based on the namespace index and
         // re-batch ops based on their targeted shard id.
-        stdx::unordered_map<ShardId, std::unique_ptr<TargetedWriteBatch>> childBatches;
+        TargetedBatchMap childBatches;
 
         bool recordTargetErrors = refreshedTargeter;
         auto targetStatus = bulkWriteOp.target(targeters, recordTargetErrors, childBatches);
@@ -106,20 +105,12 @@ BulkWriteOp::BulkWriteOp(OperationContext* opCtx, const BulkWriteCommandRequest&
     }
 }
 
-StatusWith<bool> BulkWriteOp::target(
-    const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-    bool recordTargetErrors,
-    stdx::unordered_map<ShardId, std::unique_ptr<TargetedWriteBatch>>& targetedBatches) {
+StatusWith<bool> BulkWriteOp::target(const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+                                     bool recordTargetErrors,
+                                     TargetedBatchMap& targetedBatches) {
     const auto ordered = _clientRequest.getOrdered();
 
-    // Used to track the shard endpoints (w/ shardVersion) we targeted and the batches to each of
-    // these shard endpoints.
-    TargetedBatchMap batchMap;
-
-    // Used to track the set of shardIds (w/o shardVersion) we targeted.
-    std::set<ShardId> targetedShards;
-
-    auto targetStatus = targetWriteOps(
+    return targetWriteOps(
         _opCtx,
         _writeOps,
         ordered,
@@ -144,23 +135,7 @@ StatusWith<bool> BulkWriteOp::target(
             // outgoing request.
             return 1;
         },
-        batchMap);
-
-    if (!targetStatus.isOK()) {
-        return targetStatus;
-    }
-
-    // Send back our targeted batches.
-    for (TargetedBatchMap::iterator it = batchMap.begin(); it != batchMap.end(); ++it) {
-        auto batch = std::move(it->second);
-        if (batch->getWrites().empty())
-            continue;
-
-        invariant(targetedBatches.find(batch->getEndpoint().shardName) == targetedBatches.end());
-        targetedBatches.emplace(batch->getEndpoint().shardName, std::move(batch));
-    }
-
-    return targetStatus;
+        targetedBatches);
 }
 
 bool BulkWriteOp::isFinished() const {
