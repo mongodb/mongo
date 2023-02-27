@@ -177,6 +177,23 @@ const newShardName =
 
 {
     //
+    // Can't create catalogShard using the addShard command.
+    //
+
+    assert.commandFailed(st.s.adminCommand({addShard: st.configRS.getURL(), name: "config"}));
+
+    // Ensure that the config server's RSM hasn't been removed and that it can still target itself.
+    st.s.getDB("config")
+        .chunks
+        .aggregate([
+            {$lookup: {from: "shards", localField: "shard", foreignField: "_id", as: "shardHost"}},
+            {$unwind: "$shardHost"},
+        ])
+        .toArray();
+}
+
+{
+    //
     // Add back the catalog shard.
     //
 

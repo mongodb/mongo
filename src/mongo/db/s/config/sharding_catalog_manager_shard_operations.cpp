@@ -662,8 +662,13 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     auto targeter = shard->getTargeter();
 
     ScopeGuard stopMonitoringGuard([&] {
+        // Do not remove the RSM for the config server because it is still needed even if
+        // adding the config server as a shard failed.
         if (shardConnectionString.type() == ConnectionString::ConnectionType::kReplicaSet &&
-            !isCatalogShard) {
+            shardConnectionString.getReplicaSetName() !=
+                repl::ReplicationCoordinator::get(opCtx)
+                    ->getConfigConnectionString()
+                    .getReplicaSetName()) {
             // This is a workaround for the case were we could have some bad shard being
             // requested to be added and we put that bad connection string on the global replica set
             // monitor registry. It needs to be cleaned up so that when a correct replica set is
