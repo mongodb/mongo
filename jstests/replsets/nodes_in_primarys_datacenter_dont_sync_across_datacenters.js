@@ -25,6 +25,7 @@ const rst = new ReplSetTest({
             // Set 'maxNumSyncSourceChangesPerHour' to a high value to remove the limit on how many
             // times nodes change sync sources in an hour.
             maxNumSyncSourceChangesPerHour: 99,
+            writePeriodicNoops: true,
         }
     },
     settings: {
