@@ -295,6 +295,7 @@ struct __wt_txn {
      * the current oldest/pinned timestamp, respectively.
      */
     wt_timestamp_t checkpoint_read_timestamp;
+    wt_timestamp_t checkpoint_stable_timestamp;
     wt_timestamp_t checkpoint_oldest_timestamp;
 
     /* Array of modifications by this transaction. */

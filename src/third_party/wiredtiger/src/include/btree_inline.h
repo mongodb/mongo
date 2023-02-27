@@ -1652,7 +1652,8 @@ __wt_page_del_visible(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool 
             return (false);
     }
 
-    return (__wt_txn_visible(session, page_del->txnid, page_del->timestamp));
+    return (
+      __wt_txn_visible(session, page_del->txnid, page_del->timestamp, page_del->durable_timestamp));
 }
 
 /*
@@ -2312,7 +2313,8 @@ __wt_btcur_skip_page(
          * point added to the page during the last reconciliation.
          */
         if (addr.ta.newest_stop_txn != WT_TXN_MAX && addr.ta.newest_stop_ts != WT_TS_MAX &&
-          __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts)) {
+          __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts,
+            addr.ta.newest_stop_durable_ts)) {
             *skipp = true;
             goto unlock;
         }
