@@ -322,6 +322,10 @@ last-continuous:
     ticket: SERVER-73697
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
     ticket: SERVER-73822
+  - test_file: jstests/sharding/query/collation_targeting_inherited.js
+    ticket: SERVER-72224
+  - test_file: jstests/core/clustered/clustered_collection_collation.js
+    ticket: SERVER-72224
   - test_file: jstests/sharding/internal_txns/incomplete_transaction_history_during_migration.js
     ticket: SERVER-73938
   - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
@@ -725,6 +729,10 @@ last-lts:
     ticket: SERVER-73697
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
     ticket: SERVER-73822
+  - test_file: jstests/sharding/query/collation_targeting_inherited.js
+    ticket: SERVER-72224
+  - test_file: jstests/core/clustered/clustered_collection_collation.js
+    ticket: SERVER-72224
   - test_file: jstests/sharding/internal_txns/incomplete_transaction_history_during_migration.js
     ticket: SERVER-73938
   - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
