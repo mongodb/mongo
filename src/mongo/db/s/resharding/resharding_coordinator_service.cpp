@@ -2156,6 +2156,8 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
                     Grid::get(opCtx.get())->shardRegistry()->getAllShardIds(opCtx.get());
                 const auto& nss = coordinatorDoc.getSourceNss();
                 const auto& notMatchingThisUUID = coordinatorDoc.getReshardingUUID();
+                // TODO SERVER-74324: deprecate _shardsvrDropCollectionIfUUIDNotMatching after 7.0
+                // is lastLTS.
                 const auto cmdObj =
                     ShardsvrDropCollectionIfUUIDNotMatchingRequest(nss, notMatchingThisUUID)
                         .toBSON({});

@@ -26,7 +26,9 @@
 # it in the license file.
 #
 
-# This IDL file describes the BSON format for the _shardsvrDropCollectionIfUUIDNotMatching command.
+# This IDL file describes the BSON format for _shardsvrDropCollectionIfUUIDNotMatching and 
+# _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern command.
+# TODO SERVER-74324: deprecate _shardsvrDropCollectionIfUUIDNotMatching after 7.0 is lastLTS.
 
 global:
   cpp_namespace: "mongo"
@@ -35,10 +37,24 @@ imports:
     - "mongo/db/basic_types.idl"
 
 commands:
+
   _shardsvrDropCollectionIfUUIDNotMatching:
     command_name: _shardsvrDropCollectionIfUUIDNotMatching
     cpp_name: ShardsvrDropCollectionIfUUIDNotMatchingRequest
     description: "Internal dropCollectionIfUUIDNotMatching request."
+    strict: false
+    namespace: concatenate_with_db
+    api_version: ""
+    fields:
+        expectedCollectionUUID:
+            type: uuid
+            description: "The expected collection UUID: if the local catalog has a different uuid
+                         associated to the namespace, the collection will be dropped."
+
+  _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern:
+    command_name: _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern
+    cpp_name: ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernRequest
+    description: "Internal dropCollectionIfUUIDNotMatching request with write concern."
     strict: false
     namespace: concatenate_with_db
     api_version: ""

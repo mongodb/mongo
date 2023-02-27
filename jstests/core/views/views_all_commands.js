@@ -157,7 +157,9 @@ let viewsCommandTests = {
     _shardsvrCloneCatalogData: {skip: isAnInternalCommand},
     _shardsvrCompactStructuredEncryptionData: {skip: isAnInternalCommand},
     _shardsvrDropCollection: {skip: isAnInternalCommand},
+    // TODO SERVER-74324: deprecate _shardsvrDropCollectionIfUUIDNotMatching after 7.0 is lastLTS.
     _shardsvrDropCollectionIfUUIDNotMatching: {skip: isUnrelated},
+    _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern: {skip: isUnrelated},
     _shardsvrDropCollectionParticipant: {skip: isAnInternalCommand},
     _shardsvrDropIndexCatalogEntryParticipant: {skip: isAnInternalCommand},
     _shardsvrDropIndexes: {skip: isAnInternalCommand},

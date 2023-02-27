@@ -112,7 +112,9 @@ const allCommands = {
     _shardsvrDropCollection: {skip: isAnInternalCommand},
     _shardsvrCreateCollection: {skip: isAnInternalCommand},
     _shardsvrCreateGlobalIndex: {skip: isAnInternalCommand},
+    // TODO SERVER-74324: deprecate _shardsvrDropCollectionIfUUIDNotMatching after 7.0 is lastLTS.
     _shardsvrDropCollectionIfUUIDNotMatching: {skip: isAnInternalCommand},
+    _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern: {skip: isAnInternalCommand},
     _shardsvrDropCollectionParticipant: {skip: isAnInternalCommand},
     _shardsvrDropGlobalIndex: {skip: isAnInternalCommand},
     _shardsvrDropIndexCatalogEntryParticipant: {skip: isAnInternalCommand},

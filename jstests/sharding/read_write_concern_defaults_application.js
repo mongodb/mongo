@@ -156,7 +156,9 @@ let testCases = {
     _shardsvrCreateGlobalIndex: {skip: "internal command"},
     _shardsvrDropGlobalIndex: {skip: "internal command"},
     _shardsvrDropCollection: {skip: "internal command"},
+    // TODO SERVER-74324: deprecate _shardsvrDropCollectionIfUUIDNotMatching after 7.0 is lastLTS.
     _shardsvrDropCollectionIfUUIDNotMatching: {skip: "internal command"},
+    _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern: {skip: "internal command"},
     _shardsvrDropCollectionParticipant: {skip: "internal command"},
     _shardsvrUnregisterIndex: {skip: "internal command"},
     _shardsvrDropIndexCatalogEntryParticipant: {skip: "internal command"},

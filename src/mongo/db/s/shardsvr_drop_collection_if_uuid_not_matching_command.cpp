@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/request_types/drop_collection_if_uuid_not_matching_gen.h"
@@ -41,6 +41,7 @@
 namespace mongo {
 namespace {
 
+// TODO SERVER-74324: deprecate _shardsvrDropCollectionIfUUIDNotMatching after 7.0 is lastLTS.
 class ShardsvrDropCollectionIfUUIDNotMatchingCommand final
     : public TypedCommand<ShardsvrDropCollectionIfUUIDNotMatchingCommand> {
 public:
@@ -65,10 +66,16 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             uassertStatusOK(dropCollectionIfUUIDNotMatching(
                 opCtx, ns(), request().getExpectedCollectionUUID()));
+
+            WriteConcernResult ignoreResult;
+            auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+            uassertStatusOK(waitForWriteConcern(
+                opCtx, latestOpTime, CommandHelpers::kMajorityWriteConcern, &ignoreResult));
         }
 
     private:
@@ -90,5 +97,57 @@ public:
     };
 } shardSvrDropCollectionIfUUIDNotMatching;
 
+class ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernCommand final
+    : public TypedCommand<ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernCommand> {
+public:
+    bool skipApiVersionCheck() const override {
+        /* Internal command (server to server) */
+        return true;
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return Command::AllowedOnSecondary::kNever;
+    }
+
+    std::string help() const override {
+        return "Internal command aimed to remove stale entries from the local collection catalog.";
+    }
+
+    using Request = ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernRequest;
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
+
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+            uassertStatusOK(dropCollectionIfUUIDNotMatching(
+                opCtx, ns(), request().getExpectedCollectionUUID()));
+        }
+
+    private:
+        NamespaceString ns() const override {
+            return request().getNamespace();
+        }
+
+        bool supportsWriteConcern() const override {
+            return true;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::dropCollection));
+        }
+    };
+} shardSvrDropCollectionIfUUIDNotMatchingWithWriteConcern;
 }  // namespace
 }  // namespace mongo
