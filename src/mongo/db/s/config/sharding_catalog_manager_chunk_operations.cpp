@@ -1048,129 +1048,153 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
     // under the exclusive _kChunkOpLock happen on the same term.
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
-    // strictly monotonously increasing collection versions
-    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
+    // Retry the commit a fixed number of  times before failing: the discovery of chunks to merge
+    // happens before acquiring the `_kChunkOpLock` in order not to block  for too long concurrent
+    // chunk operations. This implies that other chunk operations for the same collection could
+    // potentially commit before acquiring the lock, forcing to repeat the discovey.
+    const int MAX_RETRIES = 5;
+    int nRetries = 0;
 
-    // 1. Retrieve the collection entry and the initial version.
-    const auto [coll, originalVersion] =
-        uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
-    auto& collUuid = coll.getUuid();
-    auto newVersion = originalVersion;
+    while (nRetries < MAX_RETRIES) {
+        // 1. Retrieve the collection entry and the initial version.
+        const auto [coll, originalVersion] =
+            uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
+        auto& collUuid = coll.getUuid();
+        auto newVersion = originalVersion;
 
-    // 2. Retrieve the list of mergeable chunks belonging to the requested shard/collection.
-    // A chunk is mergeable when the following conditions are honored:
-    // - Non-jumbo
-    // - The last migration occurred before the current history window
-    const auto oldestTimestampSupportedForHistory = [&]() {
-        const auto currTime = VectorClock::get(opCtx)->getTime();
-        auto currTimeSeconds = currTime.clusterTime().asTimestamp().getSecs();
-        return Timestamp(currTimeSeconds - getHistoryWindowInSeconds(), 0);
-    }();
+        // 2. Retrieve the list of mergeable chunks belonging to the requested shard/collection.
+        // A chunk is mergeable when the following conditions are honored:
+        // - Non-jumbo
+        // - The last migration occurred before the current history window
+        const auto oldestTimestampSupportedForHistory = [&]() {
+            const auto currTime = VectorClock::get(opCtx)->getTime();
+            auto currTimeSeconds = currTime.clusterTime().asTimestamp().getSecs();
+            return Timestamp(currTimeSeconds - getHistoryWindowInSeconds(), 0);
+        }();
 
-    const auto chunksBelongingToShard =
-        uassertStatusOK(
-            _localConfigShard->exhaustiveFindOnConfig(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                repl::ReadConcernLevel::kLocalReadConcern,
-                ChunkType::ConfigNS,
-                BSON(ChunkType::collectionUUID
-                     << collUuid << ChunkType::shard(shardId.toString()) << ChunkType::jumbo
-                     << BSON("$ne" << true) << ChunkType::onCurrentShardSince
-                     << BSON("$lt" << oldestTimestampSupportedForHistory)),
-                BSON(ChunkType::min << 1) /* sort */,
-                boost::none /* limit */))
-            .docs;
+        const auto chunksBelongingToShard =
+            uassertStatusOK(
+                _localConfigShard->exhaustiveFindOnConfig(
+                    opCtx,
+                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                    repl::ReadConcernLevel::kLocalReadConcern,
+                    ChunkType::ConfigNS,
+                    BSON(ChunkType::collectionUUID
+                         << collUuid << ChunkType::shard(shardId.toString()) << ChunkType::jumbo
+                         << BSON("$ne" << true) << ChunkType::onCurrentShardSince
+                         << BSON("$lt" << oldestTimestampSupportedForHistory)),
+                    BSON(ChunkType::min << 1) /* sort */,
+                    boost::none /* limit */))
+                .docs;
 
-    // 3. Prepare the data for the merge.
+        // 3. Prepare the data for the merge.
 
-    // Track the number of merged chunks for each new chunk
-    std::vector<size_t> numMergedChunks;
+        // Track the number of merged chunks for each new chunk
+        std::vector<size_t> numMergedChunks;
 
-    const auto newChunks = [&]() -> std::shared_ptr<std::vector<ChunkType>> {
-        auto newChunks = std::make_shared<std::vector<ChunkType>>();
-        const Timestamp minValidTimestamp = Timestamp(0, 1);
+        const auto newChunks = [&]() -> std::shared_ptr<std::vector<ChunkType>> {
+            auto newChunks = std::make_shared<std::vector<ChunkType>>();
+            const Timestamp minValidTimestamp = Timestamp(0, 1);
 
-        BSONObj rangeMin, rangeMax;
-        Timestamp rangeOnCurrentShardSince = minValidTimestamp;
-        size_t nChunksInRange = 0;
+            BSONObj rangeMin, rangeMax;
+            Timestamp rangeOnCurrentShardSince = minValidTimestamp;
+            size_t nChunksInRange = 0;
 
-        // Lambda generating the new chunk to be committed if a merge can be issued on the range
-        auto processRange = [&]() {
-            if (nChunksInRange > 1) {
-                newVersion.incMinor();
-                ChunkType newChunk(collUuid, {rangeMin, rangeMax}, newVersion, shardId);
-                newChunk.setOnCurrentShardSince(rangeOnCurrentShardSince);
-                newChunk.setHistory({ChunkHistory{rangeOnCurrentShardSince, shardId}});
-                numMergedChunks.push_back(nChunksInRange);
-                newChunks->push_back(std::move(newChunk));
+            // Lambda generating the new chunk to be committed if a merge can be issued on the range
+            auto processRange = [&]() {
+                if (nChunksInRange > 1) {
+                    newVersion.incMinor();
+                    ChunkType newChunk(collUuid, {rangeMin, rangeMax}, newVersion, shardId);
+                    newChunk.setOnCurrentShardSince(rangeOnCurrentShardSince);
+                    newChunk.setHistory({ChunkHistory{rangeOnCurrentShardSince, shardId}});
+                    numMergedChunks.push_back(nChunksInRange);
+                    newChunks->push_back(std::move(newChunk));
+                }
+                nChunksInRange = 0;
+                rangeOnCurrentShardSince = minValidTimestamp;
+            };
+
+            for (const auto& chunkDoc : chunksBelongingToShard) {
+                const auto& chunkMin = chunkDoc.getObjectField(ChunkType::min());
+                const auto& chunkMax = chunkDoc.getObjectField(ChunkType::max());
+                const Timestamp chunkOnCurrentShardSince = [&]() {
+                    Timestamp t = minValidTimestamp;
+                    bsonExtractTimestampField(chunkDoc, ChunkType::onCurrentShardSince(), &t)
+                        .ignore();
+                    return t;
+                }();
+
+                if (rangeMax.woCompare(chunkMin) != 0) {
+                    processRange();
+                }
+
+                if (nChunksInRange == 0) {
+                    rangeMin = chunkMin;
+                }
+                rangeMax = chunkMax;
+
+                if (chunkOnCurrentShardSince > rangeOnCurrentShardSince) {
+                    rangeOnCurrentShardSince = chunkOnCurrentShardSince;
+                }
+                nChunksInRange++;
             }
-            nChunksInRange = 0;
-            rangeOnCurrentShardSince = minValidTimestamp;
-        };
+            processRange();
 
-        for (const auto& chunkDoc : chunksBelongingToShard) {
-            const auto& chunkMin = chunkDoc.getObjectField(ChunkType::min());
-            const auto& chunkMax = chunkDoc.getObjectField(ChunkType::max());
-            const Timestamp chunkOnCurrentShardSince = [&]() {
-                Timestamp t = minValidTimestamp;
-                bsonExtractTimestampField(chunkDoc, ChunkType::onCurrentShardSince(), &t).ignore();
-                return t;
-            }();
+            return newChunks;
+        }();
 
-            if (rangeMax.woCompare(chunkMin) != 0) {
-                processRange();
-            }
+        // If there is no mergeable chunk for the given shard, return success.
+        if (newChunks->empty()) {
+            const auto currentShardVersion =
+                getShardVersion(opCtx, _localConfigShard.get(), coll, shardId, originalVersion);
 
-            if (nChunksInRange == 0) {
-                rangeMin = chunkMin;
-            }
-            rangeMax = chunkMax;
-
-            if (chunkOnCurrentShardSince > rangeOnCurrentShardSince) {
-                rangeOnCurrentShardSince = chunkOnCurrentShardSince;
-            }
-            nChunksInRange++;
+            // Makes sure that the last thing we read in getCollectionAndVersion and getShardVersion
+            // gets majority written before to return from this command, otherwise next RoutingInfo
+            // cache refresh from the shard may not see those newest information.
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+            return ShardAndCollectionVersion{currentShardVersion, originalVersion};
         }
-        processRange();
 
-        return newChunks;
-    }();
+        // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications
+        Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
-    // If there is no mergeable chunk for the given shard, return success.
-    if (newChunks->empty()) {
-        const auto currentShardVersion =
-            getShardVersion(opCtx, _localConfigShard.get(), coll, shardId, originalVersion);
+        // Precondition for merges to be safely committed: make sure the current collection version
+        // fits the one retrieved before acquiring the lock.
+        const auto [_, versionRetrievedUnderLock] =
+            uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
 
-        // Makes sure that the last thing we read in getCollectionAndVersion and getShardVersion
-        // gets majority written before to return from this command, otherwise next RoutingInfo
-        // cache refresh from the shard may not see those newest information.
-        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-        return ShardAndCollectionVersion{currentShardVersion, originalVersion};
+        if (originalVersion != versionRetrievedUnderLock) {
+            nRetries++;
+            continue;
+        }
+
+        // 4. Commit the new routing table changes to the sharding catalog.
+        mergeAllChunksOnShardInTransaction(opCtx, collUuid, shardId, newChunks);
+
+        // 5. Log changes
+        auto prevVersion = originalVersion;
+        invariant(numMergedChunks.size() == newChunks->size());
+        for (auto i = 0U; i < newChunks->size(); ++i) {
+            const auto& newChunk = newChunks->at(i);
+            logMergeToChangelog(opCtx,
+                                nss,
+                                prevVersion,
+                                newChunk.getVersion(),
+                                shardId,
+                                newChunk.getRange(),
+                                numMergedChunks.at(i));
+
+            // we can know the prevVersion since newChunks vector is sorted by version
+            prevVersion = newChunk.getVersion();
+        }
+
+        return ShardAndCollectionVersion{newVersion /*shardVersion*/, newVersion /*collVersion*/};
     }
 
-    // 4. Commit the new routing table changes to the sharding catalog.
-    mergeAllChunksOnShardInTransaction(opCtx, collUuid, shardId, newChunks);
-
-    // 5. Log changes
-    auto prevVersion = originalVersion;
-    invariant(numMergedChunks.size() == newChunks->size());
-    for (auto i = 0U; i < newChunks->size(); ++i) {
-        const auto& newChunk = newChunks->at(i);
-        logMergeToChangelog(opCtx,
-                            nss,
-                            prevVersion,
-                            newChunk.getVersion(),
-                            shardId,
-                            newChunk.getRange(),
-                            numMergedChunks.at(i));
-
-        // we can know the prevVersion since newChunks vector is sorted by version
-        prevVersion = newChunk.getVersion();
-    }
-
-    return ShardAndCollectionVersion{newVersion /*shardVersion*/, newVersion /*collVersion*/};
+    uasserted(ErrorCodes::ConflictingOperationInProgress,
+              str::stream() << "Tried to commit the operation " << nRetries
+                            << " times before giving up due to concurrent chunk operations "
+                               "happening for the same collection");
 }
 
 StatusWith<ShardingCatalogManager::ShardAndCollectionVersion>
