@@ -146,6 +146,23 @@ function isRetryableError(errorOrResponse) {
     return ErrorCodes.isRetriableError(errorOrResponse);
 }
 
+/**
+ * Run the passed function and catch any network error, otherwise throw the exception back to the
+ * caller.
+ * @param {Function} func that will run and catch any network error otherwise throws.
+ * @returns returns the result of the function that was passed as a parameter or the exception.
+ */
+function executeNoThrowNetworkError(func) {
+    try {
+        return func();
+    } catch (e) {
+        if (isNetworkError(e)) {
+            return e;
+        }
+        throw e;
+    }
+}
+
 // Please consider using bsonWoCompare instead of this as much as possible.
 friendlyEqual = function(a, b) {
     if (a == b)
