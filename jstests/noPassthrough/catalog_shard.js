@@ -142,6 +142,26 @@ const newShardName =
 
 {
     //
+    // Collections on the config server support changeStreamPreAndPostImages when the config server
+    // is acting as a shard.
+    //
+    assert.commandWorked(st.s.getDB(dbName).runCommand(
+        {collMod: collName, changeStreamPreAndPostImages: {enabled: true}}));
+    basicCRUD(st.s);
+
+    // Sharding metadata collections still cannot have changeStreamPreAndPostImages set.
+    assert.commandFailedWithCode(
+        st.s.getDB("config").runCommand(
+            {collMod: "chunks", changeStreamPreAndPostImages: {enabled: true}}),
+        ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        st.s.getDB("admin").runCommand(
+            {collMod: "system.version", changeStreamPreAndPostImages: {enabled: true}}),
+        ErrorCodes.InvalidOptions);
+}
+
+{
+    //
     // Remove the catalog shard.
     //
 
@@ -173,6 +193,18 @@ const newShardName =
 
     // Flushing routing / db cache updates works.
     flushRoutingAndDBCacheUpdates(st.configRS.getPrimary());
+
+    //
+    // A config server that isn't currently a shard can support changeStreamPreAndPostImages. Note
+    // sharding metadata databases cannot have this option, so we have to make a direct connection
+    // to the config server to create a collection on a different db.
+    //
+    const directConfigNS = "directDB.onConfig";
+    assert.commandWorked(st.configRS.getPrimary().getCollection(directConfigNS).insert({x: 1}));
+    assert.commandWorked(st.configRS.getPrimary().getDB("directDB").runCommand({
+        collMod: "onConfig",
+        changeStreamPreAndPostImages: {enabled: true}
+    }));
 }
 
 {

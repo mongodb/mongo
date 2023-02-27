@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog/uncommitted_multikey.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
@@ -152,7 +153,8 @@ Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceStri
         return validationStatus;
     }
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        !gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility)) {
         return {
             ErrorCodes::InvalidOptions,
             "changeStreamPreAndPostImages collection option is not supported on config servers"};

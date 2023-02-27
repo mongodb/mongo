@@ -841,6 +841,10 @@ private:
     void _userCollectionsUassertsForDowngrade(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            if (!gFeatureFlagCatalogShard.isEnabledOnVersion(requestedVersion)) {
+                _assertNoCollectionsHaveChangeStreamsPrePostImages(opCtx);
+            }
+
             if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(
                     requestedVersion)) {
                 bool hasGlobalIndexes;
@@ -1269,6 +1273,32 @@ private:
                     changeTimestamp);
         }
         return changeTimestamp;
+    }
+
+    void _assertNoCollectionsHaveChangeStreamsPrePostImages(OperationContext* opCtx) {
+        invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+
+        // Config servers only started allowing collections with changeStreamPreAndPostImages
+        // in 7.0, so don't allow downgrading with such a collection.
+        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+            Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+            catalog::forEachCollectionFromDb(
+                opCtx,
+                dbName,
+                MODE_S,
+                [&](const Collection* collection) {
+                    uassert(ErrorCodes::CannotDowngrade,
+                            str::stream() << "Cannot downgrade the config server as collection "
+                                          << collection->ns()
+                                          << " has 'changeStreamPreAndPostImages' enabled. Please "
+                                             "unset the option or drop the collection.",
+                            !collection->isChangeStreamPreAndPostImagesEnabled());
+                    return true;
+                },
+                [&](const Collection* collection) {
+                    return collection->isChangeStreamPreAndPostImagesEnabled();
+                });
+        }
     }
 
 } setFeatureCompatibilityVersionCommand;
