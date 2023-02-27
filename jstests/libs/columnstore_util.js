@@ -58,7 +58,14 @@ function safeToCreateColumnStoreIndexInCluster(nodes) {
             return false;
         }
 
-        break;
+        const getParamFeatureFlagRes = assert.commandWorked(
+            conn.adminCommand({getParameter: 1, featureFlagColumnstoreIndexes: 1}));
+        if (!getParamFeatureFlagRes.featureFlagColumnstoreIndexes ||
+            !getParamFeatureFlagRes.featureFlagColumnstoreIndexes["value"]) {
+            jsTestLog("Note: declining to create column store index, because " +
+                      "featureFlagColumnstoreIndexes is disabled");
+            return false;
+        }
     }
 
     return true;
