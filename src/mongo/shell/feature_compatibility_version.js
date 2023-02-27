@@ -49,12 +49,22 @@ function checkFCV(adminDB, version, targetVersion) {
     if (isMongod) {
         let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
         assert.commandWorked(res);
-        assert.eq(res.featureCompatibilityVersion.version, version, tojson(res));
-        assert.eq(res.featureCompatibilityVersion.targetVersion, targetVersion, tojson(res));
+        assert.eq(res.featureCompatibilityVersion.version,
+                  version,
+                  "FCV server parameter 'version' field does not match: " + tojson(res));
+        assert.eq(res.featureCompatibilityVersion.targetVersion,
+                  targetVersion,
+                  "FCV server parameter 'targetVersion' field does not match: " + tojson(res));
         if (isDowngrading) {
-            assert.eq(res.featureCompatibilityVersion.previousVersion, latestFCV, tojson(res));
+            assert.eq(
+                res.featureCompatibilityVersion.previousVersion,
+                latestFCV,
+                "FCV server parameter 'previousVersion' field does not match: " + tojson(res));
         } else {
-            assert.eq(res.featureCompatibilityVersion.previousVersion, undefined, tojson(res));
+            assert.eq(
+                res.featureCompatibilityVersion.previousVersion,
+                undefined,
+                "FCV server parameter 'previousVersion' field does not match: " + tojson(res));
         }
     }
 
@@ -65,13 +75,32 @@ function checkFCV(adminDB, version, targetVersion) {
                   .limit(1)
                   .readConcern("local")
                   .next();
-    assert.eq(doc.version, version, tojson(doc));
-    assert.eq(doc.targetVersion, targetVersion, tojson(doc));
+    assert.eq(doc.version, version, "FCV document 'version' field does not match: " + tojson(doc));
+    assert.eq(doc.targetVersion,
+              targetVersion,
+              "FCV document 'targetVersion' field does not match: " + tojson(doc));
     if (isDowngrading) {
-        assert.eq(doc.previousVersion, latestFCV, tojson(doc));
+        assert.eq(doc.previousVersion,
+                  latestFCV,
+                  "FCV document 'previousVersion' field does not match: " + tojson(doc));
     } else {
-        assert.eq(doc.previousVersion, undefined, tojson(doc));
+        assert.eq(doc.previousVersion,
+                  undefined,
+                  "FCV document 'previousVersion' field does not match: " + tojson(doc));
     }
+}
+
+/**
+ * Returns true if checkFCV runs successfully.
+ */
+function isFCVEqual(adminDB, version, targetVersion) {
+    try {
+        checkFCV(adminDB, version, targetVersion);
+    } catch (e) {
+        jsTestLog("checkFCV failed with error: " + tojson(e));
+        return false;
+    }
+    return true;
 }
 
 /**
