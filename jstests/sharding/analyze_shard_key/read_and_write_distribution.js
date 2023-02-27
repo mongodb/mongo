@@ -449,13 +449,14 @@ const analyzeShardKeyNumRanges = 10;
             assert.commandWorked(db.runCommand(cmdObjs[i]));
         }
 
-        // Turn off query sampling and wait for sampling to become inactive on all mongoses. The
-        // wait is necessary for preventing the internal aggregate commands run by the
+        // Turn off query sampling and wait for sampling to become inactive on all mongoses and
+        // mongods. The wait is necessary for preventing the internal aggregate commands run by the
         // analyzeShardKey commands below from getting sampled.
         assert.commandWorked(st.s0.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
         for (let i = 0; i < numMongoses; i++) {
             QuerySamplingUtil.waitForInactiveSampling(st["s" + String(i)]);
         }
+        QuerySamplingUtil.waitForInactiveSamplingOnAllShards(st);
 
         // Wait for all sampled queries and diffs to get flushed to disk.
         let numTries = 0;

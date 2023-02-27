@@ -27,16 +27,20 @@ var QuerySamplingUtil = (function() {
     }
 
     /**
-     * Waits for the given node to have at least one active collection for query sampling.
+     * Waits for the given node to have at least one active collection for query sampling. If
+     * 'waitForTokens' is true, additionally waits for the sampling bucket to contain at least one
+     * second of tokens.
      */
-    function waitForActiveSampling(node) {
+    function waitForActiveSampling(node, waitForTokens = true) {
         assert.soon(() => {
             const res = assert.commandWorked(node.adminCommand({serverStatus: 1}));
             assert(res.hasOwnProperty("queryAnalyzers"));
             return res.queryAnalyzers.activeCollections >= 1;
         });
-        // Wait for the bucket to contain at least one second of tokens.
-        sleep(1000);
+        if (waitForTokens) {
+            // Wait for the bucket to contain at least one second of tokens.
+            sleep(1000);
+        }
     }
 
     /**
@@ -55,15 +59,23 @@ var QuerySamplingUtil = (function() {
     function waitForActiveSamplingOnAllShards(st) {
         st._rs.forEach(rs => {
             rs.nodes.forEach(node => {
-                assert.soon(() => {
-                    const res = assert.commandWorked(node.adminCommand({serverStatus: 1}));
-                    assert(res.hasOwnProperty("queryAnalyzers"));
-                    return res.queryAnalyzers.activeCollections == 1;
-                });
+                // Skip waiting for tokens now and just wait once at the end.
+                waitForActiveSampling(node, false /* waitForTokens */);
             });
         });
         // Wait for the bucket to contain at least one second of tokens.
         sleep(1000);
+    }
+
+    /**
+     * Waits for all shard nodes to have no active collection for query sampling.
+     */
+    function waitForInactiveSamplingOnAllShards(st) {
+        st._rs.forEach(rs => {
+            rs.nodes.forEach(node => {
+                waitForInactiveSampling(node);
+            });
+        });
     }
 
     /**
@@ -318,6 +330,7 @@ var QuerySamplingUtil = (function() {
         waitForActiveSampling,
         waitForInactiveSampling,
         waitForActiveSamplingOnAllShards,
+        waitForInactiveSamplingOnAllShards,
         assertSoonSampledQueryDocuments,
         assertSoonSampledQueryDocumentsAcrossShards,
         assertNoSampledQueryDocuments,

@@ -205,6 +205,7 @@ function runTest({isShardedColl}) {
     // getting sampled.
     assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
     QuerySamplingUtil.waitForInactiveSampling(st.s);
+    QuerySamplingUtil.waitForInactiveSamplingOnAllShards(st);
 
     let numTotal = numUpdates + numFindAndModifys;
     assert.soon(() => {
@@ -285,6 +286,7 @@ function runTest({isShardedColl}) {
     // getting sampled.
     assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
     QuerySamplingUtil.waitForInactiveSampling(st.s);
+    QuerySamplingUtil.waitForInactiveSamplingOnAllShards(st);
 
     numTotal = numUpdates + numFindAndModifys;
     assert.soon(() => {
