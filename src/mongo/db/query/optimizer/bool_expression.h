@@ -31,6 +31,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <numeric>
 #include <vector>
 
 #include "mongo/db/query/optimizer/algebra/operator.h"
@@ -211,6 +212,10 @@ struct BoolExpr {
         return false;
     }
 
+    static size_t numLeaves(const Node& n) {
+        return NumLeavesTransporter().countLeaves(n);
+    }
+
     /**
      * Builder which is used to create BoolExpr trees. It supports negation, which is translated
      * internally to conjunction and disjunction via deMorgan elimination. The following template
@@ -367,6 +372,25 @@ struct BoolExpr {
     }
 
 private:
+    class NumLeavesTransporter {
+    public:
+        size_t transport(const Atom& node) {
+            return 1;
+        }
+
+        size_t transport(const Conjunction& node, std::vector<size_t> childResults) {
+            return std::reduce(childResults.begin(), childResults.end());
+        }
+
+        size_t transport(const Disjunction& node, std::vector<size_t> childResults) {
+            return std::reduce(childResults.begin(), childResults.end());
+        }
+
+        size_t countLeaves(const Node& expr) {
+            return algebra::transport<false>(expr, *this);
+        }
+    };
+
     template <bool toCNF,
               class TopLevel = std::conditional_t<toCNF, Conjunction, Disjunction>,
               class SecondLevel = std::conditional_t<toCNF, Disjunction, Conjunction>>

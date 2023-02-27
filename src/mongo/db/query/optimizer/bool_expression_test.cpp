@@ -46,23 +46,13 @@ TEST(BoolExpr, IntervalCNFtoDNF) {
     {
         // Convert to CNF: singular DNF becomes singular CNF
         auto interval = _disj(_conj(_interval(_incl("v1"_var), _incl("v2"_var))));
-        ASSERT_INTERVAL_AUTO(
-            "{\n"
-            "    {\n"
-            "        {[Variable [v1], Variable [v2]]}\n"
-            "    }\n"
-            "}\n",
-            interval);
+        ASSERT_INTERVAL_AUTO("{{{[Variable [v1], Variable [v2]]}}}\n",  // NOLINT (test auto-update)
+                             interval);
 
         auto res = BoolExpr<IntervalRequirement>::convertToCNF(interval);
         ASSERT(res.has_value());
-        ASSERT_INTERVAL_AUTO(
-            "{\n"
-            "    {\n"
-            "        {[Variable [v1], Variable [v2]]}\n"
-            "    }\n"
-            "}\n",
-            *res);
+        ASSERT_INTERVAL_AUTO("{{{[Variable [v1], Variable [v2]]}}}\n",  // NOLINT (test auto-update)
+                             *res);
     }
 
     {
@@ -71,13 +61,9 @@ TEST(BoolExpr, IntervalCNFtoDNF) {
                               _conj(_interval(_incl("v1"_var), _incl("v2"_var))));
         ASSERT_INTERVAL_AUTO(
             "{\n"
-            "    {\n"
-            "        {[Variable [v1], Variable [v2]]}\n"
-            "    }\n"
+            "    {{[Variable [v1], Variable [v2]]}}\n"
             " U \n"
-            "    {\n"
-            "        {[Variable [v1], Variable [v2]]}\n"
-            "    }\n"
+            "    {{[Variable [v1], Variable [v2]]}}\n"
             "}\n",
             interval);
 

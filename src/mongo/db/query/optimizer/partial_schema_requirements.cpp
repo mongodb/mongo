@@ -158,9 +158,7 @@ bool PartialSchemaRequirements::isNoop() const {
 }
 
 size_t PartialSchemaRequirements::numLeaves() const {
-    size_t n = 0;
-    applyToEachAtom(_expr, [&](const Entry& entry) { n++; });
-    return n;
+    return PSRExpr::numLeaves(_expr);
 }
 
 size_t PartialSchemaRequirements::numConjuncts() const {

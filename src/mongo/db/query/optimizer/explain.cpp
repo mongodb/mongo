@@ -1051,27 +1051,67 @@ public:
         return printer.str();
     }
 
-    template <class T>
-    ExplainPrinter printIntervalExpr(const typename T::Node& intervalExpr) {
-        IntervalPrinter<T> intervalPrinter(*this);
-        return intervalPrinter.print(intervalExpr);
+    void printPartialSchemaEntry(ExplainPrinter& printer, const PartialSchemaEntry& entry) {
+        const auto& [key, req] = entry;
+
+        if (const auto& projName = key._projectionName) {
+            printer.fieldName("refProjection").print(*projName).separator(", ");
+        }
+        ExplainPrinter pathPrinter = generate(key._path);
+        printer.fieldName("path").separator("'").printSingleLevel(pathPrinter).separator("', ");
+
+        if (const auto& boundProjName = req.getBoundProjectionName()) {
+            printer.fieldName("boundProjection").print(*boundProjName).separator(", ");
+        }
+
+        printer.fieldName("intervals");
+        {
+            ExplainPrinter intervals = printIntervalExpr<IntervalRequirement>(req.getIntervals());
+            printer.printSingleLevel(intervals, "" /*singleLevelSpacer*/);
+        }
+
+        printBooleanFlag(printer, "perfOnly", req.getIsPerfOnly());
     }
 
     template <class T>
-    class IntervalPrinter {
-    public:
-        IntervalPrinter(ExplainGeneratorTransporter& instance) : _instance(instance) {}
+    using PrinterFn = std::function<void(ExplainPrinter& printer, const T& t)>;
 
-        ExplainPrinter transport(const typename T::Atom& node) {
+    template <class T>
+    ExplainPrinter printIntervalExpr(const typename BoolExpr<T>::Node& intervalExpr) {
+        PrinterFn<T> intervalPrinter = [&](ExplainPrinter& printer, const T& interval) {
+            printInterval(printer, interval);
+        };
+
+        BoolExprPrinter<T> exprPrinter(intervalPrinter);
+        return exprPrinter.print(intervalExpr);
+    }
+
+    ExplainPrinter printPartialSchemaRequirements(
+        const typename BoolExpr<PartialSchemaEntry>::Node& reqs) {
+        PrinterFn<PartialSchemaEntry> printer = [&](ExplainPrinter& printer,
+                                                    const PartialSchemaEntry& entry) {
+            printPartialSchemaEntry(printer, entry);
+        };
+
+        BoolExprPrinter<PartialSchemaEntry> exprPrinter(printer);
+        return exprPrinter.print(reqs);
+    }
+
+    template <class T>
+    class BoolExprPrinter {
+    public:
+        BoolExprPrinter(PrinterFn<T>& tPrinter) : _tPrinter(tPrinter) {}
+
+        ExplainPrinter transport(const typename BoolExpr<T>::Atom& node, const bool, const bool) {
             ExplainPrinter printer;
             printer.separator("{");
-            _instance.printInterval(printer, node.getExpr());
+            _tPrinter(printer, node.getExpr());
             printer.separator("}");
             return printer;
         }
 
         template <bool isConjunction>
-        ExplainPrinter print(std::vector<ExplainPrinter> childResults) {
+        ExplainPrinter print(std::vector<ExplainPrinter> childResults, const bool inlineChildren) {
             if constexpr (version < ExplainVersion::V3) {
                 ExplainPrinter printer;
                 printer.separator("{");
@@ -1085,7 +1125,12 @@ public:
                     } else {
                         printer.print(" U ");
                     }
-                    printer.print(child);
+
+                    if (inlineChildren) {
+                        printer.printSingleLevel(child);
+                    } else {
+                        printer.print(child);
+                    }
                 }
                 printer.separator("}");
 
@@ -1104,22 +1149,30 @@ public:
             }
         }
 
-        ExplainPrinter transport(const typename T::Conjunction& node,
+        ExplainPrinter transport(const typename BoolExpr<T>::Conjunction& node,
+                                 const bool hasOneAtom,
+                                 const bool isCNF,
                                  std::vector<ExplainPrinter> childResults) {
-            return print<true /*isConjunction*/>(std::move(childResults));
+            bool inlineChildren = hasOneAtom || (childResults.size() == 1 && !isCNF);
+            return print<true /*isConjunction*/>(std::move(childResults), inlineChildren);
         }
 
-        ExplainPrinter transport(const typename T::Disjunction& node,
+        ExplainPrinter transport(const typename BoolExpr<T>::Disjunction& node,
+                                 const bool hasOneAtom,
+                                 const bool isCNF,
                                  std::vector<ExplainPrinter> childResults) {
-            return print<false /*isConjunction*/>(std::move(childResults));
+            bool inlineChildren = hasOneAtom || (childResults.size() == 1 && isCNF);
+            return print<false /*isConjunction*/>(std::move(childResults), inlineChildren);
         }
 
-        ExplainPrinter print(const typename T::Node& intervals) {
-            return algebra::transport<false>(intervals, *this);
+        ExplainPrinter print(const typename BoolExpr<T>::Node& expr) {
+            bool hasOneAtom = BoolExpr<T>::numLeaves(expr) == 1;
+            bool isCNF = expr.template is<typename BoolExpr<T>::Conjunction>();
+            return algebra::transport<false>(expr, *this, hasOneAtom, isCNF);
         }
 
     private:
-        ExplainGeneratorTransporter& _instance;
+        PrinterFn<T>& _tPrinter;
     };
 
     ExplainPrinter transport(const ABT& n, const IndexScanNode& node, ExplainPrinter bindResult) {
@@ -1294,32 +1347,9 @@ public:
     }
 
     void printPartialSchemaReqMap(ExplainPrinter& parent, const PartialSchemaRequirements& reqMap) {
-        std::vector<ExplainPrinter> printers;
-        for (const auto& [key, req] : reqMap.conjuncts()) {
-            ExplainPrinter local;
-
-            if (const auto& projName = key._projectionName) {
-                local.fieldName("refProjection").print(*projName).separator(", ");
-            }
-            ExplainPrinter pathPrinter = generate(key._path);
-            local.fieldName("path").separator("'").printSingleLevel(pathPrinter).separator("', ");
-
-            if (const auto& boundProjName = req.getBoundProjectionName()) {
-                local.fieldName("boundProjection").print(*boundProjName).separator(", ");
-            }
-
-            local.fieldName("intervals");
-            {
-                ExplainPrinter intervals = printIntervalExpr<IntervalReqExpr>(req.getIntervals());
-                local.printSingleLevel(intervals, "" /*singleLevelSpacer*/);
-            }
-
-            printBooleanFlag(local, "perfOnly", req.getIsPerfOnly());
-
-            printers.push_back(std::move(local));
-        }
-
-        parent.fieldName("requirementsMap").print(printers);
+        ExplainPrinter reqs =
+            reqMap.isNoop() ? ExplainPrinter() : printPartialSchemaRequirements(reqMap.getRoot());
+        parent.fieldName("requirements").print(reqs);
     }
 
     void printResidualRequirements(ExplainPrinter& parent,
@@ -1340,7 +1370,8 @@ public:
 
             local.fieldName("intervals");
             {
-                ExplainPrinter intervals = printIntervalExpr<IntervalReqExpr>(req.getIntervals());
+                ExplainPrinter intervals =
+                    printIntervalExpr<IntervalRequirement>(req.getIntervals());
                 local.printSingleLevel(intervals, "" /*singleLevelSpacer*/);
             }
             local.separator(", ").fieldName("entryIndex").print(entryIndex);
@@ -1427,11 +1458,10 @@ public:
 
                 local.separator("}, ");
                 {
-                    IntervalPrinter<CompoundIntervalReqExpr> intervalPrinter(*this);
                     if (candidateIndexEntry._eqPrefixes.size() == 1) {
                         local.fieldName("intervals", ExplainVersion::V3);
 
-                        ExplainPrinter intervals = intervalPrinter.print(
+                        ExplainPrinter intervals = printIntervalExpr<CompoundIntervalRequirement>(
                             candidateIndexEntry._eqPrefixes.front()._interval);
                         local.printSingleLevel(intervals, "" /*singleLevelSpacer*/);
                     } else {
@@ -1442,7 +1472,8 @@ public:
                                 .print(entry._startPos)
                                 .separator(", ");
 
-                            ExplainPrinter intervals = intervalPrinter.print(entry._interval);
+                            ExplainPrinter intervals =
+                                printIntervalExpr<CompoundIntervalRequirement>(entry._interval);
                             eqPrefixPrinter.separator("[")
                                 .fieldName("interval", ExplainVersion::V3)
                                 .printSingleLevel(intervals, "" /*singleLevelSpacer*/)
@@ -3016,13 +3047,12 @@ std::string ExplainGenerator::explainInterval(const CompoundIntervalRequirement&
 
 std::string ExplainGenerator::explainIntervalExpr(const IntervalReqExpr::Node& intervalExpr) {
     ExplainGeneratorV2 gen;
-    return gen.printIntervalExpr<IntervalReqExpr>(intervalExpr).str();
+    return gen.printIntervalExpr<IntervalRequirement>(intervalExpr).str();
 }
 
 std::string ExplainGenerator::explainIntervalExpr(
     const CompoundIntervalReqExpr::Node& intervalExpr) {
     ExplainGeneratorV2 gen;
-    return gen.printIntervalExpr<CompoundIntervalReqExpr>(intervalExpr).str();
+    return gen.printIntervalExpr<CompoundIntervalRequirement>(intervalExpr).str();
 }
-
 }  // namespace mongo::optimizer

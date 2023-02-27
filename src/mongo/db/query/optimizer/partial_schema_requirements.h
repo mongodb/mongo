@@ -219,6 +219,10 @@ public:
      */
     bool simplify(std::function<bool(const PartialSchemaKey&, PartialSchemaRequirement&)>);
 
+    const auto& getRoot() const {
+        return _expr;
+    }
+
 private:
     // Restore the invariant that the entries are sorted by key.
     // TODO SERVER-73827: Consider applying this normalization during BoolExpr building.

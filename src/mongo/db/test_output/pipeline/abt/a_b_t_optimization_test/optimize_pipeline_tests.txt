@@ -24,7 +24,7 @@ metadata:
 					distribution and paths: 
 						distribution type: Centralized
 						distribution paths: 
-					requirementsMap: 
+					requirements: 
 
 			collection exists: 1
 			CE type: -1
@@ -34,8 +34,8 @@ optimization phases:
 -- OUTPUT:
 Root [{scan_0}]
 Sargable [Complete]
-|   |   |   |   requirementsMap: 
-|   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
+|   |   |   |   requirements: 
+|   |   |   |       {{{refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}}}}
 |   |   |   candidateIndexes: 
 |   |   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
 |   |   scanParams: 
@@ -71,7 +71,7 @@ metadata:
 					distribution and paths: 
 						distribution type: Centralized
 						distribution paths: 
-					requirementsMap: 
+					requirements: 
 
 			collection exists: 1
 			CE type: -1
@@ -81,8 +81,8 @@ optimization phases:
 -- OUTPUT:
 Root [{scan_0}]
 Sargable [Complete]
-|   |   |   |   requirementsMap: 
-|   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
+|   |   |   |   requirements: 
+|   |   |   |       {{{refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}}}}
 |   |   |   candidateIndexes: 
 |   |   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
 |   |   scanParams: 
@@ -342,7 +342,7 @@ metadata:
 					distribution and paths: 
 						distribution type: Centralized
 						distribution paths: 
-					requirementsMap: 
+					requirements: 
 
 			collection exists: 1
 			CE type: -1
@@ -385,7 +385,7 @@ metadata:
 					distribution and paths: 
 						distribution type: Centralized
 						distribution paths: 
-					requirementsMap: 
+					requirements: 
 
 			collection exists: 1
 			CE type: -1
@@ -432,7 +432,7 @@ metadata:
 					distribution and paths: 
 						distribution type: Centralized
 						distribution paths: 
-					requirementsMap: 
+					requirements: 
 
 			collection exists: 1
 			CE type: -1
@@ -484,7 +484,7 @@ metadata:
 					distribution and paths: 
 						distribution type: Centralized
 						distribution paths: 
-					requirementsMap: 
+					requirements: 
 
 			collection exists: 1
 			CE type: -1
@@ -541,7 +541,7 @@ metadata:
 					distribution and paths: 
 						distribution type: Centralized
 						distribution paths: 
-					requirementsMap: 
+					requirements: 
 
 			collection exists: 1
 			CE type: -1
@@ -606,7 +606,7 @@ metadata:
 					distribution and paths: 
 						distribution type: Centralized
 						distribution paths: 
-					requirementsMap: 
+					requirements: 
 
 			collection exists: 1
 			CE type: -1
@@ -662,7 +662,7 @@ metadata:
 					distribution and paths: 
 						distribution type: Centralized
 						distribution paths: 
-					requirementsMap: 
+					requirements: 
 
 			collection exists: 1
 			CE type: -1
@@ -707,7 +707,7 @@ metadata:
 					distribution and paths: 
 						distribution type: Centralized
 						distribution paths: 
-					requirementsMap: 
+					requirements: 
 
 			collection exists: 1
 			CE type: -1
@@ -772,7 +772,7 @@ metadata:
 					distribution and paths: 
 						distribution type: Centralized
 						distribution paths: 
-					requirementsMap: 
+					requirements: 
 
 			collection exists: 1
 			CE type: -1
@@ -816,7 +816,7 @@ metadata:
 					distribution and paths: 
 						distribution type: Centralized
 						distribution paths: 
-					requirementsMap: 
+					requirements: 
 
 			collection exists: 1
 			CE type: -1
@@ -1052,11 +1052,18 @@ optimization phases:
 -- OUTPUT:
 Root [{scan_0}]
 Sargable [Complete]
-|   |   |   |   requirementsMap: 
-|   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}
-|   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{[Const [5], Const [6]]}}}
-|   |   |   |       refProjection: scan_0, path: 'PathGet [b] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}
-|   |   |   |       refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [3]]}}}
+|   |   |   |   requirements: 
+|   |   |   |       {
+|   |   |   |           {
+|   |   |   |               {refProjection: scan_0, path: 'PathGet [a] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}}
+|   |   |   |            ^ 
+|   |   |   |               {refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{[Const [5], Const [6]]}}}}
+|   |   |   |            ^ 
+|   |   |   |               {refProjection: scan_0, path: 'PathGet [b] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}}
+|   |   |   |            ^ 
+|   |   |   |               {refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [3]]}}}}
+|   |   |   |           }
+|   |   |   |       }
 |   |   |   candidateIndexes: 
 |   |   scanParams: 
 |   |       {'a': evalTemp_7, 'b': evalTemp_8}

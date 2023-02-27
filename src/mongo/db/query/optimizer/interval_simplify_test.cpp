@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
+#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
@@ -215,20 +216,16 @@ TEST_F(IntervalIntersection, VariableIntervals1) {
     ASSERT_TRUE(result);
 
     // (max(v1, v2), +inf) U [v2 >= v1 ? MaxKey : v1, max(v1, v2)]
-    ASSERT_INTERVAL(
+    ASSERT_INTERVAL_AUTO(
         "{\n"
-        "    {\n"
-        "        {[If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [And] "
+        "    {{[If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [And] "
         "BinaryOp [Lt] Variable [v2] Variable [v1] Const [true] BinaryOp [And] BinaryOp [Lt] "
         "Variable [v2] Const [maxKey] Const [true] BinaryOp [Or] BinaryOp [And] BinaryOp [Lt] "
         "Variable [v1] Variable [v2] BinaryOp [Lt] Variable [v2] Const [maxKey] Const [true] "
         "BinaryOp [Lt] Variable [v2] Const [maxKey] BinaryOp [Gt] Variable [v1] Variable [v2] "
-        "Variable [v1] Const [maxKey], Variable [v1]]}\n"
-        "    }\n"
+        "Variable [v1] Const [maxKey], Variable [v1]]}}\n"
         " U \n"
-        "    {\n"
-        "        {>If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2]}\n"
-        "    }\n"
+        "    {{>If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2]}}\n"
         "}\n",
         *result);
 
@@ -246,13 +243,9 @@ TEST_F(IntervalIntersection, VariableIntervals2) {
     ASSERT_TRUE(result);
 
     // [v1, v3] ^ [v2, v4] -> [max(v1, v2), min(v3, v4)]
-    ASSERT_INTERVAL(
-        "{\n"
-        "    {\n"
-        "        {[If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable "
-        "[v2], If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4]]}\n"
-        "    }\n"
-        "}\n",
+    ASSERT_INTERVAL_AUTO(
+        "{{{[If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2], If [] "
+        "BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4]]}}}\n",
         *result);
 
     // Make sure repeated intersection does not change the result.
@@ -268,23 +261,19 @@ TEST_F(IntervalIntersection, VariableIntervals3) {
     auto result = intersectDNFIntervals(interval, ConstEval::constFold);
     ASSERT_TRUE(result);
 
-    ASSERT_INTERVAL(
+    ASSERT_INTERVAL_AUTO(
         "{\n"
-        "    {\n"
-        "        {[If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [And] "
+        "    {{[If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [And] "
         "BinaryOp [Lt] Variable [v2] Variable [v1] BinaryOp [Lt] Variable [v1] Variable [v4] "
         "BinaryOp [And] BinaryOp [Lte] Variable [v2] Variable [v3] BinaryOp [Lte] Variable [v3] "
         "Variable [v4] BinaryOp [Or] BinaryOp [And] BinaryOp [Lt] Variable [v1] Variable [v2] "
         "BinaryOp [Lte] Variable [v2] Variable [v3] BinaryOp [And] BinaryOp [Lt] Variable [v1] "
         "Variable [v4] BinaryOp [Lte] Variable [v4] Variable [v3] BinaryOp [And] BinaryOp [Lt] "
         "Variable [v1] Variable [v3] BinaryOp [Lte] Variable [v2] Variable [v4] BinaryOp [Gt] "
-        "Variable [v2] Variable [v1] Variable [v2] Const [maxKey], Variable [v2]]}\n"
-        "    }\n"
+        "Variable [v2] Variable [v1] Variable [v2] Const [maxKey], Variable [v2]]}}\n"
         " U \n"
-        "    {\n"
-        "        {(If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2], "
-        "If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4]]}\n"
-        "    }\n"
+        "    {{(If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2], If "
+        "[] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4]]}}\n"
         "}\n",
         *result);
 
@@ -301,34 +290,28 @@ TEST_F(IntervalIntersection, VariableIntervals4) {
     auto result = intersectDNFIntervals(interval, ConstEval::constFold);
     ASSERT_TRUE(result);
 
-    ASSERT_INTERVAL(
+    ASSERT_INTERVAL_AUTO(
         "{\n"
-        "    {\n"
-        "        {[If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [And] "
+        "    {{[If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [And] "
         "BinaryOp [Lt] Variable [v2] Variable [v1] BinaryOp [Lt] Variable [v1] Variable [v4] "
         "BinaryOp [And] BinaryOp [Lte] Variable [v2] Variable [v3] BinaryOp [Lt] Variable [v3] "
         "Variable [v4] BinaryOp [Or] BinaryOp [And] BinaryOp [Lt] Variable [v1] Variable [v2] "
         "BinaryOp [Lte] Variable [v2] Variable [v3] BinaryOp [And] BinaryOp [Lt] Variable [v1] "
         "Variable [v4] BinaryOp [Lt] Variable [v4] Variable [v3] BinaryOp [And] BinaryOp [Lt] "
         "Variable [v1] Variable [v3] BinaryOp [Lt] Variable [v2] Variable [v4] BinaryOp [Gt] "
-        "Variable [v2] Variable [v1] Variable [v2] Const [maxKey], Variable [v2]]}\n"
-        "    }\n"
+        "Variable [v2] Variable [v1] Variable [v2] Const [maxKey], Variable [v2]]}}\n"
         " U \n"
-        "    {\n"
-        "        {[Variable [v3], If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] "
+        "    {{[Variable [v3], If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] "
         "BinaryOp [And] BinaryOp [Lt] Variable [v2] Variable [v1] BinaryOp [Lt] Variable [v1] "
         "Variable [v4] BinaryOp [And] BinaryOp [Lte] Variable [v2] Variable [v3] BinaryOp [Lt] "
         "Variable [v3] Variable [v4] BinaryOp [Or] BinaryOp [And] BinaryOp [Lt] Variable [v1] "
         "Variable [v2] BinaryOp [Lte] Variable [v2] Variable [v3] BinaryOp [And] BinaryOp [Lt] "
         "Variable [v1] Variable [v4] BinaryOp [Lt] Variable [v4] Variable [v3] BinaryOp [And] "
         "BinaryOp [Lt] Variable [v1] Variable [v3] BinaryOp [Lt] Variable [v2] Variable [v4] "
-        "BinaryOp [Lt] Variable [v3] Variable [v4] Variable [v3] Const [minKey]]}\n"
-        "    }\n"
+        "BinaryOp [Lt] Variable [v3] Variable [v4] Variable [v3] Const [minKey]]}}\n"
         " U \n"
-        "    {\n"
-        "        {(If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2], "
-        "If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4])}\n"
-        "    }\n"
+        "    {{(If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2], If "
+        "[] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4])}}\n"
         "}\n",
         *result);
 
@@ -351,85 +334,53 @@ TEST(IntervalIntersection, EliminateEmptyIntervals) {
                     _conj(_interval(_incl("6"_cint32), _incl("5"_cint32))),
                     _conj(_interval(_excl("7"_cint32), _incl("7"_cint32))),
                     _conj(_interval(_excl("8"_cint32), _excl("8"_cint32)))),
-              "{\n"
-              "    {\n"
-              "        {[Const [1], Const [3]]}\n"
-              "    }\n"
-              "}\n");
+              "{{{[Const [1], Const [3]]}}}\n");
 }
 
 TEST(IntervalIntersection, FullyOpenInterval) {
     unionTest(_disj(_conj(_interval(_incl("1"_cint32), _incl("3"_cint32))),
                     _conj(_interval(_minusInf(), _plusInf()))),
-              "{\n"
-              "    {\n"
-              "        {<fully open>}\n"
-              "    }\n"
-              "}\n");
+              "{{{<fully open>}}}\n");
 }
 
 TEST(IntervalIntersection, FullyOpenIntervalAfterSimplification) {
     unionTest(_disj(_conj(_interval(_minusInf(), _incl("10"_cint32))),
                     _conj(_interval(_incl("5"_cint32), _plusInf())),
                     _conj(_interval(_incl("v1"_var), _incl("v2"_var)))),
-              "{\n"
-              "    {\n"
-              "        {<fully open>}\n"
-              "    }\n"
-              "}\n");
+              "{{{<fully open>}}}\n");
 }
 
 TEST(IntervalIntersection, UnionConstConst1) {
     unionTest(_disj(_conj(_interval(_incl("2"_cint32), _excl("4"_cint32))),
                     _conj(_interval(_incl("1"_cint32), _incl("3"_cint32)))),
-              "{\n"
-              "    {\n"
-              "        {[Const [1], Const [4])}\n"
-              "    }\n"
-              "}\n");
+              "{{{[Const [1], Const [4])}}}\n");
 }
 
 TEST(IntervalIntersection, UnionConstConst2) {
     unionTest(_disj(_conj(_interval(_incl("1"_cint32), _excl("4"_cint32))),
                     _conj(_interval(_incl("2"_cint32), _incl("3"_cint32)))),
-              "{\n"
-              "    {\n"
-              "        {[Const [1], Const [4])}\n"
-              "    }\n"
-              "}\n");
+              "{{{[Const [1], Const [4])}}}\n");
 }
 
 TEST(IntervalIntersection, UnionConstConst3) {
     unionTest(_disj(_conj(_interval(_incl("2"_cint32), _incl("3"_cint32))),
                     _conj(_interval(_incl("1"_cint32), _excl("4"_cint32)))),
-              "{\n"
-              "    {\n"
-              "        {[Const [1], Const [4])}\n"
-              "    }\n"
-              "}\n");
+              "{{{[Const [1], Const [4])}}}\n");
 }
 
 TEST(IntervalIntersection, UnionConstSameIntervalExclusive) {
     unionTest(_disj(_conj(_interval(_excl("1"_cint32), _excl("4"_cint32))),
                     _conj(_interval(_excl("1"_cint32), _excl("4"_cint32)))),
-              "{\n"
-              "    {\n"
-              "        {(Const [1], Const [4])}\n"
-              "    }\n"
-              "}\n");
+              "{{{(Const [1], Const [4])}}}\n");
 }
 
 TEST(IntervalIntersection, UnionConstConstNoOverlap) {
     unionTest(_disj(_conj(_interval(_incl("1"_cint32), _incl("2"_cint32))),
                     _conj(_interval(_incl("3"_cint32), _incl("5"_cint32)))),
               "{\n"
-              "    {\n"
-              "        {[Const [1], Const [2]]}\n"
-              "    }\n"
+              "    {{[Const [1], Const [2]]}}\n"
               " U \n"
-              "    {\n"
-              "        {[Const [3], Const [5]]}\n"
-              "    }\n"
+              "    {{[Const [3], Const [5]]}}\n"
               "}\n");
 }
 
@@ -437,34 +388,22 @@ TEST(IntervalIntersection, UnionConstConstSameBoundExcl) {
     unionTest(_disj(_conj(_interval(_incl("1"_cint32), _excl("3"_cint32))),
                     _conj(_interval(_excl("3"_cint32), _incl("5"_cint32)))),
               "{\n"
-              "    {\n"
-              "        {[Const [1], Const [3])}\n"
-              "    }\n"
+              "    {{[Const [1], Const [3])}}\n"
               " U \n"
-              "    {\n"
-              "        {(Const [3], Const [5]]}\n"
-              "    }\n"
+              "    {{(Const [3], Const [5]]}}\n"
               "}\n");
 }
 
 TEST(IntervalIntersection, UnionConstConstSameBoundOneIncl) {
     unionTest(_disj(_conj(_interval(_incl("1"_cint32), _incl("3"_cint32))),
                     _conj(_interval(_excl("3"_cint32), _incl("5"_cint32)))),
-              "{\n"
-              "    {\n"
-              "        {[Const [1], Const [5]]}\n"
-              "    }\n"
-              "}\n");
+              "{{{[Const [1], Const [5]]}}}\n");
 }
 
 TEST(IntervalIntersection, UnionConstConstSameBoundIncl) {
     unionTest(_disj(_conj(_interval(_incl("1"_cint32), _incl("3"_cint32))),
                     _conj(_interval(_incl("3"_cint32), _incl("5"_cint32)))),
-              "{\n"
-              "    {\n"
-              "        {[Const [1], Const [5]]}\n"
-              "    }\n"
-              "}\n");
+              "{{{[Const [1], Const [5]]}}}\n");
 }
 
 TEST(IntervalIntersection, UnionManyConst) {
@@ -477,17 +416,11 @@ TEST(IntervalIntersection, UnionManyConst) {
               _conj(_interval(_incl("12"_cint32), _incl("13"_cint32))),
               _conj(_interval(_incl("1"_cint32), _incl("2"_cint32)))),
         "{\n"
-        "    {\n"
-        "        {[Const [1], Const [2]]}\n"
-        "    }\n"
+        "    {{[Const [1], Const [2]]}}\n"
         " U \n"
-        "    {\n"
-        "        {[Const [3], Const [7]]}\n"
-        "    }\n"
+        "    {{[Const [3], Const [7]]}}\n"
         " U \n"
-        "    {\n"
-        "        {[Const [8], Const [13]]}\n"
-        "    }\n"
+        "    {{[Const [8], Const [13]]}}\n"
         "}\n");
 }
 
@@ -497,24 +430,16 @@ TEST(IntervalIntersection, UnionManyConst2) {
         _disj(_conj(_interval(_incl("1"_cint32), _excl("3"_cint32))),
               _conj(_interval(_excl("3"_cint32), _incl("4"_cint32))),
               _conj(_interval(_incl("3"_cint32), _incl("4"_cint32)))),
-        "{\n"
-        "    {\n"
-        "        {[Const [1], Const [4]]}\n"
-        "    }\n"
-        "}\n");
+        "{{{[Const [1], Const [4]]}}}\n");
 }
 
 TEST(IntervalIntersection, UnionConstVariable) {
     unionTest(_disj(_conj(_interval(_incl("v1"_var), _incl("v3"_var))),
                     _conj(_interval(_incl("1"_cint32), _incl("3"_cint32)))),
               "{\n"
-              "    {\n"
-              "        {[Variable [v1], Variable [v3]]}\n"
-              "    }\n"
+              "    {{[Variable [v1], Variable [v3]]}}\n"
               " U \n"
-              "    {\n"
-              "        {[Const [1], Const [3]]}\n"
-              "    }\n"
+              "    {{[Const [1], Const [3]]}}\n"
               "}\n");
 }
 

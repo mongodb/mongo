@@ -680,54 +680,34 @@ TEST(IntervalNormalize, IntervalNormalizeConstantsFirst) {
                               _conj(_interval(_incl("var3"_var), _incl("4"_cint64))),
                               _conj(_interval(_incl("1"_cint64), _incl("5"_cint64))));
 
-    ASSERT_INTERVAL(
+    ASSERT_INTERVAL_AUTO(
         "{\n"
-        "    {\n"
-        "        {[Variable [var1], Variable [var2]]}\n"
-        "    }\n"
+        "    {{[Variable [var1], Variable [var2]]}}\n"
         " U \n"
-        "    {\n"
-        "        {[Const [3], Variable [var2]]}\n"
-        "    }\n"
+        "    {{[Const [3], Variable [var2]]}}\n"
         " U \n"
-        "    {\n"
-        "        {[Const [7], Const [8]]}\n"
-        "    }\n"
+        "    {{[Const [7], Const [8]]}}\n"
         " U \n"
-        "    {\n"
-        "        {[Variable [var3], Const [4]]}\n"
-        "    }\n"
+        "    {{[Variable [var3], Const [4]]}}\n"
         " U \n"
-        "    {\n"
-        "        {[Const [1], Const [5]]}\n"
-        "    }\n"
+        "    {{[Const [1], Const [5]]}}\n"
         "}\n",
         intervalExpr);
 
     normalizeIntervals(intervalExpr);
 
     // Demonstrate that constant intervals are sorted first.
-    ASSERT_INTERVAL(
+    ASSERT_INTERVAL_AUTO(
         "{\n"
-        "    {\n"
-        "        {[Const [1], Const [5]]}\n"
-        "    }\n"
+        "    {{[Const [1], Const [5]]}}\n"
         " U \n"
-        "    {\n"
-        "        {[Const [7], Const [8]]}\n"
-        "    }\n"
+        "    {{[Const [7], Const [8]]}}\n"
         " U \n"
-        "    {\n"
-        "        {[Const [3], Variable [var2]]}\n"
-        "    }\n"
+        "    {{[Const [3], Variable [var2]]}}\n"
         " U \n"
-        "    {\n"
-        "        {[Variable [var1], Variable [var2]]}\n"
-        "    }\n"
+        "    {{[Variable [var1], Variable [var2]]}}\n"
         " U \n"
-        "    {\n"
-        "        {[Variable [var3], Const [4]]}\n"
-        "    }\n"
+        "    {{[Variable [var3], Const [4]]}}\n"
         "}\n",
         intervalExpr);
 }
