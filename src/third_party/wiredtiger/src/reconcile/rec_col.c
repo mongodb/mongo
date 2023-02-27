@@ -765,16 +765,7 @@ __wt_rec_col_fix(
         /* If there's an update to apply, apply the value. */
 
         if (upd->type == WT_UPDATE_TOMBSTONE) {
-            /*
-             * When an out-of-order or mixed-mode tombstone is getting written to disk, remove any
-             * historical versions that are greater in the history store for this key.
-             */
-            if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone)
-                WT_ERR(__wt_rec_hs_clear_on_tombstone(
-                  session, r, upd_select.tw.durable_stop_ts, recno, NULL, false));
-
             val = 0;
-
             /* Do not write a time window; if we get just a tombstone, it is globally visible. */
         } else {
             /* MODIFY is not allowed in FLCS. */
@@ -783,18 +774,18 @@ __wt_rec_col_fix(
 
             /* Write the time window. */
             if (!WT_TIME_WINDOW_IS_EMPTY(&upd_select.tw)) {
-                /*
-                 * When an out-of-order or mixed-mode tombstone is getting written to disk, remove
-                 * any historical versions that are greater in the history store for this key.
-                 */
-                if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone)
-                    WT_ERR(__wt_rec_hs_clear_on_tombstone(
-                      session, r, upd_select.tw.durable_stop_ts, recno, NULL, true));
-
                 WT_ERR(__wt_rec_col_fix_addtw(
                   session, r, (uint32_t)(recno - curstartrecno), &upd_select.tw));
             }
         }
+
+        /*
+         * When a tombstone without a timestamp is written to disk, remove any historical versions
+         * that are greater in the history store for this key.
+         */
+        if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone)
+            WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, upd_select.tw.durable_stop_ts, recno,
+              NULL, upd->type == WT_UPDATE_TOMBSTONE ? false : true));
 
         /* Write the data. */
         __bit_setv(r->first_free, recno - curstartrecno, btree->bitcnt, val);
@@ -920,9 +911,20 @@ __wt_rec_col_fix(
                     /* MODIFY is not allowed in FLCS, so the update must be an ordinary value. */
                     WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD);
                     val = *upd->data;
+
                     if (!WT_TIME_WINDOW_IS_EMPTY(&upd_select.tw))
                         WT_ERR(__wt_rec_col_fix_addtw(session, r, entry, &upd_select.tw));
                 }
+
+                /*
+                 * When a tombstone without a timestamp is written to disk, remove any historical
+                 * versions that are greater in the history store for this key.
+                 */
+                if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone)
+                    WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, upd_select.tw.durable_stop_ts,
+                      recno, NULL,
+                      (upd == NULL || upd->type == WT_UPDATE_TOMBSTONE) ? false : true));
+
                 __bit_setv(r->first_free, entry, btree->bitcnt, val);
                 --nrecs;
                 ++entry;
@@ -1415,32 +1417,22 @@ record_loop:
                 case WT_UPDATE_STANDARD:
                     data = upd->data;
                     size = upd->size;
-                    /*
-                     * When an out-of-order or mixed-mode tombstone is getting written to disk,
-                     * remove any historical versions that are greater in the history store for this
-                     * key.
-                     */
-                    if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone)
-                        WT_ERR(__wt_rec_hs_clear_on_tombstone(
-                          session, r, twp->durable_stop_ts, src_recno, NULL, true));
-
                     break;
                 case WT_UPDATE_TOMBSTONE:
-                    /*
-                     * When an out-of-order or mixed-mode tombstone is getting written to disk,
-                     * remove any historical versions that are greater in the history store for this
-                     * key.
-                     */
-                    if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone)
-                        WT_ERR(__wt_rec_hs_clear_on_tombstone(
-                          session, r, twp->durable_stop_ts, src_recno, NULL, false));
-
                     deleted = true;
                     twp = &clear_tw;
                     break;
                 default:
                     WT_ERR(__wt_illegal_value(session, upd->type));
                 }
+
+                /*
+                 * When a tombstone without a timestamp is written to disk, remove any historical
+                 * versions that are greater in the history store for this key.
+                 */
+                if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone)
+                    WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, twp->durable_stop_ts,
+                      src_recno, NULL, upd->type == WT_UPDATE_TOMBSTONE ? false : true));
             }
 
 compare:
@@ -1590,6 +1582,14 @@ compare:
                 default:
                     WT_ERR(__wt_illegal_value(session, upd->type));
                 }
+
+                /*
+                 * When a tombstone without a timestamp is written to disk, remove any historical
+                 * versions that are greater in the history store for this key.
+                 */
+                if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone)
+                    WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, upd_select.tw.durable_stop_ts,
+                      src_recno, NULL, upd->type == WT_UPDATE_TOMBSTONE ? false : true));
             }
 
             /*
