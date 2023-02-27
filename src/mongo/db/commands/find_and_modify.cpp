@@ -703,9 +703,6 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                 }
                 updateRequest.setSampleId(req.getSampleId());
 
-                updateRequest.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
-                    req.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
-
                 const ExtensionsCallbackReal extensionsCallback(
                     opCtx, &updateRequest.getNamespaceString());
                 ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);

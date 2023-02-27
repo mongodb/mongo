@@ -224,6 +224,7 @@ structs:
                 cpp_name: originalCollation
                 stability: internal
 
+
     UpdateOpEntry:
         description: "Parser for the entries in the 'updates' array of an update command."
         strict: true
@@ -282,12 +283,6 @@ structs:
                 type: uuid
                 optional: true
                 stability: unstable
-            $_allowShardKeyUpdatesWithoutFullShardKeyInQuery:
-                description: "Set to true if shard key updates are allowed without the full shard 
-                              key in the query."
-                type: optionalBool
-                cpp_name: allowShardKeyUpdatesWithoutFullShardKeyInQuery
-                stability: internal
 
     DeleteOpEntry:
         description: "Parser for the entries in the 'deletes' array of a delete command."
@@ -591,11 +586,5 @@ commands:
                 type: object
                 optional: true
                 cpp_name: originalCollation
-                stability: internal
-            $_allowShardKeyUpdatesWithoutFullShardKeyInQuery:
-                description: "Set to true if shard key updates are allowed without the full shard 
-                              key in the query."
-                type: optionalBool
-                cpp_name: allowShardKeyUpdatesWithoutFullShardKeyInQuery
                 stability: internal
             

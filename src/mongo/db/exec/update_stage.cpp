@@ -634,21 +634,19 @@ void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
     const auto& shardKeyPathsVector = collDesc.getKeyPatternFields();
     pathsupport::EqualityMatches equalities;
 
-    if (_params.request->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery()) {
-        bool isInternalClient =
-            !cc().session() || (cc().session()->getTags() & transport::Session::kInternalClient);
-        uassert(ErrorCodes::InvalidOptions,
-                "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery is an internal parameter",
-                isInternalClient);
-    }
-
-    // If the incoming update request came from a _clusterWriteWithoutShardKey command, we allow
-    // shard key updates without the full shard key specified.
+    // We can now update a document shard key without needing to specify the full shard key in the
+    // query. The protocol to perform the write uses _id with a proper shardVersion to target the
+    // specific document, but due to current constraints that _id writes are manually broadcast with
+    // ShardVersion::Ignored, we differentiate user queries that originally only contained _id and
+    // the protocol's use of _id in its queries by the shardVersion set.
+    auto sentShardVersion =
+        OperationShardingState::get(opCtx()).getShardVersion(_params.request->getNamespaceString());
     bool allowShardKeyUpdatesWithoutFullShardKeyInQuery =
         feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
             serverGlobalParams.featureCompatibility) &&
-        _params.request->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery();
+        sentShardVersion && !ShardVersion::isIgnoredVersion(*sentShardVersion);
 
+    // TODO: SERVER-73689 Fix shard key update check in update_stage.cpp to exclude _id queries.
     uassert(31025,
             "Shard key update is not allowed without specifying the full shard key in the "
             "query",
