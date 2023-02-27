@@ -1323,13 +1323,24 @@ tasks:
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
              read_cmd: 'true'}
-  - name: compound-wildcard-index-insert
+  - name: compound_wildcard_index_write_commands
     commands:
       - func: f_run_dsi_workload
         vars:
           test_control: mongo-perf.2023-02
           test_control_params: |
-            {include_filter_1: compound-wildcard-insert,
+            {include_filter_1: compound-wildcard-insert compound-wildcard-remove compound-wildcard-update,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: compound_wildcard_index_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: compound-wildcard-query,
              include_filter_2: core regression,
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
@@ -4024,7 +4035,7 @@ buildvariants:
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-all-feature-flags.2023-02
-    # Same as standalone tasks, but with compound-wildcard-index-insert added
+    # Same as standalone tasks, but with compound_wildcard_index* added
     tasks: &mirobenchmarks-all-feature-flags-tasks
     - name: big_collection
     - name: genny_scale_InsertRemove
@@ -4051,7 +4062,8 @@ buildvariants:
     - name: singleThreaded_read_commands
     - name: pipeline-updates
     - name: javascript
-    - name: compound-wildcard-index-insert
+    - name: compound_wildcard_index_write_commands
+    - name: compound_wildcard_index_read_commands
 
   - <<: *linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-classic-query-engine-arm.2023-01
