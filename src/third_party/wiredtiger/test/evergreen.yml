@@ -2494,6 +2494,22 @@ tasks:
             set -o verbose
             sh s_all -A -E 2>&1
 
+  - name: s-string
+    # Run the script with "-r" option to remove no-longer-needed words in s_string.ok
+    # This task only needs to be scheduled every a few months. A failure can remind us
+    # to keep the s_string.ok word list up-to-date.
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/dist"
+          script: |
+            set -o errexit
+            set -o verbose
+            sh s_string -r 2>&1
+
   - name: conf-dump-test
     tags: ["pull_request", "python"]
     depends_on:
@@ -4828,6 +4844,8 @@ buildvariants:
     - name: unittest-assertions
     - name: memory-model-test
       batchtime: 40320 # 28 days
+    - name: s-string
+      batchtime: 129600 # 90 days
 
 - name: ubuntu2004-asan
   display_name: "! Ubuntu 20.04 ASAN"

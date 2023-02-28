@@ -56,13 +56,21 @@ usage()
     echo 'usage: s_string [-r]' >&2
     exit 1
 }
+
+exit_val=0
 while :
     do case "$1" in
     -r)            # -r builds replacement list of OK words
         for f in $l; do
             replace $f
         done | sort -u > $t
-        cp $t s_string.ok
+	if ! diff $t s_string.ok >/dev/null 2>&1; then
+            echo "The string.ok list will be updated."
+            cp $t s_string.ok
+            exit_val=1
+        else
+            echo "No need to update the string.ok list."
+        fi
         shift;;
     *)
         test "$#" -eq 0 || usage
@@ -75,4 +83,4 @@ for f in $l; do
     check "--mode=ccpp" $f
 done
 
-exit 0
+exit $exit_val
