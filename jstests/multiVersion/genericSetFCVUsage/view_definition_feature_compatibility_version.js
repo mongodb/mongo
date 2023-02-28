@@ -13,7 +13,7 @@ const testName = "view_definition_feature_compatibility_version_multiversion";
 const dbpath = MongoRunner.dataPath + testName;
 
 // An array of feature flags that must be enabled to run feature flag tests.
-const featureFlagsToEnable = [];
+const featureFlagsToEnable = ["featureFlagUserRoles"];
 
 // These arrays should be populated with aggregation pipelines that use
 // aggregation features in new versions of mongod. This test ensures that a view
@@ -21,13 +21,24 @@ const featureFlagsToEnable = [];
 // latest version, and rejects it when the feature compatibility version is the last
 // version.
 const testCasesLastContinuous = [];
-const testCasesLastContinuousWithFeatureFlags = [];
+const testCasesLastContinuousWithFeatureFlags = [
+    // TODO SERVER-70689: Remove this case when 7.0 becomes lastLTS.
+    [{$project: {z: "$$USER_ROLES"}}]
+];
 
 // Anything that's incompatible with the last continuous release is incompatible with the last
 // stable release.
 const testCasesLastStable = testCasesLastContinuous.concat([]);
 
 const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([]);
+
+// The addition of the $$USER_ROLES system variable is slightly different than the usual use case of
+// this test file. This means that some of the following commands won't work/fail as expected for
+// the $$USER_ROLES test case.
+// TODO SERVER-70689: Remove this function and references to it.
+function testCaseDoesNotReferenceUserRoles(testCase) {
+    return testCase[0].$project.z != "$$USER_ROLES";
+}
 
 // Tests Feature Compatibility Version behavior of view creation while using aggregation pipelines
 // 'testCases' and using a previous stable version 'lastVersion' of mongod.
@@ -82,17 +93,28 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
         testDB.adminCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion)}));
 
     // Read against an existing view using new query features should not fail.
-    testCases.forEach(
-        (pipe, i) => assert.commandWorked(testDB.runCommand({find: "firstView" + i}),
-                                          `Failed to query view with pipeline ${tojson(pipe)}`));
+    testCases.forEach((pipe, i) => {
+        if (testCaseDoesNotReferenceUserRoles(pipe)) {
+            // The $$USER_ROLES value will be evaluated every time the view is queried, so the
+            // following query would fail since we are running an older FCV.
+            // TODO SERVER-70689: Remove the guard of this if-statement and keep the body.
+            assert.commandWorked(testDB.runCommand({find: "firstView" + i}),
+                                 `Failed to query view with pipeline ${tojson(pipe)}`);
+        }
+    });
 
     // Trying to create a new view in the same database as existing invalid view should fail,
     // even if the new view doesn't use any new query features.
-    assert.commandFailedWithCode(
-        testDB.createView("newViewOldFeatures", "coll", [{$project: {_id: 1}}]),
-        ErrorCodes.QueryFeatureNotAllowed,
-        `Expected *not* to be able to create view on database ${testDB} while in FCV ${
-            binVersionToFCV(lastVersion)}`);
+    if (testCaseDoesNotReferenceUserRoles(testCases[0])) {
+        // Since the $$USER_ROLES variable won't be evaluated during this view creation, the view
+        // creation will succeed even though we are on an older FCV.
+        // TODO SERVER-70689: Remove the guard of this if-statement and keep the body.
+        assert.commandFailedWithCode(
+            testDB.createView("newViewOldFeatures", "coll", [{$project: {_id: 1}}]),
+            ErrorCodes.QueryFeatureNotAllowed,
+            `Expected *not* to be able to create view on database ${testDB} while in FCV ${
+                binVersionToFCV(lastVersion)}`);
+    }
 
     // Trying to create a new view succeeds if it's on a separate database.
     const testDB2 = conn.getDB(testName + '2');
@@ -148,9 +170,15 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
     testDB = conn.getDB(testName);
 
     // Read against an existing view using new query features should not fail.
-    testCases.forEach(
-        (pipe, i) => assert.commandWorked(testDB.runCommand({find: "firstView" + i}),
-                                          `Failed to query view with pipeline ${tojson(pipe)}`));
+    testCases.forEach((pipe, i) => {
+        if (testCaseDoesNotReferenceUserRoles(pipe)) {
+            // The view is evaluated on the fly, and the FCV is still set to the last version so the
+            // evaluation of $$USER_ROLES will cause this to fail.
+            // TODO SERVER-70689: Remove the guard of this if-statement and keep the body.
+            assert.commandWorked(testDB.runCommand({find: "firstView" + i}),
+                                 `Failed to query view with pipeline ${tojson(pipe)}`);
+        }
+    });
 
     // Set the feature compatibility version back to the latest version.
     assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
@@ -189,21 +217,32 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
     testDB = conn.getDB(testName);
 
     testCases.forEach(function(pipe, i) {
-        // Even though the feature compatibility version is the last version, we should still be
-        // able to create a view using new query features, because internalValidateFeaturesAsPrimary
-        // is false.
-        assert.commandWorked(
-            testDB.createView("thirdView" + i, "coll", pipe),
-            `Expected to be able to create view with pipeline ${tojson(pipe)} while in FCV` +
-                ` ${binVersionToFCV(lastVersion)} with internalValidateFeaturesAsPrimary=false`);
+        // In this case, using $$USER_ROLES on the last FCV version will cause the view
+        // creation to fail during parsing because the necessary feature flag will not have been
+        // enabled due to the older FCV.
+        // TODO SERVER-70689: Remove the guard of this if-statement and keep the body.
+        if (testCaseDoesNotReferenceUserRoles(pipe)) {
+            // Even though the feature compatibility version is the last version, we should still be
+            // able to create a view using new query features, because
+            // internalValidateFeaturesAsPrimary is false.
+            assert.commandWorked(
+                testDB.createView("thirdView" + i, "coll", pipe),
+                `Expected to be able to create view with pipeline ${tojson(pipe)} while in FCV` +
+                    ` ${
+                        binVersionToFCV(
+                            lastVersion)} with internalValidateFeaturesAsPrimary=false`);
 
-        // We should also be able to modify a view to use new query features.
-        assert(testDB["thirdView" + i].drop(), `Drop of view with pipeline ${tojson(pipe)} failed`);
-        assert.commandWorked(testDB.createView("thirdView" + i, "coll", []));
-        assert.commandWorked(
-            testDB.runCommand({collMod: "thirdView" + i, viewOn: "coll", pipeline: pipe}),
-            `Expected to be able to modify view to use pipeline ${tojson(pipe)} while in FCV` +
-                ` ${binVersionToFCV(lastVersion)} with internalValidateFeaturesAsPrimary=false`);
+            // We should also be able to modify a view to use new query features.
+            assert(testDB["thirdView" + i].drop(),
+                   `Drop of view with pipeline ${tojson(pipe)} failed`);
+            assert.commandWorked(testDB.createView("thirdView" + i, "coll", []));
+            assert.commandWorked(
+                testDB.runCommand({collMod: "thirdView" + i, viewOn: "coll", pipeline: pipe}),
+                `Expected to be able to modify view to use pipeline ${tojson(pipe)} while in FCV` +
+                    ` ${
+                        binVersionToFCV(
+                            lastVersion)} with internalValidateFeaturesAsPrimary=false`);
+        }
     });
 
     MongoRunner.stopMongod(conn);

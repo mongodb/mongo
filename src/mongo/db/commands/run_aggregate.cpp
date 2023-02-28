@@ -458,6 +458,9 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         expCtx->changeStreamTokenVersion = 1;
     }
 
+    // Set the value of $$USER_ROLES for the aggregation.
+    expCtx->setUserRoles();
+
     return expCtx;
 }
 

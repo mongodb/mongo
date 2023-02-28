@@ -114,6 +114,7 @@ ExpressionContext::ExpressionContext(
         auto genConsts = variables.generateRuntimeConstants(opCtx);
         genConsts.setJsScope(runtimeConstants->getJsScope());
         genConsts.setIsMapReduce(runtimeConstants->getIsMapReduce());
+        genConsts.setUserRoles(runtimeConstants->getUserRoles());
         variables.setLegacyRuntimeConstants(genConsts);
     } else if (runtimeConstants) {
         variables.setLegacyRuntimeConstants(*runtimeConstants);
@@ -273,6 +274,18 @@ void ExpressionContext::stopExpressionCounters() {
             _expressionCounters.value().windowAccumulatorExprCountersMap);
     }
     _expressionCounters = boost::none;
+}
+
+void ExpressionContext::setUserRoles() {
+    // We need to check the FCV here because the $$USER_ROLES variable will always appear in the
+    // serialized command when one shard is sending a sub-query to another shard. The query will
+    // fail in the case where the shards are running different binVersions and one of them does not
+    // have a notion of this variable. This FCV check prevents this from happening, as the value of
+    // the variable is not set (and therefore not serialized) if the FCV is too old.
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        feature_flags::gFeatureFlagUserRoles.isEnabled(serverGlobalParams.featureCompatibility)) {
+        variables.defineUserRoles(opCtx);
+    }
 }
 
 }  // namespace mongo

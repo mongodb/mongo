@@ -13,7 +13,7 @@ const testName = "collection_validator_feature_compatibility_version";
 const dbpath = MongoRunner.dataPath + testName;
 
 // An array of feature flags that must be enabled to run feature flag tests.
-const featureFlagsToEnable = [];
+const featureFlagsToEnable = ["featureFlagUserRoles"];
 
 // These arrays should be populated with
 //
@@ -31,10 +31,25 @@ const testCasesLastContinuous = [
     // Populate with any new expressions.
     //
 ];
-const testCasesLastContinuousWithFeatureFlags = [];
+const testCasesLastContinuousWithFeatureFlags = [
+    // TODO SERVER-70689: Remove this case when 7.0 becomes lastLTS.
+    {
+        validator: {$expr: {$eq: ["$$USER_ROLES", []]}},
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 17276
+    }
+];
 
 const testCasesLastStable = testCasesLastContinuous.concat([]);
 const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([]);
+
+// The addition of the $$USER_ROLES system variable is slightly different than the usual use case of
+// this test file. This means that some of the following commands won't work/fail as expected for
+// the $$USER_ROLES test case.
+// TODO SERVER-70689: Remove this function and references to it.
+function testCaseDoesNotReferenceUserRoles(testCase) {
+    return testCase.validator.$expr.$eq[0] != "$$USER_ROLES";
+}
 
 // Tests Feature Compatibility Version behavior of the validator of a collection by executing test
 // cases 'testCases' and using a previous stable version 'lastVersion' of mongod. 'lastVersion' can
@@ -229,21 +244,29 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
     testDB = conn.getDB(testName);
 
     testCases.forEach(function(test, i) {
-        const coll = testDB["coll3" + i];
-        // Even though the feature compatibility version is the last version, we should still
-        // be able to add a validator using new query features, because
-        // internalValidateFeaturesAsPrimary is false.
-        assert.commandWorked(
-            testDB.createCollection(coll.getName(), {validator: test.validator}),
-            `Expected to be able to create collection with validator ${tojson(test.validator)}`);
+        // In this case, using $$USER_ROLES on the last FCV will cause the collection
+        // creation to fail during parsing because the necessary feature flag will not have been
+        // enabled.
+        // TODO SERVER-70689: Remove the guard of this if-statement and keep the body.
+        if (testCaseDoesNotReferenceUserRoles(test)) {
+            const coll = testDB["coll3" + i];
+            // Even though the feature compatibility version is the last version, we should still
+            // be able to add a validator using new query features, because
+            // internalValidateFeaturesAsPrimary is false.
+            assert.commandWorked(
+                testDB.createCollection(coll.getName(), {validator: test.validator}),
+                `Expected to be able to create collection with validator ${
+                    tojson(test.validator)}`);
 
-        // We should also be able to modify a collection to have a validator using new query
-        // features.
-        coll.drop();
-        assert.commandWorked(testDB.createCollection(coll.getName()));
-        assert.commandWorked(
-            testDB.runCommand({collMod: coll.getName(), validator: test.validator}),
-            `Expected to be able to modify collection validator to be ${tojson(test.validator)}`);
+            // We should also be able to modify a collection to have a validator using new query
+            // features.
+            coll.drop();
+            assert.commandWorked(testDB.createCollection(coll.getName()));
+            assert.commandWorked(
+                testDB.runCommand({collMod: coll.getName(), validator: test.validator}),
+                `Expected to be able to modify collection validator to be ${
+                    tojson(test.validator)}`);
+        }
     });
 
     MongoRunner.stopMongod(conn);

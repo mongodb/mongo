@@ -63,3 +63,9 @@ structs:
               stability: stable
               description: When specified, signals that the aggregation pipeline originated from a
                            mapReduce command.
+          userRoles:
+               cpp_name: userRoles
+               type: array
+               optional: true
+               description: A value of the $$USER_ROLES variable.
+               stability: unstable

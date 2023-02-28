@@ -162,6 +162,8 @@ public:
 
     bool isExpired() const override;
 
+    BSONArray getUserRoles();
+
 protected:
     friend class AuthorizationSessionImplTestHelper;
 

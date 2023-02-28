@@ -232,6 +232,10 @@ public:
         return false;
     }
 
+    BSONArray getUserRoles() override {
+        UASSERT_NOT_IMPLEMENTED;
+    }
+
 protected:
     std::tuple<boost::optional<UserName>*, std::vector<RoleName>*> _getImpersonations() override {
         UASSERT_NOT_IMPLEMENTED;

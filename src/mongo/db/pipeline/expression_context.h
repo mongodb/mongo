@@ -401,6 +401,11 @@ public:
         return _expressionCounters.is_initialized();
     }
 
+    /**
+     * Sets the value of the $$USER_ROLES system variable.
+     */
+    void setUserRoles();
+
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
     boost::optional<ExplainOptions::Verbosity> explain;
 

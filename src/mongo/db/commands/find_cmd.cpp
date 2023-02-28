@@ -131,6 +131,9 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->startExpressionCounters();
 
+    // Set the value of $$USER_ROLES for the find command.
+    expCtx->setUserRoles();
+
     return expCtx;
 }
 
