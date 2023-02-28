@@ -76,7 +76,10 @@ public:
     };
 
     UpdateRequest(const write_ops::UpdateOpEntry& updateOp = write_ops::UpdateOpEntry())
-        : _updateOp(updateOp), _sampleId(updateOp.getSampleId()) {}
+        : _updateOp(updateOp),
+          _sampleId(updateOp.getSampleId()),
+          _allowShardKeyUpdatesWithoutFullShardKeyInQuery(
+              updateOp.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery()) {}
 
     void setNamespaceString(const NamespaceString& nsString) {
         _nsString = nsString;
@@ -265,6 +268,16 @@ public:
         return _sampleId;
     }
 
+    void setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
+        OptionalBool allowShardKeyUpdatesWithoutFullShardKeyInQuery) {
+        _allowShardKeyUpdatesWithoutFullShardKeyInQuery =
+            allowShardKeyUpdatesWithoutFullShardKeyInQuery;
+    }
+
+    const OptionalBool& getAllowShardKeyUpdatesWithoutFullShardKeyInQuery() const {
+        return _allowShardKeyUpdatesWithoutFullShardKeyInQuery;
+    }
+
     std::string toString() const {
         StringBuilder builder;
         builder << " query: " << getQuery();
@@ -298,6 +311,8 @@ public:
         builder << " multi: " << isMulti();
         builder << " fromOplogApplication: " << _fromOplogApplication;
         builder << " isExplain: " << static_cast<bool>(_explain);
+        builder << " $_allowShardKeyUpdatesWithoutFullShardKeyInQuery: "
+                << _allowShardKeyUpdatesWithoutFullShardKeyInQuery;
         return builder.str();
     }
 
@@ -324,6 +339,10 @@ private:
 
     // The unique sample id for this request if it has been chosen for sampling.
     boost::optional<UUID> _sampleId;
+
+    // True if this update is allowed to modify the shard key without the specifying the full shard
+    // key.
+    OptionalBool _allowShardKeyUpdatesWithoutFullShardKeyInQuery;
 
     // Flags controlling the update.
 

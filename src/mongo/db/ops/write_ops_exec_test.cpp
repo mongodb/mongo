@@ -87,6 +87,18 @@ TEST_F(WriteOpsExecTest, TestUpdateSizeEstimationLogic) {
     // Add a sampleId.
     updateOpEntry.setSampleId(UUID::gen());
     ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add $_allowShardKeyUpdatesWithoutFullShardKeyInQuery.
+    updateOpEntry.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(OptionalBool(false));
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Set '$_allowShardKeyUpdatesWithoutFullShardKeyInQuery' to true.
+    updateOpEntry.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(OptionalBool(true));
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Set '$_allowShardKeyUpdatesWithoutFullShardKeyInQuery' to boost::none.
+    updateOpEntry.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(OptionalBool(boost::none));
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
 }
 
 TEST_F(WriteOpsExecTest, TestDeleteSizeEstimationLogic) {

@@ -114,7 +114,8 @@ int getUpdateSizeEstimate(const BSONObj& q,
                           const boost::optional<mongo::BSONObj>& collation,
                           const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
                           const mongo::BSONObj& hint,
-                          const boost::optional<UUID>& sampleId);
+                          const boost::optional<UUID>& sampleId,
+                          bool includeAllowShardKeyUpdatesWithoutFullShardKeyInQuery);
 int getDeleteSizeEstimate(const BSONObj& q,
                           const boost::optional<mongo::BSONObj>& collation,
                           const mongo::BSONObj& hint,

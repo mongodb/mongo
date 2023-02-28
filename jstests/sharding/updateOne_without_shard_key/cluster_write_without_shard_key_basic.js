@@ -12,7 +12,8 @@ let dbName = "test";
 let collName = "foo";
 let ns = dbName + "." + collName;
 let mongosConn = st.s.getDB(dbName);
-let shardConn = st.shard0.shardName;
+let shardConn = st.shard0.getDB(dbName);
+let shard0Name = st.shard0.shardName;
 const testColl = mongosConn.getCollection(collName);
 let _id = 0;
 const aFieldValue = 50;  // Arbitrary field value used for testing.
@@ -24,7 +25,7 @@ let unshardedCollName = "unshardedCollection";
 
 // Shard collection
 assert.commandWorked(st.s.adminCommand({enablesharding: dbName}));
-st.ensurePrimaryShard(dbName, shardConn);
+st.ensurePrimaryShard(dbName, shard0Name);
 
 // Create a sharded collection and move the chunk x:[0,inf) to shard1.
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
@@ -102,7 +103,7 @@ function runAndVerifyCommand(testCase) {
                     ],
                     writeConcern: {w: "majority"},
                 },
-                shardId: shardConn,
+                shardId: shard0Name,
                 targetDocId: {_id: _id},
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
@@ -188,7 +189,7 @@ function runAndVerifyCommand(testCase) {
                         limit: 1,
                     }],
                 },
-                shardId: shardConn,
+                shardId: shard0Name,
                 targetDocId: {_id: _id},
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
@@ -219,7 +220,7 @@ function runAndVerifyCommand(testCase) {
                         {$set: {a: aFieldValue}},
                     ]
                 },
-                shardId: shardConn,
+                shardId: shard0Name,
                 targetDocId: {_id: _id},
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
@@ -241,7 +242,7 @@ function runAndVerifyCommand(testCase) {
                     // Testing post-image.
                     new: true
                 },
-                shardId: shardConn,
+                shardId: shard0Name,
                 targetDocId: {_id: _id},
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
@@ -261,7 +262,7 @@ function runAndVerifyCommand(testCase) {
                         {$set: {a: aFieldValue}},
                     ]
                 },
-                shardId: shardConn,
+                shardId: shard0Name,
                 targetDocId: {_id: _id},
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
@@ -280,7 +281,7 @@ function runAndVerifyCommand(testCase) {
                     // Testing removal.
                     remove: true,
                 },
-                shardId: shardConn,
+                shardId: shard0Name,
                 targetDocId: {_id: _id},
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
@@ -310,7 +311,7 @@ function runAndVerifyCommand(testCase) {
                     {$set: {a: aFieldValue}},
                 ]
             },
-            shardId: shardConn,
+            shardId: shard0Name,
             targetDocId: {_id: 1},
             txnNumber: NumberLong(1),
             lsid: {id: UUID()},
@@ -328,18 +329,18 @@ function runAndVerifyCommand(testCase) {
     jsTest.log("Testing error cases.");
     testColl.insert([{_id: _id, x: xFieldValueShard0}]);
 
-    // Cannot run on mongod.
+    // Test that the command is not registered on a shard.
     let cmdObj = {
         _clusterWriteWithoutShardKey: 1,
         writeCmd: {insert: collName, documents: [{_id: _id, x: xFieldValueShard0}]},
-        shardId: shardConn,
+        shardId: shard0Name,
         targetDocId: {_id: _id},
         txnNumber: NumberLong(1),
         lsid: {id: UUID()},
         startTransaction: true,
         autocommit: false
     };
-    assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(shardConn.runCommand(cmdObj), ErrorCodes.CommandNotFound);
 
     // Must run on a sharded collection.
     cmdObj = {
@@ -350,7 +351,7 @@ function runAndVerifyCommand(testCase) {
                 {q: {}, u: {$set: {a: 90}}},
             ],
         },
-        shardId: shardConn,
+        shardId: shard0Name,
         targetDocId: {_id: _id},
         txnNumber: NumberLong(1),
         lsid: {id: UUID()},
@@ -364,10 +365,50 @@ function runAndVerifyCommand(testCase) {
     cmdObj = {
         _clusterWriteWithoutShardKey: 1,
         writeCmd: {insert: collName, documents: [{_id: _id, x: xFieldValueShard0}]},
-        shardId: shardConn,
+        shardId: shard0Name,
         targetDocId: {_id: _id},
     };
     assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.IllegalOperation);
+
+    // Cannot specify $_allowShardKeyUpdatesWithoutFullShardKeyInQuery for an update from an
+    // external client.
+    cmdObj = {
+        _clusterWriteWithoutShardKey: 1,
+        writeCmd: {
+            update: collName,
+            updates: [
+                {q: {}, u: {$set: {x: 90}}, $_allowShardKeyUpdatesWithoutFullShardKeyInQuery: true},
+            ],
+        },
+        shardId: shard0Name,
+        targetDocId: {_id: _id},
+        txnNumber: NumberLong(1),
+        lsid: {id: UUID()},
+        startTransaction: true,
+        autocommit: false
+    };
+    assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.InvalidOptions);
+
+    // Cannot specify $_allowShardKeyUpdatesWithoutFullShardKeyInQuery for a findAndModify from an
+    // external client.
+    cmdObj = {
+        _clusterWriteWithoutShardKey: 1,
+        writeCmd: {
+            findAndModify: collName,
+            query: {},
+            update: [
+                {$set: {a: aFieldValue}},
+            ],
+            $_allowShardKeyUpdatesWithoutFullShardKeyInQuery: true
+        },
+        shardId: shard0Name,
+        targetDocId: {_id: _id},
+        txnNumber: NumberLong(1),
+        lsid: {id: UUID()},
+        startTransaction: true,
+        autocommit: false
+    };
+    assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.InvalidOptions);
 })();
 
 st.stop();

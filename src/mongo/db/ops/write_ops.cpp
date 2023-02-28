@@ -152,7 +152,8 @@ int getUpdateSizeEstimate(const BSONObj& q,
                           const boost::optional<mongo::BSONObj>& collation,
                           const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
                           const mongo::BSONObj& hint,
-                          const boost::optional<UUID>& sampleId) {
+                          const boost::optional<UUID>& sampleId,
+                          const bool includeAllowShardKeyUpdatesWithoutFullShardKeyInQuery) {
     using UpdateOpEntry = write_ops::UpdateOpEntry;
 
     // This constant accounts for the null terminator in each field name and the BSONType byte for
@@ -210,6 +211,12 @@ int getUpdateSizeEstimate(const BSONObj& q,
         estSize += UpdateOpEntry::kSampleIdFieldName.size() + kUUIDSize + kPerElementOverhead;
     }
 
+    // Add the size of the '$_allowShardKeyUpdatesWithoutFullShardKeyInQuery' field, if present.
+    if (includeAllowShardKeyUpdatesWithoutFullShardKeyInQuery) {
+        estSize += UpdateOpEntry::kAllowShardKeyUpdatesWithoutFullShardKeyInQueryFieldName.size() +
+            kBoolSize + kPerElementOverhead;
+    }
+
     return estSize;
 }
 
@@ -248,14 +255,17 @@ int getDeleteSizeEstimate(const BSONObj& q,
 }
 
 bool verifySizeEstimate(const write_ops::UpdateOpEntry& update) {
-    return write_ops::getUpdateSizeEstimate(update.getQ(),
-                                            update.getU(),
-                                            update.getC(),
-                                            update.getUpsertSupplied().has_value(),
-                                            update.getCollation(),
-                                            update.getArrayFilters(),
-                                            update.getHint(),
-                                            update.getSampleId()) >= update.toBSON().objsize();
+    return write_ops::getUpdateSizeEstimate(
+               update.getQ(),
+               update.getU(),
+               update.getC(),
+               update.getUpsertSupplied().has_value(),
+               update.getCollation(),
+               update.getArrayFilters(),
+               update.getHint(),
+               update.getSampleId(),
+               update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value()) >=
+        update.toBSON().objsize();
 }
 
 bool verifySizeEstimate(const write_ops::DeleteOpEntry& deleteOp) {

@@ -166,14 +166,16 @@ int getWriteSizeBytes(const WriteOp& writeOp) {
     } else if (batchType == BatchedCommandRequest::BatchType_Update) {
         // Note: Be conservative here - it's okay if we send slightly too many batches.
         const auto& update = item.getUpdate();
-        auto estSize = write_ops::getUpdateSizeEstimate(update.getQ(),
-                                                        update.getU(),
-                                                        update.getC(),
-                                                        update.getUpsertSupplied().has_value(),
-                                                        update.getCollation(),
-                                                        update.getArrayFilters(),
-                                                        update.getHint(),
-                                                        update.getSampleId());
+        auto estSize = write_ops::getUpdateSizeEstimate(
+            update.getQ(),
+            update.getU(),
+            update.getC(),
+            update.getUpsertSupplied().has_value(),
+            update.getCollation(),
+            update.getArrayFilters(),
+            update.getHint(),
+            update.getSampleId(),
+            update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
 
         // When running a debug build, verify that estSize is at least the BSON serialization size.
         dassert(estSize >= update.toBSON().objsize());

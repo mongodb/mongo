@@ -76,14 +76,16 @@ public:
 
         int estimateUpdateSizeBytes(const BatchObject& batchObject,
                                     UpsertType type) const override {
-            return getUpdateSizeEstimate(std::get<BSONObj>(batchObject),
-                                         std::get<write_ops::UpdateModification>(batchObject),
-                                         std::get<boost::optional<BSONObj>>(batchObject),
-                                         type != UpsertType::kNone /* includeUpsertSupplied */,
-                                         boost::none /* collation */,
-                                         boost::none /* arrayFilters */,
-                                         BSONObj() /* hint*/,
-                                         boost::none /* sampleId */) +
+            return getUpdateSizeEstimate(
+                       std::get<BSONObj>(batchObject),
+                       std::get<write_ops::UpdateModification>(batchObject),
+                       std::get<boost::optional<BSONObj>>(batchObject),
+                       type != UpsertType::kNone /* includeUpsertSupplied */,
+                       boost::none /* collation */,
+                       boost::none /* arrayFilters */,
+                       BSONObj() /* hint*/,
+                       boost::none /* sampleId */,
+                       false /* $_allowShardKeyUpdatesWithoutFullShardKeyInQuery */) +
                 write_ops::kWriteCommandBSONArrayPerElementOverheadBytes;
         }
     };

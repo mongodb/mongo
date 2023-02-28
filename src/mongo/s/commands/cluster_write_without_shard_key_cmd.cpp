@@ -79,6 +79,14 @@ BSONObj _createCmdObj(OperationContext* opCtx,
             updateRequest.setWriteCommandRequestBase(writeCommandRequestBase);
         }
 
+        // This field is only set for writes that could modify the shard key.
+        uassert(ErrorCodes::InvalidOptions,
+                "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery is an internal parameter",
+                !updateRequest.getUpdates()
+                     .front()
+                     .getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
+        updateRequest.getUpdates().front().setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(true);
+
         updateRequest.getUpdates().front().setQ(targetDocId);
 
         // Unset the collation because targeting by _id uses default collation.
@@ -121,6 +129,12 @@ BSONObj _createCmdObj(OperationContext* opCtx,
             findAndModifyRequest.setOriginalQuery(findAndModifyRequest.getQuery());
             findAndModifyRequest.setOriginalCollation(findAndModifyRequest.getCollation());
         }
+
+        // This field is only set for writes that could modify the shard key.
+        uassert(ErrorCodes::InvalidOptions,
+                "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery is an internal parameter",
+                !findAndModifyRequest.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
+        findAndModifyRequest.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(true);
 
         findAndModifyRequest.setQuery(targetDocId);
 
