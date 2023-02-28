@@ -198,7 +198,7 @@ TEST_CASE("Connection config: off/on", "[assertions]")
         WT_ASSERT_ALWAYS(session, false, "Values are not equal!");
         REQUIRE(session->unittest_assert_hit);
         REQUIRE(std::string(session->unittest_assert_msg) ==
-          "Assertion 'false' failed: Values are not equal!");
+          "WiredTiger assertion failed: 'false'. Values are not equal!");
 
         all_diag_asserts_off(session);
     }
@@ -215,7 +215,7 @@ TEST_CASE("Connection config: off/on", "[assertions]")
         WT_ASSERT_ALWAYS(session, false, "Values are not equal!");
         REQUIRE(session->unittest_assert_hit);
         REQUIRE(std::string(session->unittest_assert_msg) ==
-          "Assertion 'false' failed: Values are not equal!");
+          "WiredTiger assertion failed: 'false'. Values are not equal!");
 
         all_diag_asserts_on(session);
     }

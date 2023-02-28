@@ -135,6 +135,21 @@
 #define UNLIKELY(x) (x)
 #endif
 
+#define WT_ERR_MSG_BUF_LEN 100
+
+/*
+ * BUILD_ASSERTION_STRING --
+ *  Append a common prefix to an assertion message and save into the provided buffer.
+ */
+#define BUILD_ASSERTION_STRING(session, buf, len, exp, ...)                                        \
+    do {                                                                                           \
+        size_t _offset;                                                                            \
+        _offset = 0;                                                                               \
+        WT_IGNORE_RET(                                                                             \
+          __wt_snprintf_len_set(buf, len, &_offset, "WiredTiger assertion failed: '%s'. ", #exp)); \
+        WT_IGNORE_RET(__wt_snprintf(buf + _offset, len - _offset, __VA_ARGS__));                   \
+    } while (0)
+
 /*
  * TRIGGER_ABORT --
  *  Abort the program.
@@ -143,32 +158,24 @@
  * should have done so.
  */
 #ifdef HAVE_UNITTEST_ASSERTS
-#define TRIGGER_ABORT(session, exp, ...)                                                        \
-    do {                                                                                        \
-        size_t _offset;                                                                         \
-        if ((session) == NULL) {                                                                \
-            __wt_errx(                                                                          \
-              session, "A non-NULL session must be provided when unit testing assertions");     \
-            __wt_abort(session);                                                                \
-        }                                                                                       \
-                                                                                                \
-        /*                                                                                      \
-         * Normally these are two errx messages, but we need to stitch them both together into  \
-         * unittest_assert_msg. To do so insert the second message immediately after the first. \
-         */                                                                                     \
-        WT_IGNORE_RET(__wt_snprintf_len_set((session)->unittest_assert_msg,                     \
-          WT_SESSION_UNITTEST_BUF_LEN, &_offset, "Assertion '%s' failed: ", #exp));             \
-        WT_IGNORE_RET(__wt_snprintf((session)->unittest_assert_msg + _offset,                   \
-          WT_SESSION_UNITTEST_BUF_LEN - _offset, __VA_ARGS__));                                 \
-                                                                                                \
-        (session)->unittest_assert_hit = true;                                                  \
+#define TRIGGER_ABORT(session, exp, ...)                                                    \
+    do {                                                                                    \
+        if ((session) == NULL) {                                                            \
+            __wt_errx(                                                                      \
+              session, "A non-NULL session must be provided when unit testing assertions"); \
+            __wt_abort(session);                                                            \
+        }                                                                                   \
+        BUILD_ASSERTION_STRING(                                                             \
+          session, (session)->unittest_assert_msg, WT_ERR_MSG_BUF_LEN, exp, __VA_ARGS__);   \
+        (session)->unittest_assert_hit = true;                                              \
     } while (0)
 #else
-#define TRIGGER_ABORT(session, exp, ...)                     \
-    do {                                                     \
-        __wt_errx(session, "Assertion '%s' failed: ", #exp); \
-        __wt_errx(session, __VA_ARGS__);                     \
-        __wt_abort(session);                                 \
+#define TRIGGER_ABORT(session, exp, ...)                                             \
+    do {                                                                             \
+        char _buf[WT_ERR_MSG_BUF_LEN];                                               \
+        BUILD_ASSERTION_STRING(session, _buf, WT_ERR_MSG_BUF_LEN, exp, __VA_ARGS__); \
+        __wt_errx(session, "%s", _buf);                                              \
+        __wt_abort(session);                                                         \
     } while (0)
 #endif
 
