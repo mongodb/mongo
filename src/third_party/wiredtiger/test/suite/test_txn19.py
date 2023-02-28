@@ -34,10 +34,10 @@
 #   Transactions: test recovery with corrupted log files
 #
 
-import os, shutil
+import os
 from wtscenario import make_scenarios
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import helper, wiredtiger, wttest
 
 # This test uses an artificially small log file limit, and creates
 # large records so two fit into a log file. This allows us to test
@@ -56,20 +56,6 @@ def corrupt(fname, truncate, offset, writeit):
             log.truncate()
         if writeit:
             log.write(writeit)
-
-def copy_for_crash_restart(olddir, newdir):
-    ''' Simulate a crash from olddir and restart in newdir. '''
-    # with the connection still open, copy files to new directory
-    shutil.rmtree(newdir, ignore_errors=True)
-    os.mkdir(newdir)
-    for fname in os.listdir(olddir):
-        fullname = os.path.join(olddir, fname)
-        # Skip lock file on Windows since it is locked
-        if os.path.isfile(fullname) and \
-            "WiredTiger.lock" not in fullname and \
-            "Tmplog" not in fullname and \
-            "Preplog" not in fullname:
-            shutil.copy(fullname, newdir)
 
 class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
     base_config = 'log=(enabled,file_max=100K,remove=false),' + \
@@ -290,7 +276,7 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create(self.uri, create_params)
         self.inserts([x for x in range(0, self.nrecords)])
         newdir = "RESTART"
-        copy_for_crash_restart(self.home, newdir)
+        helper.copy_wiredtiger_home(self, self.home, newdir)
         self.close_conn()
         #self.show_logs(newdir, 'before corruption')
         self.corrupt_log(newdir)
@@ -348,7 +334,7 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
         newdir2 = "RESTART2"
         self.inserts([self.nrecords, self.nrecords + 1])
         expect.extend([self.nrecords, self.nrecords + 1])
-        copy_for_crash_restart(newdir, newdir2)
+        helper.copy_wiredtiger_home(self, newdir, newdir2)
         self.checks(expect)
         self.reopen_conn(newdir, self.conn_config)
         self.checks(expect)
@@ -536,10 +522,10 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
         # The second directory will be used to run:
         #    wiredtiger_open with salvage flag first.
 
-        copy_for_crash_restart(self.home, newdir)
+        helper.copy_wiredtiger_home(self, self.home, newdir)
         self.close_conn()
         self.corrupt_meta(newdir)
-        copy_for_crash_restart(newdir, newdir2)
+        helper.copy_wiredtiger_home(self, newdir, newdir2)
 
         self.run_wt_and_check(newdir, not self.is_openable())
 

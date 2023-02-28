@@ -30,7 +30,7 @@
 #   Check for fast-truncate rollback-to-stable timestamps.
 
 import wttest
-from helper import copy_wiredtiger_home, simulate_crash_restart
+from helper import simulate_crash_restart
 from wtdataset import simple_key, simple_value
 from wtscenario import make_scenarios
 
@@ -100,7 +100,6 @@ class test_truncate09(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         # Restart, testing RTS on the copy.
-        copy_wiredtiger_home(self, ".", "RESTART")
         simulate_crash_restart(self, ".", "RESTART")
 
         # Search for a key in the truncated range which is stabilised, hence should not find it.

@@ -29,7 +29,6 @@
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
-from helper import simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 
 # test_rollback_to_stable37.py

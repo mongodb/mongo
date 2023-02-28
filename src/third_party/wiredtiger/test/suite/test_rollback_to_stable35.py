@@ -29,7 +29,6 @@
 import wttest, threading, time
 from wtdataset import SimpleDataSet
 from wtthread import checkpoint_thread
-from helper import simulate_crash_restart
 from wiredtiger import stat
 from helper import copy_wiredtiger_home
 from wtscenario import make_scenarios
