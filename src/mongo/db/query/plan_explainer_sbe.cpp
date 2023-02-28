@@ -471,7 +471,8 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
 
         auto stats = candidate.root->getStats(true /* includeDebugInfo  */);
         invariant(stats);
-        auto execPlanDebugInfo = buildExecPlanDebugInfo(candidate.root.get(), &candidate.data);
+        auto execPlanDebugInfo =
+            buildExecPlanDebugInfo(candidate.root.get(), &candidate.data.stageData);
         res.push_back(buildPlanStatsDetails(
             candidate.solution.get(), *stats, execPlanDebugInfo, boost::none, verbosity));
     }

@@ -84,8 +84,9 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
                                                     candidates[i].solution->_enumeratorExplainInfo);
             } else {
                 static_assert(std::is_same_v<PlanStageStatsType, mongo::sbe::PlanStageStats>);
-                return plan_explainer_factory::make(
-                    candidates[i].root.get(), &candidates[i].data, candidates[i].solution.get());
+                return plan_explainer_factory::make(candidates[i].root.get(),
+                                                    &candidates[i].data.stageData,
+                                                    candidates[i].solution.get());
             }
         }();
 
@@ -148,7 +149,7 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
         // Get the winning candidate's index to get the correct winning plan.
         size_t winnerIdx = scoresAndCandidateIndices[0].second;
         auto explainer = plan_explainer_factory::make(candidates[winnerIdx].root.get(),
-                                                      &candidates[winnerIdx].data,
+                                                      &candidates[winnerIdx].data.stageData,
                                                       candidates[winnerIdx].solution.get());
         auto&& [stats, _] =
             explainer->getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);

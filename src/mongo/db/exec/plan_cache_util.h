@@ -131,10 +131,11 @@ void updatePlanCache(
             auto&& [winnerExplainer, runnerUpExplainer] = [&]() {
                 if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
                     return std::make_pair(
-                        plan_explainer_factory::make(
-                            winningPlan.root.get(), &winningPlan.data, winningPlan.solution.get()),
+                        plan_explainer_factory::make(winningPlan.root.get(),
+                                                     &winningPlan.data.stageData,
+                                                     winningPlan.solution.get()),
                         plan_explainer_factory::make(candidates[runnerUpIdx].root.get(),
-                                                     &candidates[runnerUpIdx].data,
+                                                     &candidates[runnerUpIdx].data.stageData,
                                                      candidates[runnerUpIdx].solution.get()));
                 } else {
                     static_assert(std::is_same_v<PlanStageType, PlanStage*>);
@@ -157,8 +158,9 @@ void updatePlanCache(
             canCache = false;
             auto winnerExplainer = [&]() {
                 if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
-                    return plan_explainer_factory::make(
-                        winningPlan.root.get(), &winningPlan.data, winningPlan.solution.get());
+                    return plan_explainer_factory::make(winningPlan.root.get(),
+                                                        &winningPlan.data.stageData,
+                                                        winningPlan.solution.get());
                 } else {
                     static_assert(std::is_same_v<PlanStageType, PlanStage*>);
                     return plan_explainer_factory::make(winningPlan.root);
@@ -205,9 +207,9 @@ void updatePlanCache(
                         winningPlan.clonedPlan);
 
                 // Clone the winning SBE plan and its auxiliary data.
-                auto cachedPlan =
-                    std::make_unique<sbe::CachedSbePlan>(std::move(winningPlan.clonedPlan->first),
-                                                         std::move(winningPlan.clonedPlan->second));
+                auto cachedPlan = std::make_unique<sbe::CachedSbePlan>(
+                    std::move(winningPlan.clonedPlan->first),
+                    std::move(winningPlan.clonedPlan->second.stageData));
                 cachedPlan->indexFilterApplied = winningPlan.solution->indexFilterApplied;
 
                 auto buildDebugInfoFn =

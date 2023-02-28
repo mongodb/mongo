@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/sbe_multi_planner.h"
 
+#include "mongo/db/exec/histogram_server_status_metric.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -42,8 +43,45 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-
 namespace mongo::sbe {
+namespace {
+/**
+ * An element in this histogram is the number of plans in the candidate set of an invocation (of the
+ * SBE multiplanner).
+ */
+HistogramServerStatusMetric sbeNumPlansHistogram("query.multiPlanner.histograms.sbeNumPlans",
+                                                 HistogramServerStatusMetric::pow(5, 2, 2));
+
+/**
+ * Aggregation of the total number of invocations (of the SBE multiplanner).
+ */
+CounterMetric sbeCount("query.multiPlanner.sbeCount");
+
+/**
+ * Aggregation of the total number of microseconds spent (in SBE multiplanner).
+ */
+CounterMetric sbeMicrosTotal("query.multiPlanner.sbeMicros");
+
+/**
+ * Aggregation of the total number of reads done (in SBE multiplanner).
+ */
+CounterMetric sbeNumReadsTotal("query.multiPlanner.sbeNumReads");
+
+/**
+ * An element in this histogram is the number of microseconds spent in an invocation (of the SBE
+ * multiplanner).
+ */
+HistogramServerStatusMetric sbeMicrosHistogram("query.multiPlanner.histograms.sbeMicros",
+                                               HistogramServerStatusMetric::pow(11, 1024, 4));
+
+/**
+ * An element in this histogram is the number of reads performance during an invocation (of the SBE
+ * multiplanner).
+ */
+HistogramServerStatusMetric sbeNumReadsHistogram("query.multiPlanner.histograms.sbeNumReads",
+                                                 HistogramServerStatusMetric::pow(9, 128, 2));
+}  // namespace
+
 CandidatePlans MultiPlanner::plan(
     std::vector<std::unique_ptr<QuerySolution>> solutions,
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) {
@@ -56,6 +94,141 @@ CandidatePlans MultiPlanner::plan(
                                              internalQueryPlanEvaluationCollFractionSbe.load()));
     auto decision = uassertStatusOK(mongo::plan_ranker::pickBestPlan<PlanStageStats>(candidates));
     return finalizeExecutionPlans(std::move(decision), std::move(candidates));
+}
+
+bool MultiPlanner::CandidateCmp::operator()(const plan_ranker::CandidatePlan* lhs,
+                                            const plan_ranker::CandidatePlan* rhs) const {
+    size_t lhsReads = lhs->data.tracker->getMetric<TrialRunTracker::TrialRunMetric::kNumReads>();
+    size_t rhsReads = rhs->data.tracker->getMetric<TrialRunTracker::TrialRunMetric::kNumReads>();
+    auto lhsProductivity = plan_ranker::calculateProductivity(lhs->results.size(), lhsReads);
+    auto rhsProductivity = plan_ranker::calculateProductivity(rhs->results.size(), rhsReads);
+    return lhsProductivity < rhsProductivity;
+}
+
+MultiPlanner::PlanQ MultiPlanner::preparePlans(
+    const std::vector<size_t>& planIndexes,
+    const size_t trackerResultsBudget,
+    std::vector<std::unique_ptr<QuerySolution>>& solutions,
+    std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>>& roots) {
+    PlanQ planq;
+    for (auto planIndex : planIndexes) {
+        auto&& [root, stageData] = roots[planIndex];
+        // Make a copy of the original plan. This pristine copy will be inserted into the plan
+        // cache if this candidate becomes the winner.
+        auto origPlan = std::make_pair<std::unique_ptr<PlanStage>, plan_ranker::CandidatePlanData>(
+            root->clone(), plan_ranker::CandidatePlanData{stageData});
+
+        // Attach a unique TrialRunTracker to the plan, which is configured to use at most
+        // '_maxNumReads' reads.
+        auto tracker = std::make_unique<TrialRunTracker>(trackerResultsBudget, _maxNumReads);
+        root->attachToTrialRunTracker(tracker.get());
+
+        plan_ranker::CandidatePlanData data = {std::move(stageData), std::move(tracker)};
+        _candidates.push_back({std::move(solutions[planIndex]),
+                               std::move(root),
+                               std::move(data),
+                               false /* exitedEarly */,
+                               Status::OK()});
+        auto* candidatePtr = &_candidates.back();
+        // Store the original plan in the CandidatePlan.
+        candidatePtr->clonedPlan.emplace(std::move(origPlan));
+        prepareCandidate(candidatePtr, false /*preparingFromCache*/);
+        if (fetchOneDocument(candidatePtr)) {
+            planq.push(candidatePtr);
+        }
+    }
+    return planq;
+}
+
+void MultiPlanner::trialPlans(PlanQ planq) {
+    while (!planq.empty()) {
+        plan_ranker::CandidatePlan* bestCandidate = planq.top();
+        planq.pop();
+        bestCandidate->data.tracker->updateMaxMetric<TrialRunTracker::TrialRunMetric::kNumReads>(
+            _maxNumReads);
+        if (fetchOneDocument(bestCandidate)) {
+            planq.push(bestCandidate);
+        }
+    }
+}
+
+bool MultiPlanner::fetchOneDocument(plan_ranker::CandidatePlan* candidate) {
+    if (!fetchNextDocument(candidate, _maxNumResults)) {
+        candidate->root->detachFromTrialRunTracker();
+        if (candidate->status.isOK()) {
+            _maxNumReads = std::min(
+                _maxNumReads,
+                candidate->data.tracker->getMetric<TrialRunTracker::TrialRunMetric::kNumReads>());
+        }
+        return false;
+    }
+    return true;
+}
+
+std::vector<plan_ranker::CandidatePlan> MultiPlanner::collectExecutionStats(
+    std::vector<std::unique_ptr<QuerySolution>> solutions,
+    std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots,
+    size_t maxTrialPeriodNumReads) {
+    invariant(solutions.size() == roots.size());
+
+    _maxNumResults = trial_period::getTrialPeriodNumToReturn(_cq);
+    _maxNumReads = maxTrialPeriodNumReads;
+
+    auto tickSource = _opCtx->getServiceContext()->getTickSource();
+    auto startTicks = tickSource->getTicks();
+    sbeNumPlansHistogram.increment(solutions.size());
+    sbeCount.increment();
+
+    // Determine which plans are blocking and which are non blocking. The non blocking plans will
+    // be run first in order to provide an upper bound on the number of reads allowed for the
+    // blocking plans.
+    std::vector<size_t> nonBlockingPlanIndexes;
+    std::vector<size_t> blockingPlanIndexes;
+    for (size_t index = 0; index < solutions.size(); ++index) {
+        if (solutions[index]->hasBlockingStage) {
+            blockingPlanIndexes.push_back(index);
+        } else {
+            nonBlockingPlanIndexes.push_back(index);
+        }
+    }
+
+    // If all the plans are blocking, then the trial period risks going on for too long. Because the
+    // plans are blocking, they may not provide '_maxNumResults' within the allotted budget of
+    // reads. We could end up in a situation where each plan's trial period runs for a long time,
+    // substantially slowing down the multi-planning process. For this reason, when all the plans
+    // are blocking, we pass '_maxNumResults' to the trial run tracker. This causes the sort stage
+    // to exit early as soon as it sees '_maxNumResults' _input_ values, which keeps the trial
+    // period shorter.
+    //
+    // On the other hand, if we have a mix of blocking and non-blocking plans, we don't want the
+    // sort stage to exit early based on the number of input rows it observes. This could cause the
+    // trial period for the blocking plans to run for a much shorter timeframe than the non-blocking
+    // plans. This leads to an apples-to-oranges comparison between the blocking and non-blocking
+    // plans which could artificially favor the blocking plans.
+    const size_t trackerResultsBudget = nonBlockingPlanIndexes.empty() ? _maxNumResults : 0;
+
+    // Reserve space for the candidates to avoid reallocations and have stable pointers to vector's
+    // elements.
+    _candidates.reserve(solutions.size());
+    // Run the non-blocking plans first.
+    trialPlans(preparePlans(nonBlockingPlanIndexes, trackerResultsBudget, solutions, roots));
+    // Run the blocking plans.
+    trialPlans(preparePlans(blockingPlanIndexes, trackerResultsBudget, solutions, roots));
+
+    size_t totalNumReads = 0;
+    for (const auto& candidate : _candidates) {
+        totalNumReads +=
+            candidate.data.tracker->getMetric<TrialRunTracker::TrialRunMetric::kNumReads>();
+    }
+    sbeNumReadsHistogram.increment(totalNumReads);
+    sbeNumReadsTotal.increment(totalNumReads);
+
+    auto durationMicros = durationCount<Microseconds>(
+        tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks));
+    sbeMicrosHistogram.increment(durationMicros);
+    sbeMicrosTotal.increment(durationMicros);
+
+    return std::move(_candidates);
 }
 
 CandidatePlans MultiPlanner::finalizeExecutionPlans(
@@ -90,8 +263,8 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
     LOGV2_DEBUG(
         4822875, 5, "Winning solution", "bestSolution"_attr = redact(winner.solution->toString()));
 
-    auto explainer =
-        plan_explainer_factory::make(winner.root.get(), &winner.data, winner.solution.get());
+    auto explainer = plan_explainer_factory::make(
+        winner.root.get(), &winner.data.stageData, winner.solution.get());
     LOGV2_DEBUG(4822876, 2, "Winning plan", "planSummary"_attr = explainer->getPlanSummary());
 
     // Close all candidate plans but the winner.
@@ -114,16 +287,17 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
                 winner.clonedPlan);
         // Clone a new copy of the original plan to use for execution so that the 'clonedPlan' in
         // 'winner' can be inserted into the plan cache while in a clean state.
-        winner.data = stage_builder::PlanStageData(winner.clonedPlan->second);
+        winner.data.stageData = stage_builder::PlanStageData(winner.clonedPlan->second.stageData);
         // When we clone the tree below, the new tree's stats will be zeroed out. If this is an
         // explain operation, save the stats from the old tree before we discard it.
         if (_cq.getExplain()) {
-            winner.data.savedStatsOnEarlyExit = winner.root->getStats(true /* includeDebugInfo  */);
+            winner.data.stageData.savedStatsOnEarlyExit =
+                winner.root->getStats(true /* includeDebugInfo  */);
         }
         winner.root = winner.clonedPlan->first->clone();
 
         stage_builder::prepareSlotBasedExecutableTree(
-            _opCtx, winner.root.get(), &winner.data, _cq, _collections, _yieldPolicy);
+            _opCtx, winner.root.get(), &winner.data.stageData, _cq, _collections, _yieldPolicy);
         // Clear the results queue.
         winner.results = {};
         winner.root->open(false);
@@ -142,16 +316,18 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
             _opCtx, _collections, _cq, *solution, _yieldPolicy);
         // The winner might have been replanned. So, pass through the replanning reason to the new
         // plan.
-        data.replanReason = std::move(winner.data.replanReason);
+        data.replanReason = std::move(winner.data.stageData.replanReason);
 
         // We need to clone the plan here for the plan cache to use. The clone will be stored in the
         // cache prior to preparation, whereas the original copy of the tree will be prepared and
         // used to execute this query.
-        auto clonedPlan = std::make_pair(rootStage->clone(), stage_builder::PlanStageData(data));
+        auto clonedPlan = std::make_pair(rootStage->clone(), plan_ranker::CandidatePlanData{data});
         stage_builder::prepareSlotBasedExecutableTree(
             _opCtx, rootStage.get(), &data, _cq, _collections, _yieldPolicy);
-        candidates[winnerIdx] = sbe::plan_ranker::CandidatePlan{
-            std::move(solution), std::move(rootStage), std::move(data)};
+        candidates[winnerIdx] =
+            sbe::plan_ranker::CandidatePlan{std::move(solution),
+                                            std::move(rootStage),
+                                            plan_ranker::CandidatePlanData{std::move(data)}};
         candidates[winnerIdx].clonedPlan.emplace(std::move(clonedPlan));
         candidates[winnerIdx].root->open(false);
 

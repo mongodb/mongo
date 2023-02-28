@@ -118,10 +118,8 @@ CandidatePlans SubPlanner::plan(
     // range deletion).
     plan_cache_util::updatePlanCache(_opCtx, _collections, _cq, *compositeSolution, *root, data);
 
-    auto status = prepareExecutionPlan(root.get(), &data);
-    uassertStatusOK(status);
-    auto [result, recordId, exitedEarly] = status.getValue();
-    tassert(5323804, "sub-planner unexpectedly exited early during prepare phase", !exitedEarly);
+    prepareExecutionPlan(root.get(), &data, false /*preparingFromCache*/);
+    root->open(false);
 
     return {makeVector(plan_ranker::CandidatePlan{
                 std::move(compositeSolution), std::move(root), std::move(data)}),
@@ -143,11 +141,8 @@ CandidatePlans SubPlanner::planWholeQuery() const {
 
         auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
             _opCtx, _collections, _cq, *solutions[0], _yieldPolicy);
-        auto status = prepareExecutionPlan(root.get(), &data);
-        uassertStatusOK(status);
-        auto [result, recordId, exitedEarly] = status.getValue();
-        tassert(
-            5323805, "sub-planner unexpectedly exited early during prepare phase", !exitedEarly);
+        prepareExecutionPlan(root.get(), &data, false /*preparingFromCache*/);
+        root->open(false);
         return {makeVector(plan_ranker::CandidatePlan{
                     std::move(solutions[0]), std::move(root), std::move(data)}),
                 0};

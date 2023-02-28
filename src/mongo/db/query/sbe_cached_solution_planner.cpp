@@ -75,22 +75,15 @@ CandidatePlans CachedSolutionPlanner::plan(
     // If the '_decisionReads' is not present then we do not run a trial period, keeping the current
     // plan.
     if (!_decisionReads) {
-        const auto status = prepareExecutionPlan(
-            roots[0].first.get(), &roots[0].second, true /* preparingFromCache */);
-        uassertStatusOK(status);
-        bool exitedEarly;
-
-        // Discarding SlotAccessor pointers as they will be reacquired later.
-        std::tie(std::ignore, std::ignore, exitedEarly) = status.getValue();
-        tassert(
-            6693502, "TrialRunTracker is not attached therefore can not exit early", !exitedEarly);
-        return {makeVector(plan_ranker::CandidatePlan{std::move(solutions[0]),
-                                                      std::move(roots[0].first),
-                                                      std::move(roots[0].second),
-                                                      false /* exitedEarly*/,
-                                                      Status::OK(),
-                                                      true,
-                                                      /*isFromPlanCache */}),
+        prepareExecutionPlan(roots[0].first.get(), &roots[0].second, true /* preparingFromCache */);
+        roots[0].first->open(false /* reOpen */);
+        return {makeVector(plan_ranker::CandidatePlan{
+                    std::move(solutions[0]),
+                    std::move(roots[0].first),
+                    plan_ranker::CandidatePlanData{std::move(roots[0].second)},
+                    false /* exitedEarly*/,
+                    Status::OK(),
+                    true /*isFromPlanCache */}),
                 0};
     }
 
@@ -107,15 +100,15 @@ CandidatePlans CachedSolutionPlanner::plan(
 
     auto explainer = plan_explainer_factory::make(
         candidate.root.get(),
-        &candidate.data,
+        &candidate.data.stageData,
         candidate.solution.get(),
         {},    /* optimizedData */
         {},    /* rejectedCandidates */
         false, /* isMultiPlan */
         true,  /* isFromPlanCache */
-        candidate.data.debugInfo
-            ? std::make_unique<plan_cache_debug_info::DebugInfoSBE>(*candidate.data.debugInfo)
-            : nullptr);
+        candidate.data.stageData.debugInfo ? std::make_unique<plan_cache_debug_info::DebugInfoSBE>(
+                                                 *candidate.data.stageData.debugInfo)
+                                           : nullptr);
 
     if (!candidate.status.isOK()) {
         // On failure, fall back to replanning the whole query. We neither evict the existing cache
@@ -165,12 +158,11 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::collectExecutionStatsForCached
 
     plan_ranker::CandidatePlan candidate{std::move(solution),
                                          std::move(root),
-                                         std::move(data),
+                                         plan_ranker::CandidatePlanData{std::move(data)},
                                          false /* exitedEarly*/,
                                          Status::OK(),
                                          true,
                                          /*is Cached plan*/};
-
     ON_BLOCK_EXIT([rootPtr = candidate.root.get()] { rootPtr->detachFromTrialRunTracker(); });
 
     // Callback for the tracker when it exceeds any of the tracked metrics. If the tracker exceeds
@@ -192,10 +184,10 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::collectExecutionStatsForCached
                 MONGO_UNREACHABLE;
         }
     };
-    auto tracker = std::make_unique<TrialRunTracker>(
+    candidate.data.tracker = std::make_unique<TrialRunTracker>(
         std::move(onMetricReached), maxNumResults, maxTrialPeriodNumReads);
-    candidate.root->attachToTrialRunTracker(tracker.get());
-    executeCandidateTrial(&candidate, maxNumResults, /*isCachedPlanTrial*/ true);
+    candidate.root->attachToTrialRunTracker(candidate.data.tracker.get());
+    executeCachedCandidateTrial(&candidate, maxNumResults);
 
     return candidate;
 }
@@ -235,11 +227,8 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
 
         // Only one possible plan. Build the stages from the solution.
         auto [root, data] = buildExecutableTree(*solutions[0]);
-        auto status = prepareExecutionPlan(root.get(), &data);
-        uassertStatusOK(status);
-        auto [result, recordId, exitedEarly] = status.getValue();
-        tassert(
-            5323800, "cached planner unexpectedly exited early during prepare phase", !exitedEarly);
+        prepareExecutionPlan(root.get(), &data, false /*preparingFromCache*/);
+        root->open(false /* reOpen */);
 
         auto explainer = plan_explainer_factory::make(root.get(), &data, solutions[0].get());
         LOGV2_DEBUG(2058101,
@@ -267,7 +256,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     MultiPlanner multiPlanner{_opCtx, _collections, _cq, plannerParams, cachingMode, _yieldPolicy};
     auto&& [candidates, winnerIdx] = multiPlanner.plan(std::move(solutions), std::move(roots));
     auto explainer = plan_explainer_factory::make(candidates[winnerIdx].root.get(),
-                                                  &candidates[winnerIdx].data,
+                                                  &candidates[winnerIdx].data.stageData,
                                                   candidates[winnerIdx].solution.get());
     LOGV2_DEBUG(2058201,
                 1,

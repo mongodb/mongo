@@ -37,67 +37,19 @@
 #include "mongo/db/query/plan_executor_sbe.h"
 
 namespace mongo::sbe {
-namespace {
-
-/**
- * Aggregation of the total number of microseconds spent (in SBE multiplanner).
- */
-CounterMetric sbeMicrosTotal("query.multiPlanner.sbeMicros");
-
-/**
- * Aggregation of the total number of reads done (in SBE multiplanner).
- */
-CounterMetric sbeNumReadsTotal("query.multiPlanner.sbeNumReads");
-
-/**
- * Aggregation of the total number of invocations (of the SBE multiplanner).
- */
-CounterMetric sbeCount("query.multiPlanner.sbeCount");
-
-/**
- * An element in this histogram is the number of microseconds spent in an invocation (of the SBE
- * multiplanner).
- */
-HistogramServerStatusMetric sbeMicrosHistogram("query.multiPlanner.histograms.sbeMicros",
-                                               HistogramServerStatusMetric::pow(11, 1024, 4));
-
-/**
- * An element in this histogram is the number of reads performance during an invocation (of the SBE
- * multiplanner).
- */
-HistogramServerStatusMetric sbeNumReadsHistogram("query.multiPlanner.histograms.sbeNumReads",
-                                                 HistogramServerStatusMetric::pow(9, 128, 2));
-
-/**
- * An element in this histogram is the number of plans in the candidate set of an invocation (of the
- * SBE multiplanner).
- */
-HistogramServerStatusMetric sbeNumPlansHistogram("query.multiPlanner.histograms.sbeNumPlans",
-                                                 HistogramServerStatusMetric::pow(5, 2, 2));
-
-/**
- * Fetches a next document form the given plan stage tree and returns 'true' if the plan stage
- * returns EOF, or throws 'TrialRunTracker::EarlyExitException' exception. Otherwise, the
- * loaded document is placed into the candidate's plan result queue.
- *
- * If the plan stage throws a 'QueryExceededMemoryLimitNoDiskUseAllowed', it will be caught and the
- * 'candidate->failed' flag will be set to 'true', and the 'numFailures' parameter incremented by 1.
- * This failure is considered recoverable, as another candidate plan may require less memory, or may
- * not contain a stage requiring spilling to disk at all.
- */
-enum class FetchDocStatus {
-    done = 0,
-    exitedEarly,
-    inProgress,
-};
-FetchDocStatus fetchNextDocument(
-    plan_ranker::CandidatePlan* candidate,
-    const std::pair<value::SlotAccessor*, value::SlotAccessor*>& slots) {
+bool BaseRuntimePlanner::fetchNextDocument(plan_ranker::CandidatePlan* candidate,
+                                           size_t maxNumResults) {
+    auto* resultSlot = candidate->data.resultAccessor;
+    auto* recordIdSlot = candidate->data.recordIdAccessor;
     try {
+        if (!candidate->data.open) {
+            candidate->root->open(false);
+            candidate->data.open = true;
+        }
+
         BSONObj obj;
         RecordId recordId;
 
-        auto [resultSlot, recordIdSlot] = slots;
         auto state = fetchNext(candidate->root.get(),
                                resultSlot,
                                recordIdSlot,
@@ -106,26 +58,28 @@ FetchDocStatus fetchNextDocument(
                                true /* must return owned BSON */);
         if (state == PlanState::IS_EOF) {
             candidate->root->close();
-            return FetchDocStatus::done;
+            return false;
         }
 
         invariant(state == PlanState::ADVANCED);
         invariant(obj.isOwned());
-        candidate->results.push_back({obj, {recordIdSlot != nullptr, recordId}});
+        candidate->results.push_back({std::move(obj), {recordIdSlot != nullptr, recordId}});
+        if (candidate->results.size() >= maxNumResults) {
+            return false;
+        }
     } catch (const ExceptionFor<ErrorCodes::QueryTrialRunCompleted>&) {
-        return FetchDocStatus::exitedEarly;
+        candidate->exitedEarly = true;
+        return false;
     } catch (const ExceptionFor<ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed>& ex) {
         candidate->root->close();
         candidate->status = ex.toStatus();
+        return false;
     }
-    return FetchDocStatus::inProgress;
+    return true;
 }
-}  // namespace
 
-StatusWith<std::tuple<value::SlotAccessor*, value::SlotAccessor*, bool>>
-BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
-                                         stage_builder::PlanStageData* data,
-                                         const bool preparingFromCache) const {
+std::pair<value::SlotAccessor*, value::SlotAccessor*> BaseRuntimePlanner::prepareExecutionPlan(
+    PlanStage* root, stage_builder::PlanStageData* data, const bool preparingFromCache) const {
     invariant(root);
     invariant(data);
 
@@ -144,141 +98,20 @@ BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
         tassert(4822872, "Query does not have a recordId slot.", recordIdSlot);
     }
 
-    auto exitedEarly{false};
-    try {
-        root->open(false);
-    } catch (const ExceptionFor<ErrorCodes::QueryTrialRunCompleted>&) {
-        exitedEarly = true;
-    } catch (const ExceptionFor<ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed>& ex) {
-        root->close();
-        return ex.toStatus();
-    }
-
-    return std::make_tuple(resultSlot, recordIdSlot, exitedEarly);
+    return std::make_pair(resultSlot, recordIdSlot);
 }
 
-void BaseRuntimePlanner::executeCandidateTrial(plan_ranker::CandidatePlan* candidate,
-                                               size_t maxNumResults,
-                                               const bool isCachedPlanTrial) {
+void BaseRuntimePlanner::prepareCandidate(plan_ranker::CandidatePlan* candidate,
+                                          bool preparingFromCache) {
     _indexExistenceChecker.check(_opCtx, _collections);
-
-    auto status = prepareExecutionPlan(candidate->root.get(), &candidate->data, isCachedPlanTrial);
-    if (!status.isOK()) {
-        candidate->status = status.getStatus();
-        return;
-    }
-
-    auto [resultAccessor, recordIdAccessor, exitedEarly] = status.getValue();
-    if (exitedEarly) {
-        candidate->exitedEarly = true;
-        return;
-    }
-
-    for (size_t i = 0; i < maxNumResults && candidate->status.isOK(); ++i) {
-        FetchDocStatus fetch =
-            fetchNextDocument(candidate, std::make_pair(resultAccessor, recordIdAccessor));
-        if (fetch == FetchDocStatus::done || fetch == FetchDocStatus::exitedEarly) {
-            candidate->exitedEarly = (fetch == FetchDocStatus::exitedEarly);
-            return;
-        }
-    }
+    std::tie(candidate->data.resultAccessor, candidate->data.recordIdAccessor) =
+        prepareExecutionPlan(candidate->root.get(), &candidate->data.stageData, preparingFromCache);
 }
 
-std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStats(
-    std::vector<std::unique_ptr<QuerySolution>> solutions,
-    std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots,
-    size_t maxTrialPeriodNumReads) {
-    invariant(solutions.size() == roots.size());
-
-    std::vector<plan_ranker::CandidatePlan> candidates;
-    std::vector<std::pair<value::SlotAccessor*, value::SlotAccessor*>> accessors;
-
-    const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(_cq)};
-
-    auto tickSource = _opCtx->getServiceContext()->getTickSource();
-    auto startTicks = tickSource->getTicks();
-    sbeNumPlansHistogram.increment(solutions.size());
-    sbeCount.increment();
-
-    // Determine which plans are blocking and which are non blocking. The non blocking plans will
-    // be run first in order to provide an upper bound on the number of reads allowed for the
-    // blocking plans.
-    std::vector<size_t> nonBlockingPlanIndexes;
-    std::vector<size_t> blockingPlanIndexes;
-    for (size_t index = 0; index < solutions.size(); ++index) {
-        if (solutions[index]->hasBlockingStage) {
-            blockingPlanIndexes.push_back(index);
-        } else {
-            nonBlockingPlanIndexes.push_back(index);
-        }
+void BaseRuntimePlanner::executeCachedCandidateTrial(plan_ranker::CandidatePlan* candidate,
+                                                     size_t maxNumResults) {
+    prepareCandidate(candidate, true /*preparingFromCache*/);
+    while (fetchNextDocument(candidate, maxNumResults)) {
     }
-
-    // If all the plans are blocking, then the trial period risks going on for too long. Because the
-    // plans are blocking, they may not provide 'maxNumResults' within the allotted budget of reads.
-    // We could end up in a situation where each plan's trial period runs for a long time,
-    // substantially slowing down the multi-planning process. For this reason, when all the plans
-    // are blocking, we pass 'maxNumResults' to the trial run tracker. This causes the sort stage to
-    // exit early as soon as it sees 'maxNumResults' _input_ values, which keeps the trial period
-    // shorter.
-    //
-    // On the other hand, if we have a mix of blocking and non-blocking plans, we don't want the
-    // sort stage to exit early based on the number of input rows it observes. This could cause the
-    // trial period for the blocking plans to run for a much shorter timeframe than the non-blocking
-    // plans. This leads to an apples-to-oranges comparison between the blocking and non-blocking
-    // plans which could artificially favor the blocking plans.
-    const size_t trackerResultsBudget = nonBlockingPlanIndexes.empty() ? maxNumResults : 0;
-
-    uint64_t totalNumReads = 0;
-
-    auto runPlans = [&](const std::vector<size_t>& planIndexes, size_t& maxNumReads) -> void {
-        for (auto planIndex : planIndexes) {
-            // Prepare the plan.
-            auto&& [root, data] = roots[planIndex];
-            // Make a copy of the original plan. This pristine copy will be inserted into the plan
-            // cache if this candidate becomes the winner.
-            auto origPlan =
-                std::make_pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>(
-                    root->clone(), stage_builder::PlanStageData(data));
-
-            // Attach a unique TrialRunTracker to the plan, which is configured to use at most
-            // 'maxNumReads' reads.
-            auto tracker = std::make_unique<TrialRunTracker>(trackerResultsBudget, maxNumReads);
-            ON_BLOCK_EXIT([rootPtr = root.get()] { rootPtr->detachFromTrialRunTracker(); });
-            root->attachToTrialRunTracker(tracker.get());
-
-            candidates.push_back({std::move(solutions[planIndex]),
-                                  std::move(root),
-                                  std::move(data),
-                                  false /* exitedEarly */,
-                                  Status::OK()});
-            auto& currentCandidate = candidates.back();
-            // Store the original plan in the CandidatePlan.
-            currentCandidate.clonedPlan.emplace(std::move(origPlan));
-            executeCandidateTrial(&currentCandidate, maxNumResults, /*isCachedPlanTrial*/ false);
-
-            auto reads = tracker->getMetric<TrialRunTracker::TrialRunMetric::kNumReads>();
-            // We intentionally increment the metrics outside of the isOk/existedEarly check.
-            totalNumReads += reads;
-
-            // Reduce the number of reads the next candidates are allocated if this candidate is
-            // more efficient than the current bound.
-            if (currentCandidate.status.isOK() && !currentCandidate.exitedEarly) {
-                maxNumReads = std::min(maxNumReads, reads);
-            }
-        }
-    };
-
-    runPlans(nonBlockingPlanIndexes, maxTrialPeriodNumReads);
-    runPlans(blockingPlanIndexes, maxTrialPeriodNumReads);
-
-    sbeNumReadsHistogram.increment(totalNumReads);
-    sbeNumReadsTotal.increment(totalNumReads);
-
-    auto durationMicros = durationCount<Microseconds>(
-        tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks));
-    sbeMicrosHistogram.increment(durationMicros);
-    sbeMicrosTotal.increment(durationMicros);
-
-    return candidates;
 }
 }  // namespace mongo::sbe

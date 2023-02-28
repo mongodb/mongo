@@ -142,22 +142,23 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 "slots"_attr = data.debugString(),
                 "stages"_attr = sbe::DebugPrinter{}.print(*rootStage));
 
-    return {{new PlanExecutorSBE(opCtx,
-                                 std::move(cq),
-                                 std::move(optimizerData),
-                                 {makeVector<sbe::plan_ranker::CandidatePlan>(
-                                      sbe::plan_ranker::CandidatePlan{std::move(solution),
-                                                                      std::move(rootStage),
-                                                                      std::move(data),
-                                                                      false,
-                                                                      Status::OK(),
-                                                                      planIsFromCache}),
-                                  0},
-                                 plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
-                                 std::move(nss),
-                                 false,
-                                 std::move(yieldPolicy),
-                                 generatedByBonsai),
+    return {{new PlanExecutorSBE(
+                 opCtx,
+                 std::move(cq),
+                 std::move(optimizerData),
+                 {makeVector<sbe::plan_ranker::CandidatePlan>(sbe::plan_ranker::CandidatePlan{
+                      std::move(solution),
+                      std::move(rootStage),
+                      sbe::plan_ranker::CandidatePlanData{std::move(data)},
+                      false /*exitedEarly*/,
+                      Status::OK(),
+                      planIsFromCache}),
+                  0},
+                 plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
+                 std::move(nss),
+                 false /*isOpen*/,
+                 std::move(yieldPolicy),
+                 generatedByBonsai),
              PlanExecutor::Deleter{opCtx}}};
 }
 
@@ -172,7 +173,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     LOGV2_DEBUG(4822861,
                 5,
                 "SBE plan",
-                "slots"_attr = candidates.winner().data.debugString(),
+                "slots"_attr = candidates.winner().data.stageData.debugString(),
                 "stages"_attr = sbe::DebugPrinter{}.print(*candidates.winner().root));
 
     return {{new PlanExecutorSBE(opCtx,

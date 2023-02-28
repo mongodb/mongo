@@ -56,6 +56,61 @@ public:
         final;
 
 private:
+    struct CandidateCmp {
+        bool operator()(const plan_ranker::CandidatePlan* lhs,
+                        const plan_ranker::CandidatePlan* rhs) const;
+    };
+
+    using PlanQ = std::priority_queue<plan_ranker::CandidatePlan*,
+                                      std::vector<plan_ranker::CandidatePlan*>,
+                                      CandidateCmp>;
+
+    /**
+     * Moves candidates into the internal candidates vector, sets up a PlanQ entry for each,
+     * prepares each candidate's execution tree and tries to fetch the first document to initialize
+     * plan productivity stats.
+     */
+    PlanQ preparePlans(
+        const std::vector<size_t>& planIndexes,
+        size_t trackerResultsBudget,
+        std::vector<std::unique_ptr<QuerySolution>>& solutions,
+        std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>>& roots);
+
+    /**
+     * Runs the plans in the queue by fetching one document at a time. Each time the most
+     * productive plan is executed.
+     */
+    void trialPlans(PlanQ planq);
+
+    /**
+     * Tries to fetch a single document from the plan. Returns true if the trial run should continue
+     * for the given candidate and false if the trial should end.
+     */
+    bool fetchOneDocument(plan_ranker::CandidatePlan* candidate);
+
+    /**
+     * Executes each plan in to collect execution stats. Stops when all the plans have either:
+     *    * Hit EOF.
+     *    * Returned a pre-defined number of results.
+     *    * Failed
+     *    * Exited early by throwing a special signaling exception.
+     *
+     * Each plan is executed at least once. After that plans are executed by fetching one document
+     * at a time. Every time the most productive plan is executed.
+     *
+     * All documents returned by each plan are enqueued into the 'CandidatePlan->results' queue.
+     *
+     * Upon completion, returns a vector of candidate plans. Execution stats can be obtained for
+     * each of the candidate plans by calling 'CandidatePlan->root->getStats()'.
+     *
+     * After the trial period ends, plans that ran out of memory or reached EOF are closed.
+     * All other plans are open, but 'exitedEarly' plans are in an invalid state. Such plans must be
+     * re-created using the cloned copy before execution of the plan.
+     */
+    std::vector<plan_ranker::CandidatePlan> collectExecutionStats(
+        std::vector<std::unique_ptr<QuerySolution>> solutions,
+        std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots,
+        size_t maxTrialPeriodNumReads);
     /**
      * Returns the best candidate plan selected according to the plan ranking 'decision'.
      *
@@ -68,5 +123,7 @@ private:
 
     // Describes the cases in which we should write an entry for the winning plan to the plan cache.
     const PlanCachingMode _cachingMode;
+    size_t _maxNumResults;
+    size_t _maxNumReads;
 };
 }  // namespace mongo::sbe

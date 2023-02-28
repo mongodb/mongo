@@ -122,8 +122,14 @@ public:
         return _metrics[metric];
     }
 
+    template <TrialRunMetric metric>
+    void updateMaxMetric(size_t newMaxMetric) {
+        static_assert(metric >= 0 && metric < sizeof(_metrics) / sizeof(size_t));
+        _maxMetrics[metric] = newMaxMetric;
+    }
+
 private:
-    const size_t _maxMetrics[TrialRunMetric::kLastElem];
+    size_t _maxMetrics[TrialRunMetric::kLastElem];
     size_t _metrics[TrialRunMetric::kLastElem]{0};
     bool _done{false};
     std::function<bool(TrialRunMetric)> _onMetricReached{};

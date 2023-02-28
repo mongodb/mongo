@@ -47,24 +47,15 @@ public:
 
 protected:
     double calculateProductivity(const mongo::sbe::PlanStageStats* root) const final {
-        auto numReads{calculateNumberOfReads(root)};
-
-        // We add one to the number of advances so that plans which returned zero documents still
-        // have a productivity of non-zero. This allows us to compare productivity scores between
-        // plans with zero advances. For example, a plan which did zero advances but examined ten
-        // documents would have a score of (0 + 1)/10, while a plan which did zero advances but
-        // examined a hundred documents would have a score of (0 + 1)/100.
-        //
-        // Similarly, we add one to the number of reads in case 0 reads were performed. This could
-        // happen if a plan encounters EOF right away, for example.
-        return static_cast<double>(root->common.advances + 1) / static_cast<double>(numReads + 1);
+        return plan_ranker::calculateProductivity(root->common.advances,
+                                                  calculateNumberOfReads(root));
     }
 
     std::string getProductivityFormula(const mongo::sbe::PlanStageStats* root) const final {
         auto numReads{calculateNumberOfReads(root)};
         StringBuilder sb;
 
-        sb << "(" << (root->common.advances + 1) << " advances)/(" << numReads << " numReads)";
+        sb << "(" << (root->common.advances) << " advances + 1)/(" << numReads << " numReads + 1)";
 
         return sb.str();
     }
@@ -90,4 +81,17 @@ std::unique_ptr<mongo::plan_ranker::PlanScorer<PlanStageStats>> makePlanScorer(
     const QuerySolution* solution) {
     return std::make_unique<DefaultPlanScorer>(solution);
 }
+
+double calculateProductivity(const size_t advances, const size_t numReads) {
+    // We add one to the number of advances so that plans which returned zero documents still
+    // have a productivity of non-zero. This allows us to compare productivity scores between
+    // plans with zero advances. For example, a plan which did zero advances but examined ten
+    // documents would have a score of (0 + 1)/10, while a plan which did zero advances but
+    // examined a hundred documents would have a score of (0 + 1)/100.
+    //
+    // Similarly, we add one to the number of reads in case 0 reads were performed. This could
+    // happen if a plan encounters EOF right away, for example.
+    return static_cast<double>(advances + 1) / static_cast<double>(numReads + 1);
+}
+
 }  // namespace mongo::sbe::plan_ranker
