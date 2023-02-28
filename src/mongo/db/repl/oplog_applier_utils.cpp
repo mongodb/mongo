@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/db/catalog_raii.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection.h"
@@ -352,14 +353,35 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
             writeConflictRetry(opCtx, "applyOplogEntryOrGroupedInserts_CRUD", nss.ns(), [&] {
                 // Need to throw instead of returning a status for it to be properly ignored.
                 try {
-                    AutoGetCollection autoColl(opCtx,
-                                               getNsOrUUID(nss, *op),
-                                               fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
-                    auto db = autoColl.getDb();
+                    boost::optional<AutoGetCollection> autoColl;
+                    Database* db = nullptr;
+
+                    // If the collection UUID does not resolve, acquire the collection using the
+                    // namespace. This is so we reach `applyOperation_inlock` below and invalidate
+                    // the preimage / postimage for the op if applicable.
+
+                    // TODO SERVER-41371 / SERVER-73661 this code is difficult to maintain and
+                    // needs to be done everywhere this situation is possible. We should try
+                    // to consolidate this into applyOperation_inlock.
+                    try {
+                        autoColl.emplace(opCtx,
+                                         getNsOrUUID(nss, *op),
+                                         fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
+                        db = autoColl->getDb();
+                    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+                        if (!isDataConsistent) {
+                            autoColl.emplace(
+                                opCtx, nss, fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
+                            db = autoColl->ensureDbExists(opCtx);
+                        } else {
+                            throw ex;
+                        }
+                    }
+
                     uassert(ErrorCodes::NamespaceNotFound,
                             str::stream() << "missing database (" << nss.db() << ")",
                             db);
-                    OldClientContext ctx(opCtx, autoColl.getNss(), db);
+                    OldClientContext ctx(opCtx, autoColl->getNss(), db);
 
                     // We convert updates to upserts in secondary mode when the
                     // oplogApplicationEnforcesSteadyStateConstraints parameter is false, to avoid

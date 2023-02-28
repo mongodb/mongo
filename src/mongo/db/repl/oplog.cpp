@@ -1399,6 +1399,29 @@ Status applyOperation_inlock(OperationContext* opCtx,
     if (auto uuid = op.getUuid()) {
         auto catalog = CollectionCatalog::get(opCtx);
         collection = CollectionPtr(catalog->lookupCollectionByUUID(opCtx, uuid.value()));
+        // Invalidate the image collection if collectionUUID does not resolve and this op returns
+        // a preimage or postimage. We only expect this to happen when in kInitialSync mode but
+        // this can sometimes occur in kRecovering mode during rollback-via-refetch. In either case
+        // we want to do image invalidation.
+        if (!collection && op.getNeedsRetryImage()) {
+            tassert(735200,
+                    "mode should be in initialSync or recovering",
+                    mode == OplogApplication::Mode::kInitialSync ||
+                        mode == OplogApplication::Mode::kRecovering);
+            writeConflictRetry(opCtx, "applyOps_imageInvalidation", op.getNss().toString(), [&] {
+                WriteUnitOfWork wuow(opCtx);
+                bool upsertConfigImage = true;
+                writeToImageCollection(opCtx,
+                                       op.getSessionId().value(),
+                                       op.getTxnNumber().value(),
+                                       op.getApplyOpsTimestamp().value_or(op.getTimestamp()),
+                                       op.getNeedsRetryImage().value(),
+                                       BSONObj(),
+                                       getInvalidatingReason(mode, isDataConsistent),
+                                       &upsertConfigImage);
+                wuow.commit();
+            });
+        }
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply operation due to missing collection ("
                               << uuid.value() << "): " << redact(opOrGroupedInserts.toBSON()),

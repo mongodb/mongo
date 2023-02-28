@@ -48,6 +48,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/ops/write_ops.h"
@@ -56,6 +57,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/idempotency_test_fixture.h"
+#include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_batcher.h"
@@ -768,6 +770,83 @@ TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenantAcrossTenantsRequ
     ASSERT_TRUE(collectionExists(_opCtx.get(), sourceNss));
     ASSERT_FALSE(collectionExists(_opCtx.get(), targetNss));
     ASSERT_FALSE(collectionExists(_opCtx.get(), wrongTargetNss));
+}
+
+TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateChangeStreamPreImages) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    CollectionOptions options;
+    createCollection(_opCtx.get(), NamespaceString::kConfigImagesNamespace, options);
+
+    auto document = BSON("_id" << 0);
+
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(3);
+
+    const BSONObj preImage(BSON("_id" << 2 << "post" << 1));
+    OpTime opTime = OpTime();
+
+    repl::ImageEntry imageEntry;
+    imageEntry.set_id(sessionId);
+    imageEntry.setTxnNumber(2);
+    imageEntry.setTs(opTime.getTimestamp());
+    imageEntry.setImageKind(repl::RetryImageEnum::kPreImage);
+    imageEntry.setImage(preImage);
+    imageEntry.setInvalidated(false);
+
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        _opCtx.get(), NamespaceString::kConfigImagesNamespace, {imageEntry.toBSON()}, 0));
+
+    {
+        AutoGetCollection sideCollection(
+            _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
+        auto imageEntry = ImageEntry::parse(
+            IDLParserContext("test"),
+            Helpers::findOneForTesting(
+                _opCtx.get(), sideCollection.getCollection(), BSON("_id" << sessionId.toBSON())));
+        ASSERT_FALSE(imageEntry.getInvalidated());
+    }
+
+    // Make an oplog entry to invalidate the pre image.
+    OplogEntry invalidateOp =
+        DurableOplogEntry(OpTime(),                   // optime
+                          OpTypeEnum::kUpdate,        // opType
+                          std::move(nss),             // namespace
+                          kUuid,                      // uuid
+                          boost::none,                // fromMigrate
+                          OplogEntry::kOplogVersion,  // version
+                          document,                   // o
+                          boost::none,                // o2
+                          sessionInfo,                // sessionInfo
+                          boost::none,                // upsert
+                          Date_t(),                   // wall clock time
+                          {},                         // statement ids
+                          boost::none,  // optime of previous write within same transaction
+                          boost::none,  // pre-image optime
+                          boost::none,  // post-image optime
+                          boost::none,  // ShardId of resharding recipient
+                          boost::none,  // _id
+                          RetryImageEnum::kPreImage);  // needsRetryImage
+
+    // Apply the oplog entry.
+    {
+        repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+        DisableDocumentValidation validationDisabler(_opCtx.get());
+        ASSERT_THROWS(applyOplogEntryOrGroupedInserts(_opCtx.get(),
+                                                      ApplierOperation{&invalidateOp},
+                                                      OplogApplication::Mode::kInitialSync,
+                                                      /* isDataConsistent */ false),
+                      ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    }
+
+    AutoGetCollection sideCollection(
+        _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
+    imageEntry = ImageEntry::parse(IDLParserContext("test"),
+                                   Helpers::findOneForTesting(_opCtx.get(),
+                                                              sideCollection.getCollection(),
+                                                              BSON("_id" << sessionId.toBSON())));
+    ASSERT(imageEntry.getInvalidated());
 }
 
 TEST_F(IdempotencyTest, CollModCommandMultitenant) {

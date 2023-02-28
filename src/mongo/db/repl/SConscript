@@ -1763,6 +1763,7 @@ if wiredtiger:
             'drop_pending_collection_reaper',
             'idempotency_test_fixture',
             'idempotency_test_util',
+            'image_collection_entry',
             'initial_syncer',
             'isself',
             'multiapplier',
