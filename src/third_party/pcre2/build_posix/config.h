@@ -81,7 +81,7 @@ sure both macros are undefined; an emulation function will then be used. */
 #define HAVE_LIMITS_H 1
 
 /* Define to 1 if you have the `memfd_create' function. */
-#define HAVE_MEMFD_CREATE 1
+/* #undef HAVE_MEMFD_CREATE */
 
 /* Define to 1 if you have the `memmove' function. */
 #define HAVE_MEMMOVE 1
@@ -214,7 +214,7 @@ sure both macros are undefined; an emulation function will then be used. */
 #define PACKAGE_NAME "PCRE2"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "PCRE2 10.42"
+#define PACKAGE_STRING "PCRE2 10.40"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "pcre2"
@@ -223,7 +223,7 @@ sure both macros are undefined; an emulation function will then be used. */
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "10.42"
+#define PACKAGE_VERSION "10.40"
 
 /* The value of PARENS_NEST_LIMIT specifies the maximum depth of nested
    parentheses (of any kind) in a pattern. This limits the amount of system
@@ -353,18 +353,7 @@ sure both macros are undefined; an emulation function will then be used. */
 
 
 /* Version number of package */
-#define VERSION "10.42"
-
-/* Enable large inode numbers on Mac OS X 10.5.  */
-#ifndef _DARWIN_USE_64_BIT_INODE
-# define _DARWIN_USE_64_BIT_INODE 1
-#endif
-
-/* Number of bits in a file offset, on hosts where this is settable. */
-/* #undef _FILE_OFFSET_BITS */
-
-/* Define for large files, on AIX-style hosts. */
-/* #undef _LARGE_FILES */
+#define VERSION "10.40"
 
 /* Define to 1 if on MINIX. */
 /* #undef _MINIX */
