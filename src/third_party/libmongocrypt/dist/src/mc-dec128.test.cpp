@@ -1,5 +1,9 @@
 #include <mc-dec128.h>
 
+#include <cstdio>
+
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
+
 #include <stdlib.h>
 
 #include <mlib/check.hpp>
@@ -70,3 +74,13 @@ main ()
    mc_dec128 nan = MC_DEC128_POSITIVE_NAN;
    CHECK (mc_dec128_is_nan (nan));
 }
+
+#else
+
+int
+main ()
+{
+   std::puts ("@@ctest-skip@@\n Decimal128 support is not enabled\n");
+}
+
+#endif

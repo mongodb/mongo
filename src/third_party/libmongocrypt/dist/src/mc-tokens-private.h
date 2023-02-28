@@ -29,16 +29,19 @@
  * Integers are represented as uint64_t in little-endian.
  *
  * CollectionsLevel1Token = HMAC(RootKey, 1)
+ * ServerTokenDerivationLevel1Token = HMAC(RootKey, 2)  <- new in v2
  * ServerDataEncryptionLevel1Token = HMAC(RootKey, 3)
  *
  * EDCToken = HMAC(CollectionsLevel1Token, 1)
  * ESCToken = HMAC(CollectionsLevel1Token, 2)
- * ECCToken = HMAC(CollectionsLevel1Token, 3)
+ * ECCToken = HMAC(CollectionsLevel1Token, 3)  <- deprecated in v2
  * ECOCToken = HMAC(CollectionsLevel1Token, 4)
  *
  * EDCDerivedFromDataToken = HMAC(EDCToken, v)
  * ESCDerivedFromDataToken = HMAC(ESCToken, v)
- * ECCDerivedFromDataToken = HMAC(ECCToken, v)
+ * ECCDerivedFromDataToken = HMAC(ECCToken, v)  <- deprecated in v2
+ * ServerDerivedFromDataToken = HMAC(ServerTokenDerivationLevel1Token, v) <- new
+ * in v2
  *
  * EDCDerivedFromDataTokenAndCounter = HMAC(EDCDerivedFromDataToken, u)
  * ESCDerivedFromDataTokenAndCounter = HMAC(ESCDerivedFromDataToken, u)
@@ -80,6 +83,8 @@
                                     mongocrypt_status_t * status)
 
 DECL_TOKEN_TYPE (mc_CollectionsLevel1Token, const _mongocrypt_buffer_t *);
+DECL_TOKEN_TYPE (mc_ServerTokenDerivationLevel1Token,
+                 const _mongocrypt_buffer_t *);
 DECL_TOKEN_TYPE (mc_ServerDataEncryptionLevel1Token,
                  const _mongocrypt_buffer_t *);
 DECL_TOKEN_TYPE (mc_EDCToken,
@@ -93,15 +98,16 @@ DECL_TOKEN_TYPE (mc_ECOCToken,
 DECL_TOKEN_TYPE (mc_EDCDerivedFromDataToken,
                  const mc_EDCToken_t *EDCToken,
                  const _mongocrypt_buffer_t *v);
-DECL_TOKEN_TYPE (mc_ECCDerivedFromDatatoken,
+DECL_TOKEN_TYPE (mc_ECCDerivedFromDataToken,
                  const mc_ECCToken_t *ECCToken,
                  const _mongocrypt_buffer_t *v);
 DECL_TOKEN_TYPE (mc_ESCDerivedFromDataToken,
                  const mc_ESCToken_t *ESCToken,
                  const _mongocrypt_buffer_t *v);
-DECL_TOKEN_TYPE (mc_ECCDerivedFromDataToken,
-                 const mc_ECCToken_t *ECCToken,
-                 const _mongocrypt_buffer_t *v);
+DECL_TOKEN_TYPE (
+   mc_ServerDerivedFromDataToken,
+   const mc_ServerTokenDerivationLevel1Token_t *ServerTokenDerivationToken,
+   const _mongocrypt_buffer_t *v);
 DECL_TOKEN_TYPE (mc_EDCDerivedFromDataTokenAndCounter,
                  const mc_EDCDerivedFromDataToken_t *EDCDerivedFromDataToken,
                  uint64_t u);

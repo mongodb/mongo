@@ -86,6 +86,10 @@
 DEF_TOKEN_TYPE (mc_CollectionsLevel1Token, const _mongocrypt_buffer_t *RootKey)
 IMPL_TOKEN_NEW_CONST (mc_CollectionsLevel1Token, RootKey, 1)
 
+DEF_TOKEN_TYPE (mc_ServerTokenDerivationLevel1Token,
+                const _mongocrypt_buffer_t *RootKey)
+IMPL_TOKEN_NEW_CONST (mc_ServerTokenDerivationLevel1Token, RootKey, 2)
+
 DEF_TOKEN_TYPE (mc_ServerDataEncryptionLevel1Token,
                 const _mongocrypt_buffer_t *RootKey)
 IMPL_TOKEN_NEW_CONST (mc_ServerDataEncryptionLevel1Token, RootKey, 3)
@@ -128,6 +132,15 @@ DEF_TOKEN_TYPE (mc_ECCDerivedFromDataToken,
                 const mc_ECCToken_t *ECCToken,
                 const _mongocrypt_buffer_t *v)
 IMPL_TOKEN_NEW (mc_ECCDerivedFromDataToken, mc_ECCToken_get (ECCToken), v)
+
+DEF_TOKEN_TYPE (
+   mc_ServerDerivedFromDataToken,
+   const mc_ServerTokenDerivationLevel1Token_t *ServerTokenDerivationToken,
+   const _mongocrypt_buffer_t *v)
+IMPL_TOKEN_NEW (
+   mc_ServerDerivedFromDataToken,
+   mc_ServerTokenDerivationLevel1Token_get (ServerTokenDerivationToken),
+   v)
 
 DEF_TOKEN_TYPE (mc_EDCDerivedFromDataTokenAndCounter,
                 const mc_EDCDerivedFromDataToken_t *EDCDerivedFromDataToken,

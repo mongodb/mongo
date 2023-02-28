@@ -103,6 +103,7 @@ typedef struct {
       .set = true, .value = val \
    }
 
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
 typedef struct {
    bool set;
    mc_dec128 value;
@@ -113,7 +114,7 @@ typedef struct {
    {                                    \
       .set = true, .value = __VA_ARGS__ \
    }
-
+#endif // MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
 
 #define OPT_NULLOPT \
    {                \

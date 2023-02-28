@@ -314,6 +314,7 @@ mc_getTypeInfoDouble (mc_getTypeInfoDouble_args_t args,
    return true;
 }
 
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
 /**
  * @brief There is no shipped algorithm for creating a full 128-bit integer from
  * a Decimal128, but it's easy enough to write one of our own.
@@ -437,8 +438,8 @@ mc_getTypeInfoDecimal128 (mc_getTypeInfoDecimal128_args_t args,
              mc_dec128_less (bits_range_dec, MC_DEC128 (128))) {
             // We need fewer than 128 bits to hold the result. But round up,
             // just to be sure:
-            int64_t r = mc_dec128_to_int64 (
-               mc_dec128_round_integral_positive (bits_range_dec));
+            int64_t r = mc_dec128_to_int64 (mc_dec128_round_integral_ex (
+               bits_range_dec, MC_DEC128_ROUND_UPWARD, NULL));
             BSON_ASSERT (r >= 0);
             BSON_ASSERT (r <= UINT8_MAX);
             // We've computed the proper 'bits_range'
@@ -473,7 +474,8 @@ mc_getTypeInfoDecimal128 (mc_getTypeInfoDecimal128_args_t args,
 
       // Round the number down
       // Returns 3141.0
-      mc_dec128 valTrunc = mc_dec128_round_integral_zero (valScaled);
+      mc_dec128 valTrunc = mc_dec128_round_integral_ex (
+         valScaled, MC_DEC128_ROUND_TOWARD_ZERO, NULL);
 
       // Shift the number down
       // Returns: 31.41
@@ -490,7 +492,8 @@ mc_getTypeInfoDecimal128 (mc_getTypeInfoDecimal128_args_t args,
       // decimal places than the precision (e.g. .001). Subtracting min may have
       // resulted in v_prime2 with a non-zero fraction. v_prime2 is expected to
       // have no fractional value when converting to int128.
-      v_prime2 = mc_dec128_round_integral_zero (v_prime2);
+      v_prime2 = mc_dec128_round_integral_ex (
+         v_prime2, MC_DEC128_ROUND_TOWARD_ZERO, NULL);
 
       BSON_ASSERT (mc_dec128_less (mc_dec128_log2 (v_prime2), MC_DEC128 (128)));
 
@@ -613,3 +616,5 @@ mc_getTypeInfoDecimal128 (mc_getTypeInfoDecimal128_args_t args,
 
    return true;
 }
+
+#endif // defined MONGOCRYPT_HAVE_DECIMAL128_SUPPORT

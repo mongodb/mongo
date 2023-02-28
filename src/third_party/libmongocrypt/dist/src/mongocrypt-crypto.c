@@ -308,6 +308,38 @@ _crypto_hmac_sha_512 (_mongocrypt_crypto_t *crypto,
    return _native_crypto_hmac_sha_512 (hmac_key, in, out, status);
 }
 
+bool
+_mongocrypt_hmac_sha_256 (_mongocrypt_crypto_t *crypto,
+                          const _mongocrypt_buffer_t *key,
+                          const _mongocrypt_buffer_t *in,
+                          _mongocrypt_buffer_t *out,
+                          mongocrypt_status_t *status)
+{
+   BSON_ASSERT_PARAM (crypto);
+   BSON_ASSERT_PARAM (key);
+   BSON_ASSERT_PARAM (in);
+   BSON_ASSERT_PARAM (out);
+
+   if (key->len != MONGOCRYPT_MAC_KEY_LEN) {
+      CLIENT_ERR ("invalid hmac_sha_256 key length. Got %" PRIu32
+                  ", expected: %" PRIu32,
+                  key->len,
+                  MONGOCRYPT_MAC_KEY_LEN);
+      return false;
+   }
+
+   if (crypto->hooks_enabled) {
+      mongocrypt_binary_t key_bin, out_bin, in_bin;
+      _mongocrypt_buffer_to_binary (key, &key_bin);
+      _mongocrypt_buffer_to_binary (out, &out_bin);
+      _mongocrypt_buffer_to_binary (in, &in_bin);
+
+      return crypto->hmac_sha_256 (
+         crypto->ctx, &key_bin, &in_bin, &out_bin, status);
+   }
+   return _native_crypto_hmac_sha_256 (key, in, out, status);
+}
+
 
 static bool
 _crypto_random (_mongocrypt_crypto_t *crypto,
@@ -352,114 +384,106 @@ _mongocrypt_memequal (const void *const b1, const void *const b2, size_t len)
    return ret;
 }
 
+typedef enum {
+   MODE_CBC,
+   MODE_CTR,
+} _mongocrypt_encryption_mode_t;
+
+typedef enum {
+   HMAC_NONE,
+   HMAC_SHA_512_256, // sha512 truncated to 256 bits
+   HMAC_SHA_256,
+} _mongocrypt_hmac_type_t;
+
+typedef enum {
+   KEY_FORMAT_FLE1,       // 32 octets MAC key, 32 DATA key, 32 IV key (ignored)
+   KEY_FORMAT_FLE2,       // 32 octets DATA key
+   KEY_FORMAT_FLE2AEAD,   // 32 octets DATA key, 32 MAC key, 32 IV key (ignored)
+   KEY_FORMAT_FLE2v2AEAD, // 32 octets DATA key, 32 MAC key, 32 IV key (ignored)
+} _mongocrypt_key_format_t;
+
+typedef enum {
+   MAC_FORMAT_FLE1,       // HMAC(AAD || IV || S || LEN(AAD) as uint64be)
+   MAC_FORMAT_FLE2,       // NONE
+   MAC_FORMAT_FLE2AEAD,   // HMAC(AAD || IV || S)
+   MAC_FORMAT_FLE2v2AEAD, // HMAC(AAD || IV || S)
+} _mongocrypt_mac_format_t;
+
 /* ----------------------------------------------------------------------------
  *
- * _mongocrypt_calculate_ciphertext_len --
+ * _mongocrypt_calculate_ciphertext_len
  *
- *    For a given plaintext length, return the length of the ciphertext.
- *    This includes IV and HMAC.
+ * Calculate the space needed for a ciphertext payload of a given size
+ * and using fixed iv/hmac lengths.
  *
- *    To compute that I'm following section 2.3 in [MCGREW]:
- *    L = 16 * ( floor(M / 16) + 2)
- *    This formula includes space for the IV, but not the sha512 HMAC.
- *    Add 32 for the sha512 HMAC.
+ * MODE_CBC: Assumes the ciphertext will be padded according to PKCS#7
+ * which rounds up to the next block size, adding up to a complete block
+ * for block aligned input payloads.
  *
- * Parameters:
- *    @plaintext_len then length of the plaintext.
- *    @status set on error.
+ * MODE_CTR: Assumes no additional padding since CTR is a streaming cipher.
  *
- * Returns:
- *    The calculated length of the ciphertext.
+ * Assumes all algorithms use identical IV length and blocksizes.
  *
  * ----------------------------------------------------------------------------
  */
-uint32_t
-_mongocrypt_calculate_ciphertext_len (uint32_t plaintext_len,
+static uint32_t
+_mongocrypt_calculate_ciphertext_len (uint32_t inlen,
+                                      _mongocrypt_encryption_mode_t mode,
+                                      _mongocrypt_hmac_type_t hmac,
                                       mongocrypt_status_t *status)
 {
-   if ((plaintext_len / 16u) >
-       ((UINT32_MAX - (uint32_t) MONGOCRYPT_HMAC_LEN) / 16u) - 2u) {
+   const uint32_t hmaclen = (hmac == HMAC_NONE) ? 0 : MONGOCRYPT_HMAC_LEN;
+   const uint32_t maxinlen =
+      UINT32_MAX - (MONGOCRYPT_IV_LEN + MONGOCRYPT_BLOCK_SIZE + hmaclen);
+   uint32_t fill;
+   if (inlen > maxinlen) {
       CLIENT_ERR ("plaintext too long");
       return 0;
    }
-   return 16 * ((plaintext_len / 16) + 2) + MONGOCRYPT_HMAC_LEN;
-}
 
-uint32_t
-_mongocrypt_fle2aead_calculate_ciphertext_len (uint32_t plaintext_len,
-                                               mongocrypt_status_t *status)
-{
-   if (plaintext_len > UINT32_MAX - MONGOCRYPT_IV_LEN - MONGOCRYPT_HMAC_LEN) {
-      CLIENT_ERR ("plaintext too long");
-      return 0;
+   if (mode == MODE_CBC) {
+      fill = MONGOCRYPT_BLOCK_SIZE - (inlen % MONGOCRYPT_BLOCK_SIZE);
+   } else {
+      BSON_ASSERT (mode == MODE_CTR);
+      fill = 0;
    }
-   /* FLE2 AEAD uses CTR mode. CTR mode does not pad. */
-   return MONGOCRYPT_IV_LEN + plaintext_len + MONGOCRYPT_HMAC_LEN;
-}
 
-uint32_t
-_mongocrypt_fle2_calculate_ciphertext_len (uint32_t plaintext_len,
-                                           mongocrypt_status_t *status)
-{
-   if (plaintext_len > UINT32_MAX - MONGOCRYPT_IV_LEN) {
-      CLIENT_ERR ("plaintext too long");
-      return 0;
-   }
-   /* FLE2 AEAD uses CTR mode. CTR mode does not pad. */
-   return MONGOCRYPT_IV_LEN + plaintext_len;
+   return MONGOCRYPT_IV_LEN + inlen + fill + hmaclen;
 }
-
 
 /* ----------------------------------------------------------------------------
  *
- * _mongocrypt_calculate_plaintext_len --
+ * _mongocrypt_calculate_plaintext_len
  *
- *    For a given ciphertext length, return the length of the plaintext.
- *    This excludes the IV and HMAC, but includes the padding.
+ * Calculate the space needed for a plaintext payload of a given size
+ * and using fixed iv/hmac lengths.
  *
- * Parameters:
- *    @ciphertext_len then length of the ciphertext.
- *    @status set on error.
+ * MODE_CBC: In practice, plaintext will be between 1 and {blocksize} bytes
+ * shorter
+ * than the input ciphertext, but it's easier and safer to assume the
+ * full ciphertext length and waste a few bytes.
  *
- * Returns:
- *    The calculated length of the plaintext.
+ * MODE_CTR: Assumes no additional padding since CTR is a streaming cipher.
+ *
+ * Assumes all algorithms use identical IV length and blocksizes.
  *
  * ----------------------------------------------------------------------------
  */
-uint32_t
-_mongocrypt_calculate_plaintext_len (uint32_t ciphertext_len,
+static uint32_t
+_mongocrypt_calculate_plaintext_len (uint32_t inlen,
+                                     _mongocrypt_encryption_mode_t mode,
+                                     _mongocrypt_hmac_type_t hmac,
                                      mongocrypt_status_t *status)
 {
-   if (ciphertext_len <
-       MONGOCRYPT_HMAC_LEN + MONGOCRYPT_IV_LEN + MONGOCRYPT_BLOCK_SIZE) {
-      CLIENT_ERR ("ciphertext too short");
+   const uint32_t hmaclen = (hmac == HMAC_NONE) ? 0 : MONGOCRYPT_HMAC_LEN;
+   const uint32_t mincipher = (mode == MODE_CTR) ? 0 : MONGOCRYPT_BLOCK_SIZE;
+   if (inlen < (MONGOCRYPT_IV_LEN + mincipher + hmaclen)) {
+      CLIENT_ERR ("input ciphertext too small. Must be more than %" PRIu32
+                  " bytes",
+                  MONGOCRYPT_IV_LEN + mincipher + hmaclen);
       return 0;
    }
-   return ciphertext_len - (MONGOCRYPT_IV_LEN + MONGOCRYPT_HMAC_LEN);
-}
-
-uint32_t
-_mongocrypt_fle2aead_calculate_plaintext_len (uint32_t ciphertext_len,
-                                              mongocrypt_status_t *status)
-{
-   /* FLE2 AEAD uses CTR mode. CTR mode does not pad. */
-   if (ciphertext_len < MONGOCRYPT_IV_LEN + MONGOCRYPT_HMAC_LEN) {
-      CLIENT_ERR ("ciphertext too short");
-      return 0;
-   }
-   return ciphertext_len - MONGOCRYPT_IV_LEN - MONGOCRYPT_HMAC_LEN;
-}
-
-uint32_t
-_mongocrypt_fle2_calculate_plaintext_len (uint32_t ciphertext_len,
-                                          mongocrypt_status_t *status)
-{
-   /* FLE2 AEAD uses CTR mode. CTR mode does not pad. */
-   if (ciphertext_len < MONGOCRYPT_IV_LEN) {
-      CLIENT_ERR ("ciphertext too short");
-      return 0;
-   }
-   return ciphertext_len - MONGOCRYPT_IV_LEN;
+   return inlen - (MONGOCRYPT_IV_LEN + hmaclen);
 }
 
 /* ----------------------------------------------------------------------------
@@ -487,12 +511,13 @@ _mongocrypt_fle2_calculate_plaintext_len (uint32_t ciphertext_len,
  * Postconditions:
  *    1. bytes_written is set to the length of the written ciphertext. This
  *    is the same as
- *    _mongocrypt_calculate_ciphertext_len (plaintext->len, status).
+ *    _mongocrypt_calculate_ciphertext_len (plaintext->len, mode, hmac, status).
  *
  * ----------------------------------------------------------------------------
  */
 static bool
 _encrypt_step (_mongocrypt_crypto_t *crypto,
+               _mongocrypt_encryption_mode_t mode,
                const _mongocrypt_buffer_t *iv,
                const _mongocrypt_buffer_t *enc_key,
                const _mongocrypt_buffer_t *plaintext,
@@ -500,20 +525,11 @@ _encrypt_step (_mongocrypt_crypto_t *crypto,
                uint32_t *bytes_written,
                mongocrypt_status_t *status)
 {
-   uint32_t unaligned;
-   uint32_t padding_byte;
-   _mongocrypt_buffer_t intermediates[2];
-   _mongocrypt_buffer_t to_encrypt;
-   uint8_t final_block_storage[MONGOCRYPT_BLOCK_SIZE];
-   bool ret = false;
-
    BSON_ASSERT_PARAM (crypto);
    BSON_ASSERT_PARAM (iv);
    BSON_ASSERT_PARAM (enc_key);
    BSON_ASSERT_PARAM (plaintext);
    BSON_ASSERT_PARAM (ciphertext);
-
-   _mongocrypt_buffer_init (&to_encrypt);
 
    BSON_ASSERT_PARAM (bytes_written);
    *bytes_written = 0;
@@ -522,18 +538,38 @@ _encrypt_step (_mongocrypt_crypto_t *crypto,
       CLIENT_ERR ("IV should have length %d, but has length %d",
                   MONGOCRYPT_IV_LEN,
                   iv->len);
-      goto done;
+      return false;
    }
 
    if (MONGOCRYPT_ENC_KEY_LEN != enc_key->len) {
       CLIENT_ERR ("Encryption key should have length %d, but has length %d",
                   MONGOCRYPT_ENC_KEY_LEN,
                   enc_key->len);
-      goto done;
+      return false;
    }
 
+   if (mode == MODE_CTR) {
+      // Streaming cipher, no padding required.
+      return _crypto_aes_256_ctr_encrypt (
+         crypto,
+         (aes_256_args_t){.key = enc_key,
+                          .iv = iv,
+                          .in = plaintext,
+                          .out = ciphertext,
+                          .bytes_written = bytes_written,
+                          .status = status});
+   }
+
+   BSON_ASSERT (mode == MODE_CBC);
+
    /* calculate how many extra bytes there are after a block boundary */
-   unaligned = plaintext->len % MONGOCRYPT_BLOCK_SIZE;
+   const uint32_t unaligned = plaintext->len % MONGOCRYPT_BLOCK_SIZE;
+   uint32_t padding_byte = MONGOCRYPT_BLOCK_SIZE - unaligned;
+   _mongocrypt_buffer_t intermediates[2], to_encrypt;
+   uint8_t final_block_storage[MONGOCRYPT_BLOCK_SIZE];
+   bool ret;
+
+   BSON_ASSERT (MONGOCRYPT_BLOCK_SIZE >= unaligned);
 
    /* Some crypto providers disallow variable length inputs, and require
     * the input to be a multiple of the block size. So add everything up
@@ -556,60 +592,51 @@ _encrypt_step (_mongocrypt_crypto_t *crypto,
       memcpy (intermediates[1].data,
               plaintext->data + (plaintext->len - unaligned),
               unaligned);
-      /* Fill the rest with the padding byte. */
-      BSON_ASSERT (MONGOCRYPT_BLOCK_SIZE >= unaligned);
-      padding_byte = MONGOCRYPT_BLOCK_SIZE - unaligned;
-      /* it is certain that padding_byte is in range for a cast to int */
-      memset (
-         intermediates[1].data + unaligned, (int) padding_byte, padding_byte);
-   } else {
-      /* Fill the rest with the padding byte. */
-      padding_byte = MONGOCRYPT_BLOCK_SIZE;
-      memset (intermediates[1].data, (int) padding_byte, padding_byte);
    }
+   /* Fill out block remained or whole block with padding_byte */
+   memset (intermediates[1].data + unaligned, (int) padding_byte, padding_byte);
 
+   _mongocrypt_buffer_init (&to_encrypt);
    if (!_mongocrypt_buffer_concat (&to_encrypt, intermediates, 2)) {
       CLIENT_ERR ("failed to allocate buffer");
-      goto done;
+      _mongocrypt_buffer_cleanup (&to_encrypt);
+      return false;
    }
 
-   if (!_crypto_aes_256_cbc_encrypt (
-          crypto,
-          (aes_256_args_t){.key = enc_key,
-                           .iv = iv,
-                           .in = &to_encrypt,
-                           .out = ciphertext,
-                           .bytes_written = bytes_written,
-                           .status = status})) {
-      goto done;
+   ret = _crypto_aes_256_cbc_encrypt (
+      crypto,
+      (aes_256_args_t){.key = enc_key,
+                       .iv = iv,
+                       .in = &to_encrypt,
+                       .out = ciphertext,
+                       .bytes_written = bytes_written,
+                       .status = status});
+   _mongocrypt_buffer_cleanup (&to_encrypt);
+   if (!ret) {
+      return false;
    }
-
 
    if (*bytes_written % MONGOCRYPT_BLOCK_SIZE != 0) {
       CLIENT_ERR ("encryption failure, wrote %d bytes, not a multiple of %d",
                   *bytes_written,
                   MONGOCRYPT_BLOCK_SIZE);
-      goto done;
+      return false;
    }
 
-   ret = true;
-done:
-   _mongocrypt_buffer_cleanup (&to_encrypt);
-   return ret;
+   return true;
 }
-
 
 /* ----------------------------------------------------------------------------
  *
- * _hmac_sha512 --
+ * _hmac_step --
  *
- *    Compute the SHA512 HMAC with a secret key.
+ *    Compute the selected HMAC with a secret key.
  *
  * Parameters:
- *    @mac_key a 32 byte key.
- *    @associated_data associated data to add into the HMAC. This may be
+ *    @Km a 32 byte key.
+ *    @AAD associated data to add into the HMAC. This may be
  *    an empty buffer.
- *    @ciphertext the ciphertext to add into the HMAC.
+ *    @iv_and_ciphertext the IV and S components to add into the HMAC.
  *    @out a location for the resulting HMAC tag.
  *    @status set on error.
  *
@@ -626,29 +653,28 @@ done:
  */
 static bool
 _hmac_step (_mongocrypt_crypto_t *crypto,
-            const _mongocrypt_buffer_t *mac_key,
-            const _mongocrypt_buffer_t *associated_data,
-            const _mongocrypt_buffer_t *ciphertext,
+            _mongocrypt_mac_format_t mac_format,
+            _mongocrypt_hmac_type_t hmac,
+            const _mongocrypt_buffer_t *Km,
+            const _mongocrypt_buffer_t *AAD,
+            const _mongocrypt_buffer_t *iv_and_ciphertext,
             _mongocrypt_buffer_t *out,
             mongocrypt_status_t *status)
 {
-   _mongocrypt_buffer_t intermediates[3];
-   _mongocrypt_buffer_t to_hmac;
-   uint64_t associated_data_len_be;
-   uint8_t tag_storage[64];
-   _mongocrypt_buffer_t tag;
+   _mongocrypt_buffer_t to_hmac = {0};
    bool ret = false;
 
+   BSON_ASSERT (hmac != HMAC_NONE);
    BSON_ASSERT_PARAM (crypto);
-   BSON_ASSERT_PARAM (mac_key);
-   BSON_ASSERT_PARAM (associated_data);
-   BSON_ASSERT_PARAM (ciphertext);
+   BSON_ASSERT_PARAM (Km);
+   // AAD may be NULL
+   BSON_ASSERT_PARAM (iv_and_ciphertext);
    BSON_ASSERT_PARAM (out);
 
    _mongocrypt_buffer_init (&to_hmac);
 
-   if (MONGOCRYPT_MAC_KEY_LEN != mac_key->len) {
-      CLIENT_ERR ("HMAC key wrong length: %d", mac_key->len);
+   if (MONGOCRYPT_MAC_KEY_LEN != Km->len) {
+      CLIENT_ERR ("HMAC key wrong length: %d", Km->len);
       goto done;
    }
 
@@ -657,47 +683,69 @@ _hmac_step (_mongocrypt_crypto_t *crypto,
       goto done;
    }
 
-   /* [MCGREW]:
-    * """
-    * 4.  The octet string AL is equal to the number of bits in A expressed as a
-    * 64-bit unsigned integer in network byte order.
-    * 5.  A message authentication tag T is computed by applying HMAC [RFC2104]
-    * to the following data, in order:
-    *      the associated data A,
-    *      the ciphertext S computed in the previous step, and
-    *      the octet string AL defined above.
-    * """
-    */
+   /* Construct the input to the HMAC */
+   uint32_t num_intermediates = 0;
+   _mongocrypt_buffer_t intermediates[3];
+   if (AAD &&
+       !_mongocrypt_buffer_from_subrange (
+          &intermediates[num_intermediates++], AAD, 0, AAD->len)) {
+      CLIENT_ERR ("Failed creating MAC subrange on AD");
+      goto done;
+   }
+   if (!_mongocrypt_buffer_from_subrange (&intermediates[num_intermediates++],
+                                          iv_and_ciphertext,
+                                          0,
+                                          iv_and_ciphertext->len)) {
+      CLIENT_ERR ("Failed creating MAC subrange on IV and S");
+      goto done;
+   }
 
-   /* Add associated data. */
-   _mongocrypt_buffer_init (&intermediates[0]);
-   _mongocrypt_buffer_init (&intermediates[1]);
-   _mongocrypt_buffer_init (&intermediates[2]);
-   intermediates[0].data = associated_data->data;
-   intermediates[0].len = associated_data->len;
-   /* Add ciphertext. */
-   intermediates[1].data = ciphertext->data;
-   intermediates[1].len = ciphertext->len;
-   /* Add associated data length in bits. */
-   /* multiplying a uint32_t by 8 won't bring it anywhere close to UINT64_MAX */
-   associated_data_len_be = 8 * (uint64_t) associated_data->len;
-   associated_data_len_be = BSON_UINT64_TO_BE (associated_data_len_be);
-   intermediates[2].data = (uint8_t *) &associated_data_len_be;
-   intermediates[2].len = sizeof (uint64_t);
-   tag.data = tag_storage;
-   tag.len = sizeof (tag_storage);
+   // {AL} must be stored in the function's lexical scope so that
+   // {intermediates}'s reference to it survives until the
+   // _mongocrypt_buffer_concat operation later.
+   uint64_t AL;
+   if (mac_format == MAC_FORMAT_FLE1) {
+      /* T := HMAC(AAD || IV || S || AL)
+       * AL is equal to the number of bits in AAD expressed
+       * as a 64bit unsigned big-endian integer.
+       * Multiplying a uint32_t by 8 won't bring it anywhere close to
+       * UINT64_MAX.
+       */
+      AL = AAD ? BSON_UINT64_TO_BE (8 * (uint64_t) AAD->len) : 0;
+      _mongocrypt_buffer_init (&intermediates[num_intermediates]);
+      intermediates[num_intermediates].data = (uint8_t *) &AL;
+      intermediates[num_intermediates++].len = sizeof (uint64_t);
 
+   } else {
+      /* T := HMAC(AAD || IV || S) */
+      BSON_ASSERT ((mac_format == MAC_FORMAT_FLE2AEAD) ||
+                   (mac_format == MAC_FORMAT_FLE2v2AEAD));
+   }
 
-   if (!_mongocrypt_buffer_concat (&to_hmac, intermediates, 3)) {
+   if (!_mongocrypt_buffer_concat (
+          &to_hmac, intermediates, num_intermediates)) {
       CLIENT_ERR ("failed to allocate buffer");
       goto done;
    }
-   if (!_crypto_hmac_sha_512 (crypto, mac_key, &to_hmac, &tag, status)) {
-      goto done;
+
+   if (hmac == HMAC_SHA_512_256) {
+      uint8_t storage[64];
+      _mongocrypt_buffer_t tag = {.data = storage, .len = sizeof (storage)};
+
+      if (!_crypto_hmac_sha_512 (crypto, Km, &to_hmac, &tag, status)) {
+         goto done;
+      }
+
+      // Truncate sha512 to first 256 bits.
+      memcpy (out->data, tag.data, MONGOCRYPT_HMAC_LEN);
+
+   } else {
+      BSON_ASSERT (hmac == HMAC_SHA_256);
+      if (!_mongocrypt_hmac_sha_256 (crypto, Km, &to_hmac, out, status)) {
+         goto done;
+      }
    }
 
-   /* [MCGREW 2.7] "The HMAC-SHA-512 value is truncated to T_LEN=32 octets" */
-   memcpy (out->data, tag.data, MONGOCRYPT_HMAC_LEN);
    ret = true;
 done:
    _mongocrypt_buffer_cleanup (&to_hmac);
@@ -713,7 +761,7 @@ done:
  * Parameters:
  *    @iv a 16 byte IV.
  *    @associated_data associated data for the HMAC. May be NULL.
- *    @key a 96 byte key.
+ *    @key is the encryption key. The size depends on @key_format.
  *    @plaintext the plaintext to encrypt.
  *    @ciphertext a location for the resulting ciphertext and HMAC tag.
  *    @bytes_written a location for the resulting bytes written.
@@ -729,12 +777,16 @@ done:
  * Postconditions:
  *    1. bytes_written is set to the length of the written ciphertext. This
  *    is the same as
- *    _mongocrypt_calculate_ciphertext_len (plaintext->len, status).
+ *    _mongocrypt_calculate_ciphertext_len (plaintext->len, mode, hmac, status).
  *
  * ----------------------------------------------------------------------------
  */
-bool
+static bool
 _mongocrypt_do_encryption (_mongocrypt_crypto_t *crypto,
+                           _mongocrypt_key_format_t key_format,
+                           _mongocrypt_mac_format_t mac_format,
+                           _mongocrypt_encryption_mode_t mode,
+                           _mongocrypt_hmac_type_t hmac,
                            const _mongocrypt_buffer_t *iv,
                            const _mongocrypt_buffer_t *associated_data,
                            const _mongocrypt_buffer_t *key,
@@ -743,10 +795,7 @@ _mongocrypt_do_encryption (_mongocrypt_crypto_t *crypto,
                            uint32_t *bytes_written,
                            mongocrypt_status_t *status)
 {
-   _mongocrypt_buffer_t mac_key = {0}, enc_key = {0}, intermediate = {0},
-                        intermediate_hmac = {0}, empty_buffer = {0};
-   uint32_t intermediate_bytes_written = 0;
-
+   _mongocrypt_buffer_t Ke = {0}; // Ke == Key for Encryption
    BSON_ASSERT_PARAM (crypto);
    BSON_ASSERT_PARAM (iv);
    /* associated_data is checked at the point it is used, so it can be NULL */
@@ -754,18 +803,21 @@ _mongocrypt_do_encryption (_mongocrypt_crypto_t *crypto,
    BSON_ASSERT_PARAM (plaintext);
    BSON_ASSERT_PARAM (ciphertext);
 
-   memset (ciphertext->data, 0, ciphertext->len);
-
-   if (ciphertext->len !=
-       _mongocrypt_calculate_ciphertext_len (plaintext->len, status)) {
-      CLIENT_ERR (
-         "output ciphertext should have been allocated with %d bytes",
-         _mongocrypt_calculate_ciphertext_len (plaintext->len, status));
+   if (plaintext->len <= 0) {
+      CLIENT_ERR ("input plaintext too small. Must be more than zero bytes.");
       return false;
    }
 
-   BSON_ASSERT_PARAM (bytes_written);
-   *bytes_written = 0;
+   const uint32_t expect_ciphertext_len =
+      _mongocrypt_calculate_ciphertext_len (plaintext->len, mode, hmac, status);
+   if (mongocrypt_status_type (status) != MONGOCRYPT_STATUS_OK) {
+      return false;
+   }
+   if (expect_ciphertext_len != ciphertext->len) {
+      CLIENT_ERR ("output ciphertext should have been allocated with %d bytes",
+                  expect_ciphertext_len);
+      return false;
+   }
 
    if (MONGOCRYPT_IV_LEN != iv->len) {
       CLIENT_ERR ("IV should have length %d, but has length %d",
@@ -773,73 +825,107 @@ _mongocrypt_do_encryption (_mongocrypt_crypto_t *crypto,
                   iv->len);
       return false;
    }
-   if (MONGOCRYPT_KEY_LEN != key->len) {
+
+   const uint32_t expected_key_len = (key_format == KEY_FORMAT_FLE2)
+                                        ? MONGOCRYPT_ENC_KEY_LEN
+                                        : MONGOCRYPT_KEY_LEN;
+   if (key->len != expected_key_len) {
       CLIENT_ERR ("key should have length %d, but has length %d",
-                  MONGOCRYPT_KEY_LEN,
+                  expected_key_len,
                   key->len);
       return false;
    }
 
-   intermediate.len = ciphertext->len;
-   intermediate.data = ciphertext->data;
+   // Copy IV into the output, and clear remainder.
+   memmove (ciphertext->data, iv->data, MONGOCRYPT_IV_LEN);
+   memset (ciphertext->data + MONGOCRYPT_IV_LEN,
+           0,
+           ciphertext->len - MONGOCRYPT_IV_LEN);
 
-   /* [MCGREW]: Step 1. "MAC_KEY consists of the initial MAC_KEY_LEN octets of
-    * K, in order. ENC_KEY consists of the final ENC_KEY_LEN octets of K, in
-    * order." */
-   mac_key.data = (uint8_t *) key->data;
-   mac_key.len = MONGOCRYPT_MAC_KEY_LEN;
-   enc_key.data = (uint8_t *) key->data + MONGOCRYPT_MAC_KEY_LEN;
-   enc_key.len = MONGOCRYPT_ENC_KEY_LEN;
+   // S is the encryption payload without IV or HMAC
+   _mongocrypt_buffer_t S;
+   if (!_mongocrypt_buffer_from_subrange (&S,
+                                          ciphertext,
+                                          MONGOCRYPT_IV_LEN,
+                                          ciphertext->len -
+                                             MONGOCRYPT_IV_LEN)) {
+      CLIENT_ERR ("unable to create S subrange from C");
+      return false;
+   }
+   if (hmac != HMAC_NONE) {
+      S.len -= MONGOCRYPT_HMAC_LEN;
+   }
 
-   /* Prepend the IV. */
-   memcpy (intermediate.data, iv->data, iv->len);
-   intermediate.data += iv->len;
-   BSON_ASSERT (intermediate.len >= iv->len);
-   intermediate.len -= iv->len;
-   BSON_ASSERT (*bytes_written <= UINT32_MAX - iv->len);
-   *bytes_written += iv->len;
+   // Ke is the key used for payload encryption
+   const uint32_t Ke_offset =
+      (key_format == KEY_FORMAT_FLE1) ? MONGOCRYPT_MAC_KEY_LEN : 0;
+   if (!_mongocrypt_buffer_from_subrange (
+          &Ke, key, Ke_offset, MONGOCRYPT_ENC_KEY_LEN)) {
+      CLIENT_ERR ("unable to create Ke subrange from key");
+      return false;
+   }
 
-   /* [MCGREW]: Steps 2 & 3. */
-   if (!_encrypt_step (crypto,
-                       iv,
-                       &enc_key,
-                       plaintext,
-                       &intermediate,
-                       &intermediate_bytes_written,
+   uint32_t S_bytes_written = 0;
+   if (!_encrypt_step (
+          crypto, mode, iv, &Ke, plaintext, &S, &S_bytes_written, status)) {
+      return false;
+   }
+   BSON_ASSERT_PARAM (bytes_written);
+   BSON_ASSERT ((UINT32_MAX - S_bytes_written) > MONGOCRYPT_IV_LEN);
+   *bytes_written = MONGOCRYPT_IV_LEN + S_bytes_written;
+
+   if (hmac != HMAC_NONE) {
+      // Km == Key for MAC
+      const uint32_t Km_offset =
+         (key_format == KEY_FORMAT_FLE1) ? 0 : MONGOCRYPT_ENC_KEY_LEN;
+
+      // Km is the HMAC Key.
+      _mongocrypt_buffer_t Km;
+      if (!_mongocrypt_buffer_from_subrange (
+             &Km, key, Km_offset, MONGOCRYPT_MAC_KEY_LEN)) {
+         CLIENT_ERR ("unable to create Km subrange from key");
+         return false;
+      }
+
+      /* Primary payload to MAC. */
+      _mongocrypt_buffer_t iv_and_ciphertext;
+      if (!_mongocrypt_buffer_from_subrange (
+             &iv_and_ciphertext, ciphertext, 0, *bytes_written)) {
+         CLIENT_ERR ("unable to create IV || S subrange from C");
+         return false;
+      }
+
+      // T == HMAC Tag
+      _mongocrypt_buffer_t T;
+      if (!_mongocrypt_buffer_from_subrange (
+             &T, ciphertext, *bytes_written, MONGOCRYPT_HMAC_LEN)) {
+         CLIENT_ERR ("unable to create T subrange from C");
+         return false;
+      }
+
+      if (!_hmac_step (crypto,
+                       mac_format,
+                       hmac,
+                       &Km,
+                       associated_data,
+                       &iv_and_ciphertext,
+                       &T,
                        status)) {
-      return false;
+         return false;
+      }
+
+      *bytes_written += MONGOCRYPT_HMAC_LEN;
    }
 
-   BSON_ASSERT (*bytes_written <= UINT32_MAX - intermediate_bytes_written);
-   *bytes_written += intermediate_bytes_written;
-
-   /* Append the HMAC tag. */
-   intermediate_hmac.data = ciphertext->data + *bytes_written;
-   intermediate_hmac.len = MONGOCRYPT_HMAC_LEN;
-
-   intermediate.data = ciphertext->data;
-   intermediate.len = *bytes_written;
-
-   /* [MCGREW]: Steps 4 & 5, compute the HMAC. */
-   if (!_hmac_step (crypto,
-                    &mac_key,
-                    associated_data ? associated_data : &empty_buffer,
-                    &intermediate,
-                    &intermediate_hmac,
-                    status)) {
-      return false;
-   }
-
-   *bytes_written += MONGOCRYPT_HMAC_LEN;
    return true;
 }
 
 
 /* ----------------------------------------------------------------------------
  *
- * _aes256_cbc_decrypt --
+ * _decrypt_step --
  *
- *    Decrypts using AES256 CBC using a secret key and a known IV.
+ *    Decrypts using AES256 using a secret key and a known IV.
  *
  * Parameters:
  *    @enc_key a 32 byte key.
@@ -859,12 +945,13 @@ _mongocrypt_do_encryption (_mongocrypt_crypto_t *crypto,
  * Postconditions:
  *    1. bytes_written is set to the length of the written plaintext, excluding
  *    padding. This may be less than
- *    _mongocrypt_calculate_plaintext_len (ciphertext->len, status).
+ *    _mongocrypt_calculate_plaintext_len (ciphertext->len, home, hmac, status).
  *
  * ----------------------------------------------------------------------------
  */
 static bool
 _decrypt_step (_mongocrypt_crypto_t *crypto,
+               _mongocrypt_encryption_mode_t mode,
                const _mongocrypt_buffer_t *iv,
                const _mongocrypt_buffer_t *enc_key,
                const _mongocrypt_buffer_t *ciphertext,
@@ -872,8 +959,6 @@ _decrypt_step (_mongocrypt_crypto_t *crypto,
                uint32_t *bytes_written,
                mongocrypt_status_t *status)
 {
-   uint8_t padding_byte;
-
    BSON_ASSERT_PARAM (crypto);
    BSON_ASSERT_PARAM (iv);
    BSON_ASSERT_PARAM (enc_key);
@@ -897,29 +982,47 @@ _decrypt_step (_mongocrypt_crypto_t *crypto,
    }
 
 
-   if (ciphertext->len % MONGOCRYPT_BLOCK_SIZE > 0) {
-      CLIENT_ERR ("error, ciphertext length is not a multiple of block size");
-      return false;
+   if (mode == MODE_CBC) {
+      if (ciphertext->len % MONGOCRYPT_BLOCK_SIZE > 0) {
+         CLIENT_ERR (
+            "error, ciphertext length is not a multiple of block size");
+         return false;
+      }
+
+      if (!_crypto_aes_256_cbc_decrypt (
+             crypto,
+             (aes_256_args_t){.iv = iv,
+                              .key = enc_key,
+                              .in = ciphertext,
+                              .out = plaintext,
+                              .bytes_written = bytes_written,
+                              .status = status})) {
+         return false;
+      }
+
+      BSON_ASSERT (*bytes_written > 0);
+      uint8_t padding_byte = plaintext->data[*bytes_written - 1];
+      if (padding_byte > 16) {
+         CLIENT_ERR ("error, ciphertext malformed padding");
+         return false;
+      }
+      *bytes_written -= padding_byte;
+
+   } else {
+      BSON_ASSERT (mode == MODE_CTR);
+      if (!_crypto_aes_256_ctr_decrypt (
+             crypto,
+             (aes_256_args_t){.iv = iv,
+                              .key = enc_key,
+                              .in = ciphertext,
+                              .out = plaintext,
+                              .bytes_written = bytes_written,
+                              .status = status})) {
+         return false;
+      }
+      BSON_ASSERT (*bytes_written == plaintext->len);
    }
 
-   if (!_crypto_aes_256_cbc_decrypt (
-          crypto,
-          (aes_256_args_t){.iv = iv,
-                           .key = enc_key,
-                           .in = ciphertext,
-                           .out = plaintext,
-                           .bytes_written = bytes_written,
-                           .status = status})) {
-      return false;
-   }
-
-   BSON_ASSERT (*bytes_written > 0);
-   padding_byte = plaintext->data[*bytes_written - 1];
-   if (padding_byte > 16) {
-      CLIENT_ERR ("error, ciphertext malformed padding");
-      return false;
-   }
-   *bytes_written -= padding_byte;
    return true;
 }
 
@@ -948,12 +1051,16 @@ _decrypt_step (_mongocrypt_crypto_t *crypto,
  *  Postconditions:
  *    1. bytes_written is set to the length of the written plaintext, excluding
  *    padding. This may be less than
- *    _mongocrypt_calculate_plaintext_len (ciphertext->len, status).
+ *    _mongocrypt_calculate_plaintext_len (ciphertext->len, mode, hmac, status).
  *
  * ----------------------------------------------------------------------------
  */
-bool
+static bool
 _mongocrypt_do_decryption (_mongocrypt_crypto_t *crypto,
+                           _mongocrypt_key_format_t key_format,
+                           _mongocrypt_mac_format_t mac_format,
+                           _mongocrypt_encryption_mode_t mode,
+                           _mongocrypt_hmac_type_t hmac,
                            const _mongocrypt_buffer_t *associated_data,
                            const _mongocrypt_buffer_t *key,
                            const _mongocrypt_buffer_t *ciphertext,
@@ -961,11 +1068,6 @@ _mongocrypt_do_decryption (_mongocrypt_crypto_t *crypto,
                            uint32_t *bytes_written,
                            mongocrypt_status_t *status)
 {
-   bool ret = false;
-   _mongocrypt_buffer_t mac_key = {0}, enc_key = {0}, intermediate = {0},
-                        hmac_tag = {0}, iv = {0}, empty_buffer = {0};
-   uint8_t hmac_tag_storage[MONGOCRYPT_HMAC_LEN];
-
    BSON_ASSERT_PARAM (crypto);
    /* associated_data is checked at the point it is used, so it can be NULL */
    BSON_ASSERT_PARAM (key);
@@ -973,83 +1075,218 @@ _mongocrypt_do_decryption (_mongocrypt_crypto_t *crypto,
    BSON_ASSERT_PARAM (plaintext);
    BSON_ASSERT_PARAM (bytes_written);
 
-   if (plaintext->len !=
-       _mongocrypt_calculate_plaintext_len (ciphertext->len, status)) {
+   const uint32_t expect_plaintext_len =
+      _mongocrypt_calculate_plaintext_len (ciphertext->len, mode, hmac, status);
+   if (mongocrypt_status_type (status) != MONGOCRYPT_STATUS_OK) {
+      return false;
+   }
+   if (plaintext->len != expect_plaintext_len) {
       CLIENT_ERR ("output plaintext should have been allocated with %d bytes, "
                   "but has: %d",
-                  _mongocrypt_calculate_plaintext_len (ciphertext->len, status),
+                  expect_plaintext_len,
                   plaintext->len);
       return false;
    }
+   if (expect_plaintext_len == 0) {
+      // While a ciphertext string describing a zero length plaintext is
+      // technically valid,
+      // it's not actually particularly useful in the context of FLE where such
+      // values aren't encoded.
+      CLIENT_ERR ("input ciphertext too small. Must be more than %" PRIu32
+                  " bytes",
+                  _mongocrypt_calculate_ciphertext_len (0, mode, hmac, NULL));
+      return false;
+   }
 
-   if (MONGOCRYPT_KEY_LEN != key->len) {
+   const uint32_t expected_key_len = (key_format == KEY_FORMAT_FLE2)
+                                        ? MONGOCRYPT_ENC_KEY_LEN
+                                        : MONGOCRYPT_KEY_LEN;
+   if (expected_key_len != key->len) {
       CLIENT_ERR ("key should have length %d, but has length %d",
-                  MONGOCRYPT_KEY_LEN,
+                  expected_key_len,
                   key->len);
       return false;
    }
 
-   if (ciphertext->len <
-       MONGOCRYPT_HMAC_LEN + MONGOCRYPT_IV_LEN + MONGOCRYPT_BLOCK_SIZE) {
-      CLIENT_ERR ("corrupt ciphertext - must be > %d bytes",
-                  MONGOCRYPT_HMAC_LEN + MONGOCRYPT_IV_LEN +
-                     MONGOCRYPT_BLOCK_SIZE);
-      goto done;
+   const uint32_t min_cipherlen =
+      _mongocrypt_calculate_ciphertext_len (0, mode, hmac, NULL);
+   if (ciphertext->len < min_cipherlen) {
+      CLIENT_ERR ("corrupt ciphertext - must be >= %d bytes", min_cipherlen);
+      return false;
    }
 
-   mac_key.data = (uint8_t *) key->data;
-   mac_key.len = MONGOCRYPT_MAC_KEY_LEN;
-   enc_key.data = (uint8_t *) key->data + MONGOCRYPT_MAC_KEY_LEN;
-   enc_key.len = MONGOCRYPT_ENC_KEY_LEN;
-
-   iv.data = ciphertext->data;
-   iv.len = MONGOCRYPT_IV_LEN;
-
-   intermediate.data = (uint8_t *) ciphertext->data;
-   intermediate.len = ciphertext->len - MONGOCRYPT_HMAC_LEN;
-
-   hmac_tag.data = hmac_tag_storage;
-   hmac_tag.len = MONGOCRYPT_HMAC_LEN;
-
-   /* [MCGREW 2.2]: Step 3: HMAC check. */
-   if (!_hmac_step (crypto,
-                    &mac_key,
-                    associated_data ? associated_data : &empty_buffer,
-                    &intermediate,
-                    &hmac_tag,
-                    status)) {
-      goto done;
+   _mongocrypt_buffer_t Ke;
+   const uint32_t Ke_offset =
+      (key_format == KEY_FORMAT_FLE1) ? MONGOCRYPT_MAC_KEY_LEN : 0;
+   if (!_mongocrypt_buffer_from_subrange (
+          &Ke, key, Ke_offset, MONGOCRYPT_ENC_KEY_LEN)) {
+      CLIENT_ERR ("unable to create Ke subrange from key");
+      return false;
    }
 
-   /* [MCGREW] "using a comparison routine that takes constant time". */
-   if (0 != _mongocrypt_memequal (hmac_tag.data,
-                                  ciphertext->data +
-                                     (ciphertext->len - MONGOCRYPT_HMAC_LEN),
-                                  MONGOCRYPT_HMAC_LEN)) {
-      CLIENT_ERR ("HMAC validation failure");
-      goto done;
+   _mongocrypt_buffer_t IV;
+   if (!_mongocrypt_buffer_from_subrange (
+          &IV, ciphertext, 0, MONGOCRYPT_IV_LEN)) {
+      CLIENT_ERR ("unable to create IV subrange from ciphertext");
+      return false;
+   }
+
+   if (hmac == HMAC_NONE) {
+      BSON_ASSERT (key_format == KEY_FORMAT_FLE2);
+
+   } else {
+      BSON_ASSERT (key_format != KEY_FORMAT_FLE2);
+
+      uint8_t hmac_tag_storage[MONGOCRYPT_HMAC_LEN];
+      const uint32_t mac_key_offset =
+         (key_format == KEY_FORMAT_FLE1) ? 0 : MONGOCRYPT_ENC_KEY_LEN;
+      _mongocrypt_buffer_t Km;
+      if (!_mongocrypt_buffer_from_subrange (
+             &Km, key, mac_key_offset, MONGOCRYPT_MAC_KEY_LEN)) {
+         CLIENT_ERR ("unable to create Km subrange from key");
+         return false;
+      }
+
+      _mongocrypt_buffer_t iv_and_ciphertext;
+      if (!_mongocrypt_buffer_from_subrange (&iv_and_ciphertext,
+                                             ciphertext,
+                                             0,
+                                             ciphertext->len -
+                                                MONGOCRYPT_HMAC_LEN)) {
+         CLIENT_ERR ("unable to create IV || S subrange from C");
+         return false;
+      }
+
+      _mongocrypt_buffer_t hmac_tag = {.data = hmac_tag_storage,
+                                       .len = MONGOCRYPT_HMAC_LEN};
+
+      if (!_hmac_step (crypto,
+                       mac_format,
+                       hmac,
+                       &Km,
+                       associated_data,
+                       &iv_and_ciphertext,
+                       &hmac_tag,
+                       status)) {
+         return false;
+      }
+
+      /* Constant time compare. */
+      _mongocrypt_buffer_t T;
+      if (!_mongocrypt_buffer_from_subrange (&T,
+                                             ciphertext,
+                                             ciphertext->len -
+                                                MONGOCRYPT_HMAC_LEN,
+                                             MONGOCRYPT_HMAC_LEN)) {
+         CLIENT_ERR ("unable to create T subrange from C");
+         return false;
+      }
+      if (0 !=
+          _mongocrypt_memequal (hmac_tag.data, T.data, MONGOCRYPT_HMAC_LEN)) {
+         CLIENT_ERR ("HMAC validation failure");
+         return false;
+      }
    }
 
    /* Decrypt data excluding IV + HMAC. */
-   intermediate.data = (uint8_t *) ciphertext->data + MONGOCRYPT_IV_LEN;
-   intermediate.len =
-      ciphertext->len - (MONGOCRYPT_IV_LEN + MONGOCRYPT_HMAC_LEN);
-
-   if (!_decrypt_step (crypto,
-                       &iv,
-                       &enc_key,
-                       &intermediate,
-                       plaintext,
-                       bytes_written,
-                       status)) {
-      goto done;
+   const uint32_t hmac_len = (hmac == HMAC_NONE) ? 0 : MONGOCRYPT_HMAC_LEN;
+   _mongocrypt_buffer_t S;
+   if (!_mongocrypt_buffer_from_subrange (&S,
+                                          ciphertext,
+                                          MONGOCRYPT_IV_LEN,
+                                          ciphertext->len - MONGOCRYPT_IV_LEN -
+                                             hmac_len)) {
+      CLIENT_ERR ("unable to create S subrange from C");
+      return false;
    }
 
-   ret = true;
-done:
-   return ret;
+   return _decrypt_step (
+      crypto, mode, &IV, &Ke, &S, plaintext, bytes_written, status);
 }
 
+#define DECLARE_ALGORITHM(name, mode, hmac)                                  \
+   static uint32_t _mc_##name##_ciphertext_len (uint32_t plaintext_len,      \
+                                                mongocrypt_status_t *status) \
+   {                                                                         \
+      return _mongocrypt_calculate_ciphertext_len (                          \
+         plaintext_len, MODE_##mode, HMAC_##hmac, status);                   \
+   }                                                                         \
+   static uint32_t _mc_##name##_plaintext_len (uint32_t ciphertext_len,      \
+                                               mongocrypt_status_t *status)  \
+   {                                                                         \
+      return _mongocrypt_calculate_plaintext_len (                           \
+         ciphertext_len, MODE_##mode, HMAC_##hmac, status);                  \
+   }                                                                         \
+   static bool _mc_##name##_do_encryption (                                  \
+      _mongocrypt_crypto_t *crypto,                                          \
+      const _mongocrypt_buffer_t *iv,                                        \
+      const _mongocrypt_buffer_t *aad,                                       \
+      const _mongocrypt_buffer_t *key,                                       \
+      const _mongocrypt_buffer_t *plaintext,                                 \
+      _mongocrypt_buffer_t *ciphertext,                                      \
+      uint32_t *written,                                                     \
+      mongocrypt_status_t *status)                                           \
+   {                                                                         \
+      return _mongocrypt_do_encryption (crypto,                              \
+                                        KEY_FORMAT_##name,                   \
+                                        MAC_FORMAT_##name,                   \
+                                        MODE_##mode,                         \
+                                        HMAC_##hmac,                         \
+                                        iv,                                  \
+                                        aad,                                 \
+                                        key,                                 \
+                                        plaintext,                           \
+                                        ciphertext,                          \
+                                        written,                             \
+                                        status);                             \
+   }                                                                         \
+   static bool _mc_##name##_do_decryption (                                  \
+      _mongocrypt_crypto_t *crypto,                                          \
+      const _mongocrypt_buffer_t *aad,                                       \
+      const _mongocrypt_buffer_t *key,                                       \
+      const _mongocrypt_buffer_t *ciphertext,                                \
+      _mongocrypt_buffer_t *plaintext,                                       \
+      uint32_t *written,                                                     \
+      mongocrypt_status_t *status)                                           \
+   {                                                                         \
+      return _mongocrypt_do_decryption (crypto,                              \
+                                        KEY_FORMAT_##name,                   \
+                                        MAC_FORMAT_##name,                   \
+                                        MODE_##mode,                         \
+                                        HMAC_##hmac,                         \
+                                        aad,                                 \
+                                        key,                                 \
+                                        ciphertext,                          \
+                                        plaintext,                           \
+                                        written,                             \
+                                        status);                             \
+   }                                                                         \
+   static const _mongocrypt_value_encryption_algorithm_t                     \
+      _mc##name##Algorithm_definition = {                                    \
+         _mc_##name##_ciphertext_len,                                        \
+         _mc_##name##_plaintext_len,                                         \
+         _mc_##name##_do_encryption,                                         \
+         _mc_##name##_do_decryption,                                         \
+   };                                                                        \
+   const _mongocrypt_value_encryption_algorithm_t *_mc##name##Algorithm ()   \
+   {                                                                         \
+      return &_mc##name##Algorithm_definition;                               \
+   }
+
+
+// FLE1 algorithm: AES-256-CBC HMAC/SHA-512-256 (SHA-512 truncated to 256 bits)
+DECLARE_ALGORITHM (FLE1, CBC, SHA_512_256)
+
+// FLE2 AEAD used value algorithm: AES-256-CTR HMAC/SHA-256
+DECLARE_ALGORITHM (FLE2AEAD, CTR, SHA_256)
+
+// FLE2 used with ESC/ECOC tokens: AES-256-CTR no HMAC
+DECLARE_ALGORITHM (FLE2, CTR, NONE)
+
+// FLE2v2 AEAD general algorithm: AES-256-CBC HMAC/SHA-256
+DECLARE_ALGORITHM (FLE2v2AEAD, CBC, SHA_256)
+
+#undef DECLARE_ALGORITHM
 
 /* ----------------------------------------------------------------------------
  *
@@ -1197,6 +1434,8 @@ _mongocrypt_wrap_key (_mongocrypt_crypto_t *crypto,
                       _mongocrypt_buffer_t *encrypted_dek,
                       mongocrypt_status_t *status)
 {
+   const _mongocrypt_value_encryption_algorithm_t *fle1alg =
+      _mcFLE1Algorithm ();
    uint32_t bytes_written;
    _mongocrypt_buffer_t iv = {0};
    bool ret = false;
@@ -1216,22 +1455,23 @@ _mongocrypt_wrap_key (_mongocrypt_crypto_t *crypto,
       goto done;
    }
 
-   _mongocrypt_buffer_resize (
-      encrypted_dek, _mongocrypt_calculate_ciphertext_len (dek->len, status));
+   // _mongocrypt_wrap_key() uses FLE1 algorithm parameters.
+   _mongocrypt_buffer_resize (encrypted_dek,
+                              fle1alg->get_ciphertext_len (dek->len, status));
    _mongocrypt_buffer_resize (&iv, MONGOCRYPT_IV_LEN);
 
    if (!_mongocrypt_random (crypto, &iv, MONGOCRYPT_IV_LEN, status)) {
       goto done;
    }
 
-   if (!_mongocrypt_do_encryption (crypto,
-                                   &iv,
-                                   NULL /* associated data. */,
-                                   kek,
-                                   dek,
-                                   encrypted_dek,
-                                   &bytes_written,
-                                   status)) {
+   if (!fle1alg->do_encrypt (crypto,
+                             &iv,
+                             NULL /* associated data. */,
+                             kek,
+                             dek,
+                             encrypted_dek,
+                             &bytes_written,
+                             status)) {
       goto done;
    }
 
@@ -1248,6 +1488,8 @@ _mongocrypt_unwrap_key (_mongocrypt_crypto_t *crypto,
                         _mongocrypt_buffer_t *dek,
                         mongocrypt_status_t *status)
 {
+   const _mongocrypt_value_encryption_algorithm_t *fle1alg =
+      _mcFLE1Algorithm ();
    uint32_t bytes_written;
 
    BSON_ASSERT_PARAM (crypto);
@@ -1255,17 +1497,18 @@ _mongocrypt_unwrap_key (_mongocrypt_crypto_t *crypto,
    BSON_ASSERT_PARAM (dek);
    BSON_ASSERT_PARAM (encrypted_dek);
 
+   // _mongocrypt_wrap_key() uses FLE1 algorithm parameters.
    _mongocrypt_buffer_init (dek);
    _mongocrypt_buffer_resize (
-      dek, _mongocrypt_calculate_plaintext_len (encrypted_dek->len, status));
+      dek, fle1alg->get_plaintext_len (encrypted_dek->len, status));
 
-   if (!_mongocrypt_do_decryption (crypto,
-                                   NULL /* associated data. */,
-                                   kek,
-                                   encrypted_dek,
-                                   dek,
-                                   &bytes_written,
-                                   status)) {
+   if (!fle1alg->do_decrypt (crypto,
+                             NULL /* associated data. */,
+                             kek,
+                             encrypted_dek,
+                             dek,
+                             &bytes_written,
+                             status)) {
       return false;
    }
    dek->len = bytes_written;
@@ -1277,500 +1520,6 @@ _mongocrypt_unwrap_key (_mongocrypt_crypto_t *crypto,
                   dek->len);
       return false;
    }
-   return true;
-}
-
-bool
-_mongocrypt_hmac_sha_256 (_mongocrypt_crypto_t *crypto,
-                          const _mongocrypt_buffer_t *key,
-                          const _mongocrypt_buffer_t *in,
-                          _mongocrypt_buffer_t *out,
-                          mongocrypt_status_t *status)
-{
-   BSON_ASSERT_PARAM (crypto);
-   BSON_ASSERT_PARAM (key);
-   BSON_ASSERT_PARAM (in);
-   BSON_ASSERT_PARAM (out);
-
-   if (key->len != MONGOCRYPT_MAC_KEY_LEN) {
-      CLIENT_ERR ("invalid hmac_sha_256 key length. Got %" PRIu32
-                  ", expected: %" PRIu32,
-                  key->len,
-                  MONGOCRYPT_MAC_KEY_LEN);
-      return false;
-   }
-
-   if (crypto->hooks_enabled) {
-      mongocrypt_binary_t key_bin, out_bin, in_bin;
-      _mongocrypt_buffer_to_binary (key, &key_bin);
-      _mongocrypt_buffer_to_binary (out, &out_bin);
-      _mongocrypt_buffer_to_binary (in, &in_bin);
-
-      return crypto->hmac_sha_256 (
-         crypto->ctx, &key_bin, &in_bin, &out_bin, status);
-   }
-   return _native_crypto_hmac_sha_256 (key, in, out, status);
-}
-
-bool
-_mongocrypt_fle2aead_do_encryption (_mongocrypt_crypto_t *crypto,
-                                    const _mongocrypt_buffer_t *iv,
-                                    const _mongocrypt_buffer_t *associated_data,
-                                    const _mongocrypt_buffer_t *key,
-                                    const _mongocrypt_buffer_t *plaintext,
-                                    _mongocrypt_buffer_t *ciphertext,
-                                    uint32_t *bytes_written,
-                                    mongocrypt_status_t *status)
-{
-   BSON_ASSERT_PARAM (crypto);
-   BSON_ASSERT_PARAM (iv);
-   BSON_ASSERT_PARAM (associated_data);
-   BSON_ASSERT_PARAM (key);
-   BSON_ASSERT_PARAM (plaintext);
-   BSON_ASSERT_PARAM (ciphertext);
-   BSON_ASSERT_PARAM (bytes_written);
-
-   if (ciphertext->len !=
-       _mongocrypt_fle2aead_calculate_ciphertext_len (plaintext->len, status)) {
-      CLIENT_ERR ("output ciphertext must be allocated with %" PRIu32 " bytes",
-                  _mongocrypt_fle2aead_calculate_ciphertext_len (plaintext->len,
-                                                                 status));
-      return false;
-   }
-
-   if (plaintext->len <= 0) {
-      CLIENT_ERR ("input plaintext too small. Must be more than zero bytes.");
-      return false;
-   }
-
-   if (MONGOCRYPT_IV_LEN != iv->len) {
-      CLIENT_ERR ("IV must be length %d, but is length %" PRIu32,
-                  MONGOCRYPT_IV_LEN,
-                  iv->len);
-      return false;
-   }
-   if (MONGOCRYPT_KEY_LEN != key->len) {
-      CLIENT_ERR ("key must be length %d, but is length %" PRIu32,
-                  MONGOCRYPT_KEY_LEN,
-                  key->len);
-      return false;
-   }
-
-   memset (ciphertext->data, 0, ciphertext->len);
-   *bytes_written = 0;
-
-   /* Declare variable names matching [AEAD with
-    * CTR](https://docs.google.com/document/d/1eCU7R8Kjr-mdyz6eKvhNIDVmhyYQcAaLtTfHeK7a_vE/).
-    */
-   /* M is the input plaintext. */
-   _mongocrypt_buffer_t M;
-   if (!_mongocrypt_buffer_from_subrange (&M, plaintext, 0, plaintext->len)) {
-      CLIENT_ERR ("unable to create M view from plaintext");
-      return false;
-   }
-   /* Ke is 32 byte Key for encryption. */
-   _mongocrypt_buffer_t Ke;
-   if (!_mongocrypt_buffer_from_subrange (
-          &Ke, key, 0, MONGOCRYPT_ENC_KEY_LEN)) {
-      CLIENT_ERR ("unable to create Ke view from key");
-      return false;
-   }
-   /* IV is 16 byte IV. */
-   _mongocrypt_buffer_t IV;
-   if (!_mongocrypt_buffer_from_subrange (&IV, iv, 0, iv->len)) {
-      CLIENT_ERR ("unable to create IV view from iv");
-      return false;
-   }
-   /* Km is 32 byte Key for HMAC. */
-   _mongocrypt_buffer_t Km;
-   if (!_mongocrypt_buffer_from_subrange (
-          &Km, key, MONGOCRYPT_ENC_KEY_LEN, MONGOCRYPT_MAC_KEY_LEN)) {
-      CLIENT_ERR ("unable to create Km view from key");
-      return false;
-   }
-   /* AD is Associated Data. */
-   _mongocrypt_buffer_t AD;
-   if (!_mongocrypt_buffer_from_subrange (
-          &AD, associated_data, 0, associated_data->len)) {
-      CLIENT_ERR ("unable to create AD view from associated_data");
-      return false;
-   }
-   /* C is the output ciphertext. */
-   _mongocrypt_buffer_t C;
-   if (!_mongocrypt_buffer_from_subrange (&C, ciphertext, 0, ciphertext->len)) {
-      CLIENT_ERR ("unable to create C view from ciphertext");
-      return false;
-   }
-   /* S is the output of the symmetric cipher. It is appended after IV in C. */
-   _mongocrypt_buffer_t S;
-   BSON_ASSERT (C.len >= MONGOCRYPT_IV_LEN + MONGOCRYPT_HMAC_LEN);
-   if (!_mongocrypt_buffer_from_subrange (&S,
-                                          &C,
-                                          MONGOCRYPT_IV_LEN,
-                                          C.len - MONGOCRYPT_IV_LEN -
-                                             MONGOCRYPT_HMAC_LEN)) {
-      CLIENT_ERR ("unable to create S view from C");
-      return false;
-   }
-   uint32_t S_bytes_written = 0;
-   /* T is the output of the HMAC tag. It is appended after S in C. */
-   _mongocrypt_buffer_t T;
-   if (!_mongocrypt_buffer_from_subrange (
-          &T, &C, C.len - MONGOCRYPT_HMAC_LEN, MONGOCRYPT_HMAC_LEN)) {
-      CLIENT_ERR ("unable to create T view from C");
-      return false;
-   }
-
-   /* Compute S = AES-CTR.Enc(Ke, IV, M). */
-   if (!_crypto_aes_256_ctr_encrypt (
-          crypto,
-          (aes_256_args_t){.key = &Ke,
-                           .iv = &IV,
-                           .in = &M,
-                           .out = &S,
-                           .bytes_written = &S_bytes_written,
-                           .status = status})) {
-      return false;
-   }
-
-   /* Compute T = HMAC-SHA256(Km, AD || IV || S). */
-   {
-      _mongocrypt_buffer_t hmac_inputs[] = {AD, IV, S};
-      _mongocrypt_buffer_t hmac_input = {0};
-      _mongocrypt_buffer_concat (&hmac_input, hmac_inputs, 3);
-      if (!_mongocrypt_hmac_sha_256 (crypto, &Km, &hmac_input, &T, status)) {
-         _mongocrypt_buffer_cleanup (&hmac_input);
-         return false;
-      }
-      _mongocrypt_buffer_cleanup (&hmac_input);
-   }
-
-   /* Output C = IV || S || T. */
-   /* S and T are already in C. Prepend IV. */
-   memmove (C.data, IV.data, MONGOCRYPT_IV_LEN);
-
-   *bytes_written = MONGOCRYPT_IV_LEN + S_bytes_written + MONGOCRYPT_HMAC_LEN;
-   return true;
-}
-
-bool
-_mongocrypt_fle2aead_do_decryption (_mongocrypt_crypto_t *crypto,
-                                    const _mongocrypt_buffer_t *associated_data,
-                                    const _mongocrypt_buffer_t *key,
-                                    const _mongocrypt_buffer_t *ciphertext,
-                                    _mongocrypt_buffer_t *plaintext,
-                                    uint32_t *bytes_written,
-                                    mongocrypt_status_t *status)
-{
-   BSON_ASSERT_PARAM (crypto);
-   BSON_ASSERT_PARAM (associated_data);
-   BSON_ASSERT_PARAM (key);
-   BSON_ASSERT_PARAM (ciphertext);
-   BSON_ASSERT_PARAM (plaintext);
-   BSON_ASSERT_PARAM (bytes_written);
-
-   if (ciphertext->len <= MONGOCRYPT_IV_LEN + MONGOCRYPT_HMAC_LEN) {
-      CLIENT_ERR ("input ciphertext too small. Must be more than %" PRIu32
-                  " bytes",
-                  MONGOCRYPT_IV_LEN + MONGOCRYPT_HMAC_LEN);
-      return false;
-   }
-
-   if (plaintext->len !=
-       _mongocrypt_fle2aead_calculate_plaintext_len (ciphertext->len, status)) {
-      CLIENT_ERR ("output plaintext must be allocated with %" PRIu32 " bytes",
-                  _mongocrypt_fle2aead_calculate_plaintext_len (ciphertext->len,
-                                                                status));
-      return false;
-   }
-
-   if (MONGOCRYPT_KEY_LEN != key->len) {
-      CLIENT_ERR ("key must be length %d, but is length %" PRIu32,
-                  MONGOCRYPT_KEY_LEN,
-                  key->len);
-      return false;
-   }
-
-   memset (plaintext->data, 0, plaintext->len);
-   *bytes_written = 0;
-
-   /* Declare variable names matching [AEAD with
-    * CTR](https://docs.google.com/document/d/1eCU7R8Kjr-mdyz6eKvhNIDVmhyYQcAaLtTfHeK7a_vE/).
-    */
-   /* C is the input ciphertext. */
-   _mongocrypt_buffer_t C;
-   if (!_mongocrypt_buffer_from_subrange (&C, ciphertext, 0, ciphertext->len)) {
-      CLIENT_ERR ("unable to create C view from ciphertext");
-      return false;
-   }
-   /* IV is 16 byte IV. It is the first part of C. */
-   _mongocrypt_buffer_t IV;
-   if (!_mongocrypt_buffer_from_subrange (
-          &IV, ciphertext, 0, MONGOCRYPT_IV_LEN)) {
-      CLIENT_ERR ("unable to create IV view from ciphertext");
-      return false;
-   }
-   /* S is the symmetric cipher output from C. It is after the IV in C. */
-   _mongocrypt_buffer_t S;
-   if (!_mongocrypt_buffer_from_subrange (&S,
-                                          ciphertext,
-                                          MONGOCRYPT_IV_LEN,
-                                          C.len - MONGOCRYPT_IV_LEN -
-                                             MONGOCRYPT_HMAC_LEN)) {
-      CLIENT_ERR ("unable to create S view from C");
-      return false;
-   }
-   /* T is the HMAC tag from C. It is after S in C. */
-   _mongocrypt_buffer_t T;
-   if (!_mongocrypt_buffer_from_subrange (
-          &T, &C, C.len - MONGOCRYPT_HMAC_LEN, MONGOCRYPT_HMAC_LEN)) {
-      CLIENT_ERR ("unable to create T view from C");
-      return false;
-   }
-   /* Tp is the computed HMAC of the input. */
-   _mongocrypt_buffer_t Tp = {0};
-   /* M is the output plaintext. */
-   _mongocrypt_buffer_t M;
-   if (!_mongocrypt_buffer_from_subrange (&M, plaintext, 0, plaintext->len)) {
-      CLIENT_ERR ("unable to create M view from plaintext");
-      return false;
-   }
-   /* Ke is 32 byte Key for encryption. */
-   _mongocrypt_buffer_t Ke;
-   if (!_mongocrypt_buffer_from_subrange (
-          &Ke, key, 0, MONGOCRYPT_ENC_KEY_LEN)) {
-      CLIENT_ERR ("unable to create Ke view from key");
-      return false;
-   }
-   /* Km is 32 byte Key for HMAC. */
-   _mongocrypt_buffer_t Km;
-   if (!_mongocrypt_buffer_from_subrange (
-          &Km, key, MONGOCRYPT_ENC_KEY_LEN, MONGOCRYPT_MAC_KEY_LEN)) {
-      CLIENT_ERR ("unable to create Km view from key");
-      return false;
-   }
-   /* AD is Associated Data. */
-   _mongocrypt_buffer_t AD;
-   if (!_mongocrypt_buffer_from_subrange (
-          &AD, associated_data, 0, associated_data->len)) {
-      CLIENT_ERR ("unable to create AD view from associated_data");
-      return false;
-   }
-
-   /* Compute Tp = HMAC-SHA256(Km, AD || IV || S). Check that it matches input
-    * ciphertext T. */
-   {
-      _mongocrypt_buffer_t hmac_inputs[] = {AD, IV, S};
-      _mongocrypt_buffer_t hmac_input = {0};
-      _mongocrypt_buffer_concat (&hmac_input, hmac_inputs, 3);
-      _mongocrypt_buffer_resize (&Tp, MONGOCRYPT_HMAC_LEN);
-      if (!_mongocrypt_hmac_sha_256 (crypto, &Km, &hmac_input, &Tp, status)) {
-         _mongocrypt_buffer_cleanup (&hmac_input);
-         _mongocrypt_buffer_cleanup (&Tp);
-         return false;
-      }
-      if (0 != _mongocrypt_buffer_cmp (&T, &Tp)) {
-         CLIENT_ERR ("decryption error");
-         _mongocrypt_buffer_cleanup (&hmac_input);
-         _mongocrypt_buffer_cleanup (&Tp);
-         return false;
-      }
-      _mongocrypt_buffer_cleanup (&hmac_input);
-      _mongocrypt_buffer_cleanup (&Tp);
-   }
-
-   /* Compute and output M = AES-CTR.Dec(Ke, S) */
-   if (!_crypto_aes_256_ctr_decrypt (
-          crypto,
-          (aes_256_args_t){.key = &Ke,
-                           .iv = &IV,
-                           .in = &S,
-                           .out = &M,
-                           .bytes_written = bytes_written,
-                           .status = status})) {
-      return false;
-   }
-
-   return true;
-}
-
-bool
-_mongocrypt_fle2_do_encryption (_mongocrypt_crypto_t *crypto,
-                                const _mongocrypt_buffer_t *iv,
-                                const _mongocrypt_buffer_t *key,
-                                const _mongocrypt_buffer_t *plaintext,
-                                _mongocrypt_buffer_t *ciphertext,
-                                uint32_t *bytes_written,
-                                mongocrypt_status_t *status)
-{
-   BSON_ASSERT_PARAM (crypto);
-   BSON_ASSERT_PARAM (iv);
-   BSON_ASSERT_PARAM (key);
-   BSON_ASSERT_PARAM (plaintext);
-   BSON_ASSERT_PARAM (ciphertext);
-   BSON_ASSERT_PARAM (bytes_written);
-
-   if (ciphertext->len !=
-       _mongocrypt_fle2_calculate_ciphertext_len (plaintext->len, status)) {
-      CLIENT_ERR (
-         "output ciphertext must be allocated with %" PRIu32 " bytes",
-         _mongocrypt_fle2_calculate_ciphertext_len (plaintext->len, status));
-      return false;
-   }
-
-   if (plaintext->len <= 0) {
-      CLIENT_ERR ("input plaintext too small. Must be more than zero bytes.");
-      return false;
-   }
-
-   if (MONGOCRYPT_IV_LEN != iv->len) {
-      CLIENT_ERR ("IV must be length %d, but is length %" PRIu32,
-                  MONGOCRYPT_IV_LEN,
-                  iv->len);
-      return false;
-   }
-   if (MONGOCRYPT_ENC_KEY_LEN != key->len) {
-      CLIENT_ERR ("key must be length %d, but is length %" PRIu32,
-                  MONGOCRYPT_ENC_KEY_LEN,
-                  key->len);
-      return false;
-   }
-
-   BSON_ASSERT (ciphertext->len >= MONGOCRYPT_IV_LEN);
-   memset (ciphertext->data + MONGOCRYPT_IV_LEN,
-           0,
-           ciphertext->len - MONGOCRYPT_IV_LEN);
-   *bytes_written = 0;
-
-   /* Declare variable names matching [AEAD with
-    * CTR](https://docs.google.com/document/d/1eCU7R8Kjr-mdyz6eKvhNIDVmhyYQcAaLtTfHeK7a_vE/).
-    */
-   /* M is the input plaintext. */
-   _mongocrypt_buffer_t M = *plaintext;
-   /* Ke is 32 byte Key for encryption. */
-   _mongocrypt_buffer_t Ke = *key;
-   /* IV is 16 byte IV. */
-   _mongocrypt_buffer_t IV = *iv;
-   /* C is the output ciphertext. */
-   _mongocrypt_buffer_t C = *ciphertext;
-   /* S is the output of the symmetric cipher. It is appended after IV in C. */
-   _mongocrypt_buffer_t S;
-   if (!_mongocrypt_buffer_from_subrange (
-          &S, &C, MONGOCRYPT_IV_LEN, C.len - MONGOCRYPT_IV_LEN)) {
-      CLIENT_ERR ("unable to create S view from C");
-      return false;
-   }
-   uint32_t S_bytes_written = 0;
-
-   /* Compute S = AES-CTR.Enc(Ke, IV, M). */
-   if (!_crypto_aes_256_ctr_encrypt (
-          crypto,
-          (aes_256_args_t){.key = &Ke,
-                           .iv = &IV,
-                           .in = &M,
-                           .out = &S,
-                           .bytes_written = &S_bytes_written,
-                           .status = status})) {
-      return false;
-   }
-
-   if (S_bytes_written != M.len) {
-      CLIENT_ERR ("expected S_bytes_written=%" PRIu32 " got %" PRIu32,
-                  M.len,
-                  S_bytes_written);
-      return false;
-   }
-
-   /* Output C = IV || S. */
-   /* S is already in C. Prepend IV. */
-   memmove (C.data, IV.data, MONGOCRYPT_IV_LEN);
-
-   *bytes_written = MONGOCRYPT_IV_LEN + S_bytes_written;
-   return true;
-}
-
-bool
-_mongocrypt_fle2_do_decryption (_mongocrypt_crypto_t *crypto,
-                                const _mongocrypt_buffer_t *key,
-                                const _mongocrypt_buffer_t *ciphertext,
-                                _mongocrypt_buffer_t *plaintext,
-                                uint32_t *bytes_written,
-                                mongocrypt_status_t *status)
-{
-   BSON_ASSERT_PARAM (crypto);
-   BSON_ASSERT_PARAM (key);
-   BSON_ASSERT_PARAM (ciphertext);
-   BSON_ASSERT_PARAM (plaintext);
-   BSON_ASSERT_PARAM (bytes_written);
-
-   if (ciphertext->len <= MONGOCRYPT_IV_LEN) {
-      CLIENT_ERR ("input ciphertext too small. Must be more than %" PRIu32
-                  " bytes",
-                  MONGOCRYPT_IV_LEN);
-      return false;
-   }
-
-   if (plaintext->len !=
-       _mongocrypt_fle2_calculate_plaintext_len (ciphertext->len, status)) {
-      CLIENT_ERR (
-         "output plaintext must be allocated with %" PRIu32 " bytes",
-         _mongocrypt_fle2_calculate_plaintext_len (ciphertext->len, status));
-      return false;
-   }
-
-   if (MONGOCRYPT_ENC_KEY_LEN != key->len) {
-      CLIENT_ERR ("key must be length %d, but is length %" PRIu32,
-                  MONGOCRYPT_ENC_KEY_LEN,
-                  key->len);
-      return false;
-   }
-
-   memset (plaintext->data, 0, plaintext->len);
-   *bytes_written = 0;
-
-   /* Declare variable names matching [AEAD with
-    * CTR](https://docs.google.com/document/d/1eCU7R8Kjr-mdyz6eKvhNIDVmhyYQcAaLtTfHeK7a_vE/).
-    */
-   /* C is the input ciphertext. */
-   _mongocrypt_buffer_t C = *ciphertext;
-   /* IV is 16 byte IV. It is the first part of C. */
-   _mongocrypt_buffer_t IV;
-   if (!_mongocrypt_buffer_from_subrange (
-          &IV, ciphertext, 0, MONGOCRYPT_IV_LEN)) {
-      CLIENT_ERR ("unable to create IV view from ciphertext");
-      return false;
-   }
-   /* S is the symmetric cipher output from C. It is after the IV in C. */
-   _mongocrypt_buffer_t S;
-   if (!_mongocrypt_buffer_from_subrange (
-          &S, ciphertext, MONGOCRYPT_IV_LEN, C.len - MONGOCRYPT_IV_LEN)) {
-      CLIENT_ERR ("unable to create S view from C");
-      return false;
-   }
-   /* M is the output plaintext. */
-   _mongocrypt_buffer_t M = *plaintext;
-   /* Ke is 32 byte Key for encryption. */
-   _mongocrypt_buffer_t Ke = *key;
-
-   /* Compute and output M = AES-CTR.Dec(Ke, S) */
-   if (!_crypto_aes_256_ctr_decrypt (
-          crypto,
-          (aes_256_args_t){.key = &Ke,
-                           .iv = &IV,
-                           .in = &S,
-                           .out = &M,
-                           .bytes_written = bytes_written,
-                           .status = status})) {
-      return false;
-   }
-
-   if (*bytes_written != S.len) {
-      CLIENT_ERR ("expected bytes_written=%" PRIu32 " got %" PRIu32,
-                  S.len,
-                  *bytes_written);
-      return false;
-   }
-
    return true;
 }
 

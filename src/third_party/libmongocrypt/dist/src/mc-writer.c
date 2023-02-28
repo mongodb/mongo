@@ -23,14 +23,13 @@
       return false;         \
    }
 
-#define CHECK_REMAINING_BUFFER_AND_RET(write_size)       \
-   if ((write_size) > writer->len - writer->pos) {       \
-      CLIENT_ERR ("%s expected at most %" PRIu64         \
-                  " bytes, got: %" PRIu64,               \
-                  writer->parser_name,                   \
-                  (writer->len - writer->pos),           \
-                  (uint64_t) (write_size));              \
-      return false;                                      \
+#define CHECK_REMAINING_BUFFER_AND_RET(write_size)                        \
+   if ((write_size) > writer->len - writer->pos) {                        \
+      CLIENT_ERR ("%s expected at most %" PRIu64 " bytes, got: %" PRIu64, \
+                  writer->parser_name,                                    \
+                  (writer->len - writer->pos),                            \
+                  (uint64_t) (write_size));                               \
+      return false;                                                       \
    }
 
 void
@@ -133,7 +132,7 @@ mc_writer_write_buffer (mc_writer_t *writer,
                   length,
                   buf->len);
 
-      return false; 
+      return false;
    }
 
    CHECK_REMAINING_BUFFER_AND_RET (length);

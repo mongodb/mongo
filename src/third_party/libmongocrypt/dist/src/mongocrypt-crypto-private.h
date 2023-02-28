@@ -44,116 +44,58 @@ typedef struct {
    void *ctx;
 } _mongocrypt_crypto_t;
 
-uint32_t
-_mongocrypt_calculate_ciphertext_len (uint32_t plaintext_len,
-                                      mongocrypt_status_t *status);
+typedef uint32_t (*_mongocrypt_ciphertextlen_fn) (uint32_t plaintext_len,
+                                                  mongocrypt_status_t *status);
+typedef uint32_t (*_mongocrypt_plaintextlen_fn) (uint32_t ciphertext_len,
+                                                 mongocrypt_status_t *status);
+typedef bool (*_mongocrypt_do_encryption_fn) (
+   _mongocrypt_crypto_t *crypto,
+   const _mongocrypt_buffer_t *iv,
+   const _mongocrypt_buffer_t *associated_data,
+   const _mongocrypt_buffer_t *key,
+   const _mongocrypt_buffer_t *plaintext,
+   _mongocrypt_buffer_t *ciphertext,
+   uint32_t *bytes_written,
+   mongocrypt_status_t *status) MONGOCRYPT_WARN_UNUSED_RESULT;
+typedef bool (*_mongocrypt_do_decryption_fn) (
+   _mongocrypt_crypto_t *crypto,
+   const _mongocrypt_buffer_t *associated_data,
+   const _mongocrypt_buffer_t *key,
+   const _mongocrypt_buffer_t *ciphertext,
+   _mongocrypt_buffer_t *plaintext,
+   uint32_t *bytes_written,
+   mongocrypt_status_t *status) MONGOCRYPT_WARN_UNUSED_RESULT;
 
-/* _mongocrypt_fle2aead_calculate_ciphertext_len returns the required length of
- * the ciphertext for _mongocrypt_fle2aead_do_encryption. */
-uint32_t
-_mongocrypt_fle2aead_calculate_ciphertext_len (uint32_t plaintext_len,
-                                               mongocrypt_status_t *status);
-
-/* _mongocrypt_fle2_calculate_ciphertext_len returns the required length of
- * the ciphertext for _mongocrypt_fle2_do_encryption. */
-uint32_t
-_mongocrypt_fle2_calculate_ciphertext_len (uint32_t plaintext_len,
-                                           mongocrypt_status_t *status);
-
-uint32_t
-_mongocrypt_calculate_plaintext_len (uint32_t ciphertext_len,
-                                     mongocrypt_status_t *status);
-
-/* _mongocrypt_fle2aead_calculate_plaintext_len returns the required length of
- * the plaintext for _mongocrypt_fle2aead_do_decryption. */
-uint32_t
-_mongocrypt_fle2aead_calculate_plaintext_len (uint32_t ciphertext_len,
-                                              mongocrypt_status_t *status);
-
-/* _mongocrypt_fle2_calculate_plaintext_len returns the required length of
- * the plaintext for _mongocrypt_fle2_do_decryption. */
-uint32_t
-_mongocrypt_fle2_calculate_plaintext_len (uint32_t ciphertext_len,
-                                          mongocrypt_status_t *status);
-
-bool
-_mongocrypt_do_encryption (_mongocrypt_crypto_t *crypto,
-                           const _mongocrypt_buffer_t *iv,
-                           const _mongocrypt_buffer_t *associated_data,
-                           const _mongocrypt_buffer_t *key,
-                           const _mongocrypt_buffer_t *plaintext,
-                           _mongocrypt_buffer_t *ciphertext,
-                           uint32_t *bytes_written,
-                           mongocrypt_status_t *status)
-   MONGOCRYPT_WARN_UNUSED_RESULT;
-
-bool
-_mongocrypt_do_decryption (_mongocrypt_crypto_t *crypto,
-                           const _mongocrypt_buffer_t *associated_data,
-                           const _mongocrypt_buffer_t *key,
-                           const _mongocrypt_buffer_t *ciphertext,
-                           _mongocrypt_buffer_t *plaintext,
-                           uint32_t *bytes_written,
-                           mongocrypt_status_t *status)
-   MONGOCRYPT_WARN_UNUSED_RESULT;
-
-/* _mongocrypt_fle2aead_do_encryption does AEAD encryption.
- * It follows the construction described in the [AEAD with
- * CTR](https://docs.google.com/document/d/1eCU7R8Kjr-mdyz6eKvhNIDVmhyYQcAaLtTfHeK7a_vE/)
- *
- * Note: The 96 byte key is split differently for FLE 2.
- * - FLE 1 uses first 32 bytes as the mac key, and the second 32 bytes as the
- *   encryption key.
- * - FLE 2 uses first 32 bytes as encryption key, and the
- *   second 32 bytes as the mac key.
- * Note: Attempting to encrypt a 0 length plaintext is an error.
+/**
+ * Defines the application layer protocol to use when
+ * encrypting client data values.
  */
-bool
-_mongocrypt_fle2aead_do_encryption (_mongocrypt_crypto_t *crypto,
-                                    const _mongocrypt_buffer_t *iv,
-                                    const _mongocrypt_buffer_t *associated_data,
-                                    const _mongocrypt_buffer_t *key,
-                                    const _mongocrypt_buffer_t *plaintext,
-                                    _mongocrypt_buffer_t *ciphertext,
-                                    uint32_t *bytes_written,
-                                    mongocrypt_status_t *status)
-   MONGOCRYPT_WARN_UNUSED_RESULT;
+typedef struct {
+   _mongocrypt_ciphertextlen_fn get_ciphertext_len;
+   _mongocrypt_plaintextlen_fn get_plaintext_len;
+   _mongocrypt_do_encryption_fn do_encrypt;
+   _mongocrypt_do_decryption_fn do_decrypt;
+} _mongocrypt_value_encryption_algorithm_t;
 
-bool
-_mongocrypt_fle2aead_do_decryption (_mongocrypt_crypto_t *crypto,
-                                    const _mongocrypt_buffer_t *associated_data,
-                                    const _mongocrypt_buffer_t *key,
-                                    const _mongocrypt_buffer_t *ciphertext,
-                                    _mongocrypt_buffer_t *plaintext,
-                                    uint32_t *bytes_written,
-                                    mongocrypt_status_t *status)
-   MONGOCRYPT_WARN_UNUSED_RESULT;
+// FLE1 algorithm: AES-256-CBC HMAC/SHA-512-256 (SHA-512 truncated to 256 bits)
+// Algorithm is documented in [FLE and
+// AEAD](https://docs.google.com/document/d/1D8xTXWo1B1dunO0bDZhPdolKTMbbD5fUIgsERubWRmY)
+const _mongocrypt_value_encryption_algorithm_t *
+_mcFLE1Algorithm ();
 
-/* _mongocrypt_fle2_do_encryption does non-AEAD encryption.
- * @key is expected to be only an encryption key of size MONGOCRYPT_ENC_KEY_LEN.
- * Note: Attempting to encrypt a 0 length plaintext is an error.
- */
-bool
-_mongocrypt_fle2_do_encryption (_mongocrypt_crypto_t *crypto,
-                                const _mongocrypt_buffer_t *iv,
-                                const _mongocrypt_buffer_t *key,
-                                const _mongocrypt_buffer_t *plaintext,
-                                _mongocrypt_buffer_t *ciphertext,
-                                uint32_t *bytes_written,
-                                mongocrypt_status_t *status)
-   MONGOCRYPT_WARN_UNUSED_RESULT;
+// FLE2 general algorithm: AES-256-CTR HMAC/SHA-256
+// Algorithm is documented in [AEAD with
+// CTR](https://docs.google.com/document/d/1eCU7R8Kjr-mdyz6eKvhNIDVmhyYQcAaLtTfHeK7a_vE/).
+const _mongocrypt_value_encryption_algorithm_t *
+_mcFLE2AEADAlgorithm ();
 
-/* _mongocrypt_fle2_do_decryption does non-AEAD decryption.
- * @key is expected to be only an encryption key of size MONGOCRYPT_ENC_KEY_LEN.
- */
-bool
-_mongocrypt_fle2_do_decryption (_mongocrypt_crypto_t *crypto,
-                                const _mongocrypt_buffer_t *key,
-                                const _mongocrypt_buffer_t *ciphertext,
-                                _mongocrypt_buffer_t *plaintext,
-                                uint32_t *bytes_written,
-                                mongocrypt_status_t *status)
-   MONGOCRYPT_WARN_UNUSED_RESULT;
+// FLE2 used with FLE2IndexedEncryptedValue: AES-256-CTR no HMAC
+const _mongocrypt_value_encryption_algorithm_t *
+_mcFLE2Algorithm ();
+
+// FLE2AEAD general algorithm: AES-256-CBC HMAC/SHA-256
+const _mongocrypt_value_encryption_algorithm_t *
+_mcFLE2v2AEADAlgorithm ();
 
 bool
 _mongocrypt_random (_mongocrypt_crypto_t *crypto,

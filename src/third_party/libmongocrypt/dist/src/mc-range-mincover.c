@@ -80,6 +80,9 @@ mc_mincover_destroy (mc_mincover_t *mincover)
 #define DECORATE_NAME(N) N##_u64
 #include "mc-range-mincover-generator.template.h"
 
+// The 128-bit version is only required for Decimal128, otherwise generates
+// unused-fn warnings
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
 #define UINT_T mlib_int128
 #define UINT_C MLIB_INT128
 #define UINT_FMT_S "s"
@@ -92,6 +95,7 @@ mc_mincover_destroy (mc_mincover_t *mincover)
 #define MC_UINT_MAX MLIB_INT128_UMAX
 #define UINT_BITOR mlib_int128_bitor
 #include "mc-range-mincover-generator.template.h"
+#endif // MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
 
 
 // Check bounds and return an error message including the original inputs.
@@ -283,6 +287,7 @@ mc_getMincoverDouble (mc_getMincoverDouble_args_t args,
    return mc;
 }
 
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
 mc_mincover_t *
 mc_getMincoverDecimal128 (mc_getMincoverDecimal128_args_t args,
                           mongocrypt_status_t *status)
@@ -333,3 +338,4 @@ mc_getMincoverDecimal128 (mc_getMincoverDecimal128_args_t args,
    MinCoverGenerator_destroy_u128 (mcg);
    return mc;
 }
+#endif // MONGOCRYPT_HAVE_DECIMAL128_SUPPORT

@@ -16,48 +16,48 @@
 
 #include <bson/bson.h>
 
-#include "mc-fle2-insert-update-payload-private.h"
+#include "mc-fle2-insert-update-payload-private-v2.h"
 #include "mongocrypt.h"
 #include "mongocrypt-buffer-private.h"
 
 void
-mc_FLE2InsertUpdatePayload_init (mc_FLE2InsertUpdatePayload_t *payload)
+mc_FLE2InsertUpdatePayloadV2_init (mc_FLE2InsertUpdatePayloadV2_t *payload)
 {
    BSON_ASSERT_PARAM (payload);
 
-   memset (payload, 0, sizeof (mc_FLE2InsertUpdatePayload_t));
-   _mc_array_init (&payload->edgeTokenSetArray, sizeof (mc_EdgeTokenSet_t));
+   memset (payload, 0, sizeof (mc_FLE2InsertUpdatePayloadV2_t));
+   _mc_array_init (&payload->edgeTokenSetArray, sizeof (mc_EdgeTokenSetV2_t));
 }
 
 static void
-mc_EdgeTokenSet_cleanup (mc_EdgeTokenSet_t *etc)
+mc_EdgeTokenSetV2_cleanup (mc_EdgeTokenSetV2_t *etc)
 {
    BSON_ASSERT_PARAM (etc);
 
    _mongocrypt_buffer_cleanup (&etc->edcDerivedToken);
    _mongocrypt_buffer_cleanup (&etc->escDerivedToken);
-   _mongocrypt_buffer_cleanup (&etc->eccDerivedToken);
+   _mongocrypt_buffer_cleanup (&etc->serverDerivedFromDataToken);
    _mongocrypt_buffer_cleanup (&etc->encryptedTokens);
 }
 
 void
-mc_FLE2InsertUpdatePayload_cleanup (mc_FLE2InsertUpdatePayload_t *payload)
+mc_FLE2InsertUpdatePayloadV2_cleanup (mc_FLE2InsertUpdatePayloadV2_t *payload)
 {
    BSON_ASSERT_PARAM (payload);
 
    _mongocrypt_buffer_cleanup (&payload->edcDerivedToken);
    _mongocrypt_buffer_cleanup (&payload->escDerivedToken);
-   _mongocrypt_buffer_cleanup (&payload->eccDerivedToken);
    _mongocrypt_buffer_cleanup (&payload->encryptedTokens);
    _mongocrypt_buffer_cleanup (&payload->indexKeyId);
    _mongocrypt_buffer_cleanup (&payload->value);
    _mongocrypt_buffer_cleanup (&payload->serverEncryptionToken);
+   _mongocrypt_buffer_cleanup (&payload->serverDerivedFromDataToken);
    _mongocrypt_buffer_cleanup (&payload->plaintext);
    // Free all EdgeTokenSet entries.
    for (size_t i = 0; i < payload->edgeTokenSetArray.len; i++) {
-      mc_EdgeTokenSet_t entry =
-         _mc_array_index (&payload->edgeTokenSetArray, mc_EdgeTokenSet_t, i);
-      mc_EdgeTokenSet_cleanup (&entry);
+      mc_EdgeTokenSetV2_t entry =
+         _mc_array_index (&payload->edgeTokenSetArray, mc_EdgeTokenSetV2_t, i);
+      mc_EdgeTokenSetV2_cleanup (&entry);
    }
    _mc_array_destroy (&payload->edgeTokenSetArray);
 }
@@ -110,26 +110,26 @@ mc_FLE2InsertUpdatePayload_cleanup (mc_FLE2InsertUpdatePayload_t *payload)
    }
 
 bool
-mc_FLE2InsertUpdatePayload_parse (mc_FLE2InsertUpdatePayload_t *out,
-                                  const _mongocrypt_buffer_t *in,
-                                  mongocrypt_status_t *status)
+mc_FLE2InsertUpdatePayloadV2_parse (mc_FLE2InsertUpdatePayloadV2_t *out,
+                                    const _mongocrypt_buffer_t *in,
+                                    mongocrypt_status_t *status)
 {
    bson_iter_t iter;
-   bool has_d = false, has_s = false, has_c = false;
-   bool has_p = false, has_u = false, has_t = false;
-   bool has_v = false, has_e = false;
+   bool has_d = false, has_s = false, has_p = false;
+   bool has_u = false, has_t = false, has_v = false;
+   bool has_e = false, has_l = false, has_k = false;
    bson_t in_bson;
 
    BSON_ASSERT_PARAM (out);
    BSON_ASSERT_PARAM (in);
 
    if (in->len < 1) {
-      CLIENT_ERR ("FLE2InsertUpdatePayload_parse got too short input");
+      CLIENT_ERR ("FLE2InsertUpdatePayloadV2_parse got too short input");
       return false;
    }
 
    if (!bson_init_static (&in_bson, in->data + 1, in->len - 1)) {
-      CLIENT_ERR ("FLE2InsertUpdatePayload_parse got invalid BSON");
+      CLIENT_ERR ("FLE2InsertUpdatePayloadV2_parse got invalid BSON");
       return false;
    }
 
@@ -145,7 +145,6 @@ mc_FLE2InsertUpdatePayload_parse (mc_FLE2InsertUpdatePayload_t *out,
 
       PARSE_BINARY (d, edcDerivedToken)
       PARSE_BINARY (s, escDerivedToken)
-      PARSE_BINARY (c, eccDerivedToken)
       PARSE_BINARY (p, encryptedTokens)
       PARSE_BINDATA (u, BSON_SUBTYPE_UUID, indexKeyId)
       IF_FIELD (t)
@@ -162,18 +161,37 @@ mc_FLE2InsertUpdatePayload_parse (mc_FLE2InsertUpdatePayload_t *out,
          out->valueType = (bson_type_t) type;
       }
       END_IF_FIELD
+
+      IF_FIELD (k)
+      {
+         int64_t contention = bson_iter_int64 (&iter);
+         if (!BSON_ITER_HOLDS_INT64 (&iter)) {
+            CLIENT_ERR ("Field 'k' expected to hold an int64");
+            goto fail;
+         }
+         if ((contention < 0)) {
+            CLIENT_ERR ("Field 'k' must be non-negative, got: %" PRId64,
+                        contention);
+            goto fail;
+         }
+         out->contentionFactor = contention;
+      }
+      END_IF_FIELD
+
       PARSE_BINARY (v, value)
       PARSE_BINARY (e, serverEncryptionToken)
+      PARSE_BINARY (l, serverDerivedFromDataToken)
    }
 
    CHECK_HAS (d);
    CHECK_HAS (s);
-   CHECK_HAS (c);
    CHECK_HAS (p);
    CHECK_HAS (u);
    CHECK_HAS (t);
    CHECK_HAS (v);
    CHECK_HAS (e);
+   CHECK_HAS (l);
+   CHECK_HAS (k);
 
    if (!_mongocrypt_buffer_from_subrange (
           &out->userKeyId, &out->value, 0, UUID_LEN)) {
@@ -184,7 +202,7 @@ mc_FLE2InsertUpdatePayload_parse (mc_FLE2InsertUpdatePayload_t *out,
 
    return true;
 fail:
-   mc_FLE2InsertUpdatePayload_cleanup (out);
+   mc_FLE2InsertUpdatePayloadV2_cleanup (out);
    return false;
 }
 
@@ -194,8 +212,8 @@ fail:
    }
 
 bool
-mc_FLE2InsertUpdatePayload_serialize (
-   const mc_FLE2InsertUpdatePayload_t *payload, bson_t *out)
+mc_FLE2InsertUpdatePayloadV2_serialize (
+   const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out)
 {
    BSON_ASSERT_PARAM (out);
    BSON_ASSERT_PARAM (payload);
@@ -205,8 +223,6 @@ mc_FLE2InsertUpdatePayload_serialize (
    IUPS_APPEND_BINDATA (
       out, "s", BSON_SUBTYPE_BINARY, payload->escDerivedToken);
    IUPS_APPEND_BINDATA (
-      out, "c", BSON_SUBTYPE_BINARY, payload->eccDerivedToken);
-   IUPS_APPEND_BINDATA (
       out, "p", BSON_SUBTYPE_BINARY, payload->encryptedTokens);
    IUPS_APPEND_BINDATA (out, "u", BSON_SUBTYPE_UUID, payload->indexKeyId);
    if (!BSON_APPEND_INT32 (out, "t", payload->valueType)) {
@@ -215,18 +231,23 @@ mc_FLE2InsertUpdatePayload_serialize (
    IUPS_APPEND_BINDATA (out, "v", BSON_SUBTYPE_BINARY, payload->value);
    IUPS_APPEND_BINDATA (
       out, "e", BSON_SUBTYPE_BINARY, payload->serverEncryptionToken);
+   IUPS_APPEND_BINDATA (
+      out, "l", BSON_SUBTYPE_BINARY, payload->serverDerivedFromDataToken);
+   if (!BSON_APPEND_INT64 (out, "k", payload->contentionFactor)) {
+      return false;
+   }
 
    return true;
 }
 
 bool
-mc_FLE2InsertUpdatePayload_serializeForRange (
-   const mc_FLE2InsertUpdatePayload_t *payload, bson_t *out)
+mc_FLE2InsertUpdatePayloadV2_serializeForRange (
+   const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out)
 {
    BSON_ASSERT_PARAM (out);
    BSON_ASSERT_PARAM (payload);
 
-   if (!mc_FLE2InsertUpdatePayload_serialize (payload, out)) {
+   if (!mc_FLE2InsertUpdatePayloadV2_serialize (payload, out)) {
       return false;
    }
    // Append "g" array of EdgeTokenSets.
@@ -237,8 +258,8 @@ mc_FLE2InsertUpdatePayload_serializeForRange (
 
    uint32_t g_index = 0;
    for (size_t i = 0; i < payload->edgeTokenSetArray.len; i++) {
-      mc_EdgeTokenSet_t etc =
-         _mc_array_index (&payload->edgeTokenSetArray, mc_EdgeTokenSet_t, i);
+      mc_EdgeTokenSetV2_t etc =
+         _mc_array_index (&payload->edgeTokenSetArray, mc_EdgeTokenSetV2_t, i);
       bson_t etc_bson;
 
       const char *g_index_string;
@@ -255,7 +276,7 @@ mc_FLE2InsertUpdatePayload_serializeForRange (
       IUPS_APPEND_BINDATA (
          &etc_bson, "s", BSON_SUBTYPE_BINARY, etc.escDerivedToken);
       IUPS_APPEND_BINDATA (
-         &etc_bson, "c", BSON_SUBTYPE_BINARY, etc.eccDerivedToken);
+         &etc_bson, "l", BSON_SUBTYPE_BINARY, etc.serverDerivedFromDataToken);
       IUPS_APPEND_BINDATA (
          &etc_bson, "p", BSON_SUBTYPE_BINARY, etc.encryptedTokens);
 
@@ -276,19 +297,19 @@ mc_FLE2InsertUpdatePayload_serializeForRange (
 #undef IUPS_APPEND_BINDATA
 
 const _mongocrypt_buffer_t *
-mc_FLE2InsertUpdatePayload_decrypt (_mongocrypt_crypto_t *crypto,
-                                    mc_FLE2InsertUpdatePayload_t *iup,
-                                    const _mongocrypt_buffer_t *user_key,
-                                    mongocrypt_status_t *status)
+mc_FLE2InsertUpdatePayloadV2_decrypt (_mongocrypt_crypto_t *crypto,
+                                      mc_FLE2InsertUpdatePayloadV2_t *iup,
+                                      const _mongocrypt_buffer_t *user_key,
+                                      mongocrypt_status_t *status)
 {
-   const _mongocrypt_value_encryption_algorithm_t *fle2aead =
-      _mcFLE2AEADAlgorithm ();
+   const _mongocrypt_value_encryption_algorithm_t *fle2v2 =
+      _mcFLE2v2AEADAlgorithm ();
    BSON_ASSERT_PARAM (crypto);
    BSON_ASSERT_PARAM (iup);
    BSON_ASSERT_PARAM (user_key);
 
    if (iup->value.len == 0) {
-      CLIENT_ERR ("FLE2InsertUpdatePayload value not parsed");
+      CLIENT_ERR ("FLE2InsertUpdatePayloadV2 value not parsed");
       return NULL;
    }
 
@@ -301,17 +322,18 @@ mc_FLE2InsertUpdatePayload_decrypt (_mongocrypt_crypto_t *crypto,
    }
 
    _mongocrypt_buffer_resize (
-      &iup->plaintext, fle2aead->get_plaintext_len (ciphertext.len, status));
-   uint32_t bytes_written; /* ignored */
+      &iup->plaintext, fle2v2->get_plaintext_len (ciphertext.len, status));
+   uint32_t bytes_written;
 
-   if (!fle2aead->do_decrypt (crypto,
-                              &iup->userKeyId,
-                              user_key,
-                              &ciphertext,
-                              &iup->plaintext,
-                              &bytes_written,
-                              status)) {
+   if (!fle2v2->do_decrypt (crypto,
+                            &iup->userKeyId,
+                            user_key,
+                            &ciphertext,
+                            &iup->plaintext,
+                            &bytes_written,
+                            status)) {
       return NULL;
    }
+   iup->plaintext.len = bytes_written;
    return &iup->plaintext;
 }

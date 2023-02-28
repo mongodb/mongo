@@ -583,11 +583,19 @@ _ctx_done_aws (mongocrypt_kms_ctx_t *kms, const char *json_field)
 
    b64_str = (char *) bson_iter_utf8 (&iter, &b64_strlen);
    BSON_ASSERT (b64_str);
-   kms->result.data = bson_malloc ((size_t) b64_strlen + 1u);
-   BSON_ASSERT (kms->result.data);
+   uint8_t *result_data = bson_malloc ((size_t) b64_strlen + 1u);
+   BSON_ASSERT (result_data);
 
-   result_len = kms_message_b64_pton (b64_str, kms->result.data, b64_strlen);
-   BSON_ASSERT (result_len >= 0);
+   result_len = kms_message_b64_pton (b64_str, result_data, b64_strlen);
+   if (result_len < 0) {
+      CLIENT_ERR (
+         "Failed to base64 decode response. HTTP status=%d. Response body=\n%s",
+         http_status,
+         body);
+      bson_free (result_data);
+      goto fail;
+   }
+   kms->result.data = result_data;
    kms->result.len = (uint32_t) result_len;
    kms->result.owned = true;
    ret = true;
@@ -745,9 +753,20 @@ _ctx_done_azure_wrapkey_unwrapkey (mongocrypt_kms_ctx_t *kms)
       CLIENT_ERR ("Error converting base64url to base64");
       goto fail;
    }
-   kms->result.data = bson_malloc0 (b64_len);
-   result_len = kms_message_b64_pton (b64_data, kms->result.data, b64_len);
-   BSON_ASSERT (result_len >= 0);
+
+   uint8_t *result_data = bson_malloc (b64_len);
+   BSON_ASSERT (result_data);
+   result_len = kms_message_b64_pton (b64_data, result_data, b64_len);
+   if (result_len < 0) {
+      CLIENT_ERR (
+         "Failed to base64 decode response. HTTP status=%d. Response body=\n%s",
+         http_status,
+         body);
+      bson_free (result_data);
+      goto fail;
+   }
+
+   kms->result.data = result_data;
    kms->result.len = (uint32_t) result_len;
    kms->result.owned = true;
 

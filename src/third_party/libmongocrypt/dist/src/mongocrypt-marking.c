@@ -290,6 +290,8 @@ _fle2_placeholder_aes_ctr_encrypt (_mongocrypt_key_broker_t *kb,
                                    _mongocrypt_buffer_t *out,
                                    mongocrypt_status_t *status)
 {
+   const _mongocrypt_value_encryption_algorithm_t *fle2alg =
+      _mcFLE2Algorithm ();
    BSON_ASSERT_PARAM (kb);
    BSON_ASSERT_PARAM (key);
    BSON_ASSERT_PARAM (in);
@@ -298,8 +300,7 @@ _fle2_placeholder_aes_ctr_encrypt (_mongocrypt_key_broker_t *kb,
 
    _mongocrypt_crypto_t *crypto = kb->crypt->crypto;
    _mongocrypt_buffer_t iv;
-   const uint32_t cipherlen =
-      _mongocrypt_fle2_calculate_ciphertext_len (in->len, status);
+   const uint32_t cipherlen = fle2alg->get_ciphertext_len (in->len, status);
    if (cipherlen == 0) {
       return false;
    }
@@ -313,8 +314,8 @@ _fle2_placeholder_aes_ctr_encrypt (_mongocrypt_key_broker_t *kb,
       return false;
    }
 
-   if (!_mongocrypt_fle2_do_encryption (
-          crypto, &iv, key, in, out, &written, status)) {
+   if (!fle2alg->do_encrypt (
+          crypto, &iv, NULL /* aad */, key, in, out, &written, status)) {
       _mongocrypt_buffer_cleanup (out);
       _mongocrypt_buffer_init (out);
       return false;
@@ -331,6 +332,8 @@ _fle2_placeholder_aead_encrypt (_mongocrypt_key_broker_t *kb,
                                 _mongocrypt_buffer_t *out,
                                 mongocrypt_status_t *status)
 {
+   const _mongocrypt_value_encryption_algorithm_t *fle2 =
+      _mcFLE2AEADAlgorithm ();
    BSON_ASSERT_PARAM (kb);
    BSON_ASSERT_PARAM (keyId);
    BSON_ASSERT_PARAM (in);
@@ -339,8 +342,7 @@ _fle2_placeholder_aead_encrypt (_mongocrypt_key_broker_t *kb,
 
    _mongocrypt_crypto_t *crypto = kb->crypt->crypto;
    _mongocrypt_buffer_t iv, key;
-   const uint32_t cipherlen =
-      _mongocrypt_fle2aead_calculate_ciphertext_len (in->len, status);
+   const uint32_t cipherlen = fle2->get_ciphertext_len (in->len, status);
    if (cipherlen == 0) {
       return false;
    }
@@ -359,8 +361,7 @@ _fle2_placeholder_aead_encrypt (_mongocrypt_key_broker_t *kb,
    }
 
    _mongocrypt_buffer_init_size (out, cipherlen);
-   res = _mongocrypt_fle2aead_do_encryption (
-      crypto, &iv, keyId, &key, in, out, &written, status);
+   res = fle2->do_encrypt (crypto, &iv, keyId, &key, in, out, &written, status);
    _mongocrypt_buffer_cleanup (&key);
    _mongocrypt_buffer_cleanup (&iv);
 
@@ -702,10 +703,10 @@ get_edges (mc_FLE2RangeInsertSpec_t *insertSpec,
    }
 
    else if (value_type == BSON_TYPE_DECIMAL128) {
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
       const mc_dec128 value = mc_dec128_from_bson_iter (&insertSpec->v);
       mc_getEdgesDecimal128_args_t args = {
-         .value = value,
-         .sparsity = sparsity,
+         .value = value, .sparsity = sparsity,
       };
       if (insertSpec->precision.set) {
          const mc_dec128 min = mc_dec128_from_bson_iter (&insertSpec->min);
@@ -715,6 +716,11 @@ get_edges (mc_FLE2RangeInsertSpec_t *insertSpec,
          args.precision = insertSpec->precision;
       }
       return mc_getEdgesDecimal128 (args, status);
+#else // ↑↑↑↑↑↑↑↑ With Decimal128 / Without ↓↓↓↓↓↓↓↓↓↓
+      CLIENT_ERR ("unsupported BSON type (Decimal128) for range: libmongocrypt "
+                  "was built without extended Decimal128 support");
+      return NULL;
+#endif
    }
 
 
@@ -851,6 +857,7 @@ _mongocrypt_fle2_placeholder_to_insert_update_ciphertextForRange (
 
    // g:= array<EdgeTokenSet>
    {
+      /* coverity[Operands don't affect result]: suppress warning */
       BSON_ASSERT (placeholder->sparsity >= 0 &&
                    (uint64_t) placeholder->sparsity <= (uint64_t) SIZE_MAX);
       edges = get_edges (&insertSpec, (size_t) placeholder->sparsity, status);
@@ -1177,6 +1184,7 @@ mc_get_mincover_from_FLE2RangeFindSpec (mc_FLE2RangeFindSpec_t *findSpec,
       return mc_getMincoverDouble (args, status);
    }
    case BSON_TYPE_DECIMAL128: {
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
       BSON_ASSERT (bson_iter_type (&lowerBound) == BSON_TYPE_DECIMAL128);
       BSON_ASSERT (bson_iter_type (&upperBound) == BSON_TYPE_DECIMAL128);
       BSON_ASSERT (bson_iter_type (&findSpec->edgesInfo.value.indexMin) ==
@@ -1199,6 +1207,11 @@ mc_get_mincover_from_FLE2RangeFindSpec (mc_FLE2RangeFindSpec_t *findSpec,
          args.precision = findSpec->edgesInfo.value.precision;
       }
       return mc_getMincoverDecimal128 (args, status);
+#else // ↑↑↑↑↑↑↑↑ With Decimal128 / Without ↓↓↓↓↓↓↓↓↓↓
+      CLIENT_ERR ("FLE2 find is not supported for Decimal128: libmongocrypt "
+                  "was built without Decimal128 support");
+      return NULL;
+#endif
    }
 
    case BSON_TYPE_EOD:
@@ -1283,6 +1296,7 @@ _mongocrypt_fle2_placeholder_to_find_ciphertextForRange (
 
       // g:= array<EdgeFindTokenSet>
       {
+         /* coverity[Operands don't affect result]: suppress warning */
          BSON_ASSERT (placeholder->sparsity >= 0 &&
                       (uint64_t) placeholder->sparsity <= (uint64_t) SIZE_MAX);
          mincover = mc_get_mincover_from_FLE2RangeFindSpec (
@@ -1423,6 +1437,7 @@ _mongocrypt_fle1_marking_to_ciphertext (_mongocrypt_key_broker_t *kb,
                                         _mongocrypt_ciphertext_t *ciphertext,
                                         mongocrypt_status_t *status)
 {
+   const _mongocrypt_value_encryption_algorithm_t *fle1 = _mcFLE1Algorithm ();
    _mongocrypt_buffer_t plaintext;
    _mongocrypt_buffer_t iv;
    _mongocrypt_buffer_t associated_data;
@@ -1480,8 +1495,7 @@ _mongocrypt_fle1_marking_to_ciphertext (_mongocrypt_key_broker_t *kb,
    }
 
    _mongocrypt_buffer_from_iter (&plaintext, &marking->v_iter);
-   ciphertext->data.len =
-      _mongocrypt_calculate_ciphertext_len (plaintext.len, status);
+   ciphertext->data.len = fle1->get_ciphertext_len (plaintext.len, status);
    if (ciphertext->data.len == 0) {
       goto fail;
    }
@@ -1505,14 +1519,14 @@ _mongocrypt_fle1_marking_to_ciphertext (_mongocrypt_key_broker_t *kb,
          goto fail;
       }
 
-      ret = _mongocrypt_do_encryption (kb->crypt->crypto,
-                                       &iv,
-                                       &associated_data,
-                                       &key_material,
-                                       &plaintext,
-                                       &ciphertext->data,
-                                       &bytes_written,
-                                       status);
+      ret = fle1->do_encrypt (kb->crypt->crypto,
+                              &iv,
+                              &associated_data,
+                              &key_material,
+                              &plaintext,
+                              &ciphertext->data,
+                              &bytes_written,
+                              status);
       break;
    case MONGOCRYPT_ENCRYPTION_ALGORITHM_RANDOM:
       /* Use randomized encryption.
@@ -1522,14 +1536,14 @@ _mongocrypt_fle1_marking_to_ciphertext (_mongocrypt_key_broker_t *kb,
              kb->crypt->crypto, &iv, MONGOCRYPT_IV_LEN, status)) {
          goto fail;
       }
-      ret = _mongocrypt_do_encryption (kb->crypt->crypto,
-                                       &iv,
-                                       &associated_data,
-                                       &key_material,
-                                       &plaintext,
-                                       &ciphertext->data,
-                                       &bytes_written,
-                                       status);
+      ret = fle1->do_encrypt (kb->crypt->crypto,
+                              &iv,
+                              &associated_data,
+                              &key_material,
+                              &plaintext,
+                              &ciphertext->data,
+                              &bytes_written,
+                              status);
       break;
    case MONGOCRYPT_ENCRYPTION_ALGORITHM_NONE:
    default:

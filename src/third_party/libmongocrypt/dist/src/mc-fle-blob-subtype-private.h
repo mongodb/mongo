@@ -34,7 +34,15 @@ typedef enum {
    MC_SUBTYPE_FLE2UnindexedEncryptedValue = 6,
    MC_SUBTYPE_FLE2IndexedEqualityEncryptedValue = 7,
    MC_SUBTYPE_FLE2IndexedRangeEncryptedValue = 9,
-   MC_SUBTYPE_FLE2FindRangePayload = 10
+   MC_SUBTYPE_FLE2FindRangePayload = 10,
+
+   /* Queryable Encryption Version 2 Subtypes */
+   MC_SUBTYPE_FLE2InsertUpdatePayloadV2 = 11,
+   MC_SUBTYPE_FLE2FindEqualityPayloadV2 = 12,
+   MC_SUBTYPE_FLE2FindRangePayloadV2 = 13,
+   MC_SUBTYPE_FLE2IndexedEqualityEncryptedValueV2 = 14,
+   MC_SUBTYPE_FLE2IndexedRangeEncryptedValueV2 = 15,
+   MC_SUBTYPE_FLE2UnindexedEncryptedValueV2 = 16
 } mc_fle_blob_subtype_t;
 
 #endif /* MC_FLE_BLOB_SUBTYPE_PRIVATE_H */

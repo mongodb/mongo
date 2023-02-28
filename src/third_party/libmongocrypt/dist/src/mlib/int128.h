@@ -673,8 +673,8 @@ mlib_int128_format (mlib_int128 i)
       i = dm.quotient;
       ++len;
    }
-   for (int i = 0; i < len; ++i) {
-      into.str[i] = out[i + 1];
+   for (int j = 0; j < len; ++j) {
+      into.str[j] = out[j + 1];
    }
    into.str[len] = 0;
    return into;

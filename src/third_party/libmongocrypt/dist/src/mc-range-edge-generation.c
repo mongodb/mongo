@@ -213,6 +213,7 @@ mc_getEdgesDouble (mc_getEdgesDouble_args_t args, mongocrypt_status_t *status)
    return ret;
 }
 
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
 mc_edges_t *
 mc_getEdgesDecimal128 (mc_getEdgesDecimal128_args_t args,
                        mongocrypt_status_t *status)
@@ -238,3 +239,4 @@ mc_getEdgesDecimal128 (mc_getEdgesDecimal128_args_t args,
    mc_edges_t *ret = mc_edges_new (leaf, args.sparsity, status);
    return ret;
 }
+#endif // MONGOCRYPT_HAVE_DECIMAL128_SUPPORT

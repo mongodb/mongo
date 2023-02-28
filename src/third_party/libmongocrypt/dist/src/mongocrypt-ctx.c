@@ -807,9 +807,11 @@ mongocrypt_ctx_setopt_masterkey_aws (mongocrypt_ctx_t *ctx,
    bson_append_utf8 (&as_bson,
                      MONGOCRYPT_STR_AND_LEN ("provider"),
                      MONGOCRYPT_STR_AND_LEN ("aws"));
+   /* coverity[Operands don't affect result]: suppress warning */
    BSON_ASSERT (region_len <= INT_MAX);
    bson_append_utf8 (
       &as_bson, MONGOCRYPT_STR_AND_LEN ("region"), region, region_len);
+   /* coverity[Operands don't affect result]: suppress warning */
    BSON_ASSERT (cmk_len <= INT_MAX);
    bson_append_utf8 (&as_bson, MONGOCRYPT_STR_AND_LEN ("key"), cmk, cmk_len);
    bin = mongocrypt_binary_new_from_data ((uint8_t *) bson_get_data (&as_bson),

@@ -7,9 +7,20 @@
 #include <mlib/int128.h>
 #include <mlib/endian.h>
 
+// Conditional preprocessor definition set by the usage of an intel_dfp from
+// the ImportDFP.cmake script:
+#ifndef MONGOCRYPT_INTELDFP
+// Notify includers that Decimal128 is not available:
+#define MONGOCRYPT_HAVE_DECIMAL128_SUPPORT 0
+
+#else // With IntelDFP:
+// Tell includers that Decimal128 is okay:
+#define MONGOCRYPT_HAVE_DECIMAL128_SUPPORT 1
+
 // Include the header that declares the DFP functions, which may be macros that
 // expand to renamed symbols:
 #include <bid_conf.h>
+#include <bid_functions.h>
 
 #include <inttypes.h>
 #include <string.h>
@@ -29,7 +40,7 @@ typedef enum mc_dec128_rounding_mode {
 } mc_dec128_rounding_mode;
 
 typedef struct mc_dec128_flagset {
-   int bits;
+   _IDEC_flags bits;
 } mc_dec128_flagset;
 
 // This alignment conditional is the same conditions used in Intel's DFP
@@ -38,7 +49,7 @@ typedef struct mc_dec128_flagset {
 #if defined _M_IX86 && !defined __INTEL_COMPILER
 #define _mcDec128Align(n)
 #else
-#define _mcDec128Align(n) __declspec(align (n))
+#define _mcDec128Align(n) __declspec (align (n))
 #endif
 #else
 #if !defined HPUX_OS
@@ -124,6 +135,23 @@ static const mc_dec128 MC_DEC128_MINUSONE = MC_DEC128_C (-1);
 #define MC_DEC128_NEGATIVE_NAN \
    _mcDec128ConstFromParts (0, _mcDec128QuietNaNCombo | 1ull << 63)
 
+/// Convert an mc_dec128 value to a DFP 128-bit object
+static inline BID_UINT128
+_mc_to_bid128 (mc_dec128 d)
+{
+   BID_UINT128 r;
+   memcpy (&r, &d, sizeof d);
+   return r;
+}
+
+/// Convert a DFP 128-bit object to a mc_dec128 value
+static inline mc_dec128
+_bid128_to_mc (BID_UINT128 d)
+{
+   mc_dec128 r;
+   memcpy (&r, &d, sizeof d);
+   return r;
+}
 
 /**
  * @brief Convert a double-precision binary floating point value into the
@@ -138,10 +166,9 @@ mc_dec128_from_double_ex (double d,
                           mc_dec128_rounding_mode rnd,
                           mc_dec128_flagset *flags)
 {
-   extern mc_dec128 binary64_to_bid128 (
-      double d, mc_dec128_rounding_mode, mc_dec128_flagset *);
    mc_dec128_flagset zero_flags = {0};
-   return binary64_to_bid128 (d, rnd, flags ? flags : &zero_flags);
+   return _bid128_to_mc (
+      binary64_to_bid128 (d, rnd, flags ? &flags->bits : &zero_flags.bits));
 }
 
 /**
@@ -167,10 +194,9 @@ mc_dec128_from_string_ex (const char *s,
                           mc_dec128_rounding_mode rnd,
                           mc_dec128_flagset *flags)
 {
-   extern mc_dec128 bid128_from_string (
-      const char *, mc_dec128_rounding_mode, mc_dec128_flagset *);
    mc_dec128_flagset zero_flags = {0};
-   return bid128_from_string (s, rnd, flags ? flags : &zero_flags);
+   return _bid128_to_mc (bid128_from_string (
+      (char *) s, rnd, flags ? &flags->bits : &zero_flags.bits));
 }
 
 /**
@@ -201,10 +227,10 @@ typedef struct mc_dec128_string {
 static inline mc_dec128_string
 mc_dec128_to_string_ex (mc_dec128 d, mc_dec128_flagset *flags)
 {
-   extern void bid128_to_string (char *, mc_dec128 d, mc_dec128_flagset *);
    mc_dec128_flagset zero_flags = {0};
    mc_dec128_string out = {{0}};
-   bid128_to_string (out.str, d, flags ? flags : &zero_flags);
+   bid128_to_string (
+      out.str, _mc_to_bid128 (d), flags ? &flags->bits : &zero_flags.bits);
    return out;
 }
 
@@ -218,27 +244,26 @@ mc_dec128_to_string (mc_dec128 d)
 }
 
 /// Compare two dec128 numbers
-#define DECL_IDF_COMPARE_1(Oper)                                             \
-   static inline bool mc_dec128_##Oper##_ex (                                \
-      mc_dec128 left, mc_dec128 right, mc_dec128_flagset *flags)             \
-   {                                                                         \
-      extern int bid128_quiet_##Oper (                                       \
-         mc_dec128 left, mc_dec128 right, mc_dec128_flagset *);              \
-      mc_dec128_flagset zero_flags = {0};                                    \
-      return 0 !=                                                            \
-             bid128_quiet_##Oper (left, right, flags ? flags : &zero_flags); \
-   }                                                                         \
-                                                                             \
-   static inline bool mc_dec128_##Oper (mc_dec128 left, mc_dec128 right)     \
-   {                                                                         \
-      return mc_dec128_##Oper##_ex (left, right, NULL);                      \
+#define DECL_IDF_COMPARE_1(Oper)                                            \
+   static inline bool mc_dec128_##Oper##_ex (                               \
+      mc_dec128 left, mc_dec128 right, mc_dec128_flagset *flags)            \
+   {                                                                        \
+      mc_dec128_flagset zero_flags = {0};                                   \
+      return 0 !=                                                           \
+             bid128_quiet_##Oper (_mc_to_bid128 (left),                     \
+                                  _mc_to_bid128 (right),                    \
+                                  flags ? &flags->bits : &zero_flags.bits); \
+   }                                                                        \
+                                                                            \
+   static inline bool mc_dec128_##Oper (mc_dec128 left, mc_dec128 right)    \
+   {                                                                        \
+      return mc_dec128_##Oper##_ex (left, right, NULL);                     \
    }
 
-#define DECL_IDF_COMPARE(Op) \
-   DECL_IDF_COMPARE_1 (Op)   \
-   DECL_IDF_COMPARE_1 (not_##Op)
+#define DECL_IDF_COMPARE(Op) DECL_IDF_COMPARE_1 (Op)
 
 DECL_IDF_COMPARE (equal)
+DECL_IDF_COMPARE (not_equal)
 DECL_IDF_COMPARE (greater)
 DECL_IDF_COMPARE (greater_equal)
 DECL_IDF_COMPARE (less)
@@ -248,11 +273,10 @@ DECL_IDF_COMPARE (less_equal)
 #undef DECL_IDF_COMPARE_1
 
 /// Test properties of Decimal128 numbers
-#define DECL_PREDICATE(Name, BIDName)                \
-   static inline bool mc_dec128_##Name (mc_dec128 d) \
-   {                                                 \
-      extern int bid128_##BIDName (mc_dec128 d);     \
-      return 0 != bid128_##BIDName (d);              \
+#define DECL_PREDICATE(Name, BIDName)                   \
+   static inline bool mc_dec128_##Name (mc_dec128 d)    \
+   {                                                    \
+      return 0 != bid128_##BIDName (_mc_to_bid128 (d)); \
    }
 
 DECL_PREDICATE (is_zero, isZero)
@@ -271,12 +295,12 @@ DECL_PREDICATE (is_nan, isNaN)
       mc_dec128_rounding_mode mode,                                           \
       mc_dec128_flagset *flags)                                               \
    {                                                                          \
-      extern mc_dec128 bid128_##Oper (mc_dec128 left,                         \
-                                      mc_dec128 right,                        \
-                                      mc_dec128_rounding_mode rounding,       \
-                                      mc_dec128_flagset *flags);              \
       mc_dec128_flagset zero_flags = {0};                                     \
-      return bid128_##Oper (left, right, mode, flags ? flags : &zero_flags);  \
+      return _bid128_to_mc (                                                  \
+         bid128_##Oper (_mc_to_bid128 (left),                                 \
+                        _mc_to_bid128 (right),                                \
+                        mode,                                                 \
+                        flags ? &flags->bits : &zero_flags.bits));            \
    }                                                                          \
                                                                               \
    static inline mc_dec128 mc_dec128_##Oper (mc_dec128 left, mc_dec128 right) \
@@ -298,11 +322,11 @@ DECL_IDF_BINOP_WRAPPER (pow)
    static inline mc_dec128 mc_dec128_##Oper##_ex (mc_dec128 operand,        \
                                                   mc_dec128_flagset *flags) \
    {                                                                        \
-      extern mc_dec128 bid128_##Oper (                                      \
-         mc_dec128 v, mc_dec128_rounding_mode, mc_dec128_flagset *);        \
       mc_dec128_flagset zero_flags = {0};                                   \
-      return bid128_##Oper (                                                \
-         operand, MC_DEC128_ROUND_DEFAULT, flags ? flags : &zero_flags);    \
+      return _bid128_to_mc (                                                \
+         bid128_##Oper (_mc_to_bid128 (operand),                            \
+                        MC_DEC128_ROUND_DEFAULT,                            \
+                        flags ? &flags->bits : &zero_flags.bits));          \
    }                                                                        \
                                                                             \
    static inline mc_dec128 mc_dec128_##Oper (mc_dec128 operand)             \
@@ -310,15 +334,45 @@ DECL_IDF_BINOP_WRAPPER (pow)
       return mc_dec128_##Oper##_ex (operand, NULL);                         \
    }
 
-DECL_IDF_UNOP_WRAPPER (round_integral_zero)
-DECL_IDF_UNOP_WRAPPER (round_integral_positive)
-DECL_IDF_UNOP_WRAPPER (round_integral_negative)
-DECL_IDF_UNOP_WRAPPER (round_integral_exact)
 DECL_IDF_UNOP_WRAPPER (log2)
 DECL_IDF_UNOP_WRAPPER (log10)
-DECL_IDF_UNOP_WRAPPER (negate)
-DECL_IDF_UNOP_WRAPPER (abs)
 #undef DECL_IDF_UNOP_WRAPPER
+
+static inline mc_dec128
+mc_dec128_round_integral_ex (mc_dec128 value,
+                             mc_dec128_rounding_mode direction,
+                             mc_dec128_flagset *flags)
+{
+   BID_UINT128 bid = _mc_to_bid128 (value);
+   mc_dec128_flagset zero_flags = {0};
+   _IDEC_flags *fl = flags ? &flags->bits : &zero_flags.bits;
+   switch (direction) {
+   case MC_DEC128_ROUND_TOWARD_ZERO:
+      return _bid128_to_mc (bid128_round_integral_zero (bid, fl));
+   case MC_DEC128_ROUND_NEAREST_AWAY:
+      return _bid128_to_mc (bid128_round_integral_nearest_away (bid, fl));
+   case MC_DEC128_ROUND_NEAREST_EVEN:
+      return _bid128_to_mc (bid128_round_integral_nearest_even (bid, fl));
+   case MC_DEC128_ROUND_DOWNWARD:
+      return _bid128_to_mc (bid128_round_integral_negative (bid, fl));
+   case MC_DEC128_ROUND_UPWARD:
+      return _bid128_to_mc (bid128_round_integral_positive (bid, fl));
+   default:
+      abort ();
+   }
+}
+
+static inline mc_dec128
+mc_dec128_negate (mc_dec128 operand)
+{
+   return _bid128_to_mc (bid128_negate (_mc_to_bid128 (operand)));
+}
+
+static inline mc_dec128
+mc_dec128_abs (mc_dec128 operand)
+{
+   return _bid128_to_mc (bid128_abs (_mc_to_bid128 (operand)));
+}
 
 /**
  * @brief Scale the given Decimal128 by a power of ten
@@ -335,10 +389,12 @@ mc_dec128_scale_ex (mc_dec128 fac,
                     mc_dec128_rounding_mode rounding,
                     mc_dec128_flagset *flags)
 {
-   extern mc_dec128 bid128_scalbln (
-      mc_dec128 fac, long int, mc_dec128_rounding_mode, mc_dec128_flagset *);
    mc_dec128_flagset zero_flags = {0};
-   return bid128_scalbln (fac, exp, rounding, flags ? flags : &zero_flags);
+   return _bid128_to_mc (
+      bid128_scalbln (_mc_to_bid128 (fac),
+                      exp,
+                      rounding,
+                      flags ? &flags->bits : &zero_flags.bits));
 }
 
 /**
@@ -374,11 +430,12 @@ typedef struct mc_dec128_modf_result {
 static inline mc_dec128_modf_result
 mc_dec128_modf_ex (mc_dec128 d, mc_dec128_flagset *flags)
 {
-   extern mc_dec128 bid128_modf (
-      mc_dec128 d, mc_dec128 * iptr, mc_dec128_flagset *);
    mc_dec128_flagset zero_flags = {0};
    mc_dec128_modf_result res;
-   res.frac = bid128_modf (d, &res.whole, flags ? flags : &zero_flags);
+   BID_UINT128 whole;
+   res.frac = _bid128_to_mc (bid128_modf (
+      _mc_to_bid128 (d), &whole, flags ? &flags->bits : &zero_flags.bits));
+   res.whole = _bid128_to_mc (whole);
    return res;
 }
 
@@ -407,10 +464,10 @@ mc_dec128_modf (mc_dec128 d)
 static inline mc_dec128
 mc_dec128_fmod_ex (mc_dec128 numer, mc_dec128 denom, mc_dec128_flagset *flags)
 {
-   extern mc_dec128 bid128_fmod (
-      mc_dec128 numer, mc_dec128 denom, mc_dec128_flagset *);
    mc_dec128_flagset zero_flags = {0};
-   return bid128_fmod (numer, denom, flags ? flags : &zero_flags);
+   return _bid128_to_mc (bid128_fmod (_mc_to_bid128 (numer),
+                                      _mc_to_bid128 (denom),
+                                      flags ? &flags->bits : &zero_flags.bits));
 }
 
 /**
@@ -436,9 +493,9 @@ mc_dec128_fmod (mc_dec128 numer, mc_dec128 denom)
 static inline int64_t
 mc_dec128_to_int64_ex (mc_dec128 d, mc_dec128_flagset *flags)
 {
-   extern int64_t bid128_to_int64_int (mc_dec128 d, mc_dec128_flagset *);
    mc_dec128_flagset zero_flags = {0};
-   return bid128_to_int64_int (d, flags ? flags : &zero_flags);
+   return bid128_to_int64_int (_mc_to_bid128 (d),
+                               flags ? &flags->bits : &zero_flags.bits);
 }
 
 /**
@@ -680,5 +737,7 @@ mc_dec128_to_bson_decimal128 (mc_dec128 v)
 }
 
 MLIB_C_LINKAGE_END
+
+#endif /// defined MONGOCRYPT_INTELDFP
 
 #endif // MC_DEC128_H_INCLUDED

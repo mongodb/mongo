@@ -218,6 +218,8 @@ _replace_ciphertext_with_plaintext (void *ctx,
                                     bson_value_t *out,
                                     mongocrypt_status_t *status)
 {
+   const _mongocrypt_value_encryption_algorithm_t *fle1alg =
+      _mcFLE1Algorithm ();
    _mongocrypt_key_broker_t *kb;
    _mongocrypt_ciphertext_t ciphertext;
    _mongocrypt_buffer_t plaintext;
@@ -263,8 +265,7 @@ _replace_ciphertext_with_plaintext (void *ctx,
       goto fail;
    }
 
-   plaintext.len =
-      _mongocrypt_calculate_plaintext_len (ciphertext.data.len, status);
+   plaintext.len = fle1alg->get_plaintext_len (ciphertext.data.len, status);
    if (plaintext.len == 0) {
       goto fail;
    }
@@ -279,13 +280,13 @@ _replace_ciphertext_with_plaintext (void *ctx,
       goto fail;
    }
 
-   if (!_mongocrypt_do_decryption (kb->crypt->crypto,
-                                   &associated_data,
-                                   &key_material,
-                                   &ciphertext.data,
-                                   &plaintext,
-                                   &bytes_written,
-                                   status)) {
+   if (!fle1alg->do_decrypt (kb->crypt->crypto,
+                             &associated_data,
+                             &key_material,
+                             &ciphertext.data,
+                             &plaintext,
+                             &bytes_written,
+                             status)) {
       goto fail;
    }
 

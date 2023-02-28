@@ -90,6 +90,7 @@ mc_getMincoverDouble (mc_getMincoverDouble_args_t args,
    MONGOCRYPT_WARN_UNUSED_RESULT;
 
 
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
 typedef struct {
    mc_dec128 lowerBound;
    bool includeLowerBound;
@@ -106,5 +107,6 @@ mc_mincover_t *
 mc_getMincoverDecimal128 (mc_getMincoverDecimal128_args_t args,
                           mongocrypt_status_t *status)
    MONGOCRYPT_WARN_UNUSED_RESULT;
+#endif // MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
 
 #endif /* MC_RANGE_MINCOVER_PRIVATE_H */
