@@ -33,6 +33,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
+#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/configure_query_analyzer_cmd_gen.h"
 #include "mongo/s/grid.h"
 
@@ -54,6 +55,9 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
+            const auto& nss = ns();
+            uassertStatusOK(validateNamespace(nss));
+
             const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
             auto swResponse = configShard->runCommandWithFixedRetryAttempts(

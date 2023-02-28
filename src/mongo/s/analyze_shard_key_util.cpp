@@ -31,14 +31,16 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/query/getmore_command_gen.h"
+#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/analyze_shard_key_cmd_gen.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/configure_query_analyzer_cmd_gen.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_find.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -169,7 +171,117 @@ BSONObj executeWriteCommand(OperationContext* opCtx,
     return {};
 }
 
+/*
+ * The helper for 'validateCollectionOptions'. Performs the validation locally.
+ */
+StatusWith<UUID> validateCollectionOptionsLocal(OperationContext* opCtx,
+                                                const NamespaceString& nss) {
+    if (CollectionCatalog::get(opCtx)->lookupView(opCtx, nss)) {
+        return Status{ErrorCodes::CommandNotSupportedOnView, "The namespace corresponds to a view"};
+    }
+
+    AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, nss);
+    if (!collection) {
+        return Status{ErrorCodes::NamespaceNotFound,
+                      str::stream() << "The namespace does not exist"};
+    }
+    if (collection->getCollectionOptions().encryptedFieldConfig.has_value()) {
+        return Status{ErrorCodes::IllegalOperation,
+                      str::stream() << "The collection has queryable encryption enabled"};
+    }
+    return collection->uuid();
+}
+
+/*
+ * The helper for 'validateCollectionOptions'. Performs the validation based on the listCollections
+ * response from the primary shard for the database.
+ */
+StatusWith<UUID> validateCollectionOptionsOnPrimaryShard(OperationContext* opCtx,
+                                                         const NamespaceString& nss) {
+    auto dbInfo = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db()));
+
+    ListCollections listCollections;
+    listCollections.setDbName(nss.db());
+    listCollections.setFilter(BSON("name" << nss.coll()));
+    auto cmdResponse = executeCommandAgainstDatabasePrimary(
+        opCtx,
+        nss.db(),
+        dbInfo,
+        CommandHelpers::filterCommandRequestForPassthrough(listCollections.toBSON({})),
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        Shard::RetryPolicy::kIdempotent);
+    auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+    uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+
+    auto cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(remoteResponse.data));
+    auto firstBatch = cursorResponse.getBatch();
+
+    if (firstBatch.empty()) {
+        return Status{ErrorCodes::NamespaceNotFound,
+                      str::stream() << "The namespace does not exist"};
+    }
+    uassert(6915300,
+            str::stream() << "The namespace corresponds to multiple collections",
+            firstBatch.size() == 1);
+
+    auto listCollRepItem = ListCollectionsReplyItem::parse(
+        IDLParserContext("ListCollectionsReplyItem"), firstBatch[0]);
+
+    if (listCollRepItem.getType() == "view") {
+        return Status{ErrorCodes::CommandNotSupportedOnView, "The namespace corresponds to a view"};
+    }
+    if (auto obj = listCollRepItem.getOptions()) {
+        auto options = uassertStatusOK(CollectionOptions::parse(*obj));
+        if (options.encryptedFieldConfig.has_value()) {
+            return Status{ErrorCodes::IllegalOperation,
+                          str::stream() << "The collection has queryable encryption enabled"};
+        }
+    }
+
+    auto info = listCollRepItem.getInfo();
+    uassert(6915301,
+            str::stream() << "The listCollections reply for '" << nss
+                          << "' does not have the 'info' field",
+            info);
+    return *info->getUuid();
+}
+
 }  // namespace
+
+Status validateNamespace(const NamespaceString& nss) {
+    if (nss.isOnInternalDb()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      str::stream() << "Cannot run against an internal collection");
+    }
+    if (nss.isSystem()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      str::stream() << "Cannot run against a system collection");
+    }
+    if (nss.isFLE2StateCollection()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      str::stream() << "Cannot run against an internal collection");
+    }
+    return Status::OK();
+}
+
+StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           StringData cmdName) {
+    if (cmdName == AnalyzeShardKey::kCommandParameterFieldName) {
+        return validateCollectionOptionsLocal(opCtx, nss);
+    }
+    if (cmdName == ConfigureQueryAnalyzer::kCommandParameterFieldName) {
+        if (serverGlobalParams.clusterRole == ClusterRole::None) {
+            return validateCollectionOptionsLocal(opCtx, nss);
+        }
+        tassert(7362503,
+                str::stream()
+                    << "Found the configureQueryAnalyzer command running on a shardsvr mongod",
+                !serverGlobalParams.clusterRole.isExclusivelyShardRole());
+        return validateCollectionOptionsOnPrimaryShard(opCtx, nss);
+    }
+    MONGO_UNREACHABLE;
+}
 
 double round(double val, int n) {
     const double multiplier = std::pow(10.0, n);

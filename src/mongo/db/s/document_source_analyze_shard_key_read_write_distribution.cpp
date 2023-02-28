@@ -281,12 +281,10 @@ DocumentSource::GetNextResult DocumentSourceAnalyzeShardKeyReadWriteDistribution
         return GetNextResult::makeEOF();
     }
 
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Cannot analyze a shard key for a non-existing collection",
-            pExpCtx->uuid);
-    auto collUuid = *pExpCtx->uuid;
     _finished = true;
 
+    auto collUuid = uassertStatusOK(validateCollectionOptions(
+        pExpCtx->opCtx, pExpCtx->ns, AnalyzeShardKey::kCommandParameterFieldName));
     auto targeter = makeCollectionRoutingInfoTargeter(pExpCtx->opCtx,
                                                       pExpCtx->ns,
                                                       _spec.getKey(),

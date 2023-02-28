@@ -242,6 +242,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/rpc/rewrite_state_change_errors',
+        '$BUILD_DIR/mongo/s/analyze_shard_key_util',
         '$BUILD_DIR/mongo/s/mongos_topology_coordinator',
         '$BUILD_DIR/mongo/s/sharding_api',
         '$BUILD_DIR/mongo/s/vector_clock_mongos',

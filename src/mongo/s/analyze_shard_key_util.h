@@ -33,8 +33,6 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -45,6 +43,29 @@ const int kMaxNumDecimalPlaces = 10;
 // The size limit for the documents to an insert in a single batch. Leave some padding for other
 // fields in the insert command.
 constexpr int kMaxBSONObjSizePerInsertBatch = BSONObjMaxUserSize - 100 * 1024;
+
+//
+// The helpers used for validation within the analyzeShardKey or configureQueryAnalyzer command.
+
+/*
+ * If the namespace corresponds to an internal collection, returns an IllegalOperation error.
+ * Otherwise, returns an OK status.
+ */
+Status validateNamespace(const NamespaceString& nss);
+
+/*
+ * If the namespace doesn't exist, returns a NamespaceNotFound error. If the namespace corresponds
+ * to a view, returns a CommandNotSupportedOnView error. If the collection has queryable encryption
+ * enabled, returns an IllegalOperation error. Throws DBException on any error that occurs during
+ * the validation. If the validation passed, returns an OK status and the collection UUID for the
+ * collection when the validation occurred.
+ */
+StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           StringData cmdName);
+
+//
+// Other helpers.
 
 /*
  * Rounds 'val' to 'n' decimal places.

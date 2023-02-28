@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/s/document_source_analyze_shard_key_read_write_distribution_gen.h"
+#include "mongo/s/analyze_shard_key_util.h"
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -44,10 +45,15 @@ public:
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& specElem) {
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << kStageName << "is only suppported on a shardsvr mongod",
+                    serverGlobalParams.clusterRole.isShardRole());
             uassert(6875700,
                     str::stream() << kStageName
                                   << " must take a nested object but found: " << specElem,
                     specElem.type() == BSONType::Object);
+            uassertStatusOK(validateNamespace(nss));
+
             auto spec = DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec::parse(
                 IDLParserContext(kStageName), specElem.embeddedObject());
             return std::make_unique<LiteParsed>(specElem.fieldName(), nss, std::move(spec));

@@ -37,6 +37,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
+#include "mongo/s/analyze_shard_key_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -46,6 +47,7 @@ namespace analyze_shard_key {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(analyzeShardKeySkipCalcalutingKeyCharactericsMetrics);
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics);
 
 const std::string kOrphanDocsWarningMessage = "If \"" +
@@ -54,19 +56,6 @@ const std::string kOrphanDocsWarningMessage = "If \"" +
     "\", you may want to rerun the command at some other time to get more accurate \"" +
     KeyCharacteristicsMetrics::kNumDistinctValuesFieldName + "\" and \"" +
     KeyCharacteristicsMetrics::kMostCommonValuesFieldName + "\" metrics.";
-
-void validateCommandOptions(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            const KeyPattern& key) {
-    uassert(ErrorCodes::CommandNotSupportedOnView,
-            "Cannot analyze a shard key for a view",
-            !CollectionCatalog::get(opCtx)->lookupView(opCtx, nss));
-
-    AutoGetCollectionForReadCommand collection(opCtx, nss);
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Cannot analyze a shard key for a non-existing collection",
-            collection);
-}
 
 class AnalyzeShardKeyCmd : public TypedCommand<AnalyzeShardKeyCmd> {
 public:
@@ -85,32 +74,40 @@ public:
 
             const auto& nss = ns();
             const auto& key = request().getKey();
-            validateCommandOptions(opCtx, nss, key);
+            uassertStatusOK(validateNamespace(nss));
+            const auto collUuid = uassertStatusOK(
+                validateCollectionOptions(opCtx, nss, AnalyzeShardKey::kCommandParameterFieldName));
 
-            LOGV2(6875001, "Start analyzing shard key", "nss"_attr = nss, "key"_attr = key);
+            LOGV2(6875001,
+                  "Start analyzing shard key",
+                  "namespace"_attr = nss,
+                  "shardKey"_attr = key);
 
             Response response;
 
             // Calculate metrics about the characteristics of the shard key.
-            auto keyCharacteristics =
-                analyze_shard_key::calculateKeyCharacteristicsMetrics(opCtx, nss, key);
-            response.setKeyCharacteristics(keyCharacteristics);
-            if (response.getNumOrphanDocs()) {
-                response.setNote(StringData(kOrphanDocsWarningMessage));
+            if (!MONGO_unlikely(
+                    analyzeShardKeySkipCalcalutingKeyCharactericsMetrics.shouldFail())) {
+                auto keyCharacteristics = analyze_shard_key::calculateKeyCharacteristicsMetrics(
+                    opCtx, nss, collUuid, key);
+                response.setKeyCharacteristics(keyCharacteristics);
+                if (response.getNumOrphanDocs()) {
+                    response.setNote(StringData(kOrphanDocsWarningMessage));
+                }
             }
 
-            if (!serverGlobalParams.clusterRole.isShardRole() ||
-                MONGO_unlikely(
+            // Calculate metrics about the read and write distribution from sampled queries.
+            // Currently, query sampling is only supported on sharded clusters.
+            if (serverGlobalParams.clusterRole.isShardRole() &&
+                !MONGO_unlikely(
                     analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics.shouldFail())) {
-                // Currently, query sampling is only supported on sharded clusters.
-                return response;
+                auto [readDistribution, writeDistribution] =
+                    analyze_shard_key::calculateReadWriteDistributionMetrics(
+                        opCtx, nss, collUuid, key);
+                response.setReadDistribution(readDistribution);
+                response.setWriteDistribution(writeDistribution);
             }
 
-            // Metrics about the read and write distribution.
-            auto [readDistribution, writeDistribution] =
-                analyze_shard_key::calculateReadWriteDistributionMetrics(opCtx, nss, key);
-            response.setReadDistribution(readDistribution);
-            response.setWriteDistribution(writeDistribution);
 
             return response;
         }

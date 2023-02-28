@@ -32,6 +32,7 @@
 #include <boost/math/statistics/bivariate_statistics.hpp>
 
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -61,6 +62,9 @@ namespace mongo {
 namespace analyze_shard_key {
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(analyzeShardKeyPauseBeforeCalculatingKeyCharacteristicsMetrics);
+MONGO_FAIL_POINT_DEFINE(analyzeShardKeyPauseBeforeCalculatingReadWriteDistributionMetrics);
 
 constexpr StringData kIndexKeyFieldName = "key"_sd;
 constexpr StringData kNumDocsFieldName = "numDocs"_sd;
@@ -312,6 +316,11 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(OperationCont
                                                                    const NamespaceString& nss,
                                                                    const BSONObj& shardKey,
                                                                    int64_t numDocs) {
+    LOGV2(6915302,
+          "Calculating cardinality and frequency for a unique shard key",
+          "namespace"_attr = nss,
+          "shardKey"_attr = shardKey);
+
     CardinalityFrequencyMetrics metrics;
 
     metrics.numDocs = numDocs;
@@ -345,6 +354,12 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
                                                                     const NamespaceString& nss,
                                                                     const BSONObj& shardKey,
                                                                     const BSONObj& hintIndexKey) {
+    LOGV2(6915303,
+          "Calculating cardinality and frequency for a non-unique shard key",
+          "namespace"_attr = nss,
+          "shardKey"_attr = shardKey,
+          "indexKey"_attr = hintIndexKey);
+
     CardinalityFrequencyMetrics metrics;
 
     const auto numMostCommonValues = gNumMostCommonValues.load();
@@ -380,7 +395,7 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
         metrics.mostCommonValues.emplace_back(std::move(value), frequency);
     });
 
-    uassert(ErrorCodes::InvalidOptions,
+    uassert(ErrorCodes::IllegalOperation,
             "Cannot analyze the cardinality and frequency of a shard key for an empty collection",
             metrics.numDocs > 0);
 
@@ -396,6 +411,11 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
 MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
                                           const CollectionPtr& collection,
                                           const BSONObj& shardKey) {
+    LOGV2(6915304,
+          "Calculating monotonicity",
+          "namespace"_attr = collection->ns(),
+          "shardKey"_attr = shardKey);
+
     MonotonicityMetrics metrics;
 
     if (collection->isClustered()) {
@@ -451,7 +471,9 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
         throw;
     }
 
-    invariant(recordIds.size() > 0);
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot analyze the monotonicity of a shard key for an empty collection",
+            recordIds.size() > 0);
 
     if (recordIds.size() == 1) {
         metrics.setType(MonotonicityTypeEnum::kNotMonotonic);
@@ -468,7 +490,10 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
     }());
     auto coefficientThreshold = gMonotonicityCorrelationCoefficientThreshold.load();
     LOGV2(6875302,
-          "Calculating monotonicity",
+          "Calculated monotonicity",
+          "namespace"_attr = collection->ns(),
+          "shardKey"_attr = shardKey,
+          "indexKey"_attr = indexKeyPattern,
           "coefficient"_attr = metrics.getRecordIdCorrelationCoefficient(),
           "coefficientThreshold"_attr = coefficientThreshold);
 
@@ -507,6 +532,9 @@ CollStatsMetrics calculateCollStats(OperationContext* opCtx, const NamespaceStri
 
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         metrics.numDocs = doc.getField(kNumDocsFieldName).exactNumberLong();
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot analyze a shard key for an empty collection",
+                metrics.numDocs > 0);
         metrics.avgDocSizeBytes =
             doc.getField(kNumBytesFieldName).exactNumberLong() / metrics.numDocs;
 
@@ -544,11 +572,17 @@ NamespaceString makeSplitPointsNss(const UUID& origCollUuid, const UUID& tempCol
  */
 std::pair<NamespaceString, Timestamp> generateSplitPoints(OperationContext* opCtx,
                                                           const NamespaceString& nss,
+                                                          const UUID& collUuid,
                                                           const KeyPattern& shardKey) {
     auto origCollUuid = CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Cannot analyze a shard key for a non-existing collection",
             origCollUuid);
+    // Perform best-effort validation that the collection has not been dropped and recreated.
+    uassert(CollectionUUIDMismatchInfo(nss.db(), collUuid, nss.coll().toString(), boost::none),
+            str::stream() << "Found that the collection UUID has changed from " << collUuid
+                          << " to " << origCollUuid << " since the command started",
+            origCollUuid == collUuid);
 
     auto tempCollUuid = UUID::gen();
     auto splitPointsNss = makeSplitPointsNss(*origCollUuid, tempCollUuid);
@@ -614,6 +648,7 @@ std::pair<NamespaceString, Timestamp> generateSplitPoints(OperationContext* opCt
 
 KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* opCtx,
                                                              const NamespaceString& nss,
+                                                             const UUID& collUuid,
                                                              const KeyPattern& shardKey) {
     KeyCharacteristicsMetrics metrics;
 
@@ -625,10 +660,15 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Cannot analyze a shard key for a non-existing collection",
                 collection);
+        // Perform best-effort validation that the collection has not been dropped and recreated.
+        uassert(CollectionUUIDMismatchInfo(nss.db(), collUuid, nss.coll().toString(), boost::none),
+                str::stream() << "Found that the collection UUID has changed from " << collUuid
+                              << " to " << collection->uuid() << " since the command started",
+                collection->uuid() == collUuid);
 
         uassert(serverGlobalParams.clusterRole == ClusterRole::ShardServer
                     ? ErrorCodes::CollectionIsEmptyLocally
-                    : ErrorCodes::InvalidOptions,
+                    : ErrorCodes::IllegalOperation,
                 "Cannot analyze a shard key for an empty collection",
                 collection->numRecords(opCtx) > 0);
 
@@ -640,6 +680,14 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
         }
 
         indexKeyBson = indexSpec->keyPattern.getOwned();
+
+        LOGV2(6915305,
+              "Calculating metrics about the characteristics of the shard key",
+              "namespace"_attr = nss,
+              "shardKey"_attr = shardKeyBson,
+              "indexKey"_attr = indexKeyBson);
+        analyzeShardKeyPauseBeforeCalculatingKeyCharacteristicsMetrics.pauseWhileSet(opCtx);
+
         metrics.setIsUnique(shardKeyBson.nFields() == indexKeyBson.nFields() ? indexSpec->isUnique
                                                                              : false);
         auto monotonicityMetrics = calculateMonotonicity(opCtx, *collection, shardKeyBson);
@@ -661,12 +709,22 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
 }
 
 std::pair<ReadDistributionMetrics, WriteDistributionMetrics> calculateReadWriteDistributionMetrics(
-    OperationContext* opCtx, const NamespaceString& nss, const KeyPattern& shardKey) {
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& collUuid,
+    const KeyPattern& shardKey) {
+    LOGV2(6915306,
+          "Calculating metrics about the read and write distribution",
+          "namespace"_attr = nss,
+          "shardKey"_attr = shardKey);
+    analyzeShardKeyPauseBeforeCalculatingReadWriteDistributionMetrics.pauseWhileSet(opCtx);
+
     ReadDistributionMetrics readDistributionMetrics;
     WriteDistributionMetrics writeDistributionMetrics;
 
     auto splitPointsShardId = ShardingState::get(opCtx)->shardId();
-    auto [splitPointsNss, splitPointsAfterClusterTime] = generateSplitPoints(opCtx, nss, shardKey);
+    auto [splitPointsNss, splitPointsAfterClusterTime] =
+        generateSplitPoints(opCtx, nss, collUuid, shardKey);
 
     std::vector<BSONObj> pipeline;
     DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec spec(

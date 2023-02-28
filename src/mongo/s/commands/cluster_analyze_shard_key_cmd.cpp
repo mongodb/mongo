@@ -35,6 +35,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
+#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 
@@ -71,6 +72,8 @@ public:
 
         Response typedRun(OperationContext* opCtx) {
             const auto& nss = ns();
+            uassertStatusOK(validateNamespace(nss));
+
             const auto& catalogCache = Grid::get(opCtx)->catalogCache();
             const auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
             const auto primaryShardId = cri.cm.dbPrimary();
@@ -129,7 +132,7 @@ public:
                 auto status = Shard::CommandResponse::getEffectiveStatus(swResponse);
 
                 if (status == ErrorCodes::CollectionIsEmptyLocally) {
-                    uassert(ErrorCodes::InvalidOptions,
+                    uassert(ErrorCodes::IllegalOperation,
                             "Cannot analyze a shard key for an empty collection",
                             !candidateShardIds.empty());
 
@@ -137,8 +140,8 @@ public:
                           "Failed to analyze shard key on the selected shard since it did not "
                           "have any documents for the collection locally. Retrying on a different "
                           "shard.",
-                          "nss"_attr = nss,
-                          "key"_attr = request().getKey(),
+                          "namespace"_attr = nss,
+                          "shardKey"_attr = request().getKey(),
                           "shardId"_attr = shardId,
                           "error"_attr = status);
                     continue;
