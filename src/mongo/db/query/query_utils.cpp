@@ -64,8 +64,9 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
     auto expCtx = cq->getExpCtxRaw();
     const auto& sortPattern = cq->getSortPattern();
     const bool allExpressionsSupported = expCtx && expCtx->sbeCompatible;
-    const bool isNotOplog = !cq->nss().isOplog();
-    const bool isNotChangeCollection = !cq->nss().isChangeCollection();
+    const auto nss = cq->nss();
+    const bool isNotOplog = !nss.isOplog();
+    const bool isNotChangeCollection = !nss.isChangeCollection();
     const bool doesNotContainMetadataRequirements = cq->metadataDeps().none();
     const bool doesNotSortOnMetaOrPathWithNumericComponents =
         !sortPattern || std::all_of(sortPattern->begin(), sortPattern->end(), [](auto&& part) {
@@ -74,7 +75,7 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
         });
 
     // Queries against a time-series collection are not currently supported by SBE.
-    const bool isQueryNotAgainstTimeseriesCollection = !(cq->nss().isTimeseriesBucketsCollection());
+    const bool isQueryNotAgainstTimeseriesCollection = !nss.isTimeseriesBucketsCollection();
 
     // Queries against a clustered collection are not currently supported by SBE.
     tassert(6038600, "Expected CollectionPtr to not be nullptr", collection);

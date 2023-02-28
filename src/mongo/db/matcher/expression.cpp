@@ -120,7 +120,7 @@ std::vector<const MatchExpression*> MatchExpression::parameterize(MatchExpressio
     MatchExpressionParameterizationVisitor visitor{&context};
     MatchExpressionParameterizationWalker walker{&visitor};
     tree_walker::walk<false, MatchExpression>(tree, &walker);
-    return context.inputParamIdToExpressionMap;
+    return std::move(context.inputParamIdToExpressionMap);
 }
 
 std::string MatchExpression::toString() const {
