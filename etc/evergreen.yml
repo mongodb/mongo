@@ -1874,7 +1874,7 @@ buildvariants:
 
 - name: &enterprise-rhel-80-64-bit-suggested enterprise-rhel-80-64-bit-suggested
   display_name: "* Enterprise RHEL 8.0"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
   run_on:
