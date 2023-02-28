@@ -208,27 +208,30 @@ BSONObj queryShapeForOptimizedExprExpression(std::string exprPredicateJson) {
 }
 
 TEST(QueryPredicateShape, OptimizedExprPredicates) {
-    // TODO SERVER-73709 $expr should respect the literal redaction and hide the '2' - here and in
-    // all following assertions.
     ASSERT_BSONOBJ_EQ(
         queryShapeForOptimizedExprExpression("{$expr: {$eq: ['$a', 2]}}"),
-        fromjson("{$and: [{a: {$_internalExprEq: '?'}}, {$expr: {$eq: ['$a', {$const: 2}]}}]}"));
+        fromjson(
+            "{$and: [{a: {$_internalExprEq: '?'}}, {$expr: {$eq: ['$a', {$const: \"?\"}]}}]}"));
 
     ASSERT_BSONOBJ_EQ(
         queryShapeForOptimizedExprExpression("{$expr: {$lt: ['$a', 2]}}"),
-        fromjson("{$and: [{a: {$_internalExprLt: '?'}}, {$expr: {$lt: ['$a', {$const: 2}]}}]}"));
+        fromjson(
+            "{$and: [{a: {$_internalExprLt: '?'}}, {$expr: {$lt: ['$a', {$const: \"?\"}]}}]}"));
 
     ASSERT_BSONOBJ_EQ(
         queryShapeForOptimizedExprExpression("{$expr: {$lte: ['$a', 2]}}"),
-        fromjson("{$and: [{a: {$_internalExprLte: '?'}}, {$expr: {$lte: ['$a', {$const: 2}]}}]}"));
+        fromjson(
+            "{$and: [{a: {$_internalExprLte: '?'}}, {$expr: {$lte: ['$a', {$const: \"?\"}]}}]}"));
 
     ASSERT_BSONOBJ_EQ(
         queryShapeForOptimizedExprExpression("{$expr: {$gt: ['$a', 2]}}"),
-        fromjson("{$and: [{a: {$_internalExprGt: '?'}}, {$expr: {$gt: ['$a', {$const: 2}]}}]}"));
+        fromjson(
+            "{$and: [{a: {$_internalExprGt: '?'}}, {$expr: {$gt: ['$a', {$const: \"?\"}]}}]}"));
 
     ASSERT_BSONOBJ_EQ(
         queryShapeForOptimizedExprExpression("{$expr: {$gte: ['$a', 2]}}"),
-        fromjson("{$and: [{a: {$_internalExprGte: '?'}}, {$expr: {$gte: ['$a', {$const: 2}]}}]}"));
+        fromjson(
+            "{$and: [{a: {$_internalExprGte: '?'}}, {$expr: {$gte: ['$a', {$const: \"?\"}]}}]}"));
 }
 
 }  // namespace mongo

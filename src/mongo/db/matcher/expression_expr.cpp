@@ -78,8 +78,7 @@ Value ExprMatchExpression::evaluateExpression(const MatchableDocument* doc) cons
 }
 
 void ExprMatchExpression::serialize(BSONObjBuilder* out, SerializationOptions opts) const {
-    // TODO aggregation expressions should support some of the new options.
-    *out << "$expr" << _expression->serialize(false);
+    *out << "$expr" << _expression->serialize(opts);
 }
 
 bool ExprMatchExpression::equivalent(const MatchExpression* other) const {
