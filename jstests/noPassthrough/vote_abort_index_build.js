@@ -18,7 +18,6 @@ const rst = new ReplSetTest({
             // Disallow elections on secondary.
             rsConfig: {
                 priority: 0,
-                votes: 0,
             },
         },
         {/* arbiter */ rsConfig: {arbiterOnly: true}}
