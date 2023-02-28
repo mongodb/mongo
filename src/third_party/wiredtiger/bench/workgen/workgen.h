@@ -323,7 +323,6 @@ struct Operation {
     void init_internal(OperationInternal *other);
     void create_all();
     void get_static_counts(Stats &stats, int multiplier);
-    bool has_table() const;
     bool is_table_op() const;
     void kv_compute_max(bool iskey, bool has_random);
     void kv_gen(ThreadRunner *runner, bool iskey, uint64_t compressibility,
@@ -458,9 +457,6 @@ struct WorkloadOptions {
     int drop_interval;
     int drop_target;
     int drop_trigger;
-    bool random_table_values;
-    bool mirror_tables;
-    std::string mirror_suffix;
 
     WorkloadOptions();
     WorkloadOptions(const WorkloadOptions &other);
