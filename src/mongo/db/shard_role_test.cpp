@@ -153,6 +153,8 @@ protected:
     // Workaround to be able to write parametrized TEST_F
     void testRestoreFailsIfCollectionNoLongerExists(
         AcquisitionPrerequisites::OperationType operationType);
+    void testRestoreFailsIfCollectionBecomesCreated(
+        AcquisitionPrerequisites::OperationType operationType);
     void testRestoreFailsIfCollectionRenamed(AcquisitionPrerequisites::OperationType operationType);
     void testRestoreFailsIfCollectionDroppedAndRecreated(
         AcquisitionPrerequisites::OperationType operationType);
@@ -215,10 +217,10 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
     const auto nss = nssUnshardedCollection1;
 
     {
-        CollectionOrViewAcquisitionRequest acquisitionRequest(
-            opCtx(), nss, {}, AcquisitionPrerequisites::kWrite);
-        ASSERT_EQ(boost::none, acquisitionRequest.placementConcern.dbVersion);
-        ASSERT_EQ(boost::none, acquisitionRequest.placementConcern.shardVersion);
+        auto acquisition =
+            CollectionAcquisitionRequest::fromOpCtx(opCtx(), nss, AcquisitionPrerequisites::kWrite);
+        ASSERT_EQ(boost::none, acquisition.placementConcern.dbVersion);
+        ASSERT_EQ(boost::none, acquisition.placementConcern.shardVersion);
     }
 
     {
@@ -226,40 +228,52 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
             NamespaceString::createNamespaceString_forTest("test2.foo");
         ScopedSetShardRole setShardRole(
             opCtx(), anotherCollection, ShardVersion::UNSHARDED(), dbVersionTestDb);
-        CollectionOrViewAcquisitionRequest acquisitionRequest(
-            opCtx(), nss, {}, AcquisitionPrerequisites::kWrite);
-        ASSERT_EQ(boost::none, acquisitionRequest.placementConcern.dbVersion);
-        ASSERT_EQ(boost::none, acquisitionRequest.placementConcern.shardVersion);
+        auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx(),
+            nss,
+            AcquisitionPrerequisites::kWrite,
+            AcquisitionPrerequisites::kMustBeCollection);
+        ASSERT_EQ(boost::none, acquisition.placementConcern.dbVersion);
+        ASSERT_EQ(boost::none, acquisition.placementConcern.shardVersion);
     }
 
     {
         const auto dbVersion = boost::none;
         const auto shardVersion = boost::none;
         ScopedSetShardRole setShardRole(opCtx(), nss, shardVersion, dbVersion);
-        CollectionOrViewAcquisitionRequest acquisitionRequest(
-            opCtx(), nss, {}, AcquisitionPrerequisites::kWrite);
-        ASSERT_EQ(dbVersion, acquisitionRequest.placementConcern.dbVersion);
-        ASSERT_EQ(shardVersion, acquisitionRequest.placementConcern.shardVersion);
+        auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx(),
+            nss,
+            AcquisitionPrerequisites::kWrite,
+            AcquisitionPrerequisites::kMustBeCollection);
+        ASSERT_EQ(dbVersion, acquisition.placementConcern.dbVersion);
+        ASSERT_EQ(shardVersion, acquisition.placementConcern.shardVersion);
     }
 
     {
         const auto dbVersion = dbVersionTestDb;
         const auto shardVersion = ShardVersion::UNSHARDED();
         ScopedSetShardRole setShardRole(opCtx(), nss, shardVersion, dbVersion);
-        CollectionOrViewAcquisitionRequest acquisitionRequest(
-            opCtx(), nss, {}, AcquisitionPrerequisites::kWrite);
-        ASSERT_EQ(dbVersion, acquisitionRequest.placementConcern.dbVersion);
-        ASSERT_EQ(shardVersion, acquisitionRequest.placementConcern.shardVersion);
+        auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx(),
+            nss,
+            AcquisitionPrerequisites::kWrite,
+            AcquisitionPrerequisites::kMustBeCollection);
+        ASSERT_EQ(dbVersion, acquisition.placementConcern.dbVersion);
+        ASSERT_EQ(shardVersion, acquisition.placementConcern.shardVersion);
     }
 
     {
         const auto dbVersion = boost::none;
         const auto shardVersion = shardVersionShardedCollection1;
         ScopedSetShardRole setShardRole(opCtx(), nss, shardVersion, dbVersion);
-        CollectionOrViewAcquisitionRequest acquisitionRequest(
-            opCtx(), nss, {}, AcquisitionPrerequisites::kWrite);
-        ASSERT_EQ(dbVersion, acquisitionRequest.placementConcern.dbVersion);
-        ASSERT_EQ(shardVersion, acquisitionRequest.placementConcern.shardVersion);
+        auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx(),
+            nss,
+            AcquisitionPrerequisites::kWrite,
+            AcquisitionPrerequisites::kMustBeCollection);
+        ASSERT_EQ(dbVersion, acquisition.placementConcern.dbVersion);
+        ASSERT_EQ(shardVersion, acquisition.placementConcern.shardVersion);
     }
 }
 
@@ -374,14 +388,11 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenCriticalSectionIsActiveThrows) {
 }
 
 TEST_F(ShardRoleTest, AcquireUnshardedCollWithoutSpecifyingPlacementVersion) {
-    AcquisitionPrerequisites::PlacementConcern placementConcern =
-        CollectionOrViewAcquisitionRequest::kPretendUnshardedDueToDirectConnection;
-    const auto acquisition = acquireCollection(opCtx(),
-                                               {nssUnshardedCollection1,
-                                                {placementConcern},
-                                                repl::ReadConcernArgs(),
-                                                AcquisitionPrerequisites::kWrite},
-                                               MODE_IX);
+    const auto acquisition =
+        acquireCollection(opCtx(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              opCtx(), nssUnshardedCollection1, AcquisitionPrerequisites::kWrite),
+                          MODE_IX);
 
     ASSERT_EQ(nssUnshardedCollection1, acquisition.nss());
     ASSERT_EQ(nssUnshardedCollection1, acquisition.getCollectionPtr()->ns());
@@ -503,16 +514,11 @@ TEST_F(ShardRoleTest, AcquireShardedCollWhenCriticalSectionIsActiveThrows) {
 }
 
 TEST_F(ShardRoleTest, AcquireShardedCollWithoutSpecifyingPlacementVersion) {
-    AcquisitionPrerequisites::PlacementConcern placementConcern =
-        CollectionOrViewAcquisitionRequest::kPretendUnshardedDueToDirectConnection;
-    const auto acquisition = acquireCollection(opCtx(),
-                                               {
-                                                   nssShardedCollection1,
-                                                   placementConcern,
-                                                   repl::ReadConcernArgs(),
-                                                   AcquisitionPrerequisites::kWrite,
-                                               },
-                                               MODE_IX);
+    const auto acquisition =
+        acquireCollection(opCtx(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              opCtx(), nssShardedCollection1, AcquisitionPrerequisites::kWrite),
+                          MODE_IX);
 
     ASSERT_EQ(nssShardedCollection1, acquisition.nss());
     ASSERT_EQ(nssShardedCollection1, acquisition.getCollectionPtr()->ns());
@@ -525,18 +531,17 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithoutSpecifyingPlacementVersion) {
 // ---------------------------------------------------------------------------
 // Acquire inexistent collections
 
-TEST_F(ShardRoleTest, AcquireCollectionFailsIfItDoesNotExist) {
+TEST_F(ShardRoleTest, AcquireCollectionNonExistentNamespace) {
     const NamespaceString inexistentNss =
         NamespaceString::createNamespaceString_forTest(dbNameTestDb, "inexistent");
-    AcquisitionPrerequisites::PlacementConcern placementConcern;
-    ASSERT_THROWS_CODE(acquireCollection(opCtx(),
-                                         {inexistentNss,
-                                          placementConcern,
-                                          repl::ReadConcernArgs(),
-                                          AcquisitionPrerequisites::kWrite},
-                                         MODE_IX),
-                       DBException,
-                       ErrorCodes::NamespaceNotFound);
+    auto acquisition =
+        acquireCollection(opCtx(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              opCtx(), inexistentNss, AcquisitionPrerequisites::kWrite),
+                          MODE_IX);
+    ASSERT(!acquisition.getCollectionPtr());
+    ASSERT(!acquisition.getShardingDescription().isSharded());
+    ASSERT(!acquisition.getCollectionFilter());
 }
 
 TEST_F(ShardRoleTest, AcquireInexistentCollectionWithWrongPlacementThrowsBecauseWrongPlacement) {
@@ -562,24 +567,19 @@ TEST_F(ShardRoleTest, AcquireInexistentCollectionWithWrongPlacementThrowsBecause
 }
 
 TEST_F(ShardRoleTest, AcquireCollectionButItIsAView) {
-    ASSERT_THROWS_CODE(
-        acquireCollection(
-            opCtx(),
-            {nssView,
-             CollectionOrViewAcquisitionRequest::kPretendUnshardedDueToDirectConnection,
-             repl::ReadConcernArgs(),
-             AcquisitionPrerequisites::kWrite},
-            MODE_IX),
-        DBException,
-        ErrorCodes::CommandNotSupportedOnView);
+    ASSERT_THROWS_CODE(acquireCollection(opCtx(),
+                                         CollectionAcquisitionRequest::fromOpCtx(
+                                             opCtx(), nssView, AcquisitionPrerequisites::kWrite),
+                                         MODE_IX),
+                       DBException,
+                       ErrorCodes::CommandNotSupportedOnView);
 
     const auto acquisition = acquireCollectionOrView(
         opCtx(),
-        {nssView,
-         CollectionOrViewAcquisitionRequest::kPretendUnshardedDueToDirectConnection,
-         repl::ReadConcernArgs(),
-         AcquisitionPrerequisites::kWrite,
-         AcquisitionPrerequisites::kCanBeView},
+        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx(),
+                                                      nssView,
+                                                      AcquisitionPrerequisites::kWrite,
+                                                      AcquisitionPrerequisites::kCanBeView),
         MODE_IX);
 
     ASSERT_TRUE(std::holds_alternative<ScopedViewAcquisition>(acquisition));
@@ -669,17 +669,14 @@ DEATH_TEST_REGEX_F(ShardRoleTest,
                    ForbiddenToAcquireMultipleCollectionsOnDifferentDatabases,
                    "Tripwire assertion") {
     ASSERT_THROWS_CODE(
-        acquireCollections(
-            opCtx(),
-            {{nssUnshardedCollection1,
-              CollectionOrViewAcquisitionRequest::kPretendUnshardedDueToDirectConnection,
-              repl::ReadConcernArgs(),
-              AcquisitionPrerequisites::kWrite},
-             {NamespaceString::createNamespaceString_forTest("anotherDb", "foo"),
-              CollectionOrViewAcquisitionRequest::kPretendUnshardedDueToDirectConnection,
-              repl::ReadConcernArgs(),
-              AcquisitionPrerequisites::kWrite}},
-            MODE_IX),
+        acquireCollections(opCtx(),
+                           {CollectionAcquisitionRequest::fromOpCtx(
+                                opCtx(), nssUnshardedCollection1, AcquisitionPrerequisites::kWrite),
+                            CollectionAcquisitionRequest::fromOpCtx(
+                                opCtx(),
+                                NamespaceString::createNamespaceString_forTest("anotherDb", "foo"),
+                                AcquisitionPrerequisites::kWrite)},
+                           MODE_IX),
         DBException,
         7300400);
 }
@@ -942,6 +939,33 @@ TEST_F(ShardRoleTest, RestoreWithShardVersionIgnored) {
     ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 }
 
+void ShardRoleTest::testRestoreFailsIfCollectionBecomesCreated(
+    AcquisitionPrerequisites::OperationType operationType) {
+    NamespaceString nss(dbNameTestDb, "NonExistentCollectionWhichWillBeCreated");
+
+    const auto acquisition = acquireCollection(
+        opCtx(), CollectionAcquisitionRequest::fromOpCtx(opCtx(), nss, operationType), MODE_IX);
+
+    // Yield the resources
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+
+    // Create the collection
+    createTestCollection(opCtx(), nss);
+
+    // Try to restore the resources should fail because the collection showed-up after a restore
+    // where it didn't exist before that.
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           opCtx(), std::move(yieldedTransactionResources)),
+                       DBException,
+                       743870);
+}
+TEST_F(ShardRoleTest, RestoreForReadFailsIfCollectionBecomesCreated) {
+    testRestoreFailsIfCollectionBecomesCreated(AcquisitionPrerequisites::kRead);
+}
+TEST_F(ShardRoleTest, RestoreForWriteFailsIfCollectionBecomesCreated) {
+    testRestoreFailsIfCollectionBecomesCreated(AcquisitionPrerequisites::kWrite);
+}
+
 void ShardRoleTest::testRestoreFailsIfCollectionNoLongerExists(
     AcquisitionPrerequisites::OperationType operationType) {
     const auto nss = nssShardedCollection1;
@@ -1105,13 +1129,12 @@ TEST_F(ShardRoleTest, RestoreForReadSucceedsEvenIfPlacementHasChanged) {
 }
 
 DEATH_TEST_REGEX_F(ShardRoleTest, YieldingViewAcquisitionIsForbidden, "Tripwire assertion") {
-    const auto acquisition = acquireCollectionsOrViews(
+    const auto acquisition = acquireCollectionOrView(
         opCtx(),
-        {{nssView,
-          CollectionOrViewAcquisitionRequest::kPretendUnshardedDueToDirectConnection,
-          repl::ReadConcernArgs(),
-          AcquisitionPrerequisites::kWrite,
-          AcquisitionPrerequisites::kCanBeView}},
+        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx(),
+                                                      nssView,
+                                                      AcquisitionPrerequisites::kWrite,
+                                                      AcquisitionPrerequisites::kCanBeView),
         MODE_IX);
 
     ASSERT_THROWS_CODE(

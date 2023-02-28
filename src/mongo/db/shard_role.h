@@ -30,8 +30,7 @@
 #pragma once
 
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/database_name.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/transaction_resources.h"
@@ -40,13 +39,10 @@
 namespace mongo {
 
 /**
- * Contains all the required properties for the acquisition of a collection. These properties are
- * taken into account in addition to the ReadConcern of the transaction, which is stored in the
- * OperationContext.
+ * Structure which contains all the prerequsites that the catalog needs to meet in order for an
+ * acquisition of a namespace to succeed.
  */
 struct CollectionOrViewAcquisitionRequest {
-    static const AcquisitionPrerequisites::PlacementConcern kPretendUnshardedDueToDirectConnection;
-
     /**
      * Overload, which acquires a collection by NSS, ignoring the current UUID mapping.
      */
@@ -99,15 +95,14 @@ struct CollectionOrViewAcquisitionRequest {
           viewMode(viewMode) {}
 
     /**
-     * Overload, which acquires a collection by NSS, ignoring the current UUID mapping. Takes the
-     * placement concern from the opCtx's OperationShardingState.
+     * Infers the placement and read concerns from the OperationShardingState and ReadConcern values
+     * on the OperationContext.
      */
-    CollectionOrViewAcquisitionRequest(
+    static CollectionOrViewAcquisitionRequest fromOpCtx(
         OperationContext* opCtx,
         NamespaceString nss,
-        repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
-        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kMustBeCollection);
+        AcquisitionPrerequisites::ViewMode viewMode);
 
     boost::optional<DatabaseName> dbname;
     boost::optional<NamespaceString> nss;
@@ -164,16 +159,13 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
                                              AcquisitionPrerequisites::kMustBeCollection) {}
 
     /**
-     * Overload, which acquires a collection by NSS, ignoring the current UUID mapping. Takes the
-     * placement concern from the opCtx's OperationShardingState.
+     * Infers the placement and read concerns from the OperationShardingState and ReadConcern values
+     * on the OperationContext.
      */
-    CollectionAcquisitionRequest(OperationContext* opCtx,
-                                 NamespaceString nss,
-                                 repl::ReadConcernArgs readConcern,
-                                 AcquisitionPrerequisites::OperationType operationType)
-        : CollectionOrViewAcquisitionRequest(
-              opCtx, nss, readConcern, operationType, AcquisitionPrerequisites::kMustBeCollection) {
-    }
+    static CollectionAcquisitionRequest fromOpCtx(
+        OperationContext* opCtx,
+        NamespaceString nss,
+        AcquisitionPrerequisites::OperationType operationType);
 };
 
 class ScopedCollectionAcquisition {
@@ -273,7 +265,6 @@ std::vector<ScopedCollectionAcquisition> acquireCollections(
     OperationContext* opCtx,
     std::vector<CollectionAcquisitionRequest> acquisitionRequests,
     LockMode mode);
-
 
 ScopedCollectionOrViewAcquisition acquireCollectionOrView(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest, LockMode mode);

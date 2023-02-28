@@ -33,7 +33,9 @@
 #include <map>
 
 #include "mongo/db/catalog/catalog_helper.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
+#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -64,13 +66,6 @@ shard_role_details::TransactionResources& getOrMakeTransactionResources(Operatio
     return *optTransactionResources;
 }
 
-AcquisitionPrerequisites::PlacementConcern getPlacementConcernFromOSS(OperationContext* opCtx,
-                                                                      const NamespaceString& nss) {
-    const auto optDbVersion = OperationShardingState::get(opCtx).getDbVersion(nss.db());
-    const auto optShardVersion = OperationShardingState::get(opCtx).getShardVersion(nss);
-    return {optDbVersion, optShardVersion};
-}
-
 struct ResolvedNamespaceOrViewAcquisitionRequest {
     // Populated in the first phase of collection(s) acquisition
     AcquisitionPrerequisites prerequisites;
@@ -83,6 +78,10 @@ struct ResolvedNamespaceOrViewAcquisitionRequest {
 using ResolvedNamespaceOrViewAcquisitionRequestsMap =
     std::map<ResourceId, ResolvedNamespaceOrViewAcquisitionRequest>;
 
+/**
+ * Takes the input acquisitions, populates the NSS and UUID parts and returns a list, sorted by NSS,
+ * suitable for a defined lock acquisition order.
+ */
 ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionRequests(
     OperationContext* opCtx,
     const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
@@ -115,6 +114,7 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
                                   << ". Expected: " << *ar.dbname
                                   << " Actual: " << coll->ns().dbName(),
                     coll->ns().dbName() == *ar.dbname);
+
             if (ar.nss) {
                 checkCollectionUUIDMismatch(opCtx, *ar.nss, coll, *ar.uuid);
             }
@@ -127,6 +127,8 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
 
             sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, coll->ns()),
                                               std::move(resolvedAcquisitionRequest));
+        } else {
+            MONGO_UNREACHABLE;
         }
     }
 
@@ -182,20 +184,13 @@ void checkPlacementVersion(OperationContext* opCtx, const AcquisitionPrerequisit
     }
 }
 
-struct SnapshotedServices {
-    std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> collectionPtrOrView;
-    ScopedCollectionDescription collectionDescription;
-    boost::optional<ScopedCollectionFilter> ownershipFilter;
-};
-
-std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireCollectionPtrOrView(
+std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireLocalCollectionOrView(
     OperationContext* opCtx, const AcquisitionPrerequisites& prerequisites) {
     const auto& nss = prerequisites.nss;
 
     const auto catalog = CollectionCatalog::get(opCtx);
-    CollectionPtr coll(catalog->lookupCollectionByNamespace(opCtx, nss));
 
-    if (coll) {
+    if (auto coll = CollectionPtr(catalog->lookupCollectionByNamespace(opCtx, nss))) {
         verifyDbAndCollection(opCtx, nss, coll);
         checkCollectionUUIDMismatch(opCtx, nss, coll, prerequisites.uuid);
         return coll;
@@ -206,10 +201,18 @@ std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireCollec
                 prerequisites.viewMode == AcquisitionPrerequisites::kCanBeView);
         return view;
     } else {
-        uasserted(ErrorCodes::NamespaceNotFound,
-                  str::stream() << "Namespace " << nss << "does not exist.");
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Namespace " << nss << " does not exist",
+                !prerequisites.uuid);
+        return CollectionPtr();
     }
 }
+
+struct SnapshotedServices {
+    std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> collectionPtrOrView;
+    ScopedCollectionDescription collectionDescription;
+    boost::optional<ScopedCollectionFilter> ownershipFilter;
+};
 
 SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
                                            const AcquisitionPrerequisites& prerequisites) {
@@ -218,7 +221,7 @@ SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
     // Check placement version before acquiring the catalog snapshot
     checkPlacementVersion(opCtx, prerequisites);
 
-    auto coll = acquireCollectionPtrOrView(opCtx, prerequisites);
+    auto collOrView = acquireLocalCollectionOrView(opCtx, prerequisites);
 
     const bool isPlacementConcernVersioned =
         prerequisites.placementConcern.dbVersion || prerequisites.placementConcern.shardVersion;
@@ -243,7 +246,7 @@ SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
     checkPlacementVersion(opCtx, prerequisites);
 
     return SnapshotedServices{
-        std::move(coll), std::move(collectionDescription), std::move(optOwnershipFilter)};
+        std::move(collOrView), std::move(collectionDescription), std::move(optOwnershipFilter)};
 }
 
 std::vector<ScopedCollectionOrViewAcquisition> acquireResolvedCollectionsOrViewsWithoutTakingLocks(
@@ -266,7 +269,7 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireResolvedCollectionsOrViews
             const auto& collectionPtr =
                 std::get<CollectionPtr>(snapshotedServices.collectionPtrOrView);
             invariant(!prerequisites.uuid || prerequisites.uuid == collectionPtr->uuid());
-            if (!prerequisites.uuid) {
+            if (!prerequisites.uuid && collectionPtr) {
                 // If the uuid wasn't originally set on the AcquisitionRequest, set it now on the
                 // prerequisites so that on restore from yield we can check we are restoring the
                 // same instance of the ns.
@@ -304,21 +307,32 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireResolvedCollectionsOrViews
 
 }  // namespace
 
-const AcquisitionPrerequisites::PlacementConcern
-    CollectionOrViewAcquisitionRequest::kPretendUnshardedDueToDirectConnection{boost::none,
-                                                                               boost::none};
-
-CollectionOrViewAcquisitionRequest::CollectionOrViewAcquisitionRequest(
+CollectionOrViewAcquisitionRequest CollectionOrViewAcquisitionRequest::fromOpCtx(
     OperationContext* opCtx,
     NamespaceString nss,
-    repl::ReadConcernArgs readConcern,
     AcquisitionPrerequisites::OperationType operationType,
-    AcquisitionPrerequisites::ViewMode viewMode)
-    : nss(nss),
-      placementConcern(getPlacementConcernFromOSS(opCtx, nss)),
-      readConcern(readConcern),
-      operationType(operationType),
-      viewMode(viewMode) {}
+    AcquisitionPrerequisites::ViewMode viewMode) {
+    auto& oss = OperationShardingState::get(opCtx);
+    auto& readConcern = repl::ReadConcernArgs::get(opCtx);
+
+    return CollectionOrViewAcquisitionRequest(
+        nss,
+        {oss.getDbVersion(nss.db()), oss.getShardVersion(nss)},
+        readConcern,
+        operationType,
+        viewMode);
+}
+
+CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
+    OperationContext* opCtx,
+    NamespaceString nss,
+    AcquisitionPrerequisites::OperationType operationType) {
+    auto& oss = OperationShardingState::get(opCtx);
+    auto& readConcern = repl::ReadConcernArgs::get(opCtx);
+
+    return CollectionAcquisitionRequest(
+        nss, {oss.getDbVersion(nss.db()), oss.getShardVersion(nss)}, readConcern, operationType);
+}
 
 ScopedCollectionAcquisition::~ScopedCollectionAcquisition() {
     if (_opCtx) {
@@ -499,30 +513,40 @@ void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
     for (auto& acquiredCollection : yieldedResources._yieldedResources->acquiredCollections) {
         const auto& prerequisites = acquiredCollection.prerequisites;
 
+        auto uassertCollectionAppearedAfterRestore = [&] {
+            uasserted(743870,
+                      str::stream()
+                          << "Collection " << prerequisites.nss
+                          << " appeared after a restore, which violates the semantics of restore");
+        };
+
         if (prerequisites.operationType == AcquisitionPrerequisites::OperationType::kRead) {
             // Just reacquire the CollectionPtr. Reads don't care about placement changes because
             // they have already established a ScopedCollectionFilter that acts as RangePreserver.
-            auto collectionPtrOrView = acquireCollectionPtrOrView(opCtx, prerequisites);
+            auto collOrView = acquireLocalCollectionOrView(opCtx, prerequisites);
 
             // We do not support yielding view acquisitions. Therefore it is not possible that upon
-            // restore 'acquireCollectionPtrOrView' snapshoted a view -- it would not have met the
+            // restore 'acquireLocalCollectionOrView' snapshoted a view -- it would not have met the
             // prerequisite that the collection instance is still the same as the one before
             // yielding.
-            invariant(std::holds_alternative<CollectionPtr>(collectionPtrOrView));
+            invariant(std::holds_alternative<CollectionPtr>(collOrView));
+            if (!acquiredCollection.collectionPtr != !std::get<CollectionPtr>(collOrView))
+                uassertCollectionAppearedAfterRestore();
 
             // Update the services snapshot on TransactionResources
-            acquiredCollection.collectionPtr =
-                std::move(std::get<CollectionPtr>(collectionPtrOrView));
-
+            acquiredCollection.collectionPtr = std::move(std::get<CollectionPtr>(collOrView));
         } else {
             auto reacquiredServicesSnapshot = acquireServicesSnapshot(opCtx, prerequisites);
 
             // We do not support yielding view acquisitions. Therefore it is not possible that upon
-            // restore 'acquireCollectionPtrOrView' snapshoted a view -- it would not have met the
+            // restore 'acquireLocalCollectionOrView' snapshoted a view -- it would not have met the
             // prerequisite that the collection instance is still the same as the one before
             // yielding.
             invariant(std::holds_alternative<CollectionPtr>(
                 reacquiredServicesSnapshot.collectionPtrOrView));
+            if (!acquiredCollection.collectionPtr !=
+                !std::get<CollectionPtr>(reacquiredServicesSnapshot.collectionPtrOrView))
+                uassertCollectionAppearedAfterRestore();
 
             // Update the services snapshot on TransactionResources
             acquiredCollection.collectionPtr =
