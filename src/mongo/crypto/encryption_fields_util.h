@@ -154,13 +154,12 @@ inline bool isFLE2UnindexedSupportedType(BSONType type) {
 inline bool isFLE2SupportedType(EncryptedBinDataType fleType, BSONType bsonType) {
     switch (fleType) {
         case EncryptedBinDataType::kFLE2UnindexedEncryptedValue:
+        case EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2:
             return isFLE2UnindexedSupportedType(bsonType);
         case EncryptedBinDataType::kFLE2EqualityIndexedValue:
-            return isFLE2EqualityIndexedSupportedType(bsonType);
-        case EncryptedBinDataType::kFLE2RangeIndexedValue:
-            return isFLE2RangeIndexedSupportedType(bsonType);
         case EncryptedBinDataType::kFLE2EqualityIndexedValueV2:
             return isFLE2EqualityIndexedSupportedType(bsonType);
+        case EncryptedBinDataType::kFLE2RangeIndexedValue:
         case EncryptedBinDataType::kFLE2RangeIndexedValueV2:
             return isFLE2RangeIndexedSupportedType(bsonType);
         default:

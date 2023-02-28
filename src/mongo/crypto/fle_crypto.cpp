@@ -1667,6 +1667,14 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
                                   << "' is not a valid type for Queryable Encryption",
                     isFLE2UnindexedSupportedType(el.type()));
 
+            if (gFeatureFlagFLE2ProtocolVersion2.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                auto payload = FLE2UnindexedEncryptedValueV2::serialize(userKey, el);
+                builder->appendBinData(
+                    fieldNameToSerialize, payload.size(), BinDataType::Encrypt, payload.data());
+                return;
+            }
+
             auto payload = FLE2UnindexedEncryptedValue::serialize(userKey, el);
             builder->appendBinData(
                 fieldNameToSerialize, payload.size(), BinDataType::Encrypt, payload.data());
@@ -1742,8 +1750,14 @@ void collectEDCServerInfo(std::vector<EDCServerPayloadInfo>* pFields,
                encryptedType == EncryptedBinDataType::kFLE2FindRangePayloadV2) {
         // No-op
         return;
-    } else if (encryptedType == EncryptedBinDataType::kFLE2UnindexedEncryptedValue) {
-        // No-op
+    } else if (encryptedType == EncryptedBinDataType::kFLE2UnindexedEncryptedValue ||
+               encryptedType == EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2) {
+        if (gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+            uassert(7413901,
+                    "Encountered a Queryable Encryption unindexed encrypted payload type that is "
+                    "no longer supported",
+                    encryptedType == EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2);
+        }
         return;
     }
     uasserted(6373503,
@@ -1901,7 +1915,17 @@ void convertServerPayload(ConstDataRange cdr,
             pTags->push_back({EDCServerCollection::generateTag(*payload)});
         }
 
-    } else if (encryptedTypeBinding == EncryptedBinDataType::kFLE2UnindexedEncryptedValue) {
+    } else if (encryptedTypeBinding == EncryptedBinDataType::kFLE2UnindexedEncryptedValue ||
+               encryptedTypeBinding == EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2) {
+        auto validVersionedTypeBinding =
+            gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)
+            ? EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2
+            : EncryptedBinDataType::kFLE2UnindexedEncryptedValue;
+        uassert(7413902,
+                "Encountered a Queryable Encryption unindexed encrypted payload type that is no "
+                "longer supported",
+                encryptedTypeBinding == validVersionedTypeBinding);
+
         builder->appendBinData(fieldPath, cdr.length(), BinDataType::Encrypt, cdr.data());
         return;
     } else {
@@ -2586,8 +2610,9 @@ BSONObj FLEClientCrypto::decryptDocument(BSONObj& doc, FLEKeyVault* keyVault) {
                         uassertStatusOK(KeyIdAndValue::decrypt(userKey.key, userCipherText));
                     BSONObj obj = toBSON(type, userData);
                     builder->appendAs(obj.firstElement(), fieldPath);
-                } else if (encryptedType == EncryptedBinDataType::kFLE2UnindexedEncryptedValue) {
-                    auto [type, userData] = FLE2UnindexedEncryptedValue::deserialize(keyVault, cdr);
+                } else if (encryptedType == EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2) {
+                    auto [type, userData] =
+                        FLE2UnindexedEncryptedValueV2::deserialize(keyVault, cdr);
                     BSONObj obj = toBSON(type, userData);
                     builder->appendAs(obj.firstElement(), fieldPath);
                 } else {
@@ -3817,8 +3842,9 @@ StatusWith<std::vector<uint8_t>> FLE2IndexedEqualityEncryptedValueV2::serialize(
     return serializedServerValue;
 }
 
-std::vector<uint8_t> FLE2UnindexedEncryptedValue::serialize(const FLEUserKeyAndId& userKey,
-                                                            const BSONElement& element) {
+template <class UnindexedValue>
+std::vector<uint8_t> serializeUnindexedEncryptedValue(const FLEUserKeyAndId& userKey,
+                                                      const BSONElement& element) {
     BSONType bsonType = element.type();
     uassert(6379107,
             "Invalid BSON data type for Queryable Encryption",
@@ -3828,32 +3854,40 @@ std::vector<uint8_t> FLE2UnindexedEncryptedValue::serialize(const FLEUserKeyAndI
     auto cdrKeyId = userKey.keyId.toCDR();
     auto cdrKey = userKey.key.toCDR();
 
-    auto cipherTextSize = crypto::fle2AeadCipherOutputLength(value.length(), crypto::aesMode::ctr);
-    std::vector<uint8_t> buf(assocDataSize + cipherTextSize);
+    auto cipherTextSize = crypto::fle2AeadCipherOutputLength(value.length(), UnindexedValue::mode);
+    std::vector<uint8_t> buf(UnindexedValue::assocDataSize + cipherTextSize);
     DataRangeCursor adc(buf);
-    adc.writeAndAdvance(static_cast<uint8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue));
+    adc.writeAndAdvance(static_cast<uint8_t>(UnindexedValue::fleType));
     adc.writeAndAdvance(cdrKeyId);
     adc.writeAndAdvance(static_cast<uint8_t>(bsonType));
 
-    ConstDataRange assocData(buf.data(), assocDataSize);
+    ConstDataRange assocData(buf.data(), UnindexedValue::assocDataSize);
     auto cipherText = uassertStatusOK(
-        encryptDataWithAssociatedData(cdrKey, assocData, value, crypto::aesMode::ctr));
+        encryptDataWithAssociatedData(cdrKey, assocData, value, UnindexedValue::mode));
     uassert(6379106, "Cipher text size mismatch", cipherTextSize == cipherText.size());
     adc.writeAndAdvance(ConstDataRange(cipherText));
 
     return buf;
 }
 
-std::pair<BSONType, std::vector<uint8_t>> FLE2UnindexedEncryptedValue::deserialize(
-    FLEKeyVault* keyVault, ConstDataRange blob) {
+std::vector<uint8_t> FLE2UnindexedEncryptedValue::serialize(const FLEUserKeyAndId& userKey,
+                                                            const BSONElement& element) {
+    return serializeUnindexedEncryptedValue<FLE2UnindexedEncryptedValue>(userKey, element);
+}
 
-    auto [assocDataCdr, cipherTextCdr] = blob.split(assocDataSize);
+std::vector<uint8_t> FLE2UnindexedEncryptedValueV2::serialize(const FLEUserKeyAndId& userKey,
+                                                              const BSONElement& element) {
+    return serializeUnindexedEncryptedValue<FLE2UnindexedEncryptedValueV2>(userKey, element);
+}
+
+template <class UnindexedValue>
+std::pair<BSONType, std::vector<uint8_t>> deserializeUnindexedEncryptedValue(FLEKeyVault* keyVault,
+                                                                             ConstDataRange blob) {
+    auto [assocDataCdr, cipherTextCdr] = blob.split(UnindexedValue::assocDataSize);
     ConstDataRangeCursor adc(assocDataCdr);
 
     uint8_t marker = adc.readAndAdvance<uint8_t>();
-    uassert(6379110,
-            "Invalid data type",
-            static_cast<uint8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue) == marker);
+    uassert(6379110, "Invalid data type", static_cast<uint8_t>(UnindexedValue::fleType) == marker);
 
     UUID keyId = UUID::fromCDR(adc.readAndAdvance<UUIDBuf>());
     auto userKey = keyVault->getUserKeyById(keyId);
@@ -3864,8 +3898,18 @@ std::pair<BSONType, std::vector<uint8_t>> FLE2UnindexedEncryptedValue::deseriali
             isFLE2UnindexedSupportedType(bsonType));
 
     auto data = uassertStatusOK(decryptDataWithAssociatedData(
-        userKey.key.toCDR(), assocDataCdr, cipherTextCdr, crypto::aesMode::ctr));
+        userKey.key.toCDR(), assocDataCdr, cipherTextCdr, UnindexedValue::mode));
     return {bsonType, data};
+}
+
+std::pair<BSONType, std::vector<uint8_t>> FLE2UnindexedEncryptedValue::deserialize(
+    FLEKeyVault* keyVault, ConstDataRange blob) {
+    return deserializeUnindexedEncryptedValue<FLE2UnindexedEncryptedValue>(keyVault, blob);
+}
+
+std::pair<BSONType, std::vector<uint8_t>> FLE2UnindexedEncryptedValueV2::deserialize(
+    FLEKeyVault* keyVault, ConstDataRange blob) {
+    return deserializeUnindexedEncryptedValue<FLE2UnindexedEncryptedValueV2>(keyVault, blob);
 }
 
 std::vector<FLEEdgeToken> toFLEEdgeTokenSet(const FLE2InsertUpdatePayload& payload) {

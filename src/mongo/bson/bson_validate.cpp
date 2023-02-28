@@ -246,7 +246,8 @@ private:
             case EncryptedBinDataType::kFLE2EqualityIndexedValue:
             case EncryptedBinDataType::kFLE2RangeIndexedValue:
             case EncryptedBinDataType::kFLE2EqualityIndexedValueV2:
-            case EncryptedBinDataType::kFLE2RangeIndexedValueV2: {
+            case EncryptedBinDataType::kFLE2RangeIndexedValueV2:
+            case EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2: {
                 uassert(ErrorCodes::NonConformantBSON,
                         fmt::format("Invalid Encrypted BSON Value length {}", len),
                         len >= minLength);

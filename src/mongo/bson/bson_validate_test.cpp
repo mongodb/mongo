@@ -839,6 +839,19 @@ TEST(BSONValidateExtended, BSONEncryptedValue) {
     }
 
     {
+        // Successful FLE2 Unindexed Encrypted Value V2
+        memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
+        blob.originalBsonType = BSONType::String;
+        blob.fleBlobSubtype =
+            static_cast<int8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2);
+        fle = BSONBinData(
+            reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
+        obj = BSON("a" << fle);
+        status = validateBSON(obj, BSONValidateMode::kExtended);
+        ASSERT_OK(status);
+    }
+
+    {
         // Empty Encrypted BSON Value.
         auto emptyBinData = "";
         obj = BSON("a" << BSONBinData(emptyBinData, 0, Encrypt));

@@ -358,20 +358,36 @@ TEST(FLETokens, TestVectors) {
     ASSERT_EQUALS(ECCTwiceDerivedValueToken(decodePrf(
                       "EFA5746DB796DAC6FAACB7E5F28DB53B333588A43131F0C026B19D2B1215EAE2"_sd)),
                   eccTwiceValueToken);
+}
 
+TEST(FLETokens, TestVectorUnindexedValueDecryption) {
     // Unindexed field decryption
     // Encryption can not be generated using test vectors because IV is random
-
     TestKeyVault keyVault;
-    const std::string uxCiphertext = hexblob::decode(
-        "06ABCDEFAB12349876123412345678901202F2CE7FDD0DECD5442CC98C10B9138741785173E323132982740496768877A3BA46581CED4A34031B1174B5C524C15BAAE687F88C29FC71F40A32BCD53D63CDA0A6646E8677E167BB3A933529F5B519CFE255BBC323D943B4F105"_sd);
-    auto [uxBsonType, uxPlaintext] =
-        FLE2UnindexedEncryptedValue::deserialize(&keyVault, ConstDataRange(uxCiphertext));
-    ASSERT_EQUALS(uxBsonType, BSONType::String);
-    ASSERT_EQUALS(
-        hexblob::encode(uxPlaintext.data(), uxPlaintext.size()),
-        "260000004C6F7279207761732061206D6F75736520696E2061206269672062726F776E20686F75736500");
+    {
+        const std::string uxCiphertext = hexblob::decode(
+            "06ABCDEFAB12349876123412345678901202F2CE7FDD0DECD5442CC98C10B9138741785173E323132982740496768877A3BA46581CED4A34031B1174B5C524C15BAAE687F88C29FC71F40A32BCD53D63CDA0A6646E8677E167BB3A933529F5B519CFE255BBC323D943B4F105"_sd);
+        auto [uxBsonType, uxPlaintext] =
+            FLE2UnindexedEncryptedValue::deserialize(&keyVault, ConstDataRange(uxCiphertext));
+        ASSERT_EQUALS(uxBsonType, BSONType::String);
+        ASSERT_EQUALS(
+            hexblob::encode(uxPlaintext.data(), uxPlaintext.size()),
+            "260000004C6F7279207761732061206D6F75736520696E2061206269672062726F776E20686F75736500");
+    }
 
+    {
+        const std::string uxCiphertext = hexblob::decode(
+            "10ABCDEFAB1234987612341234567890120274E15D9477DA66394DF17BBA08FBEBB76A8BAFA63E6A7E7DCDDF9415B39877CE537469BB98A6B2B57E89AAC2CBBB5D5184DDE0111CD325E409739EF1C5C53AA917149FCF2EA2F6CB6BC8E11A7783E142FECC1570448837E6A295FCE6F16730B3"_sd);
+        auto [uxBsonType, uxPlaintext] =
+            FLE2UnindexedEncryptedValueV2::deserialize(&keyVault, ConstDataRange(uxCiphertext));
+        ASSERT_EQUALS(uxBsonType, BSONType::String);
+        ASSERT_EQUALS(
+            hexblob::encode(uxPlaintext.data(), uxPlaintext.size()),
+            "260000004C6F7279207761732061206D6F75736520696E2061206269672062726F776E20686F75736500");
+    }
+}
+
+TEST(FLETokens, TestVectorIndexedValueDecryption) {
     // Equality indexed field decryption
     // Encryption can not be generated using test vectors because IV is random
 
@@ -2580,13 +2596,34 @@ TEST(EDC, UnindexedEncryptDecrypt) {
     auto const elementData =
         std::vector<uint8_t>(element.value(), element.value() + element.valuesize());
 
-    auto blob = FLE2UnindexedEncryptedValue::serialize(userKey, element);
-    ASSERT_EQ(blob[0], 6);
+    {
+        auto blob = FLE2UnindexedEncryptedValue::serialize(userKey, element);
+        ASSERT_EQ(blob[0], 6);
 
-    auto [type, plainText] = FLE2UnindexedEncryptedValue::deserialize(&keyVault, {blob});
-    ASSERT_EQ(type, element.type());
-    ASSERT_TRUE(
-        std::equal(plainText.begin(), plainText.end(), elementData.begin(), elementData.end()));
+        // assert length of ciphertext (including HMAC & IV) is consistent with CTR mode
+        auto cipherTextLen = blob.size() - FLE2UnindexedEncryptedValue::assocDataSize;
+        ASSERT_EQ(cipherTextLen,
+                  crypto::fle2AeadCipherOutputLength(elementData.size(), crypto::aesMode::ctr));
+
+        auto [type, plainText] = FLE2UnindexedEncryptedValue::deserialize(&keyVault, {blob});
+        ASSERT_EQ(type, element.type());
+        ASSERT_TRUE(
+            std::equal(plainText.begin(), plainText.end(), elementData.begin(), elementData.end()));
+    }
+    {
+        auto blob = FLE2UnindexedEncryptedValueV2::serialize(userKey, element);
+        ASSERT_EQ(blob[0], 16);
+
+        // assert length of ciphertext (including HMAC & IV) is consistent with CBC mode
+        auto cipherTextLen = blob.size() - FLE2UnindexedEncryptedValueV2::assocDataSize;
+        ASSERT_EQ(cipherTextLen,
+                  crypto::fle2AeadCipherOutputLength(elementData.size(), crypto::aesMode::cbc));
+
+        auto [type, plainText] = FLE2UnindexedEncryptedValueV2::deserialize(&keyVault, {blob});
+        ASSERT_EQ(type, element.type());
+        ASSERT_TRUE(
+            std::equal(plainText.begin(), plainText.end(), elementData.begin(), elementData.end()));
+    }
 }
 
 TEST(EDC, ValidateDocument) {

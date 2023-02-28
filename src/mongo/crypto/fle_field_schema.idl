@@ -68,6 +68,7 @@ enums:
           # QE protocol version 2 - server-side payloads
           kFLE2EqualityIndexedValueV2: 14
           kFLE2RangeIndexedValueV2: 15
+          kFLE2UnindexedEncryptedValueV2: 16
 
     FleVersion:
         description: "The version / type of field-level encryption in use."

@@ -522,6 +522,12 @@ function assertIsRangeIndexedEncryptedField(value) {
 function assertIsUnindexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-    assert(value.hex().startsWith("06"),
+    // TODO: SERVER-73303 remove once v2 is enabled by default
+    if (!isFLE2ProtocolVersion2Enabled()) {
+        assert(value.hex().startsWith("06"),
+               "Expected subtype 6 but found the wrong type: " + value.hex());
+        return;
+    }
+    assert(value.hex().startsWith("10"),
            "Expected subtype 6 but found the wrong type: " + value.hex());
 }

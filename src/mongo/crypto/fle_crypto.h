@@ -1070,6 +1070,7 @@ struct FLE2IndexedEqualityEncryptedValueV2 {
     FLE2TagAndEncryptedMetadataBlock metadataBlock;
 };
 
+// TODO: SERVER-73303 delete when v2 is enabled by default
 /**
  * Class to read/write FLE2 Unindexed Encrypted Values
  *
@@ -1090,6 +1091,47 @@ struct FLE2UnindexedEncryptedValue {
     static std::pair<BSONType, std::vector<uint8_t>> deserialize(FLEKeyVault* keyVault,
                                                                  ConstDataRange blob);
 
+    static constexpr crypto::aesMode mode = crypto::aesMode::ctr;
+    static constexpr EncryptedBinDataType fleType =
+        EncryptedBinDataType::kFLE2UnindexedEncryptedValue;
+    static constexpr size_t assocDataSize = sizeof(uint8_t) + sizeof(UUID) + sizeof(uint8_t);
+};
+
+/**
+ * Class to read/write FLE2 Unindexed Encrypted Values (for protocol version 2)
+ *
+ * Fields are encrypted with the following:
+ *
+ * struct {
+ *   uint8_t fle_blob_subtype = 16;
+ *   uint8_t key_uuid[16];
+ *   uint8_t original_bson_type;
+ *   ciphertext[ciphertext_length];
+ * } blob;
+ *
+ * The specification needs to be in sync with the validation in 'bson_validate.cpp'.
+ */
+struct FLE2UnindexedEncryptedValueV2 {
+    static std::vector<uint8_t> serialize(const FLEUserKeyAndId& userKey,
+                                          const BSONElement& element);
+    static std::pair<BSONType, std::vector<uint8_t>> deserialize(FLEKeyVault* keyVault,
+                                                                 ConstDataRange blob);
+
+    /*
+     * The block cipher mode used with AES to encrypt/decrypt the value
+     */
+    static constexpr crypto::aesMode mode = crypto::aesMode::cbc;
+
+    /*
+     * The FLE type associated with this unindexed value
+     */
+    static constexpr EncryptedBinDataType fleType =
+        EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2;
+
+    /*
+     * The size of the AAD used in AEAD encryption. The AAD consists of the fleType (1), the
+     * key UUID (16), and the BSON type of the value (1).
+     */
     static constexpr size_t assocDataSize = sizeof(uint8_t) + sizeof(UUID) + sizeof(uint8_t);
 };
 

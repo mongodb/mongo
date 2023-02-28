@@ -1078,6 +1078,58 @@ TEST_F(FleCrudTest, InsertV1PayloadAgainstV2Protocol) {
         7291907);
 }
 
+// Test insert of v1 FLEUnindexedEncryptedValue is rejected if v2 is enabled.
+// There are 2 places where the payload version compatibility is checked:
+// 1. When visiting all encrypted BinData in EDCServerCollection::getEncryptedFieldInfo()
+// 2. When visiting all encrypted BinData in processInsert()
+TEST_F(FleCrudTest, InsertUnindexedV1AgainstV2Protocol) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+
+    // Create a dummy InsertUpdatePayloadV2 to include in the document.
+    // This is so that the assertion being tested will not be skipped during processInsert()
+    FLE2InsertUpdatePayloadV2 payload;
+    PrfBlock dummyToken;
+    payload.setEdcDerivedToken(dummyToken);
+    payload.setEscDerivedToken(dummyToken);
+    payload.setServerDerivedFromDataToken(dummyToken);
+    payload.setServerEncryptionToken(dummyToken);
+    payload.setEncryptedTokens(std::vector<uint8_t>{64});
+    payload.setValue(std::vector<uint8_t>{64});
+    payload.setType(BSONType::String);
+    payload.setContentionFactor(0);
+    payload.setIndexKeyId(indexKeyId);
+    auto iup = payload.toBSON();
+    std::vector<uint8_t> buf(iup.objsize() + 1);
+    buf[0] = static_cast<uint8_t>(EncryptedBinDataType::kFLE2InsertUpdatePayloadV2);
+    std::copy(iup.objdata(), iup.objdata() + iup.objsize(), buf.data() + 1);
+
+    BSONObjBuilder builder;
+    builder.append("_id", 1);
+    builder.append("counter", 1);
+    builder.append("plainText", "sample");
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+    // Append the unindexed v1 blob
+    buf[0] = static_cast<uint8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue);
+    builder.appendBinData("unindexed", buf.size(), BinDataType::Encrypt, buf.data());
+
+    BSONObj document = builder.obj();
+
+    // I. Verify the document gets rejected in getEncryptedFieldInfo()
+    ASSERT_THROWS_CODE(EDCServerCollection::getEncryptedFieldInfo(document), DBException, 7413901);
+
+    // II. Verify the document gets rejected in processInsert()
+    std::vector<EDCServerPayloadInfo> serverPayload(1);
+    serverPayload.front().fieldPathName = "encrypted";
+    serverPayload.front().counts = {1};
+    serverPayload.front().payload = std::move(payload);
+
+    auto efc = getTestEncryptedFieldConfig();
+    ASSERT_THROWS_CODE(
+        processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, document, false),
+        DBException,
+        7413902);
+}
+
 #define ASSERT_ECC_DOC(assertElement, assertPosition, assertStart, assertEnd)            \
     {                                                                                    \
         auto _eccDoc = getECCDocument(getTestECCToken((assertElement)), assertPosition); \
