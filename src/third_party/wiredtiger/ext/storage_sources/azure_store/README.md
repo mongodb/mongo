@@ -14,9 +14,9 @@ This section describes how to build WiredTiger with the Azure extension enabled.
 
 ### Building
 
-There is currently only 1 way to build WiredTiger with Azure extension:
+There is currently only 1 way to build WiredTiger with the Azure extension:
 This way manages the Azure SDK dependency as an external project. This method will download the
-Azure SDK, and link to the WiredTiger's build system and build the extension.
+Azure SDK, link to WiredTiger's build system, and build the extension.
 
 There are two CMake flags associated with the Azure extension: `ENABLE_AZURE` and `IMPORT_AZURE_SDK`.
 * `ENABLE_AZURE=1` is required to build the Azure extension.
@@ -63,8 +63,8 @@ env WT_BUILDDIR=$(pwd) python3 ../test/suite/run.py -j 10 -v 4 test_tiered19
 
 ```bash
 # Once WiredTiger has been built with the Azure Extension, run the tests from the build directory
-cd build
-ext/storage_sources/azure_store/test/run_azure_unit_tests
+cd build/ext/storage_sources/azure_store/test/
+./run_azure_unit_tests
 ```
 
 To add any additional unit testing, add to the file `test_azure_connection.cpp`, alternatively if
@@ -73,7 +73,7 @@ the developer wishes to add a new test file, add it to the `SOURCES` list in
 
 ## 5. Evergreen Testing
 Currently the Evergreen testing runs both `test_tiered19.py` and the unit tests in
-`test_azure_connection.cpp`. Should a developer wish to additional tests to the extension, they
+`test_azure_connection.cpp`. Should a developer wish to add additional tests to the extension, they
 would first have to write the tests before adding it as a task to the evergreen.yml file.
 
 Additionally, Evergreen has hidden the connection string for Azure and this is stored within the
