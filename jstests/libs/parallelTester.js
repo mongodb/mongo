@@ -253,10 +253,6 @@ if (typeof _threadInject != "undefined") {
             // inMemory storage engine.
             "timeseries/timeseries_compact.js",
 
-            // TODO (SERVER-63228): Remove this exclusion once the feature flag is enabled by
-            // default.
-            "timeseries/timeseries_index_ttl_partial.js",
-
             // These tests load 'sbe_assert_error_override.js' unconditionally, which causes
             // failures in the parallel suite.
             "computed_projections.js",
