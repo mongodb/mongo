@@ -45,9 +45,8 @@ void write(OperationContext* opCtx,
            BatchedCommandResponse* response,
            boost::optional<OID> targetEpoch = boost::none);
 
-void bulkWrite(OperationContext* opCtx,
-               const BulkWriteCommandRequest& request,
-               BulkWriteCommandReply* reply);
+std::vector<BulkWriteReplyItem> bulkWrite(OperationContext* opCtx,
+                                          const BulkWriteCommandRequest& request);
 
 }  // namespace cluster
 }  // namespace mongo

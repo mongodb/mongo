@@ -73,16 +73,15 @@ void write(OperationContext* opCtx,
         4817401, 2, {logv2::LogComponent::kShardMigrationPerf}, "Finished batch write");
 }
 
-void bulkWrite(OperationContext* opCtx,
-               const BulkWriteCommandRequest& request,
-               BulkWriteCommandReply* reply) {
+std::vector<BulkWriteReplyItem> bulkWrite(OperationContext* opCtx,
+                                          const BulkWriteCommandRequest& request) {
     std::vector<std::unique_ptr<NSTargeter>> targeters;
     targeters.reserve(request.getNsInfo().size());
     for (const auto& nsInfo : request.getNsInfo()) {
         targeters.push_back(std::make_unique<CollectionRoutingInfoTargeter>(opCtx, nsInfo.getNs()));
     }
 
-    bulkWriteExec::execute(opCtx, targeters, request, reply);
+    return bulkWriteExec::execute(opCtx, targeters, request);
 }
 
 }  // namespace cluster

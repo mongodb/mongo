@@ -43,9 +43,56 @@
 namespace mongo {
 namespace {
 
+class BulkWriteMockNSTargeter : public MockNSTargeter {
+public:
+    using MockNSTargeter::MockNSTargeter;
+
+    enum class LastErrorType { kCouldNotTarget, kStaleShardVersion, kStaleDbVersion };
+
+    void noteCouldNotTarget() override {
+        _lastError = LastErrorType::kCouldNotTarget;
+    }
+
+    void noteStaleShardResponse(OperationContext* opCtx,
+                                const ShardEndpoint& endpoint,
+                                const StaleConfigInfo& staleInfo) override {
+        _lastError = LastErrorType::kStaleShardVersion;
+    }
+
+    void noteStaleDbResponse(OperationContext* opCtx,
+                             const ShardEndpoint& endpoint,
+                             const StaleDbRoutingVersion& staleInfo) override {
+        _lastError = LastErrorType::kStaleDbVersion;
+    }
+
+    bool refreshIfNeeded(OperationContext* opCtx) override {
+        if (!_lastError) {
+            return false;
+        }
+
+        ON_BLOCK_EXIT([&] { _lastError = boost::none; });
+
+        // Not changing metadata but incrementing _numRefreshes.
+        _numRefreshes++;
+        return false;
+    }
+
+    const boost::optional<LastErrorType>& getLastError() const {
+        return _lastError;
+    }
+
+    int getNumRefreshes() const {
+        return _numRefreshes;
+    }
+
+private:
+    boost::optional<LastErrorType> _lastError;
+    int _numRefreshes = 0;
+};
+
 auto initTargeterFullRange(const NamespaceString& nss, const ShardEndpoint& endpoint) {
     std::vector<MockRange> range{MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))};
-    return std::make_unique<MockNSTargeter>(nss, std::move(range));
+    return std::make_unique<BulkWriteMockNSTargeter>(nss, std::move(range));
 }
 
 auto initTargeterSplitRange(const NamespaceString& nss,
@@ -53,13 +100,13 @@ auto initTargeterSplitRange(const NamespaceString& nss,
                             const ShardEndpoint& endpointB) {
     std::vector<MockRange> range{MockRange(endpointA, BSON("x" << MINKEY), BSON("x" << 0)),
                                  MockRange(endpointB, BSON("x" << 0), BSON("x" << MAXKEY))};
-    return std::make_unique<MockNSTargeter>(nss, std::move(range));
+    return std::make_unique<BulkWriteMockNSTargeter>(nss, std::move(range));
 }
 
 auto initTargeterHalfRange(const NamespaceString& nss, const ShardEndpoint& endpoint) {
     // x >= 0 values are untargetable
     std::vector<MockRange> range{MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << 0))};
-    return std::make_unique<MockNSTargeter>(nss, std::move(range));
+    return std::make_unique<BulkWriteMockNSTargeter>(nss, std::move(range));
 }
 
 using namespace bulkWriteExec;
@@ -378,6 +425,107 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsUnordered_RecordTargetErrors) {
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
 }
+
+/**
+ * Mimics a sharding backend to test BulkWriteExec.
+ */
+class BulkWriteExecTest : public ShardingTestFixture {
+public:
+    BulkWriteExecTest() = default;
+    ~BulkWriteExecTest() = default;
+
+    void setUp() override {
+        ShardingTestFixture::setUp();
+    }
+};
+
+TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
+    ShardId shardIdA("shardA");
+    ShardId shardIdB("shardB");
+    NamespaceString nss0("foo.bar");
+    NamespaceString nss1("bar.foo");
+    ShardEndpoint endpoint0(shardIdA, ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint1(
+        shardIdB,
+        ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
+                                  boost::optional<CollectionIndexes>(boost::none)),
+        boost::none);
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    // Initialize the targeter so that x >= 0 values are untargetable so target call will encounter
+    // an error.
+    targeters.push_back(initTargeterHalfRange(nss0, endpoint0));
+    targeters.push_back(initTargeterFullRange(nss1, endpoint1));
+
+    auto targeter0 = static_cast<BulkWriteMockNSTargeter*>(targeters[0].get());
+    auto targeter1 = static_cast<BulkWriteMockNSTargeter*>(targeters[1].get());
+
+    // Only the first op would get a target error.
+    BulkWriteCommandRequest request(
+        {BulkWriteInsertOp(0, BSON("x" << 1)), BulkWriteInsertOp(1, BSON("x" << 1))},
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+
+    // Test unordered operations. Since only the first op is untargetable, the second op will
+    // succeed without errors. But bulkWriteExec::execute would retry on targeting errors and try to
+    // refresh the targeters upon targeting errors.
+    request.setOrdered(false);
+    auto replyItems = bulkWriteExec::execute(operationContext(), targeters, request);
+    ASSERT_EQUALS(replyItems.size(), 2u);
+    ASSERT_NOT_OK(replyItems[0].getStatus());
+    ASSERT_OK(replyItems[1].getStatus());
+    ASSERT_EQUALS(targeter0->getNumRefreshes(), 1);
+    ASSERT_EQUALS(targeter1->getNumRefreshes(), 1);
+
+    // Test ordered operations. This is mostly the same as the test case above except that we should
+    // only return the first error for ordered operations.
+    request.setOrdered(true);
+    replyItems = bulkWriteExec::execute(operationContext(), targeters, request);
+    ASSERT_EQUALS(replyItems.size(), 1u);
+    ASSERT_NOT_OK(replyItems[0].getStatus());
+    // We should have another refresh attempt.
+    ASSERT_EQUALS(targeter0->getNumRefreshes(), 2);
+    ASSERT_EQUALS(targeter1->getNumRefreshes(), 2);
+}
+
+TEST_F(BulkWriteExecTest, CollectionDroppedBeforeRefreshingTargeters) {
+    ShardId shardId("shardA");
+    NamespaceString nss("foo.bar");
+    ShardEndpoint endpoint(shardId, ShardVersion::IGNORED(), boost::none);
+
+    // Mock targeter that throws StaleEpoch on refresh to mimic the collection being dropped.
+    class StaleEpochMockNSTargeter : public MockNSTargeter {
+    public:
+        using MockNSTargeter::MockNSTargeter;
+
+        bool refreshIfNeeded(OperationContext* opCtx) override {
+            uasserted(ErrorCodes::StaleEpoch, "Mock StaleEpoch error");
+        }
+    };
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+
+    // Initialize the targeter so that x >= 0 values are untargetable so target call will encounter
+    // an error.
+    std::vector<MockRange> range{MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << 0))};
+    targeters.push_back(std::make_unique<StaleEpochMockNSTargeter>(nss, std::move(range)));
+
+    // The first op would get a target error.
+    BulkWriteCommandRequest request(
+        {BulkWriteInsertOp(0, BSON("x" << 1)), BulkWriteInsertOp(0, BSON("x" << -1))},
+        {NamespaceInfoEntry(nss)});
+    request.setOrdered(false);
+
+    // After the targeting error from the first op, targeter refresh will throw a StaleEpoch
+    // exception which should abort the entire bulkWrite.
+    auto replyItems = bulkWriteExec::execute(operationContext(), targeters, request);
+    ASSERT_EQUALS(replyItems.size(), 2u);
+    ASSERT_EQUALS(replyItems[0].getStatus().code(), ErrorCodes::StaleEpoch);
+    ASSERT_EQUALS(replyItems[1].getStatus().code(), ErrorCodes::StaleEpoch);
+}
+
+// TODO(SERVER-72790): Test refreshing targeters on stale config errors, including the case where
+// NoProgressMade is returned if stale config retry doesn't make any progress after
+// kMaxRoundsWithoutProgress.
 
 }  // namespace
 

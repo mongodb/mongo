@@ -41,12 +41,18 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+namespace {
+
+// The number of times we'll try to continue a batch op if no progress is being made. This only
+// applies when no writes are occurring and metadata is not changing on reload.
+const int kMaxRoundsWithoutProgress(5);
+
+}  // namespace
 namespace bulkWriteExec {
 
-void execute(OperationContext* opCtx,
-             const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-             const BulkWriteCommandRequest& clientRequest,
-             BulkWriteCommandReply* reply) {
+std::vector<BulkWriteReplyItem> execute(OperationContext* opCtx,
+                                        const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+                                        const BulkWriteCommandRequest& clientRequest) {
     LOGV2_DEBUG(7263700,
                 4,
                 "Starting execution of a bulkWrite",
@@ -56,6 +62,9 @@ void execute(OperationContext* opCtx,
     BulkWriteOp bulkWriteOp(opCtx, clientRequest);
 
     bool refreshedTargeter = false;
+    int rounds = 0;
+    int numCompletedOps = 0;
+    int numRoundsWithoutProgress = 0;
 
     while (!bulkWriteOp.isFinished()) {
         // 1: Target remaining ops with the appropriate targeter based on the namespace index and
@@ -66,7 +75,10 @@ void execute(OperationContext* opCtx,
         auto targetStatus = bulkWriteOp.target(targeters, recordTargetErrors, childBatches);
         if (!targetStatus.isOK()) {
             dassert(childBatches.size() == 0u);
-            // TODO(SERVER-72982): Handle targeting errors.
+            // The target error comes from one of the targeters. But to avoid getting another target
+            // error from another targeter in retry, we simply refresh all targeters and only retry
+            // once for target errors. The performance hit should be negligible as target errors
+            // should be rare.
             for (auto& targeter : targeters) {
                 targeter->noteCouldNotTarget();
             }
@@ -79,18 +91,65 @@ void execute(OperationContext* opCtx,
         // 3: Wait for responses for all those sub-batches and keep track of the responses from
         // sub-batches based on the op index in the original bulkWrite command. Abort the batch upon
         // errors for ordered writes or transactions.
+        // TODO(SERVER-72792): Remove the logic below that mimics ok responses and process real
+        // batch responses.
+        for (const auto& childBatch : childBatches) {
+            bulkWriteOp.noteBatchResponse(*childBatch.second);
+        }
 
-        // 4: Refresh the targeter(s) if we receive a stale config/db error.
-        // TODO(SERVER-72982): Handle targeting errors.
+
+        // 4: Refresh the targeter(s) if we receive a target error or a stale config/db error.
+        if (bulkWriteOp.isFinished()) {
+            // No need to refresh the targeters if we are done.
+            break;
+        }
+
+        bool targeterChanged = false;
+        try {
+            LOGV2_DEBUG(7298200, 2, "Refreshing all targeters for bulkWrite");
+            for (auto& targeter : targeters) {
+                targeterChanged = targeter->refreshIfNeeded(opCtx);
+            }
+            LOGV2_DEBUG(7298201,
+                        2,
+                        "Successfully refreshed all targeters for bulkWrite",
+                        "targeterChanged"_attr = targeterChanged);
+        } catch (const ExceptionFor<ErrorCodes::StaleEpoch>& ex) {
+            LOGV2_DEBUG(
+                7298203,
+                2,
+                "Failed to refresh all targeters for bulkWrite because collection was dropped",
+                "error"_attr = redact(ex));
+
+            bulkWriteOp.abortBatch(
+                ex.toStatus("collection was dropped in the middle of the operation"));
+            break;
+        } catch (const DBException& ex) {
+            LOGV2_WARNING(7298204,
+                          "Failed to refresh all targeters for bulkWrite",
+                          "error"_attr = redact(ex));
+        }
+
+        int currCompletedOps = bulkWriteOp.numWriteOpsIn(WriteOpState_Completed);
+        if (currCompletedOps == numCompletedOps && !targeterChanged) {
+            ++numRoundsWithoutProgress;
+        } else {
+            numRoundsWithoutProgress = 0;
+        }
+        numCompletedOps = currCompletedOps;
+
+        if (numRoundsWithoutProgress > kMaxRoundsWithoutProgress) {
+            bulkWriteOp.abortBatch(
+                {ErrorCodes::NoProgressMade,
+                 str::stream() << "no progress was made executing bulkWrite ops in after "
+                               << kMaxRoundsWithoutProgress << " rounds (" << numCompletedOps
+                               << " ops completed in " << rounds << " rounds total)"});
+            break;
+        }
     }
 
-    // Reassemble the final response based on responses from sub-batches.
-    auto replies = std::vector<BulkWriteReplyItem>();
-    replies.emplace_back(0);
-    reply->setCursor(BulkWriteCommandResponseCursor(0, replies));
-
     LOGV2_DEBUG(7263701, 4, "Finished execution of bulkWrite");
-    return;
+    return bulkWriteOp.generateReplyItems();
 }
 
 BulkWriteOp::BulkWriteOp(OperationContext* opCtx, const BulkWriteCommandRequest& clientRequest)
@@ -153,6 +212,62 @@ bool BulkWriteOp::isFinished() const {
 
 const WriteOp& BulkWriteOp::getWriteOp_forTest(int i) const {
     return _writeOps[i];
+}
+
+int BulkWriteOp::numWriteOpsIn(WriteOpState opState) const {
+    return std::accumulate(
+        _writeOps.begin(), _writeOps.end(), 0, [opState](int sum, const WriteOp& writeOp) {
+            return sum + (writeOp.getWriteState() == opState ? 1 : 0);
+        });
+}
+
+void BulkWriteOp::abortBatch(const Status& status) {
+    dassert(!isFinished());
+    dassert(numWriteOpsIn(WriteOpState_Pending) == 0);
+
+    const auto ordered = _clientRequest.getOrdered();
+    for (auto& writeOp : _writeOps) {
+        if (writeOp.getWriteState() < WriteOpState_Completed) {
+            const auto opIdx = writeOp.getWriteItem().getItemIndex();
+            writeOp.setOpError(write_ops::WriteError(opIdx, status));
+
+            // Only return the first error if we are ordered.
+            if (ordered)
+                break;
+        }
+    }
+
+    dassert(isFinished());
+}
+
+// TODO(SERVER-72792): Finish this and process real batch responses.
+void BulkWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch) {
+    for (auto&& write : targetedBatch.getWrites()) {
+        WriteOp& writeOp = _writeOps[write->writeOpRef.first];
+        writeOp.noteWriteComplete(*write);
+    }
+}
+
+std::vector<BulkWriteReplyItem> BulkWriteOp::generateReplyItems() const {
+    dassert(isFinished());
+    std::vector<BulkWriteReplyItem> replyItems;
+    replyItems.reserve(_writeOps.size());
+
+    const auto ordered = _clientRequest.getOrdered();
+    for (auto& writeOp : _writeOps) {
+        dassert(writeOp.getWriteState() != WriteOpState_Pending);
+        if (writeOp.getWriteState() == WriteOpState_Completed) {
+            replyItems.emplace_back(writeOp.getWriteItem().getItemIndex());
+        } else if (writeOp.getWriteState() == WriteOpState_Error) {
+            replyItems.emplace_back(writeOp.getWriteItem().getItemIndex(),
+                                    writeOp.getOpError().getStatus());
+            // Only return the first error if we are ordered.
+            if (ordered)
+                break;
+        }
+    }
+
+    return replyItems;
 }
 }  // namespace bulkWriteExec
 

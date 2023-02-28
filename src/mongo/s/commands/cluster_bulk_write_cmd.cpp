@@ -99,8 +99,11 @@ public:
                 "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
                 gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
 
+            auto replyItems = cluster::bulkWrite(opCtx, request());
+
             auto reply = Reply();
-            cluster::bulkWrite(opCtx, request(), &reply);
+            // TODO(SERVER-72794): Support cursor response for bulkWrite on mongos.
+            reply.setCursor(BulkWriteCommandResponseCursor(0, replyItems));
             return reply;
         }
 
