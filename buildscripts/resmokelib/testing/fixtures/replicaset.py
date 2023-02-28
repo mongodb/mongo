@@ -342,6 +342,8 @@ class ReplicaSetFixture(interface.ReplFixture):
                 except pymongo.errors.OperationFailure as err:
                     if err.code != ReplicaSetFixture._INTERRUPTED_DUE_TO_STORAGE_CHANGE:
                         raise
+                except pymongo.errors.AutoReconnect:
+                    self.logger.info("AutoReconnect exception thrown, retrying...")
                 time.sleep(0.1)  # Wait a little bit before trying again.
             self.logger.info("Secondary on port %d is now available.", secondary.port)
 
