@@ -2616,7 +2616,7 @@ bool WiredTigerKVEngine::supportsReadConcernMajority() const {
     return true;
 }
 
-bool WiredTigerKVEngine::supportsOplogStones() const {
+bool WiredTigerKVEngine::supportsOplogTruncateMarkers() const {
     return true;
 }
 

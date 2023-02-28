@@ -1,6 +1,6 @@
 /**
  * Ensure serverStatus reports the total time spent sampling the oplog for all storage engines that
- * support OplogStones.
+ * support OplogTruncateMarkers.
  * @tags: [
  *   requires_persistence,
  * ]
@@ -10,10 +10,10 @@
 
 const kOplogDocs = 47500;
 // kNumOplogSamples is derived from the number of oplog entries above.
-// Formula is kRandomSamplesPerStone * numRecords / estRecordsPerStone, where
-// kRandomSamplesPerStone = 10
+// Formula is kRandomSamplesPerMarker * numRecords / estimatedRecordsPerMarker, where
+// kRandomSamplesPerMarker = 10
 // numRecords = kOplogDocs + some small number of bookkeeping records
-// estRecordsPerStone = (16MB / average oplog record size), empirically about 28700 records.
+// estimatedRecordsPerMarker = (16MB / average oplog record size), empirically about 28700 records.
 // The number of samples is picked to NOT be divisible by kLoggingIntervalSeconds so we can
 // safely miss a logging interval without failing; this can sometimes happen due to clock
 // adjustment.

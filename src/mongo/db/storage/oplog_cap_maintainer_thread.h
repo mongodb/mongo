@@ -37,7 +37,7 @@
 namespace mongo {
 
 /**
- * Responsible for deleting oplog stones once their max capacity has been reached.
+ * Responsible for deleting oplog truncate markers once their max capacity has been reached.
  */
 class OplogCapMaintainerThread : public BackgroundJob {
 public:

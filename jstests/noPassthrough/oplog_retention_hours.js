@@ -2,9 +2,9 @@
  * When started with the --oplogMinRetentionHours flag, the server must enforce a minimum retention
  * time (in hours) in addition to the implicit oplogSize for the oplog.
  *
- * Only when the oplog's size has exceeded the server's --oplogSize parameter AND the timestamp
- * of the newest oplog entry in the oldest stone has fallen outside of the retention window do we
- * remove the last stone.
+ * Only when the oplog's size has exceeded the server's --oplogSize parameter AND the timestamp of
+ * the newest oplog entry in the oldest truncate marker has fallen outside of the retention window
+ * do we remove the last truncate marker.
  *
  * This test floods the oplog collection until it reaches --oplogSize, and then checks that the
  * current size of the oplog is less than --oplogSize only after the minimum retention time has

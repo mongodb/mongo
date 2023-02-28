@@ -38,9 +38,9 @@
 namespace mongo {
 namespace {
 
-class OplogStonesServerStatusSection : public ServerStatusSection {
+class OplogTruncateMarkersServerStatusSection : public ServerStatusSection {
 public:
-    OplogStonesServerStatusSection() : ServerStatusSection("oplogTruncation") {}
+    OplogTruncateMarkersServerStatusSection() : ServerStatusSection("oplogTruncation") {}
     /**
      * <ServerStatusSection>
      */
@@ -54,7 +54,7 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         BSONObjBuilder builder;
-        if (!opCtx->getServiceContext()->getStorageEngine()->supportsOplogStones()) {
+        if (!opCtx->getServiceContext()->getStorageEngine()->supportsOplogTruncateMarkers()) {
             return builder.obj();
         }
 
@@ -66,7 +66,7 @@ public:
         return builder.obj();
     }
 
-} oplogStonesStats;
+} oplogTruncateMarkersStats;
 
 }  // namespace
 }  // namespace mongo

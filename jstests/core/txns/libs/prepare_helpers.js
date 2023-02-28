@@ -103,8 +103,8 @@ const PrepareHelpers = (function() {
         const secondaryOplog = secondary.getDB("local").oplog.rs;
 
         // Old entries are reclaimed when oplog size reaches new milestone. With a 1MB oplog,
-        // milestones are every 0.1 MB (see WiredTigerRecordStore::OplogStones::OplogStones) so
-        // write about 0.2 MB to be certain.
+        // milestones are every 0.1 MB (see WiredTigerRecordStore::OplogTruncateMarkers) so write
+        // about 0.2 MB to be certain.
         print("Add writes after transaction finished to trigger oplog reclamation");
         const tenKB = new Array(10 * 1024).join("a");
         const coll = primary.getDB("awaitOplogTruncation").awaitOplogTruncation;

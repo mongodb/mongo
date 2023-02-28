@@ -28,7 +28,7 @@ wtEnv.InjectThirdParty(libraries=['valgrind'])
 wtEnv.Library(
     target='storage_wiredtiger_core',
     source=[
-        'oplog_stones_server_status_section.cpp',
+        'oplog_truncate_markers_server_status_section.cpp',
         'wiredtiger_begin_transaction_block.cpp',
         'wiredtiger_column_store.cpp',
         'wiredtiger_cursor.cpp',
@@ -91,7 +91,7 @@ wtEnv.Library(
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/util/log_and_backoff',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
-        'oplog_stone_parameters',
+        'oplog_truncate_marker_parameters',
     ],
 )
 
@@ -192,9 +192,9 @@ wtEnv.Library(
 )
 
 wtEnv.Library(
-    target='oplog_stone_parameters',
+    target='oplog_truncate_marker_parameters',
     source=[
-        'oplog_stone_parameters.idl',
+        'oplog_truncate_marker_parameters.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/server_base',

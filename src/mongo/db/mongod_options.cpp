@@ -509,9 +509,9 @@ Status storeMongodOptions(const moe::Environment& params) {
         // a replica set member could be deleted. Replication can need history older than the last
         // checkpoint to support transactions.
         //
-        // Note: we only use this to defer oplog collection truncation via OplogStones in WT. Non-WT
-        // storage engines will continue to perform regular capped collection handling for the oplog
-        // collection, regardless of this parameter setting.
+        // Note: we only use this to defer oplog collection truncation via OplogTruncateMarkers in
+        // WT. Non-WT storage engines will continue to perform regular capped collection handling
+        // for the oplog collection, regardless of this parameter setting.
         storageGlobalParams.allowOplogTruncation = false;
     }
 

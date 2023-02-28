@@ -407,9 +407,9 @@ public:
     }
 
     /**
-     * See `StorageEngine::supportsOplogStones`
+     * See `StorageEngine::supportsOplogTruncateMarkers`
      */
-    virtual bool supportsOplogStones() const {
+    virtual bool supportsOplogTruncateMarkers() const {
         return false;
     }
 

@@ -1603,32 +1603,34 @@ The oplog collection can be truncated both at the front end (most recent entries
 (the oldest entries). The capped setting on the oplog collection causes the oldest oplog entries to
 be deleted when new writes increase the collection size past the cap. MongoDB using the WiredTiger
 storage engine with `--replSet` handles oplog collection deletion specially via a purpose built
-[OplogStones](#wiredtiger-oplogstones) mechanism, ignoring the generic capped collection deletion
+[OplogTruncateMarkers](#wiredtiger-oplogtruncatemarkers) mechanism, ignoring the generic capped collection deletion
 mechanism. The front of the oplog may be truncated back to a particular timestamp during replication
 startup recovery or replication rollback.
 
-### WiredTiger OplogStones
+### WiredTiger OplogTruncateMarkers
 
 The WiredTiger storage engine disregards the regular capped collection deletion mechanism for the
-oplog collection and instead uses `OplogStones` to improve performance by batching deletes. The
-oplog is broken up into a number of stones. Each stone tracks a range of the oplog, the number of
-bytes in that range, and the last (newest) entry's record ID. A new stone is created when existing
-stones fill up; and the oldest stone's oplog is deleted when the oplog size exceeds its cap size
-setting.
+oplog collection and instead uses `OplogTruncateMarkers` to improve performance by batching deletes.
+The oplog is broken up into a number of truncate markers. Each truncate marker tracks a range of the
+oplog, the number of bytes in that range, and the last (newest) entry's record ID. A new truncate
+marker is created when the in-progress marker segment contains more than the minimum bytes needed to
+complete the segment; and the oldest truncate marker's oplog is deleted when the oplog size exceeds
+its cap size setting.
 
 ### Special Timestamps That Will Not Be Truncated
 
-The WiredTiger integration layer's `OplogStones` implementation will stall deletion waiting for
-certain significant tracked timestamps to move forward past entries in the oldest stone. This is
+The WiredTiger integration layer's `OplogTruncateMarkers` implementation will stall deletion waiting for
+certain significant tracked timestamps to move forward past entries in the oldest truncate marker. This is
 done for correctness. Backup pins truncation in order to maintain a consistent view of the oplog;
 and startup recovery after an unclean shutdown and rollback both require oplog history back to
 certain timestamps.
 
 ### Min Oplog Retention
 
-WiredTiger `OplogStones` obey an `oplogMinRetentionHours` configurable setting. When
-`oplogMinRetentionHours` is active, the WT `OplogStones` will only truncate the oplog if a stone (a
-sequential range of oplog) is not within the minimum time range required to remain.
+WiredTiger `OplogTruncateMarkers` obey an `oplogMinRetentionHours` configurable setting. When
+`oplogMinRetentionHours` is active, the WT `OplogTruncateMarkers` will only truncate the oplog if a
+truncate marker (a sequential range of oplog) is not within the minimum time range required to
+remain.
 
 ### Oplog Hole Truncation
 

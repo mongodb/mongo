@@ -119,7 +119,7 @@ public:
     bool supportsReadConcernMajority() const final {
         return false;
     }
-    bool supportsOplogStones() const final {
+    bool supportsOplogTruncateMarkers() const final {
         return false;
     }
     bool supportsResumableIndexBuilds() const final {

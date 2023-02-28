@@ -425,7 +425,7 @@ public:
      * Responsible for initializing independent processes for replication that manage
      * and interact with the storage layer.
      *
-     * Initializes the OplogCapMaintainerThread to control deletion of oplog stones.
+     * Initializes the OplogCapMaintainerThread to control deletion of oplog truncate markers.
      */
     virtual void initializeStorageControlsForReplication(ServiceContext* serviceCtx) const = 0;
 

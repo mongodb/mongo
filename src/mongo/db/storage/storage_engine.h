@@ -443,11 +443,11 @@ public:
     virtual bool supportsReadConcernMajority() const = 0;
 
     /**
-     * Returns true if the storage engine uses oplog stones to more finely control
+     * Returns true if the storage engine uses oplog truncate markers to more finely control
      * deletion of oplog history, instead of the standard capped collection controls on
      * the oplog collection size.
      */
-    virtual bool supportsOplogStones() const = 0;
+    virtual bool supportsOplogTruncateMarkers() const = 0;
 
     virtual bool supportsResumableIndexBuilds() const = 0;
 

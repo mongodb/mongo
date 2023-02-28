@@ -295,7 +295,7 @@ public:
 
     bool supportsReadConcernSnapshot() const final override;
 
-    bool supportsOplogStones() const final override;
+    bool supportsOplogTruncateMarkers() const final override;
 
     bool supportsReadConcernMajority() const final;
 
@@ -550,8 +550,8 @@ private:
         MONGO_MAKE_LATCH("WiredTigerKVEngine::_oldestTimestampPinRequestsMutex");
     std::map<std::string, Timestamp> _oldestTimestampPinRequests;
 
-    // Pins the oplog so that OplogStones will not truncate oplog history equal or newer to this
-    // timestamp.
+    // Pins the oplog so that OplogTruncateMarkers will not truncate oplog history equal or newer to
+    // this timestamp.
     AtomicWord<std::uint64_t> _pinnedOplogTimestamp;
 
     // The amount of memory alloted for the WiredTiger cache.

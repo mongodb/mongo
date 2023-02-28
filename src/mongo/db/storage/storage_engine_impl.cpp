@@ -1194,8 +1194,8 @@ bool StorageEngineImpl::supportsReadConcernMajority() const {
     return _engine->supportsReadConcernMajority();
 }
 
-bool StorageEngineImpl::supportsOplogStones() const {
-    return _engine->supportsOplogStones();
+bool StorageEngineImpl::supportsOplogTruncateMarkers() const {
+    return _engine->supportsOplogTruncateMarkers();
 }
 
 bool StorageEngineImpl::supportsResumableIndexBuilds() const {

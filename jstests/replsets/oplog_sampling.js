@@ -1,6 +1,6 @@
 /**
  * Ensure serverStatus reports the total time spent sampling the oplog for all storage engines that
- * support OplogStones.
+ * support OplogTruncateMarkers.
  * @tags: [ requires_persistence ]
  */
 (function() {

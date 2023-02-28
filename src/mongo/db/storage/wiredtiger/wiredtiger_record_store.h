@@ -252,11 +252,11 @@ public:
     StatusWith<Timestamp> getLatestOplogTimestamp(OperationContext* opCtx) const override;
     StatusWith<Timestamp> getEarliestOplogTimestamp(OperationContext* opCtx) override;
 
-    class OplogStones;
+    class OplogTruncateMarkers;
 
     // Exposed only for testing.
-    OplogStones* oplogStones() {
-        return _oplogStones.get();
+    OplogTruncateMarkers* oplogTruncateMarkers() {
+        return _oplogTruncateMarkers.get();
     };
 
     typedef stdx::variant<int64_t, WiredTigerItem> CursorKey;
@@ -352,7 +352,7 @@ private:
     WiredTigerKVEngine* _kvEngine;  // not owned.
 
     // Non-null if this record store is underlying the active oplog.
-    std::shared_ptr<OplogStones> _oplogStones;
+    std::shared_ptr<OplogTruncateMarkers> _oplogTruncateMarkers;
 
     AtomicWord<int64_t>
         _totalTimeTruncating;            // Cumulative amount of time spent truncating the oplog.

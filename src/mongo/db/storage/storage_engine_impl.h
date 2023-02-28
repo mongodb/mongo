@@ -156,7 +156,7 @@ public:
 
     bool supportsReadConcernMajority() const final;
 
-    bool supportsOplogStones() const final;
+    bool supportsOplogTruncateMarkers() const final;
 
     bool supportsResumableIndexBuilds() const final;
 

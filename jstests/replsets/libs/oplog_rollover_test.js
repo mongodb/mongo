@@ -14,9 +14,10 @@ function oplogRolloverTest(storageEngine, initialSyncMethod) {
     }
 
     // Pause the oplog cap maintainer thread for this test until oplog truncation is needed. The
-    // truncation thread can hold a mutex for a short period of time which prevents new oplog stones
-    // from being created during an insertion if the mutex cannot be obtained immediately. Instead,
-    // the next insertion will attempt to create a new oplog stone, which this test does not do.
+    // truncation thread can hold a mutex for a short period of time which prevents new oplog
+    // truncate markers from being created during an insertion if the mutex cannot be obtained
+    // immediately. Instead, the next insertion will attempt to create a new oplog truncate marker,
+    // which this test does not do.
     let parameters = {
         logComponentVerbosity: tojson({storage: 2}),
         'failpoint.hangOplogCapMaintainerThread': tojson({mode: 'alwaysOn'})
@@ -126,13 +127,13 @@ function oplogRolloverTest(storageEngine, initialSyncMethod) {
 
         // Wait for checkpointing/stable timestamp to catch up with the second insert so oplog
         // entry of the first insert is allowed to be deleted by the oplog cap maintainer thread
-        // when a new oplog stone is created. "inMemory" WT engine does not run checkpoint
+        // when a new oplog truncate marker is created. "inMemory" WT engine does not run checkpoint
         // thread and lastStableRecoveryTimestamp is the stable timestamp in this case.
         awaitCheckpointer(secondInsertTimestamp);
 
-        // Insert the third document which will trigger a new oplog stone to be created. The
-        // oplog cap maintainer thread will then be unblocked on the creation of the new oplog
-        // stone and will start truncating oplog entries. The oplog entry for the first
+        // Insert the third document which will trigger a new oplog truncate marker to be created.
+        // The oplog cap maintainer thread will then be unblocked on the creation of the new oplog
+        // marker and will start truncating oplog entries. The oplog entry for the first
         // insert will be truncated after the oplog cap maintainer thread finishes.
         const thirdInsertTimestamp =
             assert

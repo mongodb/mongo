@@ -125,7 +125,7 @@ struct StorageGlobalParams {
     // outside of the retention window which is set by this option.
     AtomicWord<double> oplogMinRetentionHours;
 
-    // Controls whether we allow the OplogStones mechanism to delete oplog history on WT.
+    // Controls whether we allow the OplogTruncateMarkers mechanism to delete oplog history on WT.
     bool allowOplogTruncation;
 
     // Disables lock-free reads. Lock-free reads is incompatible with

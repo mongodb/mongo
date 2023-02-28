@@ -651,25 +651,26 @@ public:
 
     /**
      * Returns false if the oplog was dropped while waiting for a deletion request.
-     * This should only be called if StorageEngine::supportsOplogStones() is true.
-     * Storage engines supporting oplog stones must implement this function.
+     * This should only be called if StorageEngine::supportsOplogTruncateMarkers() is true.
+     * Storage engines supporting oplog truncate markers must implement this function.
      */
     virtual bool yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx) {
         MONGO_UNREACHABLE;
     }
 
     /**
-     * This should only be called if StorageEngine::supportsOplogStones() is true.
-     * Storage engines supporting oplog stones must implement this function.
+     * This should only be called if StorageEngine::supportsOplogTruncateMarkers() is true.
+     * Storage engines supporting oplog truncate markers must implement this function.
      */
     virtual void reclaimOplog(OperationContext* opCtx) {
         MONGO_UNREACHABLE;
     }
 
     /**
-     * This should only be called if StorageEngine::supportsOplogStones() is true.
-     * Storage engines supporting oplog stones must implement this function.
-     * Populates `builder` with various statistics pertaining to oplog stones and oplog truncation.
+     * This should only be called if StorageEngine::supportsOplogTruncateMarkers() is true.
+     * Storage engines supporting oplog truncate markers must implement this function.
+     * Populates `builder` with various statistics pertaining to oplog truncate markers and oplog
+     * truncation.
      */
     virtual void getOplogTruncateStats(BSONObjBuilder& builder) const {
         MONGO_UNREACHABLE;

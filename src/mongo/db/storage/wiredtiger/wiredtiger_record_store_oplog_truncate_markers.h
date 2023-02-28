@@ -44,17 +44,17 @@ class RecordId;
 
 // Keep "milestones" against the oplog to efficiently remove the old records when the collection
 // grows beyond its desired maximum size.
-class WiredTigerRecordStore::OplogStones final : public CollectionTruncateMarkers {
+class WiredTigerRecordStore::OplogTruncateMarkers final : public CollectionTruncateMarkers {
 public:
-    OplogStones(std::deque<CollectionTruncateMarkers::Marker> markers,
-                int64_t partialMarkerRecords,
-                int64_t partialMarkerBytes,
-                int64_t minBytesPerMarker,
-                Microseconds totalTimeSpentBuilding,
-                CollectionTruncateMarkers::MarkersCreationMethod creationMethod,
-                WiredTigerRecordStore* rs);
+    OplogTruncateMarkers(std::deque<CollectionTruncateMarkers::Marker> markers,
+                         int64_t partialMarkerRecords,
+                         int64_t partialMarkerBytes,
+                         int64_t minBytesPerMarker,
+                         Microseconds totalTimeSpentBuilding,
+                         CollectionTruncateMarkers::MarkersCreationMethod creationMethod,
+                         WiredTigerRecordStore* rs);
 
-    void getOplogStonesStats(BSONObjBuilder& builder) const {
+    void getOplogTruncateMarkersStats(BSONObjBuilder& builder) const {
         builder.append("totalTimeProcessingMicros", _totalTimeProcessing.count());
         builder.append("processingMethod", _processBySampling ? "sampling" : "scanning");
         if (auto oplogMinRetentionHours = storageGlobalParams.oplogMinRetentionHours.load()) {
@@ -69,8 +69,8 @@ public:
     // efficiently truncate records with WiredTiger by skipping over tombstones, etc.
     RecordId firstRecord;
 
-    static WiredTigerRecordStore::OplogStones createOplogStones(OperationContext* opCtx,
-                                                                WiredTigerRecordStore* rs);
+    static WiredTigerRecordStore::OplogTruncateMarkers createOplogTruncateMarkers(
+        OperationContext* opCtx, WiredTigerRecordStore* rs);
     //
     // The following methods are public only for use in tests.
     //

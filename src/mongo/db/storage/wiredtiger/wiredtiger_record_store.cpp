@@ -57,13 +57,13 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/capped_snapshots.h"
-#include "mongo/db/storage/wiredtiger/oplog_stone_parameters_gen.h"
+#include "mongo/db/storage/wiredtiger/oplog_truncate_marker_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_stones.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_truncate_markers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -147,32 +147,35 @@ MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
 
 const std::string kWiredTigerEngineName = "wiredTiger";
 
-WiredTigerRecordStore::OplogStones WiredTigerRecordStore::OplogStones::createOplogStones(
-    OperationContext* opCtx, WiredTigerRecordStore* rs) {
+WiredTigerRecordStore::OplogTruncateMarkers
+WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(OperationContext* opCtx,
+                                                                        WiredTigerRecordStore* rs) {
 
     invariant(rs->_isCapped && rs->_isOplog);
     invariant(rs->_oplogMaxSize && *rs->_oplogMaxSize > 0);
     invariant(rs->keyFormat() == KeyFormat::Long);
     long long maxSize = *rs->_oplogMaxSize;
 
-    // The minimum oplog stone size should be BSONObjMaxInternalSize.
-    const unsigned int oplogStoneSize =
-        std::max(gOplogStoneSizeMB * 1024 * 1024, BSONObjMaxInternalSize);
+    // The minimum oplog truncate marker size should be BSONObjMaxInternalSize.
+    const unsigned int oplogTruncateMarkerSize =
+        std::max(gOplogTruncateMarkerSizeMB * 1024 * 1024, BSONObjMaxInternalSize);
 
     // IDL does not support unsigned long long types.
-    const unsigned long long kMinStonesToKeep = static_cast<unsigned long long>(gMinOplogStones);
-    const unsigned long long kMaxStonesToKeep =
-        static_cast<unsigned long long>(gMaxOplogStonesDuringStartup);
+    const unsigned long long kMinTruncateMarkersToKeep =
+        static_cast<unsigned long long>(gMinOplogTruncateMarkers);
+    const unsigned long long kMaxTruncateMarkersToKeep =
+        static_cast<unsigned long long>(gMaxOplogTruncateMarkersDuringStartup);
 
-    unsigned long long numStones = maxSize / oplogStoneSize;
-    size_t numStonesToKeep = std::min(kMaxStonesToKeep, std::max(kMinStonesToKeep, numStones));
-    auto minBytesPerStone = maxSize / numStonesToKeep;
+    unsigned long long numTruncateMarkers = maxSize / oplogTruncateMarkerSize;
+    size_t numTruncateMarkersToKeep = std::min(
+        kMaxTruncateMarkersToKeep, std::max(kMinTruncateMarkersToKeep, numTruncateMarkers));
+    auto minBytesPerTruncateMarker = maxSize / numTruncateMarkersToKeep;
     uassert(7206300,
-            fmt::format("Cannot create oplog of size less than {} bytes", numStonesToKeep),
-            minBytesPerStone > 0);
+            fmt::format("Cannot create oplog of size less than {} bytes", numTruncateMarkersToKeep),
+            minBytesPerTruncateMarker > 0);
 
     auto initialSetOfMarkers = CollectionTruncateMarkers::createFromExistingRecordStore(
-        opCtx, rs, minBytesPerStone, [](const Record& record) {
+        opCtx, rs, minBytesPerTruncateMarker, [](const Record& record) {
             BSONObj obj = record.data.toBson();
             auto wallTime = obj.hasField("wall") ? obj["wall"].Date() : obj["ts"].timestampTime();
             return RecordIdAndWallTime(record.id, wallTime);
@@ -181,16 +184,16 @@ WiredTigerRecordStore::OplogStones WiredTigerRecordStore::OplogStones::createOpl
           "WiredTiger record store oplog processing took {duration}ms",
           "WiredTiger record store oplog processing finished",
           "duration"_attr = duration_cast<Milliseconds>(initialSetOfMarkers.timeTaken));
-    return WiredTigerRecordStore::OplogStones(std::move(initialSetOfMarkers.markers),
-                                              initialSetOfMarkers.leftoverRecordsCount,
-                                              initialSetOfMarkers.leftoverRecordsBytes,
-                                              minBytesPerStone,
-                                              initialSetOfMarkers.timeTaken,
-                                              initialSetOfMarkers.methodUsed,
-                                              rs);
+    return WiredTigerRecordStore::OplogTruncateMarkers(std::move(initialSetOfMarkers.markers),
+                                                       initialSetOfMarkers.leftoverRecordsCount,
+                                                       initialSetOfMarkers.leftoverRecordsBytes,
+                                                       minBytesPerTruncateMarker,
+                                                       initialSetOfMarkers.timeTaken,
+                                                       initialSetOfMarkers.methodUsed,
+                                                       rs);
 }
 
-WiredTigerRecordStore::OplogStones::OplogStones(
+WiredTigerRecordStore::OplogTruncateMarkers::OplogTruncateMarkers(
     std::deque<CollectionTruncateMarkers::Marker> markers,
     int64_t partialMarkerRecords,
     int64_t partialMarkerBytes,
@@ -208,52 +211,55 @@ WiredTigerRecordStore::OplogStones::OplogStones(
       _processBySampling(creationMethod ==
                          CollectionTruncateMarkers::MarkersCreationMethod::Sampling) {}
 
-bool WiredTigerRecordStore::OplogStones::_hasExcessMarkers(OperationContext* opCtx) const {
+bool WiredTigerRecordStore::OplogTruncateMarkers::_hasExcessMarkers(OperationContext* opCtx) const {
     int64_t totalBytes = 0;
     for (const auto& marker : getMarkers()) {
         totalBytes += marker.bytes;
     }
 
-    // check that oplog stones is at capacity
+    // check that oplog truncate markers is at capacity
     if (totalBytes <= *_rs->_oplogMaxSize) {
         return false;
     }
 
-    const auto& stone = getMarkers().front();
+    const auto& truncateMarker = getMarkers().front();
 
     // The pinned oplog is inside the earliest marker, so we cannot remove the marker range.
-    if (static_cast<std::uint64_t>(stone.lastRecord.getLong()) >= _rs->getPinnedOplog().asULL()) {
+    if (static_cast<std::uint64_t>(truncateMarker.lastRecord.getLong()) >=
+        _rs->getPinnedOplog().asULL()) {
         return false;
     }
 
     double minRetentionHours = storageGlobalParams.oplogMinRetentionHours.load();
 
-    // If we are not checking for time, then yes, there is a stone to be reaped
+    // If we are not checking for time, then yes, there is a truncate marker to be reaped
     // because oplog is at capacity.
     if (minRetentionHours == 0.0) {
         return true;
     }
 
     auto nowWall = Date_t::now();
-    auto lastStoneWall = stone.wallTime;
+    auto lastTruncateMarkerWallTime = truncateMarker.wallTime;
 
-    auto currRetentionMS = durationCount<Milliseconds>(nowWall - lastStoneWall);
+    auto currRetentionMS = durationCount<Milliseconds>(nowWall - lastTruncateMarkerWallTime);
     double currRetentionHours = currRetentionMS / kNumMSInHour;
     return currRetentionHours >= minRetentionHours;
 }
 
-void WiredTigerRecordStore::OplogStones::adjust(OperationContext* opCtx, int64_t maxSize) {
-    const unsigned int oplogStoneSize =
-        std::max(gOplogStoneSizeMB * 1024 * 1024, BSONObjMaxInternalSize);
+void WiredTigerRecordStore::OplogTruncateMarkers::adjust(OperationContext* opCtx, int64_t maxSize) {
+    const unsigned int oplogTruncateMarkerSize =
+        std::max(gOplogTruncateMarkerSizeMB * 1024 * 1024, BSONObjMaxInternalSize);
 
     // IDL does not support unsigned long long types.
-    const unsigned long long kMinStonesToKeep = static_cast<unsigned long long>(gMinOplogStones);
-    const unsigned long long kMaxStonesToKeep =
-        static_cast<unsigned long long>(gMaxOplogStonesAfterStartup);
+    const unsigned long long kMinTruncateMarkersToKeep =
+        static_cast<unsigned long long>(gMinOplogTruncateMarkers);
+    const unsigned long long kMaxTruncateMarkersToKeep =
+        static_cast<unsigned long long>(gMaxOplogTruncateMarkersAfterStartup);
 
-    unsigned long long numStones = maxSize / oplogStoneSize;
-    size_t numStonesToKeep = std::min(kMaxStonesToKeep, std::max(kMinStonesToKeep, numStones));
-    setMinBytesPerMarker(maxSize / numStonesToKeep);
+    unsigned long long numTruncateMarkers = maxSize / oplogTruncateMarkerSize;
+    size_t numTruncateMarkersToKeep = std::min(
+        kMaxTruncateMarkersToKeep, std::max(kMinTruncateMarkersToKeep, numTruncateMarkers));
+    setMinBytesPerMarker(maxSize / numTruncateMarkersToKeep);
     pokeReclaimThreadIfNeeded(opCtx);
 }
 
@@ -556,8 +562,8 @@ WiredTigerRecordStore::~WiredTigerRecordStore() {
                     "getIdent"_attr = getIdent());
     }
 
-    if (_oplogStones) {
-        _oplogStones->kill();
+    if (_oplogTruncateMarkers) {
+        _oplogTruncateMarkers->kill();
     }
 
     if (_isOplog) {
@@ -598,11 +604,12 @@ void WiredTigerRecordStore::checkSize(OperationContext* opCtx) {
 }
 
 void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
-    // If the server was started in read-only mode, skip calculating the oplog stones. The
+    // If the server was started in read-only mode, skip calculating the oplog truncate markers. The
     // OplogCapMaintainerThread does not get started in this instance.
     if (NamespaceString::oplog(ns()) && opCtx->getServiceContext()->userWritesAllowed() &&
         !storageGlobalParams.repair) {
-        _oplogStones = std::make_shared<OplogStones>(OplogStones::createOplogStones(opCtx, this));
+        _oplogTruncateMarkers = std::make_shared<OplogTruncateMarkers>(
+            OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, this));
     }
 
     if (_isOplog) {
@@ -612,8 +619,8 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
 }
 
 void WiredTigerRecordStore::getOplogTruncateStats(BSONObjBuilder& builder) const {
-    if (_oplogStones) {
-        _oplogStones->getOplogStonesStats(builder);
+    if (_oplogTruncateMarkers) {
+        _oplogTruncateMarkers->getOplogTruncateMarkersStats(builder);
     }
     builder.append("totalTimeTruncatingMicros", _totalTimeTruncating.load());
     builder.append("truncateCount", _truncateCount.load());
@@ -748,9 +755,9 @@ Timestamp WiredTigerRecordStore::getPinnedOplog() const {
 }
 
 bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx) {
-    // Create another reference to the oplog stones while holding a lock on the collection to
-    // prevent it from being destructed.
-    std::shared_ptr<OplogStones> oplogStones = _oplogStones;
+    // Create another reference to the oplog truncate markers while holding a lock on the collection
+    // to prevent it from being destructed.
+    std::shared_ptr<OplogTruncateMarkers> oplogTruncateMarkers = _oplogTruncateMarkers;
 
     Locker* locker = opCtx->lockState();
     Locker::LockSnapshot snapshot;
@@ -767,12 +774,12 @@ bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* 
     recoveryUnit->beginIdle();
 
     // Wait for an oplog deletion request, or for this record store to have been destroyed.
-    oplogStones->awaitHasExcessMarkersOrDead(opCtx);
+    oplogTruncateMarkers->awaitHasExcessMarkersOrDead(opCtx);
 
     // Reacquire the locks that were released.
     locker->restoreLockState(opCtx, snapshot);
 
-    return !oplogStones->isDead();
+    return !oplogTruncateMarkers->isDead();
 }
 
 void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
@@ -780,18 +787,16 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
     invariant(_keyFormat == KeyFormat::Long);
 
     Timer timer;
-    while (auto stone = _oplogStones->peekOldestMarkerIfNeeded(opCtx)) {
-        invariant(stone->lastRecord.isValid());
+    while (auto truncateMarker = _oplogTruncateMarkers->peekOldestMarkerIfNeeded(opCtx)) {
+        invariant(truncateMarker->lastRecord.isValid());
 
-        LOGV2_DEBUG(
-            22399,
-            1,
-            "Truncating the oplog between {oplogStones_firstRecord} and {stone_lastRecord} to "
-            "remove approximately {stone_records} records totaling to {stone_bytes} bytes",
-            "oplogStones_firstRecord"_attr = _oplogStones->firstRecord,
-            "stone_lastRecord"_attr = stone->lastRecord,
-            "stone_records"_attr = stone->records,
-            "stone_bytes"_attr = stone->bytes);
+        LOGV2_DEBUG(7420100,
+                    1,
+                    "Truncating the oplog",
+                    "firstRecord"_attr = _oplogTruncateMarkers->firstRecord,
+                    "lastRecord"_attr = truncateMarker->lastRecord,
+                    "numRecords"_attr = truncateMarker->records,
+                    "numBytes"_attr = truncateMarker->bytes);
 
         WiredTigerRecoveryUnit* ru = WiredTigerRecoveryUnit::get(opCtx);
         WT_SESSION* session = ru->getSession()->getSession();
@@ -806,19 +811,19 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
             int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return cursor->next(cursor); });
             invariantWTOK(ret, cursor->session);
             RecordId firstRecord = getKey(cursor);
-            if (firstRecord < _oplogStones->firstRecord || firstRecord > stone->lastRecord) {
-                LOGV2_WARNING(22407,
-                              "First oplog record {firstRecord} is not in truncation range "
-                              "({oplogStones_firstRecord}, {stone_lastRecord})",
+            if (firstRecord < _oplogTruncateMarkers->firstRecord ||
+                firstRecord > truncateMarker->lastRecord) {
+                LOGV2_WARNING(7420101,
+                              "First oplog record is not in truncation range",
                               "firstRecord"_attr = firstRecord,
-                              "oplogStones_firstRecord"_attr = _oplogStones->firstRecord,
-                              "stone_lastRecord"_attr = stone->lastRecord);
+                              "truncateRangeFirstRecord"_attr = _oplogTruncateMarkers->firstRecord,
+                              "truncateRangeLastRecord"_attr = truncateMarker->lastRecord);
             }
 
-            // It is necessary that there exists a record after the stone but before or including
-            // the mayTruncateUpTo point.  Since the mayTruncateUpTo point may fall between
-            // records, the stone check is not sufficient.
-            CursorKey truncateUpToKey = makeCursorKey(stone->lastRecord, _keyFormat);
+            // It is necessary that there exists a record after the truncate marker but before or
+            // including the mayTruncateUpTo point.  Since the mayTruncateUpTo point may fall
+            // between records, the truncate marker check is not sufficient.
+            CursorKey truncateUpToKey = makeCursorKey(truncateMarker->lastRecord, _keyFormat);
             setKey(cursor, &truncateUpToKey);
             int cmp;
             ret = wiredTigerPrepareConflictRetry(opCtx,
@@ -826,13 +831,13 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
             invariantWTOK(ret, cursor->session);
 
             // Check 'cmp' to determine if we landed on the requested record. While it is often the
-            // case that stones represent a perfect partitioning of the oplog, it's not guaranteed.
-            // The truncation method is lenient to overlapping stones. See SERVER-56590 for details.
-            // If we landed land on a higher record (cmp > 0), we likely truncated a duplicate stone
-            // in a previous iteration. In this case we can skip the check for oplog entries after
-            // the stone we are truncating. If we landed on a prior record, then we have records
-            // that are not in truncation range of any stone. This will have been logged as a
-            // warning, above.
+            // case that truncate markers represent a perfect partitioning of the oplog, it's not
+            // guaranteed.  The truncation method is lenient to overlapping truncate markers. See
+            // SERVER-56590 for details.  If we landed land on a higher record (cmp > 0), we likely
+            // truncated a duplicate truncate marker in a previous iteration. In this case we can
+            // skip the check for oplog entries after the truncate marker we are truncating. If we
+            // landed on a prior record, then we have records that are not in truncation range of
+            // any truncate marker. This will have been logged as a warning, above.
             if (cmp <= 0) {
                 ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return cursor->next(cursor); });
                 if (ret == WT_NOTFOUND) {
@@ -843,30 +848,31 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
             }
             RecordId nextRecord = getKey(cursor);
             if (static_cast<std::uint64_t>(nextRecord.getLong()) > mayTruncateUpTo.asULL()) {
-                LOGV2_DEBUG(5140901,
-                            0,
-                            "Cannot truncate as there are no oplog entries after the stone but "
-                            "before the truncate-up-to point",
-                            "nextRecord"_attr = Timestamp(nextRecord.getLong()),
-                            "mayTruncateUpTo"_attr = mayTruncateUpTo);
+                LOGV2_DEBUG(
+                    5140901,
+                    0,
+                    "Cannot truncate as there are no oplog entries after the truncate marker but "
+                    "before the truncate-up-to point",
+                    "nextRecord"_attr = Timestamp(nextRecord.getLong()),
+                    "mayTruncateUpTo"_attr = mayTruncateUpTo);
                 return;
             }
 
             // After checking whether or not we should truncate, reposition the cursor back to the
-            // current stone's lastRecord.
+            // current truncate marker's lastRecord.
             invariantWTOK(cursor->reset(cursor), cursor->session);
             setKey(cursor, &truncateUpToKey);
             invariantWTOK(session->truncate(session, nullptr, nullptr, cursor, nullptr), session);
-            _changeNumRecordsAndDataSize(opCtx, -stone->records, -stone->bytes);
+            _changeNumRecordsAndDataSize(opCtx, -truncateMarker->records, -truncateMarker->bytes);
 
             wuow.commit();
 
-            // Remove the stone after a successful truncation.
-            _oplogStones->popOldestMarker();
+            // Remove the truncate marker after a successful truncation.
+            _oplogTruncateMarkers->popOldestMarker();
 
             // Stash the truncate point for next time to cleanly skip over tombstones, etc.
-            _oplogStones->firstRecord = stone->lastRecord;
-            _oplogFirstRecord = std::move(stone->lastRecord);
+            _oplogTruncateMarkers->firstRecord = truncateMarker->lastRecord;
+            _oplogFirstRecord = std::move(truncateMarker->lastRecord);
         } catch (const WriteConflictException&) {
             LOGV2_DEBUG(
                 22400, 1, "Caught WriteConflictException while truncating oplog entries, retrying");
@@ -998,7 +1004,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     }
     _changeNumRecordsAndDataSize(opCtx, nRecords, totalLength);
 
-    if (_oplogStones) {
+    if (_oplogTruncateMarkers) {
         auto wall = [&] {
             BSONObj obj = highestIdRecord.data.toBson();
             BSONElement ele = obj["wall"];
@@ -1011,7 +1017,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                 return ele.Date();
             }
         }();
-        _oplogStones->updateCurrentMarkerAfterInsertOnCommit(
+        _oplogTruncateMarkers->updateCurrentMarkerAfterInsertOnCommit(
             opCtx, totalLength, highestIdRecord.id, wall, nRecords);
     }
 
@@ -1126,7 +1132,7 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
 
     int64_t old_length = old_value.size;
 
-    if (_oplogStones && len != old_length) {
+    if (_oplogTruncateMarkers && len != old_length) {
         return {ErrorCodes::IllegalOperation, "Cannot change the size of a document in the oplog"};
     }
 
@@ -1330,8 +1336,8 @@ Status WiredTigerRecordStore::doTruncate(OperationContext* opCtx) {
                   session);
     _changeNumRecordsAndDataSize(opCtx, -numRecords(opCtx), -dataSize(opCtx));
 
-    if (_oplogStones) {
-        _oplogStones->clearMarkersOnCommit(opCtx);
+    if (_oplogTruncateMarkers) {
+        _oplogTruncateMarkers->clearMarkersOnCommit(opCtx);
     }
 
     return Status::OK();
@@ -1729,8 +1735,8 @@ void WiredTigerRecordStore::doCappedTruncateAfter(
         LOGV2_DEBUG(22405, 1, "truncation new read timestamp: {truncTs}", "truncTs"_attr = truncTs);
     }
 
-    if (_oplogStones) {
-        _oplogStones->updateMarkersAfterCappedTruncateAfter(
+    if (_oplogTruncateMarkers) {
+        _oplogTruncateMarkers->updateMarkersAfterCappedTruncateAfter(
             recordsRemoved, bytesRemoved, firstRemovedId);
     }
 }
@@ -2218,8 +2224,8 @@ Status WiredTigerRecordStore::updateOplogSize(OperationContext* opCtx, long long
 
     _oplogMaxSize = newOplogSize;
 
-    invariant(_oplogStones);
-    _oplogStones->adjust(opCtx, newOplogSize);
+    invariant(_oplogTruncateMarkers);
+    _oplogTruncateMarkers->adjust(opCtx, newOplogSize);
     return Status::OK();
 }
 
