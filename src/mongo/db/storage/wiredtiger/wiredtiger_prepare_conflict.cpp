@@ -47,9 +47,6 @@ namespace {
 std::once_flag logPrepareWithTimestampOnce;
 }
 
-// When set, simulates WT_PREPARE_CONFLICT returned from WiredTiger API calls.
-MONGO_FAIL_POINT_DEFINE(WTPrepareConflictForReads);
-
 MONGO_FAIL_POINT_DEFINE(WTSkipPrepareConflictRetries);
 
 MONGO_FAIL_POINT_DEFINE(WTPrintPrepareConflictLog);

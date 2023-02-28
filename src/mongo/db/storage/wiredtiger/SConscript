@@ -137,6 +137,7 @@ wtEnv.CppUnitTest(
         'wiredtiger_c_api_test.cpp',
         'wiredtiger_kv_engine_no_fixture_test.cpp',
         'wiredtiger_kv_engine_test.cpp',
+        'wiredtiger_prepare_conflict_test.cpp',
         'wiredtiger_stats_test.cpp',
         'wiredtiger_recovery_unit_test.cpp',
         'wiredtiger_session_cache_test.cpp',

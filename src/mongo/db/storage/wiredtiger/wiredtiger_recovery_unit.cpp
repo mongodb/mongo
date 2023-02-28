@@ -56,12 +56,6 @@
 namespace mongo {
 namespace {
 
-// Always notifies prepare conflict waiters when a transaction commits or aborts, even when the
-// transaction is not prepared. This should always be enabled if WTPrepareConflictForReads is
-// used, which fails randomly. If this is not enabled, no prepare conflicts will be resolved,
-// because the recovery unit may not ever actually be in a prepared state.
-MONGO_FAIL_POINT_DEFINE(WTAlwaysNotifyPrepareConflictWaiters);
-
 logv2::LogSeverity kSlowTransactionSeverity = logv2::LogSeverity::Debug(1);
 
 MONGO_FAIL_POINT_DEFINE(doUntimestampedWritesForIdempotencyTests);
@@ -108,10 +102,6 @@ void WiredTigerRecoveryUnit::_commit() {
     }
     _setState(State::kCommitting);
 
-    if (MONGO_unlikely(WTAlwaysNotifyPrepareConflictWaiters.shouldFail())) {
-        notifyDone = true;
-    }
-
     if (notifyDone) {
         _sessionCache->notifyPreparedUnitOfWorkHasCommittedOrAborted();
     }
@@ -127,7 +117,7 @@ void WiredTigerRecoveryUnit::_abort() {
     }
     _setState(State::kAborting);
 
-    if (notifyDone || MONGO_unlikely(WTAlwaysNotifyPrepareConflictWaiters.shouldFail())) {
+    if (notifyDone) {
         _sessionCache->notifyPreparedUnitOfWorkHasCommittedOrAborted();
     }
 

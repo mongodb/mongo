@@ -38,9 +38,6 @@
 
 namespace mongo {
 
-// When set, simulates returning WT_PREPARE_CONFLICT on WT cursor read operations.
-extern FailPoint WTPrepareConflictForReads;
-
 // When set, WT_ROLLBACK is returned in place of retrying on WT_PREPARE_CONFLICT errors.
 extern FailPoint WTSkipPrepareConflictRetries;
 
@@ -69,9 +66,7 @@ template <typename F>
 int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
     invariant(opCtx);
 
-    // If the failpoint is enabled, don't call the function, just simulate a conflict.
-    int ret = MONGO_unlikely(WTPrepareConflictForReads.shouldFail()) ? WT_PREPARE_CONFLICT
-                                                                     : WT_READ_CHECK(f());
+    int ret = WT_READ_CHECK(f());
     if (ret != WT_PREPARE_CONFLICT)
         return ret;
 
@@ -144,9 +139,7 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
     while (true) {
         attempts++;
         auto lastCount = recoveryUnit->getSessionCache()->getPrepareCommitOrAbortCount();
-        // If the failpoint is enabled, don't call the function, just simulate a conflict.
-        ret = MONGO_unlikely(WTPrepareConflictForReads.shouldFail()) ? WT_PREPARE_CONFLICT
-                                                                     : WT_READ_CHECK(f());
+        ret = WT_READ_CHECK(f());
 
         if (ret != WT_PREPARE_CONFLICT)
             return ret;
