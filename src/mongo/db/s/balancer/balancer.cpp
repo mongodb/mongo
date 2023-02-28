@@ -440,7 +440,7 @@ Status Balancer::moveRange(OperationContext* opCtx,
                 opCtx, nss));
         // TODO SERVER-64926 do not assume min always present
         const auto& chunk = cm.findIntersectingChunkWithSimpleCollation(*request.getMin());
-        return std::tuple<ShardId, BSONObj>{chunk.getShardId(), chunk.getMin()};
+        return std::tuple<ShardId, BSONObj>{chunk.getShardId(), *request.getMin()};
     }();
 
     ShardsvrMoveRange shardSvrRequest(nss);
