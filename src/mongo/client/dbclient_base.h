@@ -401,8 +401,6 @@ public:
                                           bool authorizedDatabases = false,
                                           bool useListDatabasesForAllTenants = false);
 
-    bool exists(const std::string& ns);
-
     /**
      * Creates an index on the collection 'nss' as described by the given keys. If you wish to
      * specify options, see the more flexible overload of 'createIndex' which takes an IndexSpec

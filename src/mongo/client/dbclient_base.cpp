@@ -575,14 +575,6 @@ vector<BSONObj> DBClientBase::getDatabaseInfos(const BSONObj& filter,
     MONGO_UNREACHABLE;
 }
 
-bool DBClientBase::exists(const string& ns) {
-    BSONObj filter = BSON("name" << nsToCollectionSubstring(ns));
-    // TODO SERVER-70433 Pass ns.dbName() once this function takes in a NamespaceString obj
-    list<BSONObj> results =
-        getCollectionInfos(DatabaseNameUtil::deserialize(boost::none, nsToDatabase(ns)), filter);
-    return !results.empty();
-}
-
 const uint64_t DBClientBase::INVALID_SOCK_CREATION_TIME = std::numeric_limits<uint64_t>::max();
 
 std::unique_ptr<DBClientCursor> DBClientBase::find(FindCommandRequest findRequest,
