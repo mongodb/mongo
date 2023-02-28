@@ -373,12 +373,11 @@ StatusWith<Shard::CommandResponse> MovePrimaryCoordinator::cloneDataToRecipient(
         return CommandHelpers::appendMajorityWriteConcern(commandBuilder.obj());
     }();
 
-    return toShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        DatabaseName::kAdmin.db(),
-        cloneCommand,
-        Shard::RetryPolicy::kNotIdempotent);
+    return toShard->runCommand(opCtx,
+                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                               DatabaseName::kAdmin.toString(),
+                               cloneCommand,
+                               Shard::RetryPolicy::kNoRetry);
 }
 
 bool MovePrimaryCoordinator::checkClonedData(Shard::CommandResponse cloneResponse) const {
