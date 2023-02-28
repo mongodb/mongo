@@ -115,7 +115,7 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
                   "Compact begin",
                   "namespace"_attr = collectionNss);
 
-    auto oldTotalSize = recordStore->storageSize(opCtx) + collection->getIndexSize(opCtx);
+    auto bytesBefore = recordStore->storageSize(opCtx) + collection->getIndexSize(opCtx);
     auto indexCatalog = collection->getIndexCatalog();
 
     Status status = recordStore->compact(opCtx);
@@ -127,14 +127,21 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    auto totalSizeDiff =
-        oldTotalSize - recordStore->storageSize(opCtx) - collection->getIndexSize(opCtx);
-    LOGV2(20286,
-          "compact {namespace} end, bytes freed: {freedBytes}",
+    auto bytesAfter = recordStore->storageSize(opCtx) + collection->getIndexSize(opCtx);
+    auto bytesDiff = static_cast<int64_t>(bytesBefore) - static_cast<int64_t>(bytesAfter);
+
+    // The compact operation might grow the file size if there is little free space left, because
+    // running a compact also triggers a checkpoint, which requires some space. Additionally, it is
+    // possible for concurrent writes and index builds to cause the size to grow while compact is
+    // running. So it is possible for the size after a compact to be larger than before it.
+    LOGV2(7386700,
           "Compact end",
           "namespace"_attr = collectionNss,
-          "freedBytes"_attr = totalSizeDiff);
-    return totalSizeDiff;
+          "bytesBefore"_attr = bytesBefore,
+          "bytesAfter"_attr = bytesAfter,
+          "bytesDiff"_attr = bytesDiff);
+
+    return bytesDiff;
 }
 
 }  // namespace mongo
