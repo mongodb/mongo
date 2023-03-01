@@ -92,10 +92,15 @@ struct StageConstraints {
 
     /**
      * A ChangeStreamRequirement determines whether a particular stage is itself a ChangeStream
-     * stage, whether it is allowed to exist in a $changeStream pipeline, or whether it is
-     * denylisted from $changeStream.
+     * stage, whether it is allowed to exist in a $changeStream pipeline, or whether it can only
+     * exist in a change stream pipeline.
      */
-    enum class ChangeStreamRequirement { kChangeStreamStage, kAllowlist, kDenylist };
+    enum class ChangeStreamRequirement {
+        kChangeStreamStage,    // This stage is an actual change stream stage.
+        kAllowlist,            // This stage is permitted in a change stream pipeline.
+        kDenylist,             // This stage is banned from change stream pipelines.
+        kRequiresChangeStream  // This stage is only allowed in a change stream pipeline.
+    };
 
     /**
      * A FacetRequirement indicates whether this stage may be used within a $facet pipeline.
@@ -245,6 +250,13 @@ struct StageConstraints {
      */
     bool isChangeStreamStage() const {
         return changeStreamRequirement == ChangeStreamRequirement::kChangeStreamStage;
+    }
+
+    /**
+     * True if this stage must run in a pipeline which starts with $changeStream.
+     */
+    bool requiresChangeStream() const {
+        return changeStreamRequirement == ChangeStreamRequirement::kRequiresChangeStream;
     }
 
     /**

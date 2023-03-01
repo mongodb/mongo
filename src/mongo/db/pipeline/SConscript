@@ -437,6 +437,7 @@ env.Library(
         'document_source_change_stream_handle_topology_change.cpp',
         'document_source_change_stream_add_pre_image.cpp',
         'document_source_change_stream_oplog_match.cpp',
+        'document_source_change_stream_split_large_event.cpp',
         'document_source_change_stream_transform.cpp',
         'document_source_change_stream_unwind_transaction.cpp',
     ],

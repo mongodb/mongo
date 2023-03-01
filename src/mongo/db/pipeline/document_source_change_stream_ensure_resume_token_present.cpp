@@ -137,9 +137,10 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent
 
         const DocumentSource::GetNextResult nextInput =
             Document::fromBsonWithMetaData(extraInfo->getStartAfterInvalidateEvent());
+
         _resumeStatus =
             DocumentSourceChangeStreamCheckResumability::compareAgainstClientResumeToken(
-                pExpCtx, nextInput.getDocument(), _tokenFromClient);
+                nextInput.getDocument(), _tokenFromClient);
 
         // This exception should always contain the client-provided resume token.
         tassert(5779201,

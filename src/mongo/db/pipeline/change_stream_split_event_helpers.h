@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <list>
+#include <queue>
 
 #include "mongo/db/exec/document_value/document.h"
 
@@ -41,6 +41,12 @@ constexpr auto kSplitEventField = "splitEvent"_sd;
 constexpr auto kFragmentNumberField = "fragment"_sd;
 constexpr auto kTotalFragmentsField = "of"_sd;
 
+/**
+ * Calculates BSON size by serializing the event to BSON. Ensures that the serialization is
+ * re-usable. The parameter 'withMetadata' desides whether the metadata is counted.
+ * Also returns a new document optimized for later serialization by PlanExecutorPipeline.
+ */
+std::pair<Document, size_t> processChangeEventBeforeSplit(Document event, bool withMetadata);
 
 /**
  * Returns the size of the BSON object with metadata for the provided document.
@@ -64,9 +70,9 @@ size_t getFieldBsonSize(const Document& doc, const StringData& key);
  *     {_id: "RESUMETOKEN2", splitEvent{fragment: 1, of: 2}, fullDocumentBeforeChange: ...}
  *     {_id: "RESUMETOKEN3", splitEvent{fragment: 2, of: 2}, fullDocument: ...}
  */
-std::list<Document> splitChangeEvent(const Document& event,
-                                     size_t maxFragmentBsonSize,
-                                     size_t skipFirstFragments = 0);
+std::queue<Document> splitChangeEvent(const Document& event,
+                                      size_t maxFragmentBsonSize,
+                                      size_t skipFirstFragments = 0);
 
 }  // namespace change_stream_split_event
 }  // namespace mongo

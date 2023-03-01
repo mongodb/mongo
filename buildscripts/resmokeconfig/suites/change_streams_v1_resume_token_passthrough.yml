@@ -14,6 +14,8 @@ selector:
   - jstests/change_streams/migrate_last_chunk_from_shard_event.js
   - jstests/change_streams/oplog_rewrite/match_pushdown_namespace_rewrite_with_expanded_events.js
   - jstests/change_streams/projection_fakes_internal_event.js
+  # The following test uses the '$changeStreamSplitLargeEvents' stage which requires v2 token.
+  - jstests/change_streams/split_large_event.js
 
   exclude_with_any_tags:
   ##

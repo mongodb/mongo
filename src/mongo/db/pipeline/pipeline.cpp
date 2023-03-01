@@ -108,13 +108,17 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
 
         // If the first stage is a $changeStream stage, then all stages in the pipeline must be
         // either $changeStream stages or allowlisted as being able to run in a change stream.
-        if (firstStageConstraints.isChangeStreamStage()) {
-            for (auto&& source : sources) {
-                uassert(ErrorCodes::IllegalOperation,
-                        str::stream() << source->getSourceName()
-                                      << " is not permitted in a $changeStream pipeline",
-                        source->constraints().isAllowedInChangeStream());
-            }
+        const bool isChangeStream = firstStageConstraints.isChangeStreamStage();
+        for (auto&& source : sources) {
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << source->getSourceName()
+                                  << " is not permitted in a $changeStream pipeline",
+                    !(isChangeStream && !source->constraints().isAllowedInChangeStream()));
+            // Check whether any stages must only be run in a change stream pipeline.
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << source->getSourceName()
+                                  << " can only be used in a $changeStream pipeline",
+                    !(source->constraints().requiresChangeStream() && !isChangeStream));
         }
     }
 

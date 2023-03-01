@@ -5,6 +5,9 @@ selector:
   exclude_files:
   # This test explicitly compares v1 and v2 tokens, and must be able to generate the former.
   - jstests/change_streams/generate_v1_resume_token.js
+  # This test uses the '$changeStreamSplitLargeEvents' stage which requires v2 token.
+  - jstests/change_streams/split_large_event.js
+
   exclude_with_any_tags:
   ##
   # The next tags correspond to the special errors thrown by the

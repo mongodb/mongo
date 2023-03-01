@@ -29,29 +29,49 @@
 
 #include "mongo/db/pipeline/change_stream_split_event_helpers.h"
 
-#include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
-#include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/resume_token.h"
 
 namespace mongo {
 namespace change_stream_split_event {
 
+std::pair<Document, size_t> processChangeEventBeforeSplit(Document event, bool withMetadata) {
+    BSONObj eventBson;
+    Document eventDocToReturn;
+    // If this stream needs merging, then we will need to serialize the metadata as well.
+    if (withMetadata) {
+        // TODO SERVER-74301: Use 'event.toBsonWithMetadata<BSONObj::LargeSizeTrait>()' here.
+        eventBson = event.toBson<BSONObj::LargeSizeTrait>();
+        eventDocToReturn = event;
+    } else {
+        // Serialize just the user data, and add the metadata fields separately.
+        eventBson = event.toBson<BSONObj::LargeSizeTrait>();
+        MutableDocument mutDoc(Document{eventBson});
+        mutDoc.copyMetaDataFrom(event);
+        eventDocToReturn = mutDoc.freeze();
+    }
+    // Count the size of the _id field again since the output cursor will have a PBRT.
+    size_t eventBsonSize = eventBson.objsize() + eventBson["_id"].size();
+    return {eventDocToReturn, eventBsonSize};
+}
+
 size_t getBsonSizeWithMetaData(const Document& doc) {
-    // TODO SERVER-72102: Calculate document BSON size without serializing the object.
+    // TODO SERVER-74301: Make sure each event is serialized only once in a pipeline.
     return static_cast<size_t>(doc.toBsonWithMetaData().objsize());
 }
 
 size_t getFieldBsonSize(const Document& doc, const StringData& key) {
-    // TODO SERVER-72102: Calculate field BSON size without serializing the object.
-    return static_cast<size_t>(doc.toBson().getField(key).size());
+    // TODO SERVER-74301: Make sure each event is serialized only once in a pipeline.
+    return static_cast<size_t>(doc.toBson<BSONObj::LargeSizeTrait>().getField(key).size());
 }
 
-std::list<Document> splitChangeEvent(const Document& event,
-                                     size_t maxFragmentBsonSize,
-                                     size_t skipFirstFragments) {
-    // Construct an sorted map of fields ordered by size and key for a deterministic greedy strategy
+std::queue<Document> splitChangeEvent(const Document& event,
+                                      size_t maxFragmentBsonSize,
+                                      size_t skipFirstFragments) {
+    // Construct a sorted map of fields ordered by size and key for a deterministic greedy strategy
     // to minimize the total number of fragments (the first fragment contains as many fields as
     // possible). Don't include the original '_id' field, since each fragment will have its own.
-    std::map<std::pair<size_t, StringData>, Value> sortedFieldMap;
+    std::map<std::pair<size_t, std::string>, Value> sortedFieldMap;
     for (auto it = event.fieldIterator(); it.more();) {
         auto&& [key, value] = it.next();
         if (key != kIdField) {
@@ -92,7 +112,6 @@ std::list<Document> splitChangeEvent(const Document& event,
         } while (++it != sortedFieldMap.cend() &&
                  fragmentBsonSize + it->first.first /* field size */ <= maxFragmentBsonSize);
 
-        // TODO SERVER-71828: make sure we don't hit this spuriously for large documents.
         uassert(7182500,
                 str::stream() << "Splitting change event failed: fragment size " << fragmentBsonSize
                               << " is greater than maximum allowed fragment size "
@@ -106,12 +125,12 @@ std::list<Document> splitChangeEvent(const Document& event,
     const auto totalFragmentsFieldPath =
         FieldPath::getFullyQualifiedPath(kSplitEventField, kTotalFragmentsField);
 
-    std::list<Document> outputFragments;
+    std::queue<Document> outputFragments;
     for (auto [it, i] = std::make_pair(fragments.begin(), 0ULL); it != fragments.end(); ++it, ++i) {
         // Do not insert first 'skipFirstFragments' into the output.
         if (i >= skipFirstFragments) {
             it->setNestedField(totalFragmentsFieldPath, totalFragments);
-            outputFragments.push_back(it->freeze());
+            outputFragments.push(it->freeze());
         }
     }
 
