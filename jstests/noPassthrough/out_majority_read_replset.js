@@ -15,15 +15,6 @@ rst.initiate();
 
 const name = "out_majority_read";
 const db = rst.getPrimary().getDB(name);
-
-// TODO(SERVER-72958): Adjust this test to work properly with point-in-time reads. When
-// point-in-time catalog reads are enabled, reads no longer block waiting for the majority
-// commit point to advance, which breaks the assumptions of the test.
-if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
-    rst.stopSet();
-    return;
-}
-
 const sourceColl = db.sourceColl;
 
 assert.commandWorked(sourceColl.insert({_id: 1, state: 'before'}));
@@ -47,7 +38,8 @@ assert.commandWorked(db.adminCommand({
 assert.commandWorked(sourceColl.createIndex({state: 1}, {name: "secondIndex"}, 0));
 
 // Run the $out in the parallel shell as it will block in the metadata until the snapshot is
-// advanced.
+// advanced. This will no longer block with point-in-time reads as a new collection instance is
+// created internally when reading before the minimum visible snapshot.
 const awaitShell = startParallelShell(`{
         const testDB = db.getSiblingDB("${name}");
         const sourceColl = testDB.sourceColl;
@@ -65,11 +57,13 @@ const awaitShell = startParallelShell(`{
     }`,
                                           db.getMongo().port);
 
-// Wait for the $out before restarting the replication.
-assert.soon(function() {
-    const filter = {"command.aggregate": "sourceColl"};
-    return assert.commandWorked(db.currentOp(filter)).inprog.length === 1;
-});
+// Wait for the $out before restarting the replication when not using point-in-time reads.
+if (!FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
+    assert.soon(function() {
+        const filter = {"command.aggregate": "sourceColl"};
+        return assert.commandWorked(db.currentOp(filter)).inprog.length === 1;
+    });
+}
 
 // Restart data replication and wait until the new write becomes visible.
 restartReplicationOnSecondaries(rst);
