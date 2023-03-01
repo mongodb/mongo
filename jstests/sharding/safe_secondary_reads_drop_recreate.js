@@ -36,7 +36,6 @@ let nss = db + "." + coll;
 let validateTestCase = function(test) {
     assert(test.setUp && typeof (test.setUp) === "function");
     assert(test.command && typeof (test.command) === "object");
-    assert(test.runsAgainstAdminDb ? typeof (test.runsAgainstAdminDb) === "boolean" : true);
     assert(test.checkResults && typeof (test.checkResults) === "function");
     assert(test.behavior === "unshardedOnly" || test.behavior === "versioned");
 };
@@ -107,19 +106,7 @@ let testCases = {
         behavior: "versioned"
     },
     analyze: {skip: "primary only"},
-    analyzeShardKey: {
-        setUp: function(mongosConn) {
-            assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
-        },
-        command: {analyzeShardKey: nss, key: {x: 1}},
-        runsAgainstAdminDb: true,
-        checkResults: function(res) {
-            // Cannot analyze a shard key for an empty collection (the collection has just been
-            // dropped and recreated).
-            assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
-        },
-        behavior: "versioned"
-    },
+    analyzeShardKey: {skip: "does not return user data"},
     appendOplogNote: {skip: "primary only"},
     applyOps: {skip: "primary only"},
     authSchemaUpgrade: {skip: "primary only"},
@@ -405,9 +392,8 @@ let scenarios = {
             st.rs0.getPrimary().getDB('admin').runCommand({_flushRoutingTableCacheUpdates: nss}));
         st.rs0.awaitReplication();
 
-        let res = staleMongos.getDB(test.runsAgainstAdminDb ? "admin" : db)
-                      .runCommand(Object.assign(
-                          {},
+        let res = staleMongos.getDB(db).runCommand(
+            Object.assign({},
                           test.command,
                           {$readPreference: {mode: 'secondary'}, readConcern: {'level': 'local'}}));
 
@@ -463,9 +449,8 @@ let scenarios = {
             st.rs0.getPrimary().getDB('admin').runCommand({_flushRoutingTableCacheUpdates: nss}));
         st.rs0.awaitReplication();
 
-        let res = staleMongos.getDB(test.runsAgainstAdminDb ? "admin" : db)
-                      .runCommand(Object.assign(
-                          {},
+        let res = staleMongos.getDB(db).runCommand(
+            Object.assign({},
                           test.command,
                           {$readPreference: {mode: 'secondary'}, readConcern: {'level': 'local'}}));
 
@@ -533,9 +518,8 @@ let scenarios = {
             writeConcern: {w: 2},
         }));
 
-        let res = staleMongos.getDB(test.runsAgainstAdminDb ? "admin" : db)
-                      .runCommand(Object.assign(
-                          {},
+        let res = staleMongos.getDB(db).runCommand(
+            Object.assign({},
                           test.command,
                           {$readPreference: {mode: 'secondary'}, readConcern: {'level': 'local'}}));
 

@@ -86,15 +86,8 @@ public:
             }
 
             PseudoRandom random{SecureRandom{}.nextInt64()};
-
-            // On secondaries, the database and shard version check is only performed for commands
-            // that specify a readConcern (that is not "available"). So to opt into the check,
-            // explicitly set the readConcern to "local".
-            const auto readConcern =
-                repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-            const auto unversionedCmdObj = CommandHelpers::filterCommandRequestForPassthrough(
-                request().toBSON(readConcern.toBSON()));
-
+            const auto unversionedCmdObj =
+                CommandHelpers::filterCommandRequestForPassthrough(request().toBSON({}));
             while (true) {
                 // Select a random shard.
                 invariant(!candidateShardIds.empty());
