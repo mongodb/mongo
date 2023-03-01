@@ -341,6 +341,7 @@ void appendShardedTelemetryKeyIfApplicable(BSONObjBuilder& objToModify,
 namespace {
 
 CounterMetric telemetryEvictedMetric("telemetry.numEvicted");
+CounterMetric telemetryRateLimitedRequestsMetric("telemetry.numRateLimitedRequests");
 
 /**
  * Cap the telemetry store size.
@@ -460,12 +461,14 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
     if (!isTelemetryEnabled()) {
         return false;
     }
-    // Cannot collect telemetry if sampling rate is not greater than 0.
+    // Cannot collect telemetry if sampling rate is not greater than 0. Note that we do not
+    // increment telemetryRateLimitedRequestsMetric here since telemetry is entirely disabled.
     if (telemetryRateLimiter(serviceCtx)->getSamplingRate() <= 0) {
         return false;
     }
     // Check if rate limiting allows us to collect telemetry for this request.
     if (!telemetryRateLimiter(serviceCtx)->handleRequestSlidingWindow()) {
+        telemetryRateLimitedRequestsMetric.increment();
         return false;
     }
     return true;
