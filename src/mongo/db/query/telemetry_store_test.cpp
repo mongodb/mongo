@@ -101,15 +101,15 @@ TEST_F(TelemetryStoreTest, EvictEntries) {
     // This creates a telemetry store with 2 partitions, each with a size of 1200 bytes.
     TelemetryStore telStore{2400, 2};
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 20; i++) {
         auto query = BSON("query" + std::to_string(i) << 1 << "xEquals" << 42);
         telStore.put(query, TelemetryMetrics{});
     }
     int numKeys = 0;
     telStore.forEach([&](const BSONObj& key, const TelemetryMetrics& entry) { numKeys++; });
-    // Given the size of the bson keys (~46 bytes) and values (~208 bytes), each partition (1200
-    // bytes) can hold at most 4 entries.
-    ASSERT_EQ(numKeys, 8);
+    // Given the size of the bson keys (~46 bytes) and values (~112 bytes), each partition (1200
+    // bytes) can hold at most 7 entries.
+    ASSERT_EQ(numKeys, 14);
 }
 
 /**

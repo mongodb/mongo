@@ -50,15 +50,9 @@ assert.commandWorked(bulk.execute());
     assert.eq(telemetryEntry.metrics.execCount, 2);
 
     // Assert telemetry values are accurate for the two above queries.
-    assert.eq(telemetryEntry.metrics.docsScanned.sum, 2 * numDocs);
-    assert.eq(telemetryEntry.metrics.docsScanned.min, numDocs);
-    assert.eq(telemetryEntry.metrics.docsScanned.max, numDocs);
     assert.eq(telemetryEntry.metrics.docsReturned.sum, numDocs);
     assert.eq(telemetryEntry.metrics.docsReturned.min, numDocs / 2);
     assert.eq(telemetryEntry.metrics.docsReturned.max, numDocs / 2);
-    assert.eq(telemetryEntry.metrics.keysScanned.sum, 0);
-    assert.eq(telemetryEntry.metrics.keysScanned.min, 0);
-    assert.eq(telemetryEntry.metrics.keysScanned.max, 0);
 
     verifyMetrics(telemetryResults);
 }
@@ -70,7 +64,7 @@ const fooNeBatchSize = 3;
 {
     let cursor1 = coll.find({foo: {$eq: 0}}).batchSize(fooEqBatchSize);
     let cursor2 = coll.find({foo: {$ne: 0}}).batchSize(fooNeBatchSize);
-    // Issue one getMore for the first query, so 2 * cursor1BatchSize documents are returned total.
+    // Issue one getMore for the first query, so 2 * fooEqBatchSize documents are returned total.
     assert.commandWorked(testDB.runCommand(
         {getMore: cursor1.getId(), collection: coll.getName(), batchSize: fooEqBatchSize}));
 
@@ -112,11 +106,6 @@ const fooNeBatchSize = 3;
             .toArray();
     assert.eq(telemetryResults.length, 4, telemetryResults);
 
-    // Assert no keys scanned when no index exists.
-    assert.eq(telemetryResults[0].metrics.keysScanned.sum, 0);
-    assert.eq(telemetryResults[1].metrics.keysScanned.sum, 0);
-    assert.eq(telemetryResults[2].metrics.keysScanned.sum, 0);
-    assert.eq(telemetryResults[3].metrics.keysScanned.sum, 0);
     verifyMetrics(telemetryResults);
 
     // This filters to just the telemetry for query coll.find().sort({"foo": 1}).batchSize(2).
@@ -162,26 +151,6 @@ const fooNeBatchSize = 3;
     assert.eq(telemetryResults[0].metrics.docsReturned.sum, numDocs / 2 + 2 * fooEqBatchSize);
     assert.eq(telemetryResults[0].metrics.docsReturned.max, numDocs / 2);
     assert.eq(telemetryResults[0].metrics.docsReturned.min, 2 * fooEqBatchSize);
-}
-
-// Ensure that for queries using an index, keys scanned is nonzero.
-{
-    assert.commandWorked(coll.createIndex({bar: 1}));
-    coll.aggregate([{$match: {$or: [{bar: 1, foo: 1}]}}], {cursor: {batchSize: 2}});
-
-    // This filters telemetry entries to just the one entered for the above agg command.
-    const telemetryResults =
-        testDB.getSiblingDB("admin")
-            .aggregate([
-                {$telemetry: {}},
-                {$match: {"key.pipeline.$match.$or": {$eq: [{'bar': '###', 'foo': '###'}]}}}
-            ])
-            .toArray();
-    assert.eq(telemetryResults.length, 1, telemetryResults);
-    assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
-    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
-    assert.gt(telemetryResults[0].metrics.keysScanned.sum, 0);
-    verifyMetrics(telemetryResults);
 }
 
 MongoRunner.stopMongod(conn);

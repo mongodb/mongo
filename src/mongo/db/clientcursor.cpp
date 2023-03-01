@@ -157,13 +157,7 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
     }
 
     if (_telemetryStoreKey && opCtx) {
-        telemetry::writeTelemetry(opCtx,
-                                  _telemetryStoreKey,
-                                  _queryOptMicros,
-                                  _queryExecMicros,
-                                  _docsReturned,
-                                  _metrics.docsExamined.value_or(0),
-                                  _metrics.keysExamined.value_or(0));
+        telemetry::writeTelemetry(opCtx, _telemetryStoreKey, _queryExecMicros, _docsReturned);
     }
 
     if (now) {
@@ -386,44 +380,27 @@ void startClientCursorMonitor() {
     getClientCursorMonitor(getGlobalServiceContext()).go();
 }
 
-void collectTelemetry(OperationContext* opCtx,
-                      boost::optional<ClientCursorPin&> pinnedCursor,
-                      bool isGetMoreOp) {
+void collectTelemetryMongod(OperationContext* opCtx, ClientCursorPin& pinnedCursor) {
     auto&& opDebug = CurOp::get(opCtx)->debug();
-    if (pinnedCursor) {
-        auto cursor = pinnedCursor->getCursor();
-        // TODO SERVER-73727 setting shouldRecordTelemetry to boost::none is only
-        // temporarily necessary to avoid collecting metrics a second time in
-        // CurOp::completeAndLogOperation
-        opDebug.telemetryStoreKey = boost::none;
 
-        // We have to use `elapsedTimeExcludingPauses` to count execution time since
-        // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
-        cursor->incCursorMetrics(opDebug.additiveMetrics,
-                                 CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
-                                 opDebug.nreturned);
+    // We have to use `elapsedTimeExcludingPauses` to count execution time since
+    // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
+    pinnedCursor->incrementCursorMetrics(opDebug.additiveMetrics,
+                                         CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
+                                         opDebug.nreturned);
+}
 
-        // If the current operation is a getMore, planning time was already aggregated on the
-        // initial operation.
-        if (!isGetMoreOp) {
-            cursor->setQueryOptMicros(opDebug.planningTime.count());
-        }
-    } else {
-        tassert(7301701, "getMore operations should aggregate metrics on the cursor", !isGetMoreOp);
-        auto&& opDebug = CurOp::get(opCtx)->debug();
-        // If we haven't registered a cursor to prepare for getMore requests, we record
-        // telemetry directly.
-        //
-        // We have to use `elapsedTimeExcludingPauses` to count execution time since
-        // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
-        telemetry::writeTelemetry(opCtx,
-                                  opDebug.telemetryStoreKey,
-                                  opDebug.planningTime.count(),
-                                  CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
-                                  opDebug.nreturned,
-                                  opDebug.additiveMetrics.docsExamined.value_or(0),
-                                  opDebug.additiveMetrics.keysExamined.value_or(0));
-    }
+void collectTelemetryMongod(OperationContext* opCtx) {
+    auto&& opDebug = CurOp::get(opCtx)->debug();
+    // If we haven't registered a cursor to prepare for getMore requests, we record
+    // telemetry directly.
+    //
+    // We have to use `elapsedTimeExcludingPauses` to count execution time since
+    // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
+    telemetry::writeTelemetry(opCtx,
+                              opDebug.telemetryStoreKey,
+                              CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
+                              opDebug.nreturned);
 }
 
 }  // namespace mongo

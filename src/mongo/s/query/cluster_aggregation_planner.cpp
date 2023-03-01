@@ -349,12 +349,24 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
         responseBuilder.setPostBatchResumeToken(ccc->getPostBatchResumeToken());
     }
 
+    bool exhausted = cursorState != ClusterCursorManager::CursorState::NotExhausted;
+    int nShards = ccc->getNumRemotes();
+
+    // Fill out the aggregation metrics in CurOp, and record telemetry metrics, before detaching the
+    // cursor from its opCtx.
+    CurOp::get(opCtx)->debug().nShards = std::max(CurOp::get(opCtx)->debug().nShards, nShards);
+    CurOp::get(opCtx)->debug().cursorExhausted = exhausted;
+    CurOp::get(opCtx)->debug().nreturned = responseBuilder.numDocs();
+    if (exhausted) {
+        collectTelemetryMongos(opCtx);
+    } else {
+        collectTelemetryMongos(opCtx, ccc);
+    }
+
     ccc->detachFromOperationContext();
 
-    int nShards = ccc->getNumRemotes();
     CursorId clusterCursorId = 0;
-
-    if (cursorState == ClusterCursorManager::CursorState::NotExhausted) {
+    if (!exhausted) {
         auto authUser = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
         clusterCursorId = uassertStatusOK(Grid::get(opCtx)->getCursorManager()->registerCursor(
             opCtx,
@@ -363,15 +375,8 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
             ClusterCursorManager::CursorType::MultiTarget,
             ClusterCursorManager::CursorLifetime::Mortal,
             authUser));
-    }
-
-    // Fill out the aggregation metrics in CurOp.
-    if (clusterCursorId > 0) {
         CurOp::get(opCtx)->debug().cursorid = clusterCursorId;
     }
-    CurOp::get(opCtx)->debug().nShards = std::max(CurOp::get(opCtx)->debug().nShards, nShards);
-    CurOp::get(opCtx)->debug().cursorExhausted = (clusterCursorId == 0);
-    CurOp::get(opCtx)->debug().nreturned = responseBuilder.numDocs();
 
     responseBuilder.done(clusterCursorId, requestedNss);
 

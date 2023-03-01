@@ -695,7 +695,7 @@ public:
             // response batch.
             curOp->debug().nreturned = numResults;
 
-            collectTelemetry(opCtx, cursorPin, true);
+            collectTelemetryMongod(opCtx, cursorPin);
 
             if (respondWithId) {
                 cursorDeleter.dismiss();

@@ -250,7 +250,6 @@ public:
                 }
                 firstBatch.setPartialResultsReturned(partialResultsReturned);
                 firstBatch.done(cursorId, cq->nss());
-                telemetry::recordExecution(opCtx, _didDoFLERewrite);
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 result->reset();
 

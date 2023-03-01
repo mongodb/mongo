@@ -505,50 +505,6 @@ void throwIfEncounteringFLEPayload(const BSONElement& e) {
 }
 
 /**
- * Get the metrics for a given key holding the appropriate locks.
- */
-class LockedMetrics {
-    LockedMetrics(TelemetryMetrics* metrics,
-                  TelemetryStore& telemetryStore,
-                  TelemetryStore::Partition partitionLock)
-        : _metrics(metrics),
-          _telemetryStore(telemetryStore),
-          _partitionLock(std::move(partitionLock)) {}
-
-public:
-    static LockedMetrics get(OperationContext* opCtx, const BSONObj& telemetryKey) {
-        auto&& telemetryStore = getTelemetryStore(opCtx);
-        auto&& [statusWithMetrics, partitionLock] =
-            telemetryStore.getWithPartitionLock(telemetryKey);
-        TelemetryMetrics* metrics;
-        if (statusWithMetrics.isOK()) {
-            metrics = statusWithMetrics.getValue();
-        } else {
-            size_t numEvicted = telemetryStore.put(telemetryKey, {}, partitionLock);
-            telemetryEvictedMetric.increment(numEvicted);
-            auto newMetrics = partitionLock->get(telemetryKey);
-            // This can happen if the budget is immediately exceeded. Specifically if the there is
-            // not enough room for a single new entry if the number of partitions is too high
-            // relative to the size.
-            tassert(7064700, "Should find telemetry store entry", newMetrics.isOK());
-            metrics = &newMetrics.getValue()->second;
-        }
-        return LockedMetrics{metrics, telemetryStore, std::move(partitionLock)};
-    }
-
-    TelemetryMetrics* operator->() const {
-        return _metrics;
-    }
-
-private:
-    TelemetryMetrics* _metrics;
-
-    TelemetryStore& _telemetryStore;
-
-    TelemetryStore::Partition _partitionLock;
-};
-
-/**
  * Upon reading telemetry data, we redact some keys. This is the list. See
  * TelemetryMetrics::redactKey().
  */
@@ -755,80 +711,38 @@ void registerFindRequest(const FindCommandRequest& request,
     CurOp::get(opCtx)->debug().telemetryStoreKey = telemetryKey.obj();
 }
 
-// TODO SERVER-73727 registerGetMoreRequest should be removed once metrics are aggregated on cursors
-// across getMores on mongos
-void registerGetMoreRequest(OperationContext* opCtx) {
-    if (!isTelemetryEnabled()) {
-        return;
-    }
-
-    // Rate limiting is important in all cases as it limits the amount of CPU telemetry uses to
-    // prevent degrading query throughput. This is essential in the case of a large find
-    // query with a batchsize of 1, where collecting metrics on every getMore would quickly impact
-    // the number of queries the system can process per second (query throughput). This is why not
-    // only are originating queries rate limited but also their subsequent getMore operations.
-    if (!shouldCollect(opCtx->getServiceContext())) {
-        return;
-    }
-}
-
 TelemetryStore& getTelemetryStore(OperationContext* opCtx) {
     uassert(6579000, "Telemetry is not enabled without the feature flag on", isTelemetryEnabled());
     return telemetryStoreDecoration(opCtx->getServiceContext())->getTelemetryStore();
 }
 
-void recordExecution(OperationContext* opCtx, bool isFle) {
-    if (!isTelemetryEnabled()) {
-        return;
-    }
-    if (isFle) {
-        return;
-    }
-    // Confirms that this is an operation the telemetry machinery has decided to collect metrics
-    // from.
-    auto&& opDebug = CurOp::get(opCtx)->debug();
-    if (!opDebug.telemetryStoreKey) {
-        return;
-    }
-    auto&& metrics = LockedMetrics::get(opCtx, *opDebug.telemetryStoreKey);
-    metrics->execCount++;
-    metrics->queryOptMicros.aggregate(opDebug.planningTime.count());
-}
-
-void collectTelemetry(OperationContext* opCtx, const OpDebug& opDebug) {
-    // Confirms that this is an operation the telemetry machinery has decided to collect metrics
-    // from.
-    if (!opDebug.telemetryStoreKey) {
-        return;
-    }
-
-    auto&& metrics = LockedMetrics::get(opCtx, *opDebug.telemetryStoreKey);
-    metrics->docsReturned.aggregate(opDebug.nreturned);
-    metrics->docsScanned.aggregate(opDebug.additiveMetrics.docsExamined.value_or(0));
-    metrics->keysScanned.aggregate(opDebug.additiveMetrics.keysExamined.value_or(0));
-    metrics->lastExecutionMicros = opDebug.executionTime.count();
-    metrics->queryExecMicros.aggregate(opDebug.executionTime.count());
-}
-
 void writeTelemetry(OperationContext* opCtx,
                     boost::optional<BSONObj> telemetryKey,
-                    const uint64_t queryOptMicros,
                     const uint64_t queryExecMicros,
-                    const uint64_t docsReturned,
-                    const uint64_t docsScanned,
-                    const uint64_t keysScanned) {
+                    const uint64_t docsReturned) {
     if (!telemetryKey) {
         return;
     }
-    auto&& metrics = LockedMetrics::get(opCtx, *telemetryKey);
+    auto&& telemetryStore = getTelemetryStore(opCtx);
+    auto&& [statusWithMetrics, partitionLock] = telemetryStore.getWithPartitionLock(*telemetryKey);
+    TelemetryMetrics* metrics;
+    if (statusWithMetrics.isOK()) {
+        metrics = statusWithMetrics.getValue();
+    } else {
+        size_t numEvicted = telemetryStore.put(*telemetryKey, {}, partitionLock);
+        telemetryEvictedMetric.increment(numEvicted);
+        auto newMetrics = partitionLock->get(*telemetryKey);
+        // This can happen if the budget is immediately exceeded. Specifically if the there is
+        // not enough room for a single new entry if the number of partitions is too high
+        // relative to the size.
+        tassert(7064700, "Should find telemetry store entry", newMetrics.isOK());
+        metrics = &newMetrics.getValue()->second;
+    }
 
     metrics->lastExecutionMicros = queryExecMicros;
     metrics->execCount++;
-    metrics->queryOptMicros.aggregate(queryOptMicros);
     metrics->queryExecMicros.aggregate(queryExecMicros);
     metrics->docsReturned.aggregate(docsReturned);
-    metrics->docsScanned.aggregate(docsScanned);
-    metrics->keysScanned.aggregate(keysScanned);
 }
 }  // namespace telemetry
 }  // namespace mongo

@@ -215,14 +215,9 @@ public:
         _nReturnedSoFar = n;
     }
 
-    void setQueryOptMicros(uint64_t queryOptMicros) {
-        tassert(7301700, "queryOptMicros should only be set once per cursor", _queryOptMicros == 0);
-        _queryOptMicros = queryOptMicros;
-    }
-
-    void incCursorMetrics(OpDebug::AdditiveMetrics newMetrics,
-                          uint64_t newExecutionTime,
-                          uint64_t newDocsReturned) {
+    void incrementCursorMetrics(OpDebug::AdditiveMetrics newMetrics,
+                                uint64_t newExecutionTime,
+                                uint64_t newDocsReturned) {
         _metrics.add(newMetrics);
         _queryExecMicros += newExecutionTime;
         _docsReturned += newDocsReturned;
@@ -467,7 +462,6 @@ private:
     // If boost::none, telemetry should not be collected for this cursor.
     boost::optional<BSONObj> _telemetryStoreKey;
     // Metrics used for telemetry. TODO SERVER-73933 consider merging more into '_metrics'
-    uint64_t _queryOptMicros = 0;
     uint64_t _queryExecMicros = 0;
     uint64_t _docsReturned = 0;
     OpDebug::AdditiveMetrics _metrics;
@@ -604,8 +598,7 @@ void startClientCursorMonitor();
  * provided, metrics are aggregated on the cursor; otherwise, metrics are written directly to the
  * telemetry store.
  */
-void collectTelemetry(OperationContext* opCtx,
-                      boost::optional<ClientCursorPin&> cursor,
-                      bool isGetMoreOp);
+void collectTelemetryMongod(OperationContext* opCtx, ClientCursorPin& cursor);
+void collectTelemetryMongod(OperationContext* opCtx);
 
 }  // namespace mongo

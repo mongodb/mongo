@@ -221,6 +221,14 @@ public:
      */
     virtual void incNBatches() = 0;
 
+    void incrementCursorMetrics(OpDebug::AdditiveMetrics newMetrics,
+                                uint64_t newExecutionTime,
+                                uint64_t newDocsReturned) {
+        _metrics.add(newMetrics);
+        _queryExecMicros += newExecutionTime;
+        _docsReturned += newDocsReturned;
+    }
+
     //
     // maxTimeMS support.
     //
@@ -244,6 +252,12 @@ public:
     void setLeftoverMaxTimeMicros(Microseconds leftoverMaxTimeMicros) {
         _leftoverMaxTimeMicros = leftoverMaxTimeMicros;
     }
+
+protected:
+    // Metrics used for telemetry. TODO SERVER-73933 consider merging more into '_metrics'
+    uint64_t _queryExecMicros = 0;
+    uint64_t _docsReturned = 0;
+    OpDebug::AdditiveMetrics _metrics;
 
 private:
     // Unused maxTime budget for this cursor.

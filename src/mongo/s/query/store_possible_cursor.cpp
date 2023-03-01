@@ -97,6 +97,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 
     if (incomingCursorResponse.getValue().getCursorId() == CursorId(0)) {
         CurOp::get(opCtx)->debug().cursorExhausted = true;
+        collectTelemetryMongos(opCtx);
         return cmdResult;
     }
 
@@ -129,6 +130,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, std::move(executor), std::move(params));
     ccc->incNBatches();
+    collectTelemetryMongos(opCtx, ccc);
     // We don't expect to use this cursor until a subsequent getMore, so detach from the current
     // OperationContext until then.
     ccc->detachFromOperationContext();

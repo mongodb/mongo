@@ -565,8 +565,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         updateHostsTargetedMetrics(opCtx, namespaces.executionNss, cm, involvedNamespaces);
         // Report usage statistics for each stage in the pipeline.
         liteParsedPipeline.tickGlobalStageCounters();
-        telemetry::recordExecution(opCtx, shouldDoFLERewrite);
-
         // Add 'command' object to explain output.
         if (expCtx->explain) {
             explain_common::appendIfRoom(

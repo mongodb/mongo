@@ -180,6 +180,15 @@ private:
 
     // Whether ClusterClientCursor::next() was interrupted due to MaxTimeMSExpired.
     bool _maxTimeMSExpired = false;
+
+    // If boost::none, telemetry should not be collected for this cursor.
+    boost::optional<BSONObj> _telemetryStoreKey;
+
+    // Tracks if kill() has been called on the cursor. Multiple calls to kill() are treated as a
+    // noop.
+    // TODO SERVER-74482 investigate where kill() is called multiple times and remove unnecessary
+    // calls
+    bool _hasBeenKilled = false;
 };
 
 }  // namespace mongo

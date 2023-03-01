@@ -131,11 +131,8 @@ public:
         BSONObjBuilder builder{sizeof(TelemetryMetrics) + 100};
         builder.append("lastExecutionMicros", (BSONNumeric)lastExecutionMicros);
         builder.append("execCount", (BSONNumeric)execCount);
-        queryOptMicros.appendTo(builder, "queryOptMicros");
         queryExecMicros.appendTo(builder, "queryExecMicros");
         docsReturned.appendTo(builder, "docsReturned");
-        docsScanned.appendTo(builder, "docsScanned");
-        keysScanned.appendTo(builder, "keysScanned");
         builder.append("firstSeenTimestamp", firstSeenTimestamp);
         return builder.obj();
     }
@@ -160,15 +157,9 @@ public:
      */
     uint64_t execCount = 0;
 
-    AggregatedMetric queryOptMicros;
-
     AggregatedMetric queryExecMicros;
 
     AggregatedMetric docsReturned;
-
-    AggregatedMetric docsScanned;
-
-    AggregatedMetric keysScanned;
 
 private:
     /**
@@ -208,8 +199,8 @@ TelemetryStore& getTelemetryStore(OperationContext* opCtx);
  * collect anything but this should be called for all requests. The decision is made based on
  * the feature flag and telemetry parameters such as rate limiting.
  *
- * The caller is still responsible for subsequently calling collectTelemetry() once the request
- * is completed.
+ * The caller is still responsible for subsequently calling writeTelemetry() once the request is
+ * completed.
  *
  * Note that calling this affects internal state. It should be called once for each request for
  * which telemetry may be collected.
@@ -220,32 +211,12 @@ void registerFindRequest(const FindCommandRequest& request,
                          const NamespaceString& collection,
                          OperationContext* ocCtx);
 
-void registerGetMoreRequest(OperationContext* opCtx);
-
-// recordExecution is called between registering the query and collecting metrics post execution.
-// Its purpose is to track the number of times a given query shape has been ran. The execution count
-// is incremented outside of registering the command because the originating command could be an
-// explain request and therefore the query is not actually executed.
-// TODO SERVER-73727 remove this function
-void recordExecution(OperationContext* opCtx, bool isFle);
-
-/**
- * Collect telemetry for the operation identified by the telemetryKey stored on
- * opDebug.
- * TODO SERVER-73727 remove this function
- */
-void collectTelemetry(OperationContext* opCtx, const OpDebug& opDebug);
-
-
 /**
  * Writes telemetry to the telemetry store for the operation identified by `telemetryKey`.
  */
 void writeTelemetry(OperationContext* opCtx,
                     boost::optional<BSONObj> telemetryKey,
-                    uint64_t queryOptMicros,
                     uint64_t queryExecMicros,
-                    uint64_t docsReturned,
-                    uint64_t docsScanned,
-                    uint64_t keysScanned);
+                    uint64_t docsReturned);
 }  // namespace telemetry
 }  // namespace mongo

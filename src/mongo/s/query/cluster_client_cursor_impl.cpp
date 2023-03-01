@@ -32,10 +32,14 @@
 #include <memory>
 
 #include "mongo/db/curop.h"
+#include "mongo/db/query/telemetry.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/query/router_stage_limit.h"
 #include "mongo/s/query/router_stage_merge.h"
 #include "mongo/s/query/router_stage_remove_metadata_fields.h"
 #include "mongo/s/query/router_stage_skip.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
@@ -69,7 +73,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _opCtx(opCtx),
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
-      _queryHash(CurOp::get(opCtx)->debug().queryHash) {
+      _queryHash(CurOp::get(opCtx)->debug().queryHash),
+      _telemetryStoreKey(CurOp::get(opCtx)->debug().telemetryStoreKey) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -124,7 +129,20 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
 }
 
 void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
+    if (_hasBeenKilled) {
+        LOGV2_DEBUG(7372700,
+                    3,
+                    "Kill called on cluster client cursor after cursor has already been killed, so "
+                    "ignoring");
+        return;
+    }
+
+    if (_telemetryStoreKey && opCtx) {
+        telemetry::writeTelemetry(opCtx, _telemetryStoreKey, _queryExecMicros, _docsReturned);
+    }
+
     _root->kill(opCtx);
+    _hasBeenKilled = true;
 }
 
 void ClusterClientCursorImpl::reattachToOperationContext(OperationContext* opCtx) {

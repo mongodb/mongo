@@ -38,6 +38,7 @@
 #include "mongo/db/allocate_cursor_id.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/telemetry.h"
 #include "mongo/db/session/kill_sessions_common.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/logv2/log.h"
@@ -586,4 +587,36 @@ StatusWith<ClusterClientCursorGuard> ClusterCursorManager::_detachCursor(WithLoc
 
     return std::move(cursor);
 }
+
+void collectTelemetryMongos(OperationContext* opCtx) {
+    auto&& opDebug = CurOp::get(opCtx)->debug();
+    // If we haven't registered a cursor to prepare for getMore requests, we record
+    // telemetry directly.
+    //
+    // We have to use `elapsedTimeExcludingPauses` to count execution time since
+    // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
+    telemetry::writeTelemetry(opCtx,
+                              opDebug.telemetryStoreKey,
+                              CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
+                              opDebug.nreturned);
+}
+
+void collectTelemetryMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor) {
+    auto&& opDebug = CurOp::get(opCtx)->debug();
+    // We have to use `elapsedTimeExcludingPauses` to count execution time since
+    // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
+    cursor->incrementCursorMetrics(opDebug.additiveMetrics,
+                                   CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
+                                   opDebug.nreturned);
+}
+
+void collectTelemetryMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor) {
+    auto&& opDebug = CurOp::get(opCtx)->debug();
+    // We have to use `elapsedTimeExcludingPauses` to count execution time since
+    // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
+    cursor->incrementCursorMetrics(opDebug.additiveMetrics,
+                                   CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
+                                   opDebug.nreturned);
+}
+
 }  // namespace mongo

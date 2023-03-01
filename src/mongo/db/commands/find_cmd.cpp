@@ -726,10 +726,10 @@ public:
                     CurOp::get(opCtx)->debug().storageStats =
                         opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
                 }
-                collectTelemetry(opCtx, pinnedCursor, false);
+                collectTelemetryMongod(opCtx, pinnedCursor);
             } else {
                 endQueryOp(opCtx, collection, *exec, numResults, cursorId);
-                collectTelemetry(opCtx, boost::none, false);
+                collectTelemetryMongod(opCtx);
             }
 
             // Generate the response object to send to the client.

@@ -593,4 +593,13 @@ private:
     size_t _cursorsTimedOut = 0;
 };
 
+/**
+ * Aggregates telemetry for the current operation via metrics stored on opDebug. If a cursor is
+ * provided (via ClusterClientCursorGuard or ClusterCursorManager::PinnedCursor), metrics are
+ * aggregated on the cursor; otherwise, metrics are written directly to the telemetry store.
+ */
+void collectTelemetryMongos(OperationContext* opCtx);
+void collectTelemetryMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor);
+void collectTelemetryMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor);
+
 }  // namespace mongo
