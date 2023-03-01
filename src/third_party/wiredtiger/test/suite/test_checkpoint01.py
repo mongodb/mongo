@@ -312,10 +312,12 @@ class test_checkpoint_last(wttest.WiredTigerTestCase):
             # Don't close the checkpoint cursor, we want it to remain open until
             # the test completes.
 
-# Check we can't use the reserved name as an application checkpoint name.
+# Check we can't use the reserved name as an application checkpoint name or open a checkpoint cursor
+# with it.
 class test_checkpoint_illegal_name(wttest.WiredTigerTestCase):
     def test_checkpoint_illegal_name(self):
-        ds = SimpleDataSet(self, "file:checkpoint", 100, key_format='S')
+        uri = "file:checkpoint"
+        ds = SimpleDataSet(self, uri, 100, key_format='S')
         ds.populate()
         msg = '/the checkpoint name.*is reserved/'
         for conf in (
@@ -336,6 +338,14 @@ class test_checkpoint_illegal_name(wttest.WiredTigerTestCase):
             'name=check\\point'):
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.checkpoint(conf), msg)
+        msg = '/the prefix.*is reserved/'
+        for conf in (
+            'checkpoint=WiredTigerCheckpoint.',
+            'checkpoint=WiredTigerCheckpointX'):
+                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                    lambda: self.session.open_cursor(uri, None, conf), msg)
+                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                    lambda: self.session.open_cursor("file:WiredTigerHS.wt", None, conf), msg)
 
 # Check we can't name checkpoints that include LSM tables.
 class test_checkpoint_lsm_name(wttest.WiredTigerTestCase):

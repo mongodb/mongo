@@ -372,12 +372,13 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
     uint64_t ds_time, first_snapshot_time, hs_time, oldest_time, snapshot_time, stable_time;
     int64_t ds_order, hs_order;
     const char *checkpoint, *hs_checkpoint;
-    bool is_unnamed_ckpt, must_resolve;
+    bool is_hs, is_unnamed_ckpt, is_reserved_name, must_resolve;
 
     ds_time = first_snapshot_time = hs_time = oldest_time = snapshot_time = stable_time = 0;
     ds_order = hs_order = 0;
     checkpoint = NULL;
     hs_checkpoint = NULL;
+    is_hs = is_unnamed_ckpt = is_reserved_name = must_resolve = false;
 
     /* These should only be set together. Asking for only one doesn't make sense. */
     WT_ASSERT(session, (hs_dhandlep == NULL) == (ckpt_snapshot == NULL));
@@ -473,9 +474,7 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
      * confusion caused by older versions that don't include these values.
      *
      * Also note that only the exact name "WiredTigerCheckpoint" needs to be resolved. Requests to
-     * open specific versions, such as "WiredTigerCheckpoint.6", must be looked up like named
-     * checkpoints but are otherwise still treated as unnamed. This is necessary so that the
-     * matching history store checkpoint we find can be itself opened later.
+     * open specific versions, such as "WiredTigerCheckpoint.6", is forbidden.
      *
      * It is also at least theoretically possible for there to be no matching history store
      * checkpoint. If looking up the checkpoint names finds no history store checkpoint, its name
@@ -483,9 +482,21 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
      * life of the checkpoint cursor.
      */
 
-    if (strcmp(uri, WT_HS_URI) == 0)
+    is_hs = strcmp(uri, WT_HS_URI) == 0;
+    if (is_hs)
         /* We're opening the history store directly, so don't open it twice. */
         hs_dhandlep = NULL;
+
+    /*
+     * Applications can use the internal reserved name "WiredTigerCheckpoint" to open the latest
+     * checkpoint, but they are not allowed to directly open specific checkpoint versions, such as
+     * "WiredTigerCheckpoint.6". However, internally it is allowed to open the history store with a
+     * specific version.
+     */
+    is_reserved_name = cval.len > strlen(WT_CHECKPOINT) && WT_PREFIX_MATCH(cval.str, WT_CHECKPOINT);
+    if (is_reserved_name && (!is_hs || session->hs_checkpoint == NULL))
+        WT_RET_MSG(
+          session, EINVAL, "the prefix \"%s\" for checkpoint cursors is reserved", WT_CHECKPOINT);
 
     /*
      * Test for the internal checkpoint name (WiredTigerCheckpoint). Note: must_resolve is true in a

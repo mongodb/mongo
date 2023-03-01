@@ -72,7 +72,8 @@ Cursors are normally opened in the live version of a data source.
 However, it is also possible to open a read-only, static view of the
 data source as of a checkpoint.
 This is done by passing the \c checkpoint configuration string to
-WT_SESSION::open_cursor.
+WT_SESSION::open_cursor. Checkpoint cursors can only be opened on application
+named checkpoints or on the latest checkpoint using "WiredTigerCheckpoint".
 This provides a limited form of time-travel, as the static
 view is not changed by subsequent checkpoints and will persist until
 the checkpoint cursor is closed.
