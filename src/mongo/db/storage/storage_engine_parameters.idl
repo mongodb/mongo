@@ -93,6 +93,6 @@ server_parameters:
     set_at: startup
     cpp_vartype: std::string
     cpp_varname: gStorageEngineConcurrencyAdjustmentAlgorithm
-    default: ""
+    default: "throughputProbing"
     validator:
       callback: TicketHolderManager::validateConcurrencyAdjustmentAlgorithm

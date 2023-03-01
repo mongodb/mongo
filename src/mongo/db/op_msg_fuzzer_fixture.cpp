@@ -49,6 +49,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/transport/service_entry_point_impl.h"
+#include "mongo/util/periodic_runner_factory.h"
 
 namespace mongo {
 
@@ -88,6 +89,8 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
 
     auto observerRegistry = std::make_unique<OpObserverRegistry>();
     _serviceContext->setOpObserver(std::move(observerRegistry));
+
+    _serviceContext->setPeriodicRunner(makePeriodicRunner(_serviceContext));
 
     _clientStrand = ClientStrand::make(_serviceContext->makeClient("test", _session));
     auto clientGuard = _clientStrand->bind();

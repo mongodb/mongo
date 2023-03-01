@@ -2,7 +2,10 @@
  * Test ensures that exhausting the number of write tickets in the system does not prevent
  * transactions from being reaped/aborted.
  *
- * @tags: [uses_transactions]
+ * @tags: [
+ *   requires_fcv_70,
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";
@@ -17,6 +20,8 @@ const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
         setParameter: {
+            // This test requires a fixed ticket pool size.
+            storageEngineConcurrencyAdjustmentAlgorithm: "",
             wiredTigerConcurrentWriteTransactions: kNumWriteTickets,
 
             // Setting a transaction lifetime of 1 hour to make sure the transaction reaper

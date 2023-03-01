@@ -68,6 +68,13 @@ TicketHolderManager::TicketHolderManager(ServiceContext* svcCtx,
 }
 
 Status TicketHolderManager::updateConcurrentWriteTransactions(const int32_t& newWriteTransactions) {
+    if (feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV() &&
+        !gStorageEngineConcurrencyAdjustmentAlgorithm.empty()) {
+        return {ErrorCodes::IllegalOperation,
+                "Cannot modify concurrent write transactions limit when it is being dynamically "
+                "adjusted"};
+    }
+
     if (auto client = Client::getCurrent()) {
         auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
         if (!ticketHolderManager) {
@@ -94,6 +101,13 @@ Status TicketHolderManager::updateConcurrentWriteTransactions(const int32_t& new
 };
 
 Status TicketHolderManager::updateConcurrentReadTransactions(const int32_t& newReadTransactions) {
+    if (feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV() &&
+        !gStorageEngineConcurrencyAdjustmentAlgorithm.empty()) {
+        return {ErrorCodes::IllegalOperation,
+                "Cannot modify concurrent read transactions limit when it is being dynamically "
+                "adjusted"};
+    }
+
     if (auto client = Client::getCurrent()) {
         auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
         if (!ticketHolderManager) {

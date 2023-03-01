@@ -68,7 +68,7 @@ void ThroughputProbing::_run(Client* client) {
 void ThroughputProbing::_probeStable(OperationContext* opCtx, double throughput) {
     invariant(_state == ProbingState::kStable);
 
-    LOGV2(7346000, "ThroughputProbing: stable", "throughput"_attr = throughput);
+    LOGV2_DEBUG(7346000, 3, "Throughput Probing: stable", "throughput"_attr = throughput);
 
     // Record the baseline reading.
     _stableThroughput = throughput;
@@ -95,7 +95,7 @@ void ThroughputProbing::_probeStable(OperationContext* opCtx, double throughput)
 void ThroughputProbing::_probeUp(OperationContext* opCtx, double throughput) {
     invariant(_state == ProbingState::kUp);
 
-    LOGV2(7346001, "ThroughputProbing: up", "throughput"_attr = throughput);
+    LOGV2_DEBUG(7346001, 3, "Throughput Probing: up", "throughput"_attr = throughput);
 
     if (throughput > _stableThroughput) {
         // Increasing concurrency caused throughput to increase, so promote this new level of
@@ -116,7 +116,7 @@ void ThroughputProbing::_probeUp(OperationContext* opCtx, double throughput) {
 void ThroughputProbing::_probeDown(OperationContext* opCtx, double throughput) {
     invariant(_state == ProbingState::kDown);
 
-    LOGV2(7346002, "ThroughputProbing: down", "throughput"_attr = throughput);
+    LOGV2_DEBUG(7346002, 3, "Throughput Probing: down", "throughput"_attr = throughput);
 
     if (throughput > _stableThroughput) {
         // Decreasing concurrency caused throughput to increase, so promote this new level of
@@ -137,7 +137,8 @@ void ThroughputProbing::_setConcurrency(OperationContext* opCtx, int concurrency
     _readTicketHolder->resize(opCtx, concurrency);
     _writeTicketHolder->resize(opCtx, concurrency);
 
-    LOGV2(7346003, "ThroughputProbing: set concurrency", "concurrency"_attr = concurrency);
+    LOGV2_DEBUG(
+        7346003, 3, "Throughput Probing: set concurrency", "concurrency"_attr = concurrency);
 }
 
 }  // namespace mongo::execution_control

@@ -15,6 +15,7 @@
  * and join the parallel remove operations and transaction thread.
  *
  * @tags: [
+ *   requires_fcv_70,
  *   uses_multi_shard_transaction,
  *   uses_transactions,
  * ]
@@ -35,6 +36,8 @@ const st = new ShardingTest({
     rs: {nodes: 1},
     rsOptions: {
         setParameter: {
+            // This test requires a fixed ticket pool size.
+            storageEngineConcurrencyAdjustmentAlgorithm: "",
             wiredTigerConcurrentWriteTransactions: kNumWriteTickets,
             // Lower transactionLifetimeLimitSeconds to cause TransactionCoordinators which haven't
             // yet made their commit or abort decision to time out and abort the transaction.

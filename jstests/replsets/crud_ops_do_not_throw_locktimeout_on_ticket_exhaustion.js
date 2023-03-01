@@ -2,7 +2,11 @@
  * Test ensures that CRUD operations that time out because they cannot acquire a ticket do not
  * return a LockTimeout.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [
+ *   requires_fcv_70,
+ *   uses_transactions,
+ *   uses_prepare_transaction,
+ * ]
  */
 (function() {
 "use strict";
@@ -19,6 +23,8 @@ const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
         setParameter: {
+            // This test requires a fixed ticket pool size.
+            storageEngineConcurrencyAdjustmentAlgorithm: "",
             wiredTigerConcurrentWriteTransactions: kNumWriteTickets,
             wiredTigerConcurrentReadTransactions: kNumReadTickets,
             logComponentVerbosity: tojson({storage: 1, command: 2})

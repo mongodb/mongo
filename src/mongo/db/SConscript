@@ -2432,6 +2432,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/periodic_runner_factory',
         'auth/auth',
         'auth/authmocks',
         'catalog/catalog_impl',
