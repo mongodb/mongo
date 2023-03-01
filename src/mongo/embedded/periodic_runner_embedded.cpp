@@ -49,6 +49,20 @@ struct PeriodicRunnerEmbedded::PeriodicJobSorter {
 PeriodicRunnerEmbedded::PeriodicRunnerEmbedded(ServiceContext* svc, ClockSource* clockSource)
     : _svc(svc), _clockSource(clockSource) {}
 
+PeriodicRunnerEmbedded::~PeriodicRunnerEmbedded() {
+    stdx::lock_guard<Latch> lk{_mutex};
+
+    auto stopJob = [&lk](const std::shared_ptr<PeriodicJobImpl>& job) {
+        stdx::lock_guard<Latch> jobLk{job->_mutex};
+        if (job->isAlive(jobLk)) {
+            job->_stopWithMasterAndJobLock(lk, jobLk);
+        }
+    };
+
+    std::for_each(_jobs.begin(), _jobs.end(), stopJob);
+    std::for_each(_Pausedjobs.begin(), _Pausedjobs.end(), stopJob);
+}
+
 auto PeriodicRunnerEmbedded::makeJob(PeriodicJob job) -> JobAnchor {
     auto impl = std::make_shared<PeriodicJobImpl>(std::move(job), this->_clockSource, this);
 
@@ -161,10 +175,18 @@ void PeriodicRunnerEmbedded::PeriodicJobImpl::resume() {
 }
 
 void PeriodicRunnerEmbedded::PeriodicJobImpl::stop() {
+    // It's possible that the periodic runner has already been destructed, so first see if this job
+    // has already been stopped. If so, we can return early before accessing the periodic runner.
+    stdx::unique_lock<Latch> lk{_mutex};
+    if (!isAlive(lk)) {
+        return;
+    }
+    lk.unlock();
+
     // Also take the master lock, the job lock is not held while executing the job and we must make
     // sure the user can invalidate it after this call.
     stdx::lock_guard<Latch> masterLock(_periodicRunner->_mutex);
-    stdx::lock_guard<Latch> lk(_mutex);
+    lk.lock();
     if (isAlive(lk)) {
         _stopWithMasterAndJobLock(masterLock, lk);
     }

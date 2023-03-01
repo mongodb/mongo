@@ -48,6 +48,8 @@ class PeriodicRunnerEmbedded : public PeriodicRunner {
 public:
     PeriodicRunnerEmbedded(ServiceContext* svc, ClockSource* clockSource);
 
+    ~PeriodicRunnerEmbedded();
+
     JobAnchor makeJob(PeriodicJob job) override;
 
     // Safe to call from multiple threads but will only execute on one thread at a time.
