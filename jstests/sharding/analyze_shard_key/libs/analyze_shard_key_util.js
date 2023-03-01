@@ -156,13 +156,22 @@ var AnalyzeShardKeyUtil = (function() {
         return assert.lte(Math.abs(actual - expected), epsilon, {actual, expected, msg});
     }
 
-    function assertNoKeyCharacteristicsMetrics(actual) {
+    function assertNotContainKeyCharacteristicsMetrics(actual) {
         assert(!actual.hasOwnProperty("numDocs"), actual);
         assert(!actual.hasOwnProperty("isUnique"), actual);
         assert(!actual.hasOwnProperty("numDistinctValues"), actual);
         assert(!actual.hasOwnProperty("mostCommonValues"), actual);
         assert(!actual.hasOwnProperty("monotonicity"), actual);
         assert(!actual.hasOwnProperty("avgDocSizeBytes"), actual);
+    }
+
+    function assertContainKeyCharacteristicsMetrics(actual) {
+        assert(actual.hasOwnProperty("numDocs"), actual);
+        assert(actual.hasOwnProperty("isUnique"), actual);
+        assert(actual.hasOwnProperty("numDistinctValues"), actual);
+        assert(actual.hasOwnProperty("mostCommonValues"), actual);
+        assert(actual.hasOwnProperty("monotonicity"), actual);
+        assert(actual.hasOwnProperty("avgDocSizeBytes"), actual);
     }
 
     function assertKeyCharacteristicsMetrics(actual, expected) {
@@ -211,7 +220,8 @@ var AnalyzeShardKeyUtil = (function() {
         disableProfiler,
         calculatePercentage,
         assertApprox,
-        assertNoKeyCharacteristicsMetrics,
+        assertNotContainKeyCharacteristicsMetrics,
+        assertContainKeyCharacteristicsMetrics,
         assertKeyCharacteristicsMetrics
     };
 })();

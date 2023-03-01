@@ -147,6 +147,7 @@ executor:
       eval: >-
         load("jstests/libs/override_methods/implicitly_configure_query_analyzer.js");
   hooks:
+  - class: AnalyzeShardKeysInBackground
   - class: CheckReplOplogs
   - class: CheckReplDBHash
   - class: ValidateCollections
@@ -165,8 +166,15 @@ executor:
         enableElectionHandoff: 0
         queryAnalysisSamplerConfigurationRefreshSecs: 1
         queryAnalysisWriterIntervalSecs: 5
+        analyzeShardKeyNumRanges: 10
+        logComponentVerbosity:
+          verbosity: 0
+          sharding: 2
     mongos_options:
       set_parameters:
         queryAnalysisSamplerConfigurationRefreshSecs: 1
+        logComponentVerbosity:
+          verbosity: 0
+          sharding: 2
     num_rs_nodes_per_shard: 3
     num_mongos: 1

@@ -271,7 +271,7 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     if (testCase.expectMetrics) {
         AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0, metrics0);
     } else {
-        AnalyzeShardKeyUtil.assertNoKeyCharacteristicsMetrics(res0);
+        AnalyzeShardKeyUtil.assertNotContainKeyCharacteristicsMetrics(res0);
     }
     assert.commandWorked(coll.remove({}));
 
@@ -284,7 +284,7 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     if (testCase.expectMetrics) {
         AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res1, metrics1);
     } else {
-        AnalyzeShardKeyUtil.assertNoKeyCharacteristicsMetrics(res1);
+        AnalyzeShardKeyUtil.assertNotContainKeyCharacteristicsMetrics(res1);
     }
     assert.commandWorked(coll.remove({}));
 
@@ -297,7 +297,7 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     if (testCase.expectMetrics) {
         AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res2, metrics2);
     } else {
-        AnalyzeShardKeyUtil.assertNoKeyCharacteristicsMetrics(res2);
+        AnalyzeShardKeyUtil.assertNotContainKeyCharacteristicsMetrics(res2);
     }
     assert.commandWorked(coll.remove({}));
 }

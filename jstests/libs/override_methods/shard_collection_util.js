@@ -1,3 +1,5 @@
+load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
+
 // Common routines for override functions that need to shard collections
 
 var testMayRunDropInParallel = false;

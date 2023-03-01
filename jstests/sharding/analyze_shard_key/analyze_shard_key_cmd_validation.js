@@ -59,7 +59,7 @@ function testValidationDuringKeyCharactericsMetricsCalculation(conn, validationT
         jsTest.log(`Testing incompatible index ${tojson({indexOptions, shardKey})}`);
         assert.commandWorked(testDB.runCommand({createIndexes: collName, indexes: [indexOptions]}));
         const res = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: shardKey}));
-        AnalyzeShardKeyUtil.assertNoKeyCharacteristicsMetrics(res);
+        AnalyzeShardKeyUtil.assertNotContainKeyCharacteristicsMetrics(res);
         assert.commandWorked(testDB.runCommand({dropIndexes: collName, index: indexOptions.name}));
     }
 
