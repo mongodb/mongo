@@ -41,26 +41,44 @@ function testReadConcernLevel(level) {
     const db = session.getDatabase("test");
     const t = db.coll;
 
-    // TODO(SERVER-72959): Adjust this test to work properly with point-in-time reads. When
-    // point-in-time catalog reads are enabled, reads no longer block waiting for the majority
-    // commit point to advance, which breaks the assumptions of the test.
-    if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
-        replTest.stopSet();
-        return;
-    }
-
     function assertNoSnapshotAvailableForReadConcernLevel() {
         var res =
             t.runCommand('find', {batchSize: 2, readConcern: {level: level}, maxTimeMS: 1000});
-        assert.commandFailed(res);
-        assert.eq(res.code, ErrorCodes.MaxTimeMSExpired);
+        assert.commandWorkedOrFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
+        if (!res.ok) {
+            return;
+        }
+
+        // Point-in-time reads on a collection before it was created behaves like reading from a
+        // non-existent collection.
+        assert(FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups"));
+        assert.commandWorked(res);
+        assert(res.cursor.firstBatch.length == 0);
+    }
+
+    function assertSnapshotAvailableForReadConcernLevel() {
+        return assert.commandWorked(
+            t.runCommand('find', {batchSize: 2, readConcern: {level: level}}));
     }
 
     function assertNoSnapshotAvailableForReadConcernLevelByUUID(uuid) {
         var res =
             db.runCommand({find: uuid, batchSize: 2, readConcern: {level: level}, maxTimeMS: 1000});
-        assert.commandFailed(res);
-        assert.eq(res.code, ErrorCodes.MaxTimeMSExpired);
+        assert.commandWorkedOrFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
+        if (!res.ok) {
+            return;
+        }
+
+        // Point-in-time reads on a collection before it was created behaves like reading from a
+        // non-existent collection.
+        assert(FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups"));
+        assert.commandWorked(res);
+        assert(res.cursor.firstBatch.length == 0);
+    }
+
+    function assertSnapshotAvailableForReadConcernLevelByUUID(uuid) {
+        return assert.commandWorked(
+            t.runCommand({find: uuid, batchSize: 2, readConcern: {level: level}}));
     }
 
     function getCursorForReadConcernLevel() {
@@ -202,25 +220,39 @@ function testReadConcernLevel(level) {
     // Even though renaming advances the minimum visible snapshot, we're querying by a namespace
     // that no longer exists. Because of this, the query surprisingly returns no results instead of
     // timing out. This violates read-committed semantics but is allowed by the current
-    // specification.
+    // specification. This is not the case for point-in-time reads as the collection instance is
+    // recreated internally to support reads at this time.
     const tempNs = db.getName() + '.temp';
     assert.commandWorked(db.adminCommand({renameCollection: t.getFullName(), to: tempNs}));
-    assert.eq(getCursorForReadConcernLevel().itcount(), 0);
+    if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
+        assert.eq(getCursorForReadConcernLevel().itcount(), 10);
 
-    // Trigger a getMore that should fail due to the rename.
-    let error = assert.throws(() => {
-        cursor.next();
-    });
-    assert.eq(error.code, ErrorCodes.QueryPlanKilled);
+        // Snapshot is available.
+        assertSnapshotAvailableForReadConcernLevel();
+        assertSnapshotAvailableForReadConcernLevelByUUID(collUuid);
+    } else {
+        assert.eq(getCursorForReadConcernLevel().itcount(), 0);
 
-    // Starting a new query by UUID will block because the minimum visible timestamp is ahead of the
-    // majority-committed snapshot.
-    assertNoSnapshotAvailableForReadConcernLevelByUUID(collUuid);
+        // Trigger a getMore that should fail due to the rename.
+        let error = assert.throws(() => {
+            cursor.next();
+        });
+        assert.eq(error.code, ErrorCodes.QueryPlanKilled);
+
+        // Starting a new query by UUID will block because the minimum visible timestamp is ahead of
+        // the majority-committed snapshot.
+        assertNoSnapshotAvailableForReadConcernLevelByUUID(collUuid);
+    }
 
     // Renaming back will cause queries to block again because the original namespace exists, and
-    // its minimum visible timestamp is ahead of the current majority-committed snapshot.
+    // its minimum visible timestamp is ahead of the current majority-committed snapshot when not
+    // using point-in-time reads.
     assert.commandWorked(db.adminCommand({renameCollection: tempNs, to: t.getFullName()}));
-    assertNoSnapshotAvailableForReadConcernLevel();
+    if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
+        assertSnapshotAvailableForReadConcernLevel();
+    } else {
+        assertNoSnapshotAvailableForReadConcernLevel();
+    }
 
     newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
     assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
@@ -232,15 +264,25 @@ function testReadConcernLevel(level) {
     // violates strict read-committed semantics since we don't guarantee them on metadata
     // operations.
     t.drop();
-    assert.eq(getCursorForReadConcernLevel().itcount(), 0);
-    assert.eq(getAggCursorForReadConcernLevel().itcount(), 0);
+    if (!FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
+        assert.eq(getCursorForReadConcernLevel().itcount(), 0);
+        assert.eq(getAggCursorForReadConcernLevel().itcount(), 0);
+    }
 
     // Creating a new collection with the same name hides the collection until that operation is
-    // in the committed view.
+    // in the committed view when not using point-in-time reads.
     t.insert({_id: 0, version: 8});
-    assertNoSnapshotAvailableForReadConcernLevel();
+    if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
+        assertSnapshotAvailableForReadConcernLevel();
+    } else {
+        assertNoSnapshotAvailableForReadConcernLevel();
+    }
     newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
-    assertNoSnapshotAvailableForReadConcernLevel();
+    if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
+        assertSnapshotAvailableForReadConcernLevel();
+    } else {
+        assertNoSnapshotAvailableForReadConcernLevel();
+    }
     assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
     assert.eq(getCursorForReadConcernLevel().itcount(), 1);
     assert.eq(getAggCursorForReadConcernLevel().itcount(), 1);
