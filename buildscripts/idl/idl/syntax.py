@@ -391,6 +391,7 @@ class Type(common.SourceLocation):
         self.description = None  # type: str
         self.deserialize_with_tenant = False  # type: bool
         self.default = None  # type: str
+        self.internal_only = False  # type: bool
 
         super(Type, self).__init__(file_name, line, column)
 

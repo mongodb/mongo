@@ -38,7 +38,8 @@
 
 namespace mongo {
 
-std::string DatabaseNameUtil::serialize(const DatabaseName& dbName) {
+std::string DatabaseNameUtil::serialize(const DatabaseName& dbName,
+                                        const SerializationContext& context) {
     if (!gMultitenancySupport) {
         return dbName.toString();
     }
@@ -72,7 +73,9 @@ DatabaseName parseDbNameFromStringExpectTenantIdInMultitenancyMode(StringData db
     return DatabaseName(tenantId, dbName.substr(tenantDelim + 1));
 }
 
-DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId, StringData db) {
+DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId,
+                                           StringData db,
+                                           const SerializationContext& context) {
     if (db.empty()) {
         return DatabaseName();
     }

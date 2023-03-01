@@ -108,6 +108,7 @@ class Type(common.SourceLocation):
         self.variant_struct_types = None  # type: List[Type]
         self.first_element_field_name = None  # type: str
         self.deserialize_with_tenant = False  # type: bool
+        self.internal_only = False  # type: bool
         super(Type, self).__init__(file_name, line, column)
 
 

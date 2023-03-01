@@ -303,6 +303,10 @@ const boost::optional<TenantId>& IDLParserContext::getTenantId() const {
     return _predecessor->getTenantId();
 }
 
+const SerializationContext& IDLParserContext::getSerializationContext() const {
+    return _serializationContext;
+}
+
 std::vector<StringData> transformVector(const std::vector<std::string>& input) {
     return std::vector<StringData>(begin(input), end(input));
 }

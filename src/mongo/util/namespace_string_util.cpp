@@ -36,7 +36,8 @@
 
 namespace mongo {
 
-std::string NamespaceStringUtil::serialize(const NamespaceString& ns) {
+std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
+                                           const SerializationContext& context) {
     if (gMultitenancySupport) {
         if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
             gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
@@ -48,7 +49,8 @@ std::string NamespaceStringUtil::serialize(const NamespaceString& ns) {
 }
 
 NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenantId,
-                                                 StringData ns) {
+                                                 StringData ns,
+                                                 const SerializationContext& context) {
     if (ns.empty()) {
         return NamespaceString();
     }

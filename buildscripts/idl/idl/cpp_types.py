@@ -458,6 +458,7 @@ class _CppTypeOptional(_CppTypeDelegating):
 def get_cpp_type_from_cpp_type_name(field, cpp_type_name, array):
     # type: (ast.Field, str, bool) -> CppTypeBase
     """Get the C++ Type information for the given C++ type name, e.g. std::string."""
+    # print('get_cpp_type_from_cpp_type_name field: ' + field.name + ', cpp type: ' + cpp_type_name)
     cpp_type_info: CppTypeBase
     if cpp_type_name == 'std::string':
         cpp_type_info = _CppTypeView(field, 'std::string', 'std::string', 'StringData')
@@ -517,8 +518,8 @@ class BsonCppTypeBase(object, metaclass=ABCMeta):
         pass
 
 
-def _call_method_or_global_function(expression, method_name):
-    # type: (str, str) -> str
+def _call_method_or_global_function(expression, ast_type):
+    # type: (str, ast.Type) -> str
     """
     Given a fully-qualified method name, call it correctly.
 
@@ -526,13 +527,20 @@ def _call_method_or_global_function(expression, method_name):
     not treated as a global C++ function though. This notion of functions is designed to support
     enum deserializers/serializers which are not methods.
     """
+    method_name = ast_type.serializer
+    serializer_flags = 'getSerializationContext()' if ast_type.deserialize_with_tenant else ''
+
     short_method_name = writer.get_method_name(method_name)
     if writer.is_function(method_name):
-        return common.template_args('${method_name}(${expression})', expression=expression,
-                                    method_name=method_name)
+        if ast_type.deserialize_with_tenant:
+            serializer_flags = ', ' + serializer_flags
+        return common.template_args('${method_name}(${expression}${serializer_flags})',
+                                    expression=expression, method_name=method_name,
+                                    serializer_flags=serializer_flags)
 
-    return common.template_args('${expression}.${method_name}()', expression=expression,
-                                method_name=short_method_name)
+    return common.template_args('${expression}.${method_name}(${serializer_flags})',
+                                expression=expression, method_name=short_method_name,
+                                serializer_flags=serializer_flags)
 
 
 class _CommonBsonCppTypeBase(BsonCppTypeBase):
@@ -555,7 +563,7 @@ class _CommonBsonCppTypeBase(BsonCppTypeBase):
 
     def gen_serializer_expression(self, indented_writer, expression):
         # type: (writer.IndentedTextWriter, str) -> str
-        return _call_method_or_global_function(expression, self._ast_type.serializer)
+        return _call_method_or_global_function(expression, self._ast_type)
 
 
 class _ObjectBsonCppTypeBase(BsonCppTypeBase):
@@ -580,9 +588,15 @@ class _ObjectBsonCppTypeBase(BsonCppTypeBase):
     def gen_serializer_expression(self, indented_writer, expression):
         # type: (writer.IndentedTextWriter, str) -> str
         method_name = writer.get_method_name(self._ast_type.serializer)
-        indented_writer.write_line(
-            common.template_args('const BSONObj localObject = ${expression}.${method_name}();',
-                                 expression=expression, method_name=method_name))
+        if self._ast_type.deserialize_with_tenant:  # SerializationContext is tied to tenant deserialization
+            indented_writer.write_line(
+                common.template_args(
+                    'const BSONObj localObject = ${expression}.${method_name}(getSerializationContext());',
+                    expression=expression, method_name=method_name))
+        else:
+            indented_writer.write_line(
+                common.template_args('const BSONObj localObject = ${expression}.${method_name}();',
+                                     expression=expression, method_name=method_name))
         return "localObject"
 
 

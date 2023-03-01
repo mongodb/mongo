@@ -31,6 +31,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo {
 
@@ -50,7 +51,8 @@ public:
      * If multitenancySupport is disabled, the tenantID is not set in the NamespaceString Object.
      * eg. serialize(NamespaceString(boost::none, "foo.bar")) -> "foo.bar"
      */
-    static std::string serialize(const NamespaceString& ns);
+    static std::string serialize(const NamespaceString& ns,
+                                 const SerializationContext& context = SerializationContext());
 
     /**
      * Deserializes StringData ns to a NamespaceString object.
@@ -71,7 +73,10 @@ public:
      * and NamespaceString is constructor without the tenantID.
      * eg. deserialize(boost::none, "foo.bar") -> NamespaceString(boost::none, "foo.bar")
      */
-    static NamespaceString deserialize(boost::optional<TenantId> tenantId, StringData ns);
+    static NamespaceString deserialize(
+        boost::optional<TenantId> tenantId,
+        StringData ns,
+        const SerializationContext& context = SerializationContext());
 };
 
 }  // namespace mongo

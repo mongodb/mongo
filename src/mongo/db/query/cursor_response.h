@@ -194,14 +194,17 @@ public:
     static StatusWith<CursorResponse> parseFromBSON(
         const BSONObj& cmdResponse,
         const BSONObj* ownedObj = nullptr,
-        boost::optional<TenantId> tenantId = boost::none);
+        boost::optional<TenantId> tenantId = boost::none,
+        const SerializationContext& serializationContext = SerializationContext());
 
     /**
      * A throwing version of 'parseFromBSON'.
      */
-    static CursorResponse parseFromBSONThrowing(boost::optional<TenantId> tenantId,
-                                                const BSONObj& cmdResponse) {
-        return uassertStatusOK(parseFromBSON(cmdResponse, nullptr, tenantId));
+    static CursorResponse parseFromBSONThrowing(
+        boost::optional<TenantId> tenantId,
+        const BSONObj& cmdResponse,
+        const SerializationContext& serializationContext = SerializationContext()) {
+        return uassertStatusOK(parseFromBSON(cmdResponse, nullptr, tenantId, serializationContext));
     }
 
     /**
@@ -282,10 +285,14 @@ public:
     /**
      * Converts this response to its raw BSON representation.
      */
-    BSONObj toBSON(ResponseType responseType) const;
-    void addToBSON(ResponseType responseType, BSONObjBuilder* builder) const;
-    BSONObj toBSONAsInitialResponse() const {
-        return toBSON(ResponseType::InitialResponse);
+    BSONObj toBSON(ResponseType responseType,
+                   const SerializationContext& serializationContext = SerializationContext()) const;
+    void addToBSON(ResponseType responseType,
+                   BSONObjBuilder* builder,
+                   const SerializationContext& serializationContext = SerializationContext()) const;
+    BSONObj toBSONAsInitialResponse(
+        const SerializationContext& serializationContext = SerializationContext()) const {
+        return toBSON(ResponseType::InitialResponse, serializationContext);
     }
 
 private:

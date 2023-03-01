@@ -186,8 +186,9 @@ def _validate_type_properties(ctxt, idl_type, syntax_type):
 
         if bson_type == "any":
             # For 'any', a deserializer is required but the user can try to get away with the default
-            # serialization for their C++ type.
-            if idl_type.deserializer is None:
+            # serialization for their C++ type.  An internal_only type is not associated with BSON
+            # and thus should not have a deserializer defined.
+            if idl_type.deserializer is None and not idl_type.internal_only:
                 ctxt.add_missing_ast_required_field_error(idl_type, syntax_type, idl_type.name,
                                                           "deserializer")
         elif bson_type == "chain":
@@ -256,6 +257,8 @@ def _get_struct_qualified_cpp_name(struct):
 
 def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
     # type: (errors.ParserContext, syntax.IDLSpec, syntax.Struct, ast.Struct) -> None
+
+    _inject_hidden_fields(struct)
 
     ast_struct.name = struct.name
     ast_struct.description = struct.description
@@ -342,6 +345,26 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
             for ast_field in ast_struct.fields:
                 ast_field.comparison_order = pos
                 pos += 1
+
+
+def _inject_hidden_fields(struct):
+    # type: (syntax.Struct) -> None
+    """Inject hidden fields to aid deserialization/serialization for structs."""
+
+    # Don't generate if no fields exist or it's already included in this struct
+    if struct.fields is None:
+        struct.fields = []
+
+    serialization_context_field = syntax.Field(struct.file_name, struct.line, struct.column)
+    serialization_context_field.name = "serialization_context"  # This comes from basic_types.idl
+    serialization_context_field.type = syntax.FieldTypeSingle(struct.file_name, struct.line,
+                                                              struct.column)
+    serialization_context_field.type.type_name = "serialization_context"
+    serialization_context_field.cpp_name = "serializationContext"
+    serialization_context_field.optional = False
+    serialization_context_field.default = "SerializationContext()"
+
+    struct.fields.append(serialization_context_field)
 
 
 def _bind_struct(ctxt, parsed_spec, struct):
@@ -965,6 +988,7 @@ def _bind_type(idltype):
     ast_type.serializer = _normalize_method_name(idltype.cpp_type, idltype.serializer)
     ast_type.deserializer = _normalize_method_name(idltype.cpp_type, idltype.deserializer)
     ast_type.deserialize_with_tenant = idltype.deserialize_with_tenant
+    ast_type.internal_only = idltype.internal_only
     return ast_type
 
 
@@ -1142,6 +1166,9 @@ def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct):
     # Merge all the fields from resolved struct into this ast struct.
     for field in struct.fields or []:
         ast_field = _bind_field(ctxt, parsed_spec, field)
+        # Don't use internal fields in chained types, stick to local access only
+        if ast_field.type.internal_only:
+            continue
         if ast_field and not _is_duplicate_field(ctxt, chained_struct.name, ast_struct.fields,
                                                  ast_field):
 

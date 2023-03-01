@@ -184,9 +184,11 @@ std::vector<StatusWith<CursorResponse>> CursorResponse::parseFromBSONMany(
     return cursors;
 }
 
-StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdResponse,
-                                                         const BSONObj* ownedObj,
-                                                         boost::optional<TenantId> tenantId) {
+StatusWith<CursorResponse> CursorResponse::parseFromBSON(
+    const BSONObj& cmdResponse,
+    const BSONObj* ownedObj,
+    boost::optional<TenantId> tenantId,
+    const SerializationContext& serializationContext) {
     Status cmdStatus = getStatusFromCommandResult(cmdResponse);
     if (!cmdStatus.isOK()) {
         return cmdStatus;
@@ -324,7 +326,7 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
                               << writeConcernError.type()};
     }
 
-    return {{NamespaceStringUtil::deserialize(tenantId, fullns),
+    return {{NamespaceStringUtil::deserialize(tenantId, fullns, serializationContext),
              cursorId,
              std::move(batch),
              atClusterTimeElem ? atClusterTimeElem.timestamp() : boost::optional<Timestamp>{},
@@ -339,11 +341,12 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
 }
 
 void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
-                               BSONObjBuilder* builder) const {
+                               BSONObjBuilder* builder,
+                               const SerializationContext& serializationContext) const {
     BSONObjBuilder cursorBuilder(builder->subobjStart(kCursorField));
 
     cursorBuilder.append(kIdField, _cursorId);
-    cursorBuilder.append(kNsField, NamespaceStringUtil::serialize(_nss));
+    cursorBuilder.append(kNsField, NamespaceStringUtil::serialize(_nss, serializationContext));
 
     const char* batchFieldName =
         (responseType == ResponseType::InitialResponse) ? kBatchFieldInitial : kBatchField;
@@ -382,9 +385,10 @@ void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
     }
 }
 
-BSONObj CursorResponse::toBSON(CursorResponse::ResponseType responseType) const {
+BSONObj CursorResponse::toBSON(CursorResponse::ResponseType responseType,
+                               const SerializationContext& serializationContext) const {
     BSONObjBuilder builder;
-    addToBSON(responseType, &builder);
+    addToBSON(responseType, &builder, serializationContext);
     return builder.obj();
 }
 

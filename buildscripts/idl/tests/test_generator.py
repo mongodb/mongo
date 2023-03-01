@@ -100,6 +100,13 @@ class TestGenerator(testcase.IDLTestcase):
         # type: () -> None
         """Validate enums are not marked as const in getters."""
         header, _ = self.assert_generate("""
+        types:
+                serialization_context:
+                    bson_serialization_type: any
+                    description: foo
+                    cpp_type: foo
+                    internal_only: true
+
         enums:
 
             StringEnum:

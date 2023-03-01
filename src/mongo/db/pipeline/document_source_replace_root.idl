@@ -31,6 +31,7 @@ global:
 
 imports:
   - "mongo/db/pipeline/value.idl"
+  - "mongo/db/basic_types.idl"
 
 structs:
   ReplaceRootSpec:

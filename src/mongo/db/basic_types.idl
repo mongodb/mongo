@@ -320,6 +320,14 @@ types:
         deserializer: "::mongo::DatabaseNameUtil::deserialize"
         deserialize_with_tenant: true
 
+    # internal_only is used here because this type is not part of the input or output (ie. not to
+    # be serialized/deserialized), and is only used internally by the class structures
+    serialization_context:
+        bson_serialization_type: any
+        description: "modifies serializer/deserializer behavior based on caller context"
+        cpp_type: "SerializationContext"
+        internal_only: true
+
 enums:
     CollationCaseFirst:
         description: Sort order of case differences.

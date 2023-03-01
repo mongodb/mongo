@@ -31,6 +31,7 @@
 
 #include "mongo/db/database_name.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo {
 
@@ -50,7 +51,8 @@ public:
      * If multitenancySupport is disabled, the tenantID is not set in the DatabaseName Object.
      * eg. serialize(DatabaseName(boost::none, "foo")) -> "foo"
      */
-    static std::string serialize(const DatabaseName& dbName);
+    static std::string serialize(const DatabaseName& dbName,
+                                 const SerializationContext& context = SerializationContext());
 
     /**
      * Deserializes StringData dbName to a DatabaseName object.
@@ -71,7 +73,9 @@ public:
      * and DatabaseName is constructed without the tenantID.
      * eg. deserialize(boost::none, "foo") -> DatabaseName(boost::none, "foo")
      */
-    static DatabaseName deserialize(boost::optional<TenantId> tenantId, StringData db);
+    static DatabaseName deserialize(boost::optional<TenantId> tenantId,
+                                    StringData db,
+                                    const SerializationContext& context = SerializationContext());
 };
 
 }  // namespace mongo

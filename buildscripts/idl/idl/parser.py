@@ -252,6 +252,7 @@ def _parse_type(ctxt, spec, name, node):
             "serializer": _RuleDesc('scalar'),
             "deserializer": _RuleDesc('scalar'),
             "deserialize_with_tenant": _RuleDesc('bool_scalar'),
+            "internal_only": _RuleDesc('bool_scalar'),
             "default": _RuleDesc('scalar'),
         })
 
