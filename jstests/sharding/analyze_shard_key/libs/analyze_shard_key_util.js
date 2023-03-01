@@ -118,7 +118,7 @@ var AnalyzeShardKeyUtil = (function() {
      */
     function enableProfiler(mongodConns, dbName) {
         mongodConns.forEach(conn => {
-            conn.getDB(dbName).setProfilingLevel(2);
+            assert.commandWorked(conn.getDB(dbName).setProfilingLevel(2));
         });
     }
 
@@ -127,7 +127,7 @@ var AnalyzeShardKeyUtil = (function() {
      */
     function disableProfiler(mongodConns, dbName) {
         mongodConns.forEach(conn => {
-            conn.getDB(dbName).setProfilingLevel(0);
+            assert.commandWorked(conn.getDB(dbName).setProfilingLevel(0));
         });
     }
 

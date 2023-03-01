@@ -108,6 +108,7 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
                                    << repl::ReadConcernArgs::kAfterClusterTimeFieldName
                                    << splitPointsAfterClusterTime));
     aggRequest.setWriteConcern(WriteConcernOptions());
+    aggRequest.setUnwrappedReadPref(ReadPreferenceSetting::get(opCtx).toContainingBSON());
 
     uassertStatusOK(shard->runAggregation(
         opCtx,
