@@ -856,60 +856,84 @@ const Collection* CollectionCatalog::_openCollection(
     // latest. Separated the implementation into helper functions and we call the right one
     // depending on the input parameters.
     if (!readTimestamp) {
-        const auto& nss = nssOrUUID.nss();
-        if (nss) {
-            return _openCollectionAtLatestByNamespace(opCtx, *nss);
-        }
-
-        return _openCollectionAtLatestByUUID(opCtx, *nssOrUUID.uuid());
+        return _openCollectionAtLatestByNamespaceOrUUID(opCtx, nssOrUUID);
     }
 
     return _openCollectionAtPointInTimeByNamespaceOrUUID(opCtx, nssOrUUID, *readTimestamp);
 }
 
-const Collection* CollectionCatalog::_openCollectionAtLatestByNamespace(
-    OperationContext* opCtx, const NamespaceString& nss) const {
+const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
+    OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) const {
     auto& openedCollections = OpenedCollections::get(opCtx);
 
     // When openCollection is called with no timestamp, the namespace must be pending commit. We
     // compare the collection instance in _pendingCommitNamespaces and the collection instance in
     // the in-memory catalog with the durable catalog entry to determine which instance to return.
-    auto it = _pendingCommitNamespaces.find(nss);
-    invariant(it != _pendingCommitNamespaces.end());
-    const auto& pendingCollection = it->second;
+    const auto& pendingCollection = [&]() -> std::shared_ptr<Collection> {
+        if (const auto& nss = nssOrUUID.nss()) {
+            auto it = _pendingCommitNamespaces.find(*nss);
+            invariant(it != _pendingCommitNamespaces.end());
+            return it->second;
+        }
 
-    RecordId catalogId;
-    if (pendingCollection) {
-        catalogId = pendingCollection->getCatalogId();
-    } else {
-        auto lookupResult = lookupCatalogIdByNSS(nss, boost::none);
-        invariant(lookupResult.result == CatalogIdLookup::Existence::kExists);
-        catalogId = lookupResult.id;
-    }
+        auto it = _pendingCommitUUIDs.find(*nssOrUUID.uuid());
+        invariant(it != _pendingCommitUUIDs.end());
+        return it->second;
+    }();
+
+    auto latestCollection = [&]() -> std::shared_ptr<const Collection> {
+        if (const auto& nss = nssOrUUID.nss()) {
+            return lookupCollectionByNamespaceForRead(opCtx, *nss);
+        }
+        return lookupCollectionByUUIDForRead(opCtx, *nssOrUUID.uuid());
+    }();
+
+    // At least one of latest and pending should be a valid pointer.
+    invariant(latestCollection || pendingCollection);
+
+    const RecordId catalogId = [&]() {
+        if (pendingCollection) {
+            return pendingCollection->getCatalogId();
+        }
+
+        // If pendingCollection is nullptr then it is a concurrent drop and the uuid should exist at
+        // latest.
+        return latestCollection->getCatalogId();
+    }();
 
     auto catalogEntry = DurableCatalog::get(opCtx)->getCatalogEntry(opCtx, catalogId);
 
-    auto latestCollection = lookupCollectionByNamespaceForRead(opCtx, nss);
+    const NamespaceString& nss = [&]() {
+        if (auto nss = nssOrUUID.nss()) {
+            return *nss;
+        }
+        return latestCollection ? latestCollection->ns() : pendingCollection->ns();
+    }();
 
-    // If pendingCollection is nullptr, the collection is being dropped, so latestCollection
-    // must be non-nullptr and must contain a uuid.
-    auto uuid = pendingCollection ? pendingCollection->uuid() : latestCollection->uuid();
+    const UUID uuid = [&]() {
+        if (auto uuid = nssOrUUID.uuid()) {
+            return *uuid;
+        }
 
-    // If the catalog entry is not found in our snapshot then the collection is being
-    // dropped and we can observe the drop. Lookups by this namespace or uuid should not
-    // find a collection.
+        // If pendingCollection is nullptr, the collection is being dropped, so latestCollection
+        // must be non-nullptr and must contain a uuid.
+        return pendingCollection ? pendingCollection->uuid() : latestCollection->uuid();
+    }();
+
+    // If the catalog entry is not found in our snapshot then the collection is being dropped and we
+    // can observe the drop. Lookups by this namespace or uuid should not find a collection.
     if (catalogEntry.isEmpty()) {
         openedCollections.store(nullptr, nss, uuid);
         return nullptr;
     }
 
-    // If the catalog entry has a different namespace in our snapshot, then there is a
-    // rename operation concurrent with this call. We need to store entries under
-    // uncommitted catalog changes for two namespaces (rename 'from' and 'to') so we can
-    // make sure lookups by UUID is supported and will return a Collection with its
+    // When trying to open the latest collection by namespace and the catalog entry has a different
+    // namespace in our snapshot, then there is a rename operation concurrent with this call. We
+    // need to store entries under uncommitted catalog changes for two namespaces (rename 'from' and
+    // 'to') so we can make sure lookups by UUID is supported and will return a Collection with its
     // namespace in sync with the storage snapshot.
     NamespaceString nsInDurableCatalog = DurableCatalog::getNamespaceFromCatalogEntry(catalogEntry);
-    if (nss != nsInDurableCatalog) {
+    if (nssOrUUID.nss() && nss != nsInDurableCatalog) {
         // Like above, the correct instance is either in the catalog or under pending. First
         // lookup in pending by UUID to determine if it contains the right namespace.
         auto itUUID = _pendingCommitUUIDs.find(uuid);
@@ -930,103 +954,25 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespace(
         return nullptr;
     }
 
-    auto metadata = DurableCatalog::getMetadataFromCatalogEntry(catalogEntry);
-
-    if (latestCollection && latestCollection->isMetadataEqual(metadata)) {
-        openedCollections.store(latestCollection, nss, uuid);
-        return latestCollection.get();
-    }
-
-    // Use the pendingCollection if there is no latestCollection or if the metadata of the
-    // latestCollection doesn't match the durable catalogEntry.
-    if (pendingCollection && pendingCollection->isMetadataEqual(metadata)) {
-        // If the latest collection doesn't exist then the pending collection must exist as it's
-        // being created in this snapshot. Otherwise, if the latest collection is incompatible
-        // with this snapshot, then the change came from an uncommitted update by an operation
-        // operating on this snapshot.
-        // TODO(SERVER-72193): Test this code path.
-        openedCollections.store(pendingCollection, nss, uuid);
-        return pendingCollection.get();
-    }
-
-    // If neither `latestCollection` or `pendingCollection` match the metadata we fully instantiate
-    // a new collection instance from durable storage that is guaranteed to match. This can happen
-    // when multikey is not consistent with the storage snapshot.
-    invariant(latestCollection || pendingCollection);
-    auto durableCatalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
-    invariant(durableCatalogEntry);
-    auto compatibleCollection =
-        _createCompatibleCollection(opCtx,
-                                    latestCollection ? latestCollection : pendingCollection,
-                                    /*readTimestamp=*/boost::none,
-                                    durableCatalogEntry.get());
-    invariant(compatibleCollection);
-    openedCollections.store(
-        compatibleCollection, compatibleCollection->ns(), compatibleCollection->uuid());
-    return compatibleCollection.get();
-}
-
-const Collection* CollectionCatalog::_openCollectionAtLatestByUUID(OperationContext* opCtx,
-                                                                   const UUID& uuid) const {
-    auto& openedCollections = OpenedCollections::get(opCtx);
-
-    // When openCollection is called with no timestamp, the namespace must be pending commit. We
-    // compare the collection instance in _pendingCommitUUIDs and the collection instance in
-    // the in-memory catalog with the durable catalog entry to determine which instance to return.
-    auto it = _pendingCommitUUIDs.find(uuid);
-    invariant(it != _pendingCommitUUIDs.end());
-
-    const auto& pendingCollection = it->second;
-    auto latestCollection = lookupCollectionByUUIDForRead(opCtx, uuid);
-
-    // At least one of latest and pending should be a valid pointer.
-    invariant(latestCollection || pendingCollection);
-
-    const RecordId catalogId = [&] {
-        if (pendingCollection) {
-            return pendingCollection->getCatalogId();
-        } else {
-            // If pendingCollection is nullptr then it is a concurrent drop and the uuid should
-            // exist at latest
-            invariant(latestCollection);
-            return latestCollection->getCatalogId();
-        }
-    }();
-
-    auto catalogEntry = DurableCatalog::get(opCtx)->getCatalogEntry(opCtx, catalogId);
-
-    // If the catalog entry is not found in our snapshot then the collection is being
-    // dropped and we can observe the drop. Lookups by this namespace or uuid should not
-    // find a collection.
-    if (catalogEntry.isEmpty()) {
-        openedCollections.store(
-            nullptr, latestCollection ? latestCollection->ns() : pendingCollection->ns(), uuid);
-        return nullptr;
-    }
-
-    NamespaceString nss = DurableCatalog::getNamespaceFromCatalogEntry(catalogEntry);
-    // If the Collection instances has different namespaces, then there is a rename operation
-    // concurrent with this call. We need to store entries under uncommitted catalog changes for two
-    // namespaces (rename 'from' and 'to') so we can make sure lookups by UUID is supported and will
-    // return a Collection with its namespace in sync with the storage snapshot.
-    if (latestCollection && pendingCollection &&
+    // When trying to open the latest collection by UUID and the Collection instances has different
+    // namespaces, then there is a rename operation concurrent with this call. We need to store
+    // entries under uncommitted catalog changes for two namespaces (rename 'from' and 'to') so we
+    // can make sure lookups by UUID is supported and will return a Collection with its namespace in
+    // sync with the storage snapshot.
+    if (nssOrUUID.uuid() && latestCollection && pendingCollection &&
         latestCollection->ns() != pendingCollection->ns()) {
-        if (latestCollection->ns() == nss) {
+        if (latestCollection->ns() == nsInDurableCatalog) {
             openedCollections.store(nullptr, pendingCollection->ns(), boost::none);
-            openedCollections.store(latestCollection, nss, uuid);
+            openedCollections.store(latestCollection, nsInDurableCatalog, uuid);
             return latestCollection.get();
         } else {
-            invariant(pendingCollection->ns() == nss);
+            invariant(pendingCollection->ns() == nsInDurableCatalog);
             openedCollections.store(nullptr, latestCollection->ns(), boost::none);
-            openedCollections.store(pendingCollection, nss, uuid);
+            openedCollections.store(pendingCollection, nsInDurableCatalog, uuid);
             return pendingCollection.get();
         }
     }
 
-    // If we get to this point we know that the concurrent DDL operation is not a rename. Compare
-    // the metadata to our collection instances to determine which matches with the storage
-    // snapshot. It could also be a create or a drop where we don't have both valid latest and
-    // pending collection instances. Make sure that the metadata is as expected in this case.
     auto metadata = DurableCatalog::getMetadataFromCatalogEntry(catalogEntry);
 
     if (latestCollection && latestCollection->isMetadataEqual(metadata)) {

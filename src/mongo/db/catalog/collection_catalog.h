@@ -843,10 +843,8 @@ private:
                                       boost::optional<Timestamp> readTimestamp) const;
 
     // Helpers to perform openCollection at latest or at point-in-time on Namespace/UUID.
-    const Collection* _openCollectionAtLatestByNamespace(OperationContext* opCtx,
-                                                         const NamespaceString& nss) const;
-    const Collection* _openCollectionAtLatestByUUID(OperationContext* opCtx,
-                                                    const UUID& uuid) const;
+    const Collection* _openCollectionAtLatestByNamespaceOrUUID(
+        OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) const;
     const Collection* _openCollectionAtPointInTimeByNamespaceOrUUID(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nssOrUUID,
