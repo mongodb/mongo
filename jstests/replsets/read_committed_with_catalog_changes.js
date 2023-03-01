@@ -206,10 +206,18 @@ const testCases = {
 
 // Assertion helpers. These must get all state as arguments rather than through closure since
 // they may be passed in to a Thread.
-function assertReadsBlock(coll) {
+function assertReadsBlock(db, coll) {
     var res = coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": 5000});
-    assert.commandFailedWithCode(
-        res, ErrorCodes.MaxTimeMSExpired, "Expected read of " + coll.getFullName() + " to block");
+
+    // When point-in-time catalog reads are enabled, reads no longer block waiting for the majority
+    // commit point to advance and allow reading earlier than the minimum visible snapshot.
+    if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
+        assert.commandWorked(res);
+    } else {
+        assert.commandFailedWithCode(res,
+                                     ErrorCodes.MaxTimeMSExpired,
+                                     "Expected read of " + coll.getFullName() + " to block");
+    }
 }
 
 function assertReadsSucceed(coll, timeoutMs = 20000) {
@@ -251,14 +259,6 @@ assert.commandWorked(primary.adminCommand(
 replTest.awaitReplication();
 // This is the DB that all of the tests will use.
 var mainDB = primary.getDB('mainDB');
-
-// TODO(SERVER-72960): Adjust this test to work properly with point-in-time reads. When
-// point-in-time catalog reads are enabled, reads no longer block waiting for the majority
-// commit point to advance, which breaks the assumptions of the test.
-if (FeatureFlagUtil.isEnabled(primary.getDB('mainDB'), "PointInTimeCatalogLookups")) {
-    replTest.stopSet();
-    return;
-}
 
 // This DB won't be used by any tests so it should always be unblocked.
 var otherDB = primary.getDB('otherDB');
@@ -304,7 +304,7 @@ for (var testName in testCases) {
     // Perform the op and ensure that blocked collections block and unblocked ones don't.
     test.performOp(mainDB);
     assertReadsSucceed(otherDBCollection);
-    test.blockedCollections.forEach((name) => assertReadsBlock(mainDB[name]));
+    test.blockedCollections.forEach((name) => assertReadsBlock(mainDB, mainDB[name]));
     test.unblockedCollections.forEach((name) => assertReadsSucceed(mainDB[name]));
 
     // Use background threads to test that reads that start blocked can complete if the
@@ -329,7 +329,7 @@ for (var testName in testCases) {
     try {
         // Try the committed read again after sleeping to ensure that it still blocks even if it
         // isn't immediately after the operation.
-        test.blockedCollections.forEach((name) => assertReadsBlock(mainDB[name]));
+        test.blockedCollections.forEach((name) => assertReadsBlock(mainDB, mainDB[name]));
 
         // Restart oplog application on the secondary and ensure the blocked collections become
         // unblocked.
