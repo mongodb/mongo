@@ -123,12 +123,12 @@ public:
                 // Execute the command against the shard.
                 auto shard =
                     uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
-                auto swResponse = shard->runCommandWithFixedRetryAttempts(
-                    opCtx,
-                    ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
-                    DatabaseName::kAdmin.toString(),
-                    versionedCmdObj,
-                    Shard::RetryPolicy::kIdempotent);
+                auto swResponse =
+                    shard->runCommandWithFixedRetryAttempts(opCtx,
+                                                            request().getReadPreference(),
+                                                            DatabaseName::kAdmin.toString(),
+                                                            versionedCmdObj,
+                                                            Shard::RetryPolicy::kIdempotent);
                 auto status = Shard::CommandResponse::getEffectiveStatus(swResponse);
 
                 if (status == ErrorCodes::CollectionIsEmptyLocally) {
