@@ -3025,12 +3025,7 @@ TopologyCoordinator::UpdateTermResult TopologyCoordinator::updateTerm(long long 
     if (_iAmPrimary()) {
         return TopologyCoordinator::UpdateTermResult::kTriggerStepDown;
     }
-    LOGV2_DEBUG(21827,
-                1,
-                "Updating term from {oldTerm} to {newTerm}",
-                "Updating term",
-                "oldTerm"_attr = _term,
-                "newTerm"_attr = term);
+    LOGV2(21827, "Updating term", "oldTerm"_attr = _term, "newTerm"_attr = term);
     _term = term;
     return TopologyCoordinator::UpdateTermResult::kUpdatedTerm;
 }
