@@ -831,6 +831,11 @@ Status createCollection(OperationContext* opCtx,
     }
 
     if (options.isView()) {
+        // system.profile will have new document inserts due to profiling. Inserts aren't supported
+        // on views.
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot create system.profile as a view",
+                !ns.isSystemDotProfile());
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream() << "Cannot create a view in a multi-document "
                                  "transaction.",
@@ -841,6 +846,11 @@ Status createCollection(OperationContext* opCtx,
 
         return _createView(opCtx, ns, options);
     } else if (options.timeseries && !ns.isTimeseriesBucketsCollection()) {
+        // system.profile must be a simple collection since new document insertions directly work
+        // against the usual collection API. See introspect.cpp for more details.
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot create system.profile as a timeseries collection",
+                !ns.isSystemDotProfile());
         // This helper is designed for user-created time-series collections on primaries. If a
         // time-series buckets collection is created explicitly or during replication, treat this as
         // a normal collection creation.
