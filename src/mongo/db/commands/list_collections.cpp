@@ -465,9 +465,7 @@ public:
                             }
 
                             if (view.timeseries()) {
-                                if (!CollectionCatalog::get(opCtx)
-                                         ->lookupCollectionByNamespaceForRead(opCtx,
-                                                                              view.viewOn())) {
+                                if (!catalog->lookupCollectionByNamespace(opCtx, view.viewOn())) {
                                     // There is no buckets collection backing this time-series view,
                                     // which means that it was not already added along with the
                                     // buckets collection above.

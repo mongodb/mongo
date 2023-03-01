@@ -883,9 +883,9 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
 
     auto latestCollection = [&]() -> std::shared_ptr<const Collection> {
         if (const auto& nss = nssOrUUID.nss()) {
-            return lookupCollectionByNamespaceForRead(opCtx, *nss);
+            return _getCollectionByNamespace(opCtx, *nss);
         }
-        return lookupCollectionByUUIDForRead(opCtx, *nssOrUUID.uuid());
+        return _getCollectionByUUID(opCtx, *nssOrUUID.uuid());
     }();
 
     // At least one of latest and pending should be a valid pointer.
@@ -944,7 +944,7 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
         } else {
             // If pending by UUID does not contain the right namespace, a regular lookup in
             // the catalog by UUID should have it.
-            auto latestCollectionByUUID = lookupCollectionByUUIDForRead(opCtx, uuid);
+            auto latestCollectionByUUID = _getCollectionByUUID(opCtx, uuid);
             invariant(latestCollectionByUUID && latestCollectionByUUID->ns() == nsInDurableCatalog);
             openedCollections.store(latestCollectionByUUID, latestCollectionByUUID->ns(), uuid);
         }
@@ -1336,8 +1336,8 @@ uint64_t CollectionCatalog::getEpoch() const {
     return _epoch;
 }
 
-std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByUUIDForRead(
-    OperationContext* opCtx, const UUID& uuid) const {
+std::shared_ptr<const Collection> CollectionCatalog::_getCollectionByUUID(OperationContext* opCtx,
+                                                                          const UUID& uuid) const {
     auto [found, uncommittedColl, newColl] =
         UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
     if (uncommittedColl) {
@@ -1445,7 +1445,7 @@ std::shared_ptr<Collection> CollectionCatalog::_lookupCollectionByUUID(UUID uuid
     return foundIt == _catalog.end() ? nullptr : foundIt->second;
 }
 
-std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByNamespaceForRead(
+std::shared_ptr<const Collection> CollectionCatalog::_getCollectionByNamespace(
     OperationContext* opCtx, const NamespaceString& nss) const {
 
     auto [found, uncommittedColl, newColl] =

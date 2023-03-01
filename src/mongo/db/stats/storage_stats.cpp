@@ -241,8 +241,10 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     static constexpr auto kStorageStatsField = "storageStats"_sd;
 
     const auto bucketNss = nss.makeTimeseriesBucketsNamespace();
+    // Hold reference to the catalog for collection lookup without locks to be safe.
+    auto catalog = CollectionCatalog::get(opCtx);
     const auto isTimeseries = nss.isTimeseriesBucketsCollection() ||
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketNss);
+        catalog->lookupCollectionByNamespace(opCtx, bucketNss);
     const auto collNss =
         (isTimeseries && !nss.isTimeseriesBucketsCollection()) ? std::move(bucketNss) : nss;
 

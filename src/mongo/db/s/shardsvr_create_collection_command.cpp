@@ -52,8 +52,9 @@ void translateToTimeseriesCollection(OperationContext* opCtx,
                                      NamespaceString* nss,
                                      CreateCollectionRequest* createCmdRequest) {
     auto bucketsNs = nss->makeTimeseriesBucketsNamespace();
-    auto bucketsColl =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketsNs);
+    // Hold reference to the catalog for collection lookup without locks to be safe.
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
 
     // If the 'system.buckets' exists or 'timeseries' parameters are passed in, we know that
     // we are trying shard a timeseries collection.

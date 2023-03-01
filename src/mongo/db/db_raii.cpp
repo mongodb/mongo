@@ -935,7 +935,7 @@ void AutoGetCollectionForReadLockFreeLegacy::EmplaceHelper::emplace(
                     // should never be nested.
                     invariant(!isLockFreeReadSubOperation);
 
-                    auto coll = catalog.lookupCollectionByUUIDForRead(opCtx, uuid);
+                    auto coll = catalog.lookupCollectionByUUIDForRead_DONT_USE(opCtx, uuid);
 
                     if (coll) {
                         if (coll->usesCappedSnapshots()) {

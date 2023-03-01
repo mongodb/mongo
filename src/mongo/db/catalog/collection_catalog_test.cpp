@@ -1275,19 +1275,17 @@ private:
         t.join();
 
 
+        auto catalog = CollectionCatalog::get(opCtx);
         if (expectedExistence) {
             ASSERT(coll);
 
-            NamespaceString nss =
-                CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nssOrUUID);
+            NamespaceString nss = catalog->resolveNamespaceStringOrUUID(opCtx, nssOrUUID);
 
             ASSERT_EQ(coll->ns(), nss);
             // Check that lookup returns the same instance as openCollection above
-            ASSERT_EQ(CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, coll->ns()),
-                      coll);
-            ASSERT_EQ(CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, coll->uuid()),
-                      coll);
-            ASSERT_EQ(CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, coll->uuid()), nss);
+            ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx, coll->ns()), coll);
+            ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx, coll->uuid()), coll);
+            ASSERT_EQ(catalog->lookupNSSByUUID(opCtx, coll->uuid()), nss);
             ASSERT_EQ(coll->getIndexCatalog()->numIndexesTotal(), expectedNumIndexes);
 
             auto catalogEntry =
@@ -1297,14 +1295,8 @@ private:
                 coll->isMetadataEqual(DurableCatalog::getMetadataFromCatalogEntry(catalogEntry)));
 
             // Lookups from the catalog should return the newly opened collection.
-            ASSERT_EQ(CollectionCatalog::get(opCtx)
-                          ->lookupCollectionByNamespaceForRead(opCtx, coll->ns())
-                          .get(),
-                      coll);
-            ASSERT_EQ(CollectionCatalog::get(opCtx)
-                          ->lookupCollectionByUUIDForRead(opCtx, coll->uuid())
-                          .get(),
-                      coll);
+            ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx, coll->ns()), coll);
+            ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx, coll->uuid()), coll);
         } else {
             ASSERT(!coll);
             if (auto nss = nssOrUUID.nss()) {
@@ -1314,10 +1306,7 @@ private:
 
                 // Lookups from the catalog should return the newly opened collection (in this case
                 // nullptr).
-                ASSERT_EQ(CollectionCatalog::get(opCtx)
-                              ->lookupCollectionByNamespaceForRead(opCtx, *nss)
-                              .get(),
-                          coll);
+                ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx, *nss), coll);
             } else if (auto uuid = nssOrUUID.uuid()) {
                 auto catalogEntry =
                     DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, *uuid);
@@ -1325,10 +1314,7 @@ private:
 
                 // Lookups from the catalog should return the newly opened collection (in this case
                 // nullptr).
-                ASSERT_EQ(CollectionCatalog::get(opCtx)
-                              ->lookupCollectionByUUIDForRead(opCtx, *uuid)
-                              .get(),
-                          coll);
+                ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx, *uuid), coll);
             }
         }
 
@@ -1407,9 +1393,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenCollectionBeforeCreateTimestamp) {
     ASSERT(!coll);
 
     // Lookups from the catalog should return the newly opened collection (in this case nullptr).
-    ASSERT_EQ(CollectionCatalog::get(opCtx.get())
-                  ->lookupCollectionByNamespaceForRead(opCtx.get(), nss)
-                  .get(),
+    ASSERT_EQ(CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss),
               coll);
 }
 
@@ -1444,13 +1428,13 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollection) {
     auto newClient = opCtx->getServiceContext()->makeClient("AlternativeClient");
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
-    auto latestColl = CollectionCatalog::get(newOpCtx.get())
-                          ->lookupCollectionByNamespaceForRead(newOpCtx.get(), nss);
+    auto latestColl =
+        CollectionCatalog::get(newOpCtx.get())->lookupCollectionByNamespace(newOpCtx.get(), nss);
     ASSERT(latestColl);
     ASSERT_EQ(1, latestColl->getIndexCatalog()->numIndexesTotal());
 
     // Ensure the idents are shared between the collection instances.
-    ASSERT_NE(coll, latestColl.get());
+    ASSERT_NE(coll, latestColl);
     ASSERT_EQ(coll->getSharedIdent(), latestColl->getSharedIdent());
 }
 
@@ -1491,13 +1475,13 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithIndex) {
     auto newClient = opCtx->getServiceContext()->makeClient("AlternativeClient");
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
-    auto latestColl = CollectionCatalog::get(newOpCtx.get())
-                          ->lookupCollectionByNamespaceForRead(newOpCtx.get(), nss);
+    auto latestColl =
+        CollectionCatalog::get(newOpCtx.get())->lookupCollectionByNamespace(newOpCtx.get(), nss);
     ASSERT(latestColl);
     ASSERT_EQ(2, latestColl->getIndexCatalog()->numIndexesTotal());
 
     // Ensure the idents are shared between the collection and index instances.
-    ASSERT_NE(coll, latestColl.get());
+    ASSERT_NE(coll, latestColl);
     ASSERT_EQ(coll->getSharedIdent(), latestColl->getSharedIdent());
 
     auto indexDescPast = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
@@ -1534,8 +1518,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenLatestCollectionWithIndex) {
 
     // Verify that the CollectionCatalog returns the latest collection.
     auto currentColl =
-        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespaceForRead(opCtx.get(), nss);
-    ASSERT_EQ(coll, currentColl.get());
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
+    ASSERT_EQ(coll, currentColl);
 
     // Ensure the idents are shared between the collection and index instances.
     ASSERT_EQ(coll->getSharedIdent(), currentColl->getSharedIdent());
@@ -1573,8 +1557,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithDropPendingIndex
     // Maintain a shared_ptr to "x_1", so it's not expired in drop pending map, but not for "y_1".
     std::shared_ptr<const IndexCatalogEntry> index;
     {
-        auto latestColl = CollectionCatalog::get(opCtx.get())
-                              ->lookupCollectionByNamespaceForRead(opCtx.get(), nss);
+        auto latestColl =
+            CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
         auto desc = latestColl->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
         index = latestColl->getIndexCatalog()->getEntryShared(desc);
     }
@@ -1596,9 +1580,9 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithDropPendingIndex
     auto newClient = opCtx->getServiceContext()->makeClient("AlternativeClient");
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
-    auto latestColl = CollectionCatalog::get(newOpCtx.get())
-                          ->lookupCollectionByNamespaceForRead(newOpCtx.get(), nss);
-    ASSERT_NE(coll, latestColl.get());
+    auto latestColl =
+        CollectionCatalog::get(newOpCtx.get())->lookupCollectionByNamespace(newOpCtx.get(), nss);
+    ASSERT_NE(coll, latestColl);
 
     auto indexDescX = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
     auto indexDescY = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "y_1");
@@ -1655,8 +1639,8 @@ TEST_F(CollectionCatalogTimestampTest,
     // Maintain a shared_ptr to "z_1", so it's not expired in drop pending map. This is required so
     // that this index entry's ident will be re-used when openCollection is called.
     std::shared_ptr<const IndexCatalogEntry> index = [&] {
-        auto latestColl = CollectionCatalog::get(opCtx.get())
-                              ->lookupCollectionByNamespaceForRead(opCtx.get(), nss);
+        auto latestColl =
+            CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
         auto desc = latestColl->getIndexCatalog()->findIndexByName(opCtx.get(), zIndexName);
         return latestColl->getIndexCatalog()->getEntryShared(desc);
     }();
@@ -1692,10 +1676,10 @@ TEST_F(CollectionCatalogTimestampTest,
     auto newClient = opCtx->getServiceContext()->makeClient("AlternativeClient");
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
-    auto latestColl = CollectionCatalog::get(newOpCtx.get())
-                          ->lookupCollectionByNamespaceForRead(newOpCtx.get(), nss);
+    auto latestColl =
+        CollectionCatalog::get(newOpCtx.get())->lookupCollectionByNamespace(newOpCtx.get(), nss);
 
-    ASSERT_NE(coll, latestColl.get());
+    ASSERT_NE(coll, latestColl);
 
     auto indexDescZ = coll->getIndexCatalog()->findIndexByName(opCtx.get(), zIndexName);
     auto indexEntryZ = coll->getIndexCatalog()->getEntryShared(indexDescZ);
@@ -1716,11 +1700,12 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierAlreadyDropPendingCollection) 
     createCollection(opCtx.get(), firstNss, createCollectionTs);
     createCollection(opCtx.get(), secondNss, createCollectionTs);
 
-    // Maintain a shared_ptr to "a.b" so that it isn't expired in the drop pending map after we drop
-    // the collections.
-    std::shared_ptr<const Collection> coll =
-        CollectionCatalog::get(opCtx.get())
-            ->lookupCollectionByNamespaceForRead(opCtx.get(), firstNss);
+    // Maintain a shared_ptr to the catalog so that collection "a.b" isn't expired in the drop
+    // pending map after we drop the collections.
+    auto catalog = CollectionCatalog::get(opCtx.get());
+    auto coll =
+
+        catalog->lookupCollectionByNamespace(opCtx.get(), firstNss);
     ASSERT(coll);
 
     // Make the collections drop pending.
@@ -1787,10 +1772,10 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionUsingDropPendingCollecti
                          << "key" << BSON("x" << 1)),
                 createIndexTs);
 
-    // Maintain a shared_ptr to "a.b" so that it isn't expired in the drop pending map after we drop
-    // it.
-    auto coll =
-        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespaceForRead(opCtx.get(), nss);
+    // Maintain a shared_ptr to the catalog so that the collection "a.b" isn't expired in the drop
+    // pending map after we drop it.
+    auto catalog = CollectionCatalog::get(opCtx.get());
+    auto coll = catalog->lookupCollectionByNamespace(opCtx.get(), nss);
 
     ASSERT(coll);
     ASSERT_EQ(coll->getMinimumValidSnapshot(), createIndexTs);
@@ -1808,7 +1793,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionUsingDropPendingCollecti
     auto openedColl = CollectionCatalog::get(opCtx.get())
                           ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
     ASSERT(openedColl);
-    ASSERT_NE(coll.get(), openedColl);
+    ASSERT_NE(coll, openedColl);
     // Ensure the idents are shared between the opened collection and the drop pending collection.
     ASSERT_EQ(coll->getSharedIdent(), openedColl->getSharedIdent());
     opCtx->recoveryUnit()->abandonSnapshot();
@@ -1826,9 +1811,9 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionWithReaper) {
 
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
-    // Maintain a shared_ptr so that the reaper cannot drop the collection ident.
-    std::shared_ptr<const Collection> coll =
-        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespaceForRead(opCtx.get(), nss);
+    // Maintain a shared_ptr to the catalog so that the reaper cannot drop the collection ident.
+    auto catalog = CollectionCatalog::get(opCtx.get());
+    auto coll = catalog->lookupCollectionByNamespace(opCtx.get(), nss);
     ASSERT(coll);
 
     // Mark the collection as drop pending. The dropToken in the ident reaper is not expired as we
@@ -1857,7 +1842,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionWithReaper) {
         ASSERT_EQ(coll->getSharedIdent(), openedColl->getSharedIdent());
 
         // The ident is now expired and should be removed the next time the ident reaper runs.
-        coll.reset();
+        catalog.reset();
     }
 
     {
@@ -1959,9 +1944,9 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
     dropIndex(opCtx.get(), nss, "x_1", dropXIndexTs);
     dropIndex(opCtx.get(), nss, "y_1", dropYIndexTs);
 
-    // Maintain a shared_ptr to the collection so that the reaper cannot drop the collection ident.
-    std::shared_ptr<const Collection> coll =
-        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespaceForRead(opCtx.get(), nss);
+    // Maintain a shared_ptr to the catalog so that the reaper cannot drop the collection ident.
+    auto catalog = CollectionCatalog::get(opCtx.get());
+    auto coll = catalog->lookupCollectionByNamespace(opCtx.get(), nss);
     ASSERT(coll);
 
     dropCollection(opCtx.get(), nss, dropCollectionTs);
@@ -2033,7 +2018,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
 
     {
         // Drop all remaining idents.
-        coll.reset();
+        catalog.reset();
 
         storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
         ASSERT_EQ(0, storageEngine->getDropPendingIdents().size());
@@ -3655,13 +3640,11 @@ TEST_F(CollectionCatalogTimestampTest, OpenCollectionBetweenIndexBuildInProgress
 
         // Lookups from the catalog should return the newly opened collection.
         ASSERT_EQ(CollectionCatalog::get(opCtx.get())
-                      ->lookupCollectionByNamespaceForRead(opCtx.get(), coll->ns())
-                      .get(),
+                      ->lookupCollectionByNamespace(opCtx.get(), coll->ns()),
                   coll);
-        ASSERT_EQ(CollectionCatalog::get(opCtx.get())
-                      ->lookupCollectionByUUIDForRead(opCtx.get(), coll->uuid())
-                      .get(),
-                  coll);
+        ASSERT_EQ(
+            CollectionCatalog::get(opCtx.get())->lookupCollectionByUUID(opCtx.get(), coll->uuid()),
+            coll);
     }
 
     finishIndexBuild(opCtx.get(), nss, std::move(indexBuildBlock), indexReadyTs);
@@ -3679,13 +3662,11 @@ TEST_F(CollectionCatalogTimestampTest, OpenCollectionBetweenIndexBuildInProgress
 
         // Lookups from the catalog should return the newly opened collection.
         ASSERT_EQ(CollectionCatalog::get(opCtx.get())
-                      ->lookupCollectionByNamespaceForRead(opCtx.get(), coll->ns())
-                      .get(),
+                      ->lookupCollectionByNamespace(opCtx.get(), coll->ns()),
                   coll);
-        ASSERT_EQ(CollectionCatalog::get(opCtx.get())
-                      ->lookupCollectionByUUIDForRead(opCtx.get(), coll->uuid())
-                      .get(),
-                  coll);
+        ASSERT_EQ(
+            CollectionCatalog::get(opCtx.get())->lookupCollectionByUUID(opCtx.get(), coll->uuid()),
+            coll);
     }
 }
 }  // namespace

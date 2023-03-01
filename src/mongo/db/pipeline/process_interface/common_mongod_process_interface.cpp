@@ -282,8 +282,9 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
         }
 
         for (const auto& svns : systemViewsNamespaces) {
-            auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
-                opCtx, *svns.nss());
+            // Hold reference to the catalog for collection lookup without locks to be safe.
+            auto catalog = CollectionCatalog::get(opCtx);
+            auto collection = catalog->lookupCollectionByNamespace(opCtx, *svns.nss());
             if (!collection) {
                 continue;
             }

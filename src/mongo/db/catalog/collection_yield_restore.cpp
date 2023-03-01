@@ -50,9 +50,12 @@ const Collection* LockedCollectionYieldRestore::operator()(OperationContext* opC
     // Confirm that we are holding the neccessary collection level lock.
     invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IS));
 
+    // Hold reference to the catalog for collection lookup without locks to be safe.
+    auto catalog = CollectionCatalog::get(opCtx);
+
     // Fetch the Collection by UUID. A rename could have occurred which means we might not be
     // holding the collection-level lock on the right namespace.
-    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForRead(opCtx, uuid);
+    auto collection = catalog->lookupCollectionByUUID(opCtx, uuid);
 
     // Collection dropped during yielding.
     if (!collection) {
@@ -68,7 +71,7 @@ const Collection* LockedCollectionYieldRestore::operator()(OperationContext* opC
 
     // Non-lock-free readers use this path and need to re-establish their capped snapshot.
     if (collection->usesCappedSnapshots()) {
-        CappedSnapshots::get(opCtx).establish(opCtx, collection.get());
+        CappedSnapshots::get(opCtx).establish(opCtx, collection);
     }
 
     // After yielding and reacquiring locks, the preconditions that were used to select our
@@ -78,7 +81,7 @@ const Collection* LockedCollectionYieldRestore::operator()(OperationContext* opC
     // necessary.
     SnapshotHelper::changeReadSourceIfNeeded(opCtx, collection->ns());
 
-    return collection.get();
+    return collection;
 }
 
 }  // namespace mongo

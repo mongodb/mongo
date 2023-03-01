@@ -72,8 +72,7 @@ protected:
 
     const Collection* lookupCollectionFromCatalogForRead() {
         return CollectionCatalog::get(operationContext())
-            ->lookupCollectionByNamespaceForRead(operationContext(), kNss)
-            .get();
+            ->lookupCollectionByNamespace(operationContext(), kNss);
     }
 
     void verifyCollectionInCatalogUsingDifferentClient(const Collection* expected) {
@@ -198,9 +197,8 @@ TEST_F(CollectionWriterTest, CatalogWrite) {
             // We should see a different catalog instance than a reader would
             ASSERT_NE(&writableCatalog, catalog.get());
             // However, it should be a shallow copy. The collection instance should be the same
-            ASSERT_EQ(
-                writableCatalog.lookupCollectionByNamespaceForRead(operationContext(), kNss).get(),
-                catalog->lookupCollectionByNamespaceForRead(operationContext(), kNss).get());
+            ASSERT_EQ(writableCatalog.lookupCollectionByNamespace(operationContext(), kNss),
+                      catalog->lookupCollectionByNamespace(operationContext(), kNss));
         });
     auto after = CollectionCatalog::latest(getServiceContext());
     ASSERT_NE(&catalog, &after);

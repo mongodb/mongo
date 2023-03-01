@@ -58,8 +58,10 @@ public:
             return builder.obj();
         }
 
-        auto oplogCollection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
-            opCtx, NamespaceString::kRsOplogNamespace);
+        // Hold reference to the catalog for collection lookup without locks to be safe.
+        auto catalog = CollectionCatalog::get(opCtx);
+        auto oplogCollection =
+            catalog->lookupCollectionByNamespace(opCtx, NamespaceString::kRsOplogNamespace);
         if (oplogCollection) {
             oplogCollection->getRecordStore()->getOplogTruncateStats(builder);
         }

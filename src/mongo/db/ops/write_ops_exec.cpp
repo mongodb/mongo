@@ -2070,10 +2070,11 @@ TimeseriesSingleWriteResult performTimeseriesBucketCompression(
         compressionStats.result = result.result.getStatus();
 
         // Report stats for the bucket collection
-        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
-            opCtx, compressionOp.getNamespace());
+        // Hold reference to the catalog for collection lookup without locks to be safe.
+        auto catalog = CollectionCatalog::get(opCtx);
+        auto coll = catalog->lookupCollectionByNamespace(opCtx, compressionOp.getNamespace());
         if (coll) {
-            const auto& stats = TimeseriesStats::get(coll.get());
+            const auto& stats = TimeseriesStats::get(coll);
             stats.onBucketClosed(*beforeSize, compressionStats);
         }
     }
@@ -2379,8 +2380,8 @@ insertIntoBucketCatalog(OperationContext* opCtx,
     auto bucketsNs = makeTimeseriesBucketsNamespace(ns(request));
     // Holding this shared pointer to the collection guarantees that the collator is not
     // invalidated.
-    auto bucketsColl =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketsNs);
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
     uassert(ErrorCodes::NamespaceNotFound,
             "Could not find time-series buckets collection for write",
             bucketsColl);

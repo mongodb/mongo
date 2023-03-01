@@ -887,8 +887,9 @@ TranslatedRequestParams CreateCollectionCoordinator::_translateRequestParameters
     };
 
     auto bucketsNs = originalNss().makeTimeseriesBucketsNamespace();
-    auto existingBucketsColl =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketsNs);
+    // Hold reference to the catalog for collection lookup without locks to be safe.
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto existingBucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
 
     auto targetingStandardCollection = !_request.getTimeseries() && !existingBucketsColl;
 

@@ -253,8 +253,10 @@ public:
         result.append("latestOptime", replCoord->getMyLastAppliedOpTime().getTimestamp());
 
         auto earliestOplogTimestampFetch = [&]() -> Timestamp {
-            auto oplog = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
-                opCtx, NamespaceString::kRsOplogNamespace);
+            // Hold reference to the catalog for collection lookup without locks to be safe.
+            auto catalog = CollectionCatalog::get(opCtx);
+            auto oplog =
+                catalog->lookupCollectionByNamespace(opCtx, NamespaceString::kRsOplogNamespace);
             if (!oplog) {
                 return Timestamp();
             }

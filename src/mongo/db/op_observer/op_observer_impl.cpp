@@ -725,8 +725,9 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         // to insert measurements with dates outside the standard range, chances are they will do so
         // again, and we will have only set the flag a little early.
         invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
-        auto bucketsColl =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, nss);
+        // Hold reference to the catalog for collection lookup without locks to be safe.
+        auto catalog = CollectionCatalog::get(opCtx);
+        auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, nss);
         tassert(6905201, "Could not find collection for write", bucketsColl);
         auto timeSeriesOptions = bucketsColl->getTimeseriesOptions();
         if (timeSeriesOptions.has_value()) {

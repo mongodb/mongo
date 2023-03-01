@@ -452,7 +452,7 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
 
     auto catalog = CollectionCatalog::get(opCtx);
     _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
-    _collection = catalog->lookupCollectionByNamespaceForRead(opCtx, _resolvedNss);
+    _collection = catalog->lookupCollectionByNamespaceForRead_DONT_USE(opCtx, _resolvedNss);
 
     // When we restore from yield on this CollectionPtr we will update _collection above and use its
     // new pointer in the CollectionPtr
