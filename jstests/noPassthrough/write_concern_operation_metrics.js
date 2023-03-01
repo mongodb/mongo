@@ -102,17 +102,17 @@ hangAfterUpdate.off();
 // Waiting for write concern.
 hangBeforeWaitingForWriteConcern.wait();
 
-// Make sure waitForWriteConcernDurationMillis exists in the currentOp query.
-let foundWaitForWriteConcernDurationMillis = false;
-let allOps = db1.currentOp({ns: "db1.coll"});
-for (const j in allOps.inprog) {
-    let op = allOps.inprog[j];
-    if (op.hasOwnProperty("waitForWriteConcernDurationMillis")) {
-        foundWaitForWriteConcernDurationMillis = true;
+assert.soon(() => {
+    // Make sure waitForWriteConcernDurationMillis exists in the currentOp query.
+    let allOps = db1.currentOp({ns: "db1.coll"});
+    for (const j in allOps.inprog) {
+        let op = allOps.inprog[j];
+        if (op.hasOwnProperty("waitForWriteConcernDurationMillis")) {
+            return true;
+        }
     }
-}
-assert(foundWaitForWriteConcernDurationMillis,
-       () => "did not find waitForWriteConcernDurationMillis in currentOp: " + tojson(allOps));
+    return false;
+}, "did not find waitForWriteConcernDurationMillis in currentOp");
 
 // Unblock write concern wait.
 hangBeforeWaitingForWriteConcern.off();
@@ -122,7 +122,9 @@ joinWriter2();
 
 // Check for the existence of waitForWriteConcernDurationMillis field in slow query.
 const predicate = /Slow query.*"appName":"MongoDB Shell".*"waitForWriteConcernDurationMillis":.*/;
-assert(checkLog.checkContainsOnce(primary, predicate));
+assert.soon(() => {
+    return checkLog.checkContainsOnce(primary, predicate);
+}, "did not find waitForWriteConcernDurationMillis in slow query log");
 
 const metrics = getDBMetrics(adminDB);
 jsTestLog(metrics);
