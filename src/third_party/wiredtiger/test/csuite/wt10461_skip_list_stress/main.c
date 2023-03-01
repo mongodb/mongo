@@ -71,6 +71,7 @@ static volatile uint32_t active_search_insert_threads;
 
 #define NUM_KEYS 10000
 #define KEY_SIZE 6
+#define CHECK_KEY_SIZE 3
 
 /*
  * usage --
@@ -138,9 +139,9 @@ thread_search_insert_run(void *arg)
      * Set up our key to __wt_search_insert on. It'll always sit just after the first item in the
      * skiplist.
      */
-    check_key.data = dmalloc(3);
-    sprintf((char *)check_key.data, "00");
-    check_key.size = 3;
+    check_key.data = dmalloc(CHECK_KEY_SIZE);
+    testutil_check(__wt_snprintf((char *)check_key.data, CHECK_KEY_SIZE, "00"));
+    check_key.size = CHECK_KEY_SIZE;
 
     __wt_atomic_addv32(&active_search_insert_threads, 1);
     while (inserts_finished == false)
@@ -150,6 +151,7 @@ thread_search_insert_run(void *arg)
 
     cursor->close(cursor);
     session->close(session, "");
+    free((void *)check_key.data);
     return (WT_THREAD_RET_VALUE);
 }
 
@@ -210,7 +212,7 @@ run(const char *working_dir)
     testutil_check(session->begin_transaction(session, NULL));
     for (uint32_t i = NUM_KEYS; i > 0; i--) {
         /* All keys use leading zeros. Otherwise "2" is consider larger than "11". */
-        sprintf(key, "%0*u", KEY_SIZE - 1, i);
+        testutil_check(__wt_snprintf(key, KEY_SIZE, "%0*u", KEY_SIZE - 1, i));
         insert_key(cursor, key);
     }
     testutil_check(session->commit_transaction(session, NULL));
@@ -220,6 +222,7 @@ run(const char *working_dir)
         testutil_check(__wt_thread_join(NULL, &thr[i]));
 
     free(thr);
+    free(key);
     testutil_check(cursor->close(cursor));
     testutil_check(session->close(session, ""));
     testutil_check(conn->close(conn, ""));
