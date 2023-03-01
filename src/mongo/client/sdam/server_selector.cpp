@@ -230,35 +230,40 @@ bool SdamServerSelector::_containsAllTags(ServerDescriptionPtr server, const BSO
 
 void SdamServerSelector::filterTags(std::vector<ServerDescriptionPtr>* servers,
                                     const TagSet& tagSet) {
-    const auto& checkTags = tagSet.getTagBSON();
+    const auto& tagSetList = tagSet.getTagBSON();
 
-    if (checkTags.nFields() == 0)
+    if (tagSetList.isEmpty()) {
         return;
+    }
 
-    const auto predicate = [&](const ServerDescriptionPtr& s) {
-        auto it = checkTags.begin();
-        while (it != checkTags.end()) {
-            if (it->isABSONObj()) {
-                const BSONObj& tags = it->Obj();
-                if (_containsAllTags(s, tags)) {
-                    // found a match -- don't remove the server
-                    return false;
-                }
-            } else {
-                LOGV2_WARNING(
-                    4671202,
-                    "Invalid tags specified for server selection; tags should be specified as "
-                    "bson Objects",
-                    "tag"_attr = *it);
-            }
-            ++it;
+    for (const auto& tagSetElem : tagSetList) {
+        if (tagSetElem.type() != BSONType::Object) {
+            LOGV2_WARNING(4671202,
+                          "Invalid tag set specified for server selection; tag sets should be"
+                          " specified as a BSON object",
+                          "tag"_attr = tagSetElem);
+            continue;
         }
 
-        // remove the server
-        return true;
-    };
+        const auto predicate = [&](const ServerDescriptionPtr& s) {
+            const bool shouldRemove = !_containsAllTags(s, tagSetElem.embeddedObject());
+            return shouldRemove;
+        };
 
-    servers->erase(std::remove_if(servers->begin(), servers->end(), predicate), servers->end());
+        auto it = std::remove_if(servers->begin(), servers->end(), predicate);
+        // If none of the server descriptions match the tag set, then continue on to check the next
+        // tag set in the list. Otherwise, if at least one of the server descriptions match the tag
+        // set criteria, then we've found our preferred host(s) to read from.
+        if (it != servers->begin()) {
+            servers->erase(it, servers->end());
+            return;
+        }
+    }
+
+    // Getting here means a non-empty tag set list was specified but none of the server descriptions
+    // matched any of the tag sets in the list. We've therefore failed to find any server
+    // description matching the read preference tag criteria.
+    servers->clear();
 }
 
 bool SdamServerSelector::recencyFilter(const ReadPreferenceSetting& readPref,
