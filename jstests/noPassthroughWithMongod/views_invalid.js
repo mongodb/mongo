@@ -22,6 +22,9 @@ assert.eq(invalidDB.view.findOne({}, {_id: 0}),
 assert.commandWorked(invalidDB.adminCommand(
     {applyOps: [{op: "i", ns: dbname + ".system.views", o: {_id: "invalid", pipeline: 3.0}}]}));
 
+// Make sure we logged an error message about the invalid view.
+assert(checkLog.checkContainsOnceJson(invalidDB, 7267300));
+
 // Check that view-related commands fail with an invalid view catalog, but other commands on
 // existing collections still succeed.
 assert.commandFailedWithCode(invalidDB.runCommand({find: 'view'}),

@@ -783,7 +783,21 @@ void CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseName&
     LOGV2_DEBUG(22546, 1, "Reloading view catalog for database", "db"_attr = dbName.toString());
 
     ViewsForDatabase viewsForDb;
-    viewsForDb.reload(opCtx, CollectionPtr(_lookupSystemViews(opCtx, dbName))).ignore();
+    auto status = viewsForDb.reload(opCtx, CollectionPtr(_lookupSystemViews(opCtx, dbName)));
+    if (!status.isOK()) {
+        // If we encountered an error while reloading views, then the 'viewsForDb' variable will be
+        // empty, and marked invalid. Any further operations that attempt to use a view will fail
+        // until the view catalog is fixed. Most of the time, this means the system.views collection
+        // needs to be dropped.
+        //
+        // Unfortunately, we don't have a good way to respond to this error, as when we're calling
+        // this function, we're in an op observer, and we expect the operation to succeed once it's
+        // gotten to that point since it's passed all our other checks. Instead, we can log this
+        // information to aid in diagnosing the problem.
+        LOGV2(7267300,
+              "Encountered an error while reloading the view catalog",
+              "error"_attr = status);
+    }
 
     uncommittedCatalogUpdates.replaceViewsForDatabase(dbName, std::move(viewsForDb));
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
