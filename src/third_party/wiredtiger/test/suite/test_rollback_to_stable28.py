@@ -31,7 +31,7 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from helper import simulate_crash_restart
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 
 # test_rollback_to_stable28.py
 # Test the debug mode setting for update_restore_evict during recovery.
@@ -40,7 +40,7 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 # the proper write generation number and we don't end up reading stale
 # transaction ID's stored on the page.
 class test_rollback_to_stable28(test_rollback_to_stable_base):
-    conn_config = 'statistics=(all)'
+    conn_config = 'statistics=(all),verbose=(rts:5)'
     # Recovery connection config: The debug mode is only effective on high cache pressure as WiredTiger can potentially decide
     # to do an update restore evict on a page when the cache pressure requirements are not met.
     # This means setting eviction target low and cache size low.

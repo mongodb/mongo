@@ -112,7 +112,8 @@ COMMANDS="
 2>&1 ./s_whitespace > ${t_pfx}s_whitespace
 2>&1 python3 function.py > ${t_pfx}py_function
 2>&1 python3 style.py > ${t_pfx}py_style
-2>&1 python3 comment_style.py ${fast} > ${t_pfx}py_comment_style"
+2>&1 python3 comment_style.py ${fast} > ${t_pfx}py_comment_style
+2>&1 python3 type_to_str.py > ${t_pfx}py_type_to_str"
 
 # Parallelize if possible.
 xp=""

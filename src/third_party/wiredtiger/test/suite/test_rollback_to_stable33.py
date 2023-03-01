@@ -26,6 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+from rollback_to_stable_util import verify_rts_logs
 import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -44,7 +45,14 @@ class test_rollback_to_stable33(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(format_values, logged)
 
     # Configure an in-memory database.
-    conn_config = 'in_memory=true'
+    conn_config = 'in_memory=true,verbose=(rts:5)'
+
+    # Don't raise errors for these, the expectation is that the RTS verifier will
+    # run on the test output.
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ignoreStdoutPattern('WT_VERB_RTS')
+        self.addTearDownAction(verify_rts_logs)
 
     # Smoke test RTS on in-memory databases.
     def test_rollback_to_stable33(self):

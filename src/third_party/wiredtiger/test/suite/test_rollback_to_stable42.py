@@ -38,7 +38,7 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 # unacceptable or we don't see the needle at all.
 def custom_validator(data):
     acceptable = [
-        "connection logging enabled",
+        "connection_logging_enabled",
         "deleted page walk skipped",
         "page with reconciled",
         "performing recovery rollback",

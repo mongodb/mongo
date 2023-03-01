@@ -134,8 +134,9 @@ __wt_rts_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t rollback_times
          */
         if (ret == ENOENT || (ret == WT_ERROR && F_ISSET(S2C(session), WT_CONN_DATA_CORRUPTION))) {
             __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
-              "%s: skipped performing rollback to stable because the file %s", uri,
-              ret == ENOENT ? "does not exist" : "is corrupted.");
+              WT_RTS_VERB_TAG_SKIP_DAMAGE
+              "%s: skipped performing rollback to stable because the file %s",
+              uri, ret == ENOENT ? "does not exist" : "is corrupted.");
             continue;
         }
         WT_ERR(ret);

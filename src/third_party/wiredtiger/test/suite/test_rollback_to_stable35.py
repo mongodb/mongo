@@ -32,7 +32,7 @@ from wtthread import checkpoint_thread
 from wiredtiger import stat
 from helper import copy_wiredtiger_home
 from wtscenario import make_scenarios
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 
 # test_rollback_to_stable35.py
 # Test that log is flushed for all writes that occurred in the checkpoint.
@@ -79,7 +79,7 @@ class test_rollback_to_stable35(test_rollback_to_stable_base):
         cursor_2.close()
 
     def conn_config(self):
-        config = 'cache_size=50MB,statistics=(all),log=(enabled,force_write_wait=60),timing_stress_for_test=[checkpoint_slow, checkpoint_stop]'
+        config = 'cache_size=50MB,statistics=(all),log=(enabled,force_write_wait=60),timing_stress_for_test=[checkpoint_slow, checkpoint_stop],verbose=(rts:5)'
         return config
 
     def test_rollback_to_stable(self):

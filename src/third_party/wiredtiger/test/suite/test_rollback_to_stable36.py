@@ -28,6 +28,7 @@
 
 import wttest
 from helper import simulate_crash_restart
+from rollback_to_stable_util import verify_rts_logs
 from wiredtiger import stat, WiredTigerError, wiredtiger_strerror, WT_ROLLBACK
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -38,7 +39,7 @@ from wtscenario import make_scenarios
 # everything else on the page is.
 
 class test_rollback_to_stable36(wttest.WiredTigerTestCase):
-    conn_config = 'statistics=(all)'
+    conn_config = 'statistics=(all),verbose=(rts:5)'
     session_config = 'isolation=snapshot'
 
     # Hook to run using remove instead of truncate for reference. This should not alter the
@@ -60,6 +61,13 @@ class test_rollback_to_stable36(wttest.WiredTigerTestCase):
         ('recovery', dict(crash=True)),
     ]
     scenarios = make_scenarios(trunc_values, format_values, rollback_modes)
+
+    # Don't raise errors for these, the expectation is that the RTS verifier will
+    # run on the test output.
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ignoreStdoutPattern('WT_VERB_RTS')
+        self.addTearDownAction(verify_rts_logs)
 
     def truncate(self, uri, make_key, keynum1, keynum2):
         if self.trunc_with_remove:

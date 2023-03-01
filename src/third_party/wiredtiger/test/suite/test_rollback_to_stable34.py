@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from helper import simulate_crash_restart
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -36,7 +36,7 @@ from wtscenario import make_scenarios
 # Test interaction between fast-delete and RTS.
 class test_rollback_to_stable34(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
-    conn_config = 'cache_size=50MB,statistics=(all),log=(enabled=false)'
+    conn_config = 'cache_size=50MB,statistics=(all),log=(enabled=false),verbose=(rts:5)'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S', extraconfig='')),

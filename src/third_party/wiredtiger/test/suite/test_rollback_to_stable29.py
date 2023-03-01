@@ -30,13 +30,13 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from helper import simulate_crash_restart
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 
 # test_rollback_to_stable29.py
 # Test that the rollback to stable to verify the history store order when an update without a
 # timestamp inserted to a tombstone.
 class test_rollback_to_stable29(test_rollback_to_stable_base):
-    conn_config = 'cache_size=5MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true)'
+    conn_config = 'cache_size=5MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true),verbose=(rts:5)'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),

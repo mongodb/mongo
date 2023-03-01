@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 from helper import simulate_crash_restart
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -51,6 +51,9 @@ class test_rollback_to_stable31(test_rollback_to_stable_base):
     ]
 
     scenarios = make_scenarios(format_values, checkpoint_modes, rollback_modes)
+
+    def conn_config(self):
+        return 'verbose=(rts:5)'
 
     def test_rollback_to_stable(self):
         nrows = 10

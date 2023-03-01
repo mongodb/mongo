@@ -28,6 +28,7 @@
 
 import wttest
 from helper import simulate_crash_restart
+from rollback_to_stable_util import verify_rts_logs
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -37,7 +38,7 @@ from wtscenario import make_scenarios
 # Test using fast truncate to delete the whole tree of records from the history store
 
 class test_rollback_to_stable38(wttest.WiredTigerTestCase):
-    conn_config = 'statistics=(all),cache_size=50MB'
+    conn_config = 'statistics=(all),cache_size=50MB,verbose=(rts:5)'
     session_config = 'isolation=snapshot'
 
     format_values = [
@@ -47,6 +48,13 @@ class test_rollback_to_stable38(wttest.WiredTigerTestCase):
         ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
     ]
     scenarios = make_scenarios(format_values)
+
+    # Don't raise errors for these, the expectation is that the RTS verifier will
+    # run on the test output.
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ignoreStdoutPattern('WT_VERB_RTS')
+        self.addTearDownAction(verify_rts_logs)
 
     def check(self, ds, value, nrows, ts):
         cursor = self.session.open_cursor(ds.uri)

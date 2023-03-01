@@ -29,7 +29,7 @@
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 
 # test_rollback_to_stable08.py
 # Test that rollback to stable does not abort updates when the stable timestamp is
@@ -55,7 +55,7 @@ class test_rollback_to_stable08(test_rollback_to_stable_base):
     scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=50MB,statistics=(all)'
+        config = 'cache_size=50MB,statistics=(all),verbose=(rts:5)'
         if self.in_memory:
             config += ',in_memory=true'
         return config

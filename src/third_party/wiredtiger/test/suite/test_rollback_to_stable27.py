@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -50,9 +50,10 @@ class test_rollback_to_stable27(test_rollback_to_stable_base):
     scenarios = make_scenarios(key_format_values, in_memory_values)
 
     def conn_config(self):
+        config = 'verbose=(rts:5)'
         if self.in_memory:
-            return 'in_memory=true'
-        return ''
+            config += ',in_memory=true'
+        return config
 
     # Evict the page to force reconciliation.
     def evict(self, uri, key, check_value):

@@ -28,7 +28,7 @@
 
 import threading, time
 from helper import simulate_crash_restart
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -63,7 +63,7 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
     scenarios = make_scenarios(format_values, hs_remove_values, prepare_values, prepare_remove_values)
 
     def conn_config(self):
-        config = 'cache_size=10MB,statistics=(all),timing_stress_for_test=[history_store_checkpoint_delay]'
+        config = 'cache_size=10MB,statistics=(all),timing_stress_for_test=[history_store_checkpoint_delay],verbose=(rts:5)'
         return config
 
     def evict_cursor(self, uri, nrows):

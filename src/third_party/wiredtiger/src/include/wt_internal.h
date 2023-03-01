@@ -495,6 +495,7 @@ typedef uint64_t wt_timestamp_t;
 #include "packing_inline.h"
 #include "reconcile_inline.h"
 #include "serial_inline.h"
+#include "str_inline.h"
 #include "time_inline.h"
 
 #if defined(__cplusplus)

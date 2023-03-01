@@ -1009,8 +1009,8 @@ done:
 
         __wt_verbose_multi(session,
           WT_DECL_VERBOSE_MULTI_CATEGORY(((WT_VERBOSE_CATEGORY[]){WT_VERB_RECOVERY, WT_VERB_RTS})),
-          "performing recovery rollback_to_stable with stable timestamp: %s and oldest timestamp: "
-          "%s",
+          "[RECOVERY_RTS] performing recovery rollback_to_stable with stable_timestamp=%s and "
+          "oldest_timestamp=%s",
           __wt_timestamp_to_string(conn->txn_global.stable_timestamp, ts_string[0]),
           __wt_timestamp_to_string(conn->txn_global.oldest_timestamp, ts_string[1]));
         rts_executed = true;

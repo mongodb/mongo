@@ -249,6 +249,7 @@ NetBSD
 NoAddr
 Noll
 Nul
+ONDISK
 OOB
 OPLOG
 OPTRACK

@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from helper import simulate_crash_restart
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 from wiredtiger import stat, WT_NOTFOUND
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -56,7 +56,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
 
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all),eviction_dirty_trigger=10,' \
-                 'eviction_updates_trigger=10'
+                 'eviction_updates_trigger=10,verbose=(rts:5)'
         if self.in_memory:
             config += ',in_memory=true'
         return config

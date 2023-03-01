@@ -29,13 +29,13 @@
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 
 # test_rollback_to_stable37.py
 # Test that the rollback to stable to restore proper stable update from history store when a no timestamp
 # update has rewritten the history store data.
 class test_rollback_to_stable37(test_rollback_to_stable_base):
-    conn_config = 'cache_size=1GB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=false)'
+    conn_config = 'cache_size=1GB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=false),verbose=(rts:5)'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),

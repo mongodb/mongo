@@ -805,10 +805,9 @@ struct __wt_page {
  * 	Prepare state will not be updated during rollback and will continue to
  * 	have the state as INPROGRESS.
  */
-#define WT_PREPARE_INIT              \
-    0 /* Must be 0, as structures    \
-         will be default initialized \
-         with 0. */
+
+/* Must be 0, as structures will be default initialized with 0. */
+#define WT_PREPARE_INIT 0
 #define WT_PREPARE_INPROGRESS 1
 #define WT_PREPARE_LOCKED 2
 #define WT_PREPARE_RESOLVED 3

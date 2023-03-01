@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
+from rollback_to_stable_util import verify_rts_logs
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
@@ -51,8 +52,15 @@ class test_rollback_to_stable15(wttest.WiredTigerTestCase):
     ]
     scenarios = make_scenarios(key_format_values, value_format_values, in_memory_values)
 
+    # Don't raise errors for these, the expectation is that the RTS verifier will
+    # run on the test output.
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ignoreStdoutPattern('WT_VERB_RTS')
+        self.addTearDownAction(verify_rts_logs)
+
     def conn_config(self):
-        config = 'cache_size=200MB,statistics=(all),debug_mode=(eviction=false)'
+        config = 'cache_size=200MB,statistics=(all),debug_mode=(eviction=false),verbose=(rts:5)'
         if self.in_memory:
             config += ',in_memory=true'
         return config
