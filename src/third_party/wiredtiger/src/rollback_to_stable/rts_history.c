@@ -142,7 +142,7 @@ __wt_rts_history_btree_hs_truncate(WT_SESSION_IMPL *session, uint32_t btree_id)
 
     WT_RTS_STAT_CONN_DATA_INCR(session, cache_hs_btree_truncate);
 
-    __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
+    __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
       "Rollback to stable has truncated records for btree %u from the history store", btree_id);
 
 done:

@@ -194,27 +194,6 @@ class CapturedFd(object):
                           gotstr + '"')
         self.expectpos = os.path.getsize(self.filename)
 
-    def checkCustomValidator(self, testcase, f):
-        """
-        Check to see that an additional string has been added to the
-        output file.  If it has not, raise it as a test failure.
-        In any case, reset the expected pos to account for the new output.
-        """
-        if self.file != None:
-            self.file.flush()
-
-        # Custom validators probably don't want to see truncated output.
-        # Give them the whole string.
-        new_expectpos = os.path.getsize(self.filename)
-        diff = new_expectpos - self.expectpos
-        gotstr = self.readFileFrom(self.filename, self.expectpos, diff)
-        try:
-            f(gotstr)
-        except Exception as e:
-            testcase.fail('in ' + self.desc +
-                          ', custom validator failed: ' + str(e))
-        self.expectpos = new_expectpos
-
 class TestSuiteConnection(object):
     def __init__(self, conn, connlist):
         connlist.append(conn)
@@ -673,7 +652,6 @@ class WiredTigerTestCase(unittest.TestCase):
             namefile.write(str(self) + '\n')
         self.fdSetUp()
         self._threadLocal.currentTestCase = self
-        self.ignoreTearDownLogs = False
         # tearDown needs a conn field, set it here in case the open fails.
         self.conn = None
         try:
@@ -770,7 +748,7 @@ class WiredTigerTestCase(unittest.TestCase):
         self._connections = []
         try:
             self.fdTearDown()
-            if not (dueToRetry or self.ignoreTearDownLogs):
+            if not dueToRetry:
                 self.captureout.check(self)
                 self.captureerr.check(self)
         finally:
@@ -841,12 +819,6 @@ class WiredTigerTestCase(unittest.TestCase):
         self.captureerr.check(self)
         yield
         self.captureerr.checkAdditionalPattern(self, pat, re_flags)
-
-    @contextmanager
-    def customStdoutPattern(self, f):
-        self.captureout.check(self)
-        yield
-        self.captureout.checkCustomValidator(self, f)
 
     def readStdout(self, maxchars=10000):
         return self.captureout.readFileFrom(self.captureout.filename, self.captureout.expectpos, maxchars)
