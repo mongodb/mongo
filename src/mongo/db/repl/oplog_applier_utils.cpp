@@ -417,7 +417,15 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                         !oplogApplicationEnforcesSteadyStateConstraints &&
                         oplogApplicationMode == OplogApplication::Mode::kSecondary) {
                         if (opCounters) {
+                            const auto& opObj = redact(op->toBSONForLogging());
                             opCounters->gotDeleteFromMissingNamespace();
+                            logOplogConstraintViolation(
+                                opCtx,
+                                op->getNss(),
+                                OplogConstraintViolationEnum::kDeleteOnMissingNs,
+                                "delete",
+                                opObj,
+                                boost::none /* status */);
                         }
                         return Status::OK();
                     }
