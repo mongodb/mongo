@@ -87,10 +87,6 @@ void runWithoutSession(OperationContext* opCtx, Callable callable) {
 
 void MigrationBatchInserter::onCreateThread(const std::string& threadName) {
     Client::initThread(threadName, getGlobalServiceContext(), nullptr);
-    {
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationKillableByStepdown(lk);
-    }
 }
 
 void MigrationBatchInserter::run(Status status) const try {

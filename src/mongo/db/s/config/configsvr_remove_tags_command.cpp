@@ -79,11 +79,6 @@ public:
 
             {
                 auto newClient = opCtx->getServiceContext()->makeClient("RemoveTagsMetadata");
-                {
-                    stdx::lock_guard<Client> lk(*newClient.get());
-                    newClient->setSystemOperationKillableByStepdown(lk);
-                }
-
                 AlternativeClientRegion acr(newClient);
                 auto executor =
                     Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();

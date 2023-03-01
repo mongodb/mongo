@@ -161,10 +161,6 @@ private:
 
     static void onCreateThread(const std::string& threadName) {
         Client::initThread(threadName, getGlobalServiceContext(), nullptr);
-        {
-            stdx::lock_guard<Client> lk(cc());
-            cc().setSystemOperationKillableByStepdown(lk);
-        }
     }
 
 };  // namespace mongo

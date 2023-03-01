@@ -86,10 +86,6 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
         // an alternative client.
         auto newClient = opCtx->getServiceContext()->makeClient("removeRangeDeletions-" +
                                                                 collectionUUID->toString());
-        {
-            stdx::lock_guard<Client> lk(*newClient.get());
-            newClient->setSystemOperationKillableByStepdown(lk);
-        }
         AlternativeClientRegion acr{newClient};
         auto executor =
             Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();

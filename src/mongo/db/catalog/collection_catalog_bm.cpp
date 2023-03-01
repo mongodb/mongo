@@ -94,6 +94,12 @@ void BM_CollectionCatalogWrite(benchmark::State& state) {
     ThreadClient threadClient(serviceContext);
     ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
 
+    // TODO(SERVER-74657): Please revisit if this thread could be made killable.
+    {
+        stdx::lock_guard<Client> lk(*threadClient.get());
+        threadClient.get()->setSystemOperationUnKillableByStepdown(lk);
+    }
+
     createCollections(opCtx.get(), state.range(0));
 
     for (auto _ : state) {
@@ -106,6 +112,12 @@ void BM_CollectionCatalogWriteBatchedWithGlobalExclusiveLock(benchmark::State& s
     auto serviceContext = setupServiceContext();
     ThreadClient threadClient(serviceContext);
     ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
+
+    // TODO(SERVER-74657): Please revisit if this thread could be made killable.
+    {
+        stdx::lock_guard<Client> lk(*threadClient.get());
+        threadClient.get()->setSystemOperationUnKillableByStepdown(lk);
+    }
 
     createCollections(opCtx.get(), state.range(0));
 

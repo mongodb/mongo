@@ -82,6 +82,13 @@ public:
         for (int i = 0; i < k; ++i) {
             auto client = getGlobalServiceContext()->makeClient(str::stream()
                                                                 << "test client for thread " << i);
+
+            // TODO(SERVER-74657): Please revisit if this thread could be made killable.
+            {
+                stdx::lock_guard<Client> lk(*client.get());
+                client.get()->setSystemOperationUnKillableByStepdown(lk);
+            }
+
             auto opCtx = client->makeOperationContext();
             clients.emplace_back(std::move(client), std::move(opCtx));
         }

@@ -631,6 +631,13 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                 // The current OperationContext may be interrupted, which would prevent us from
                 // taking locks. Use a new OperationContext to abort the index build.
                 auto newClient = opCtx->getServiceContext()->makeClient("abort-index-build");
+
+                // TODO(SERVER-74657): Please revisit if this thread could be made killable.
+                {
+                    stdx::lock_guard<Client> lk(*newClient.get());
+                    newClient.get()->setSystemOperationUnKillableByStepdown(lk);
+                }
+
                 AlternativeClientRegion acr(newClient);
                 const auto abortCtx = cc().makeOperationContext();
 

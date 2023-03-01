@@ -69,12 +69,6 @@ public:
         kvEngine = makeKVEngine(serviceContext, home.path(), &cs);
         opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(kvEngine->newRecoveryUnit()),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-
-        // Sets internal states to pass invariants inside 'wiredTigerPrepareConflictRetry()'.
-        {
-            stdx::lock_guard<Client> lk(*client);
-            client->setSystemOperationKillableByStepdown(lk);
-        }
     }
 
     unittest::TempDir home{"temp"};

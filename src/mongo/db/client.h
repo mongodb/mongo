@@ -194,15 +194,15 @@ public:
     }
 
     /**
-     * Used to mark system operations that are allowed to be killed by the stepdown process. This
-     * should only be called once per Client and only from system connections. The Client should be
-     * locked by the caller.
+     * Used to mark system operations that are not allowed to be killed by the stepdown process.
+     * This should only be called once per Client and only from system connections. The Client
+     * should be locked by the caller.
      */
-    void setSystemOperationKillableByStepdown(WithLock) {
+    void setSystemOperationUnKillableByStepdown(WithLock) {
         // This can only be changed once for system operations.
         invariant(isFromSystemConnection());
-        invariant(!_systemOperationKillable);
-        _systemOperationKillable = true;
+        invariant(_systemOperationKillable);
+        _systemOperationKillable = false;
     }
 
     /**
@@ -294,7 +294,7 @@ private:
     OperationContext* _opCtx = nullptr;
 
     // If the active system client operation is allowed to be killed.
-    bool _systemOperationKillable = false;
+    bool _systemOperationKillable = true;
 
     PseudoRandom _prng;
 

@@ -158,6 +158,12 @@ void shutdown(ServiceContext* srvContext) {
         auto const client = Client::getCurrent();
         auto const serviceContext = client->getServiceContext();
 
+        // TODO(SERVER-74659): Please revisit if this thread could be made killable.
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc.get()->setSystemOperationUnKillableByStepdown(lk);
+        }
+
         serviceContext->setKillAllOperations();
 
         // We should always be able to acquire the global lock at shutdown.
