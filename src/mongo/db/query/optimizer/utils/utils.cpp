@@ -687,7 +687,8 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
 
     // If we over-approximate, we need to switch all requirements to perf-only.
     if (result->_retainPredicate) {
-        reqMap.transform([&](const PartialSchemaKey& key, PartialSchemaRequirement& req) {
+        PSRExpr::visitDNF(reqMap.getRoot(), [&](PartialSchemaEntry& entry) {
+            auto& [key, req] = entry;
             if (!req.getIsPerfOnly()) {
                 req = {req.getBoundProjectionName(), req.getIntervals(), true /*isPerfOnly*/};
             }

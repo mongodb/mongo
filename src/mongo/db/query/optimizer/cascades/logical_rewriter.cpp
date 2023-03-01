@@ -1109,8 +1109,8 @@ struct SubstituteConvert<EvaluationNode> {
             return;
         }
 
-        conversion->_reqMap.transform([&](const PartialSchemaKey& key,
-                                          PartialSchemaRequirement& req) {
+        PSRExpr::visitDNF(conversion->_reqMap.getRoot(), [&](PartialSchemaEntry& entry) {
+            auto& [key, req] = entry;
             req = {
                 evalNode.getProjectionName(), std::move(req.getIntervals()), req.getIsPerfOnly()};
 

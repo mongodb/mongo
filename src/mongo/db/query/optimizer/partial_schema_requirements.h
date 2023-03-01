@@ -150,8 +150,6 @@ public:
      */
     size_t numConjuncts() const;
 
-    std::set<ProjectionName> getBoundNames() const;
-
     /**
      * Return the bound projection name corresponding to the first conjunct matching the given key.
      * Assert on non-DNF requirements.
@@ -187,22 +185,11 @@ public:
         return {atoms.begin(), atoms.end()};
     }
 
-    using Bindings = std::vector<std::pair<PartialSchemaKey, ProjectionName>>;
-    Bindings iterateBindings() const;
-
     /**
      * Add an entry to the first AND under a top-level OR. Asserts on non-DNF requirements.
      * TODO SERVER-74101 In the follow up ticket to update callsites, remove or clarify this method.
      */
     void add(PartialSchemaKey, PartialSchemaRequirement);
-
-    /**
-     * Apply an in-place transformation to each PartialSchemaRequirement.
-     *
-     * Since the key is only exposed read-only to the callback, we don't need to
-     * worry about restoring the no-Traverseless-duplicates invariant.
-     */
-    void transform(std::function<void(const PartialSchemaKey&, PartialSchemaRequirement&)>);
 
     /**
      * Apply a simplification to each PartialSchemaRequirement.
@@ -220,6 +207,10 @@ public:
     bool simplify(std::function<bool(const PartialSchemaKey&, PartialSchemaRequirement&)>);
 
     const auto& getRoot() const {
+        return _expr;
+    }
+
+    auto& getRoot() {
         return _expr;
     }
 

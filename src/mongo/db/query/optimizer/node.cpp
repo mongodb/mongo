@@ -373,17 +373,19 @@ const ProjectionName& RIDUnionNode::getScanProjectionName() const {
 
 static ProjectionNameVector createSargableBindings(const PartialSchemaRequirements& reqMap) {
     ProjectionNameVector result;
-    for (const auto& [key, binding] : reqMap.iterateBindings()) {
-        result.push_back(binding);
-    }
+    PSRExpr::visitDNF(reqMap.getRoot(), [&](const PartialSchemaEntry& e) {
+        if (auto binding = e.second.getBoundProjectionName()) {
+            result.push_back(*binding);
+        }
+    });
     return result;
 }
 
 static ProjectionNameVector createSargableReferences(const PartialSchemaRequirements& reqMap) {
     ProjectionNameOrderPreservingSet result;
-    for (const auto& entry : reqMap.conjuncts()) {
-        result.emplace_back(*entry.first._projectionName);
-    }
+    PSRExpr::visitDNF(reqMap.getRoot(), [&](const PartialSchemaEntry& e) {
+        result.emplace_back(*e.first._projectionName);
+    });
     return result.getVector();
 }
 
@@ -401,49 +403,57 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
       _target(target) {
     assertNodeSort(getChild());
     tassert(6624085, "SargableNode requires at least one predicate", !_reqMap.isNoop());
+    tassert(
+        7447500, "SargableNode requirements should be in DNF", PSRExpr::isDNF(_reqMap.getRoot()));
     tassert(6624086,
             str::stream() << "SargableNode has too many predicates: " << _reqMap.numLeaves(),
             _reqMap.numLeaves() <= kMaxPartialSchemaReqs);
 
-    // Assert merged map does not contain duplicate bound projections.
-    ProjectionNameSet boundsProjectionNameSet;
-    for (const auto& [key, req] : _reqMap.conjuncts()) {
-        if (const auto& boundProjName = req.getBoundProjectionName()) {
-            tassert(6624094,
-                    "SargableNode has a multikey requirement with a non-trivial interval which "
-                    "also binds",
-                    isIntervalReqFullyOpenDNF(req.getIntervals()) ||
-                        !checkPathContainsTraverse(key._path));
-            tassert(
-                6624095, "SargableNode has a perf only binding requirement", !req.getIsPerfOnly());
+    auto bindings = createSargableBindings(_reqMap);
+    ProjectionNameSet boundsProjectionNameSet(bindings.begin(), bindings.end());
 
-            const bool inserted = boundsProjectionNameSet.insert(*boundProjName).second;
-            tassert(6624087,
-                    str::stream() << "SargableNode has duplicate bound projection: "
-                                  << *boundProjName,
-                    inserted);
-        }
-    }
+    // Assert there are no perf-only binding requirements, references to internally bound
+    // projections, or non-trivial multikey requirements which also bind. Further assert that under
+    // a conjunction 1) non-multikey paths have at most one req and 2) there are no duplicate bound
+    // projection names.
+    PSRExpr::visitDisjuncts(_reqMap.getRoot(), [&](const PSRExpr::Node& disjunct, const size_t) {
+        PartialSchemaKeySet seenKeys;
+        ProjectionNameSet seenProjNames;
+        PSRExpr::visitConjuncts(disjunct, [&](const PSRExpr::Node& conjunct, const size_t) {
+            PSRExpr::visitAtom(conjunct, [&](const PartialSchemaEntry& e) {
+                const auto& [key, req] = e;
+                if (auto projName = req.getBoundProjectionName()) {
+                    tassert(
+                        6624094,
+                        "SargableNode has a multikey requirement with a non-trivial interval which "
+                        "also binds",
+                        isIntervalReqFullyOpenDNF(req.getIntervals()) ||
+                            !checkPathContainsTraverse(key._path));
+                    tassert(6624095,
+                            "SargableNode has a perf only binding requirement",
+                            !req.getIsPerfOnly());
 
-    // Assert there are no references to internally bound projections.
-    for (const auto& [key, req] : _reqMap.conjuncts()) {
-        tassert(6624088,
-                "SargableNode cannot reference an internally bound projection",
-                boundsProjectionNameSet.count(*key._projectionName) == 0);
-    }
+                    auto insertedBoundProj = seenProjNames.insert(*projName).second;
+                    tassert(6624087,
+                            "PartialSchemaRequirements has duplicate bound projection names in "
+                            "a conjunction",
+                            insertedBoundProj);
+                }
 
-    // Assert that non-multikey paths have at most one requirement.
-    {
-        PartialSchemaKeySet seen;
-        for (auto&& [key, req] : _reqMap.conjuncts()) {
-            if (!checkPathContainsTraverse(key._path)) {
-                auto inserted = seen.insert(key).second;
-                tassert(7155020,
-                        "SargableNode should not have two predicates on the same non-multikey path",
-                        inserted);
-            }
-        }
-    }
+                tassert(6624088,
+                        "SargableNode cannot reference an internally bound projection",
+                        boundsProjectionNameSet.count(*key._projectionName) == 0);
+
+                if (!checkPathContainsTraverse(key._path)) {
+                    auto insertedKey = seenKeys.insert(key).second;
+                    tassert(7155020,
+                            "PartialSchemaRequirements has two predicates on the same non-multikey "
+                            "path in a conjunction",
+                            insertedKey);
+                }
+            });
+        });
+    });
 }
 
 bool SargableNode::operator==(const SargableNode& other) const {

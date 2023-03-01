@@ -86,27 +86,6 @@ PartialSchemaEntry makeNoopPartialSchemaEntry() {
                     BoundRequirement::makeMinusInf(), BoundRequirement::makePlusInf())),
                 false /*isPerfOnly*/)};
 }
-
-// Apply 'func' to all of the atoms of 'n', where 'n' is in CNF or DNF.
-template <bool isConst = true,
-          class MaybeConstNode = std::conditional_t<isConst, const PSRExpr::Node, PSRExpr::Node>,
-          class MaybeConstVisitor =
-              std::conditional_t<isConst, PSRExpr::AtomVisitorConst, PSRExpr::AtomVisitor>>
-void applyToEachAtom(MaybeConstNode& n, const MaybeConstVisitor& func) {
-    if (PSRExpr::isCNF(n)) {
-        PSRExpr::visitConjuncts(n, [&](MaybeConstNode& conjunct, const size_t) {
-            PSRExpr::visitDisjuncts(conjunct, [&](MaybeConstNode& disjunct, const size_t) {
-                PSRExpr::visitAtom(disjunct, func);
-            });
-        });
-    } else {
-        PSRExpr::visitDisjuncts(n, [&](MaybeConstNode& disjunct, const size_t) {
-            PSRExpr::visitConjuncts(disjunct, [&](MaybeConstNode& conjunct, const size_t) {
-                PSRExpr::visitAtom(conjunct, func);
-            });
-        });
-    }
-}
 }  // namespace
 
 void PartialSchemaRequirements::normalize() {
@@ -128,14 +107,6 @@ PartialSchemaRequirements::PartialSchemaRequirements(PSRExpr::Node requirements)
 PartialSchemaRequirements::PartialSchemaRequirements()
     : PartialSchemaRequirements(PSRExpr::makeSingularDNF(makeNoopPartialSchemaEntry())) {}
 
-std::set<ProjectionName> PartialSchemaRequirements::getBoundNames() const {
-    std::set<ProjectionName> names;
-    for (auto&& [key, b] : iterateBindings()) {
-        names.insert(b);
-    }
-    return names;
-}
-
 bool PartialSchemaRequirements::operator==(const PartialSchemaRequirements& other) const {
     return _expr == other._expr;
 }
@@ -151,8 +122,15 @@ bool PartialSchemaRequirements::isNoop() const {
 
     // ...or if it has exactly one predicate which is a no-op.
     auto reqIsNoop = false;
-    applyToEachAtom(
-        _expr, [&](const Entry& entry) { reqIsNoop = (entry == makeNoopPartialSchemaEntry()); });
+
+    auto checkNoop = [&](const Entry& entry) {
+        reqIsNoop = (entry == makeNoopPartialSchemaEntry());
+    };
+    if (PSRExpr::isCNF(_expr)) {
+        PSRExpr::visitCNF(_expr, checkNoop);
+    } else {
+        PSRExpr::visitDNF(_expr, checkNoop);
+    }
 
     return reqIsNoop;
 }
@@ -167,10 +145,10 @@ size_t PartialSchemaRequirements::numConjuncts() const {
 
 boost::optional<ProjectionName> PartialSchemaRequirements::findProjection(
     const PartialSchemaKey& key) const {
-    tassert(7016404, "Expected a PartialSchemaRequirements in DNF form", PSRExpr::isDNF(_expr));
+    assertIsSingletonDisjunction();
 
     boost::optional<ProjectionName> proj;
-    applyToEachAtom(_expr, [&](const Entry& entry) {
+    PSRExpr::visitDNF(_expr, [&](const Entry& entry) {
         if (!proj && entry.first == key) {
             proj = entry.second.getBoundProjectionName();
         }
@@ -184,23 +162,13 @@ PartialSchemaRequirements::findFirstConjunct(const PartialSchemaKey& key) const 
 
     size_t i = 0;
     boost::optional<std::pair<size_t, PartialSchemaRequirement>> res;
-    applyToEachAtom(_expr, [&](const Entry& entry) {
+    PSRExpr::visitDNF(_expr, [&](const PartialSchemaEntry& entry) {
         if (!res && entry.first == key) {
             res = {{i, entry.second}};
         }
         ++i;
     });
     return res;
-}
-
-PartialSchemaRequirements::Bindings PartialSchemaRequirements::iterateBindings() const {
-    Bindings result;
-    applyToEachAtom(_expr, [&](const Entry& entry) {
-        if (auto binding = entry.second.getBoundProjectionName()) {
-            result.emplace_back(entry.first, std::move(*binding));
-        };
-    });
-    return result;
 }
 
 void PartialSchemaRequirements::add(PartialSchemaKey key, PartialSchemaRequirement req) {
@@ -215,12 +183,6 @@ void PartialSchemaRequirements::add(PartialSchemaKey key, PartialSchemaRequireme
         }
     });
     normalize();
-}
-
-void PartialSchemaRequirements::transform(
-    std::function<void(const PartialSchemaKey&, PartialSchemaRequirement&)> func) {
-    applyToEachAtom<false /*isConst*/>(_expr,
-                                       [&](Entry& entry) { func(entry.first, entry.second); });
 }
 
 void PartialSchemaRequirements::assertIsSingletonDisjunction() const {

@@ -83,23 +83,10 @@ static void updateCompoundBoundHash(size_t& result, const CompoundBoundRequireme
 }
 
 template <class T>
-class IntervalHasher {
+class BoolExprHasher {
 public:
-    size_t computeHash(const IntervalRequirement& req) {
-        size_t result = 17;
-        updateBoundHash(result, req.getLowBound());
-        updateBoundHash(result, req.getHighBound());
-        return 17;
-    }
-
-    size_t computeHash(const CompoundIntervalRequirement& req) {
-        size_t result = 19;
-        updateCompoundBoundHash(result, req.getLowBound());
-        updateCompoundBoundHash(result, req.getHighBound());
-        return result;
-    }
-
     size_t transport(const typename T::Atom& node) {
+        // Dispatch to one of the computeHash functions below.
         return computeHash(node.getExpr());
     }
 
@@ -124,23 +111,44 @@ public:
     }
 };
 
-static size_t computePartialSchemaReqHash(const PartialSchemaRequirements& reqMap) {
+static size_t computeHash(const IntervalRequirement& req) {
     size_t result = 17;
+    updateBoundHash(result, req.getLowBound());
+    updateBoundHash(result, req.getHighBound());
+    return 17;
+}
 
-    IntervalHasher<IntervalReqExpr> intervalHasher;
-    for (const auto& [key, req] : reqMap.conjuncts()) {
-        if (const auto& projName = key._projectionName) {
-            updateHash(result, ProjectionName::Hasher()(*projName));
-        }
-        updateHash(result, ABTHashGenerator::generate(key._path));
-
-        if (const auto& projName = req.getBoundProjectionName()) {
-            updateHash(result, ProjectionName::Hasher()(*projName));
-        }
-        updateHash(result, intervalHasher.compute(req.getIntervals()));
-        updateHash(result, std::hash<bool>()(req.getIsPerfOnly()));
-    }
+static size_t computeHash(const CompoundIntervalRequirement& req) {
+    size_t result = 19;
+    updateCompoundBoundHash(result, req.getLowBound());
+    updateCompoundBoundHash(result, req.getHighBound());
     return result;
+}
+
+static size_t computeHash(const PartialSchemaEntry& entry) {
+    const auto& [key, req] = entry;
+
+    size_t result = 17;
+    if (const auto& projName = key._projectionName) {
+        updateHash(result, ProjectionName::Hasher()(*projName));
+    }
+    updateHash(result, ABTHashGenerator::generate(key._path));
+
+    if (const auto& projName = req.getBoundProjectionName()) {
+        updateHash(result, ProjectionName::Hasher()(*projName));
+    }
+
+    BoolExprHasher<IntervalReqExpr> intervalHasher;
+    updateHash(result, intervalHasher.compute(req.getIntervals()));
+
+    updateHash(result, std::hash<bool>()(req.getIsPerfOnly()));
+
+    return result;
+}
+
+static size_t computePartialSchemaReqHash(const PartialSchemaRequirements& reqMap) {
+    BoolExprHasher<PSRExpr> psrHasher;
+    return psrHasher.compute(reqMap.getRoot());
 }
 
 /**

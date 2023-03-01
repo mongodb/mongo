@@ -189,6 +189,36 @@ struct BoolExpr {
         visitor(node.template cast<Atom>()->getExpr());
     }
 
+    static void visitCNF(const Node& node, const AtomVisitorConst& visitor) {
+        visitConjuncts(node, [&](const Node& child, const size_t) {
+            visitDisjuncts(child, [&](const Node& grandChild, const size_t) {
+                visitAtom(grandChild, visitor);
+            });
+        });
+    }
+
+    static void visitDNF(const Node& node, const AtomVisitorConst& visitor) {
+        visitDisjuncts(node, [&](const Node& child, const size_t) {
+            visitConjuncts(child, [&](const Node& grandChild, const size_t) {
+                visitAtom(grandChild, visitor);
+            });
+        });
+    }
+
+    static void visitCNF(Node& node, const AtomVisitor& visitor) {
+        visitConjuncts(node, [&](Node& child, const size_t) {
+            visitDisjuncts(child,
+                           [&](Node& grandChild, const size_t) { visitAtom(grandChild, visitor); });
+        });
+    }
+
+    static void visitDNF(Node& node, const AtomVisitor& visitor) {
+        visitDisjuncts(node, [&](Node& child, const size_t) {
+            visitConjuncts(child,
+                           [&](Node& grandChild, const size_t) { visitAtom(grandChild, visitor); });
+        });
+    }
+
 
     static bool isCNF(const Node& n) {
         if (n.template is<Conjunction>()) {
