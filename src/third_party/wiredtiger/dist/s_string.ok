@@ -433,6 +433,7 @@ allocators
 allocfile
 allocsize
 ao
+ap
 api
 arg
 argc
@@ -447,6 +448,7 @@ autocommit
 auxheader
 auximage
 auxincr
+aws
 bInheritHandle
 backoff
 bal
@@ -1106,6 +1108,7 @@ sH
 sHQ
 scr
 sd
+sdk
 secretkey
 sessionp
 setkv
@@ -1184,6 +1187,7 @@ tablename
 td
 teardown
 tempdir
+testext
 testutil
 th
 tid

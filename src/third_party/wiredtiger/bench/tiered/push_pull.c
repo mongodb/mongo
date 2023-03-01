@@ -25,8 +25,11 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#include "test_util.h"
+#ifndef _WIN32
+#include <dirent.h>
+#endif
 #include <math.h>
+#include "test_util.h"
 
 /*
  * This test is to calculate benchmarks for tiered storage:
@@ -59,10 +62,13 @@ static void compute_wt_file_size(const char *, const char *, uint64_t *);
 static void compute_tiered_file_size(const char *, const char *, uint64_t *);
 static void fill_random_data(void);
 static void get_file_size(const char *, uint64_t *);
+static void populate(WT_SESSION *, uint32_t, uint32_t);
 static void recover_validate(const char *, uint32_t, uint64_t, uint32_t);
 static void run_test_clean(const char *, uint32_t);
 static void run_test(const char *, uint32_t, uint32_t);
-static void populate(WT_SESSION *, uint32_t, uint32_t);
+#ifndef _WIN32
+static void remove_local_cached_files(const char *);
+#endif
 
 static double avg_wtime_arr[MAX_RUN], avg_rtime_arr[MAX_RUN], avg_wthroughput_arr[MAX_RUN],
   avg_rthroughput_arr[MAX_RUN];
@@ -95,22 +101,27 @@ main(int argc, char *argv[])
           "\n");
 
         /*
-         * Run test with 100K file size. Row store case.
+         * Run test with 100K file size.
          */
         run_test_clean("100KB", NUM_RECORDS);
 
         /*
-         * Run test with 1Mb file size. Row store case.
+         * Run test with 1Mb file size.
          */
         run_test_clean("1MB", NUM_RECORDS * 10);
 
         /*
-         * Run test with 10 Mb file size. Row store case.
+         * Run test with 10 Mb file size.
          */
         run_test_clean("10MB", NUM_RECORDS * 100);
 
         /*
-         * Run test with 100 Mb file size. Row store case.
+         * Run test with 50 Mb file size.
+         */
+        run_test_clean("50MB", NUM_RECORDS * 500);
+
+        /*
+         * Run test with 100 Mb file size.
          */
         run_test_clean("100MB", NUM_RECORDS * WT_THOUSAND);
         flush = true;
@@ -204,6 +215,68 @@ fill_random_data(void)
     data_str[str_len - 1] = '\0';
 }
 
+#ifndef _WIN32
+/*
+ * remove_local_cached_files --
+ *     Remove local cached files and cached folders.
+ */
+static void
+remove_local_cached_files(const char *home)
+{
+    struct dirent *dir_entry;
+    DIR *dir;
+
+    char *tablename;
+    char delete_file[512], file_prefix[1024], rm_cmd[512];
+    int highest, index, nmatches, objnum, status;
+
+    highest = nmatches = objnum = 0;
+    tablename = opts->uri;
+
+    if (!WT_PREFIX_SKIP(tablename, "table:"))
+        testutil_die(EINVAL, "unexpected uri: %s", opts->uri);
+
+    /*
+     * This code is to remove all the .wtobj files except the object file with highest object number
+     * because that is the writable object.
+     */
+    dir = opendir(home);
+    testutil_assert(dir != NULL);
+
+    while ((dir_entry = readdir(dir)) != NULL) {
+        if (strcmp(dir_entry->d_name, ".") == 0 || strcmp(dir_entry->d_name, "..") == 0)
+            continue;
+
+        if (!WT_PREFIX_MATCH(dir_entry->d_name, tablename))
+            continue;
+
+        ++nmatches;
+
+        sscanf(dir_entry->d_name, "%*[^0-9]%d", &objnum);
+        highest = WT_MAX(highest, objnum);
+    }
+
+    closedir(dir);
+
+    testutil_check(__wt_snprintf(file_prefix, sizeof(file_prefix), "%s-000", tablename));
+    if (highest > 1 && nmatches > 1) {
+        for (index = 1; index < highest; index++) {
+            testutil_check(__wt_snprintf(
+              delete_file, sizeof(delete_file), "rm -f %s/%s*0%d.wtobj", home, file_prefix, index));
+            status = system(delete_file);
+
+            if (status != 0)
+                testutil_die(status, "system: %s", delete_file);
+        }
+    }
+
+    testutil_check(__wt_snprintf(rm_cmd, sizeof(rm_cmd), "rm -rf %s/cache-*", home));
+    status = system(rm_cmd);
+    if (status < 0)
+        testutil_die(status, "system: %s", rm_cmd);
+}
+#endif
+
 /*
  * recover_validate --
  *     Open wiredtiger and validate the data.
@@ -213,9 +286,8 @@ recover_validate(const char *home, uint32_t num_records, uint64_t file_size, uin
 {
     struct timeval start, end;
 
-    char buf[1024], rm_cmd[512];
+    char buf[1024];
     double diff_sec;
-    int status;
     size_t val_1_size, val_2_size;
     uint64_t key, i, v;
 
@@ -229,6 +301,15 @@ recover_validate(const char *home, uint32_t num_records, uint64_t file_size, uin
 
     key = 0;
     buf[0] = '\0';
+
+#ifndef _WIN32
+    /*
+     * Remove cached files and cached buckets.
+     */
+    if (opts->tiered_storage)
+        remove_local_cached_files(home);
+#endif
+
     /*
      * Open the connection which forces recovery to be run.
      */
@@ -238,11 +319,6 @@ recover_validate(const char *home, uint32_t num_records, uint64_t file_size, uin
     /* Seed the random number generator */
     v = (uint32_t)getpid() + num_records + (2 * counter);
     __wt_random_init_custom_seed(&rnd, v);
-
-    testutil_check(__wt_snprintf(rm_cmd, sizeof(rm_cmd), "rm -rf %s/cache-bucket/*", home));
-    status = system(rm_cmd);
-    if (status < 0)
-        testutil_die(status, "system: %s", rm_cmd);
 
     testutil_check(session->open_cursor(session, opts->uri, NULL, NULL, &cursor));
     val_1_size = MAX_VALUE_SIZE;
@@ -280,7 +356,6 @@ static void
 run_test(const char *home, uint32_t num_records, uint32_t counter)
 {
     struct timeval start, end;
-
     char buf[1024];
     double diff_sec;
     uint64_t file_size;
@@ -289,8 +364,8 @@ run_test(const char *home, uint32_t num_records, uint32_t counter)
     WT_SESSION *session;
 
     testutil_make_work_dir(home);
-    if (opts->tiered_storage) {
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/bucket", home));
+    if (opts->tiered_storage && testutil_is_dir_store(opts)) {
+        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, DIR_STORE_BUCKET_NAME));
         testutil_make_work_dir(buf);
     }
 
@@ -375,8 +450,6 @@ compute_tiered_file_size(const char *home, const char *tablename, uint64_t *file
         /* Return if the stat fails that means the file does not exist. */
         if (stat(stat_path, &stats) == 0)
             *file_size += (uint64_t)stats.st_size;
-        else
-            return;
     }
 }
 

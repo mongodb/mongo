@@ -26,8 +26,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 #include "test_util.h"
-#define DIR_STORE "dir_store"
-#define S3_STORE "s3_store"
 
 extern char *__wt_optarg; /* argument associated with option */
 extern int __wt_optind;
