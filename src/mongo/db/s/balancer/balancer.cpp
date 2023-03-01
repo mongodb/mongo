@@ -513,21 +513,40 @@ void Balancer::_consumeActionStreamLoop() {
         lastActionTime = Date_t::now();
     };
 
-    // allStreamsDrained is used to keep asking actions until all streams are drained
-    bool allStreamsDrained = false;
+    auto backOff = Backoff(Seconds(1), Milliseconds::max());
+    bool errorOccurred = false;
 
     while (true) {
         {
             stdx::unique_lock<Latch> ul(_mutex);
-            _actionStreamCondVar.wait(ul, [&] {
+
+            // Keep asking for more actions if we meet all these conditions:
+            //  - Balancer is in kRunning state
+            //  - There are less than kMaxOutstandingStreamingOperations
+            //  - There were  actions to schedule on the previous iteration or there is an update on
+            //  the streams state
+            auto stopWaitingCondition = [&] {
                 return _state != kRunning ||
                     (_outstandingStreamingOps.load() <= kMaxOutstandingStreamingOperations &&
-                     (_actionStreamsStateUpdated.load() || !allStreamsDrained));
-            });
+                     _actionStreamsStateUpdated.load());
+            };
+
+            if (!errorOccurred) {
+                _actionStreamCondVar.wait(ul, stopWaitingCondition);
+            } else {
+                // Enable retries in case of error by performing a backoff
+                _actionStreamCondVar.wait_for(
+                    ul, backOff.nextSleep().toSystemDuration(), stopWaitingCondition);
+            }
+
             if (_state != kRunning) {
                 break;
             }
         }
+
+        // Clear flags
+        errorOccurred = false;
+        _actionStreamsStateUpdated.store(false);
 
         // Get active streams
         auto activeStreams = [&]() -> std::vector<ActionsStreamPolicy*> {
@@ -541,27 +560,36 @@ void Balancer::_consumeActionStreamLoop() {
             return streams;
         }();
 
-        // Clear notification flag
-        _actionStreamsStateUpdated.store(false);
-
         // Get next action from a random stream together with its stream
         auto [nextAction, sourcedStream] =
             [&]() -> std::tuple<boost::optional<BalancerStreamAction>, ActionsStreamPolicy*> {
             std::shuffle(activeStreams.begin(), activeStreams.end(), _random);
             for (auto stream : activeStreams) {
-                auto action = stream->getNextStreamingAction(opCtx.get());
-                if (action.has_value()) {
-                    return std::make_tuple(std::move(action), stream);
+
+                try {
+                    auto action = stream->getNextStreamingAction(opCtx.get());
+                    if (action.has_value()) {
+                        return std::make_tuple(std::move(action), stream);
+                    }
+
+                } catch (const DBException& e) {
+                    LOGV2_WARNING(7435001,
+                                  "Failed to get next action from action stream",
+                                  "error"_attr = redact(e),
+                                  "stream"_attr = stream->getName());
+
+                    errorOccurred = true;
                 }
             }
             return std::make_tuple(boost::none, nullptr);
         }();
 
         if (!nextAction.has_value()) {
-            allStreamsDrained = true;
             continue;
         }
-        allStreamsDrained = false;
+
+        // Signal there are still actions to be consumed by next iteration
+        _actionStreamsStateUpdated.store(true);
 
         _outstandingStreamingOps.fetchAndAdd(1);
         stdx::visit(

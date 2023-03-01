@@ -89,9 +89,14 @@ boost::optional<BalancerStreamAction> AutoMergerPolicy::getNextStreamingAction(
     bool applyThrottling = false;
 
     if (_firstAction) {
-        _firstAction = false;
+        try {
+            _collectionsToMergePerShard = _getNamespacesWithMergeableChunksPerShard(opCtx);
+        } catch (DBException& e) {
+            e.addContext("Failed to fetch collections with mergeable chunks");
+            throw;
+        }
         applyThrottling = true;
-        _collectionsToMergePerShard = _getNamespacesWithMergeableChunksPerShard(opCtx);
+        _firstAction = false;
     }
 
     // Get next <shardId, collection> pair to merge
