@@ -29,10 +29,12 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/telemetry.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/inline_auto_update.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::telemetry {
@@ -108,6 +110,176 @@ TEST_F(TelemetryStoreTest, EvictEntries) {
     // Given the size of the bson keys (~46 bytes) and values (~208 bytes), each partition (1200
     // bytes) can hold at most 4 entries.
     ASSERT_EQ(numKeys, 8);
+}
+
+/**
+ * A default redaction strategy that generates easy to check results for testing purposes.
+ */
+std::string redactFieldNameForTest(StringData s) {
+    return str::stream() << "HASH(" << s << ")";
+}
+TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    fcr.setFilter(BSON("a" << 1));
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = "?";
+    opts.redactFieldNames = true;
+    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+
+    auto redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+
+    ASSERT_STR_EQ_AUTO(
+        "{ find: \"HASH(testColl)\", filter: { HASH(a): { $eq: \"?\" } } }",  // NOLINT (test
+                                                                              // auto-update)
+        redacted.toString());
+
+    // Add sort.
+    fcr.setSort(BSON("sortVal" << 1 << "otherSort" << -1));
+    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    ASSERT_STR_EQ_AUTO(
+        "{ find: \"HASH(testColl)\", filter: { HASH(a): { $eq: \"?\" } }, sort: { HASH(sortVal): "
+        "1, HASH(otherSort): -1 } }",
+        redacted.toString());
+
+    // Add inclusion projection.
+    fcr.setProjection(BSON("e" << true << "f" << true));
+    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    ASSERT_STR_EQ_AUTO(
+        "{ find: \"HASH(testColl)\", filter: { HASH(a): { $eq: \"?\" } }, projection: { HASH(e): "
+        "true, HASH(f): true, HASH(_id): true }, sort: { HASH(sortVal): 1, HASH(otherSort): -1 } "
+        "}",
+        redacted.toString());
+
+    // Add let.
+    fcr.setLet(BSON("var1"
+                    << "$a"
+                    << "var2"
+                    << "const1"));
+    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    ASSERT_STR_EQ_AUTO(
+        "{ find: \"HASH(testColl)\", filter: { HASH(a): { $eq: \"?\" } }, let: { HASH(var1): "
+        "\"$HASH(a)\", HASH(var2): { $const: \"?\" } }, projection: { HASH(e): true, HASH(f): "
+        "true, HASH(_id): true }, sort: { HASH(sortVal): 1, HASH(otherSort): -1 } }",
+        redacted.toString());
+
+    // Add hinting fields.
+    fcr.setHint(BSON("z" << 1 << "c" << 1));
+    fcr.setMax(BSON("z" << 25));
+    fcr.setMin(BSON("z" << 80));
+    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    ASSERT_STR_EQ_AUTO(
+        "{ find: \"HASH(testColl)\", filter: { HASH(a): { $eq: \"?\" } }, let: { HASH(var1): "
+        "\"$HASH(a)\", HASH(var2): { $const: \"?\" } }, projection: { HASH(e): true, HASH(f): "
+        "true, HASH(_id): true }, hint: { HASH(z): 1, HASH(c): 1 }, max: { HASH(z): \"?\" }, min: "
+        "{ HASH(z): \"?\" }, sort: { HASH(sortVal): 1, HASH(otherSort): -1 } }",
+        redacted.toString());
+
+    // Add the literal redaction fields.
+    fcr.setLimit(5);
+    fcr.setSkip(2);
+    fcr.setBatchSize(25);
+    fcr.setMaxTimeMS(1000);
+    fcr.setNoCursorTimeout(false);
+
+    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    ASSERT_STR_EQ_AUTO(
+        "{ find: \"HASH(testColl)\", filter: { HASH(a): { $eq: \"?\" } }, let: { HASH(var1): "
+        "\"$HASH(a)\", HASH(var2): { $const: \"?\" } }, projection: { HASH(e): true, HASH(f): "
+        "true, HASH(_id): true }, hint: { HASH(z): 1, HASH(c): 1 }, max: { HASH(z): \"?\" }, min: "
+        "{ HASH(z): \"?\" }, sort: { HASH(sortVal): 1, HASH(otherSort): -1 }, limit: \"?\", skip: "
+        "\"?\", batchSize: \"?\", maxTimeMS: \"?\" }",
+        redacted.toString());
+
+    // Add the fields that shouldn't be redacted.
+    fcr.setSingleBatch(true);
+    fcr.setAllowDiskUse(false);
+    fcr.setAllowPartialResults(true);
+    fcr.setAllowDiskUse(false);
+    fcr.setShowRecordId(true);
+    fcr.setAwaitData(false);
+    fcr.setMirrored(true);
+    ASSERT_STR_EQ_AUTO(
+        "{ find: \"HASH(testColl)\", filter: { HASH(a): { $eq: \"?\" } }, let: { HASH(var1): "
+        "\"$HASH(a)\", HASH(var2): { $const: \"?\" } }, projection: { HASH(e): true, HASH(f): "
+        "true, HASH(_id): true }, hint: { HASH(z): 1, HASH(c): 1 }, max: { HASH(z): \"?\" }, min: "
+        "{ HASH(z): \"?\" }, sort: { HASH(sortVal): 1, HASH(otherSort): -1 }, limit: \"?\", skip: "
+        "\"?\", batchSize: \"?\", maxTimeMS: \"?\" }",
+        redacted.toString());
+}
+TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    fcr.setFilter(BSONObj());
+    fcr.setSort(BSONObj());
+    fcr.setProjection(BSONObj());
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = "?";
+    opts.redactFieldNames = true;
+    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+
+    auto redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    ASSERT_STR_EQ_AUTO("{ find: \"HASH(testColl)\" }",
+                       redacted.toString());  // NOLINT (test auto-update)
+}
+
+TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    fcr.setFilter(BSON("b" << 1));
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = "?";
+    fcr.setHint(BSON("z" << 1 << "c" << 1));
+    fcr.setMax(BSON("z" << 25));
+    fcr.setMin(BSON("z" << 80));
+
+    auto redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+
+    ASSERT_STR_EQ_AUTO(
+        "{ find: \"testColl\", filter: { b: { $eq: \"?\" } }, hint: { z: 1, c: 1 }, max: { z: "
+        "\"?\" }, min: { z: \"?\" } }",
+        redacted.toString());
+    // Test with a string hint. Note that this is the internal representation of the string hint
+    // generated at parse time.
+    fcr.setHint(BSON("$hint"
+                     << "z"));
+
+    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    ASSERT_STR_EQ_AUTO(
+        "{ find: \"testColl\", filter: { b: { $eq: \"?\" } }, hint: { $hint: \"z\" }, max: { z: "
+        "\"?\" }, min: { z: \"?\" } }",
+        redacted.toString());
+
+    fcr.setHint(BSON("z" << 1 << "c" << 1));
+    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.redactFieldNames = true;
+    opts.replacementForLiteralArgs = boost::none;
+    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+
+    ASSERT_STR_EQ_AUTO(
+        "{ find: \"HASH(testColl)\", filter: { HASH(b): { $eq: 1 } }, hint: { HASH(z): 1, "
+        "HASH(c): 1 }, max: { HASH(z): 25 }, min: { HASH(z): 80 } }",
+        redacted.toString());
+
+    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    ASSERT_STR_EQ_AUTO(
+        "{ find: \"HASH(testColl)\", filter: { HASH(b): { $eq: 1 } }, hint: { HASH(z): 1, "
+        "HASH(c): 1 }, max: { HASH(z): 25 }, min: { HASH(z): 80 } }",
+        redacted.toString());
+
+    opts.replacementForLiteralArgs = "?";
+    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+
+    ASSERT_STR_EQ_AUTO(
+        "{ find: \"HASH(testColl)\", filter: { HASH(b): { $eq: \"?\" } }, hint: { HASH(z): 1, "
+        "HASH(c): 1 }, max: { HASH(z): \"?\" }, min: { HASH(z): \"?\" } }",
+        redacted.toString());
+
+    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    ASSERT_STR_EQ_AUTO(
+        "{ find: \"HASH(testColl)\", filter: { HASH(b): { $eq: \"?\" } }, hint: { HASH(z): 1, "
+        "HASH(c): 1 }, max: { HASH(z): \"?\" }, min: { HASH(z): \"?\" } }",
+        redacted.toString());
 }
 
 }  // namespace mongo::telemetry

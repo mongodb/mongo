@@ -393,6 +393,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/user_acquisition_stats',
+        '$BUILD_DIR/mongo/db/exec/projection_executor',
         '$BUILD_DIR/mongo/db/prepare_conflict_tracker',
         '$BUILD_DIR/mongo/db/stats/resource_consumption_metrics',
         # TODO (SERVER-66896): Remove this dependency.
@@ -400,6 +401,8 @@ env.Library(
         '$BUILD_DIR/mongo/util/concurrency/admission_context',
         '$BUILD_DIR/mongo/util/md5',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'projection_ast',
+        'sort_pattern',
     ],
 )
 

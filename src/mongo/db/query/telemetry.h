@@ -78,8 +78,15 @@ void appendShardedTelemetryKeyIfApplicable(BSONObjBuilder& objToModify,
                                            std::string hostAndPort,
                                            OperationContext* opCtx);
 /**
- * An aggregated metric stores a compressed view of data. It balances the loss of information with
- * the reduction in required storage.
+ * Serialize the FindCommandRequest according to the Options passed in. Returns the serialized BSON
+ * with all field names and literals redacted.
+ */
+BSONObj redactFindRequest(const FindCommandRequest& findCommand,
+                          const SerializationOptions& opts,
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
+/**
+ * An aggregated metric stores a compressed view of data. It balances the loss of information
+ * with the reduction in required storage.
  */
 struct AggregatedMetric {
 
@@ -103,8 +110,8 @@ struct AggregatedMetric {
     }
 
     uint64_t sum = 0;
-    // Default to the _signed_ maximum (which fits in unsigned range) because we cast to BSONNumeric
-    // when serializing.
+    // Default to the _signed_ maximum (which fits in unsigned range) because we cast to
+    // BSONNumeric when serializing.
     uint64_t min = (uint64_t)std::numeric_limits<int64_t>::max;
     uint64_t max = 0;
 
@@ -197,12 +204,12 @@ using TelemetryStore = PartitionedCache<BSONObj,
 TelemetryStore& getTelemetryStore(OperationContext* opCtx);
 
 /**
- * Register a request for telemetry collection. The telemetry machinery may decide not to collect
- * anything but this should be called for all requests. The decision is made based on the feature
- * flag and telemetry parameters such as rate limiting.
+ * Register a request for telemetry collection. The telemetry machinery may decide not to
+ * collect anything but this should be called for all requests. The decision is made based on
+ * the feature flag and telemetry parameters such as rate limiting.
  *
- * The caller is still responsible for subsequently calling collectTelemetry() once the request is
- * completed.
+ * The caller is still responsible for subsequently calling collectTelemetry() once the request
+ * is completed.
  *
  * Note that calling this affects internal state. It should be called once for each request for
  * which telemetry may be collected.
@@ -211,7 +218,7 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
 
 void registerFindRequest(const FindCommandRequest& request,
                          const NamespaceString& collection,
-                         OperationContext* opCtx);
+                         OperationContext* ocCtx);
 
 void registerGetMoreRequest(OperationContext* opCtx);
 

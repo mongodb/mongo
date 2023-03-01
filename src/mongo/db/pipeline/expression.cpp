@@ -2589,37 +2589,30 @@ auto getPrefixAndPath(FieldPath path) {
         return std::make_pair(std::string("$$"), path);
     }
 }
-std::string hashFieldPath(SerializationOptions options,
-                          std::string prefix,
-                          FieldPath path,
-                          bool redactVariable = false) {
-    std::stringstream redacted;
-    redacted << prefix;
-    size_t startPos = 0;
-    // Check if our prefix indicates this path begins with a system variable.
-    if (prefix.length() == 2) {
-        if (redactVariable) {
-            redacted << options.redactFieldNamesStrategy(path.getFieldName(0));
-        } else {
-            redacted << path.getFieldName(0);
-        }
-        ++startPos;
-    }
-    for (size_t i = startPos; i < path.getPathLength(); ++i) {
-        if (i > 0) {
-            redacted << ".";
-        }
-        redacted << options.redactFieldNamesStrategy(path.getFieldName(i));
-    }
-    return redacted.str();
-}
 }  // namespace
 
 Value ExpressionFieldPath::serialize(SerializationOptions options) const {
     auto [prefix, path] = getPrefixAndPath(_fieldPath);
     if (options.redactFieldNames) {
-        return Value(hashFieldPath(
-            options, prefix, path, !Variables::isBuiltin(_variable) /*redactVariable*/));
+        // This is a variable.
+        if (prefix.length() == 2) {
+            if (path.getPathLength() == 1 && Variables::isBuiltin(_variable)) {
+                // Nothing to redact.
+                return Value(prefix + path.fullPath());
+            } else if (path.getPathLength() == 1) {
+                // This may be a variable or a field path, but either way it needs to be redacted.
+                return Value(prefix + path.redactedFullPath(options));
+            } else if (path.getPathLength() > 1 && Variables::isBuiltin(_variable)) {
+                // The first component of this path is a system variable, so keep that and redact
+                // the rest.
+                return Value(prefix + path.front() + "." + path.tail().redactedFullPath(options));
+            } else {
+                // This path has multiple components, and each part is from the user. Redact every
+                // component.
+                return Value(prefix + path.redactedFullPath(options));
+            }
+        }
+        return Value(path.redactedFullPathWithPrefix(options));
     } else {
         return Value(prefix + path.fullPath());
     }
@@ -8044,7 +8037,8 @@ Value ExpressionGetField::serialize(SerializationOptions options) const {
         // string.
         auto strPath =
             static_cast<ExpressionConstant*>(_children[_kField].get())->getValue().getString();
-        argDoc.addField("field"_sd, Value(hashFieldPath(options, {""}, FieldPath(strPath))));
+        FieldPath fp(strPath);
+        argDoc.addField("field"_sd, Value(fp.redactedFullPath(options)));
     } else {
         argDoc.addField("field"_sd, _children[_kField]->serialize(options));
     }
@@ -8167,7 +8161,8 @@ Value ExpressionSetField::serialize(SerializationOptions options) const {
         // string.
         auto strPath =
             static_cast<ExpressionConstant*>(_children[_kField].get())->getValue().getString();
-        argDoc.addField("field"_sd, Value(hashFieldPath(options, {""}, FieldPath(strPath))));
+        FieldPath fp(strPath);
+        argDoc.addField("field"_sd, Value(fp.redactedFullPath(options)));
     } else {
         argDoc.addField("field"_sd, _children[_kField]->serialize(options));
     }

@@ -36,6 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/exec/document_value/document_internal.h"
+#include "mongo/db/query/serialization_options.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -129,6 +130,7 @@ public:
     const std::string& fullPath() const {
         return _fieldPath;
     }
+    std::string redactedFullPath(SerializationOptions opts) const;
 
     /**
      * Returns the full path, including the prefix 'FieldPath::prefix'.
@@ -136,6 +138,10 @@ public:
     std::string fullPathWithPrefix() const {
         return prefix + _fieldPath;
     }
+    std::string redactedFullPathWithPrefix(SerializationOptions opts) const {
+        return prefix + redactedFullPath(opts);
+    }
+
     /**
      * A FieldPath like this but missing the first element (useful for recursion).
      * Precondition getPathLength() > 1.
