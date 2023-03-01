@@ -2119,7 +2119,7 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
     const NamespaceString& nss,
     const boost::optional<UUID>& collectionUUID,
     bool allowMigrations) {
-    std::set<ShardId> shardsIds;
+    std::set<ShardId> cmShardIds;
     {
         // Mark opCtx as interruptible to ensure that all reads and writes to the metadata
         // collections under the exclusive _kChunkOpLock happen on the same term.
@@ -2141,7 +2141,7 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
                               << " for ns " << nss,
                 !collectionUUID || collectionUUID == cm.getUUID());
 
-        cm.getAllShardIds(&shardsIds);
+        cm.getAllShardIds(&cmShardIds);
         withTransaction(
             opCtx,
             CollectionType::ConfigNS,
@@ -2184,11 +2184,18 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
 
     // Trigger a refresh on each shard containing chunks for this collection.
     const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    sharding_util::tellShardsToRefreshCollection(
-        opCtx,
-        {std::make_move_iterator(shardsIds.begin()), std::make_move_iterator(shardsIds.end())},
-        nss,
-        executor);
+    // TODO (SERVER-74477): Remove cmShardIds and always send the refresh to all shards.
+    if (feature_flags::gAllowMigrationsRefreshToAll.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        sharding_util::tellShardsToRefreshCollection(opCtx, allShardIds, nss, executor);
+    } else {
+        sharding_util::tellShardsToRefreshCollection(opCtx,
+                                                     {std::make_move_iterator(cmShardIds.begin()),
+                                                      std::make_move_iterator(cmShardIds.end())},
+                                                     nss,
+                                                     executor);
+    }
 }
 
 void ShardingCatalogManager::bumpCollectionMinorVersionInTxn(OperationContext* opCtx,

@@ -113,11 +113,9 @@ public:
             boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
 
             {
-                AutoGetCollection autoColl(opCtx,
-                                           ns(),
-                                           MODE_IS,
-                                           AutoGetCollection::Options{}.viewMode(
-                                               auto_get_collection::ViewMode::kViewsPermitted));
+                // TODO (SERVER-74313): Replace with AutoGetCollection
+                Lock::DBLock dbLock(opCtx, ns().dbName(), MODE_IS);
+                Lock::CollectionLock collLock(opCtx, ns(), MODE_IS);
 
                 // If the primary is in the critical section, secondaries must wait for the commit
                 // to finish on the primary in case a secondary's caller has an afterClusterTime
