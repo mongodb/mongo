@@ -31,6 +31,7 @@ let nss = db + "." + coll;
 let validateTestCase = function(test) {
     assert(test.setUp && typeof (test.setUp) === "function");
     assert(test.command && typeof (test.command) === "object");
+    assert(test.runsAgainstAdminDb ? typeof (test.runsAgainstAdminDb) === "boolean" : true);
     assert(test.checkResults && typeof (test.checkResults) === "function");
     assert(test.behavior === "unshardedOnly" ||
            test.behavior === "targetsPrimaryUsesConnectionVersioning" ||
@@ -109,7 +110,23 @@ let testCases = {
         behavior: "versioned"
     },
     analyze: {skip: "primary only"},
-    analyzeShardKey: {skip: "does not return user data"},
+    analyzeShardKey: {
+        setUp: function(mongosConn) {
+            const docs = [];
+            for (let i = 1; i <= 1000; i++) {
+                docs.push({x: i});
+            }
+            assert.commandWorked(mongosConn.getCollection(nss).insert(docs));
+        },
+        command: {analyzeShardKey: nss, key: {x: 1}},
+        runsAgainstAdminDb: true,
+        checkResults: function(res) {
+            // The command should work and return correct results.
+            assert.commandWorked(res);
+            assert.eq(res.numDocs, 1000, res);
+        },
+        behavior: "versioned"
+    },
     appendOplogNote: {skip: "primary only"},
     applyOps: {skip: "primary only"},
     authenticate: {skip: "does not return user data"},
@@ -455,9 +472,10 @@ for (let command of commands) {
         writeConcern: {w: 2},
     }));
 
-    let res = staleMongos.getDB(db).runCommand(Object.extend(
-        test.command, {$readPreference: {mode: 'secondary'}, readConcern: {'level': 'local'}}));
-
+    let res = staleMongos.getDB(test.runsAgainstAdminDb ? "admin" : db)
+                  .runCommand(Object.extend(
+                      test.command,
+                      {$readPreference: {mode: 'secondary'}, readConcern: {'level': 'local'}}));
     test.checkResults(res);
 
     // Build the query to identify the operation in the system profiler.
