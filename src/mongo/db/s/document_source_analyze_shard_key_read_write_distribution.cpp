@@ -118,7 +118,9 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
                     IDLParserContext(
                         DocumentSourceAnalyzeShardKeyReadWriteDistribution::kStageName),
                     doc);
-                appendChunk(lastChunkMax, splitPointDoc.getSplitPoint());
+                auto splitPoint = splitPointDoc.getSplitPoint();
+                uassertShardKeyValueNotContainArrays(splitPoint);
+                appendChunk(lastChunkMax, splitPoint);
             }
             return true;
         }));

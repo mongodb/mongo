@@ -59,6 +59,41 @@ function makeAnalyzeShardKeyAggregateCmdObj(st, collName, key, splitPointsShardI
         }
     }
 
+    for (let key of validationTest.invalidShardKeyTestCases) {
+        jsTest.log(`Testing that the aggregation stage fails if the shard key is invalid ${
+            tojson({key})}`);
+        const aggCmdObj =
+            makeAnalyzeShardKeyAggregateCmdObj(st, validationTest.collName, key, st.shard0.name);
+        assert.commandFailedWithCode(
+            shard0Primary.getDB(validationTest.dbName).runCommand(aggCmdObj), ErrorCodes.BadValue);
+    }
+
+    {
+        jsTest.log("Testing that the aggregation stage fails if there is a split point with an" +
+                   " array field");
+        const aggCmdObj =
+            makeAnalyzeShardKeyAggregateCmdObj(st, validationTest.collName, {b: 1}, st.shard0.name);
+        const splitPointsColl = shard0Primary.getCollection(
+            aggCmdObj.pipeline[0]["$_analyzeShardKeyReadWriteDistribution"].splitPointsNss);
+        assert.commandWorked(splitPointsColl.insert({splitPoint: {b: [0, 0]}}));
+        assert.commandFailedWithCode(
+            shard0Primary.getDB(validationTest.dbName).runCommand(aggCmdObj), ErrorCodes.BadValue);
+        splitPointsColl.drop();
+    }
+
+    {
+        jsTest.log("Testing that the aggregation stage fails if there is a split point that does" +
+                   " not have the same pattern as the shard key");
+        const aggCmdObj =
+            makeAnalyzeShardKeyAggregateCmdObj(st, validationTest.collName, {a: 1}, st.shard0.name);
+        const splitPointsColl = shard0Primary.getCollection(
+            aggCmdObj.pipeline[0]["$_analyzeShardKeyReadWriteDistribution"].splitPointsNss);
+        assert.commandWorked(splitPointsColl.insert({splitPoint: {_id: 1}}));
+        assert.commandFailedWithCode(
+            shard0Primary.getDB(validationTest.dbName).runCommand(aggCmdObj), ErrorCodes.BadValue);
+        splitPointsColl.drop();
+    }
+
     st.stop();
 }
 

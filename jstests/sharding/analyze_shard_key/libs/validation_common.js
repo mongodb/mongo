@@ -11,6 +11,10 @@ function ValidationTest(conn) {
     // Create a regular collection.
     const testBasicCollName = "testBasicColl";
     assert.commandWorked(db.createCollection(testBasicCollName));
+    const listCollectionRes = assert.commandWorked(
+        db.runCommand({listCollections: 1, filter: {name: testBasicCollName}}));
+    const isClusteredColl =
+        listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
 
     // Create an FLE collection.
     const testFLECollName = "testFLEColl";
@@ -74,11 +78,65 @@ function ValidationTest(conn) {
         {dbName: dbName, collName: "testFLEColl"},
         {dbName: dbName, collName: testViewName, isView: true}
     ];
+    const invalidShardKeyTestCases = [
+        // Cannot analyze an empty shard key.
+        {},
+        // Cannot analyze an shard key with an empty field name.
+        {"": 1},
+        // Cannot analyze a shard key with a field that is neither "hashed" or 1.
+        {a: "2d"},
+        {a: "2dsphere"},
+        {a: "columnstore"},
+        {a: 0},
+        // Cannot analyze a shard key with more than one "hashed" field.
+        {a: "hashed", b: "hashed"},
+        // Cannot analyze a shard key with a field that contains an extra dot at the end.
+        {"a.": 1},
+        // Cannot analyze a shard key with a field that contains two consecutive dots.
+        {"a..": 1},
+        // Cannot analyze a shard key with a field that contains parts that start with '$'.
+        {"$a": 1},
+        {"a.$x": 1},
+        {"$**": 1},
+        {"a.$**": 1},
+    ];
+    // The analyzeShardKey command cannot use the index below for calculating cardinality and
+    // frequency metrics.
+    const noCompatibleIndexTestCases = [
+        {indexOptions: {key: {b: "2d"}, name: "b_2d"}, shardKey: {b: 1}},
+        {indexOptions: {key: {b: "2dsphere"}, name: "b_2dsphere"}, shardKey: {b: 1}},
+        {indexOptions: {key: {a: "text"}, name: "a_text"}, shardKey: {a: 1}},
+        {indexOptions: {key: {"$**": 1}, name: "wildcard"}, shardKey: {a: 1}},
+        {
+            indexOptions: {key: {"a": 1}, name: "a_sparse", sparse: true},
+            shardKey: {a: 1},
+        },
+        {
+            indexOptions:
+                {key: {"a": 1}, name: "a_partial", partialFilterExpression: {c: {$gt: 5}}},
+            shardKey: {a: 1},
+        },
+        {
+            indexOptions: {
+                key: {"a": 1},
+                name: "a_non_simple_collation",
+                collation: {locale: "en_US", strength: 1, caseLevel: false}
+            },
+            shardKey: {a: 1},
+        },
+    ];
+    // Note that clustered collections do not support columnstore indexes.
+    if (!isClusteredColl) {
+        noCompatibleIndexTestCases.push(
+            {indexOptions: {key: {"$**": "columnstore"}, name: "columnstore"}, shardKey: {a: 1}});
+    }
 
     return {
         dbName,
         collName,
         makeDocuments,
         invalidNamespaceTestCases,
+        invalidShardKeyTestCases,
+        noCompatibleIndexTestCases
     };
 }

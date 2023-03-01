@@ -10,6 +10,8 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 load("jstests/sharding/analyze_shard_key/libs/validation_common.js");
 
+const analyzeShardKeyNumRanges = 10;
+
 function testValidationBeforeMetricsCalculation(conn, validationTest) {
     jsTest.log(`Testing validation before calculating any metrics`);
 
@@ -21,10 +23,93 @@ function testValidationBeforeMetricsCalculation(conn, validationTest) {
             conn.adminCommand({analyzeShardKey: ns, key: {_id: 1}}),
             isView ? ErrorCodes.CommandNotSupportedOnView : ErrorCodes.IllegalOperation);
     }
+    for (let shardKey of validationTest.invalidShardKeyTestCases) {
+        jsTest.log(`Testing that the analyzeShardKey command fails if the shard key is invalid ${
+            tojson({shardKey})}`);
+        const ns = validationTest.validDbName + "." + validationTest.validCollName;
+        assert.commandFailedWithCode(conn.adminCommand({analyzeShardKey: ns, key: shardKey}),
+                                     ErrorCodes.BadValue);
+    }
+}
+
+function testValidationDuringKeyCharactericsMetricsCalculation(conn, validationTest) {
+    const dbName = validationTest.dbName;
+    const collName = validationTest.collName;
+    const ns = dbName + "." + collName;
+    jsTest.log(
+        `Testing validation while calculating metrics about the characteristics of the shard key ${
+            tojson(dbName, collName)}`);
+
+    const testDB = conn.getDB(dbName);
+    const testColl = testDB.getCollection(collName);
+
+    jsTest.log("Testing that the analyzeShardKey command fails to calculate the metrics if the" +
+               " shard key contains an array field");
+    const {docs, arrayFieldName} = validationTest.makeDocuments(1);
+    assert.commandWorked(testColl.insert(docs));
+    assert.commandFailedWithCode(
+        conn.adminCommand({analyzeShardKey: ns, key: {[arrayFieldName]: 1}}), ErrorCodes.BadValue);
+
+    jsTest.log("Testing that the analyzeShardKey command doesn't use an index that is not a" +
+               " b-tree or hashed index to calculate the metrics");
+    // To make the collection non-empty, keep the document from above but set the value of the
+    // array field to null (otherwise, the command would fail with a BadValue error again).
+    assert.commandWorked(testColl.update({}, {[arrayFieldName]: null}));
+    for (let {indexOptions, shardKey} of validationTest.noCompatibleIndexTestCases) {
+        jsTest.log(`Testing incompatible index ${tojson({indexOptions, shardKey})}`);
+        assert.commandWorked(testDB.runCommand({createIndexes: collName, indexes: [indexOptions]}));
+        const res = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: shardKey}));
+        AnalyzeShardKeyUtil.assertNoKeyCharacteristicsMetrics(res);
+        assert.commandWorked(testDB.runCommand({dropIndexes: collName, index: indexOptions.name}));
+    }
+
+    assert.commandWorked(testColl.remove({}));
+}
+
+function testValidationDuringReadWriteDistributionMetricsCalculation(
+    mongosConn, validationTest, shardsvrConn) {
+    const dbName = validationTest.dbName;
+    const collName = validationTest.collName;
+    const ns = dbName + "." + collName;
+    jsTest.log(`Testing validation while calculating metrics about read and write distribution ${
+        tojson(dbName, collName)}`);
+
+    const testDB = mongosConn.getDB(dbName);
+    const testColl = testDB.getCollection(collName);
+    // The sampling-based initial split policy needs 10 samples per split point so
+    // 10 * analyzeShardKeyNumRanges is the minimum number of distinct shard key values that the
+    // collection must have for the command to not fail to generate split points.
+    const {docs, arrayFieldName} = validationTest.makeDocuments(10 * analyzeShardKeyNumRanges);
+
+    let fp = configureFailPoint(
+        shardsvrConn, "analyzeShardKeyPauseBeforeCalculatingReadWriteDistributionMetrics");
+    let analyzeShardKeyFunc = (mongosHost, ns, arrayFieldName) => {
+        const mongosConn = new Mongo(mongosHost);
+        return mongosConn.adminCommand({analyzeShardKey: ns, key: {[arrayFieldName]: 1}});
+    };
+    let analyzeShardKeyThread =
+        new Thread(analyzeShardKeyFunc, mongosConn.host, ns, arrayFieldName);
+
+    // Insert the documents but set the array field to null so it passes the best-effort validation
+    // at the start of the command.
+    assert.commandWorked(testColl.insert(docs));
+    assert.commandWorked(testColl.update({}, {[arrayFieldName]: null}));
+    analyzeShardKeyThread.start();
+    fp.wait();
+
+    // Re-insert the documents. The best-effort validation when generating split points should
+    // detect that the shard key contains an array field and fail.
+    assert.commandWorked(testColl.remove({}));
+    assert.commandWorked(testColl.insert(docs));
+    fp.off();
+    assert.commandFailedWithCode(analyzeShardKeyThread.returnData(), ErrorCodes.BadValue);
+
+    assert.commandWorked(testColl.remove({}));
 }
 
 {
-    const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
+    const st =
+        new ShardingTest({shards: 1, rs: {nodes: 1, setParameter: {analyzeShardKeyNumRanges}}});
     const shard0Primary = st.rs0.getPrimary();
     const validationTest = ValidationTest(st.s);
 
@@ -35,8 +120,17 @@ function testValidationBeforeMetricsCalculation(conn, validationTest) {
                                  "analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics");
     testValidationBeforeMetricsCalculation(st.s, validationTest);
 
+    // Enable the calculation of the metrics about the characteristics of the shard key to test
+    // validation during that step.
     fp0.off();
+    testValidationDuringKeyCharactericsMetricsCalculation(st.s, validationTest);
+
+    // Enable the calculation of the metrics about the read and write distribution to test
+    // validation during that step.
     fp1.off();
+    testValidationDuringReadWriteDistributionMetricsCalculation(
+        st.s, validationTest, shard0Primary);
+
     st.stop();
 }
 
@@ -54,7 +148,11 @@ function testValidationBeforeMetricsCalculation(conn, validationTest) {
         configureFailPoint(primary, "analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics");
     testValidationBeforeMetricsCalculation(primary, validationTest);
 
+    // Enable the calculation of the metrics about the characteristics of the shard key to test
+    // validation during that step.
     fp0.off();
+    testValidationDuringKeyCharactericsMetricsCalculation(primary, validationTest);
+
     fp1.off();
     rst.stopSet();
 }

@@ -81,6 +81,8 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
                                                                        const BSONObj& shardKey,
                                                                        const BSONObj& hintIndexKey,
                                                                        int numMostCommonValues) {
+    uassertStatusOK(validateIndexKey(hintIndexKey));
+
     std::vector<BSONObj> pipeline;
 
     pipeline.push_back(BSON("$project" << BSON("_id" << 0 << kIndexKeyFieldName
@@ -253,9 +255,23 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
     while (indexIterator->more()) {
         auto indexEntry = indexIterator->next();
         auto indexDesc = indexEntry->descriptor();
+
+        if (indexDesc->getIndexType() != IndexType::INDEX_BTREE &&
+            indexDesc->getIndexType() != IndexType::INDEX_HASHED) {
+            continue;
+        }
+        if (indexEntry->isMultikey(opCtx, collection)) {
+            continue;
+        }
+        if (indexDesc->isSparse() || indexDesc->isPartial()) {
+            continue;
+        }
+        if (!indexDesc->collation().isEmpty()) {
+            continue;
+        }
+
         auto indexKey = indexDesc->keyPattern();
-        if (indexDesc->collation().isEmpty() && !indexDesc->isSparse() && !indexDesc->isPartial() &&
-            !indexEntry->isMultikey(opCtx, collection) && shardKey.isFieldNamePrefixOf(indexKey)) {
+        if (shardKey.isFieldNamePrefixOf(indexKey)) {
             return IndexSpec{indexKey, indexDesc->unique()};
         }
     }
@@ -625,6 +641,10 @@ std::pair<NamespaceString, Timestamp> generateSplitPoints(OperationContext* opCt
     int64_t objSize = 0;
 
     for (const auto& splitPoint : splitPoints) {
+        // Performs best-effort validation again that the shard key does not contain an array field
+        // by asserting that split point does not contain an array field.
+        uassertShardKeyValueNotContainArrays(splitPoint);
+
         if (splitPoint.objsize() + objSize >= BSONObjMaxUserSize ||
             splitPointsToInsert.size() >= write_ops::kMaxWriteBatchSize) {
             insertDocuments(opCtx, splitPointsNss, splitPointsToInsert, uassertWriteStatusFn);
@@ -671,6 +691,14 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
                     : ErrorCodes::IllegalOperation,
                 "Cannot analyze a shard key for an empty collection",
                 collection->numRecords(opCtx) > 0);
+
+        // Performs best-effort validation that the shard key does not contain an array field by
+        // extracting the shard key value from a random document in the collection and asserting
+        // that it does not contain an array field.
+        DBDirectClient client(opCtx);
+        auto doc = client.findOne(nss, {});
+        auto value = dotted_path_support::extractElementsBasedOnTemplate(doc, shardKeyBson);
+        uassertShardKeyValueNotContainArrays(value);
 
         auto indexSpec = findCompatiblePrefixedIndex(
             opCtx, *collection, collection->getIndexCatalog(), shardKeyBson);

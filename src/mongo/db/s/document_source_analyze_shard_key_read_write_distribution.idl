@@ -27,7 +27,9 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+  cpp_namespace: "mongo::analyze_shard_key"
+  cpp_includes:
+    - "mongo/s/analyze_shard_key_util.h"
 
 imports:
   - "mongo/db/basic_types.idl"
@@ -42,6 +44,8 @@ structs:
       key:
         description: The shard key to evaluate.
         type: KeyPattern
+        validator:
+          callback: validateShardKeyPattern
       splitPointsShardId:
         description: The id of the shard that the analyzeShardKey command is running on, and
                      therefore contains the temporary collection storing the split points for the

@@ -28,6 +28,8 @@
 
 global:
   cpp_namespace: "mongo::analyze_shard_key"
+  cpp_includes:
+    - "mongo/s/analyze_shard_key_util.h"
 
 imports:
   - "mongo/db/basic_types.idl"
@@ -303,3 +305,5 @@ commands:
       key:
         type: KeyPattern
         description: "The shard key to evaluate."
+        validator:
+          callback: validateShardKeyPattern

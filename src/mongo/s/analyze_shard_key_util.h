@@ -33,6 +33,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -63,6 +64,26 @@ Status validateNamespace(const NamespaceString& nss);
 StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            StringData cmdName);
+
+/*
+ * If the shard key is invalid, returns a BadValue error. Otherwise, returns an OK status. This
+ * helper needs to be defined inline to avoid circular dependency with the IDL files.
+ */
+inline Status validateShardKeyPattern(const KeyPattern& shardKey) {
+    ShardKeyPattern shardKeyPattern(shardKey);
+    return Status::OK();
+}
+
+/*
+ * If the index key cannot be used as a shard key index, returns a BadValue error. Otherwise,
+ * returns an OK status.
+ */
+Status validateIndexKey(const BSONObj& indexKey);
+
+/**
+ * If the given shard key value contains an array field, throws a BadValue error.
+ */
+void uassertShardKeyValueNotContainArrays(const BSONObj& value);
 
 //
 // Other helpers.

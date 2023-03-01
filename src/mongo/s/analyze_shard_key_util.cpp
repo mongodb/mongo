@@ -283,6 +283,19 @@ StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
+Status validateIndexKey(const BSONObj& indexKey) {
+    return validateShardKeyPattern(indexKey);
+}
+
+void uassertShardKeyValueNotContainArrays(const BSONObj& value) {
+    for (const auto& element : value) {
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "The shard key contains an array field '" << element.fieldName()
+                              << "'",
+                element.type() != BSONType::Array);
+    }
+}
+
 double round(double val, int n) {
     const double multiplier = std::pow(10.0, n);
     return std::ceil(val * multiplier) / multiplier;
