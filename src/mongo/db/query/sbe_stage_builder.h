@@ -362,10 +362,7 @@ public:
     }
 
     PlanStageReqs& clearAllOfType(Type t) {
-        auto fields = getOfType(t);
-        for (const auto& field : fields) {
-            _slots.erase(std::make_pair(t, StringData(field)));
-        }
+        absl::erase_if(_slots, [t](auto& item) { return item.second && item.first.first == t; });
         return *this;
     }
     PlanStageReqs& clearAllFields() {

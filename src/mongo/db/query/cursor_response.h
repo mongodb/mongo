@@ -88,7 +88,7 @@ public:
     }
 
     void setPostBatchResumeToken(BSONObj token) {
-        _postBatchResumeToken = token.getOwned();
+        _postBatchResumeToken = token.isEmptyPrototype() ? token : token.getOwned();
     }
 
     void setPartialResultsReturned(bool partialResults) {

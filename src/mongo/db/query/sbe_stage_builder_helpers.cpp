@@ -740,7 +740,7 @@ void indexKeyCorruptionCheckCallback(OperationContext* opCtx,
  * or that the index keys are still part of the underlying index.
  */
 bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
-                                      StringMap<const IndexAccessMethod*> iamTable,
+                                      const StringMap<const IndexAccessMethod*>& iamTable,
                                       sbe::value::SlotAccessor* snapshotIdAccessor,
                                       sbe::value::SlotAccessor* indexIdAccessor,
                                       sbe::value::SlotAccessor* indexKeyAccessor,
@@ -835,9 +835,9 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
 
     sbe::ScanCallbacks callbacks(
         indexKeyCorruptionCheckCallback,
-        [=](auto&& arg1, auto&& arg2, auto&& arg3, auto&& arg4, auto&& arg5, auto&& arg6) {
-            return indexKeyConsistencyCheckCallback(
-                arg1, std::move(iamMap), arg2, arg3, arg4, arg5, arg6);
+        [iam = std::move(iamMap)](
+            auto&& arg1, auto&& arg2, auto&& arg3, auto&& arg4, auto&& arg5, auto&& arg6) {
+            return indexKeyConsistencyCheckCallback(arg1, iam, arg2, arg3, arg4, arg5, arg6);
         });
 
     // Scan the collection in the range [seekKeySlot, Inf).

@@ -1119,13 +1119,15 @@ inline StringData getTopLevelField(const T& path) {
 template <typename T>
 inline std::vector<std::string> getTopLevelFields(const T& setOfPaths) {
     std::vector<std::string> topLevelFields;
-    StringSet topLevelFieldsSet;
+    if (!setOfPaths.empty()) {
+        StringSet topLevelFieldsSet;
 
-    for (const auto& path : setOfPaths) {
-        auto field = getTopLevelField(path);
-        if (!topLevelFieldsSet.count(field)) {
-            topLevelFields.emplace_back(std::string(field));
-            topLevelFieldsSet.emplace(std::string(field));
+        for (const auto& path : setOfPaths) {
+            auto field = getTopLevelField(path);
+            if (!topLevelFieldsSet.count(field)) {
+                topLevelFields.emplace_back(std::string(field));
+                topLevelFieldsSet.emplace(std::string(field));
+            }
         }
     }
 
@@ -1157,11 +1159,12 @@ inline std::pair<std::vector<T>, std::vector<T>> splitVector(std::vector<T> vec,
 
 template <typename T>
 inline std::vector<T> appendVectorUnique(std::vector<T> lhs, std::vector<T> rhs) {
-    auto valueSet = std::set<T>{lhs.begin(), lhs.end()};
-    for (size_t i = 0; i < rhs.size(); ++i) {
-        if (!valueSet.count(rhs[i])) {
-            valueSet.emplace(rhs[i]);
-            lhs.emplace_back(std::move(rhs[i]));
+    if (!rhs.empty()) {
+        auto valueSet = std::set<T>{lhs.begin(), lhs.end()};
+        for (size_t i = 0; i < rhs.size(); ++i) {
+            if (valueSet.emplace(rhs[i]).second) {
+                lhs.emplace_back(std::move(rhs[i]));
+            }
         }
     }
     return lhs;

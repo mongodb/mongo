@@ -155,7 +155,7 @@ struct IndexEntry : CoreIndexInfo {
                IndexType type,
                IndexDescriptor::IndexVersion version,
                bool mk,
-               const MultikeyPaths& mkp,
+               MultikeyPaths mkp,
                std::set<FieldRef> multikeyPathSet,
                bool sp,
                bool unq,
@@ -169,7 +169,7 @@ struct IndexEntry : CoreIndexInfo {
           version(version),
           multikey(mk),
           unique(unq),
-          multikeyPaths(mkp),
+          multikeyPaths(std::move(mkp)),
           multikeyPathSet(std::move(multikeyPathSet)),
           infoObj(io),
           wildcardFieldPos(wildcardPos) {

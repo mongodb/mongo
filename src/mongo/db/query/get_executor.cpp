@@ -241,7 +241,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             // Indexes that have these metadata keys do not store a fixed-size vector of multikey
             // metadata in the index catalog. Depending on the index type, an index uses one of
             // these mechanisms (or neither), but not both.
-            multikeyPathSet,
+            std::move(multikeyPathSet),
             desc->isSparse(),
             desc->unique(),
             IndexEntry::Identifier{desc->indexName()},
@@ -304,6 +304,7 @@ void fillOutIndexEntries(OperationContext* opCtx,
                          const CollectionPtr& collection,
                          std::vector<IndexEntry>& entries,
                          std::vector<ColumnIndexEntry>& columnEntries) {
+    std::vector<const IndexCatalogEntry*> columnIndexes, plainIndexes;
     auto ii = collection->getIndexCatalog()->getIndexIterator(
         opCtx, IndexCatalog::InclusionPolicy::kReady);
     while (ii->more()) {
@@ -322,12 +323,19 @@ void fillOutIndexEntries(OperationContext* opCtx,
             continue;
 
         if (indexType == IndexType::INDEX_COLUMN) {
-            columnEntries.emplace_back(
-                columnIndexEntryFromIndexCatalogEntry(opCtx, collection, *ice));
+            columnIndexes.push_back(ice);
         } else {
-            entries.emplace_back(
-                indexEntryFromIndexCatalogEntry(opCtx, collection, *ice, canonicalQuery));
+            plainIndexes.push_back(ice);
         }
+    }
+    columnEntries.reserve(columnIndexes.size());
+    for (auto ice : columnIndexes) {
+        columnEntries.emplace_back(columnIndexEntryFromIndexCatalogEntry(opCtx, collection, *ice));
+    }
+    entries.reserve(plainIndexes.size());
+    for (auto ice : plainIndexes) {
+        entries.emplace_back(
+            indexEntryFromIndexCatalogEntry(opCtx, collection, *ice, canonicalQuery));
     }
 }
 }  // namespace
@@ -1231,7 +1239,7 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     bool needsSubplanning,
     PlanYieldPolicySBE* yieldPolicy,
     size_t plannerOptions,
-    const boost::optional<stage_builder::PlanStageData>& planStageData) {
+    boost::optional<const stage_builder::PlanStageData&> planStageData) {
     // If we have multiple solutions, we always need to do the runtime planning.
     if (numSolutions > 1) {
         invariant(!needsSubplanning && !decisionWorks);
@@ -1321,7 +1329,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     // When query requires sub-planning, we may not get any executable plans.
     const auto planStageData = roots.empty()
         ? boost::none
-        : boost::optional<stage_builder::PlanStageData>(roots[0].second);
+        : boost::optional<const stage_builder::PlanStageData&>(roots[0].second);
 
     // In some circumstances (e.g. when have multiple candidate plans or using a cached one), we
     // might need to execute the plan(s) to pick the best one or to confirm the choice.
@@ -1515,7 +1523,7 @@ attemptToGetSlotBasedExecutor(
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    QueryPlannerParams plannerParams) {
+    const QueryPlannerParams& plannerParams) {
     if (extractAndAttachPipelineStages) {
         // Push down applicable pipeline stages and attach to the query, but don't remove from
         // the high-level pipeline object until we know for sure we will execute with SBE.

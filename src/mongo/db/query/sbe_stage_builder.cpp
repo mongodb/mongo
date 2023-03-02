@@ -146,17 +146,23 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
 sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
                                          const PlanStageSlots& outputs,
                                          const sbe::value::SlotVector& exclude) {
-    auto excludeSet = sbe::value::SlotSet{exclude.begin(), exclude.end()};
-
     std::vector<std::pair<PlanStageSlots::Name, sbe::value::SlotId>> pairs;
-    outputs.forEachSlot(reqs, [&](auto&& slot, const PlanStageSlots::Name& name) {
-        if (!excludeSet.count(slot)) {
+    if (exclude.empty()) {
+        outputs.forEachSlot(reqs, [&](auto&& slot, const PlanStageSlots::Name& name) {
             pairs.emplace_back(name, slot);
-        }
-    });
+        });
+    } else {
+        auto excludeSet = sbe::value::SlotSet{exclude.begin(), exclude.end()};
+        outputs.forEachSlot(reqs, [&](auto&& slot, const PlanStageSlots::Name& name) {
+            if (!excludeSet.count(slot)) {
+                pairs.emplace_back(name, slot);
+            }
+        });
+    }
     std::sort(pairs.begin(), pairs.end());
 
     auto outputSlots = sbe::makeSV();
+    outputSlots.reserve(pairs.size());
     for (auto&& p : pairs) {
         outputSlots.emplace_back(p.second);
     }
@@ -487,30 +493,38 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         indexKeyPatternSet.emplace(elt.fieldNameStringData());
     }
 
+    sbe::IndexKeysInclusionSet fieldBitset, sortKeyBitset;
     auto [fields, additionalFields] = splitVector(
         reqs.getFields(), [&](const std::string& s) { return indexKeyPatternSet.count(s); });
     auto fieldsSet = StringDataSet{fields.begin(), fields.end()};
-    auto sortKeys = reqs.getSortKeys();
-    auto sortKeysSet = StringDataSet{sortKeys.begin(), sortKeys.end()};
-
-    for (auto&& key : sortKeys) {
-        tassert(7097208,
-                str::stream() << "Expected sort key '" << key << "' to be part of index pattern",
-                indexKeyPatternSet.count(key));
-    }
-
-    sbe::IndexKeysInclusionSet fieldBitset;
-    sbe::IndexKeysInclusionSet sortKeyBitset;
     size_t i = 0;
     for (const auto& elt : ixn->index.keyPattern) {
         StringData name = elt.fieldNameStringData();
         if (fieldsSet.count(name)) {
             fieldBitset.set(i);
         }
-        if (sortKeysSet.count(name)) {
-            sortKeyBitset.set(i);
-        }
         ++i;
+    }
+
+    if (reqs.hasSortKeys()) {
+        auto sortKeys = reqs.getSortKeys();
+        auto sortKeysSet = StringDataSet{sortKeys.begin(), sortKeys.end()};
+
+        for (auto&& key : sortKeys) {
+            tassert(7097208,
+                    str::stream() << "Expected sort key '" << key
+                                  << "' to be part of index pattern",
+                    indexKeyPatternSet.count(key));
+        }
+
+        i = 0;
+        for (const auto& elt : ixn->index.keyPattern) {
+            StringData name = elt.fieldNameStringData();
+            if (sortKeysSet.count(name)) {
+                sortKeyBitset.set(i);
+            }
+            ++i;
+        }
     }
 
     if (reqs.has(kReturnKey) || reqs.has(kResult) || !additionalFields.empty()) {
@@ -982,7 +996,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
-    auto fieldsSet = StringSet{fields.begin(), fields.end()};
+    // Keep track of the number of entries in the "fields" vector that represent our output;
+    // anything that gets added past this point by appendVectorUnique is coming from the vector of
+    // sort keys.
+    size_t numOfFields = fields.size();
     auto sortKeysSet = StringSet{sortKeys.begin(), sortKeys.end()};
     auto fieldsAndSortKeys = appendVectorUnique(std::move(fields), std::move(sortKeys));
 
@@ -1010,7 +1027,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             projects.insert({slot, std::move(sortKeyExpr)});
             outputs.set(std::make_pair(PlanStageSlots::kSortKey, name), slot);
         }
-        if (fieldsSet.count(name)) {
+        if (i < numOfFields) {
             outputs.set(std::make_pair(PlanStageSlots::kField, std::move(name)), outSlots[i]);
         }
     }
