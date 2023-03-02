@@ -331,6 +331,8 @@ struct ESCDocument {
  */
 class FLETagQueryInterface {
 public:
+    enum class TagQueryType { kInsert, kQuery };
+
     virtual ~FLETagQueryInterface();
 
     /**
@@ -347,6 +349,17 @@ public:
      * Throws if the collection is not found.
      */
     virtual uint64_t countDocuments(const NamespaceString& nss) = 0;
+
+    /**
+     * Get the set of counts from ESC for a set of tags. Returns counts for these fields suitable
+     * either for query or insert based on the type parameter.
+     *
+     * Returns a vector of zeros if the collection does not exist.
+     */
+    virtual std::vector<std::vector<FLEEdgeCountInfo>> getTags(
+        const NamespaceString& nss,
+        const std::vector<std::vector<FLEEdgePrfBlock>>& tokensSets,
+        TagQueryType type) = 0;
 };
 
 
@@ -513,6 +526,17 @@ public:
                                                 const ESCTwiceDerivedValueToken& valueToken,
                                                 boost::optional<uint64_t> x,
                                                 FLEStatusSection::EmuBinaryTracker& tracker);
+
+    /**
+     * Get the set of counts from ESC for a set of tags. Returns counts for these fields suitable
+     * either for query or insert based on the type parameter.
+     *
+     * Returns a vector of zeros if the collection does not exist.
+     */
+    static std::vector<std::vector<FLEEdgeCountInfo>> getTags(
+        const FLEStateCollectionReader& reader,
+        const std::vector<std::vector<FLEEdgePrfBlock>>& tokensSets,
+        FLETagQueryInterface::TagQueryType type);
 };
 
 

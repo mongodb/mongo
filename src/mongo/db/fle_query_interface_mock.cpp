@@ -53,6 +53,18 @@ uint64_t FLEQueryInterfaceMock::countDocuments(const NamespaceString& nss) {
     return uassertStatusOK(_storage->getCollectionCount(_opCtx, nss));
 }
 
+std::vector<std::vector<FLEEdgeCountInfo>> FLEQueryInterfaceMock::getTags(
+    const NamespaceString& nss,
+    const std::vector<std::vector<FLEEdgePrfBlock>>& tokensSets,
+    FLETagQueryInterface::TagQueryType type) {
+
+    auto docCount = countDocuments(nss);
+
+    TxnCollectionReader reader(docCount, this, nss);
+
+    return ESCCollection::getTags(reader, tokensSets, type);
+}
+
 StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceMock::insertDocuments(
     const NamespaceString& nss,
     std::vector<BSONObj> objs,

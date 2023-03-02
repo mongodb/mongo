@@ -640,82 +640,84 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
 
     const NamespaceString nssEsc(edcNss.dbName(), efc.getEscCollection().value());
 
-    auto docCount = queryImpl->countDocuments(nssEsc);
+    if (serverPayload.empty()) {
+        return;
+    }
 
-    TxnCollectionReader reader(docCount, queryImpl, nssEsc);
+    uint32_t totalTokens = 0;
+
+    std::vector<std::vector<FLEEdgePrfBlock>> tokensSets;
+    tokensSets.reserve(serverPayload.size());
 
     for (auto& payload : serverPayload) {
-
-        const auto insertTokens = [&](ConstDataRange encryptedTokens,
-                                      ConstDataRange escDerivedToken) {
-            uint64_t count;
-
-            auto escToken = EDCServerPayloadInfo::getESCToken(escDerivedToken);
-            auto tagToken =
-                FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escToken);
-            auto valueToken =
-                FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escToken);
-
-            auto positions = ESCCollection::emuBinaryV2(reader, tagToken, valueToken);
-
-            if (positions.cpos.has_value()) {
-                // Either no ESC documents exist yet (cpos == 0), OR new non-anchors
-                // have been inserted since the last compact/cleanup (cpos > 0).
-                count = positions.cpos.value() + 1;
-            } else {
-                // No new non-anchors since the last compact/cleanup.
-                // There must be at least one anchor.
-                uassert(7291902,
-                        "An ESC anchor document is expected but none is found",
-                        !positions.apos.has_value() || positions.apos.value() > 0);
-
-                PrfBlock anchorId;
-                if (!positions.apos.has_value()) {
-                    anchorId = ESCCollection::generateNullAnchorId(tagToken);
-                } else {
-                    anchorId = ESCCollection::generateAnchorId(tagToken, positions.apos.value());
-                }
-
-                BSONObj anchorDoc = reader.getById(anchorId);
-                uassert(7291903, "ESC anchor document not found", !anchorDoc.isEmpty());
-
-                auto escAnchor =
-                    uassertStatusOK(ESCCollection::decryptAnchorDocument(valueToken, anchorDoc));
-                count = escAnchor.count + 1;
-            }
-
-            payload.counts.push_back(count);
-
-            auto escInsertReply = uassertStatusOK(queryImpl->insertDocuments(
-                nssEsc,
-                {ESCCollection::generateNonAnchorDocument(tagToken, count)},
-                pStmtId,
-                true));
-            checkWriteErrors(escInsertReply);
-
-            const NamespaceString nssEcoc(edcNss.dbName(), efc.getEcocCollection().value());
-
-            // TODO - should we make this a batch of ECOC updates?
-            auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocuments(
-                nssEcoc,
-                {ECOCCollection::generateDocument(payload.fieldPathName, encryptedTokens)},
-                pStmtId,
-                false,
-                bypassDocumentValidation));
-            checkWriteErrors(ecocInsertReply);
-        };
-
         payload.counts.clear();
-        if (payload.payload.getEdgeTokenSet().has_value()) {
-            const auto& ets = payload.payload.getEdgeTokenSet().get();
-            for (size_t i = 0; i < ets.size(); ++i) {
-                insertTokens(ets[i].getEncryptedTokens(), ets[i].getEscDerivedToken());
+
+        const bool isRangePayload = payload.payload.getEdgeTokenSet().has_value();
+        if (isRangePayload) {
+            const auto& edgeTokenSet = payload.payload.getEdgeTokenSet().get();
+
+            std::vector<FLEEdgePrfBlock> tokens;
+            tokens.reserve(edgeTokenSet.size());
+
+            for (const auto& et : edgeTokenSet) {
+                FLEEdgePrfBlock block;
+                block.esc = PrfBlockfromCDR(et.getEscDerivedToken());
+                tokens.push_back(block);
+                totalTokens++;
             }
+
+            tokensSets.emplace_back(tokens);
         } else {
-            insertTokens(payload.payload.getEncryptedTokens(),
-                         payload.payload.getEscDerivedToken());
+            FLEEdgePrfBlock block;
+            block.esc = PrfBlockfromCDR(payload.payload.getEscDerivedToken());
+            tokensSets.push_back({block});
+            totalTokens++;
         }
     }
+
+    auto countInfoSets =
+        queryImpl->getTags(nssEsc, tokensSets, FLETagQueryInterface::TagQueryType::kInsert);
+
+    std::vector<BSONObj> escDocuments;
+    escDocuments.reserve(totalTokens);
+
+    for (size_t i = 0; i < countInfoSets.size(); i++) {
+        auto& countInfos = countInfoSets[i];
+
+        for (auto const& countInfo : countInfos) {
+            serverPayload[i].counts.push_back(countInfo.count);
+
+            escDocuments.push_back(
+                ESCCollection::generateNonAnchorDocument(countInfo.tagToken, countInfo.count));
+        }
+    }
+
+    auto escInsertReply =
+        uassertStatusOK(queryImpl->insertDocuments(nssEsc, escDocuments, pStmtId, true));
+    checkWriteErrors(escInsertReply);
+
+    NamespaceString nssEcoc(edcNss.dbName(), efc.getEcocCollection().value());
+    std::vector<BSONObj> ecocDocuments;
+    ecocDocuments.reserve(totalTokens);
+
+    for (auto& payload : serverPayload) {
+        const bool isRangePayload = payload.payload.getEdgeTokenSet().has_value();
+        if (isRangePayload) {
+            const auto& edgeTokenSet = payload.payload.getEdgeTokenSet().get();
+
+            for (const auto& et : edgeTokenSet) {
+                ecocDocuments.push_back(ECOCCollection::generateDocument(payload.fieldPathName,
+                                                                         et.getEncryptedTokens()));
+            }
+        } else {
+            ecocDocuments.push_back(ECOCCollection::generateDocument(
+                payload.fieldPathName, payload.payload.getEncryptedTokens()));
+        }
+    }
+
+    auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocuments(
+        nssEcoc, ecocDocuments, pStmtId, false, bypassDocumentValidation));
+    checkWriteErrors(ecocInsertReply);
 }
 
 void processFieldsForInsert(FLEQueryInterface* queryImpl,
@@ -1616,6 +1618,19 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
 
     return static_cast<uint64_t>(signedDocCount);
 }
+
+std::vector<std::vector<FLEEdgeCountInfo>> FLEQueryInterfaceImpl::getTags(
+    const NamespaceString& nss,
+    const std::vector<std::vector<FLEEdgePrfBlock>>& tokensSets,
+    FLEQueryInterface::TagQueryType type) {
+
+    auto docCount = countDocuments(nss);
+
+    TxnCollectionReader reader(docCount, this, nss);
+
+    return ESCCollection::getTags(reader, tokensSets, type);
+}
+
 
 StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocuments(
     const NamespaceString& nss,

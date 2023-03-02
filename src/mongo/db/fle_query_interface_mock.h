@@ -47,6 +47,11 @@ public:
 
     uint64_t countDocuments(const NamespaceString& nss) final;
 
+    std::vector<std::vector<FLEEdgeCountInfo>> getTags(
+        const NamespaceString& nss,
+        const std::vector<std::vector<FLEEdgePrfBlock>>& tokensSets,
+        FLETagQueryInterface::TagQueryType type) final;
+
     StatusWith<write_ops::InsertCommandReply> insertDocuments(
         const NamespaceString& nss,
         std::vector<BSONObj> objs,

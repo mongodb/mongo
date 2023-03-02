@@ -2235,6 +2235,56 @@ BSONObj runStateMachineForDecryption(mongocrypt_ctx_t* ctx, FLEKeyVault* keyVaul
     return result;
 }
 
+FLEEdgeCountInfo getEdgeCountInfo(const FLEStateCollectionReader& reader,
+                                  ConstDataRange tag,
+                                  FLETagQueryInterface::TagQueryType type,
+                                  const boost::optional<PrfBlock>& edc) {
+
+    uint64_t count;
+
+    auto escToken = EDCServerPayloadInfo::getESCToken(tag);
+
+    auto tagToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escToken);
+    auto valueToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escToken);
+
+    auto positions = ESCCollection::emuBinaryV2(reader, tagToken, valueToken);
+
+    if (positions.cpos.has_value()) {
+        // Either no ESC documents exist yet (cpos == 0), OR new non-anchors
+        // have been inserted since the last compact/cleanup (cpos > 0).
+        count = positions.cpos.value() + 1;
+    } else {
+        // No new non-anchors since the last compact/cleanup.
+        // There must be at least one anchor.
+        uassert(7291902,
+                "An ESC anchor document is expected but none is found",
+                !positions.apos.has_value() || positions.apos.value() > 0);
+
+        PrfBlock anchorId;
+        if (!positions.apos.has_value()) {
+            anchorId = ESCCollection::generateNullAnchorId(tagToken);
+        } else {
+            anchorId = ESCCollection::generateAnchorId(tagToken, positions.apos.value());
+        }
+
+        BSONObj anchorDoc = reader.getById(anchorId);
+        uassert(7291903, "ESC anchor document not found", !anchorDoc.isEmpty());
+
+        auto escAnchor =
+            uassertStatusOK(ESCCollection::decryptAnchorDocument(valueToken, anchorDoc));
+        count = escAnchor.count + 1;
+    }
+
+
+    if (type == FLETagQueryInterface::TagQueryType::kQuery) {
+        count -= 1;
+    }
+
+    return FLEEdgeCountInfo(count, tagToken, edc.map([](const PrfBlock& prf) {
+        return FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(prf);
+    }));
+}
+
 }  // namespace
 
 std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t sparsity) {
@@ -3082,6 +3132,28 @@ boost::optional<uint64_t> ESCCollection::binaryHops(const FLEStateCollectionRead
               << std::endl;
 #endif
     return binarySearchCommon(reader, rho, lambda, i, idGenerator, tracker);
+}
+
+std::vector<std::vector<FLEEdgeCountInfo>> ESCCollection::getTags(
+    const FLEStateCollectionReader& reader,
+    const std::vector<std::vector<FLEEdgePrfBlock>>& tokensSets,
+    FLETagQueryInterface::TagQueryType type) {
+
+    std::vector<std::vector<FLEEdgeCountInfo>> countInfoSets;
+    countInfoSets.reserve(tokensSets.size());
+
+    for (const auto& tokens : tokensSets) {
+        std::vector<FLEEdgeCountInfo> countInfos;
+        countInfos.reserve(tokens.size());
+
+        for (const auto& token : tokens) {
+            countInfos.push_back(getEdgeCountInfo(reader, token.esc, type, token.edc));
+        }
+
+        countInfoSets.emplace_back(countInfos);
+    }
+
+    return countInfoSets;
 }
 
 PrfBlock ECCCollection::generateId(ECCTwiceDerivedTagToken tagToken,

@@ -238,4 +238,36 @@ using ServerCountAndContentionFactorEncryptionToken =
     FLEToken<FLETokenType::ServerCountAndContentionFactorEncryptionToken>;
 using ServerZerosEncryptionToken = FLEToken<FLETokenType::ServerZerosEncryptionToken>;
 
+
+/**
+ * A pair of a (ESCDerivedFromDataTokenAndContentionFactorToken, optional
+ * EDCDerivedFromDataTokenAndContentionFactorToken) that will be used to lookup a count for the ESC
+ * token from ESC. The EDC token is simply passed through to the response for query tag generation.
+ * The inclusion of EDC simplifies the code that processes the response.
+ */
+struct FLEEdgePrfBlock {
+    PrfBlock esc;                   // ESCDerivedFromDataTokenAndContentionFactorToken
+    boost::optional<PrfBlock> edc;  // EDCDerivedFromDataTokenAndContentionFactorToken
+};
+
+/**
+ * The information retrieved from ESC for a given ESC token. Count may reflect a count suitable for
+ * insert or query.
+ */
+struct FLEEdgeCountInfo {
+    FLEEdgeCountInfo(uint64_t c, ESCTwiceDerivedTagToken t) : count(c), tagToken(t) {}
+
+    FLEEdgeCountInfo(uint64_t c,
+                     ESCTwiceDerivedTagToken t,
+                     boost::optional<EDCDerivedFromDataTokenAndContentionFactorToken> edcParam)
+        : count(c), tagToken(t), edc(edcParam) {}
+
+    // May reflect a value suitable for insert or query.
+    uint64_t count;
+
+    ESCTwiceDerivedTagToken tagToken;
+
+    boost::optional<EDCDerivedFromDataTokenAndContentionFactorToken> edc;
+};
+
 }  // namespace mongo

@@ -264,6 +264,7 @@ protected:
         NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.edc");
     NamespaceString _escNs =
         NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.esc");
+    // TODO: SERVER-73303 delete when v2 is enabled by default
     NamespaceString _eccNs =
         NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.ecc");
     NamespaceString _ecocNs =

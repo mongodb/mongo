@@ -296,6 +296,7 @@ public:
      */
     virtual std::vector<BSONObj> findDocuments(const NamespaceString& nss, BSONObj filter) = 0;
 };
+
 /**
  * Implementation of the FLE Query interface that exposes the DB operations needed for FLE 2
  * server-side work.
@@ -309,6 +310,11 @@ public:
     BSONObj getById(const NamespaceString& nss, BSONElement element) final;
 
     uint64_t countDocuments(const NamespaceString& nss) final;
+
+    std::vector<std::vector<FLEEdgeCountInfo>> getTags(
+        const NamespaceString& nss,
+        const std::vector<std::vector<FLEEdgePrfBlock>>& escDerivedFromDataTokenAndCounter,
+        FLETagQueryInterface::TagQueryType type) final;
 
     StatusWith<write_ops::InsertCommandReply> insertDocuments(
         const NamespaceString& nss,
