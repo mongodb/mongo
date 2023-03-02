@@ -167,6 +167,8 @@ std::unique_ptr<PlanStageStats> SortStage::getStats(bool includeDebugInfo) const
                          static_cast<long long>(_specificStats.totalDataSizeBytes));
         bob.appendBool("usedDisk", _specificStats.spills > 0);
         bob.appendNumber("spills", static_cast<long long>(_specificStats.spills));
+        bob.appendNumber("spilledDataStorageSize",
+                         static_cast<long long>(_specificStats.spilledDataStorageSize));
 
         BSONObjBuilder childrenBob(bob.subobjStart("orderBySlots"));
         for (size_t idx = 0; idx < _obs.size(); ++idx) {
@@ -294,6 +296,10 @@ void SortStage::SortImpl<KeyRow, ValueRow>::makeSorter() {
         ? _stage._specificStats.limit
         : 0;
     opts.moveSortedDataIntoIterator = true;
+    if (_stage._allowDiskUse) {
+        _stage._sorterFileStats = std::make_unique<SorterFileStats>(nullptr);
+        opts.sorterFileStats = _stage._sorterFileStats.get();
+    }
 
     auto comp = [&](const KeyRow& lhs, const KeyRow& rhs) {
         auto size = lhs.size();
@@ -365,6 +371,9 @@ void SortStage::SortImpl<KeyRow, ValueRow>::open(bool reOpen) {
     _mergeIt.reset(_sorter->done());
     _stage._specificStats.spills += _sorter->stats().spilledRanges();
     _stage._specificStats.keysSorted += _sorter->stats().numSorted();
+    if (_stage._sorterFileStats) {
+        _stage._specificStats.spilledDataStorageSize += _stage._sorterFileStats->bytesSpilled();
+    }
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_stage._opCtx);
     metricsCollector.incrementKeysSorted(_sorter->stats().numSorted());
     metricsCollector.incrementSorterSpills(_sorter->stats().spilledRanges());

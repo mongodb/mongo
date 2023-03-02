@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/sorter/sorter_stats.h"
 
 namespace mongo {
 template <typename Key, typename Value>
@@ -149,6 +150,8 @@ private:
     const std::vector<value::SortDirection> _dirs;
     const value::SlotVector _vals;
     const bool _allowDiskUse;
+
+    std::unique_ptr<SorterFileStats> _sorterFileStats;
 
     std::unique_ptr<SortIface> _stageImpl;
 

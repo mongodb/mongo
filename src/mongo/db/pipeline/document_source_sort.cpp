@@ -304,6 +304,8 @@ void DocumentSourceSort::serializeToArray(
                 Value(static_cast<long long>(_timeSorter->stats().bytesSorted()));
             mutDoc["usedDisk"] = Value(_timeSorter->stats().spilledRanges() > 0);
             mutDoc["spills"] = Value(static_cast<long long>(_timeSorter->stats().spilledRanges()));
+            mutDoc["spilledDataStorageSize"] =
+                Value(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
         }
 
         array.push_back(Value{mutDoc.freeze()});
@@ -339,6 +341,8 @@ void DocumentSourceSort::serializeToArray(
             Value(static_cast<long long>(stats.totalDataSizeBytes));
         mutDoc["usedDisk"] = Value(stats.spills > 0);
         mutDoc["spills"] = Value(static_cast<long long>(stats.spills));
+        mutDoc["spilledDataStorageSize"] =
+            Value(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
     }
 
     array.push_back(Value(mutDoc.freeze()));
@@ -439,6 +443,7 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
     if (expCtx->allowDiskUse) {
         opts.extSortAllowed = true;
         opts.tempDir = expCtx->tempDir;
+        opts.sorterFileStats = ds->getSorterFileStats();
     }
 
     if (limit) {
@@ -526,11 +531,14 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
                           << kMax << "'",
             boundBase == kMin || boundBase == kMax);
 
+    auto ds = DocumentSourceSort::create(expCtx, pat);
+
     SortOptions opts;
     opts.MaxMemoryUsageBytes(internalQueryMaxBlockingSortMemoryUsageBytes.load());
     if (expCtx->allowDiskUse) {
         opts.ExtSortAllowed(true);
         opts.TempDir(expCtx->tempDir);
+        opts.FileStats(ds->getSorterFileStats());
     }
     if (BSONElement limitElem = args["limit"]) {
         uassert(6588100,
@@ -539,7 +547,6 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
         opts.Limit(limitElem.numberLong());
     }
 
-    auto ds = DocumentSourceSort::create(expCtx, pat);
     if (boundBase == kMin) {
         if (pat.back().isAscending) {
             ds->_timeSorter.reset(

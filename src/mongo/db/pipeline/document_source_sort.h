@@ -189,6 +189,10 @@ public:
         return &_sortExecutor->stats();
     }
 
+    SorterFileStats* getSorterFileStats() const {
+        return _sortExecutor->getSorterFileStats();
+    }
+
 protected:
     GetNextResult doGetNext() final;
     /**

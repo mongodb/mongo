@@ -792,6 +792,9 @@ struct SortStats : public SpecificStats {
 
     // The number of times that we spilled data to disk during the execution of this query.
     uint64_t spills = 0u;
+
+    // The maximum size of the spill file written to disk, or 0 if no spilling occurred.
+    uint64_t spilledDataStorageSize = 0u;
 };
 
 struct MergeSortStats : public SpecificStats {

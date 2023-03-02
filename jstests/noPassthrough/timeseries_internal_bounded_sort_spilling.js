@@ -137,6 +137,7 @@ function assertSorted(result) {
     const docsPerBucket = Math.floor(stats.nReturned / buckets.count());
     const spillsPerBucket = Math.floor(docsPerBucket / docsToTriggerSpill);
     assert.gt(spillsPerBucket, 0);
+    assert.gt(stats.spilledDataStorageSize, 0);
     assert.gte(stats.spills, buckets.count() * spillsPerBucket);
 }
 
