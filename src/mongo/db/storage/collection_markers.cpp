@@ -475,7 +475,7 @@ CollectionTruncateMarkers::createFromExistingRecordStore(
     // If the collection doesn't contain enough records to make sampling more efficient, then scan
     // the collection to determine where to put down markers.
     auto numMarkers = dataSize / minBytesPerMarker;
-    if (numRecords < 0 || dataSize < 0 ||
+    if (numRecords <= 0 || dataSize <= 0 ||
         uint64_t(numRecords) <
             kMinSampleRatioForRandCursor * kRandomSamplesPerMarker * numMarkers) {
         return CollectionTruncateMarkers::createMarkersByScanning(
