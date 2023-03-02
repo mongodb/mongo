@@ -23,7 +23,8 @@
  *
  * @tags: [
  *   requires_majority_read_concern,
- *   multiversion_incompatible, # TODO(SERVER-73276): Remove this tag.
+ *   # This test is incompatible with earlier implementations of point-in-time catalog lookups.
+ *   requires_fcv_70,
  * ]
  */
 
