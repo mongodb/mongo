@@ -145,7 +145,6 @@ CursorInitialReply makeCursor(OperationContext* opCtx,
     exec->saveState();
     exec->detachFromOperationContext();
 
-    // TODO: SERVER-72667: Add privileges for getMore()
     // Global cursor registration must be done without holding any locks.
     auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
         opCtx,
@@ -157,7 +156,7 @@ CursorInitialReply makeCursor(OperationContext* opCtx,
          repl::ReadConcernArgs::get(opCtx),
          ReadPreferenceSetting::get(opCtx),
          cmdObj,
-         {}});
+         {Privilege(ResourcePattern::forClusterResource(), ActionType::internal)}});
 
     pinnedCursor->incNBatches();
     pinnedCursor->incNReturnedSoFar(firstBatch.size());

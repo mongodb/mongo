@@ -251,7 +251,38 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            // TODO: SERVER-72667: Add authorization checks for cluster command
+            auto isAuthorizedOnResource = [&](const ResourcePattern& resourcePattern) {
+                return AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(resourcePattern,
+                                                       ActionType::checkMetadataConsistency);
+            };
+
+            const auto nss = ns();
+            switch (getCommandLevel(nss)) {
+                case MetadataConsistencyCommandLevelEnum::kClusterLevel:
+                    uassert(ErrorCodes::Unauthorized,
+                            "Not authorized to check cluster metadata consistency",
+                            isAuthorizedOnResource(ResourcePattern::forClusterResource()));
+                    break;
+                case MetadataConsistencyCommandLevelEnum::kDatabaseLevel:
+                    uassert(ErrorCodes::Unauthorized,
+                            str::stream()
+                                << "Not authorized to check metadata consistency for database "
+                                << nss.db(),
+                            isAuthorizedOnResource(ResourcePattern::forClusterResource()) ||
+                                isAuthorizedOnResource(ResourcePattern::forDatabaseName(nss.db())));
+                    break;
+                case MetadataConsistencyCommandLevelEnum::kCollectionLevel:
+                    uassert(ErrorCodes::Unauthorized,
+                            str::stream()
+                                << "Not authorized to check metadata consistency for collection "
+                                << nss,
+                            isAuthorizedOnResource(ResourcePattern::forClusterResource()) ||
+                                isAuthorizedOnResource(ResourcePattern::forExactNamespace(nss)));
+                    break;
+                default:
+                    MONGO_UNREACHABLE;
+            }
         }
     };
 };

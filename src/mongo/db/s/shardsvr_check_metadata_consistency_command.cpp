@@ -194,16 +194,15 @@ public:
                 auto response = uassertStatusOK(std::move(cmdResponse.swResponse));
                 uassertStatusOK(getStatusFromCommandResult(response.data));
 
-                // TODO: SERVER-72667: Add privileges for getMore()
-                auto transformedResponse = uassertStatusOK(
-                    storePossibleCursor(opCtx,
-                                        cmdResponse.shardId,
-                                        *cmdResponse.shardHostAndPort,
-                                        response.data,
-                                        nss,
-                                        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                                        cursorManager,
-                                        {}));
+                auto transformedResponse = uassertStatusOK(storePossibleCursor(
+                    opCtx,
+                    cmdResponse.shardId,
+                    *cmdResponse.shardHostAndPort,
+                    response.data,
+                    nss,
+                    Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                    cursorManager,
+                    {Privilege(ResourcePattern::forClusterResource(), ActionType::internal)}));
 
                 auto checkMetadataConsistencyResponse = CursorInitialReply::parseOwned(
                     IDLParserContext("checkMetadataConsistency"), std::move(transformedResponse));

@@ -63,6 +63,7 @@ enums:
            changeOwnCustomData :  "changeOwnCustomData"
            changeStream :  "changeStream"
            checkFreeMonitoringStatus :  "checkFreeMonitoringStatus"
+           checkMetadataConsistency :  "checkMetadataConsistency"
            cleanupOrphaned :  "cleanupOrphaned"
            clearJumboFlag :  "clearJumboFlag"
            closeAllDatabases :  "closeAllDatabases"  # Deprecated (backwards compatibility)

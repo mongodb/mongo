@@ -350,6 +350,7 @@ roles:
                   - setChangeStreamState
                   - getChangeStreamState
                   - telemetryRead
+                  - checkMetadataConsistency
 
             - matchType: any_normal
               actions: &clusterManagerRoleDatabaseActions
