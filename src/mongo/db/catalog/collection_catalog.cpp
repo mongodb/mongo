@@ -1338,6 +1338,10 @@ uint64_t CollectionCatalog::getEpoch() const {
 
 std::shared_ptr<const Collection> CollectionCatalog::_getCollectionByUUID(OperationContext* opCtx,
                                                                           const UUID& uuid) const {
+    // It's important to look in UncommittedCatalogUpdates before OpenedCollections because in a
+    // multi-document transaction it's permitted to perform a lookup on a non-existent
+    // collection followed by creating the collection. This lookup will store a nullptr in
+    // OpenedCollections.
     auto [found, uncommittedColl, newColl] =
         UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
     if (uncommittedColl) {
@@ -1412,7 +1416,10 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
 const Collection* CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
                                                             UUID uuid) const {
     // If UUID is managed by UncommittedCatalogUpdates (but not newly created) return the pointer
-    // which will be nullptr in case of a drop.
+    // which will be nullptr in case of a drop. It's important to look in UncommittedCatalogUpdates
+    // before OpenedCollections because in a multi-document transaction it's permitted to perform a
+    // lookup on a non-existent collection followed by creating the collection. This lookup will
+    // store a nullptr in OpenedCollections.
     auto [found, uncommittedPtr, newColl] =
         UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
     if (found) {
@@ -1447,7 +1454,10 @@ std::shared_ptr<Collection> CollectionCatalog::_lookupCollectionByUUID(UUID uuid
 
 std::shared_ptr<const Collection> CollectionCatalog::_getCollectionByNamespace(
     OperationContext* opCtx, const NamespaceString& nss) const {
-
+    // It's important to look in UncommittedCatalogUpdates before OpenedCollections because in a
+    // multi-document transaction it's permitted to perform a lookup on a non-existent
+    // collection followed by creating the collection. This lookup will store a nullptr in
+    // OpenedCollections.
     auto [found, uncommittedColl, newColl] =
         UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
     if (uncommittedColl) {
@@ -1534,7 +1544,10 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
 const Collection* CollectionCatalog::lookupCollectionByNamespace(OperationContext* opCtx,
                                                                  const NamespaceString& nss) const {
     // If uncommittedPtr is valid, found is always true. Return the pointer as the collection still
-    // exists.
+    // exists. It's important to look in UncommittedCatalogUpdates before OpenedCollections because
+    // in a multi-document transaction it's permitted to perform a lookup on a non-existent
+    // collection followed by creating the collection. This lookup will store a nullptr in
+    // OpenedCollections.
     auto [found, uncommittedPtr, newColl] = UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
     if (uncommittedPtr) {
         return uncommittedPtr.get();
@@ -1557,6 +1570,10 @@ const Collection* CollectionCatalog::lookupCollectionByNamespace(OperationContex
 
 boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationContext* opCtx,
                                                                     const UUID& uuid) const {
+    // It's important to look in UncommittedCatalogUpdates before OpenedCollections because in a
+    // multi-document transaction it's permitted to perform a lookup on a non-existent
+    // collection followed by creating the collection. This lookup will store a nullptr in
+    // OpenedCollections.
     auto [found, uncommittedPtr, newColl] =
         UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
     // If UUID is managed by uncommittedCatalogUpdates return its corresponding namespace if the
@@ -1596,6 +1613,10 @@ boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationCon
 
 boost::optional<UUID> CollectionCatalog::lookupUUIDByNSS(OperationContext* opCtx,
                                                          const NamespaceString& nss) const {
+    // It's important to look in UncommittedCatalogUpdates before OpenedCollections because in a
+    // multi-document transaction it's permitted to perform a lookup on a non-existent
+    // collection followed by creating the collection. This lookup will store a nullptr in
+    // OpenedCollections.
     auto [found, uncommittedPtr, newColl] = UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
     if (uncommittedPtr) {
         return uncommittedPtr->uuid();
