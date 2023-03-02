@@ -182,7 +182,7 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTest) {
     int concurrency = 30;
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagConcurrencyInChunkMigration", true);
-    RAIIServerParameterControllerForTest setMigrationConcurrencyParam{"chunkMigrationConcurrency",
+    RAIIServerParameterControllerForTest setMigrationConcurrencyParam{"migrationConcurrency",
                                                                       concurrency};
 
     AlternativeClientRegion acr(newClient);
@@ -237,7 +237,7 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicFetching) {
     int concurrency = 30;
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagConcurrencyInChunkMigration", true);
-    RAIIServerParameterControllerForTest setMigrationConcurrencyParam{"chunkMigrationConcurrency",
+    RAIIServerParameterControllerForTest setMigrationConcurrencyParam{"migrationConcurrency",
                                                                       concurrency};
 
     auto fetcher = std::make_unique<MigrationBatchFetcher<MigrationBatchMockInserter>>(

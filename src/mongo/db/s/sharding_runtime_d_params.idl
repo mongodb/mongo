@@ -31,15 +31,15 @@ global:
       - "mongo/db/s/sharding_runtime_d_params.h"
 
 server_parameters:
-    chunkMigrationConcurrency:
+    migrationConcurrency:
         description: >-
           The number of threads doing insertions on the recipient during a chunk migration and
           also the number of _migrateClone requests that the recipient sends to the source in parallel.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
-        cpp_varname: chunkMigrationConcurrency
+        cpp_varname: migrationConcurrency
         validator:
-          callback: validateChunkMigrationConcurrency
+          callback: validateMigrationConcurrency
         default: 1
 
     rangeDeleterBatchSize:

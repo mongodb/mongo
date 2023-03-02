@@ -37,20 +37,19 @@
 
 namespace mongo {
 
-inline Status validateChunkMigrationConcurrency(const int& chunkMigrationConcurrency) {
-    const int maxConcurrency = 500;
+inline Status validateMigrationConcurrency(const int& migrationConcurrency) {
     if (!mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCV()) {
         return Status{ErrorCodes::InvalidOptions,
                       "Cannot set migration concurrency number without enabling migration "
                       "concurrency feature flag"};
     }
-
-    if (chunkMigrationConcurrency <= 0 ||
-        (chunkMigrationConcurrency > maxConcurrency && !getTestCommandsEnabled())) {
+    int maxConcurrency = ProcessInfo::getNumCores();
+    if (migrationConcurrency <= 0 ||
+        (migrationConcurrency > maxConcurrency && !getTestCommandsEnabled())) {
         return Status{
             ErrorCodes::InvalidOptions,
-            fmt::format("Chunk migration concurrency level must be positive and less than {}.",
-                        maxConcurrency)};
+            fmt::format(
+                "Migration concurrency level must be positive and less than the number of cores.")};
     }
     return Status::OK();
 }

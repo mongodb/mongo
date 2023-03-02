@@ -38,10 +38,10 @@ const runParallelMoveChunk = (numThreads) => {
 
     const kInitialLoadFinalKey = shardKeyVal;
 
-    print(`Running tests with chunkMigrationConcurrency == ${kThreadCount}`);
+    print(`Running tests with migrationConcurrency == ${kThreadCount}`);
     st._rs.forEach((replSet) => {
         assert.commandWorked(replSet.test.getPrimary().adminCommand(
-            {setParameter: 1, chunkMigrationConcurrency: kThreadCount}));
+            {setParameter: 1, migrationConcurrency: kThreadCount}));
     });
 
     const configCollEntry =
