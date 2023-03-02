@@ -78,6 +78,281 @@ index build on `{lastName: 1}`:
   'ns': 'test.employees'}
 ```
 
+### $listCatalog Aggregation Pipeline Operator
+
+[$listCatalog](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/pipeline/document_source_list_catalog.h#L46) is an internal aggregation pipeline operator that may be used to inspect the contents
+of the durable catalog on a running server. For catalog entries that refer to views, additional
+information is retrieved from the enclosing database's `system.views` collection. The $listCatalog
+is generally run on the admin database to obtain a complete view of the durable catalog, provided
+the caller has the required
+[administrative privileges](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/pipeline/document_source_list_catalog.cpp#L55).
+Example command invocation and output from
+[list_catalog.js](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/jstests/core/catalog/list_catalog.js#L98)):
+
+```
+> const adminDB = db.getSiblingDB('admin');
+> adminDB.aggregate([{$listCatalog: {}}]);
+
+Collectionless $listCatalog: [
+    {
+        "db" : "test",
+        "name" : "system.views",
+        "type" : "collection",
+        "md" : {
+            "ns" : "test.system.views",
+            "options" : {
+                "uuid" : UUID("a132c4ee-a1f4-4251-8eb2-c9f4afbeb9c1")
+            },
+            "indexes" : [
+                {
+                    "spec" : {
+                        "v" : 2,
+                        "key" : {
+                            "_id" : 1
+                        },
+                        "name" : "_id_"
+                    },
+                    "ready" : true,
+                    "multikey" : false,
+                    "multikeyPaths" : {
+                        "_id" : BinData(0,"AA==")
+                    },
+                    "head" : NumberLong(0),
+                    "backgroundSecondary" : false
+                }
+            ]
+        },
+        "idxIdent" : {
+            "_id_" : "index-6-2245557986372974053"
+        },
+        "ns" : "test.system.views",
+        "ident" : "collection-5-2245557986372974053"
+    },
+    {
+        "db" : "list_catalog",
+        "name" : "simple",
+        "type" : "collection",
+        "md" : {
+            "ns" : "list_catalog.simple",
+            "options" : {
+                "uuid" : UUID("a86445c2-3e3c-42ae-96be-5d451c977ed6")
+            },
+            "indexes" : [
+                {
+                    "spec" : {
+                        "v" : 2,
+                        "key" : {
+                            "_id" : 1
+                        },
+                        "name" : "_id_"
+                    },
+                    "ready" : true,
+                    "multikey" : false,
+                    "multikeyPaths" : {
+                        "_id" : BinData(0,"AA==")
+                    },
+                    "head" : NumberLong(0),
+                    "backgroundSecondary" : false
+                },
+                {
+                    "spec" : {
+                        "v" : 2,
+                        "key" : {
+                            "a" : 1
+                        },
+                        "name" : "a_1"
+                    },
+                    "ready" : true,
+                    "multikey" : false,
+                    "multikeyPaths" : {
+                        "a" : BinData(0,"AA==")
+                    },
+                    "head" : NumberLong(0),
+                    "backgroundSecondary" : false
+                }
+            ]
+        },
+        "idxIdent" : {
+            "_id_" : "index-62-2245557986372974053",
+            "a_1" : "index-63-2245557986372974053"
+        },
+        "ns" : "list_catalog.simple",
+        "ident" : "collection-61-2245557986372974053"
+    },
+    {
+        "db" : "list_catalog",
+        "name" : "system.views",
+        "type" : "collection",
+        "md" : {
+            "ns" : "list_catalog.system.views",
+            "options" : {
+                "uuid" : UUID("2f76dd14-1d9a-42e1-8716-c1165cdbb00f")
+            },
+            "indexes" : [
+                {
+                    "spec" : {
+                        "v" : 2,
+                        "key" : {
+                            "_id" : 1
+                        },
+                        "name" : "_id_"
+                    },
+                    "ready" : true,
+                    "multikey" : false,
+                    "multikeyPaths" : {
+                        "_id" : BinData(0,"AA==")
+                    },
+                    "head" : NumberLong(0),
+                    "backgroundSecondary" : false
+                }
+            ]
+        },
+        "idxIdent" : {
+            "_id_" : "index-65-2245557986372974053"
+        },
+        "ns" : "list_catalog.system.views",
+        "ident" : "collection-64-2245557986372974053"
+    },
+    {
+        "db" : "list_catalog",
+        "name" : "simple_view",
+        "type" : "view",
+        "ns" : "list_catalog.simple_view",
+        "_id" : "list_catalog.simple_view",
+        "viewOn" : "simple",
+        "pipeline" : [
+            {
+                "$project" : {
+                    "a" : 0
+                }
+            }
+        ]
+    },
+    ...
+]
+
+```
+
+The `$listCatalog` also supports running on a specific collection. See example in
+[list_catalog.js](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/jstests/core/catalog/list_catalog.js#L77).
+
+This aggregation pipeline operator is primarily intended for internal diagnostics and applications that require information not
+currently provided by [listDatabases](https://www.mongodb.com/docs/v6.0/reference/command/listDatabases/),
+[listCollections](https://www.mongodb.com/docs/v6.0/reference/command/listCollections/), and
+[listIndexes](https://www.mongodb.com/docs/v6.0/reference/command/listIndexes/). The three commands referenced are part of the
+[Stable API](https://www.mongodb.com/docs/v6.0/reference/stable-api/) with a well-defined output format (see
+[listIndexes IDL](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/list_indexes.idl#L225)).
+
+#### Read Concern Support
+
+In terms of accessing the current state of databases, collections, and indexes in a running server,
+the `$listCatalog` provides a consistent snapshot of the catalog in a single command invocation
+using the default or user-provided
+[read concern](https://www.mongodb.com/docs/v6.0/reference/method/db.collection.aggregate/). The
+[list_catalog_read_concern.js](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/jstests/noPassthrough/list_catalog_read_concern.js#L46)
+contains examples of using $listCatalog with a variety of read concern settings.
+
+The tradtional alternative would have involved a `listDatabases` command followed by a series of
+`listCollections` and `listIndexes` calls, with the downside of reading the catalog at a different
+point in time during each command invocation.
+
+#### Examples of differences between listIndexes and $listCatalog results
+
+The `$listCatalog` operator does not format its results with the IDL-derived formatters generated for the `listIndexes` command.
+This has implications for applications that read the durable catalog using $listCatalog rather than the recommended listIndexes
+command. Below are a few examples where the `listIndexes` results may differ from `$listCatalog`.
+
+| Index Type | Index Option | createIndexes | listIndexes | $listCatalog |
+| ---------- | ------------ | ------------- | ----------- | ------------ |
+| [Sparse](https://www.mongodb.com/docs/v6.0/core/index-sparse/) | [sparse (safeBool)](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/list_indexes.idl#L84) | `db.t.createIndex({a: 1}, {sparse: 12345})` | `{ "v" : 2, "key" : { "a" : 1 }, "name" : "a_1", "sparse" : true }` | `{ "v" : 2, "key" : { "a" : 1 }, "name" : "a_1", "sparse" : 12345 }` |
+| [TTL](https://www.mongodb.com/docs/v6.0/core/index-ttl/) | [expireAfterSeconds (safeInt)](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/list_indexes.idl#L88) | `db.t.createIndex({created: 1}, {expireAfterSeconds: 10.23})` | `{ "v" : 2, "key" : { "created" : 1 }, "name" : "created_1", "expireAfterSeconds" : 10 }` | `{ "v" : 2, "key" : { "created" : 1 }, "name" : "created_1", "expireAfterSeconds" : 10.23 }` |
+| [Geo](https://www.mongodb.com/docs/v6.0/tutorial/build-a-2d-index/) | [bits (safeInt)](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/list_indexes.idl#L117) | `db.t.createIndex({p: '2d'}, {bits: 16.578})` | `{ "v" : 2, "key" : { "p" : "2d" }, "name" : "p_2d", "bits" : 16 }` | `{ "v" : 2, "key" : { "p" : "2d" }, "name" : "p_2d", "bits" : 16.578 }` |
+
+#### $listCatalog in a sharded cluster
+
+The `$listCatalog` operator supports running in a sharded cluster where the `$listCatalog`
+result from each shard is combined at the router with additional identifying information similar
+to the [shard](https://www.mongodb.com/docs/v6.0/reference/operator/aggregation/indexStats/#std-label-indexStats-output-shard) output field
+of the `$indexStats` operator. The following is a sample test output from
+[sharding/list_catalog.js](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/jstests/sharding/list_catalog.js#L40):
+
+```
+[
+    {
+        "db" : "list_catalog",
+        "name" : "coll",
+        "type" : "collection",
+        "shard" : "list_catalog-rs0",
+        "md" : {
+            "ns" : "list_catalog.coll",
+            "options" : {
+                "uuid" : UUID("17886eb0-f157-45c9-9b63-efb8273f51da")
+            },
+            "indexes" : [
+                {
+                    "spec" : {
+                        "v" : 2,
+                        "key" : {
+                            "_id" : 1
+                        },
+                        "name" : "_id_"
+                    },
+                    "ready" : true,
+                    "multikey" : false,
+                    "multikeyPaths" : {
+                        "_id" : BinData(0,"AA==")
+                    },
+                    "head" : NumberLong(0),
+                    "backgroundSecondary" : false
+                }
+            ]
+        },
+        "idxIdent" : {
+            "_id_" : "index-56--2997668048670645427"
+        },
+        "ns" : "list_catalog.coll",
+        "ident" : "collection-55--2997668048670645427"
+    },
+    {
+        "db" : "list_catalog",
+        "name" : "coll",
+        "type" : "collection",
+        "shard" : "list_catalog-rs1",
+        "md" : {
+            "ns" : "list_catalog.coll",
+            "options" : {
+                "uuid" : UUID("17886eb0-f157-45c9-9b63-efb8273f51da")
+            },
+            "indexes" : [
+                {
+                    "spec" : {
+                        "v" : 2,
+                        "key" : {
+                            "_id" : 1
+                        },
+                        "name" : "_id_"
+                    },
+                    "ready" : true,
+                    "multikey" : false,
+                    "multikeyPaths" : {
+                        "_id" : BinData(0,"AA==")
+                    },
+                    "head" : NumberLong(0),
+                    "backgroundSecondary" : false
+                }
+            ]
+        },
+        "idxIdent" : {
+            "_id_" : "index-55--2220352983339007214"
+        },
+        "ns" : "list_catalog.coll",
+        "ident" : "collection-53--2220352983339007214"
+    }
+]
+
+```
+
+
 ## Collection Catalog
 The `CollectionCatalog` class holds in-memory state about all collections in all databases and is a
 cache of the [durable catalog](#durable-catalog) state. It provides the following functionality:
