@@ -237,7 +237,9 @@ public:
 
     Status doOptimizedReconfig(OperationContext* opCtx, GetNewConfigFn getNewConfig) override;
 
-    Status awaitConfigCommitment(OperationContext* opCtx, bool waitForOplogCommitment) override;
+    Status awaitConfigCommitment(OperationContext* opCtx,
+                                 bool waitForOplogCommitment,
+                                 long long term) override;
 
     Status processReplSetInitiate(OperationContext*, const BSONObj&, BSONObjBuilder*) override;
 

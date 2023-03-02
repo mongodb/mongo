@@ -402,7 +402,8 @@ Status ReplicationCoordinatorNoOp::doOptimizedReconfig(OperationContext* opCtx,
 }
 
 Status ReplicationCoordinatorNoOp::awaitConfigCommitment(OperationContext* opCtx,
-                                                         bool waitForOplogCommitment) {
+                                                         bool waitForOplogCommitment,
+                                                         long long term) {
     MONGO_UNREACHABLE;
 }
 

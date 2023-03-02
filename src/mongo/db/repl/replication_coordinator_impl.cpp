@@ -2162,7 +2162,8 @@ SharedSemiFuture<void> ReplicationCoordinatorImpl::_startWaitingForReplication(
                     "Primary stepped down while waiting for replication"};
         }
 
-        if (opTime.getTerm() != _topCoord->getTerm()) {
+        auto term = opTime.getTerm();
+        if (term != OpTime::kUninitializedTerm && term != _topCoord->getTerm()) {
             return {
                 ErrorCodes::PrimarySteppedDown,
                 str::stream() << "Term changed from " << opTime.getTerm() << " to "
@@ -4106,7 +4107,8 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
 }
 
 Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx,
-                                                         bool waitForOplogCommitment) {
+                                                         bool waitForOplogCommitment,
+                                                         long long term) {
     stdx::unique_lock<Latch> lk(_mutex);
     // Check writable primary before waiting.
     if (!_readWriteAbility->canAcceptNonLocalWrites(lk)) {
@@ -4117,10 +4119,10 @@ Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx
     }
     auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
     auto oplogWriteConcern = _getOplogCommitmentWriteConcern(lk);
-    OpTime fakeOpTime(Timestamp(1, 1), _topCoord->getTerm());
     auto currConfig = _rsConfig;
     lk.unlock();
 
+    OpTime fakeOpTime(Timestamp(1, 1), term);
     // Wait for the config document to be replicated to a majority of nodes in the current config.
     LOGV2(4508702, "Waiting for the current config to propagate to a majority of nodes");
     StatusAndDuration configAwaitStatus =
@@ -4138,6 +4140,19 @@ Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx
         return configAwaitStatus.status.withContext(ss.str());
     }
 
+    // In an edge case, if this node has received and installed new config with a higher term via
+    // a heartbeat reconfig while still waiting for an earlier config to propagate, we can
+    // erroneously return the earlier reconfig request successfully. Therefore, if a node sees that
+    // its installed config term is higher than the config term it is waiting on, it means a new
+    // primary has been elected, and we should fail the original reconfig request.
+    auto currTerm = getConfigTerm();
+    if (term != OpTime::kUninitializedTerm && term < currTerm) {
+        return Status(ErrorCodes::PrimarySteppedDown,
+                      str::stream()
+                          << "Term changed from " << term << " to " << currTerm
+                          << " while waiting for replication, indicating that this node must "
+                             "have stepped down.");
+    }
     if (!waitForOplogCommitment) {
         LOGV2(4689401, "Propagated current replica set config to a majority of nodes", attr);
         return Status::OK();

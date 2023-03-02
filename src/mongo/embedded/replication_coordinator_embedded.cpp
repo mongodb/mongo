@@ -429,7 +429,8 @@ Status ReplicationCoordinatorEmbedded::doOptimizedReconfig(OperationContext* opC
 }
 
 Status ReplicationCoordinatorEmbedded::awaitConfigCommitment(OperationContext* opCtx,
-                                                             bool waitForOplogCommitment) {
+                                                             bool waitForOplogCommitment,
+                                                             long long term) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

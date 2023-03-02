@@ -539,7 +539,8 @@ Status ReplicationCoordinatorMock::doOptimizedReconfig(OperationContext* opCtx,
 }
 
 Status ReplicationCoordinatorMock::awaitConfigCommitment(OperationContext* opCtx,
-                                                         bool waitForOplogCommitment) {
+                                                         bool waitForOplogCommitment,
+                                                         long long term) {
     return Status::OK();
 }
 

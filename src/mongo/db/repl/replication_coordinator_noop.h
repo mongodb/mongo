@@ -228,7 +228,9 @@ public:
 
     Status doOptimizedReconfig(OperationContext* opCtx, GetNewConfigFn) final;
 
-    Status awaitConfigCommitment(OperationContext* opCtx, bool waitForOplogCommitment) final;
+    Status awaitConfigCommitment(OperationContext* opCtx,
+                                 bool waitForOplogCommitment,
+                                 long long term) final;
 
     Status processReplSetInitiate(OperationContext*, const BSONObj&, BSONObjBuilder*) final;
 

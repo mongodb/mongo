@@ -261,7 +261,9 @@ public:
 
     virtual Status doOptimizedReconfig(OperationContext* opCtx, GetNewConfigFn getNewConfig);
 
-    Status awaitConfigCommitment(OperationContext* opCtx, bool waitForOplogCommitment);
+    Status awaitConfigCommitment(OperationContext* opCtx,
+                                 bool waitForOplogCommitment,
+                                 long long term);
 
     virtual Status processReplSetInitiate(OperationContext* opCtx,
                                           const BSONObj& configObj,

@@ -140,20 +140,6 @@ void deletePersistedDefaultRWConcernDocument(OperationContext* opCtx) {
     uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
 }
 
-void waitForCurrentConfigCommitment(OperationContext* opCtx) {
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-
-    // Skip the waiting if the current config is from a force reconfig.
-    auto oplogWait = replCoord->getConfigTerm() != repl::OpTime::kUninitializedTerm;
-    auto status = replCoord->awaitConfigCommitment(opCtx, oplogWait);
-    status.addContext("New feature compatibility version is rejected");
-    if (status == ErrorCodes::MaxTimeMSExpired) {
-        // Convert the error code to be more specific.
-        uasserted(ErrorCodes::CurrentConfigNotCommittedYet, status.reason());
-    }
-    uassertStatusOK(status);
-}
-
 void abortAllReshardCollection(OperationContext* opCtx) {
     auto reshardingCoordinatorService = checked_cast<ReshardingCoordinatorService*>(
         repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())

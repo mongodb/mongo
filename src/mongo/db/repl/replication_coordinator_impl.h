@@ -293,7 +293,8 @@ public:
     virtual Status doOptimizedReconfig(OperationContext* opCtx, GetNewConfigFn) override;
 
     virtual Status awaitConfigCommitment(OperationContext* opCtx,
-                                         bool waitForOplogCommitment) override;
+                                         bool waitForOplogCommitment,
+                                         long long term) override;
 
     virtual Status processReplSetInitiate(OperationContext* opCtx,
                                           const BSONObj& configObj,
