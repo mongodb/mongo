@@ -106,9 +106,10 @@ const char* AccumulatorMinMaxN::getOpName() const {
 
 Document AccumulatorMinMaxN::serialize(boost::intrusive_ptr<Expression> initializer,
                                        boost::intrusive_ptr<Expression> argument,
-                                       bool explain) const {
+                                       bool explain,
+                                       SerializationOptions options) const {
     MutableDocument args;
-    AccumulatorN::serializeHelper(initializer, argument, explain, args);
+    AccumulatorN::serializeHelper(initializer, argument, options, args);
     return DOC(getOpName() << args.freeze());
 }
 
@@ -313,9 +314,10 @@ const char* AccumulatorFirstLastN::getOpName() const {
 
 Document AccumulatorFirstLastN::serialize(boost::intrusive_ptr<Expression> initializer,
                                           boost::intrusive_ptr<Expression> argument,
-                                          bool explain) const {
+                                          bool explain,
+                                          SerializationOptions options) const {
     MutableDocument args;
-    AccumulatorN::serializeHelper(initializer, argument, explain, args);
+    AccumulatorN::serializeHelper(initializer, argument, options, args);
     return DOC(getOpName() << args.freeze());
 }
 
@@ -460,13 +462,14 @@ template <TopBottomSense sense, bool single>
 Document AccumulatorTopBottomN<sense, single>::serialize(
     boost::intrusive_ptr<Expression> initializer,
     boost::intrusive_ptr<Expression> argument,
-    bool explain) const {
+    bool explain,
+    SerializationOptions options) const {
     MutableDocument args;
 
     if constexpr (!single) {
-        args.addField(kFieldNameN, Value(initializer->serialize(explain)));
+        args.addField(kFieldNameN, Value(initializer->serialize(options)));
     }
-    auto serializedArg = argument->serialize(explain);
+    auto serializedArg = argument->serialize(options);
 
     // If 'argument' contains a field named 'output', this means that we are serializing the
     // accumulator's original output expression under the field name 'output'. Otherwise, we are
@@ -479,13 +482,14 @@ Document AccumulatorTopBottomN<sense, single>::serialize(
     }
     args.addField(kFieldNameSortBy,
                   Value(_sortPattern.serialize(
-                      SortPattern::SortKeySerialization::kForPipelineSerialization)));
+                      SortPattern::SortKeySerialization::kForPipelineSerialization, options)));
     return DOC(getOpName() << args.freeze());
 }
 
 template <TopBottomSense sense>
 std::pair<SortPattern, BSONArray> parseAccumulatorTopBottomNSortBy(ExpressionContext* const expCtx,
                                                                    BSONObj sortBy) {
+
     SortPattern sortPattern(sortBy, expCtx);
     BSONArrayBuilder sortFieldsExpBab;
     BSONObjIterator sortByBoi(sortBy);
@@ -510,10 +514,8 @@ template <TopBottomSense sense, bool single>
 AccumulationExpression AccumulatorTopBottomN<sense, single>::parseTopBottomN(
     ExpressionContext* const expCtx, BSONElement elem, VariablesParseState vps) {
     auto name = AccumulatorTopBottomN<sense, single>::getName();
-
     const auto [n, output, sortBy] =
         accumulatorNParseArgs<single>(expCtx, elem, name.rawData(), true, vps);
-
     auto [sortPattern, sortFieldsExp] = parseAccumulatorTopBottomNSortBy<sense>(expCtx, *sortBy);
 
     // Construct argument expression. If given sortBy: {field1: 1, field2: 1} it will be shaped like

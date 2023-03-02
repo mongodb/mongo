@@ -48,9 +48,11 @@ ExpressionFunction::ExpressionFunction(ExpressionContext* const expCtx,
 
 Value ExpressionFunction::serialize(SerializationOptions options) const {
     MutableDocument d;
-    d["body"] = Value(_funcSource);
+    d["body"] = options.replacementForLiteralArgs ? Value(*options.replacementForLiteralArgs)
+                                                  : Value(_funcSource);
     d["args"] = Value(_passedArgs->serialize(options));
     d["lang"] = Value(_lang);
+
     // This field will only be seralized when desugaring $where in $expr + $_internalJs
     if (_assignFirstArgToThis) {
         d["_internalSetObjToThis"] = Value(_assignFirstArgToThis);

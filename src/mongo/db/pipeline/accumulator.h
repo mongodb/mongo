@@ -137,12 +137,13 @@ public:
      */
     virtual Document serialize(boost::intrusive_ptr<Expression> initializer,
                                boost::intrusive_ptr<Expression> argument,
-                               bool explain) const {
+                               bool explain,
+                               SerializationOptions options = {}) const {
         ExpressionConstant const* ec = dynamic_cast<ExpressionConstant const*>(initializer.get());
         invariant(ec);
         invariant(ec->getValue().nullish());
 
-        return DOC(getOpName() << argument->serialize(explain));
+        return DOC(getOpName() << argument->serialize(options));
     }
 
     virtual AccumulatorDocumentsNeeded documentsNeeded() const {
