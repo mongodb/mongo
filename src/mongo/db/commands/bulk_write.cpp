@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/bulk_write_crud_op.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
 #include "mongo/db/cursor_manager.h"
@@ -212,20 +213,6 @@ private:
     std::vector<BulkWriteReplyItem> _replies;
 };
 
-enum OperationType { kInsert = 1, kUpdate = 2, kDelete = 3 };
-
-OperationType getOpType(const stdx::variant<mongo::BulkWriteInsertOp,
-                                            mongo::BulkWriteUpdateOp,
-                                            mongo::BulkWriteDeleteOp>& op) {
-    return stdx::visit(
-        OverloadedVisitor{
-            [](const mongo::BulkWriteInsertOp& value) { return OperationType::kInsert; },
-            [](const mongo::BulkWriteUpdateOp& value) { return OperationType::kUpdate; },
-            [](const mongo::BulkWriteDeleteOp& value) { return OperationType::kDelete; },
-        },
-        op);
-}
-
 int32_t getStatementId(OperationContext* opCtx,
                        const BulkWriteCommandRequest& req,
                        const size_t currentOpIdx) {
@@ -245,25 +232,25 @@ int32_t getStatementId(OperationContext* opCtx,
 }
 
 bool handleInsertOp(OperationContext* opCtx,
+                    const BulkWriteInsertOp* op,
                     const BulkWriteCommandRequest& req,
                     size_t currentOpIdx,
                     InsertBatch& batch) {
     const auto& nsInfo = req.getNsInfo();
-    // Caller needs to check the type with getOpType or this stdx::get<>() will throw.
-    auto& op = stdx::get<mongo::BulkWriteInsertOp>(req.getOps()[currentOpIdx]);
-    auto idx = op.getInsert();
+    auto idx = op->getInsert();
 
     auto stmtId = getStatementId(opCtx, req, currentOpIdx);
     bool containsDotsAndDollarsField = false;
-    auto fixedDoc = fixDocumentForInsert(opCtx, op.getDocument(), &containsDotsAndDollarsField);
+    auto fixedDoc = fixDocumentForInsert(opCtx, op->getDocument(), &containsDotsAndDollarsField);
     BSONObj toInsert =
-        fixedDoc.getValue().isEmpty() ? op.getDocument() : std::move(fixedDoc.getValue());
+        fixedDoc.getValue().isEmpty() ? op->getDocument() : std::move(fixedDoc.getValue());
 
     // TODO handle !fixedDoc.isOk() condition like in write_ops_exec::performInserts.
     return batch.addToBatch(opCtx, currentOpIdx, stmtId, nsInfo[idx], toInsert);
 }
 
 bool handleUpdateOp(OperationContext* opCtx,
+                    const BulkWriteUpdateOp* op,
                     const BulkWriteCommandRequest& req,
                     size_t currentOpIdx,
                     std::function<void(OperationContext*, int, const SingleWriteResult&)> replyCB) {
@@ -274,6 +261,7 @@ bool handleUpdateOp(OperationContext* opCtx,
 }
 
 bool handleDeleteOp(OperationContext* opCtx,
+                    const BulkWriteDeleteOp* op,
                     const BulkWriteCommandRequest& req,
                     size_t currentOpIdx,
                     std::function<void(OperationContext*, int, const SingleWriteResult&)> replyCB) {
@@ -315,19 +303,20 @@ std::vector<BulkWriteReplyItem> performWrites(OperationContext* opCtx,
     size_t idx = 0;
 
     for (; idx < ops.size(); ++idx) {
-        auto opType = getOpType(ops[idx]);
+        auto op = BulkWriteCRUDOp(ops[idx]);
+        auto opType = op.getType();
 
-        if (opType == kInsert) {
-            if (!handleInsertOp(opCtx, req, idx, batch)) {
+        if (opType == BulkWriteCRUDOp::kInsert) {
+            if (!handleInsertOp(opCtx, op.getInsert(), req, idx, batch)) {
                 // Insert write failed can no longer continue.
                 break;
             }
-        } else if (opType == kUpdate) {
+        } else if (opType == BulkWriteCRUDOp::kUpdate) {
             // Flush insert ops before handling update ops.
             if (!batch.flush(opCtx)) {
                 break;
             }
-            if (!handleUpdateOp(opCtx, req, idx, updateCB)) {
+            if (!handleUpdateOp(opCtx, op.getUpdate(), req, idx, updateCB)) {
                 // Update write failed can no longer continue.
                 break;
             }
@@ -336,7 +325,7 @@ std::vector<BulkWriteReplyItem> performWrites(OperationContext* opCtx,
             if (!batch.flush(opCtx)) {
                 break;
             }
-            if (!handleDeleteOp(opCtx, req, idx, deleteCB)) {
+            if (!handleDeleteOp(opCtx, op.getDelete(), req, idx, deleteCB)) {
                 // Delete write failed can no longer continue.
                 break;
             }
@@ -421,19 +410,11 @@ public:
             const auto& nsInfo = req.getNsInfo();
 
             for (const auto& op : ops) {
-                // TODO(SERVER-74155) revisit logging value.toBSON() instead of 'op' once we have a
-                // helper. Issue is that we want to avoid serialization in the happy path so the
-                // visit below is not the correct place to do this right now.
-                unsigned int nsInfoIdx = stdx::visit(
-                    OverloadedVisitor{
-                        [](const mongo::BulkWriteInsertOp& value) { return value.getInsert(); },
-                        [](const mongo::BulkWriteUpdateOp& value) { return value.getUpdate(); },
-                        [](const mongo::BulkWriteDeleteOp& value) {
-                            return value.getDeleteCommand();
-                        }},
-                    op);
+                const auto& bulkWriteOp = BulkWriteCRUDOp(op);
+                unsigned int nsInfoIdx = bulkWriteOp.getNsInfoIdx();
                 uassert(ErrorCodes::BadValue,
-                        str::stream() << "BulkWrite ops entry has an invalid nsInfo index.",
+                        str::stream() << "BulkWrite ops entry " << bulkWriteOp.toBSON()
+                                      << " has an invalid nsInfo index.",
                         nsInfoIdx < nsInfo.size());
             }
 
@@ -475,29 +456,12 @@ public:
 
             // Iterate over each op and assign the appropriate actions to the namespace privilege.
             for (const auto& op : ops) {
-                // TODO(SERVER-74155) revisit logging value.toBSON() instead of 'op' once we have a
-                // helper. Issue is that we want to avoid serialization in the happy path so the
-                // visit below is not the correct place to do this right now.
-                ActionSet newActions;
-                unsigned int nsInfoIdx = stdx::visit(
-                    OverloadedVisitor{[&newActions](const mongo::BulkWriteInsertOp& value) {
-                                          newActions.addAction(ActionType::insert);
-                                          return value.getInsert();
-                                      },
-                                      [&newActions](const mongo::BulkWriteUpdateOp& value) {
-                                          if (value.getUpsert()) {
-                                              newActions.addAction(ActionType::insert);
-                                          }
-                                          newActions.addAction(ActionType::update);
-                                          return value.getUpdate();
-                                      },
-                                      [&newActions](const mongo::BulkWriteDeleteOp& value) {
-                                          newActions.addAction(ActionType::remove);
-                                          return value.getDeleteCommand();
-                                      }},
-                    op);
+                const auto& bulkWriteOp = BulkWriteCRUDOp(op);
+                ActionSet newActions = bulkWriteOp.getActions();
+                unsigned int nsInfoIdx = bulkWriteOp.getNsInfoIdx();
                 uassert(ErrorCodes::BadValue,
-                        str::stream() << "BulkWrite ops entry has an invalid nsInfo index.",
+                        str::stream() << "BulkWrite ops entry " << bulkWriteOp.toBSON()
+                                      << " has an invalid nsInfo index.",
                         nsInfoIdx < nsInfo.size());
 
                 auto& privilege = privileges[nsInfoIdx];

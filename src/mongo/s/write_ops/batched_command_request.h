@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 #include <memory>
 
+#include "mongo/db/commands/bulk_write_crud_op.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/rpc/op_msg.h"
@@ -40,13 +41,6 @@
 #include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
-
-// TODO(SERVER-74155): consider this for the helper class to access variant op.
-// This function was introduced to mitigate an MSVC Internal compiler error around
-// stdx::get<T>(op).getDocument(), see SERVER-72092.
-const mongo::BulkWriteInsertOp& getInsert(const stdx::variant<mongo::BulkWriteInsertOp,
-                                                              mongo::BulkWriteUpdateOp,
-                                                              mongo::BulkWriteDeleteOp>& op);
 
 /**
  * This class wraps the different kinds of command requests into a generically usable write command
@@ -271,7 +265,7 @@ public:
         } else {
             tassert(7263703, "invalid bulkWrite request reference", _bulkWriteRequest);
             const auto& op = _bulkWriteRequest->getOps()[_index];
-            return getInsert(op).getDocument();
+            return BulkWriteCRUDOp(op).getInsert()->getDocument();
         }
     }
     const auto& getUpdate() const {
