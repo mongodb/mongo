@@ -425,7 +425,6 @@ void broadcastDropCollection(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const std::shared_ptr<executor::TaskExecutor>& executor,
                              const OperationSessionInfo& osi) {
-    const ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);

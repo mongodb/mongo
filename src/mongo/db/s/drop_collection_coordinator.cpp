@@ -76,10 +76,7 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
             ->clearFilteringMetadataForDroppedCollection(opCtx);
     }
 
-    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        dropCollectionGlobalIndexesMetadata(opCtx, nss);
-    }
+    dropCollectionGlobalIndexesMetadata(opCtx, nss);
 
     // Remove all range deletion task documents present on disk for the collection to drop. This is
     // a best-effort tentative considering that migrations are not blocked, hence some new document

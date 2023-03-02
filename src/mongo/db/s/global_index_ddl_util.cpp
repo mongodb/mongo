@@ -417,8 +417,13 @@ void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx, const Namespac
                 const auto query =
                     BSON(ShardAuthoritativeCollectionType::kNssFieldName << nss.ns());
                 BSONObj collectionDoc;
-                // Return if there is nothing to clear.
+                // Get the collection UUID, if nothing is found, return early.
                 if (!Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc)) {
+                    LOGV2_DEBUG(6712305,
+                                1,
+                                "dropCollectionGlobalIndexesMetadata did not found collection, "
+                                "skipping dropping index metadata",
+                                "nss"_attr = redact(nss.toString()));
                     return;
                 }
                 auto collection = ShardAuthoritativeCollectionType::parse(
