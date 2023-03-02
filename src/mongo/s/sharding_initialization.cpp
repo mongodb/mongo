@@ -276,9 +276,11 @@ void preCacheMongosRoutingInfo(OperationContext* opCtx) {
         return;
     }
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        return;
-    }
+    // There's no reason this can't run on a shard or config server, but it currently only runs on a
+    // mongos, and we'd need to consider the implications of it running on either kind of mongod.
+    tassert(71960,
+            "Unexpectedly pre caching mongos routing info on shard or config server node",
+            serverGlobalParams.clusterRole == ClusterRole::None);
 
     auto grid = Grid::get(opCtx);
     auto catalogClient = grid->catalogClient();
@@ -304,9 +306,11 @@ Status preWarmConnectionPool(OperationContext* opCtx) {
         return Status::OK();
     }
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        return Status::OK();
-    }
+    // There's no reason this can't run on a shard or config server, but it currently only runs on a
+    // mongos, and we'd need to consider the implications of it running on either kind of mongod.
+    tassert(71961,
+            "Unexpectedly pre warming connection pool on shard or config server node",
+            serverGlobalParams.clusterRole == ClusterRole::None);
 
     std::vector<HostAndPort> allHosts;
     auto const grid = Grid::get(opCtx);
