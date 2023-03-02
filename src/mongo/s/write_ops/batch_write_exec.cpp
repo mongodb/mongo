@@ -415,7 +415,16 @@ void executeTwoPhaseWrite(OperationContext* opCtx,
     }
 
     // Since we only send the write to a single shard, record the response of the write against the
-    // corresponding child batch for the targeted shard. Record no-ops for the remaining shards.
+    // first TargetedWriteBatch, and record no-ops for the remaining targeted shards. We always
+    // resolve the first batch due to a quirk of this protocol running within an internal
+    // transaction. This is because StaleShardVersion errors are automatically retried within the
+    // internal transaction, and if there happened to be a moveChunk that changes the number of
+    // targetable shards, the two phase protocol would still complete successfully, but the
+    // childBatches here could potentially still only include targetedWrites for the previous subset
+    // of shards before the moveChunk (since the StaleShardVersion error was not made visible here).
+    // It isn't important which TargetedWriteBatch records the write response, just as long as only
+    // one does so that the response on the client is still valid.
+    bool hasRecordedWriteResponseForFirstBatch = false;
     for (auto&& childBatch : childBatches) {
         auto nextBatch = std::move(childBatch.second);
 
@@ -424,18 +433,20 @@ void executeTwoPhaseWrite(OperationContext* opCtx,
         invariant(nextBatch->getWrites().size() == 1);
 
         if (responseStatus.isOK()) {
-            // If no document matches were made, then the shardId would be the empty string and all
-            // of the child batches would record no-ops.
-            if (swRes.getValue().getShardId() == nextBatch->getShardId()) {
-                if ((abortBatch = processResponseFromRemote(opCtx,
-                                                            targeter,
-                                                            nextBatch->getShardId(),
-                                                            batchedCommandResponse,
-                                                            batchOp,
-                                                            nextBatch.get(),
-                                                            stats))) {
+            // If no document matches were made, then the response shardId would be the empty string
+            // and all of the child batches would record no-ops.
+            if (!hasRecordedWriteResponseForFirstBatch && !swRes.getValue().getShardId().empty()) {
+                if ((abortBatch = processResponseFromRemote(
+                         opCtx,
+                         targeter,
+                         ShardId(swRes.getValue().getShardId().toString()),
+                         batchedCommandResponse,
+                         batchOp,
+                         nextBatch.get(),
+                         stats))) {
                     break;
                 }
+                hasRecordedWriteResponseForFirstBatch = true;
             } else {
                 // Explicitly set the status so that debug builds won't invariant when checking the
                 // status.

@@ -198,8 +198,9 @@ public:
                 Shard::RetryPolicy::kNoRetry);
 
             auto response = uassertStatusOK(ars.next().swResponse);
+            auto status = getStatusFromWriteCommandReply(response.data);
 
-            if (getStatusFromCommandResult(response.data) == ErrorCodes::WouldChangeOwningShard) {
+            if (status == ErrorCodes::WouldChangeOwningShard) {
                 // Parse into OpMsgRequest to append the $db field, which is required for command
                 // parsing.
                 auto opMsgRequest = OpMsgRequest::fromDBAndBody(ns().db(), cmdObj);
@@ -235,6 +236,10 @@ public:
                     return Response(res.obj(), shardId.toString());
                 }
             }
+
+            // We uassert on the extracted write status in order to preserve error labels for the
+            // transaction api to use in case of a retry.
+            uassertStatusOK(status);
             return Response(response.data, shardId.toString());
         }
 

@@ -238,8 +238,6 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
 
             sharedBlock->clusterWriteResponse = ClusterWriteWithoutShardKeyResponse::parseOwned(
                 IDLParserContext("_clusterWriteWithoutShardKeyResponse"), std::move(writeRes));
-            uassertStatusOK(
-                getStatusFromWriteCommandReply(sharedBlock->clusterWriteResponse.getResponse()));
             return SemiFuture<void>::makeReady();
         });
 
