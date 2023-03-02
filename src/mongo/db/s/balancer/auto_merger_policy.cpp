@@ -58,8 +58,8 @@ void AutoMergerPolicy::disable() {
     stdx::lock_guard<Latch> lk(_mutex);
     _enabled = false;
     _collectionsToMergePerShard.clear();
-    _timestampLastBatch = Timestamp(0, 0);
-    _timestampLastSucceededBatch = Timestamp(0, 0);
+    _maxHistoryTimeCurrentRound = Timestamp(0, 0);
+    _maxHistoryTimePreviousRound = Timestamp(0, 0);
 }
 
 bool AutoMergerPolicy::isEnabled() {
@@ -133,7 +133,10 @@ void AutoMergerPolicy::applyActionResult(OperationContext* opCtx,
                                       const auto& status = stdx::get<Status>(response);
                                       --_outstandingActions;
                                       if (!status.isOK()) {
-                                          _allActionsSucceeded = false;
+                                          // Reset the history window to consider during next round
+                                          // because chunk merges may have been potentially missed
+                                          _maxHistoryTimeCurrentRound =
+                                              _maxHistoryTimePreviousRound;
                                           LOGV2_DEBUG(7312600,
                                                       1,
                                                       "Hit error while automerging chunks",
@@ -156,17 +159,11 @@ void AutoMergerPolicy::applyActionResult(OperationContext* opCtx,
 }
 
 void AutoMergerPolicy::_init(WithLock lk) {
-    if (_enabled) {
-        if (_allActionsSucceeded) {
-            _timestampLastSucceededBatch = _timestampLastBatch;
-        }
-
-        _allActionsSucceeded = true;
-        _intervalTimer.reset();
-        _collectionsToMergePerShard.clear();
-        _firstAction = true;
-        _onStateUpdated();
-    }
+    _maxHistoryTimePreviousRound = _maxHistoryTimeCurrentRound;
+    _intervalTimer.reset();
+    _collectionsToMergePerShard.clear();
+    _firstAction = true;
+    _onStateUpdated();
 }
 
 void AutoMergerPolicy::_checkInternalUpdatesWithLock(WithLock lk) {
@@ -221,8 +218,8 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
         //             {
         //                 $match : {
         //                     shard : <shard>,
-        //                     onCurrentShardSince : { $lt : <oldestTimestampSupportedForHistory>,
-        //                                             $gte : <timestampLastBatch> }
+        //                     onCurrentShardSince : { $lt : <_maxHistoryTimeCurrentRound>,
+        //                                             $gte : <_maxHistoryTimePreviousRound> }
         //                 }
         //             },
         //             {
@@ -232,20 +229,19 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
         //         as : "chunks"
         //     }
         // }
-        const auto oldestTimestampSupportedForHistory =
+        const auto _maxHistoryTimeCurrentRound =
             ShardingCatalogManager::getOldestTimestampSupportedForSnapshotHistory(opCtx);
-        // _timestampLastBatch = oldestTimestampSupportedForHistory;
 
         stages.emplace_back(DocumentSourceLookUp::createFromBson(
             BSON("$lookup" << BSON(
                      "from"
                      << ChunkType::ConfigNS.coll() << "localField" << CollectionType::kUuidFieldName
                      << "foreignField" << ChunkType::collectionUUID() << "pipeline"
-                     << BSON_ARRAY(BSON("$match"
-                                        << BSON(ChunkType::shard(shard.toString())
-                                                << ChunkType::onCurrentShardSince()
-                                                << BSON("$lt" << oldestTimestampSupportedForHistory
-                                                              << "$gte" << _timestampLastBatch)))
+                     << BSON_ARRAY(BSON("$match" << BSON(
+                                            ChunkType::shard(shard.toString())
+                                            << ChunkType::onCurrentShardSince()
+                                            << BSON("$lt" << _maxHistoryTimeCurrentRound << "$gte"
+                                                          << _maxHistoryTimePreviousRound)))
                                    << BSON("$limit" << 1))
                      << "as"
                      << "chunks"))

@@ -78,10 +78,9 @@ private:
 
     bool _firstAction;
     Timer _intervalTimer;
-    Timestamp _timestampLastBatch{0, 0};
-    Timestamp _timestampLastSucceededBatch{0, 0};
+    Timestamp _maxHistoryTimeCurrentRound{0, 0};
+    Timestamp _maxHistoryTimePreviousRound{0, 0};
     uint32_t _outstandingActions = 0;
-    bool _allActionsSucceeded = true;
 
     std::map<ShardId, std::vector<NamespaceString>> _collectionsToMergePerShard;
 
