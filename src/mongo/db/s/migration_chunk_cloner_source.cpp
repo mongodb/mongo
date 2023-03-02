@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/bson/bsonobj.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/migration_chunk_cloner_source.h"
