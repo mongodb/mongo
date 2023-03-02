@@ -36,11 +36,6 @@
 namespace mongo {
 
 template <typename CounterType>
-LockStats<CounterType>::LockStats() {
-    reset();
-}
-
-template <typename CounterType>
 void LockStats<CounterType>::report(BSONObjBuilder* builder) const {
     for (uint8_t i = 0; i < static_cast<uint8_t>(ResourceGlobalId::kNumIds); ++i) {
         _report(builder,

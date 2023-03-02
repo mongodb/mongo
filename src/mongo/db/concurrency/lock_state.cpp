@@ -329,9 +329,6 @@ LockerImpl::~LockerImpl() {
     invariant(_requests.empty());
 
     invariant(_modeForTicket == MODE_NONE);
-
-    // Reset the locking statistics so the object can be reused
-    _stats.reset();
 }
 
 Locker::ClientState LockerImpl::getClientState() const {
