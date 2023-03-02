@@ -82,6 +82,7 @@ struct DocumentSourceFacetStats;
 struct UnpackTimeseriesBucketStats;
 struct TimeseriesWriteStats;
 struct SampleFromTimeseriesBucketStats;
+struct SpoolStats;
 
 /**
  * Visitor pattern for PlanStageStats.
@@ -145,6 +146,7 @@ public:
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, TimeseriesWriteStats> stats) = 0;
     virtual void visit(
         tree_walker::MaybeConstPtr<IsConst, SampleFromTimeseriesBucketStats> stats) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, SpoolStats> stats) = 0;
 };
 
 /**
@@ -201,6 +203,7 @@ struct PlanStatsVisitorBase : public PlanStatsVisitor<IsConst> {
     void visit(tree_walker::MaybeConstPtr<IsConst, TimeseriesWriteStats> stats) override {}
     void visit(
         tree_walker::MaybeConstPtr<IsConst, SampleFromTimeseriesBucketStats> stats) override {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, SpoolStats> stats) override {}
 };
 
 using PlanStatsMutableVisitor = PlanStatsVisitor<false>;

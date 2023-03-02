@@ -140,6 +140,7 @@ env.CppUnitTest(
         "sort_test.cpp",
         "working_set_test.cpp",
         "bucket_unpacker_test.cpp",
+        "spool_test.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

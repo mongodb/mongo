@@ -1362,6 +1362,7 @@ env.Library(
         'exec/skip.cpp',
         'exec/sort.cpp',
         'exec/sort_key_generator.cpp',
+        'exec/spool.cpp',
         'exec/subplan.cpp',
         'exec/text_match.cpp',
         'exec/text_or.cpp',

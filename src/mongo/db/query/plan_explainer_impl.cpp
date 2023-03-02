@@ -497,6 +497,13 @@ void statsToBSON(const PlanStageStats& stats,
             bob->appendNumber("nWouldModify", static_cast<long long>(spec->nModified));
             bob->appendNumber("nWouldUpsert", static_cast<long long>(spec->nUpserted));
         }
+    } else if (STAGE_SPOOL == stats.stageType) {
+        SpoolStats* spec = static_cast<SpoolStats*>(stats.specific.get());
+
+        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+            bob->appendNumber("totalDataSizeSpooled",
+                              static_cast<long long>(spec->totalDataSizeBytes));
+        }
     }
 
     // We're done if there are no children.

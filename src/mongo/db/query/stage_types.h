@@ -111,6 +111,9 @@ enum StageType {
     STAGE_SORT_KEY_GENERATOR,
 
     STAGE_SORT_MERGE,
+
+    STAGE_SPOOL,
+
     STAGE_SUBPLAN,
 
     // Stages for running text search.

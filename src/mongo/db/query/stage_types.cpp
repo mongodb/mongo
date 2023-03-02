@@ -71,6 +71,7 @@ StringData stageTypeToString(StageType stageType) {
         {STAGE_SORT_SIMPLE, "SORT"_sd},
         {STAGE_SORT_KEY_GENERATOR, "SORT_KEY_GENERATOR"_sd},
         {STAGE_SORT_MERGE, "SORT_MERGE"_sd},
+        {STAGE_SPOOL, "SPOOL"_sd},
         {STAGE_SUBPLAN, "SUBPLAN"_sd},
         {STAGE_TEXT_OR, "TEXT_OR"_sd},
         {STAGE_TEXT_MATCH, "TEXT_MATCH"_sd},
