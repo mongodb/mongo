@@ -1,11 +1,17 @@
 """GDB Pretty-printers for MongoDB."""
 
+import os
 import re
 import struct
 import sys
 import uuid
-
+from pathlib import Path
+import gdb
 import gdb.printing
+
+if not gdb:
+    sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
+    from buildscripts.gdb.mongo import get_boost_optional
 
 try:
     import bson
@@ -100,6 +106,18 @@ class StringDataPrinter(object):
         if size == -1:
             return self.val['_data'].lazy_string()
         return self.val['_data'].lazy_string(length=size)
+
+
+class BoostOptionalPrinter(object):
+    """Pretty-printer for boost::optional."""
+
+    def __init__(self, val):
+        """Initialize BoostOptionalPriner."""
+        self.val = val
+
+    def to_string(self):
+        """Return data for printing."""
+        return get_boost_optional(self.val)
 
 
 class BSONObjPrinter(object):
@@ -1107,6 +1125,7 @@ def build_pretty_printer():
     pp.add('__wt_txn', '__wt_txn', False, WtTxnPrinter)
     pp.add('__wt_update', '__wt_update', False, WtUpdateToBsonPrinter)
     pp.add('CodeFragment', 'mongo::sbe::vm::CodeFragment', False, SbeCodeFragmentPrinter)
+    pp.add('boost::optional', 'boost::optional', True, BoostOptionalPrinter)
 
     # Optimizer/ABT related pretty printers that can be used only with a running process.
     register_abt_printers(pp)
