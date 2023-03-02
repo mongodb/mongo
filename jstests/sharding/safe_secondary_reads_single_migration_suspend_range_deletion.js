@@ -122,7 +122,7 @@ let testCases = {
         behavior: "versioned"
     },
     analyze: {skip: "primary only"},
-    analyzeShardKey: {skip: "only support readConcern 'local'"},
+    analyzeShardKey: {skip: "does not return user data"},
     appendOplogNote: {skip: "primary only"},
     applyOps: {skip: "primary only"},
     authSchemaUpgrade: {skip: "primary only"},
