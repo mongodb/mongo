@@ -787,6 +787,10 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
 
         auto collDesc = scopedCss->getCollectionDescription(opCtx);
         if (collDesc.isSharded()) {
+            uassert(ErrorCodes::SnapshotTooOld,
+                    str::stream() << "Snapshot too old to read on collection '" << _coll->ns()
+                                  << "' with UUID: " << _coll->uuid(),
+                    collDesc.uuidMatches(_coll->uuid()));
             _coll.setShardKeyPattern(collDesc.getKeyPattern());
         }
 
@@ -1355,6 +1359,11 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
         auto scopedCss = CollectionShardingState::acquire(opCtx, _collectionPtr->ns());
         auto collDesc = scopedCss->getCollectionDescription(opCtx);
         if (collDesc.isSharded()) {
+            uassert(ErrorCodes::SnapshotTooOld,
+                    str::stream() << "Snapshot too old to read on collection '"
+                                  << _collectionPtr->ns()
+                                  << "' with UUID: " << _collectionPtr->uuid(),
+                    collDesc.uuidMatches(_collectionPtr->uuid()));
             _collectionPtr.setShardKeyPattern(collDesc.getKeyPattern());
         }
     } else {
