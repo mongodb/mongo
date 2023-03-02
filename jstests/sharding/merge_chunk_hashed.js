@@ -24,11 +24,36 @@ assert.commandWorked(admin.runCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 assert.commandWorked(admin.runCommand({shardCollection: ns, key: {x: 'hashed'}}));
 
+// Setup predictable chunk distribution:
 // Default chunks:
 // shard0: MIN                  -> -4611686018427387902,
 //         -4611686018427387902 -> 0
 // shard1: 0                    -> 4611686018427387902
 //         4611686018427387902  -> MAX
+assert.commandWorked(admin.runCommand({
+    moveChunk: ns,
+    bounds: [{x: MinKey}, {x: NumberLong("-4611686018427387902")}],
+    to: st.shard0.shardName,
+    _waitForDelete: true
+}));
+assert.commandWorked(admin.runCommand({
+    moveChunk: ns,
+    bounds: [{x: NumberLong("-4611686018427387902")}, {x: 0}],
+    to: st.shard0.shardName,
+    _waitForDelete: true
+}));
+assert.commandWorked(admin.runCommand({
+    moveChunk: ns,
+    bounds: [{x: 0}, {x: NumberLong("4611686018427387902")}],
+    to: st.shard1.shardName,
+    _waitForDelete: true
+}));
+assert.commandWorked(admin.runCommand({
+    moveChunk: ns,
+    bounds: [{x: NumberLong("4611686018427387902")}, {x: MaxKey}],
+    to: st.shard1.shardName,
+    _waitForDelete: true
+}));
 
 // Get the chunk -4611686018427387902 -> 0 on shard0.
 let chunkToSplit = findChunksUtil.findOneChunkByNs(

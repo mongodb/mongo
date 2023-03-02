@@ -224,7 +224,9 @@ assertChunksOnShards(configDB, ns, shardChunkBounds);
 assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey);
 
 jsTest.log("Make the chunk not aligned with zone ranges.");
-let splitPoint = {x: NumberLong(targetChunkBounds[1].x - 5000)};
+let splitPoint = (targetChunkBounds[1].x === MaxKey)
+    ? {x: NumberLong(targetChunkBounds[0].x + 5000)}
+    : {x: NumberLong(targetChunkBounds[1].x - 5000)};
 assert(chunkBoundsUtil.containsKey(splitPoint, ...targetChunkBounds));
 assert.commandWorked(st.s.adminCommand(
     {updateZoneKeyRange: ns, min: targetChunkBounds[0], max: targetChunkBounds[1], zone: null}));

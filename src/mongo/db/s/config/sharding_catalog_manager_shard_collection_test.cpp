@@ -258,8 +258,13 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_WithZones_ManyChunksOnFirstZoneSha
         operationContext(), kShardKeyPattern, {UUID::gen(), ShardId("shard1")});
 
     ASSERT_EQ(2U, firstChunks.chunks.size());
+    ASSERT_EQ(ChunkRange(kShardKeyPattern.getKeyPattern().globalMin(), BSON("x" << 0)),
+              firstChunks.chunks[0].getRange());
+    ASSERT_EQ(ChunkRange(BSON("x" << 0), kShardKeyPattern.getKeyPattern().globalMax()),
+              firstChunks.chunks[1].getRange());
+
     ASSERT_EQ(kShards[0].getName(), firstChunks.chunks[0].getShard());
-    ASSERT_EQ(kShards[0].getName(), firstChunks.chunks[1].getShard());
+    // Chunk1 (no zone) goes to any shard (selected randomly, round-robin);
 }
 
 }  // namespace

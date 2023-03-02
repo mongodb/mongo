@@ -62,16 +62,20 @@ st.shard1.rs.getPrimary().adminCommand(
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 'hashed'}}));
 
+    // Make sure the chunk is on shard0.
+    assert.commandWorked(st.s.adminCommand(
+        {moveChunk: ns, find: {x: 50}, to: st.shard0.shardName, _waitForDelete: true}));
+
     // Pause range deletion on shard0.
     let suspendRangeDeletionFailpoint = configureFailPoint(st.shard0, "suspendRangeDeletion");
 
-    // Move the only chunk from shard0 to shard1. This will leave orphans on shard0 since we paused
-    // range deletion.
+    // Move the chunk from shard0 to shard1. This will leave orphans on shard0 since we paused range
+    // deletion.
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName}));
 
-    // Move the only chunk back to shard0 and expect timeout failure, since range deletion was
-    // paused and there are orphans on shard0.
+    // Move chunk back to shard0 and expect timeout failure, since range deletion was paused and
+    // there are orphans on shard0.
     assert.commandFailedWithCode(
         st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard0.shardName, maxTimeMS: 5000}),
         ErrorCodes.MaxTimeMSExpired);

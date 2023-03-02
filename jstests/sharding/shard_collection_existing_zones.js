@@ -82,8 +82,8 @@ function testChunkSplits(collectionExists) {
 
     // create zones:
     // shard0 - zonename0 - [0, 10)
-    // shard1 - zonename0 - [10, 20)
-    // shard2 - zonename0 - [30, 40)
+    // shard1 - zonename1 - [10, 20)
+    // shard2 - zonename2 - [30, 40)
     for (var i = 0; i < shards.length; i++) {
         assert.commandWorked(
             st.s.adminCommand({addShardToZone: shards[i]._id, zone: zoneName + i}));
@@ -98,13 +98,16 @@ function testChunkSplits(collectionExists) {
 
     // shard the collection and validate the resulting chunks
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: shardKey}));
+    // Expected:
+    //   - zoned chunks on the corresponding shard.
+    //   - 2 chunks on each shard
     var expectedChunks = [
-        {range: [{x: {"$minKey": 1}}, {x: 0}], shardId: st.shard0.shardName},
-        {range: [{x: 0}, {x: 10}], shardId: st.shard0.shardName},  // pre-defined
-        {range: [{x: 10}, {x: 20}], shardId: st.shard1.shardName},
-        {range: [{x: 20}, {x: 30}], shardId: st.shard1.shardName},  // pre-defined
+        {range: [{x: {"$minKey": 1}}, {x: 0}], shardId: null},      // any shard
+        {range: [{x: 0}, {x: 10}], shardId: st.shard0.shardName},   // pre-defined
+        {range: [{x: 10}, {x: 20}], shardId: st.shard1.shardName},  // pre-defined
+        {range: [{x: 20}, {x: 30}], shardId: null},                 // any shard
         {range: [{x: 30}, {x: 40}], shardId: st.shard2.shardName},  // pre-defined
-        {range: [{x: 40}, {x: {"$maxKey": 1}}], shardId: st.shard2.shardName}
+        {range: [{x: 40}, {x: {"$maxKey": 1}}], shardId: null}      // any shard
     ];
     var chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).sort({min: 1}).toArray();
     assert.eq(chunkDocs.length,
@@ -115,8 +118,13 @@ function testChunkSplits(collectionExists) {
             tojson(chunkDocs[i]);
         assert.eq(expectedChunks[i].range[0], chunkDocs[i].min, errMsg);
         assert.eq(expectedChunks[i].range[1], chunkDocs[i].max, errMsg);
-        assert.eq(expectedChunks[i].shardId, chunkDocs[i].shard, errMsg);
+        if (expectedChunks[i].shardId !== null) {
+            assert.eq(expectedChunks[i].shardId, chunkDocs[i].shard, errMsg);
+        }
     }
+    assert.eq(2, findChunksUtil.countChunksForNs(configDB, ns, {shard: st.shard0.shardName}));
+    assert.eq(2, findChunksUtil.countChunksForNs(configDB, ns, {shard: st.shard1.shardName}));
+    assert.eq(2, findChunksUtil.countChunksForNs(configDB, ns, {shard: st.shard2.shardName}));
 
     assert.commandWorked(testDB.runCommand({drop: kCollName}));
 }

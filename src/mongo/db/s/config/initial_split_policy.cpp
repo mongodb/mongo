@@ -56,11 +56,10 @@ using ChunkDistributionMap = stdx::unordered_map<ShardId, size_t>;
 using ZoneShardMap = StringMap<std::vector<ShardId>>;
 using boost::intrusive_ptr;
 
-std::vector<ShardId> getAllShardIdsSorted(OperationContext* opCtx) {
-    // Many tests assume that chunks will be placed on shards
-    // according to their IDs in ascending lexical order.
+std::vector<ShardId> getAllShardIdsShuffled(OperationContext* opCtx) {
     auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    std::sort(shardIds.begin(), shardIds.end());
+    std::default_random_engine rng{};
+    std::shuffle(shardIds.begin(), shardIds.end(), rng);
     return shardIds;
 }
 
@@ -241,12 +240,7 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::generateShardColle
         const BSONObj min = (i == 0) ? keyPattern.globalMin() : finalSplitPoints[i - 1];
         const BSONObj max =
             (i < finalSplitPoints.size()) ? finalSplitPoints[i] : keyPattern.globalMax();
-
-        // It's possible there are no split points or fewer split points than total number of
-        // shards, and we need to be sure that at least one chunk is placed on the primary shard
-        const ShardId shardId = (i == 0 && finalSplitPoints.size() + 1 < allShardIds.size())
-            ? params.primaryShardId
-            : allShardIds[(i / numContiguousChunksPerShard) % allShardIds.size()];
+        const ShardId shardId = allShardIds[(i / numContiguousChunksPerShard) % allShardIds.size()];
 
         appendChunk(params, min, max, &version, shardId, &chunks);
     }
@@ -363,7 +357,7 @@ InitialSplitPolicy::ShardCollectionConfig SplitPointsBasedSplitPolicy::createFir
     const SplitPolicyParams& params) {
 
     // On which shards are the generated chunks allowed to be placed.
-    const auto shardIds = getAllShardIdsSorted(opCtx);
+    const auto shardIds = getAllShardIdsShuffled(opCtx);
 
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
@@ -394,7 +388,7 @@ InitialSplitPolicy::ShardCollectionConfig AbstractTagsBasedSplitPolicy::createFi
     const SplitPolicyParams& params) {
     invariant(!_tags.empty());
 
-    const auto shardIds = getAllShardIdsSorted(opCtx);
+    const auto shardIds = getAllShardIdsShuffled(opCtx);
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
     const auto& keyPattern = shardKeyPattern.getKeyPattern();
@@ -730,7 +724,7 @@ InitialSplitPolicy::ShardCollectionConfig SamplingBasedSplitPolicy::createFirstC
     }
 
     {
-        auto allShardIds = getAllShardIdsSorted(opCtx);
+        auto allShardIds = getAllShardIdsShuffled(opCtx);
         for (const auto& shard : allShardIds) {
             chunkDistribution.emplace(shard, 0);
         }

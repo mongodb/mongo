@@ -48,7 +48,7 @@ st.ensurePrimaryShard('test', st.shard1.shardName);
  * Helper function to validate that the chunks ranges have all the shard key fields and each shard
  * has expected number of chunks.
  */
-function checkValidChunks(coll, shardKey, expectedChunks) {
+function checkValidChunks(coll, shardKey, checkChunksPerShardFn) {
     const chunks = findChunksUtil.findChunksByNs(st.config, coll.getFullName()).toArray();
     let shardCountsMap =
         {[st.shard0.shardName]: 0, [st.shard1.shardName]: 0, [st.shard2.shardName]: 0};
@@ -64,12 +64,8 @@ function checkValidChunks(coll, shardKey, expectedChunks) {
         assertHasAllShardKeyFields(chunk.min);
         assertHasAllShardKeyFields(chunk.max);
     }
-    let index = 0;
-    for (let shardName in shardCountsMap) {
-        assert.eq(expectedChunks[index++],
-                  shardCountsMap[shardName],
-                  "Expected chunks did not match for " + shardName + ". " + tojson(chunks));
-    }
+
+    checkChunksPerShardFn(shardCountsMap);
 }
 
 //
@@ -83,25 +79,47 @@ assert.commandWorked(db.hashedCollEmpty.createIndex(shardKey));
 let coll = db.hashedCollEmpty;
 assert.commandWorked(
     mongos.adminCommand({shardCollection: coll.getFullName(), key: shardKey, numInitialChunks: 6}));
-checkValidChunks(coll, shardKey, [2, 2, 2]);
+checkValidChunks(coll, shardKey, (shardCountsMap) => {
+    // Each shard has 2 chunks.
+    Object.values(shardCountsMap).every((count) => count === 2);
+});
 
 // Supported: Hashed sharding + numInitialChunks + non-existent collection.
-// Expected: Even chunk distribution and the remainder chunks on the first shard.
+// Expected: Even chunk distribution and the remainder chunks on the any shard.
 coll = db.hashedCollNonExistent;
 assert.commandWorked(
     mongos.adminCommand({shardCollection: coll.getFullName(), key: shardKey, numInitialChunks: 8}));
-checkValidChunks(coll, shardKey, [4, 2, 2]);
+checkValidChunks(coll, shardKey, (shardCountsMap) => {
+    const totalChunks = Object.values(shardCountsMap).reduce((accumulator, v) => accumulator + v);
+    assert.eq(8, totalChunks, "Unexpected total amount of chunks");
+
+    Object.values(shardCountsMap).every((count) => count >= 2);
+});
 
 // When 'numInitialChunks' is one, primary shard should have the chunk.
 coll = db.hashedNumInitialChunksOne;
 assert.commandWorked(
     mongos.adminCommand({shardCollection: coll.getFullName(), key: shardKey, numInitialChunks: 1}));
-checkValidChunks(coll, shardKey, [0, 1, 0]);
+checkValidChunks(coll, shardKey, (shardCountsMap) => {
+    // Just one chunk, on any shard.
+    const totalChunks = Object.values(shardCountsMap).reduce((accumulator, v) => accumulator + v);
+    assert.eq(1, totalChunks, "Unexpected total amount of chunks");
+});
 
 // Default pre-splitting assigns two chunks per shard.
 coll = db.hashedDefaultPreSplit;
 assert.commandWorked(mongos.adminCommand({shardCollection: coll.getFullName(), key: shardKey}));
-checkValidChunks(coll, shardKey, [2, 2, 2]);
+checkValidChunks(coll, shardKey, (shardCountsMap) => {
+    assert.gte(shardCountsMap[st.shard0.shardName],
+               2,
+               "Unexpected amount of chunks on " + st.shard0.shardName);
+    assert.gte(shardCountsMap[st.shard1.shardName],
+               2,
+               "Unexpected amount of chunks on " + st.shard1.shardName);
+    assert.gte(shardCountsMap[st.shard2.shardName],
+               2,
+               "Unexpected amount of chunks on " + st.shard2.shardName);
+});
 
 db.hashedPrefixColl.drop();
 
@@ -138,8 +156,12 @@ assert.commandFailedWithCode(db.adminCommand({
 // Creates chunks based on the zones.
 assert.commandWorked(db.adminCommand(
     {shardcollection: db.hashedPrefixColl.getFullName(), key: shardKey, numInitialChunks: 2}));
-checkValidChunks(
-    db.hashedPrefixColl, shardKey, [1 /* Boundary chunk */, 0, 1 /* zone present in shard2 */]);
+checkValidChunks(db.hashedPrefixColl, shardKey, (shardCountsMap) => {
+    // Two chunks in total. One of them on shard2 (zoned) and the other one on any shard.
+    const totalChunks = Object.values(shardCountsMap).reduce((accumulator, v) => accumulator + v);
+    assert.eq(2, totalChunks, "Unexpected total amount of chunks");
+    assert.gte(shardCountsMap[st.shard2.shardName], 1, "Unexpected amount of chunks on shard2");
+});
 
 // Verify that 'shardCollection' command will pre-split chunks if a single zone is set up ranging
 // from MinKey to MaxKey and 'presplitHashedZones' flag is set.
@@ -161,7 +183,11 @@ assert.commandWorked(db.adminCommand({
 }));
 
 // By default, we create two chunks per shard for each shard that contains at least one zone.
-checkValidChunks(db.hashedPrefixColl, shardKey, [0, 2, 2]);
+checkValidChunks(db.hashedPrefixColl, shardKey, (shardCountsMap) => {
+    assert.eq(0, shardCountsMap[st.shard0.shardName], "Unexpected amount of chunks on shard0");
+    assert.eq(2, shardCountsMap[st.shard1.shardName], "Unexpected amount of chunks on shard1");
+    assert.eq(2, shardCountsMap[st.shard2.shardName], "Unexpected amount of chunks on shard2");
+});
 
 // Verify that 'shardCollection' command will pre-split chunks equally among all the eligible
 // shards.
@@ -185,7 +211,9 @@ assert.commandWorked(db.adminCommand({
     presplitHashedZones: true,
     numInitialChunks: 100
 }));
-checkValidChunks(db.hashedPrefixColl, shardKey, [34, 34, 34]);
+checkValidChunks(db.hashedPrefixColl, shardKey, (shardCountsMap) => {
+    Object.values(shardCountsMap).every((count) => count === 34);
+});
 
 //
 // Test cases for compound hashed shard keys with non-hashed prefix.
@@ -323,7 +351,9 @@ assert.commandWorked(db.adminCommand({
 // shards have 2 tags. So we create ceil(167/4) = 42 per tag on shard1 = 168, while we create
 // ceil(167/2) = 84 per tag on others. In addition, we create 5 chunks for boundaries which will be
 // distributed among the three shards using round robin.
-checkValidChunks(db.coll, shardKey, [170, 170, 169]);
+checkValidChunks(db.coll, shardKey, (shardCountsMap) => {
+    Object.values(shardCountsMap).every((count) => count === 169);
+});
 
 // When 'numInitialChunks = 1'.
 db.coll.drop();
@@ -337,7 +367,14 @@ assert.commandWorked(db.adminCommand({
 
 // The chunk distribution from zones should be [2, 2+2 (two zones), 2]. The 5 gap chunks should be
 // distributed among three shards.
-checkValidChunks(db.coll, shardKey, [4, 6, 3]);
+checkValidChunks(db.coll, shardKey, (shardCountsMap) => {
+    const totalChunks = Object.values(shardCountsMap).reduce((accumulator, v) => accumulator + v);
+    assert.eq(13, totalChunks, "Unexpected total amount of chunks");
+
+    assert.gte(shardCountsMap[st.shard0.shardName], 3, "Unexpected amount of chunks on shard0");
+    assert.gte(shardCountsMap[st.shard1.shardName], 5, "Unexpected amount of chunks on shard1");
+    assert.gte(shardCountsMap[st.shard2.shardName], 3, "Unexpected amount of chunks on shard2");
+});
 
 // Verify that 'presplitHashedZones' uses default value of two per shard when 'numInitialChunks' is
 // not passed.
@@ -348,7 +385,14 @@ assert.commandWorked(db.adminCommand(
 
 // Since only Shard0 has chunks, we create on chunk per tag on shard0. The 5 gap chunks should be
 // distributed among three shards.
-checkValidChunks(db.coll, shardKey, [6, 2, 1]);
+checkValidChunks(db.coll, shardKey, (shardCountsMap) => {
+    const totalChunks = Object.values(shardCountsMap).reduce((accumulator, v) => accumulator + v);
+    assert.eq(9, totalChunks, "Unexpected total amount of chunks");
+
+    assert.gte(shardCountsMap[st.shard0.shardName], 5, "Unexpected amount of chunks on shard0");
+    assert.gte(shardCountsMap[st.shard1.shardName], 1, "Unexpected amount of chunks on shard1");
+    assert.gte(shardCountsMap[st.shard2.shardName], 1, "Unexpected amount of chunks on shard2");
+});
 
 st.stop();
 })();

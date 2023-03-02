@@ -235,6 +235,44 @@ const hashedNs = dbName + '.' + hashedCollName;
 
 assert.commandWorked(st.s.adminCommand({shardCollection: hashedNs, key: {_id: 'hashed'}}));
 
+// Setup a predictable chunk distribution:
+assert.commandWorked(st.s.adminCommand({
+    moveChunk: hashedNs,
+    bounds: [{_id: MinKey}, {_id: NumberLong("-6148914691236517204")}],
+    to: st.shard0.shardName,
+    _waitForDelete: true
+}));
+assert.commandWorked(st.s.adminCommand({
+    moveChunk: hashedNs,
+    bounds: [{_id: NumberLong("-6148914691236517204")}, {_id: NumberLong("-3074457345618258602")}],
+    to: st.shard0.shardName,
+    _waitForDelete: true
+}));
+assert.commandWorked(st.s.adminCommand({
+    moveChunk: hashedNs,
+    bounds: [{_id: NumberLong("-3074457345618258602")}, {_id: NumberLong("0")}],
+    to: st.shard1.shardName,
+    _waitForDelete: true
+}));
+assert.commandWorked(st.s.adminCommand({
+    moveChunk: hashedNs,
+    bounds: [{_id: NumberLong("0")}, {_id: NumberLong("3074457345618258602")}],
+    to: st.shard1.shardName,
+    _waitForDelete: true
+}));
+assert.commandWorked(st.s.adminCommand({
+    moveChunk: hashedNs,
+    bounds: [{_id: NumberLong("3074457345618258602")}, {_id: NumberLong("6148914691236517204")}],
+    to: st.shard2.shardName,
+    _waitForDelete: true
+}));
+assert.commandWorked(st.s.adminCommand({
+    moveChunk: hashedNs,
+    bounds: [{_id: NumberLong("6148914691236517204")}, {_id: MaxKey}],
+    to: st.shard2.shardName,
+    _waitForDelete: true
+}));
+
 assert.commandWorked(
     st.s.getDB(dbName)[hashedCollName].insert({_id: -3}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(
