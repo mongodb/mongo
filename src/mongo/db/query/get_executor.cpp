@@ -197,6 +197,24 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
     auto desc = ice.descriptor();
     invariant(desc);
 
+    if (desc->isIdIndex()) {
+        // _id indexes are guaranteed to be non-multikey. Determining whether the index is multikey
+        // has a small cost associated with it, so we skip that here to make _id lookups faster.
+        return {desc->keyPattern(),
+                desc->getIndexType(),
+                desc->version(),
+                false, /* isMultikey */
+                {},    /* MultikeyPaths */
+                {},    /* multikey Pathset */
+                desc->isSparse(),
+                desc->unique(),
+                IndexEntry::Identifier{desc->indexName()},
+                ice.getFilterExpression(),
+                desc->infoObj(),
+                ice.getCollator(),
+                nullptr /* wildcard projection */};
+    }
+
     auto accessMethod = ice.accessMethod();
     invariant(accessMethod);
 
@@ -282,18 +300,17 @@ ColumnIndexEntry columnIndexEntryFromIndexCatalogEntry(OperationContext* opCtx,
 void applyIndexFilters(const CollectionPtr& collection,
                        const CanonicalQuery& canonicalQuery,
                        QueryPlannerParams* plannerParams) {
-    if (!isIdHackEligibleQuery(collection, canonicalQuery)) {
-        const QuerySettings* querySettings =
-            QuerySettingsDecoration::get(collection->getSharedDecorations());
-        const auto key = canonicalQuery.encodeKeyForPlanCacheCommand();
 
-        // Filter index catalog if index filters are specified for query.
-        // Also, signal to planner that application hint should be ignored.
-        if (boost::optional<AllowedIndicesFilter> allowedIndicesFilter =
-                querySettings->getAllowedIndicesFilter(key)) {
-            filterAllowedIndexEntries(*allowedIndicesFilter, &plannerParams->indices);
-            plannerParams->indexFiltersApplied = true;
-        }
+    const QuerySettings* querySettings =
+        QuerySettingsDecoration::get(collection->getSharedDecorations());
+    const auto key = canonicalQuery.encodeKeyForPlanCacheCommand();
+
+    // Filter index catalog if index filters are specified for query.
+    // Also, signal to planner that application hint should be ignored.
+    if (boost::optional<AllowedIndicesFilter> allowedIndicesFilter =
+            querySettings->getAllowedIndicesFilter(key)) {
+        filterAllowedIndexEntries(*allowedIndicesFilter, &plannerParams->indices);
+        plannerParams->indexFiltersApplied = true;
     }
 }
 
@@ -356,17 +373,21 @@ void fillOutPlannerParams(OperationContext* opCtx,
     invariant(canonicalQuery);
     bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
 
-    // If it's not NULL, we may have indices. Access the catalog and fill out IndexEntry(s)
-    fillOutIndexEntries(opCtx,
-                        apiStrict,
-                        canonicalQuery,
-                        collection,
-                        plannerParams->indices,
-                        plannerParams->columnStoreIndexes);
+    // _id queries can skip checking the catalog for indices since they will always use the _id
+    // index.
+    if (!isIdHackEligibleQuery(collection, *canonicalQuery)) {
+        // If it's not NULL, we may have indices. Access the catalog and fill out IndexEntry(s)
+        fillOutIndexEntries(opCtx,
+                            apiStrict,
+                            canonicalQuery,
+                            collection,
+                            plannerParams->indices,
+                            plannerParams->columnStoreIndexes);
 
-    // If query supports index filters, filter params.indices by indices in query settings.
-    // Ignore index filters when it is possible to use the id-hack.
-    applyIndexFilters(collection, *canonicalQuery, plannerParams);
+        // If query supports index filters, filter params.indices by indices in query settings.
+        // Ignore index filters when it is possible to use the id-hack.
+        applyIndexFilters(collection, *canonicalQuery, plannerParams);
+    }
 
     // We will not output collection scans unless there are no indexed solutions. NO_TABLE_SCAN
     // overrides this behavior by not outputting a collscan even if there are no indexed
@@ -942,6 +963,7 @@ protected:
     std::unique_ptr<ClassicPrepareExecutionResult> buildIdHackPlan() {
         if (!isIdHackEligibleQuery(_collection, *_cq))
             return nullptr;
+
         const IndexDescriptor* descriptor = _collection->getIndexCatalog()->findIdIndex(_opCtx);
         if (!descriptor)
             return nullptr;
