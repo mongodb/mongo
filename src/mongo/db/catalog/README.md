@@ -1112,26 +1112,26 @@ their own WT table. [The appendix](#Collection-and-Index-to-Table-relationship) 
 relationship between creating/dropping a collection and the underlying creation/deletion
 of a WT table which justifies the following logic. When reconciling, every WT table
 that is not "pointed to" by a MongoDB record store or index [gets
-dropped](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L406-L408
+dropped](https://github.com/mongodb/mongo/blob/6c9adc9a2d518fa046c7739e043a568f9bee6931/src/mongo/db/storage/storage_engine_impl.cpp#L663-L676
 "Github"). A MongoDB record store that points to a WT table that doesn't exist is considered [a
 fatal
-error](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L412-L425
-"Github"). An index that doesn't point to a WT table is [scheduled to be
-rebuilt](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L479
-"Github"). The index logic is more relaxed because indexes do not go through two-phase drop when
-running with enableMajorityReadConcern=false.
+error](https://github.com/mongodb/mongo/blob/6c9adc9a2d518fa046c7739e043a568f9bee6931/src/mongo/db/storage/storage_engine_impl.cpp#L679-L693
+"Github"). An index that doesn't point to a WT table is [ignored and logged](https://github.com/mongodb/mongo/blob/6c9adc9a2d518fa046c7739e043a568f9bee6931/src/mongo/db/storage/storage_engine_impl.cpp#L734-L746
+"Github") because there are cetain cases where the catalog entry may reference an index ident which
+is no longer present, such as when an unclean shutdown occurs before a checkpoint is taken during
+startup recovery.
 
-The second step of recovering the catalog is [reconciling unfinished index builds](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L427-L432
-"Github"). In 4.7+ the story will simplify, but right now there are a few outcomes:
-* An [unfinished FCV 4.2- background index build on the primary](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L527-L542 "Github") will be discarded (no oplog entry
-  was ever written saying the index exists).
-* An [unfinished FCV 4.2- background index build on a secondary](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L513-L525 "Github") will be rebuilt in the foreground
-  (an oplog entry was written saying the index exists).
-* An [unfinished FCV 4.4\+](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L483-L511 "Github") background index build will be restarted in the background.
-    * If the server was previously shut down cleanly, we may be able to [resume the index build](#resumable-index-builds)
-      at the phase that it was stopped in. This resume information is stored in an internal ident
-      written at shutdown. If we fail to resume the index build, we will clean up the internal ident
-      and restart the index build in the background.
+The second step of recovering the catalog is [reconciling unfinished index builds](https://github.com/mongodb/mongo/blob/6c9adc9a2d518fa046c7739e043a568f9bee6931/src/mongo/db/storage/storage_engine_impl.cpp#L695-L699
+"Github"), that could have different outcomes:
+* An [index build with a UUID](https://github.com/mongodb/mongo/blob/6c9adc9a2d518fa046c7739e043a568f9bee6931/src/mongo/db/storage/storage_engine_impl.cpp#L748-L751 "Github")
+is an unfinished two-phase build and must be restarted, unless we are
+[resuming it](#resumable-index-builds). This resume information is stored in an internal ident
+written at (clean) shutdown. If we fail to resume the index build, we will clean up the internal
+ident and restart the index build in the background.
+* An [unfinished index build on standalone](https://github.com/mongodb/mongo/blob/6c9adc9a2d518fa046c7739e043a568f9bee6931/src/mongo/db/storage/storage_engine_impl.cpp#L792-L794 "Github")
+will be discarded (no oplog entry was ever written saying the index exists).
+
+
 
 After storage completes its recovery, control is passed to [replication
 recovery](https://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/README.md#startup-recovery
@@ -1277,7 +1277,7 @@ Flow Control is only concerned whether an operation is 'immediate' priority and 
 * `kNormal` - An operation that should be throttled when the server is under load. If an operation is throttled, it will not affect availability or observability. Most operations, both user and internal, should use this priority unless they qualify as 'kLow' or 'kImmediate' priority.
 * `kLow` - It's of low importance that the operation acquires a ticket in Execution Admission Control. Reserved for background tasks that have no other operations dependent on them. The operation will be throttled under load and make significantly less progress compared to operations of higher priorities in the Execution Admission Control.
 
-Developers should consciously decide admission priority when adding new features. Admission priority can be set through the [SetAdmissionPriorityForLock](https://github.com/10gen/mongo/blob/r6.3.0-rc0/src/mongo/db/concurrency/lock_state.h#L428) RAII.
+Developers should consciously decide admission priority when adding new features. Admission priority can be set through the [SetAdmissionPriorityForLock](https://github.com/mongodb/mongo/blob/r6.3.0-rc0/src/mongo/db/concurrency/lock_state.h#L428) RAII.
 
 ### Developer Guidelines for Declaring Low Admission Priority
 Developers must evaluate the consequences of each low priority operation from falling too far behind, and implement safeguards to avoid any undesirable behaviors for excessive delays in low priority operations.
@@ -1288,7 +1288,7 @@ GlobalLock with low priority.
 
 For example, since TTL deletes can be an expensive background task, they should default to low
 priority. However, it's important they don't fall too far behind TTL inserts - otherwise, there is a risk of
-unbounded collection growth. To remedy this issue, TTL deletes on a collection [are reprioritized](https://github.com/10gen/mongo/blob/d1a0e34e1e67d4a2b23104af2512d14290b25e5f/src/mongo/db/ttl.idl#L96) to normal priority if they can't catch up after n-subpasses.
+unbounded collection growth. To remedy this issue, TTL deletes on a collection [are reprioritized](https://github.com/mongodb/mongo/blob/d1a0e34e1e67d4a2b23104af2512d14290b25e5f/src/mongo/db/ttl.idl#L96) to normal priority if they can't catch up after n-subpasses.
 
 ## Execution Admission Control
 A ticketing mechanism that limits the number of concurrent storage engine transactions in a single mongod to reduce contention on storage engine resources.
@@ -1377,9 +1377,8 @@ by another configurable constant (the ticket "multiplier" constant). This produc
 of tickets to be assigned in the next period.
 
 When the Flow Control mechanism is disabled, the ticket refresher mechanism always allows one
-billion flow control ticket acquisitions per second. The Flow Control mechanism can be disabled
-explicitly via a server parameter and implicitly via setting enableMajorityReadConcern to
-false. Additionally, the mechanism is disabled on nodes that cannot accept writes.
+billion flow control ticket acquisitions per second. The Flow Control mechanism can be disabled via 
+a server parameter. Additionally, the mechanism is disabled on nodes that cannot accept writes.
 
 Criteria #2 and #3 are determined using a sampling mechanism that periodically stores the necessary
 data as primaries process writes. The sampling mechanism executes regardless of whether Flow Control
