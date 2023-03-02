@@ -287,7 +287,6 @@ env.Library(
         'analyze_shard_key_common',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/matcher/path',
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/server_base',

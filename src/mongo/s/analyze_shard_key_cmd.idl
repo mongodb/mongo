@@ -29,11 +29,9 @@
 global:
   cpp_namespace: "mongo::analyze_shard_key"
   cpp_includes:
-    - "mongo/client/read_preference.h"
     - "mongo/s/analyze_shard_key_util.h"
 
 imports:
-  - "mongo/client/read_preference_setting.idl"
   - "mongo/db/basic_types.idl"
   - "mongo/db/keypattern.idl"
 
@@ -309,10 +307,3 @@ commands:
         description: "The shard key to evaluate."
         validator:
           callback: validateShardKeyPattern
-      $readPreference:
-        type: readPreference
-        cpp_name: readPreference
-        description: >-
-            The read preference to use for metrics calculation. The default is set to
-            "secondaryPreferred" to minimize the impact on user workloads.
-        default: ReadPreferenceSetting{ReadPreference::SecondaryPreferred}
