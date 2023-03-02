@@ -1118,6 +1118,12 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: false
 
+  enableAccessToUserRoles:
+    description: "Enables access to $$USER_ROLES in queries."
+    set_at: [ startup, runtime ]
+    cpp_varname: enableAccessToUserRoles
+    cpp_vartype: AtomicWord<bool>
+    default: true
 
 # Note for adding additional query knobs:
 #
