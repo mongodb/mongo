@@ -579,6 +579,11 @@ public:
      */
     void initializePlacementHistory(OperationContext* opCtx);
 
+    /**
+     * Returns the oldest timestamp that is supported for history preservation.
+     */
+    static Timestamp getOldestTimestampSupportedForSnapshotHistory(OperationContext* opCtx);
+
 private:
     /**
      * Performs the necessary checks for version compatibility and creates a new config.version

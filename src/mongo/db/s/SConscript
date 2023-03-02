@@ -866,6 +866,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='db_s_config_server_test',
     source=[
+        'balancer/auto_merger_policy_test.cpp',
         'balancer/balancer_chunk_selection_policy_test.cpp',
         'balancer/balancer_defragmentation_policy_test.cpp',
         'balancer/balancer_policy_test.cpp',

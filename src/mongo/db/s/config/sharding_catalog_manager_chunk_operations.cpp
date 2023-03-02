@@ -1066,12 +1066,8 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
         // A chunk is mergeable when the following conditions are honored:
         // - Non-jumbo
         // - The last migration occurred before the current history window
-        const auto oldestTimestampSupportedForHistory = [&]() {
-            const auto currTime = VectorClock::get(opCtx)->getTime();
-            auto currTimeSeconds = currTime.clusterTime().asTimestamp().getSecs();
-            return Timestamp(currTimeSeconds - getHistoryWindowInSeconds(), 0);
-        }();
-
+        const auto oldestTimestampSupportedForHistory =
+            getOldestTimestampSupportedForSnapshotHistory(opCtx);
         const auto chunksBelongingToShard =
             uassertStatusOK(
                 _localConfigShard->exhaustiveFindOnConfig(
@@ -2475,5 +2471,12 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
         opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(), nullptr);
 
     txn.run(opCtx, transactionChain);
+}
+
+Timestamp ShardingCatalogManager::getOldestTimestampSupportedForSnapshotHistory(
+    OperationContext* opCtx) {
+    const auto currTime = VectorClock::get(opCtx)->getTime();
+    auto currTimeSeconds = currTime.clusterTime().asTimestamp().getSecs();
+    return Timestamp(currTimeSeconds - getHistoryWindowInSeconds(), 0);
 }
 }  // namespace mongo

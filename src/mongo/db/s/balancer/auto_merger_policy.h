@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/s/balancer/actions_stream_policy.h"
-#include "mongo/s/catalog/type_collection.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -74,11 +73,18 @@ private:
     Mutex _mutex = MONGO_MAKE_LATCH("AutoMergerPolicyPolicyImpl::_mutex");
 
     const std::function<void()> _onStateUpdated;
+
     bool _enabled;
 
     bool _firstAction;
     Timer _intervalTimer;
+    Timestamp _timestampLastBatch{0, 0};
+    Timestamp _timestampLastSucceededBatch{0, 0};
+    uint32_t _outstandingActions = 0;
+    bool _allActionsSucceeded = true;
 
     std::map<ShardId, std::vector<NamespaceString>> _collectionsToMergePerShard;
+
+    friend class AutoMergerPolicyTest;
 };
 }  // namespace mongo
