@@ -36,6 +36,11 @@ function useBucketingParametersOnLowerFCV() {
         }
     }));
 
+    // On the latestFCV, we should not be able to use collMod with incomplete bucketing parameters.
+    assert.commandFailedWithCode(
+        db.runCommand({collMod: collName, timeseries: {bucketMaxSpanSeconds: 3600}}),
+        ErrorCodes.InvalidOptions);
+
     // We should fail to downgrade if we have a collection with custom bucketing parameters set.
     assert.commandFailedWithCode(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
                                  ErrorCodes.CannotDowngrade);
@@ -66,6 +71,23 @@ function useBucketingParametersOnLowerFCV() {
         timeseries: {bucketMaxSpanSeconds: 3600, bucketRoundingSeconds: 3600}
     }),
                                  ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        db.runCommand({collMod: collName, timeseries: {bucketMaxSpanSeconds: 3600}}),
+        ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        db.runCommand({collMod: collName, timeseries: {bucketRoundingSeconds: 3600}}),
+        ErrorCodes.InvalidOptions);
+
+    // Verify the time-series options are valid.
+    let collections = assert.commandWorked(db.runCommand({listCollections: 1})).cursor.firstBatch;
+    let collectionEntry = collections.find(entry => entry.name === 'system.buckets.' + collName);
+    assert(collectionEntry);
+
+    assert.eq(collectionEntry.options.timeseries.granularity, "seconds");
+    // Downgrading does not remove the 'bucketMaxSpanSeconds' parameter. It should correspond with
+    // the "seconds" granularity.
+    assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds, 3600);
+    assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
 }
 
 useBucketingParametersOnLowerFCV();
