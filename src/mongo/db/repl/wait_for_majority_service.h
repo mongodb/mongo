@@ -84,29 +84,11 @@ private:
 }  // namespace detail
 
 
-/**
- * Provides a facility for asynchronously waiting a local opTime to be majority committed.
- */
-class WaitForMajorityService {
+class WaitForMajorityServiceImplBase {
 public:
-    ~WaitForMajorityService();
-
-    static WaitForMajorityService& get(ServiceContext* service);
-
-    /**
-     * Sets up the background thread pool responsible for waiting for opTimes to be majority
-     * committed.
-     */
+    virtual ~WaitForMajorityServiceImplBase();
     void startup(ServiceContext* ctx);
-
-    /**
-     * Blocking method, which shuts down and joins the background thread.
-     */
     void shutDown();
-
-    /**
-     * Enqueue a request to wait for the given opTime to be majority committed.
-     */
     SemiFuture<void> waitUntilMajority(const repl::OpTime& opTime,
                                        const CancellationToken& cancelToken);
 
@@ -132,6 +114,10 @@ private:
      * Periodically checks the list of opTimes to wait for majority committed.
      */
     SemiFuture<void> _periodicallyWaitForMajority();
+
+    virtual Status _waitForOpTime(OperationContext* opCtx, const repl::OpTime& opTime) = 0;
+
+    virtual StringData _getReadOrWrite() const = 0;
 
     // The pool of threads available to wait on opTimes and cancel existing requests.
     std::shared_ptr<ThreadPool> _pool;
@@ -159,6 +145,68 @@ private:
 
     // Use for signalling new opTime requests being queued.
     detail::AsyncConditionVariable _hasNewOpTimeCV;
+};
+
+class WaitForMajorityServiceForReadImpl : public WaitForMajorityServiceImplBase {
+private:
+    Status _waitForOpTime(OperationContext* opCtx, const repl::OpTime& opTime) final;
+    StringData _getReadOrWrite() const final {
+        return "Read"_sd;
+    }
+};
+
+class WaitForMajorityServiceForWriteImpl : public WaitForMajorityServiceImplBase {
+private:
+    Status _waitForOpTime(OperationContext* opCtx, const repl::OpTime& opTime) final;
+    StringData _getReadOrWrite() const final {
+        return "Write"_sd;
+    }
+};
+/**
+ * Provides a facility for asynchronously waiting a local opTime to be majority committed.
+ */
+
+class WaitForMajorityService {
+public:
+    ~WaitForMajorityService();
+
+    static WaitForMajorityService& get(ServiceContext* service);
+
+    /**
+     * Sets up the background thread pool responsible for waiting for opTimes to be majority
+     * committed.
+     */
+    void startup(ServiceContext* ctx);
+
+    /**
+     * Blocking method, which shuts down and joins the background thread.
+     */
+    void shutDown();
+
+    /**
+     * Identical to waitUntilMajorityForWrite, which should be used instead.
+     *
+     * TODO(SERVER-74754): Remove this method and replace all uses with waitUntilMajorityForWrite.
+     */
+    SemiFuture<void> waitUntilMajority(const repl::OpTime& opTime,
+                                       const CancellationToken& cancelToken);
+
+    /**
+     * Enqueue a request to wait for the given opTime to be majority committed.
+     */
+    SemiFuture<void> waitUntilMajorityForRead(const repl::OpTime& opTime,
+                                              const CancellationToken& cancelToken);
+    /**
+     * Enqueue a request to wait for the given opTime to be majority committed on this primary.
+     * Returns a PrimarySteppedDown error if the primary steps down while waiting or if this is
+     * a secondary.
+     */
+    SemiFuture<void> waitUntilMajorityForWrite(const repl::OpTime& opTime,
+                                               const CancellationToken& cancelToken);
+
+private:
+    WaitForMajorityServiceForReadImpl _readService;
+    WaitForMajorityServiceForWriteImpl _writeService;
 };
 
 }  // namespace mongo

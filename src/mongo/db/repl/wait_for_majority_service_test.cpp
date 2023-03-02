@@ -32,6 +32,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/cancellation.h"
@@ -170,6 +171,27 @@ TEST_F(WaitForMajorityServiceTest, WaitOneOpTime) {
 
     future.get();
     ASSERT_EQ(t1, getLastOpTimeWaited());
+}
+
+TEST_F(WaitForMajorityServiceTest, WaitOneOpTimeForRead) {
+    // Note the code for read and the code for write is the same except the part we stub out for
+    // unit tests, so there is no gain in duplicating every unit test for read and for write.  We
+    // have just this one as a basic check of the shim.  The mock repl coordinator does not wait
+    // for read concern or for the majority snapshot to advance, so the only wait is for there
+    // to be a snapshot available.
+    if (!serverGlobalParams.enableMajorityReadConcern)
+        return;
+
+    repl::OpTime t1(Timestamp(1, 0), 2);
+
+    auto future = waitService()->waitUntilMajorityForRead(t1, CancellationToken::uncancelable());
+
+    ASSERT_FALSE(future.isReady());
+    // Setting the committed snapshot allows read concern to continue.
+    getServiceContext()->getStorageEngine()->getSnapshotManager()->setCommittedSnapshot(
+        t1.getTimestamp());
+
+    future.get();
 }
 
 TEST_F(WaitForMajorityServiceTest, WaitWithSameOpTime) {
