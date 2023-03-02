@@ -129,20 +129,6 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     }
     return builder.obj();
 }
-
-ReplOperation makeGlobalIndexCrudOperation(const NamespaceString& indexNss,
-                                           const UUID indexUuid,
-                                           const BSONObj& key,
-                                           const BSONObj& docKey) {
-    ReplOperation op;
-    // The 'ns' field is technically redundant as it can be derived from the uuid, however it's a
-    // required oplog entry field.
-    op.setNss(indexNss.getCommandNS());
-    op.setUuid(indexUuid);
-    op.setObject(BSON(global_index::kOplogEntryIndexKeyFieldName
-                      << key << global_index::kOplogEntryDocKeyFieldName << docKey));
-    return op;
-}
 }  // namespace
 
 DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
@@ -331,22 +317,21 @@ ReplOperation MutableOplogEntry::makeDeleteOperation(const NamespaceString& nss,
     return op;
 }
 
-ReplOperation MutableOplogEntry::makeInsertGlobalIndexKeyOperation(const NamespaceString& indexNss,
-                                                                   const UUID indexUuid,
-                                                                   const BSONObj& key,
-                                                                   const BSONObj& docKey) {
-    ReplOperation op = makeGlobalIndexCrudOperation(indexNss, indexUuid, key, docKey);
-    op.setOpType(OpTypeEnum::kInsertGlobalIndexKey);
-    return op;
-}
-
-ReplOperation MutableOplogEntry::makeDeleteGlobalIndexKeyOperation(const NamespaceString& indexNss,
-                                                                   const UUID indexUuid,
-                                                                   const BSONObj& key,
-                                                                   const BSONObj& docKey) {
-    ReplOperation op = makeGlobalIndexCrudOperation(indexNss, indexUuid, key, docKey);
-    op.setOpType(OpTypeEnum::kDeleteGlobalIndexKey);
-    return op;
+MutableOplogEntry MutableOplogEntry::makeGlobalIndexCrudOperation(const OpTypeEnum& opType,
+                                                                  const NamespaceString& indexNss,
+                                                                  const UUID& indexUuid,
+                                                                  const BSONObj& key,
+                                                                  const BSONObj& docKey) {
+    MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(opType);
+    // The 'ns' field is technically redundant as it can be derived from the uuid, however it's a
+    // required oplog entry field.
+    oplogEntry.setNss(indexNss.getCommandNS());
+    oplogEntry.setTid(indexNss.tenantId());
+    oplogEntry.setUuid(indexUuid);
+    oplogEntry.setObject(BSON(global_index::kOplogEntryIndexKeyFieldName
+                              << key << global_index::kOplogEntryDocKeyFieldName << docKey));
+    return oplogEntry;
 }
 
 StatusWith<MutableOplogEntry> MutableOplogEntry::parse(const BSONObj& object) {

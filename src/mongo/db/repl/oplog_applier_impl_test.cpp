@@ -5343,13 +5343,17 @@ protected:
         NamespaceString nss = NamespaceString::createNamespaceString_forTest("system"_sd);
         for (const auto& op : batch) {
             if (op.type == GlobalIndexCrudOp::Type::Insert) {
-                arrBuilder << MutableOplogEntry::makeInsertGlobalIndexKeyOperation(
-                                  nss, op.uuid, op.key, op.docKey)
-                                  .toBSON();
+                arrBuilder
+                    << MutableOplogEntry::makeGlobalIndexCrudOperation(
+                           repl::OpTypeEnum::kInsertGlobalIndexKey, nss, op.uuid, op.key, op.docKey)
+                           .toReplOperation()
+                           .toBSON();
             } else {
-                arrBuilder << MutableOplogEntry::makeDeleteGlobalIndexKeyOperation(
-                                  nss, op.uuid, op.key, op.docKey)
-                                  .toBSON();
+                arrBuilder
+                    << MutableOplogEntry::makeGlobalIndexCrudOperation(
+                           repl::OpTypeEnum::kDeleteGlobalIndexKey, nss, op.uuid, op.key, op.docKey)
+                           .toReplOperation()
+                           .toBSON();
             }
         }
         return BSON("applyOps" << arrBuilder.arr());

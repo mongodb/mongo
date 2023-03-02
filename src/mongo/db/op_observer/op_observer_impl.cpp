@@ -135,10 +135,15 @@ repl::OpTime logOperation(OperationContext* opCtx,
 void logMutableOplogEntry(OperationContext* opCtx,
                           MutableOplogEntry* entry,
                           bool fromMigrate,
-                          OplogWriter* oplogWriter) {
+                          OplogWriter* oplogWriter,
+                          bool isRequiredInMultiDocumentTransaction = false) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
+
+    if (isRequiredInMultiDocumentTransaction) {
+        invariant(inMultiDocumentTransaction);
+    }
 
     if (inMultiDocumentTransaction) {
         txnParticipant.addTransactionOperation(opCtx, entry->toReplOperation());
@@ -750,14 +755,18 @@ void OpObserverImpl::onInsertGlobalIndexKey(OperationContext* opCtx,
         return;
     }
 
-    // _shardsvrInsertGlobalIndexKey must run inside a multi-doc transaction.
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    invariant(txnParticipant && txnParticipant.transactionIsOpen());
     invariant(!opCtx->isRetryableWrite());
 
-    const auto op = MutableOplogEntry::makeInsertGlobalIndexKeyOperation(
-        globalIndexNss, globalIndexUuid, key, docKey);
-    txnParticipant.addTransactionOperation(opCtx, op);
+    // _shardsvrInsertGlobalIndexKey must run inside a multi-doc transaction.
+    bool isRequiredInMultiDocumentTransaction = true;
+
+    MutableOplogEntry oplogEntry = MutableOplogEntry::makeGlobalIndexCrudOperation(
+        repl::OpTypeEnum::kInsertGlobalIndexKey, globalIndexNss, globalIndexUuid, key, docKey);
+    logMutableOplogEntry(opCtx,
+                         &oplogEntry,
+                         /*fromMigrate=*/false,
+                         _oplogWriter.get(),
+                         isRequiredInMultiDocumentTransaction);
 }
 
 void OpObserverImpl::onDeleteGlobalIndexKey(OperationContext* opCtx,
@@ -769,14 +778,18 @@ void OpObserverImpl::onDeleteGlobalIndexKey(OperationContext* opCtx,
         return;
     }
 
-    // _shardsvrDeleteGlobalIndexKey must run inside a multi-doc transaction.
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    invariant(txnParticipant && txnParticipant.transactionIsOpen());
     invariant(!opCtx->isRetryableWrite());
 
-    const auto op = MutableOplogEntry::makeDeleteGlobalIndexKeyOperation(
-        globalIndexNss, globalIndexUuid, key, docKey);
-    txnParticipant.addTransactionOperation(opCtx, op);
+    // _shardsvrDeleteGlobalIndexKey must run inside a multi-doc transaction.
+    bool isRequiredInMultiDocumentTransaction = true;
+
+    MutableOplogEntry oplogEntry = MutableOplogEntry::makeGlobalIndexCrudOperation(
+        repl::OpTypeEnum::kDeleteGlobalIndexKey, globalIndexNss, globalIndexUuid, key, docKey);
+    logMutableOplogEntry(opCtx,
+                         &oplogEntry,
+                         /*fromMigrate=*/false,
+                         _oplogWriter.get(),
+                         isRequiredInMultiDocumentTransaction);
 }
 
 void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {

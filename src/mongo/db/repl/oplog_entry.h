@@ -262,14 +262,18 @@ public:
     static ReplOperation makeDeleteOperation(const NamespaceString& nss,
                                              UUID uuid,
                                              const BSONObj& docToDelete);
-    static ReplOperation makeInsertGlobalIndexKeyOperation(const NamespaceString& indexNss,
-                                                           UUID indexUuid,
-                                                           const BSONObj& key,
-                                                           const BSONObj& docKey);
-    static ReplOperation makeDeleteGlobalIndexKeyOperation(const NamespaceString& indexNss,
-                                                           UUID indexUuid,
-                                                           const BSONObj& key,
-                                                           const BSONObj& docKey);
+
+    // Returns a MutableOplogEntry that is intended to be equivalent to a ReplOperation.
+    // Importantly, this MutableOplogEntry is not serializable to BSON because
+    // it does not include a WallClockTime. This MutableOplogEntry is intended for
+    // construction before logOperation() which will insert a WallClockTime.
+    // Test code that needs a BSONObj can convert this using something like
+    // MutableOplogEntry::toReplOperation().
+    static MutableOplogEntry makeGlobalIndexCrudOperation(const OpTypeEnum& opType,
+                                                          const NamespaceString& indexNss,
+                                                          const UUID& indexUuid,
+                                                          const BSONObj& key,
+                                                          const BSONObj& docKey);
 
     static ReplOperation makeCreateCommand(NamespaceString nss,
                                            const mongo::CollectionOptions& options,
@@ -481,9 +485,8 @@ public:
     using MutableOplogEntry::getOpTime;
     using MutableOplogEntry::makeCreateCommand;
     using MutableOplogEntry::makeCreateIndexesCommand;
-    using MutableOplogEntry::makeDeleteGlobalIndexKeyOperation;
     using MutableOplogEntry::makeDeleteOperation;
-    using MutableOplogEntry::makeInsertGlobalIndexKeyOperation;
+    using MutableOplogEntry::makeGlobalIndexCrudOperation;
     using MutableOplogEntry::makeInsertOperation;
     using MutableOplogEntry::makeUpdateOperation;
 
