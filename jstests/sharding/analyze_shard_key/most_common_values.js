@@ -183,9 +183,9 @@ function runTest(conn, {isUnique, isShardedColl, st}) {
 
 {
     const st = new ShardingTest({
-        shards: numNodesPerRS,
+        shards: 2,
         rs: {
-            nodes: 2,
+            nodes: numNodesPerRS,
             setParameter: {
                 "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
                     tojson({mode: "alwaysOn"}),
