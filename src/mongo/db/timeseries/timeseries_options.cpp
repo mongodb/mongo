@@ -59,6 +59,14 @@ Status isTimeseriesGranularityValidAndUnchanged(const TimeseriesOptions& current
     bool allowSecondsParameters = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
         serverGlobalParams.featureCompatibility);
 
+    // If the timeseries options are completely empty, we can skip updating them.
+    if (!targetGranularity.has_value() && !targetOptions.getBucketMaxSpanSeconds().has_value() &&
+        !targetOptions.getBucketRoundingSeconds().has_value()) {
+        if (shouldUpdateOptions)
+            *shouldUpdateOptions = false;
+        return Status::OK();
+    }
+
     if (shouldUpdateOptions) {
         *shouldUpdateOptions = true;
     }

@@ -211,5 +211,8 @@ if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db.getMongo())) {
         "timeseries":
             {"bucketMaxSpanSeconds": bucketingValueMax, "bucketRoundingSeconds": bucketingValueMax}
     }));
+
+    // No-op command should succeed with empty time-series options.
+    assert.commandWorked(db.runCommand({"collMod": collName, "timeseries": {}}));
 }
 })();
