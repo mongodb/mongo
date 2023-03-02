@@ -292,11 +292,11 @@ private:
     stdx::thread _migrateThreadHandle;
 
     long long _getNumCloned() {
-        return _migrationCloningProgress ? _migrationCloningProgress->getNumCloned() : 0;
+        return _migrationCloningProgress->getNumCloned();
     }
 
     long long _getNumBytesCloned() {
-        return _migrationCloningProgress ? _migrationCloningProgress->getNumBytes() : 0;
+        return _migrationCloningProgress->getNumBytes();
     }
 
     boost::optional<UUID> _migrationId;
