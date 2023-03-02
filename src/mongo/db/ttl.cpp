@@ -277,6 +277,9 @@ private:
     }
     void onStepDown() override {}
     void onBecomeArbiter() override {}
+    inline std::string getServiceName() const override final {
+        return "TTLMonitorService";
+    }
 };
 
 const auto _ttlMonitorService = ServiceContext::declareDecoration<TTLMonitorService>();

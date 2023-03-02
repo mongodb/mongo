@@ -146,12 +146,19 @@ public:
     virtual void onShutdown() = 0;
 
     /**
-     * Called prior to stepping up as PRIMARY, i.e. after drain mode has completed.
+     * Called prior to stepping up as PRIMARY, i.e. after drain mode has completed but before
+     * the RSTL is acquired.
+     * Implementations of this method should be short-running in order to prevent blocking
+     * the stepUp from completing.
      */
     virtual void onStepUpBegin(OperationContext* opCtx, long long term) = 0;
 
     /**
-     * Called after the node has transitioned to PRIMARY.
+     * Called after the node has transitioned to PRIMARY, i.e. after stepUp reconfig and after
+     * writing the first oplog entry with the new term, but before the node starts accepting
+     * writes.
+     * Implementations of this method should be short-running in order to prevent blocking
+     * the stepUp from completing.
      */
     virtual void onStepUpComplete(OperationContext* opCtx, long long term) = 0;
 
@@ -168,6 +175,11 @@ public:
      * Called when the node commences being an arbiter.
      */
     virtual void onBecomeArbiter() = 0;
+
+    /**
+     * Returns the name of the service. Used for logging purposes.
+     */
+    virtual std::string getServiceName() const = 0;
 };
 
 
@@ -223,6 +235,9 @@ public:
     void onStepUpComplete(OperationContext* opCtx, long long term) final;
     void onStepDown() final;
     void onBecomeArbiter() final;
+    inline std::string getServiceName() const override final {
+        return "ReplicaSetAwareServiceRegistry";
+    }
 
 private:
     void _registerService(ReplicaSetAwareInterface* service);

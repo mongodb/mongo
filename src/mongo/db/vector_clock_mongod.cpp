@@ -103,6 +103,9 @@ private:
     void onStepUpComplete(OperationContext* opCtx, long long term) override {}
     void onStepDown() override;
     void onBecomeArbiter() override;
+    inline std::string getServiceName() const override final {
+        return "VectorClockMongoD";
+    }
 
     /**
      * Structure used as keys for the map of waiters for VectorClock durability.

@@ -693,6 +693,52 @@ server_parameters:
         default:
             expr: 15 * 60 * 1000
 
+    slowServiceOnStepUpBeginThresholdMS:
+        description: >-
+            The maximum amount of time, in milliseconds, that a single replica set aware
+            service's onStepUpBegin method can take without a warning being logged.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: slowServiceOnStepUpBeginThresholdMS
+        default: 200
+        validator:
+            gte: 0
+
+    slowTotalOnStepUpBeginThresholdMS:
+        description: >-
+            The maximum amount of time, in milliseconds, that the total of all replica set
+            aware services' onStepUpBegin methods can take without a warning being logged.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: slowTotalOnStepUpBeginThresholdMS
+        default: 500
+        validator:
+            gte: 0
+
+    slowServiceOnStepUpCompleteThresholdMS:
+        description: >-
+            The maximum amount of time, in milliseconds, that a single replica set aware
+            service or primary-only service's onStepUpComplete method can take without a warning
+            being logged.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: slowServiceOnStepUpCompleteThresholdMS
+        default: 200
+        validator:
+            gte: 0
+
+    slowTotalOnStepUpCompleteThresholdMS:
+        description: >-
+            The maximum amount of time, in milliseconds, that the total of all replica set
+            aware services' and primary-only services' onStepUpComplete methods can take
+            without a warning being logged.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: slowTotalOnStepUpCompleteThresholdMS
+        default: 500
+        validator:
+            gte: 0
+
 feature_flags:
     featureFlagRetryableFindAndModify:
         description: >-

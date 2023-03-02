@@ -239,6 +239,9 @@ public:
     void onStepUpComplete(OperationContext* opCtx, long long term) override;
     void onStepDown() override;
     void onShutdown() override;
+    inline std::string getServiceName() const override final {
+        return "RangeDeleterService";
+    }
 
     /*
      * Returns the RangeDeleterService state with the following schema:

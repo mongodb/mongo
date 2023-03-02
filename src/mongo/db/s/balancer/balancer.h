@@ -173,6 +173,9 @@ private:
     void onStepUpComplete(OperationContext* opCtx, long long term) final;
     void onStepDown() final;
     void onBecomeArbiter() final;
+    inline std::string getServiceName() const override final {
+        return "Balancer";
+    }
 
     /**
      * The main balancer loop, which runs in a separate thread.

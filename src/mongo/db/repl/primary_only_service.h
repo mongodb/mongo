@@ -585,6 +585,9 @@ public:
     void onBecomeArbiter() final {}
     void onStepUpComplete(OperationContext*, long long term) final;
     void onStepDown() final;
+    inline std::string getServiceName() const override final {
+        return "PrimaryOnlyServiceRegistry";
+    }
 
 private:
     StringMap<std::unique_ptr<PrimaryOnlyService>> _servicesByName;

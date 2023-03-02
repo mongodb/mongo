@@ -125,6 +125,9 @@ private:
     void onStepUpComplete(OperationContext* opCtx, long long term) override final {}
     void onStepDown() override final {}
     void onBecomeArbiter() override final {}
+    inline std::string getServiceName() const override final {
+        return "ShardingInitializationMongoD";
+    }
 
 
     // This mutex ensures that only one thread at a time executes the sharding

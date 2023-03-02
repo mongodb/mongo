@@ -28,8 +28,10 @@
  */
 
 
+#include "mongo/logv2/log.h"
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -78,13 +80,72 @@ void ReplicaSetAwareServiceRegistry::onShutdown() {
 }
 
 void ReplicaSetAwareServiceRegistry::onStepUpBegin(OperationContext* opCtx, long long term) {
+    // Since this method is run during drain mode and can block state transition, generate a warning
+    // if we are spending too long here.
+    Timer totalTime{};
+    ON_BLOCK_EXIT([&] {
+        auto timeSpent = totalTime.millis();
+        auto threshold = repl::slowTotalOnStepUpBeginThresholdMS.load();
+        if (timeSpent > threshold) {
+            LOGV2(
+                6699600,
+                "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpBegin for all services "
+                "exceeded slowTotalOnStepUpBeginThresholdMS",
+                "thresholdMillis"_attr = threshold,
+                "durationMillis"_attr = timeSpent);
+        }
+    });
+
     std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
+        // Additionally, generate a warning if any individual service is taking too long.
+        Timer t{};
+        ON_BLOCK_EXIT([&] {
+            auto timeSpent = t.millis();
+            auto threshold = repl::slowServiceOnStepUpBeginThresholdMS.load();
+            if (timeSpent > threshold) {
+                LOGV2(6699601,
+                      "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpBegin "
+                      "for service exceeded slowServiceOnStepUpBeginThresholdMS",
+                      "thresholdMillis"_attr = threshold,
+                      "durationMillis"_attr = timeSpent,
+                      "serviceName"_attr = service->getServiceName());
+            }
+        });
         service->onStepUpBegin(opCtx, term);
     });
 }
 
 void ReplicaSetAwareServiceRegistry::onStepUpComplete(OperationContext* opCtx, long long term) {
+    // Since this method is called before we mark the node writable in
+    // ReplicationCoordinatorImpl::signalDrainComplete and therefore can block the new primary from
+    // starting to receive writes, generate a warning if we are spending too long here.
+    Timer totalTime{};
+    ON_BLOCK_EXIT([&] {
+        auto timeSpent = totalTime.millis();
+        auto threshold = repl::slowTotalOnStepUpCompleteThresholdMS.load();
+        if (timeSpent > threshold) {
+            LOGV2(6699602,
+                  "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpComplete "
+                  "for all services exceeded slowTotalOnStepUpCompleteThresholdMS",
+                  "thresholdMills"_attr = threshold,
+                  "durationMillis"_attr = timeSpent);
+        }
+    });
     std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
+        // Additionally, generate a warning if any individual service is taking too long.
+        Timer t{};
+        ON_BLOCK_EXIT([&] {
+            auto timeSpent = t.millis();
+            auto threshold = repl::slowServiceOnStepUpCompleteThresholdMS.load();
+            if (timeSpent > threshold) {
+                LOGV2(6699603,
+                      "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpComplete "
+                      "for service exceeded slowServiceOnStepUpCompleteThresholdMS",
+                      "thresholdMills"_attr = threshold,
+                      "durationMillis"_attr = timeSpent,
+                      "serviceName"_attr = service->getServiceName());
+            }
+        });
         service->onStepUpComplete(opCtx, term);
     });
 }

@@ -97,6 +97,9 @@ private:
                                 bool isMajorityDataAvailable) override final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
     void onBecomeArbiter() override final {}
+    inline std::string getServiceName() const override final {
+        return "InternalTransactionsReapService";
+    }
 
     std::shared_ptr<ThreadPool> _threadPool;
 

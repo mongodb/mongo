@@ -42,6 +42,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
@@ -1151,4 +1152,54 @@ TEST_F(PrimaryOnlyServiceTest, StateTransitionFromRebuildingShouldWakeUpConditio
 
     stepUpThread.join();
     lookUpInstanceThread.join();
+}
+
+TEST_F(PrimaryOnlyServiceTest, PrimaryOnlyServiceLogSlowServices) {
+    std::string slowSingleServiceStepUpCompleteMsg =
+        "Duration spent in PrimaryOnlyServiceRegistry::onStepUpComplete for service "
+        "exceeded slowServiceOnStepUpCompleteThresholdMS";
+    std::string slowTotalTimeStepUpCompleteMsg =
+        "Duration spent in PrimaryOnlyServiceRegistry::onStepUpComplete for all services "
+        "exceeded slowTotalOnStepUpCompleteThresholdMS";
+
+    stepDown();
+
+    // First test a stepUp with no hanging. We shouldn't log anything.
+    startCapturingLogMessages();
+    stepUp();
+    stopCapturingLogMessages();
+    ASSERT_EQ(0, countTextFormatLogLinesContaining(slowSingleServiceStepUpCompleteMsg));
+    ASSERT_EQ(0, countTextFormatLogLinesContaining(slowTotalTimeStepUpCompleteMsg));
+
+    // Use the "PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic", which is encountered
+    // via PrimaryOnlyServiceRegistry::onStepUpComplete, to simulate a slow primary-only
+    // service.
+    auto doStepUpWithHang = [this](long long ms) {
+        stepDown();
+
+        auto stepUpTimesEntered =
+            PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic.setMode(FailPoint::alwaysOn);
+
+        // Start an async task to step up, which will block on the fail point.
+        auto stepUpFuture = ExecutorFuture<void>(_testExecutor).then([this]() { stepUp(); });
+
+        // Once stepUp has hit the failpoint, sleep for the specified amount of ms so the service
+        // hangs, before disabling the failpoint and allowing stepUp to proceed.
+        PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic.waitForTimesEntered(++stepUpTimesEntered);
+        sleepmillis(ms);
+        PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic.setMode(FailPoint::off);
+        stepUpFuture.wait();
+    };
+
+    // Hang for long enough to generate a message about the single service being slow.
+    startCapturingLogMessages();
+    doStepUpWithHang(repl::slowServiceOnStepUpCompleteThresholdMS.load() + 1);
+    stopCapturingLogMessages();
+    ASSERT_EQ(1, countTextFormatLogLinesContaining(slowSingleServiceStepUpCompleteMsg));
+
+    // Hang for long enough to generate a message about the total time being slow.
+    startCapturingLogMessages();
+    doStepUpWithHang(repl::slowTotalOnStepUpCompleteThresholdMS.load() + 1);
+    stopCapturingLogMessages();
+    ASSERT_EQ(1, countTextFormatLogLinesContaining(slowTotalTimeStepUpCompleteMsg));
 }

@@ -279,6 +279,9 @@ private:
     void onStepUpComplete(OperationContext* opCtx, long long term) final {}
     void onStepDown() final;
     void onBecomeArbiter() final {}
+    inline std::string getServiceName() const override final {
+        return "MigrationDestinationManager";
+    }
 
     // The number of session oplog entries recieved from the source shard. Not all oplog
     // entries recieved from the source shard may be committed

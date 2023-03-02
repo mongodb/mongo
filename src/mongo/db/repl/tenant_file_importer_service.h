@@ -101,6 +101,10 @@ private:
 
     void onBecomeArbiter() final {}
 
+    inline std::string getServiceName() const override final {
+        return "TenantFileImporterService";
+    }
+
     /**
      * A worker function that waits for ImporterEvents and handles cloning and importing files.
      */

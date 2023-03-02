@@ -113,6 +113,9 @@ private:
     void onStartup(OperationContext* opCtx) override final;
     void onStepUpComplete(OperationContext* opCtx, long long term) override final;
     void onStepDown() override final;
+    inline std::string getServiceName() const override final {
+        return "BalancerStatsRegistry";
+    }
 
     void _loadOrphansCount(OperationContext* opCtx);
     bool _isInitialized() const {

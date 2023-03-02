@@ -35,6 +35,7 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/unittest/log_test.h"
 
 namespace mongo {
 
@@ -94,6 +95,10 @@ private:
     bool shouldRegisterReplicaSetAwareService() const final {
         return false;
     }
+
+    std::string getServiceName() const final override {
+        return "ServiceA";
+    }
 };
 
 const auto getServiceA = ServiceContext::declareDecoration<ServiceA>();
@@ -115,6 +120,10 @@ public:
 private:
     bool shouldRegisterReplicaSetAwareService() const final {
         return true;
+    }
+
+    std::string getServiceName() const final override {
+        return "ServiceB";
     }
 };
 
@@ -139,6 +148,10 @@ private:
 
     bool shouldRegisterReplicaSetAwareService() const final {
         return true;
+    }
+
+    std::string getServiceName() const final override {
+        return "ServiceC";
     }
 
     void onStartup(OperationContext* opCtx) final {
@@ -194,6 +207,57 @@ ServiceContext* ServiceC::getServiceContext() {
     return getServiceC.owner(this);
 }
 
+/*
+ * Service that can be configured to sleep for specified amount of time in its onStepUpBegin and
+ * onStepUpComplete methods. Used for testing that we log when a service takes a long time.
+ */
+class SlowService : public TestService<SlowService> {
+public:
+    static SlowService* get(ServiceContext* serviceContext);
+
+    void setStepUpBeginSleepDuration(Duration<std::milli> duration) {
+        _stepUpBeginSleepDuration = duration;
+    }
+
+    void setStepUpCompleteSleepDuration(Duration<std::milli> duration) {
+        _stepUpCompleteSleepDuration = duration;
+    }
+
+private:
+    Duration<std::milli> _stepUpBeginSleepDuration = Milliseconds(0);
+    Duration<std::milli> _stepUpCompleteSleepDuration = Milliseconds(0);
+
+    ServiceContext* getServiceContext();
+
+    bool shouldRegisterReplicaSetAwareService() const final {
+        return true;
+    }
+
+    std::string getServiceName() const final override {
+        return "SlowService";
+    }
+
+    void onStepUpBegin(OperationContext* opCtx, long long term) final {
+        sleepFor(_stepUpBeginSleepDuration);
+        TestService::onStepUpBegin(opCtx, term);
+    }
+
+    void onStepUpComplete(OperationContext* opCtx, long long term) final {
+        sleepFor(_stepUpCompleteSleepDuration);
+        TestService::onStepUpComplete(opCtx, term);
+    }
+};
+
+const auto getSlowService = ServiceContext::declareDecoration<SlowService>();
+ReplicaSetAwareServiceRegistry::Registerer<SlowService> slowServiceRegister("SlowService");
+
+SlowService* SlowService::get(ServiceContext* serviceContext) {
+    return &getSlowService(serviceContext);
+}
+
+ServiceContext* SlowService::getServiceContext() {
+    return getSlowService.owner(this);
+}
 
 class ReplicaSetAwareServiceTest : public ServiceContextTest {
 public:
@@ -291,6 +355,71 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ASSERT_EQ(2, c->numCallsOnStepUpComplete);
     ASSERT_EQ(1, c->numCallsOnStepDown);
     ASSERT_EQ(1, c->numCallsOnBecomeArbiter);
+}
+
+TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareServiceLogSlowServices) {
+    std::string slowSingleServiceStepUpBeginMsg =
+        "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpBegin for service exceeded "
+        "slowServiceOnStepUpBeginThresholdMS";
+    std::string slowSingleServiceStepUpCompleteMsg =
+        "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpComplete for service "
+        "exceeded slowServiceOnStepUpCompleteThresholdMS";
+    std::string slowTotalTimeStepUpBeginMsg =
+        "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpBegin for all services "
+        "exceeded slowTotalOnStepUpBeginThresholdMS";
+    std::string slowTotalTimeStepUpCompleteMsg =
+        "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpComplete for all services "
+        "exceeded slowTotalOnStepUpCompleteThresholdMS";
+
+    auto sc = getGlobalServiceContext();
+    auto opCtxHolder = makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+
+    auto slowService = SlowService::get(sc);
+    ASSERT_EQ(0, slowService->numCallsOnStepUpBegin);
+    ASSERT_EQ(0, slowService->numCallsOnStepUpComplete);
+
+    // With the default sleep interval (no sleep) we don't log anything.
+    startCapturingLogMessages();
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, _term);
+    stopCapturingLogMessages();
+    ASSERT_EQ(1, slowService->numCallsOnStepUpBegin);
+    ASSERT_EQ(1, slowService->numCallsOnStepUpComplete);
+    ASSERT_EQ(0,
+              countTextFormatLogLinesContaining(
+                  "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpBegin"));
+    ASSERT_EQ(0,
+              countTextFormatLogLinesContaining(
+                  "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpComplete"));
+
+    // Introduce delays at the minimum thresholds at which we will log for a single service.
+    slowService->setStepUpBeginSleepDuration(
+        Milliseconds(repl::slowServiceOnStepUpBeginThresholdMS.load() + 1));
+    slowService->setStepUpCompleteSleepDuration(
+        Milliseconds(repl::slowServiceOnStepUpCompleteThresholdMS.load() + 1));
+    startCapturingLogMessages();
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, _term);
+    stopCapturingLogMessages();
+    ASSERT_EQ(2, slowService->numCallsOnStepUpBegin);
+    ASSERT_EQ(2, slowService->numCallsOnStepUpComplete);
+    ASSERT_EQ(1, countTextFormatLogLinesContaining(slowSingleServiceStepUpBeginMsg));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining(slowSingleServiceStepUpCompleteMsg));
+
+    // Introduce a delay that should cause us to log for the total time across all services.
+    slowService->setStepUpBeginSleepDuration(
+        Milliseconds(repl::slowTotalOnStepUpBeginThresholdMS.load() + 1));
+    slowService->setStepUpCompleteSleepDuration(
+        Milliseconds(repl::slowTotalOnStepUpCompleteThresholdMS.load() + 1));
+    startCapturingLogMessages();
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, _term);
+    stopCapturingLogMessages();
+    ASSERT_EQ(3, slowService->numCallsOnStepUpBegin);
+    ASSERT_EQ(3, slowService->numCallsOnStepUpComplete);
+    ASSERT_EQ(1, countTextFormatLogLinesContaining(slowTotalTimeStepUpBeginMsg));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining(slowTotalTimeStepUpCompleteMsg));
 }
 
 }  // namespace

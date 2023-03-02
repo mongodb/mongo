@@ -139,6 +139,9 @@ public:
     void onStartup(OperationContext* opCtx);
     void onShutdown();
     void onStepUpComplete(OperationContext* opCtx, long long term);
+    inline std::string getServiceName() const override final {
+        return "QueryAnalysisWriter";
+    }
 
     ExecutorFuture<void> createTTLIndexes(OperationContext* opCtx);
 

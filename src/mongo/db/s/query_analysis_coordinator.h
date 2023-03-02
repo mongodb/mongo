@@ -153,6 +153,10 @@ private:
 
     void onBecomeArbiter() override final {}
 
+    inline std::string getServiceName() const override final {
+        return "QueryAnalysisCoordinator";
+    }
+
     /**
      * Returns the minimum last ping time for a sampler to be considered as active.
      */
