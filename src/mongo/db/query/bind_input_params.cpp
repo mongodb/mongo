@@ -83,8 +83,8 @@ public:
     }
 
     void visit(const InMatchExpression* expr) final {
-        auto inputParam = expr->getInputParamId();
-        if (!inputParam) {
+        auto slotId = getSlotId(expr->getInputParamId());
+        if (!slotId) {
             return;
         }
 
@@ -94,7 +94,7 @@ public:
 
         auto&& [arrSetTag, arrSetVal, hasArray, hasObject, hasNull] =
             stage_builder::convertInExpressionEqualities(expr);
-        bindParam(*inputParam, true /*owned*/, arrSetTag, arrSetVal);
+        bindParam(*slotId, true /*owned*/, arrSetTag, arrSetVal);
 
         // Auto-parameterization should not kick in if the $in's list of equalities includes any
         // arrays, objects or null values. Asserted after bind to avoid leaking memory allocated in
@@ -114,14 +114,14 @@ public:
         }
         tassert(6279508, "$mod had divisor param but not remainder param", remainderParam);
 
-        {
+        if (auto slotId = getSlotId(*divisorParam)) {
             auto value = sbe::value::bitcastFrom<int64_t>(expr->getDivisor());
-            bindParam(*divisorParam, true /*owned*/, sbe::value::TypeTags::NumberInt64, value);
+            bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt64, value);
         }
 
-        {
+        if (auto slotId = getSlotId(*remainderParam)) {
             auto value = sbe::value::bitcastFrom<int64_t>(expr->getRemainder());
-            bindParam(*remainderParam, true /*owned*/, sbe::value::TypeTags::NumberInt64, value);
+            bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt64, value);
         }
     }
 
@@ -134,32 +134,32 @@ public:
         }
         tassert(6279510, "$regex had source param but not compiled param", compiledRegexParam);
 
-        {
+        if (auto slotId = getSlotId(*sourceRegexParam)) {
             auto&& [bsonRegexTag, bsonRegexVal] =
                 sbe::value::makeNewBsonRegex(expr->getString(), expr->getFlags());
-            bindParam(*sourceRegexParam, true /*owned*/, bsonRegexTag, bsonRegexVal);
+            bindParam(*slotId, true /*owned*/, bsonRegexTag, bsonRegexVal);
         }
 
-        {
+        if (auto slotId = getSlotId(*compiledRegexParam)) {
             auto&& [compiledRegexTag, compiledRegexVal] =
                 sbe::value::makeNewPcreRegex(expr->getString(), expr->getFlags());
-            bindParam(*compiledRegexParam, true /*owned*/, compiledRegexTag, compiledRegexVal);
+            bindParam(*slotId, true /*owned*/, compiledRegexTag, compiledRegexVal);
         }
     }
 
     void visit(const SizeMatchExpression* expr) final {
-        auto inputParam = expr->getInputParamId();
-        if (!inputParam) {
+        auto slotId = getSlotId(expr->getInputParamId());
+        if (!slotId) {
             return;
         }
 
         auto value = sbe::value::bitcastFrom<int32_t>(expr->getData());
-        bindParam(*inputParam, true /*owned*/, sbe::value::TypeTags::NumberInt32, value);
+        bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt32, value);
     }
 
     void visit(const TypeMatchExpression* expr) final {
-        auto inputParam = expr->getInputParamId();
-        if (!inputParam) {
+        auto slotId = getSlotId(expr->getInputParamId());
+        if (!slotId) {
             return;
         }
 
@@ -169,12 +169,12 @@ public:
         auto value = sbe::value::bitcastFrom<int64_t>(expr->typeSet().getBSONTypeMask());
         tassert(
             6279506, "type mask cannot be negative", sbe::value::bitcastTo<int64_t>(value) >= 0);
-        bindParam(*inputParam, true /*owned*/, sbe::value::TypeTags::NumberInt64, value);
+        bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt64, value);
     }
 
     void visit(const WhereMatchExpression* expr) final {
-        auto inputParam = expr->getInputParamId();
-        if (!inputParam) {
+        auto slotId = getSlotId(expr->getInputParamId());
+        if (!slotId) {
             return;
         }
 
@@ -187,14 +187,14 @@ public:
             // being recovered from the SBE plan cache -- in this case, the visitor has exclusive
             // access to this match expression tree. Furthermore, after all input parameters are
             // bound the match expression tree is no longer used.
-            bindParam(*inputParam,
+            bindParam(*slotId,
                       true /*owned*/,
                       sbe::value::TypeTags::jsFunction,
                       sbe::value::bitcastFrom<JsFunction*>(
                           const_cast<WhereMatchExpression*>(expr)->extractPredicate().release()));
         } else {
             auto [typeTag, value] = sbe::value::makeCopyJsFunction(expr->getPredicate());
-            bindParam(*inputParam, true /*owned*/, typeTag, value);
+            bindParam(*slotId, true /*owned*/, typeTag, value);
         }
     }
 
@@ -247,17 +247,15 @@ public:
 
 private:
     void visitComparisonMatchExpression(const ComparisonMatchExpressionBase* expr) {
-        auto inputParam = expr->getInputParamId();
-        if (!inputParam) {
+        auto slotId = getSlotId(expr->getInputParamId());
+        if (!slotId) {
             return;
         }
-
         // This is an unowned value which is a view into the BSON owned by the MatchExpression. This
         // is acceptable because the 'MatchExpression' is held by the 'CanonicalQuery', and the
         // 'CanonicalQuery' lives for the lifetime of the query.
         auto&& [typeTag, val] = sbe::bson::convertFrom<true>(expr->getData());
-
-        bindParam(*inputParam, false /*owned*/, typeTag, val);
+        bindParam(*slotId, false /*owned*/, typeTag, val);
     }
 
     void visitBitTestExpression(const BitTestMatchExpression* expr) {
@@ -273,18 +271,18 @@ private:
                 "bit-test expression had bit positions param but not bitmask param",
                 bitMaskParam);
 
-        {
+        if (auto slotId = getSlotId(*bitPositionsParam)) {
             auto&& [bitPosTag, bitPosVal] = stage_builder::convertBitTestBitPositions(expr);
-            bindParam(*bitPositionsParam, true /*owned*/, bitPosTag, bitPosVal);
+            bindParam(*slotId, true /*owned*/, bitPosTag, bitPosVal);
         }
 
-        {
+        if (auto slotId = getSlotId(*bitMaskParam)) {
             auto val = sbe::value::bitcastFrom<uint64_t>(expr->getBitMask());
-            bindParam(*bitMaskParam, true /*owned*/, sbe::value::TypeTags::NumberInt64, val);
+            bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt64, val);
         }
     }
 
-    void bindParam(MatchExpression::InputParamId paramId,
+    void bindParam(sbe::value::SlotId slotId,
                    bool owned,
                    sbe::value::TypeTags typeTag,
                    sbe::value::Value value) {
@@ -292,18 +290,24 @@ private:
         if (owned) {
             guard.emplace(typeTag, value);
         }
-
-        auto it = _inputParamToSlotMap.find(paramId);
-        // The encoding of the plan cache key should ensure that if we recover a cached plan from
-        // the cached, the auto-parameterization of the query is consistent with the way that the
-        // cached plan is parameterized.
-        if (it != _inputParamToSlotMap.end()) {
-            auto accessor = _runtimeEnvironment->getAccessor(it->second);
-            if (guard) {
-                guard->reset();
-            }
-            accessor->reset(owned, typeTag, value);
+        auto accessor = _runtimeEnvironment->getAccessor(slotId);
+        if (owned) {
+            guard->reset();
         }
+        accessor->reset(owned, typeTag, value);
+    }
+
+    boost::optional<sbe::value::SlotId> getSlotId(
+        boost::optional<MatchExpression::InputParamId> paramId) const {
+        return paramId ? getSlotId(*paramId) : boost::none;
+    }
+
+    boost::optional<sbe::value::SlotId> getSlotId(MatchExpression::InputParamId paramId) const {
+        auto it = _inputParamToSlotMap.find(paramId);
+        if (it != _inputParamToSlotMap.end()) {
+            return it->second;
+        }
+        return boost::none;
     }
 
     const stage_builder::InputParamToSlotMap& _inputParamToSlotMap;
