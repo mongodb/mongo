@@ -210,6 +210,11 @@ void TicketHolderManager::appendStats(BSONObjBuilder& b) {
         _readTicketHolder->appendStats(bbb);
         bbb.done();
     }
+    if (_monitor) {
+        BSONObjBuilder bbb(b.subobjStart("monitor"));
+        _monitor->appendStats(bbb);
+        bbb.done();
+    }
 }
 
 Status TicketHolderManager::validateConcurrencyAdjustmentAlgorithm(

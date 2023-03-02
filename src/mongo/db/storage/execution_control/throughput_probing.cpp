@@ -42,6 +42,10 @@ ThroughputProbing::ThroughputProbing(ServiceContext* svcCtx,
     : TicketHolderMonitor(svcCtx, readTicketHolder, writeTicketHolder, interval),
       _stableConcurrency(_readTicketHolder->outof()) {}
 
+void ThroughputProbing::appendStats(BSONObjBuilder& builder) const {
+    _stats.serialize(builder);
+}
+
 void ThroughputProbing::_run(Client* client) {
     auto numFinishedProcessing =
         _readTicketHolder->numFinishedProcessing() + _writeTicketHolder->numFinishedProcessing();
@@ -49,6 +53,7 @@ void ThroughputProbing::_run(Client* client) {
 
     auto throughput = (numFinishedProcessing - _prevNumFinishedProcessing) /
         static_cast<double>(durationCount<Milliseconds>(_interval()));
+    _stats.throughput.store(throughput);
 
     switch (_state) {
         case ProbingState::kStable:
@@ -100,9 +105,12 @@ void ThroughputProbing::_probeUp(OperationContext* opCtx, double throughput) {
     if (throughput > _stableThroughput) {
         // Increasing concurrency caused throughput to increase, so promote this new level of
         // concurrency to stable.
+        auto concurrency = _readTicketHolder->outof();
+        _stats.timesIncreased.fetchAndAdd(1);
+        _stats.totalAmountIncreased.fetchAndAdd(concurrency - _stableConcurrency);
         _state = ProbingState::kStable;
         _stableThroughput = throughput;
-        _stableConcurrency = _readTicketHolder->outof();
+        _stableConcurrency = concurrency;
     } else if (_readTicketHolder->outof() > kMinConcurrency) {
         // Increasing concurrency did not cause throughput to increase, so try decreasing
         // concurrency instead.
@@ -121,9 +129,12 @@ void ThroughputProbing::_probeDown(OperationContext* opCtx, double throughput) {
     if (throughput > _stableThroughput) {
         // Decreasing concurrency caused throughput to increase, so promote this new level of
         // concurrency to stable.
+        auto concurrency = _readTicketHolder->outof();
+        _stats.timesDecreased.fetchAndAdd(1);
+        _stats.totalAmountDecreased.fetchAndAdd(_stableConcurrency - concurrency);
         _state = ProbingState::kStable;
         _stableThroughput = throughput;
-        _stableConcurrency = _readTicketHolder->outof();
+        _stableConcurrency = concurrency;
     } else {
         // Decreasing concurrency did not cause throughput to increase, so go back to stable and get
         // a new baseline to compare against.
@@ -139,6 +150,14 @@ void ThroughputProbing::_setConcurrency(OperationContext* opCtx, int concurrency
 
     LOGV2_DEBUG(
         7346003, 3, "Throughput Probing: set concurrency", "concurrency"_attr = concurrency);
+}
+
+void ThroughputProbing::Stats::serialize(BSONObjBuilder& builder) const {
+    builder.append("throughput", throughput.load());
+    builder.append("timesDecreased", static_cast<long long>(timesDecreased.load()));
+    builder.append("timesIncreased", static_cast<long long>(timesIncreased.load()));
+    builder.append("totalAmountDecreased", static_cast<long long>(totalAmountDecreased.load()));
+    builder.append("totalAmountIncreased", static_cast<long long>(totalAmountIncreased.load()));
 }
 
 }  // namespace mongo::execution_control

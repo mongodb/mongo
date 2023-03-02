@@ -46,6 +46,8 @@ public:
 
     void start();
 
+    virtual void appendStats(BSONObjBuilder& builder) const = 0;
+
 protected:
     TicketHolder* _readTicketHolder;
     TicketHolder* _writeTicketHolder;
