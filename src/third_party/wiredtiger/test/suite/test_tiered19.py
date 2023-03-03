@@ -121,16 +121,16 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda: fs.fs_open_file(
                 session, 'test_put', file_system.open_file_type_data, file_system.open_readonly), err_msg)
-        
+
         # We cannot use the file system to create files, it is read-only. So we use python I/O to
         # build up the file.
         f = open('foobar', 'wb')
-        
+
         # Test fs_open_file fails when the target file exists locally but is not in the bucket.
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda: fs.fs_open_file(
                 session, 'foobar', file_system.open_file_type_data, file_system.open_readonly), err_msg)
-        
+
         # The file system is read only so cannot be used to create files because of this
         # the python I/O is used to build files.
         local_file_name = "test_tiered19_local_file"
@@ -196,14 +196,14 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
         # Close a valid file handle.
         self.assertEqual(fh_2.close(session), 0)
 
-        
+
         # Test directory listing.
-        
+
         # Create a second file in storage.
         new_file_name = local_file_name + "1"
         self.assertEquals(ss.ss_flush(session, fs, local_file_name, new_file_name, None), 0)
         self.assertEquals(ss.ss_flush_finish(session, fs, local_file_name, new_file_name, None), 0)
-        
+
         test_files = {prefix + f for f in [local_file_name, new_file_name]}
 
         file_list = fs.fs_directory_list_single(session, '', '')
@@ -221,7 +221,7 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
         # Check that file does not exist in GCP.
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda: ss.ss_flush_finish(session, fs, 'non_existing_file', 'non_existing_file', None), err_msg)
-        
+
         # Check the file size is returned.
         self.assertEquals(fs.fs_size(session, local_file_name), len(outbytes))
 
@@ -245,12 +245,14 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda: ss.ss_customize_file_system(
                 session, "", None, self.get_fs_config(prefix_1)), err_msg)
+        self.ignoreStderrPatternIfExists('Bucket not specified')
 
         bad_bucket = "./bucket_BAD"
         err_msg = '/Exception: No such file or directory/'
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda: ss.ss_customize_file_system(
                 session, bad_bucket, None, self.get_fs_config(prefix_1)), err_msg)
+        self.ignoreStderrPatternIfExists('No such bucket')
 
         # Test the customize file system function works when there is a valid bucket.
         azure_fs = ss.ss_customize_file_system(
@@ -266,6 +268,7 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
         except:
             self.assertEquals(azure_fs.fs_exist(session, 'foobar'), -1)
         self.assertFalse(exists)
+        self.ignoreStderrPatternIfExists('does not exist in Azure')
 
         # We cannot use the file system to create files, it is readonly.
         # So use python I/O to build up the file.
@@ -279,12 +282,13 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
         except:
             self.assertEquals(azure_fs.fs_exist(session, 'foobar'), -1)
         self.assertFalse(exists)
+        self.ignoreStderrPatternIfExists('does not exist in Azure')
 
         # Flush valid file into Azure.
         self.assertEqual(ss.ss_flush(session, azure_fs, 'foobar', 'foobar', None), 0)
         # Check that file exists in Azure.
         self.assertEqual(ss.ss_flush_finish(session, azure_fs, 'foobar', 'foobar', None), 0)
-        
+
         # The object exists now.
         self.assertEquals(azure_fs.fs_directory_list(session, None, None), [prefix_1 + 'foobar'])
         try:
@@ -338,8 +342,10 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
         # Flush non valid file into Azure will result in an exception.
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda: ss.ss_flush(session, azure_fs, 'non_existing_file', 'non_existing_file', None), err_msg)
+
         # Check that file does not exist in Azure.
         self.assertEqual(ss.ss_flush_finish(session, azure_fs, 'non_existing_file', 'non_existing_file', None), 0)
+        self.ignoreStderrPatternIfExists('does not exist in Azure')
 
         # Test that the no new objects exist after failed flush.
         self.assertEquals(azure_fs.fs_directory_list(session, None, None), [prefix_1 + 'foobar'])
@@ -357,6 +363,7 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
 
         # Flush second valid file into Azure.
         self.assertEqual(ss.ss_flush(session, azure_fs, 'foobar', 'foobar2', None), 0)
+        self.ignoreStdoutPatternIfExists('HTTP status code 201 won\'t be retried.')
         # Check that second file exists in Azure.
         self.assertEqual(ss.ss_flush_finish(session, azure_fs, 'foobar', 'foobar2', None), 0)
 
@@ -413,3 +420,4 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
 
         # Test that azure storage source terminate succeeds.
         self.assertEqual(ss.terminate(session), 0)
+        self.ignoreStdoutPatternIfExists('HTTP status code 2')
