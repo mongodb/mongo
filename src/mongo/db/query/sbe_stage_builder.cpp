@@ -243,10 +243,8 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
 
 PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
                                sbe::value::SlotIdGenerator* slotIdGenerator) {
-    for (auto&& [slotName, isRequired] : reqs._slots) {
-        if (isRequired) {
-            _slots[slotName] = slotIdGenerator->generate();
-        }
+    for (const auto& slotName : reqs._slots) {
+        _slots[slotName] = slotIdGenerator->generate();
     }
 }
 

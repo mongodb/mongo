@@ -81,8 +81,6 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     PlanYieldPolicySBE* yieldPolicy,
                                     bool preparingFromCache = false);
 
-class PlanStageReqs;
-
 /**
  * The ParameterizedIndexScanSlots struct is used by SlotBasedStageBuilder while building the index
  * scan stage to return the slots that are registered in the runtime environment and will be
@@ -210,10 +208,9 @@ public:
 
     inline void forEachSlot(const PlanStageReqs& reqs,
                             const std::function<void(sbe::value::SlotId, const Name&)>& fn) const;
-
     inline void clearNonRequiredSlots(const PlanStageReqs& reqs);
 
-    struct NameMapHasher {
+    struct NameHasher {
         using is_transparent = void;
         size_t operator()(const Name& p) const noexcept {
             auto h{std::pair{p.first, absl::string_view{p.second.rawData(), p.second.size()}}};
@@ -221,12 +218,13 @@ public:
         }
     };
 
-    struct NameMapKeyEq : std::equal_to<Name> {
+    struct NameEq : std::equal_to<Name> {
         using is_transparent = void;
     };
 
     template <typename V>
-    using NameMap = absl::flat_hash_map<OwnedName, V, NameMapHasher, NameMapKeyEq>;
+    using NameMap = absl::flat_hash_map<OwnedName, V, NameHasher, NameEq>;
+    using NameSet = absl::flat_hash_set<OwnedName, NameHasher, NameEq>;
 
 private:
     NameMap<sbe::value::SlotId> _slots;
@@ -240,7 +238,7 @@ class PlanStageReqs {
 public:
     using Type = PlanStageSlots::Type;
     using Name = PlanStageSlots::Name;
-    using OwnedName = std::pair<Type, std::string>;
+    using OwnedName = PlanStageSlots::OwnedName;
 
     static constexpr auto kMeta = PlanStageSlots::Type::kMeta;
     static constexpr auto kField = PlanStageSlots::Type::kField;
@@ -251,51 +249,46 @@ public:
     }
 
     bool has(const Name& str) const {
-        auto it = _slots.find(str);
-        return it != _slots.end() && it->second;
+        return _slots.contains(str);
     }
 
     PlanStageReqs& set(const Name& str) {
-        _slots.insert_or_assign(str, true);
+        _slots.emplace(str);
         return *this;
     }
 
     PlanStageReqs& set(OwnedName str) {
-        _slots.insert_or_assign(std::move(str), true);
+        _slots.emplace(std::move(str));
         return *this;
     }
 
     PlanStageReqs& set(const std::vector<Name>& strs) {
-        for (size_t i = 0; i < strs.size(); ++i) {
-            _slots.insert_or_assign(strs[i], true);
-        }
+        _slots.insert(strs.begin(), strs.end());
         return *this;
     }
 
     PlanStageReqs& set(std::vector<OwnedName> strs) {
-        for (size_t i = 0; i < strs.size(); ++i) {
-            _slots.insert_or_assign(std::move(strs[i]), true);
-        }
+        _slots.insert(std::make_move_iterator(strs.begin()), std::make_move_iterator(strs.end()));
         return *this;
     }
 
     PlanStageReqs& setIf(const Name& str, bool condition) {
         if (condition) {
-            _slots.insert_or_assign(str, true);
+            _slots.emplace(str);
         }
         return *this;
     }
 
     PlanStageReqs& setFields(std::vector<std::string> strs) {
         for (size_t i = 0; i < strs.size(); ++i) {
-            _slots.insert_or_assign(std::make_pair(kField, std::move(strs[i])), true);
+            _slots.emplace(kField, std::move(strs[i]));
         }
         return *this;
     }
 
     PlanStageReqs& setSortKeys(std::vector<std::string> strs) {
         for (size_t i = 0; i < strs.size(); ++i) {
-            _slots.insert_or_assign(std::make_pair(kSortKey, std::move(strs[i])), true);
+            _slots.emplace(kSortKey, std::move(strs[i]));
         }
         return *this;
     }
@@ -330,12 +323,8 @@ public:
     }
 
     bool hasType(Type t) const {
-        for (auto&& [name, isRequired] : _slots) {
-            if (isRequired && name.first == t) {
-                return true;
-            }
-        }
-        return false;
+        return std::any_of(
+            _slots.begin(), _slots.end(), [t](auto& item) { return item.first == t; });
     }
     bool hasFields() const {
         return hasType(kField);
@@ -346,9 +335,9 @@ public:
 
     std::vector<std::string> getOfType(Type t) const {
         std::vector<std::string> res;
-        for (auto&& [name, isRequired] : _slots) {
-            if (isRequired && name.first == t) {
-                res.push_back(name.second);
+        for (const auto& [type, str] : _slots) {
+            if (type == t) {
+                res.push_back(str);
             }
         }
         std::sort(res.begin(), res.end());
@@ -362,7 +351,7 @@ public:
     }
 
     PlanStageReqs& clearAllOfType(Type t) {
-        absl::erase_if(_slots, [t](auto& item) { return item.second && item.first.first == t; });
+        absl::erase_if(_slots, [t](auto& item) { return item.first == t; });
         return *this;
     }
     PlanStageReqs& clearAllFields() {
@@ -382,10 +371,8 @@ public:
         const PlanStageReqs& reqs,
         const std::function<void(sbe::value::SlotId, const Name&)>& fn) const;
 
-    friend void PlanStageSlots::clearNonRequiredSlots(const PlanStageReqs& reqs);
-
 private:
-    PlanStageSlots::NameMap<bool> _slots;
+    PlanStageSlots::NameSet _slots;
 
     // When we're in the middle of building a special union sub-tree implementing a tailable cursor
     // collection scan, this flag will be set to true. Otherwise this flag will be false.
@@ -405,40 +392,27 @@ private:
 
 void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
                                  const std::function<void(sbe::value::SlotId)>& fn) const {
-    for (auto&& [name, isRequired] : reqs._slots) {
-        if (isRequired) {
-            // Clang raises an error if we attempt to use 'name' in the tassert() below, because
-            // tassert() is a macro that uses lambdas and 'name' is defined via "local binding".
-            // We work-around this by copying 'name' to a local variable 'slotName'.
-            auto slotName = Name(name);
-            auto it = _slots.find(slotName);
-            tassert(7050900,
-                    str::stream() << "Could not find " << static_cast<int>(slotName.first) << ":'"
-                                  << slotName.second << "' in the slot map, expected slot to exist",
-                    it != _slots.end());
+    for (const auto& name : reqs._slots) {
+        auto it = _slots.find(name);
+        tassert(7050900,
+                str::stream() << "Could not find " << static_cast<int>(name.first) << ":'"
+                              << name.second << "' in the slot map, expected slot to exist",
+                it != _slots.end());
 
-            fn(it->second);
-        }
+        fn(it->second);
     }
 }
 
 void PlanStageSlots::forEachSlot(
     const PlanStageReqs& reqs,
     const std::function<void(sbe::value::SlotId, const Name&)>& fn) const {
-    for (auto&& [name, isRequired] : reqs._slots) {
-        if (isRequired) {
-            // Clang raises an error if we attempt to use 'name' in the tassert() below, because
-            // tassert() is a macro that uses lambdas and 'name' is defined via "local binding".
-            // We work-around this by copying 'name' to a local variable 'slotName'.
-            auto slotName = Name(name);
-            auto it = _slots.find(slotName);
-            tassert(7050901,
-                    str::stream() << "Could not find " << static_cast<int>(slotName.first) << ":'"
-                                  << slotName.second << "' in the slot map, expected slot to exist",
-                    it != _slots.end());
-
-            fn(it->second, slotName);
-        }
+    for (const auto& name : reqs._slots) {
+        auto it = _slots.find(name);
+        tassert(7050901,
+                str::stream() << "Could not find " << static_cast<int>(name.first) << ":'"
+                              << name.second << "' in the slot map, expected slot to exist",
+                it != _slots.end());
+        fn(it->second, name);
     }
 }
 
@@ -446,10 +420,8 @@ void PlanStageSlots::clearNonRequiredSlots(const PlanStageReqs& reqs) {
     auto it = _slots.begin();
     while (it != _slots.end()) {
         auto& name = it->first;
-        auto reqIt = reqs._slots.find(name);
         // We never clear kResult, regardless of whether it is required by 'reqs'.
-        if ((reqIt != reqs._slots.end() && reqIt->second) ||
-            (name.first == kResult.first && name.second == kResult.second)) {
+        if (_slots.key_eq()(name, kResult) || reqs.has(name)) {
             ++it;
         } else {
             _slots.erase(it++);
