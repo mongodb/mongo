@@ -77,7 +77,8 @@ void TimeseriesWriteStage::_writeToTimeseriesBuckets() {
         write_ops::DeleteOpEntry deleteEntry(BSON("_id" << bucketId), false);
         write_ops::DeleteCommandRequest op(collection()->ns(), {deleteEntry});
         // TODO (SERVER-73093): Handles the write failures through retry.
-        auto result = timeseries::performAtomicWrites(opCtx(), collection(), _currentBucketRid, op);
+        auto result = timeseries::performAtomicWrites(
+            opCtx(), collection(), _currentBucketRid, op, /*fromMigrate=*/false);
     } else {
         auto timeseriesOptions = collection()->getTimeseriesOptions();
         auto metaFieldName = timeseriesOptions->getMetaField();
@@ -94,7 +95,8 @@ void TimeseriesWriteStage::_writeToTimeseriesBuckets() {
         write_ops::UpdateOpEntry updateEntry(BSON("_id" << bucketId), std::move(u));
         write_ops::UpdateCommandRequest op(collection()->ns(), {updateEntry});
         // TODO (SERVER-73093): Handles the write failures through retry.
-        auto result = timeseries::performAtomicWrites(opCtx(), collection(), _currentBucketRid, op);
+        auto result = timeseries::performAtomicWrites(
+            opCtx(), collection(), _currentBucketRid, op, /*fromMigrate=*/false);
     }
 }
 

@@ -143,12 +143,12 @@ BSONObj makeNewDocumentForWrite(
     return makeNewDocument(bucketId, metadata, minmax->min(), minmax->max(), dataBuilders);
 }
 
-Status performAtomicWrites(
-    OperationContext* opCtx,
-    const CollectionPtr& coll,
-    const RecordId& recordId,
-    const stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>&
-        modificationOp) try {
+Status performAtomicWrites(OperationContext* opCtx,
+                           const CollectionPtr& coll,
+                           const RecordId& recordId,
+                           const stdx::variant<write_ops::UpdateCommandRequest,
+                                               write_ops::DeleteCommandRequest>& modificationOp,
+                           bool fromMigrate) try {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
     invariant(!opCtx->inMultiDocumentTransaction());
 
@@ -181,7 +181,9 @@ Status performAtomicWrites(
                 if (const auto& stmtIds = updateOp.getStmtIds()) {
                     args.stmtIds = *stmtIds;
                 }
-                args.source = OperationSource::kTimeseriesDelete;
+                if (fromMigrate) {
+                    args.source = OperationSource::kFromMigrate;
+                }
 
                 BSONObj diffFromUpdate;
                 const BSONObj* diffOnIndexes =
@@ -208,7 +210,7 @@ Status performAtomicWrites(
                     record_id_helpers::keyForOID(deleteOp.getDeletes().front().getQ()["_id"].OID());
                 invariant(recordId == deleteId);
                 collection_internal::deleteDocument(
-                    opCtx, coll, kUninitializedStmtId, recordId, &curOp->debug());
+                    opCtx, coll, kUninitializedStmtId, recordId, &curOp->debug(), fromMigrate);
             }},
         modificationOp);
 
