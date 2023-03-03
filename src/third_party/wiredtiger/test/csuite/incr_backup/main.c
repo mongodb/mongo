@@ -661,6 +661,8 @@ incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABL
                 testutil_check(file_cursor->get_key(file_cursor, &offset, &size, &type));
                 testutil_assert(type == WT_BACKUP_FILE || type == WT_BACKUP_RANGE);
                 if (type == WT_BACKUP_RANGE) {
+                    VERBOSE(3, "RANGE: %s: offset %" PRIu64 " size %" PRIu64 "\n", filename, offset,
+                      size);
                     nrange++;
                     tmp = dcalloc(1, size);
 
@@ -827,7 +829,8 @@ main(int argc, char *argv[])
     uint32_t file_max, iter, max_value_size, next_checkpoint, rough_size, slot;
     int ch, ncheckpoints, nreopens, status;
     const char *backup_verbose, *working_dir;
-    char conf[1024], home[1024], backup_check[1024], backup_dir[1024], command[4096];
+    char backup_check[1024], backup_dir[1024], backup_src[1024], command[4096], conf[1024],
+      home[1024];
     bool preserve;
 
     preserve = false;
@@ -867,8 +870,10 @@ main(int argc, char *argv[])
         rnd.v = seed;
 
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
-    testutil_check(__wt_snprintf(backup_dir, sizeof(backup_dir), "../%s.BACKUP", home));
-    testutil_check(__wt_snprintf(backup_check, sizeof(backup_check), "../%s.CHECK", home));
+    /* Put the backup directories as the same level as the home directory. */
+    testutil_check(__wt_snprintf(backup_check, sizeof(backup_check), "./%s.CHECK", home));
+    testutil_check(__wt_snprintf(backup_dir, sizeof(backup_dir), "./%s.BACKUP", home));
+    testutil_check(__wt_snprintf(backup_src, sizeof(backup_src), "./%s.BACKUP.SRC", home));
     printf("Seed: %" PRIu64 "\n", seed);
 
     testutil_check(
@@ -955,11 +960,20 @@ main(int argc, char *argv[])
         }
 
         /* Close and reopen the connection once in a while. */
-        if (__wt_random(&rnd) % 10 == 0) {
+        if (iter != 0 && __wt_random(&rnd) % 5 == 0) {
             VERBOSE(2, "Close and reopen the connection %d\n", nreopens);
             testutil_check(conn->close(conn, NULL));
+            /* Check the source bitmap after restart. Copy while closed. */
+            testutil_check(__wt_snprintf(command, sizeof(command),
+              "rm -rf %s; mkdir %s; cp -rp %s/* %s", backup_src, backup_src, home, backup_src));
+            if ((status = system(command)) < 0)
+                testutil_die(status, "system: %s", command);
+
             testutil_check(wiredtiger_open(home, NULL, conf, &conn));
             testutil_check(conn->open_session(conn, NULL, NULL, &session));
+
+            /* Test against the copied directory. */
+            testutil_verify_src_backup(conn, backup_src, home, NULL);
             nreopens++;
         }
 
