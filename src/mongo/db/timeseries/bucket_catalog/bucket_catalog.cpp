@@ -211,6 +211,15 @@ void abortWriteBatch(WriteBatch& batch, const Status& status) {
 
     batch.promise.setError(status);
 }
+
+void closeArchivedBucket(BucketStateRegistry& registry,
+                         ArchivedBucket& bucket,
+                         ClosedBuckets& closedBuckets) {
+    try {
+        closedBuckets.emplace_back(&registry, bucket.bucketId, bucket.timeField, boost::none);
+    } catch (...) {
+    }
+}
 }  // namespace
 
 BucketCatalog& BucketCatalog::get(ServiceContext* svcCtx) {
@@ -404,11 +413,7 @@ boost::optional<ClosedBucket> BucketCatalog::finish(std::shared_ptr<WriteBatch> 
         switch (bucket->rolloverAction) {
             case RolloverAction::kHardClose:
             case RolloverAction::kSoftClose: {
-                closedBucket = boost::in_place(&_bucketStateRegistry,
-                                               bucket->bucketId,
-                                               bucket->timeField,
-                                               bucket->numMeasurements);
-                _removeBucket(&stripe, stripeLock, bucket, RemovalMode::kClose);
+                _closeOpenBucket(stripe, stripeLock, *bucket, closedBucket);
                 break;
             }
             case RolloverAction::kArchive: {
@@ -476,12 +481,15 @@ void BucketCatalog::directWriteFinish(const NamespaceString& ns, const OID& oid)
                 // state.
                 return boost::none;
             }
-            if (input.value().isSet(BucketStateFlag::kUntracked)) {
-                // The underlying bucket is not tracked by the catalog, so we can clean up the
+
+            auto& modified = input.value().removeDirectWrite();
+            if (!modified.isSet(BucketStateFlag::kPendingDirectWrite) &&
+                modified.isSet(BucketStateFlag::kUntracked)) {
+                // The underlying bucket is no longer tracked by the catalog, so we can clean up the
                 // state.
                 return boost::none;
             }
-            return input.value().removeDirectWrite();
+            return modified;
         });
 }
 
@@ -933,11 +941,7 @@ StatusWith<Bucket*> BucketCatalog::_reopenBucket(Stripe* stripe,
             if (existingBucket->rolloverAction == RolloverAction::kNone) {
                 stats.incNumBucketsClosedDueToReopening();
                 if (allCommitted(*existingBucket)) {
-                    closedBuckets->emplace_back(ClosedBucket{&_bucketStateRegistry,
-                                                             existingBucket->bucketId,
-                                                             existingBucket->timeField,
-                                                             existingBucket->numMeasurements});
-                    _removeBucket(stripe, stripeLock, existingBucket, RemovalMode::kClose);
+                    _closeOpenBucket(*stripe, stripeLock, *existingBucket, *closedBuckets);
                 } else {
                     existingBucket->rolloverAction = RolloverAction::kSoftClose;
                 }
@@ -1301,22 +1305,48 @@ void BucketCatalog::_archiveBucket(Stripe* stripe,
         archived = true;
     }
 
-    RemovalMode mode = RemovalMode::kArchive;
     if (archived) {
         // If we have an archived bucket, we still want to account for it in numberOfActiveBuckets
         // so we will increase it here since removeBucket decrements the count.
         _numberOfActiveBuckets.fetchAndAdd(1);
+        _removeBucket(stripe, stripeLock, bucket, RemovalMode::kArchive);
     } else {
         // We had a meta hash collision, and already have a bucket archived with the same meta hash
         // and timestamp as this bucket. Since it's somewhat arbitrary which bucket we keep, we'll
         // keep the one that's already archived and just plain close this one.
-        mode = RemovalMode::kClose;
-        closedBuckets->emplace_back(ClosedBucket{
-            &_bucketStateRegistry, bucket->bucketId, bucket->timeField, bucket->numMeasurements});
+        _closeOpenBucket(*stripe, stripeLock, *bucket, *closedBuckets);
     }
-
-    _removeBucket(stripe, stripeLock, bucket, mode);
 }
+
+void BucketCatalog::_closeOpenBucket(Stripe& stripe,
+                                     WithLock stripeLock,
+                                     Bucket& bucket,
+                                     ClosedBuckets& closedBuckets) {
+    bool error = false;
+    try {
+        closedBuckets.emplace_back(
+            &_bucketStateRegistry, bucket.bucketId, bucket.timeField, bucket.numMeasurements);
+    } catch (...) {
+        error = true;
+    }
+    _removeBucket(&stripe, stripeLock, &bucket, error ? RemovalMode::kAbort : RemovalMode::kClose);
+}
+
+void BucketCatalog::_closeOpenBucket(Stripe& stripe,
+                                     WithLock stripeLock,
+                                     Bucket& bucket,
+                                     boost::optional<ClosedBucket>& closedBucket) {
+    bool error = false;
+    try {
+        closedBucket = boost::in_place(
+            &_bucketStateRegistry, bucket.bucketId, bucket.timeField, bucket.numMeasurements);
+    } catch (...) {
+        closedBucket = boost::none;
+        error = true;
+    }
+    _removeBucket(&stripe, stripeLock, &bucket, error ? RemovalMode::kAbort : RemovalMode::kClose);
+}
+
 
 boost::optional<OID> BucketCatalog::_findArchivedCandidate(Stripe* stripe,
                                                            WithLock stripeLock,
@@ -1513,11 +1543,7 @@ void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
             // Bucket was cleared and just needs to be removed from catalog.
             _removeBucket(stripe, stripeLock, bucket, RemovalMode::kAbort);
         } else {
-            closedBuckets->emplace_back(ClosedBucket{&_bucketStateRegistry,
-                                                     bucket->bucketId,
-                                                     bucket->timeField,
-                                                     bucket->numMeasurements});
-            _removeBucket(stripe, stripeLock, bucket, RemovalMode::kClose);
+            _closeOpenBucket(*stripe, stripeLock, *bucket, *closedBuckets);
             stats.incNumBucketsClosedDueToMemoryThreshold();
         }
 
@@ -1532,8 +1558,7 @@ void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
         invariant(!archivedSet.empty());
 
         auto& [timestamp, bucket] = *archivedSet.begin();
-        closedBuckets->emplace_back(
-            ClosedBucket{&_bucketStateRegistry, bucket.bucketId, bucket.timeField, boost::none});
+        closeArchivedBucket(_bucketStateRegistry, bucket, *closedBuckets);
 
         long long memory = _marginalMemoryUsageForArchivedBucket(bucket, archivedSet.size() == 1);
         if (archivedSet.size() == 1) {
@@ -1697,12 +1722,7 @@ Bucket* BucketCatalog::_rollover(Stripe* stripe,
         if (action == RolloverAction::kArchive) {
             _archiveBucket(stripe, stripeLock, bucket, info.closedBuckets);
         } else {
-            info.closedBuckets->emplace_back(ClosedBucket{&_bucketStateRegistry,
-                                                          bucket->bucketId,
-                                                          bucket->timeField,
-                                                          bucket->numMeasurements});
-
-            _removeBucket(stripe, stripeLock, bucket, RemovalMode::kClose);
+            _closeOpenBucket(*stripe, stripeLock, *bucket, *info.closedBuckets);
         }
     } else {
         // We must keep the bucket around until all measurements are committed committed, just mark

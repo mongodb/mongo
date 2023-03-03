@@ -436,6 +436,22 @@ protected:
                         ClosedBuckets* closedBuckets);
 
     /**
+     * Close an open bucket, setting the state appropriately and removing it from the catalog.
+     */
+    void _closeOpenBucket(Stripe& stripe,
+                          WithLock stripeLock,
+                          Bucket& bucket,
+                          ClosedBuckets& closedBuckets);
+
+    /**
+     * Close an open bucket, setting the state appropriately and removing it from the catalog.
+     */
+    void _closeOpenBucket(Stripe& stripe,
+                          WithLock stripeLock,
+                          Bucket& bucket,
+                          boost::optional<ClosedBucket>& closedBucket);
+
+    /**
      * Identifies a previously archived bucket that may be able to accomodate the measurement
      * represented by 'info', if one exists.
      */
