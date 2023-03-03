@@ -5869,6 +5869,124 @@ TEST(PhysRewriter, ConjunctionTraverseMultikey2) {
         optimized);
 }
 
+TEST(PhysRewriter, ExtractAllPlans) {
+    using namespace properties;
+    using namespace unit_test_abt_literals;
+
+
+    ABT rootNode = NodeBuilder{}
+                       .root("root")
+                       .filter(_evalf(_composem(_get("a", _traverse1(_cmp("Gt", "70"_cint64))),
+                                                _get("a", _traverse1(_cmp("Lt", "90"_cint64)))),
+                                      "root"_var))
+                       .filter(_evalf(_get("b", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
+                       .finish(_scan("root", "c1"));
+
+    auto prefixId = PrefixId::createForTests();
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1",
+           createScanDef({},
+                         {{"index1",
+                           IndexDefinition{{{makeIndexPath("b"), CollationOp::Ascending},
+                                            {makeIndexPath("a"), CollationOp::Ascending}},
+                                           true /*isMultiKey*/}}})}}},
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    phaseManager.getHints()._disableBranchAndBound = true;
+    phaseManager.getHints()._keepRejectedPlans = true;
+    auto plans = phaseManager.optimizeNoAssert(std::move(optimized), true /*includeRejected*/);
+    ASSERT_EQ(22, plans.size());
+
+    // Sort plans by estimated cost. If costs are equal, sort lexicographically by plan explain.
+    // This allows us to break ties if costs are equal.
+    std::sort(plans.begin(), plans.end(), [](const PlanAndProps& e1, const PlanAndProps& e2) {
+        const auto c1 = e1.getRootAnnotation()._cost;
+        const auto c2 = e2.getRootAnnotation()._cost;
+        if (c1 < c2) {
+            return true;
+        }
+        if (c2 < c1) {
+            return false;
+        }
+
+        const auto explain1 = ExplainGenerator::explainV2(e1._node);
+        const auto explain2 = ExplainGenerator::explainV2(e2._node);
+        return explain1 < explain2;
+    });
+
+    const auto getExplainForPlan = [&plans](const size_t planId) -> std::string {
+        return str::stream() << "Cost: " << plans.at(planId).getRootAnnotation()._cost.toString()
+                             << "\n"
+                             << ExplainGenerator::explainV2(plans.at(planId)._node);
+    };
+
+    // Display the 3 best plans.
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "Cost: 0.0641986\n"
+        "Root [{root}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [evalTemp_18]\n"
+        "|   |   PathTraverse [1]\n"
+        "|   |   PathCompare [Gt]\n"
+        "|   |   Const [70]\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_18}, c1]\n"
+        "Unique [{rid_0}]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const [1 "
+        "| minKey], Const [1 | 90])}]\n",
+        getExplainForPlan(0));
+
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "Cost: 0.0641986\n"
+        "Root [{root}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [evalTemp_20]\n"
+        "|   |   PathTraverse [1]\n"
+        "|   |   PathCompare [Lt]\n"
+        "|   |   Const [90]\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_20}, c1]\n"
+        "Unique [{rid_0}]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {(Const [1 "
+        "| 70], Const [1 | maxKey]]}]\n",
+        getExplainForPlan(1));
+
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "Cost: 0.0973208\n"
+        "Root [{root}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [evalTemp_16]\n"
+        "|   |   PathTraverse [1]\n"
+        "|   |   PathCompare [Gt]\n"
+        "|   |   Const [70]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [evalTemp_16]\n"
+        "|   |   PathTraverse [1]\n"
+        "|   |   PathCompare [Lt]\n"
+        "|   |   Const [90]\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_16}, c1]\n"
+        "Unique [{rid_0}]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const [1 "
+        "| minKey], Const [1 | maxKey]]}]\n",
+        getExplainForPlan(2));
+}
 
 }  // namespace
 }  // namespace mongo::optimizer

@@ -121,24 +121,22 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
                                          boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
 
-    phaseManager.optimize(tree);
+    PlanAndProps planAndProps = phaseManager.optimizeAndReturnProps(std::move(tree));
 
-    OPTIMIZER_DEBUG_LOG(
-        6264808, 5, "SBE optimized ABT", "explain"_attr = ExplainGenerator::explainV2(tree));
+    OPTIMIZER_DEBUG_LOG(6264808,
+                        5,
+                        "SBE optimized ABT",
+                        "explain"_attr = ExplainGenerator::explainV2(planAndProps._node));
 
     SlotVarMap map;
     boost::optional<sbe::value::SlotId> ridSlot;
     auto runtimeEnv = std::make_unique<sbe::RuntimeEnvironment>();
     sbe::value::SlotIdGenerator ids;
 
-    auto env = VariableEnvironment::build(tree);
-    SBENodeLowering g{env,
-                      *runtimeEnv,
-                      ids,
-                      phaseManager.getMetadata(),
-                      phaseManager.getNodeToGroupPropsMap(),
-                      ScanOrder::Forward};
-    auto sbePlan = g.optimize(tree, map, ridSlot);
+    auto env = VariableEnvironment::build(planAndProps._node);
+    SBENodeLowering g{
+        env, *runtimeEnv, ids, phaseManager.getMetadata(), planAndProps._map, ScanOrder::Forward};
+    auto sbePlan = g.optimize(planAndProps._node, map, ridSlot);
     ASSERT_EQ(1, map.size());
     tassert(6624260, "Unexpected rid slot", !ridSlot);
     uassert(6624249, "Cannot optimize SBE plan", sbePlan != nullptr);

@@ -66,4 +66,104 @@ struct NodeProps {
 // example which of the available projections are used for exchanges.
 using NodeToGroupPropsMap = opt::unordered_map<const Node*, NodeProps>;
 
+/**
+ * Utility used to copy an ABT and an associated annotation map which points into the ABT in order
+ * to retain the map references into the newly copied ABT. The map can only point to nodes in the
+ * ABT.
+ */
+template <class MapType>
+class NodeAnnotationCopier {
+    // Used to keep track of the node pointers in the annotation map according to traversal order.
+    using PtrPosVector = std::vector<std::pair<size_t, const Node*>>;
+
+public:
+    template <typename T, typename... Ts>
+    void transport(
+        const T& node, const MapType& mapInput, PtrPosVector& ptrPos, size_t& nodeIndex, Ts&&...) {
+        if constexpr (std::is_base_of_v<Node, T>) {
+            if (mapInput.count(&node) > 0) {
+                // Step 1: collect pointers from old map.
+                ptrPos.emplace_back(nodeIndex, &node);
+            }
+            nodeIndex++;
+        }
+    }
+
+    template <typename T, typename... Ts>
+    void transport(const T& node,
+                   const MapType& mapInput,
+                   PtrPosVector& ptrPos,
+                   size_t& nodeIndex,
+                   size_t& ptrIndex,
+                   MapType& mapCopy,
+                   Ts&&...) {
+        if constexpr (std::is_base_of_v<Node, T>) {
+            // Step 2: copy to new map using previously collected pointers.
+            if (ptrIndex < ptrPos.size()) {
+                if (const auto [pos, ptr] = ptrPos.at(ptrIndex); nodeIndex == pos) {
+                    ptrIndex++;
+                    mapCopy.emplace(&node, mapInput.at(ptr));
+                }
+            }
+            nodeIndex++;
+        }
+    }
+
+    std::pair<ABT, MapType> copy(const ABT& abtInput, const MapType& mapInput) {
+        PtrPosVector ptrPos;
+        size_t nodeIndex = 0;
+        algebra::transport<false>(abtInput, *this, mapInput, ptrPos, nodeIndex);
+
+        ABT abtCopy = abtInput;
+        MapType mapCopy;
+        nodeIndex = 0;
+        size_t ptrIndex = 0;
+        algebra::transport<false>(abtCopy, *this, mapInput, ptrPos, nodeIndex, ptrIndex, mapCopy);
+
+        return {std::move(abtCopy), std::move(mapCopy)};
+    }
+};
+
+/**
+ * Structure which can safely copy a plan and associated annotation map (map from node pointer to
+ * some value type).
+ */
+template <class MapType>
+struct CopySafeNodeAnnotation {
+    CopySafeNodeAnnotation(ABT node, MapType map) : _node(std::move(node)), _map(std::move(map)) {}
+    CopySafeNodeAnnotation(CopySafeNodeAnnotation&& other)
+        : _node(std::move(other._node)), _map(std::move(other._map)) {}
+    CopySafeNodeAnnotation(const CopySafeNodeAnnotation& other)
+        : CopySafeNodeAnnotation(make<Blackhole>(), {}) {
+        *this = other;
+    }
+
+    CopySafeNodeAnnotation& operator=(const CopySafeNodeAnnotation& other) {
+        std::tie(_node, _map) = NodeAnnotationCopier<MapType>{}.copy(other._node, other._map);
+        return *this;
+    }
+    CopySafeNodeAnnotation& operator=(CopySafeNodeAnnotation&& other) {
+        _node = std::move(other._node);
+        _map = std::move(other._map);
+        return *this;
+    }
+
+    const auto& getRootAnnotation() const {
+        return _map.at(_node.cast<Node>());
+    }
+    auto& getRootAnnotation() {
+        return _map.at(_node.cast<Node>());
+    }
+
+    template <class T>
+    void setRootAnnotation(T value) {
+        _map.emplace(_node.cast<Node>(), std::move(value));
+    }
+
+    ABT _node;
+    MapType _map;
+};
+
+using PlanAndProps = CopySafeNodeAnnotation<NodeToGroupPropsMap>;
+
 }  // namespace mongo::optimizer

@@ -44,14 +44,6 @@ static ProjectionNameMap<size_t> createMapFromVector(const ProjectionNameVector&
 ProjectionNameOrderPreservingSet::ProjectionNameOrderPreservingSet(ProjectionNameVector v)
     : _map(createMapFromVector(v)), _vector(std::move(v)) {}
 
-ProjectionNameOrderPreservingSet::ProjectionNameOrderPreservingSet(
-    const ProjectionNameOrderPreservingSet& other)
-    : _map(other._map), _vector(other._vector) {}
-
-ProjectionNameOrderPreservingSet::ProjectionNameOrderPreservingSet(
-    ProjectionNameOrderPreservingSet&& other) noexcept
-    : _map(std::move(other._map)), _vector(std::move(other._vector)) {}
-
 bool ProjectionNameOrderPreservingSet::operator==(
     const ProjectionNameOrderPreservingSet& other) const {
     return _vector == other._vector;

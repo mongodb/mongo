@@ -428,20 +428,16 @@ TEST_F(NodeSBE, Lower1) {
                                          boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
 
-    phaseManager.optimize(tree);
-    auto env = VariableEnvironment::build(tree);
+    PlanAndProps planAndProps = phaseManager.optimizeAndReturnProps(std::move(tree));
+    auto env = VariableEnvironment::build(planAndProps._node);
     SlotVarMap map;
     auto runtimeEnv = std::make_unique<sbe::RuntimeEnvironment>();
     boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
 
-    SBENodeLowering g{env,
-                      *runtimeEnv,
-                      ids,
-                      phaseManager.getMetadata(),
-                      phaseManager.getNodeToGroupPropsMap(),
-                      ScanOrder::Forward};
-    auto sbePlan = g.optimize(tree, map, ridSlot);
+    SBENodeLowering g{
+        env, *runtimeEnv, ids, phaseManager.getMetadata(), planAndProps._map, ScanOrder::Forward};
+    auto sbePlan = g.optimize(planAndProps._node, map, ridSlot);
     ASSERT_EQ(1, map.size());
     ASSERT_FALSE(ridSlot);
 
@@ -500,7 +496,7 @@ TEST_F(NodeSBE, Lower2) {
                           {"index2", makeIndexDefinition("b", CollationOp::Ascending, false)}})}}},
         boost::none,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-    phaseManager.optimize(root);
+    PlanAndProps planAndProps = phaseManager.optimizeAndReturnProps(std::move(root));
 
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{pa}]\n"
@@ -515,12 +511,12 @@ TEST_F(NodeSBE, Lower2) {
         "nst [2]}]\n"
         "IndexScan [{'<indexKey> 0': pa, '<rid>': rid_0}, scanDefName: test, indexDefName: index1"
         ", interval: {=Const [1]}]\n",
-        root);
+        planAndProps._node);
 
     // Find the MergeJoin, replace it with SortedMerge. To do this we need to remove the Union and
     // Evaluation on the right side.
     {
-        ABT& mergeJoinABT = root.cast<RootNode>()->getChild();
+        ABT& mergeJoinABT = planAndProps._node.cast<RootNode>()->getChild();
         MergeJoinNode* mergeJoinNode = mergeJoinABT.cast<MergeJoinNode>();
 
         // Remove the Union and Evaluation.
@@ -545,7 +541,7 @@ TEST_F(NodeSBE, Lower2) {
         SortedMergeNode* sortedMergeNode = mergeJoinABT.cast<SortedMergeNode>();
 
         // Update nodeToGroupProps data.
-        auto& nodeToGroupProps = phaseManager.getNodeToGroupPropsMap();
+        auto& nodeToGroupProps = planAndProps._map;
         // Make the metadata for the old MergeJoin use the SortedMerge now.
         nodeToGroupProps.emplace(sortedMergeNode, nodeToGroupProps.find(mergeJoinNode)->second);
         nodeToGroupProps.erase(mergeJoinNode);
@@ -565,7 +561,7 @@ TEST_F(NodeSBE, Lower2) {
         "nst [2]}]\n"
         "IndexScan [{'<indexKey> 0': pa, '<rid>': rid_0}, scanDefName: test, indexDefName: index1"
         ", interval: {=Const [1]}]\n",
-        root);
+        planAndProps._node);
 
     // TODO SERVER-72010 fix test or SortedMergeNode logic so building VariableEnvironment succeeds
 
@@ -640,21 +636,17 @@ TEST_F(NodeSBE, RequireRID) {
                                                    {{{"test", createScanDef({}, {})}}},
                                                    DebugInfo::kDefaultForTests);
 
-    phaseManager.optimize(tree);
-    auto env = VariableEnvironment::build(tree);
+    PlanAndProps planAndProps = phaseManager.optimizeAndReturnProps(std::move(tree));
+    auto env = VariableEnvironment::build(planAndProps._node);
 
     SlotVarMap map;
     auto runtimeEnv = std::make_unique<sbe::RuntimeEnvironment>();
     boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
 
-    SBENodeLowering g{env,
-                      *runtimeEnv,
-                      ids,
-                      phaseManager.getMetadata(),
-                      phaseManager.getNodeToGroupPropsMap(),
-                      ScanOrder::Forward};
-    auto sbePlan = g.optimize(tree, map, ridSlot);
+    SBENodeLowering g{
+        env, *runtimeEnv, ids, phaseManager.getMetadata(), planAndProps._map, ScanOrder::Forward};
+    auto sbePlan = g.optimize(planAndProps._node, map, ridSlot);
     ASSERT_EQ(1, map.size());
     ASSERT_TRUE(ridSlot);
 
@@ -816,15 +808,6 @@ TEST_F(NodeSBE, SpoolFibonacci) {
     for (size_t i = 2; i < 10; i++) {
         ASSERT_EQ(results.at(i), results.at(i - 1) + results.at(i - 2));
     }
-}
-
-TEST_F(NodeSBE, TestConstantEquality) {
-    auto tree = make<If>(make<BinaryOp>(Operations::Eq, Constant::int32(9), Constant::nothing()),
-                         Constant::boolean(true),
-                         Constant::boolean(false));
-    auto env = VariableEnvironment::build(tree);
-    ConstEval{env}.optimize(tree);
-    ASSERT_TRUE(tree.is<Constant>());
 }
 
 }  // namespace

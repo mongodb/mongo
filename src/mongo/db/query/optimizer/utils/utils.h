@@ -108,17 +108,19 @@ struct RightChildAccessor {
 };
 
 /**
- * Used to access and manipulate the first child of a n-ary node.
+ * Used to access children of a n-ary node. By default, it accesses the first child.
  */
 template <class NodeType>
-struct FirstChildAccessor {
+struct IndexedChildAccessor {
     const ABT& operator()(const ABT& node) const {
-        return node.cast<NodeType>()->nodes().front();
+        return node.cast<NodeType>()->nodes().at(index);
     }
 
     ABT& operator()(ABT& node) {
-        return node.cast<NodeType>()->nodes().front();
+        return node.cast<NodeType>()->nodes().at(index);
     }
+
+    size_t index = 0;
 };
 
 /**

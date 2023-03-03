@@ -75,15 +75,20 @@ using ProjectionRenames = ProjectionNameMap<ProjectionName>;
 // Map from scanDefName to rid projection name.
 using RIDProjectionsMap = opt::unordered_map<std::string, ProjectionName>;
 
+/**
+ * A set of projection names which remembers the order in which elements were inserted.
+ */
 class ProjectionNameOrderPreservingSet {
 public:
     ProjectionNameOrderPreservingSet() = default;
     ProjectionNameOrderPreservingSet(ProjectionNameVector v);
 
-    ProjectionNameOrderPreservingSet(const ProjectionNameOrderPreservingSet& other);
-    ProjectionNameOrderPreservingSet(ProjectionNameOrderPreservingSet&& other) noexcept;
+    ProjectionNameOrderPreservingSet(const ProjectionNameOrderPreservingSet& other) = default;
+    ProjectionNameOrderPreservingSet(ProjectionNameOrderPreservingSet&& other) = default;
 
     bool operator==(const ProjectionNameOrderPreservingSet& other) const;
+    ProjectionNameOrderPreservingSet& operator=(const ProjectionNameOrderPreservingSet& other) =
+        default;
 
     std::pair<size_t, bool> emplace_back(ProjectionName projectionName);
     boost::optional<size_t> find(const ProjectionName& projectionName) const;

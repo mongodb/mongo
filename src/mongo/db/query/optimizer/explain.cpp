@@ -39,12 +39,8 @@
 
 namespace mongo::optimizer {
 
-ABTPrinter::ABTPrinter(ABT abt,
-                       NodeToGroupPropsMap nodeToPropsMap,
-                       const ExplainVersion explainVersion)
-    : _abt(std::move(abt)),
-      _nodeToPropsMap(std::move(nodeToPropsMap)),
-      _explainVersion(explainVersion) {}
+ABTPrinter::ABTPrinter(PlanAndProps planAndProps, const ExplainVersion explainVersion)
+    : _planAndProps(std::move(planAndProps)), _explainVersion(explainVersion) {}
 
 BSONObj ABTPrinter::explainBSON() const {
     const auto explainPlanStr = [&](std::string planStr) {
@@ -55,20 +51,19 @@ BSONObj ABTPrinter::explainBSON() const {
 
     switch (_explainVersion) {
         case ExplainVersion::V1:
-            return explainPlanStr(ExplainGenerator::explain(
-                _abt, false /*displayProperties*/, nullptr /*memoInterface*/, _nodeToPropsMap));
+            return explainPlanStr(ExplainGenerator::explain(_planAndProps._node));
 
         case ExplainVersion::V2:
-            return explainPlanStr(ExplainGenerator::explainV2(
-                _abt, false /*displayProperties*/, nullptr /*memoInterface*/, _nodeToPropsMap));
+            return explainPlanStr(ExplainGenerator::explainV2(_planAndProps._node));
 
         case ExplainVersion::V2Compact:
-            return explainPlanStr(ExplainGenerator::explainV2Compact(
-                _abt, false /*displayProperties*/, nullptr /*memoInterface*/, _nodeToPropsMap));
+            return explainPlanStr(ExplainGenerator::explainV2Compact(_planAndProps._node));
 
         case ExplainVersion::V3:
-            return ExplainGenerator::explainBSONObj(
-                _abt, true /*displayProperties*/, nullptr /*memoInterface*/, _nodeToPropsMap);
+            return ExplainGenerator::explainBSONObj(_planAndProps._node,
+                                                    true /*displayProperties*/,
+                                                    nullptr /*memoInterface*/,
+                                                    _planAndProps._map);
 
         case ExplainVersion::Vmax:
             // Should not be seeing this value here.
@@ -667,8 +662,7 @@ public:
         tassert(6701800,
                 "Cannot have both _displayProperties and _nodeCEMap set.",
                 !(_displayProperties && _nodeCEMap));
-        if (_nodeCEMap || !_displayProperties || version != ExplainVersion::V3 ||
-            _nodeMap.empty()) {
+        if (_nodeCEMap || !_displayProperties || _nodeMap.empty()) {
             return;
         }
         auto it = _nodeMap.find(&node);
@@ -682,12 +676,16 @@ public:
         ExplainPrinter propsPrinter;
         propsPrinter.fieldName("cost")
             .print(props._cost.getCost())
+            .separator(", ")
             .fieldName("localCost")
             .print(props._localCost.getCost())
+            .separator(", ")
             .fieldName("adjustedCE")
             .print(props._adjustedCE)
+            .separator(", ")
             .fieldName("planNodeID")
             .print(props._planNodeId)
+            .separator(", ")
             .fieldName("logicalProperties")
             .print(logPropPrinter)
             .fieldName("physicalProperties")

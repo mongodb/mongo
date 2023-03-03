@@ -35,6 +35,7 @@
 #include "mongo/db/query/optimizer/cascades/logical_rewriter.h"
 #include "mongo/db/query/optimizer/cascades/physical_rewriter.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/optimizer/utils/memo_utils.h"
 
 
 namespace mongo::optimizer {
@@ -95,21 +96,29 @@ public:
     OptPhaseManager& operator=(OptPhaseManager&& /*other*/) = delete;
 
     /**
-     * Optimization modifies the input argument.
-     * If there is a failure, program will tassert.
+     * Note: this method is primarily used for testing.
+     * Optimization modifies the input argument to return the best plan. If there is an optimization
+     * failure (including no plans or more than one plan found), program will tassert.
      */
     void optimize(ABT& input);
 
     /**
-     * Similar to optimize, but returns a bool to indicate success or failure. True means success;
-     * false means failure.
+     * Note: this method is primarily used for testing.
+     * Same as above, but we also return the associated NodeToGroupPropsMap for the best plan.
      */
-    [[nodiscard]] bool optimizeNoAssert(ABT& input);
+    [[nodiscard]] PlanAndProps optimizeAndReturnProps(ABT input);
+
+    /**
+     * Similar to optimize, but returns a vector of optimized plans. The vector can be empty if we
+     * failed to find a plan, or contain more than one entry if we also requested the rejected plans
+     * for the implementation phase.
+     */
+    [[nodiscard]] PlanExtractorResult optimizeNoAssert(ABT input, bool includeRejected);
 
     static const PhaseSet& getAllRewritesSet();
 
     MemoPhysicalNodeId getPhysicalNodeId() const;
-    const boost::optional<ABT>& getPostMemoPlan() const;
+    const boost::optional<PlanAndProps>& getPostMemoPlan() const;
 
     const QueryHints& getHints() const;
     QueryHints& getHints();
@@ -119,9 +128,6 @@ public:
     const PathToIntervalFn& getPathToInterval() const;
 
     const Metadata& getMetadata() const;
-
-    const NodeToGroupPropsMap& getNodeToGroupPropsMap() const;
-    NodeToGroupPropsMap& getNodeToGroupPropsMap();
 
 private:
     bool hasPhase(OptPhase phase) const;
@@ -144,13 +150,17 @@ private:
                                std::unique_ptr<LogicalRewriter>& logicalRewriter,
                                ABT& input);
 
-    [[nodiscard]] bool runMemoPhysicalRewrite(OptPhase phase,
-                                              VariableEnvironment& env,
-                                              GroupIdType rootGroupId,
-                                              std::unique_ptr<LogicalRewriter>& logicalRewriter,
-                                              ABT& input);
+    [[nodiscard]] PlanExtractorResult runMemoPhysicalRewrite(
+        OptPhase phase,
+        VariableEnvironment& env,
+        GroupIdType rootGroupId,
+        bool includeRejected,
+        std::unique_ptr<LogicalRewriter>& logicalRewriter,
+        ABT& input);
 
-    [[nodiscard]] bool runMemoRewritePhases(VariableEnvironment& env, ABT& input);
+    [[nodiscard]] PlanExtractorResult runMemoRewritePhases(bool includeRejected,
+                                                           VariableEnvironment& env,
+                                                           ABT& input);
 
 
     static PhaseSet _allRewrites;
@@ -213,15 +223,10 @@ private:
     MemoPhysicalNodeId _physicalNodeId;
 
     /**
-     * Post memo exploration phase plan (set if '_supportExplain' is set and if we have performed
-     * memo rewrites).
+     * Best post-memo exploration phase plan (set if '_supportExplain' is set and if we have
+     * performed memo rewrites).
      */
-    boost::optional<ABT> _postMemoPlan;
-
-    /**
-     * Map from node to logical and physical properties.
-     */
-    NodeToGroupPropsMap _nodeToGroupPropsMap;
+    boost::optional<PlanAndProps> _postMemoPlan;
 
     /**
      * Used to optimize update and delete statements. If set will include indexing requirement with

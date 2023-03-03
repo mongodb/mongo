@@ -377,10 +377,10 @@ public:
         return advanceChildPtr<CollationNode>(_collation(std::move(spec), makeStub()));
     }
 
-    // This first input is stubbed.
+    // This first input is stubbed. IndexedChildAccessor will access the first child by default.
     NodeBuilder& un(ProjectionNameVector pns, std::vector<NodeHolder> additionalInputs) {
         additionalInputs.insert(additionalInputs.begin(), makeStub());
-        return advanceChildPtr<UnionNode, FirstChildAccessor<UnionNode>>(
+        return advanceChildPtr<UnionNode, IndexedChildAccessor<UnionNode>>(
             _union(std::move(pns), std::move(additionalInputs)));
     }
 

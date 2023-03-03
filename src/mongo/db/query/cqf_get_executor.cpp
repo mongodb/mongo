@@ -264,7 +264,7 @@ QueryHints getHintsFromQueryKnobs() {
 }
 
 static ExecParams createExecutor(OptPhaseManager phaseManager,
-                                 ABT abt,
+                                 PlanAndProps planAndProps,
                                  OperationContext* opCtx,
                                  boost::intrusive_ptr<ExpressionContext> expCtx,
                                  const NamespaceString& nss,
@@ -272,18 +272,14 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
                                  const bool requireRID,
                                  const ScanOrder scanOrder,
                                  const bool needsExplain) {
-    auto env = VariableEnvironment::build(abt);
+    auto env = VariableEnvironment::build(planAndProps._node);
     SlotVarMap slotMap;
     auto runtimeEnvironment = std::make_unique<sbe::RuntimeEnvironment>();  // TODO use factory
     sbe::value::SlotIdGenerator ids;
     boost::optional<sbe::value::SlotId> ridSlot;
-    SBENodeLowering g{env,
-                      *runtimeEnvironment,
-                      ids,
-                      phaseManager.getMetadata(),
-                      phaseManager.getNodeToGroupPropsMap(),
-                      scanOrder};
-    auto sbePlan = g.optimize(abt, slotMap, ridSlot);
+    SBENodeLowering g{
+        env, *runtimeEnvironment, ids, phaseManager.getMetadata(), planAndProps._map, scanOrder};
+    auto sbePlan = g.optimize(planAndProps._node, slotMap, ridSlot);
     tassert(6624262, "Unexpected rid slot", !requireRID || ridSlot);
 
     uassert(6624253, "Lowering failed: did not produce a plan.", sbePlan != nullptr);
@@ -316,8 +312,8 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
     std::unique_ptr<ABTPrinter> abtPrinter;
     if (needsExplain) {
         // By default, we print the optimized ABT. For test-only versions we output the post-memo
-        // phan instead.
-        ABT toExplain = std::move(abt);
+        // plan instead.
+        PlanAndProps toExplain = std::move(planAndProps);
 
         ExplainVersion explainVersion = ExplainVersion::Vmax;
         const auto& explainVersionStr = internalCascadesOptimizerExplainVersion.get();
@@ -337,8 +333,7 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
             MONGO_UNREACHABLE;
         }
 
-        abtPrinter = std::make_unique<ABTPrinter>(
-            std::move(toExplain), phaseManager.getNodeToGroupPropsMap(), explainVersion);
+        abtPrinter = std::make_unique<ABTPrinter>(std::move(toExplain), explainVersion);
     }
 
     sbePlan->prepare(data.ctx);
@@ -736,9 +731,13 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                                                       constFold,
                                                       needsExplain,
                                                       std::move(queryHints));
-    if (!phaseManager.optimizeNoAssert(abt)) {
+    auto resultPlans = phaseManager.optimizeNoAssert(std::move(abt), false /*includeRejected*/);
+    if (resultPlans.empty()) {
+        // Could not find a plan.
         return boost::none;
     }
+    // At this point we should have exactly one plan.
+    PlanAndProps planAndProps = std::move(resultPlans.front());
 
     {
         const auto& memo = phaseManager.getMemo();
@@ -765,10 +764,10 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     OPTIMIZER_DEBUG_LOG(6264802,
                         5,
                         "Optimized and lowered physical ABT",
-                        "explain"_attr = ExplainGenerator::explainV2(abt));
+                        "explain"_attr = ExplainGenerator::explainV2(planAndProps._node));
 
     return createExecutor(std::move(phaseManager),
-                          std::move(abt),
+                          std::move(planAndProps),
                           opCtx,
                           expCtx,
                           nss,
@@ -781,9 +780,10 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(const CollectionPtr& collection,
                                                                QueryHints queryHints,
                                                                const CanonicalQuery* query) {
-    boost::optional<BSONObj> indexHint = query->getFindCommandRequest().getHint().isEmpty()
-        ? boost::none
-        : boost::make_optional(query->getFindCommandRequest().getHint());
+    boost::optional<BSONObj> indexHint;
+    if (!query->getFindCommandRequest().getHint().isEmpty()) {
+        indexHint = query->getFindCommandRequest().getHint();
+    }
 
     auto opCtx = query->getOpCtx();
     auto expCtx = query->getExpCtx();

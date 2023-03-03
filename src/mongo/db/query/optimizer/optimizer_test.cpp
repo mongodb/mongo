@@ -143,6 +143,15 @@ TEST(Optimizer, IntegerUnderflow) {
     ASSERT_EQ(constEval(tree)->getValueInt64(), -9223372034707292161);
 }
 
+TEST(Optimizer, ConstantEquality) {
+    auto tree = make<If>(make<BinaryOp>(Operations::Eq, Constant::int32(9), Constant::nothing()),
+                         Constant::boolean(true),
+                         Constant::boolean(false));
+    auto env = VariableEnvironment::build(tree);
+    ConstEval{env}.optimize(tree);
+    ASSERT_TRUE(tree.is<Constant>());
+}
+
 TEST(Optimizer, Tracker1) {
     ABT scanNode = make<ScanNode>("ptest", "test");
     ABT filterNode = make<FilterNode>(

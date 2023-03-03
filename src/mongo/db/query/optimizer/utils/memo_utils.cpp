@@ -35,6 +35,10 @@
 namespace mongo::optimizer {
 using namespace properties;
 
+/**
+ * Used to extract a logical plan from the memo using the last logical node from each group. It is
+ * used for testing.
+ */
 class MemoLatestPlanExtractor {
 public:
     explicit MemoLatestPlanExtractor(const cascades::Memo& memo) : _memo(memo) {}
@@ -83,67 +87,140 @@ ABT extractLatestPlan(const cascades::Memo& memo, const GroupIdType rootGroupId)
     return extractor.extractLatest(rootGroupId, visitedGroups);
 }
 
+template <class T, class Accessor = DefaultChildAccessor<T>>
+static void mergeNodeAndProps(const bool aggregateCost,
+                              PlanAndProps& merged,
+                              PlanAndProps& incoming,
+                              const bool canMove,
+                              Accessor instance = Accessor{}) {
+    ABT& child = instance(merged._node);
+
+    if (aggregateCost) {
+        // Increment cost for current node.
+        const auto& childCost = incoming.getRootAnnotation()._cost;
+        auto& nodeCost = merged.getRootAnnotation()._cost;
+        nodeCost += childCost;
+    }
+
+    if (canMove) {
+        std::swap(child, incoming._node);
+        merged._map.merge(incoming._map);
+    } else {
+        PlanAndProps copy = incoming;
+        std::swap(child, copy._node);
+        merged._map.insert(copy._map.cbegin(), copy._map.cend());
+    }
+}
+
+static PlanAndProps moveOrCopy(PlanAndProps& planAndProps, const bool canMove) {
+    if (canMove) {
+        return std::move(planAndProps);
+    } else {
+        return planAndProps;
+    }
+}
+
+template <class T>
+static PlanExtractorResult mergeLeftRightResults(const bool aggregateCost,
+                                                 PlanAndProps initial,
+                                                 PlanExtractorResult leftResult,
+                                                 PlanExtractorResult rightResult) {
+    PlanExtractorResult result;
+    for (size_t leftIndex = 0; leftIndex < leftResult.size(); leftIndex++) {
+        auto& leftEntry = leftResult.at(leftIndex);
+        const bool lastOnLeft = leftIndex == leftResult.size() - 1;
+
+        for (size_t rightIndex = 0; rightIndex < rightResult.size(); rightIndex++) {
+            auto& rightEntry = rightResult.at(rightIndex);
+            const bool lastOnRight = rightIndex == rightResult.size() - 1;
+            const bool lastOverall = lastOnLeft && lastOnRight;
+
+            PlanAndProps merged = moveOrCopy(initial, lastOverall);
+            mergeNodeAndProps<T, LeftChildAccessor<T>>(
+                aggregateCost, merged, leftEntry, lastOnRight);
+            mergeNodeAndProps<T, RightChildAccessor<T>>(
+                aggregateCost, merged, rightEntry, lastOverall);
+
+            result.push_back(std::move(merged));
+        }
+    }
+    return result;
+}
+
+template <class T>
+static PlanExtractorResult mergeNaryResults(const bool aggregateCost,
+                                            PlanAndProps initial,
+                                            std::vector<PlanExtractorResult> childResults) {
+    size_t resultCount = 1;
+    for (const auto& childResult : childResults) {
+        resultCount *= childResult.size();
+    }
+
+    PlanExtractorResult result;
+    for (size_t resultIndex = 0; resultIndex < resultCount; resultIndex++) {
+        const bool lastOverall = resultIndex == resultCount - 1;
+        PlanAndProps merged = moveOrCopy(initial, lastOverall);
+
+        size_t v = resultIndex;
+        for (size_t childIndex = 0; childIndex < childResults.size(); childIndex++) {
+            auto& childResultVector = childResults.at(childIndex);
+            const size_t currentSize = childResultVector.size();
+            const size_t childResultIndex = v % currentSize;
+            v /= currentSize;
+
+            // TODO: should be able to move in more cases besides resultCount == 1.
+            mergeNodeAndProps<T, IndexedChildAccessor<T>>(aggregateCost,
+                                                          merged,
+                                                          childResultVector.at(childResultIndex),
+                                                          lastOverall,
+                                                          {childIndex});
+        }
+
+        result.push_back(std::move(merged));
+    }
+    return result;
+}
+
+/**
+ * Used to extract one or many physical plans from the memo.
+ */
 class MemoPhysicalPlanExtractor {
 public:
     explicit MemoPhysicalPlanExtractor(const cascades::Memo& memo,
                                        const Metadata& metadata,
                                        const RIDProjectionsMap& ridProjections,
-                                       NodeToGroupPropsMap& nodeToGroupPropsMap)
+                                       const cascades::PhysNodeInfo& nodeInfo,
+                                       const LogicalProps& logicalProps,
+                                       const PhysProps& physProps,
+                                       const MemoPhysicalNodeId id,
+                                       const bool includeRejected,
+                                       int32_t& planNodeId)
         : _memo(memo),
           _metadata(metadata),
           _ridProjections(ridProjections),
-          _nodeToGroupPropsMap(nodeToGroupPropsMap),
-          _planNodeId(0) {}
+          _nodeInfo(nodeInfo),
+          _logicalProps(logicalProps),
+          _physProps(physProps),
+          _id(id),
+          _includeRejected(includeRejected),
+          _planNodeId(planNodeId) {}
 
     /**
      * Physical delegator node.
      */
-    void operator()(ABT& n,
-                    MemoPhysicalDelegatorNode& node,
-                    MemoPhysicalNodeId /*id*/,
-                    ProjectionNameOrderPreservingSet /*required*/) {
-        n = extract(node.getNodeId());
+    PlanExtractorResult operator()(const ABT& /*n*/,
+                                   const MemoPhysicalDelegatorNode& node,
+                                   const bool /*isGroupRoot*/,
+                                   ProjectionNameOrderPreservingSet /*required*/) {
+        auto result = extract(
+            _memo, _metadata, _ridProjections, node.getNodeId(), _includeRejected, _planNodeId);
+        return result;
     }
 
-    void addNodeProps(const Node* node,
-                      MemoPhysicalNodeId id,
-                      ProjectionNameOrderPreservingSet required) {
-        const auto& physicalResult = *_memo.getPhysicalNodes(id._groupId).at(id._index);
-        const auto& nodeInfo = *physicalResult._nodeInfo;
-
-        LogicalProps logicalProps = _memo.getLogicalProps(id._groupId);
-        PhysProps physProps = physicalResult._physProps;
-        if (!_metadata.isParallelExecution()) {
-            // Do not display availability and requirement if under centralized setting.
-            removeProperty<DistributionAvailability>(logicalProps);
-            removeProperty<DistributionRequirement>(physProps);
-        }
-        setPropertyOverwrite(physProps, ProjectionRequirement{std::move(required)});
-
-        boost::optional<ProjectionName> ridProjName;
-        if (hasProperty<IndexingRequirement>(physProps)) {
-            const auto& scanDefName =
-                getPropertyConst<IndexingAvailability>(logicalProps).getScanDefName();
-            ridProjName = _ridProjections.at(scanDefName);
-        }
-
-        _nodeToGroupPropsMap.emplace(node,
-                                     NodeProps{_planNodeId++,
-                                               id,
-                                               std::move(logicalProps),
-                                               std::move(physProps),
-                                               std::move(ridProjName),
-                                               nodeInfo._cost,
-                                               nodeInfo._localCost,
-                                               nodeInfo._adjustedCE});
-    }
-
-    void operator()(ABT& n,
-                    NestedLoopJoinNode& node,
-                    MemoPhysicalNodeId id,
-                    ProjectionNameOrderPreservingSet required) {
-        addNodeProps(&node, id, required);
-
+    PlanExtractorResult operator()(const ABT& n,
+                                   const NestedLoopJoinNode& node,
+                                   const bool isGroupRoot,
+                                   ProjectionNameOrderPreservingSet required) {
         // Obtain correlated projections from the left child, non-correlated from the right child.
         ProjectionNameOrderPreservingSet requiredInner = required;
         ProjectionNameOrderPreservingSet requiredOuter;
@@ -154,37 +231,53 @@ public:
             }
         }
 
-        node.getLeftChild().visit(*this, id, std::move(requiredOuter));
-        node.getRightChild().visit(*this, id, std::move(requiredInner));
+        auto leftResult =
+            node.getLeftChild().visit(*this, false /*isGroupRoot*/, std::move(requiredOuter));
+        auto rightResult =
+            node.getRightChild().visit(*this, false /*isGroupRoot*/, std::move(requiredInner));
+
+        PlanAndProps initial = createInitial(isGroupRoot, n, std::move(required));
+        auto result = mergeLeftRightResults<NestedLoopJoinNode>(
+            _includeRejected, std::move(initial), std::move(leftResult), std::move(rightResult));
+        return result;
     }
 
-    void operator()(ABT& n,
-                    GroupByNode& node,
-                    MemoPhysicalNodeId id,
-                    ProjectionNameOrderPreservingSet required) {
-        addNodeProps(&node, id, required);
-
+    PlanExtractorResult operator()(const ABT& n,
+                                   const GroupByNode& node,
+                                   const bool isGroupRoot,
+                                   ProjectionNameOrderPreservingSet required) {
+        ProjectionNameOrderPreservingSet requiredForChild = required;
         // Propagate the input projections only.
         for (const auto& projName : node.getAggregationProjectionNames()) {
-            required.erase(projName);
+            requiredForChild.erase(projName);
         }
         for (const auto& expr : node.getAggregationExpressions()) {
             if (const auto fnPtr = expr.cast<FunctionCall>();
                 fnPtr != nullptr && fnPtr->nodes().size() == 1) {
                 if (const auto varPtr = fnPtr->nodes().front().cast<Variable>()) {
-                    required.emplace_back(varPtr->name());
+                    requiredForChild.emplace_back(varPtr->name());
                 }
             }
         }
 
-        node.getChild().visit(*this, id, std::move(required));
+        auto result =
+            node.getChild().visit(*this, false /*isGroupRoot*/, std::move(requiredForChild));
+
+        PlanAndProps initial = createInitial(isGroupRoot, n, std::move(required));
+        for (size_t index = 0; index < result.size(); index++) {
+            auto& entry = result.at(index);
+            PlanAndProps merged = moveOrCopy(initial, index == result.size() - 1);
+            mergeNodeAndProps<GroupByNode>(_includeRejected, merged, entry, true /*canMove*/);
+            std::swap(entry, merged);
+        }
+        return result;
     }
 
     template <class T>
-    void operator()(ABT& n,
-                    T& node,
-                    MemoPhysicalNodeId id,
-                    ProjectionNameOrderPreservingSet required) {
+    PlanExtractorResult operator()(const ABT& n,
+                                   const T& node,
+                                   bool isGroupRoot,
+                                   ProjectionNameOrderPreservingSet required) {
         using namespace algebra::detail;
 
         if constexpr (is_one_of_v<T,
@@ -195,7 +288,7 @@ public:
                                   SeekNode,
                                   SpoolConsumerNode>) {
             // Nullary nodes.
-            addNodeProps(&node, id, std::move(required));
+            return {createInitial(isGroupRoot, n, std::move(required))};
         } else if constexpr (is_one_of_v<T,
                                          FilterNode,
                                          EvaluationNode,
@@ -207,67 +300,173 @@ public:
                                          ExchangeNode,
                                          RootNode>) {
             // Unary nodes.
-            addNodeProps(&node, id, required);
-            node.getChild().visit(*this, id, std::move(required));
+            auto result = node.getChild().visit(*this, false /*isGroupRoot*/, required);
+
+            PlanAndProps initial = createInitial(isGroupRoot, n, std::move(required));
+            for (size_t index = 0; index < result.size(); index++) {
+                auto& entry = result.at(index);
+                PlanAndProps merged = moveOrCopy(initial, index == result.size() - 1);
+
+                mergeNodeAndProps<T>(_includeRejected, merged, entry, true /*canMove*/);
+                std::swap(entry, merged);
+            }
+            return result;
         } else if constexpr (is_one_of_v<T, SortedMergeNode, UnionNode>) {
             // N-ary nodes.
-            addNodeProps(&node, id, required);
+
+            std::vector<PlanExtractorResult> childResults;
             for (auto& child : node.nodes()) {
-                child.visit(*this, id, required);
+                auto childResult = child.visit(*this, false /*isGroupRoot*/, required);
+                childResults.push_back(std::move(childResult));
             }
+
+            PlanAndProps initial = createInitial(isGroupRoot, n, std::move(required));
+            return mergeNaryResults<T>(
+                _includeRejected, std::move(initial), std::move(childResults));
         } else if constexpr (is_one_of_v<T, MergeJoinNode, HashJoinNode>) {
             // HashJoin and MergeJoin.
-            addNodeProps(&node, id, required);
 
             // Do not require RID from the inner child.
             auto requiredInner = required;
-            if (const auto& ridProjName = _nodeToGroupPropsMap.at(&node)._ridProjName) {
-                requiredInner.erase(*ridProjName);
+            if (hasProperty<IndexingRequirement>(_physProps)) {
+                const auto& scanDefName =
+                    getPropertyConst<IndexingAvailability>(_logicalProps).getScanDefName();
+                requiredInner.erase(_ridProjections.at(scanDefName));
             }
 
-            node.getLeftChild().visit(*this, id, std::move(required));
-            node.getRightChild().visit(*this, id, std::move(requiredInner));
+            auto leftResult = node.getLeftChild().visit(*this, false /*isGroupRoot*/, required);
+            auto rightResult =
+                node.getRightChild().visit(*this, false /*isGroupRoot*/, std::move(requiredInner));
+
+            PlanAndProps initial = createInitial(isGroupRoot, n, std::move(required));
+            return mergeLeftRightResults<T>(_includeRejected,
+                                            std::move(initial),
+                                            std::move(leftResult),
+                                            std::move(rightResult));
         } else {
             // Other ABT types.
             static_assert(!canBePhysicalNode<T>(), "Physical node must implement its visitor");
+            MONGO_UNREACHABLE;
         }
     }
 
-    ABT extract(MemoPhysicalNodeId nodeId) {
-        const auto& result = *_memo.getPhysicalNodes(nodeId._groupId).at(nodeId._index);
+    static PlanExtractorResult extract(const cascades::Memo& memo,
+                                       const Metadata& metadata,
+                                       const RIDProjectionsMap& ridProjections,
+                                       MemoPhysicalNodeId nodeId,
+                                       const bool includeRejected,
+                                       int32_t& planNodeId) {
+        const auto& result = *memo.getPhysicalNodes(nodeId._groupId).at(nodeId._index);
         uassert(6624143,
                 "Physical delegator must be pointing to an optimized result.",
                 result._nodeInfo.has_value());
-        ABT node = result._nodeInfo->_node;
 
-        if (hasProperty<ProjectionRequirement>(result._physProps)) {
-            node.visit(*this,
-                       nodeId,
-                       getPropertyConst<ProjectionRequirement>(result._physProps).getProjections());
-        } else {
-            node.visit(*this, nodeId, ProjectionNameOrderPreservingSet{});
+        LogicalProps logicalProps = memo.getLogicalProps(nodeId._groupId);
+        PhysProps physProps = result._physProps;
+        if (!metadata.isParallelExecution()) {
+            // Do not display availability and requirement if under centralized setting.
+            removeProperty<DistributionAvailability>(logicalProps);
+            removeProperty<DistributionRequirement>(physProps);
         }
-        return node;
+
+        ProjectionNameOrderPreservingSet projSet;
+        if (hasProperty<ProjectionRequirement>(result._physProps)) {
+            projSet = getPropertyConst<ProjectionRequirement>(result._physProps).getProjections();
+        }
+
+        PlanExtractorResult results;
+        const size_t altCount = includeRejected ? (result._rejectedNodeInfo.size() + 1) : 1;
+        for (size_t altIndex = 0; altIndex < altCount; altIndex++) {
+            const bool isLastIteration = altIndex == altCount - 1;
+            const auto& nodeInfo =
+                (altIndex == 0) ? *result._nodeInfo : result._rejectedNodeInfo.at(altIndex - 1);
+            const ABT& node = nodeInfo._node;
+
+            MemoPhysicalPlanExtractor instance(memo,
+                                               metadata,
+                                               ridProjections,
+                                               nodeInfo,
+                                               logicalProps,
+                                               physProps,
+                                               nodeId,
+                                               includeRejected,
+                                               planNodeId);
+
+            PlanExtractorResult altResults;
+            if (isLastIteration) {
+                altResults = node.visit(instance,
+                                        true /*isGroupRoot*/,
+                                        std::move(projSet));  // NOLINT(bugprone-use-after-move)
+            } else {
+                altResults = node.visit(instance, true /*isGroupRoot*/, projSet);
+            }
+            std::move(altResults.begin(), altResults.end(), std::back_inserter(results));
+        }
+
+        invariant(!results.empty() && (includeRejected || results.size() == 1));
+        return results;
     }
 
 private:
+    PlanAndProps createInitial(const bool isGroupRoot,
+                               const ABT& n,
+                               ProjectionNameOrderPreservingSet required) {
+        PhysProps physProps1 = _physProps;
+        // Restrict projections only to currently required ones.
+        setPropertyOverwrite(physProps1, ProjectionRequirement{std::move(required)});
+
+        boost::optional<ProjectionName> ridProjName;
+        if (hasProperty<IndexingRequirement>(_physProps)) {
+            const auto& scanDefName =
+                getPropertyConst<IndexingAvailability>(_logicalProps).getScanDefName();
+            ridProjName = _ridProjections.at(scanDefName);
+        }
+
+        // If we are not returning more than one plan (_includeRejected = false) then we do not
+        // aggregate cost, and thus retain the original total cost (_cost). Otherwise, if we are the
+        // group root, then we aggregate the cost of the children, otherwise we propagate zero. We
+        // keep a single cost for all nodes in the group's subplan (they are all annotated with the
+        // group's cost.
+        CostType totalCost = _includeRejected
+            ? (isGroupRoot ? _nodeInfo._localCost : CostType::kZero)
+            : _nodeInfo._cost;
+        NodeProps entry{_planNodeId++,
+                        _id,
+                        _logicalProps,
+                        std::move(physProps1),
+                        std::move(ridProjName),
+                        totalCost,
+                        _nodeInfo._localCost,
+                        _nodeInfo._adjustedCE};
+
+        PlanAndProps result{n, {}};
+        result.setRootAnnotation(std::move(entry));
+        return result;
+    }
+
     // We don't own this.
     const cascades::Memo& _memo;
     const Metadata& _metadata;
     const RIDProjectionsMap& _ridProjections;
-    NodeToGroupPropsMap& _nodeToGroupPropsMap;
 
-    int32_t _planNodeId;
+    const cascades::PhysNodeInfo& _nodeInfo;
+    const LogicalProps& _logicalProps;
+    const PhysProps& _physProps;
+    const MemoPhysicalNodeId _id;
+    const bool _includeRejected;
+
+    int32_t& _planNodeId;
 };
 
-std::pair<ABT, NodeToGroupPropsMap> extractPhysicalPlan(MemoPhysicalNodeId id,
-                                                        const Metadata& metadata,
-                                                        const RIDProjectionsMap& ridProjections,
-                                                        const cascades::Memo& memo) {
-    NodeToGroupPropsMap resultMap;
-    MemoPhysicalPlanExtractor extractor(memo, metadata, ridProjections, resultMap);
-    ABT resultNode = extractor.extract(id);
-    return {std::move(resultNode), std::move(resultMap)};
+PlanExtractorResult extractPhysicalPlans(const bool includeRejected,
+                                         const MemoPhysicalNodeId id,
+                                         const Metadata& metadata,
+                                         const RIDProjectionsMap& ridProjections,
+                                         const cascades::Memo& memo) {
+    int32_t planNodeId = 0;
+    auto result = MemoPhysicalPlanExtractor::extract(
+        memo, metadata, ridProjections, id, includeRejected, planNodeId);
+    return result;
 }
 
 }  // namespace mongo::optimizer

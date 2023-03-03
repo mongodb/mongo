@@ -242,27 +242,26 @@ private:
         return *selectivity * childResult;
     }
 
-    boost::optional<optimizer::SelectivityType> estimateSelectivity(ABT abtTree) {
+    boost::optional<optimizer::SelectivityType> estimateSelectivity(ABT abt) {
         // Add a group by to count number of documents.
         const ProjectionName sampleSumProjection = "sum";
-        abtTree =
-            make<GroupByNode>(ProjectionNameVector{},
-                              ProjectionNameVector{sampleSumProjection},
-                              makeSeq(make<FunctionCall>("$sum", makeSeq(Constant::int64(1)))),
-                              std::move(abtTree));
-        abtTree = make<RootNode>(
+        abt = make<GroupByNode>(ProjectionNameVector{},
+                                ProjectionNameVector{sampleSumProjection},
+                                makeSeq(make<FunctionCall>("$sum", makeSeq(Constant::int64(1)))),
+                                std::move(abt));
+        abt = make<RootNode>(
             properties::ProjectionRequirement{ProjectionNameVector{sampleSumProjection}},
-            std::move(abtTree));
+            std::move(abt));
 
 
         OPTIMIZER_DEBUG_LOG(6264806,
                             5,
                             "Estimate selectivity ABT",
-                            "explain"_attr = ExplainGenerator::explainV2(abtTree));
+                            "explain"_attr = ExplainGenerator::explainV2(abt));
 
-        _phaseManager.optimize(abtTree);
+        PlanAndProps planAndProps = _phaseManager.optimizeAndReturnProps(std::move(abt));
 
-        auto env = VariableEnvironment::build(abtTree);
+        auto env = VariableEnvironment::build(planAndProps._node);
         SlotVarMap slotMap;
         auto runtimeEnvironment = std::make_unique<sbe::RuntimeEnvironment>();  // TODO Use factory
         boost::optional<sbe::value::SlotId> ridSlot;
@@ -271,9 +270,9 @@ private:
                           *runtimeEnvironment,
                           ids,
                           _phaseManager.getMetadata(),
-                          _phaseManager.getNodeToGroupPropsMap(),
+                          planAndProps._map,
                           ScanOrder::Random};
-        auto sbePlan = g.optimize(abtTree, slotMap, ridSlot);
+        auto sbePlan = g.optimize(planAndProps._node, slotMap, ridSlot);
         tassert(6624261, "Unexpected rid slot", !ridSlot);
 
         // TODO: return errors instead of exceptions?
