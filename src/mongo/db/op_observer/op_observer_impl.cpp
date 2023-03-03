@@ -134,7 +134,6 @@ repl::OpTime logOperation(OperationContext* opCtx,
  */
 void logMutableOplogEntry(OperationContext* opCtx,
                           MutableOplogEntry* entry,
-                          bool fromMigrate,
                           OplogWriter* oplogWriter,
                           bool isRequiredInMultiDocumentTransaction = false) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -148,7 +147,6 @@ void logMutableOplogEntry(OperationContext* opCtx,
     if (inMultiDocumentTransaction) {
         txnParticipant.addTransactionOperation(opCtx, entry->toReplOperation());
     } else {
-        entry->setFromMigrateIfTrue(fromMigrate);
         logOperation(opCtx, entry, /*assignWallClockTime=*/true, oplogWriter);
     }
 }
@@ -414,8 +412,9 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(uuid);
     oplogEntry.setObject(builder.done());
+    oplogEntry.setFromMigrateIfTrue(fromMigrate);
 
-    logMutableOplogEntry(opCtx, &oplogEntry, fromMigrate, _oplogWriter.get());
+    logMutableOplogEntry(opCtx, &oplogEntry, _oplogWriter.get());
 }
 
 void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
@@ -762,11 +761,8 @@ void OpObserverImpl::onInsertGlobalIndexKey(OperationContext* opCtx,
 
     MutableOplogEntry oplogEntry = MutableOplogEntry::makeGlobalIndexCrudOperation(
         repl::OpTypeEnum::kInsertGlobalIndexKey, globalIndexNss, globalIndexUuid, key, docKey);
-    logMutableOplogEntry(opCtx,
-                         &oplogEntry,
-                         /*fromMigrate=*/false,
-                         _oplogWriter.get(),
-                         isRequiredInMultiDocumentTransaction);
+    logMutableOplogEntry(
+        opCtx, &oplogEntry, _oplogWriter.get(), isRequiredInMultiDocumentTransaction);
 }
 
 void OpObserverImpl::onDeleteGlobalIndexKey(OperationContext* opCtx,
@@ -785,11 +781,8 @@ void OpObserverImpl::onDeleteGlobalIndexKey(OperationContext* opCtx,
 
     MutableOplogEntry oplogEntry = MutableOplogEntry::makeGlobalIndexCrudOperation(
         repl::OpTypeEnum::kDeleteGlobalIndexKey, globalIndexNss, globalIndexUuid, key, docKey);
-    logMutableOplogEntry(opCtx,
-                         &oplogEntry,
-                         /*fromMigrate=*/false,
-                         _oplogWriter.get(),
-                         isRequiredInMultiDocumentTransaction);
+    logMutableOplogEntry(
+        opCtx, &oplogEntry, _oplogWriter.get(), isRequiredInMultiDocumentTransaction);
 }
 
 void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
@@ -1190,12 +1183,13 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
     oplogEntry.setNss(collectionName.getCommandNS());
     oplogEntry.setUuid(options.uuid);
     oplogEntry.setObject(MutableOplogEntry::makeCreateCollCmdObj(collectionName, options, idIndex));
+    oplogEntry.setFromMigrateIfTrue(fromMigrate);
 
     if (!createOpTime.isNull()) {
         oplogEntry.setOpTime(createOpTime);
     }
 
-    logMutableOplogEntry(opCtx, &oplogEntry, fromMigrate, _oplogWriter.get());
+    logMutableOplogEntry(opCtx, &oplogEntry, _oplogWriter.get());
 }
 
 void OpObserverImpl::onCollMod(OperationContext* opCtx,
