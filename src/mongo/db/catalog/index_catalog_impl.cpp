@@ -185,20 +185,9 @@ std::unique_ptr<IndexCatalog> IndexCatalogImpl::clone() const {
     return std::make_unique<IndexCatalogImpl>(*this);
 }
 
-void IndexCatalogImpl::init(OperationContext* opCtx, Collection* collection) {
-    _init(opCtx, collection, /*readTimestamp=*/boost::none, false);
-};
-
-void IndexCatalogImpl::initFromExisting(OperationContext* opCtx,
-                                        Collection* collection,
-                                        boost::optional<Timestamp> readTimestamp) {
-    _init(opCtx, collection, readTimestamp, true);
-};
-
-void IndexCatalogImpl::_init(OperationContext* opCtx,
-                             Collection* collection,
-                             boost::optional<Timestamp> readTimestamp,
-                             bool fromExisting) {
+void IndexCatalogImpl::init(OperationContext* opCtx,
+                            Collection* collection,
+                            bool isPointInTimeRead) {
     vector<string> indexNames;
     collection->getAllIndexes(&indexNames);
     const bool replSetMemberInStandaloneMode =
@@ -301,12 +290,8 @@ void IndexCatalogImpl::_init(OperationContext* opCtx,
                 createIndexEntry(opCtx, collection, std::move(descriptor), flags);
             fassert(17340, entry->isReady(opCtx));
 
-            if (readTimestamp) {
-                // When initializing indexes from an earlier point-in-time, we conservatively set
-                // the minimum valid snapshot to the read point-in-time as we don't know when the
-                // last DDL operation took place at that point-in-time.
-                entry->setMinimumVisibleSnapshot(*readTimestamp);
-            } else if (recoveryTs && !entry->descriptor()->isIdIndex()) {
+            if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV() && recoveryTs &&
+                !entry->descriptor()->isIdIndex()) {
                 // When initializing indexes from disk, we conservatively set the
                 // minimumVisibleSnapshot to non _id indexes to the recovery timestamp. The _id
                 // index is left visible. It's assumed if the collection is visible, it's _id is
@@ -316,10 +301,14 @@ void IndexCatalogImpl::_init(OperationContext* opCtx,
         }
     }
 
-    if (!fromExisting) {
-        // Only do this when we're not initializing an earlier collection from the shared state of
-        // an existing collection.
-        CollectionQueryInfo::get(collection).init(opCtx, CollectionPtr(collection));
+    // When instantiating a collection for point-in-time reads the collection instance can be using
+    // shared state, so we clear the query plan cache and rebuild it.
+    CollectionQueryInfo& info = CollectionQueryInfo::get(collection);
+    if (isPointInTimeRead) {
+        info.clearQueryCache(opCtx, CollectionPtr(collection));
+        info.rebuildIndexData(opCtx, CollectionPtr(collection));
+    } else {
+        info.init(opCtx, CollectionPtr(collection));
     }
 }
 

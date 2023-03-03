@@ -444,7 +444,7 @@ Status CollectionImpl::initFromExisting(OperationContext* opCtx,
         sharedIdents.emplace(indexName, swIndexIdent.getValue());
     }
 
-    getIndexCatalog()->initFromExisting(opCtx, this, readTimestamp);
+    getIndexCatalog()->init(opCtx, this, /*isPointInTimeRead=*/true);
 
     // Update the idents for the newly initialized indexes. We must reuse the same shared_ptr<Ident>
     // objects from existing indexes to prevent the index idents from being dropped by the drop

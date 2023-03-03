@@ -64,10 +64,9 @@ public:
      */
     std::unique_ptr<IndexCatalog> clone() const override;
 
-    void init(OperationContext* opCtx, Collection* collection) override;
-    void initFromExisting(OperationContext* opCtx,
-                          Collection* collection,
-                          boost::optional<Timestamp> readTimestamp) override;
+    void init(OperationContext* opCtx,
+              Collection* collection,
+              bool isPointInTimeRead = false) override;
 
     bool haveAnyIndexes() const override;
 
@@ -245,14 +244,6 @@ public:
 
 private:
     static const BSONObj _idObj;  // { _id : 1 }
-
-    /**
-     * Helper for init() and initFromExisting().
-     */
-    void _init(OperationContext* opCtx,
-               Collection* collection,
-               boost::optional<Timestamp> readTimestamp,
-               bool fromExisting);
 
     /**
      * In addition to IndexNames::findPluginName, validates that it is a known index type.

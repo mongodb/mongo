@@ -215,14 +215,9 @@ public:
     virtual std::unique_ptr<IndexCatalog> clone() const = 0;
 
     // Must be called before used.
-    virtual void init(OperationContext* opCtx, Collection* collection) = 0;
-
-    /**
-     * Must be called before used.
-     */
-    virtual void initFromExisting(OperationContext* opCtx,
-                                  Collection* collection,
-                                  boost::optional<Timestamp> readTimestamp) = 0;
+    virtual void init(OperationContext* opCtx,
+                      Collection* collection,
+                      bool isPointInTimeRead = false) = 0;
 
     // ---- accessors -----
 
