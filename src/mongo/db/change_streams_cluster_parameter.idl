@@ -68,11 +68,3 @@ server_parameters:
     validator:
       gte: 1
     default: 10
-
-feature_flags:
-    featureFlagUseUnreplicatedTruncatesForDeletions:
-        description: "Feature flag to enable pre-image collection and change collection maintenance
-        using unreplicated truncates instead of normal document deletions replicated from the
-        primary."
-        cpp_varname: gFeatureFlagUseUnreplicatedTruncatesForDeletions
-        default: false
