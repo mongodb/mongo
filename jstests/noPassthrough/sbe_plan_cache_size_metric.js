@@ -16,8 +16,8 @@
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
-load('jstests/libs/fixture_helpers.js');  // For FixtureHelpers.
+load("jstests/libs/sbe_util.js");      // For 'checkSBEEnabled()'.
+load("jstests/libs/analyze_plan.js");  // For 'getQueryHashFromExplain()'.
 
 const conn = MongoRunner.runMongod();
 assert.neq(conn, null, "mongod failed to start");
@@ -31,14 +31,6 @@ if (!checkSBEEnabled(db)) {
 
 function getCacheEntriesByQueryHashKey(coll, queryHash) {
     return coll.aggregate([{$planCacheStats: {}}, {$match: {queryHash}}]).toArray();
-}
-
-function getQueryHashFromExplain(explainRes) {
-    const hash = FixtureHelpers.isMongos(db)
-        ? explainRes.queryPlanner.winningPlan.shards[0].queryHash
-        : explainRes.queryPlanner.queryHash;
-    assert.eq(typeof (hash), "string");
-    return hash;
 }
 
 function getPlanCacheSize() {
