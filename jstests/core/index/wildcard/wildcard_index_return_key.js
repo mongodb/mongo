@@ -1,5 +1,9 @@
 /**
  * Tests that $** indexes works with returnKey option.
+ *
+ * @tags: [
+ *   does_not_support_stepdowns,
+ * ]
  */
 (function() {
 'use strict';

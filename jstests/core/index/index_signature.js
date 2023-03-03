@@ -12,7 +12,8 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fixture_helpers.js");  // For 'isSharded'.
+load("jstests/libs/feature_flag_util.js");  // For "FeatureFlagUtil"
+load("jstests/libs/fixture_helpers.js");    // For 'isSharded'.
 
 const testDB = db.getSiblingDB(jsTestName());
 const coll = testDB.test;
@@ -215,4 +216,37 @@ assert.commandFailedWithCode(
     coll.createIndex(wildcardKeyPattern,
                      {name: "wc_a_sub_b_c_1", wildcardProjection: {"a.c": 1, "a.b": 1}}),
     ErrorCodes.IndexOptionsConflict);
+
+// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
+const allowCompoundWildcardIndexes =
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
+if (allowCompoundWildcardIndexes) {
+    const compoundWildcardIndex = {"$**": 1, 'other': 1};
+
+    // Verifies that two indexes which includes or excludes a same field can be created.
+    assertNewIndexBuilt(compoundWildcardIndex, {name: "cwi_a", wildcardProjection: {a: 1}});
+    assertNewIndexBuilt(compoundWildcardIndex,
+                        {name: "cwi_noa", wildcardProjection: {a: 0, other: 0}});
+
+    // Verifies that the {_id: 0, a: 0} path projection is same as {a: 0} and thus an index with the
+    // projection can not be created.
+    assertIndexAlreadyExists(compoundWildcardIndex,
+                             {name: "cwi_noa", wildcardProjection: {_id: 0, a: 0, other: 0}});
+
+    assertNewIndexBuilt(compoundWildcardIndex,
+                        {name: "cwi_a_sub_b_c", wildcardProjection: {"a.b": 1, "a.c": 1}});
+
+    assertIndexAlreadyExists(compoundWildcardIndex,
+                             {name: "cwi_a_sub_b_c", wildcardProjection: {"a.b": 1, "a.c": 1}});
+    assert.commandFailedWithCode(
+        coll.createIndex(compoundWildcardIndex,
+                         {name: "cwi_a_sub_b_c_1", wildcardProjection: {"a.b": 1, "a.c": 1}}),
+        ErrorCodes.IndexOptionsConflict);
+    assertIndexAlreadyExists(compoundWildcardIndex,
+                             {name: "cwi_a_sub_b_c", wildcardProjection: {"a.c": 1, "a.b": 1}});
+    assert.commandFailedWithCode(
+        coll.createIndex(compoundWildcardIndex,
+                         {name: "cwi_a_sub_b_c_1", wildcardProjection: {"a.c": 1, "a.b": 1}}),
+        ErrorCodes.IndexOptionsConflict);
+}
 })();

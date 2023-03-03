@@ -1,7 +1,10 @@
 /**
  * Tests that '$_internalIndexKey' expression works as expected under various scenarios.
  *
- * @tags: [requires_fcv_63]
+ * @tags: [
+ *   does_not_support_stepdowns,
+ *   requires_fcv_63,
+ * ]
  */
 (function() {
 "use strict";

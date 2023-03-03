@@ -15,11 +15,16 @@
 
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
 load("jstests/libs/analyze_plan.js");         // For getPlanStages and isIndexOnly.
+load("jstests/libs/feature_flag_util.js");    // For "FeatureFlagUtil"
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r));
 
 const coll = db.wildcard_covered_query;
 coll.drop();
+
+// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
+const allowCompoundWildcardIndexes =
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
 
 // Confirms that the $** index can answer the given query and projection, that it produces a
 // covered solution, and that the results are identical to those obtained by a COLLSCAN. If
@@ -38,7 +43,7 @@ function assertWildcardProvidesCoveredSolution(query, proj, shouldFailToCover = 
 
     // Verify that the solution is covered, and that no documents were examined. If the argument
     // 'shouldFailToCover' is true, invert the validation to confirm that it is NOT covered.
-    assert.eq(!!explainOut.executionStats.totalDocsExamined, shouldFailToCover);
+    assert.eq(!!explainOut.executionStats.totalDocsExamined, shouldFailToCover, explainOut);
     assert.eq(isIndexOnly(coll.getDB(), winningPlan), !shouldFailToCover);
 
     // Verify that the query covered by the $** index produces the same results as a COLLSCAN.
@@ -49,38 +54,60 @@ function assertWildcardProvidesCoveredSolution(query, proj, shouldFailToCover = 
 // Create a new collection and build a $** index on it.
 const bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < 200; i++) {
-    bulk.insert({a: {b: i, c: `${(i + 1)}`}, d: (i + 2)});
+    bulk.insert({a: {b: i, c: `${(i + 1)}`}, d: (i + 2), other: (i + 3)});
 }
 assert.commandWorked(bulk.execute());
 assert.commandWorked(coll.createIndex({"$**": 1}));
 
-// Verify that the $** index can cover an exact match on an integer value.
-assertWildcardProvidesCoveredSolution({"a.b": 10}, {_id: 0, "a.b": 1});
+const wildcardIndexes = [
+    {keyPattern: {"$**": 1}},
+    {keyPattern: {"a.$**": 1, other: 1}},
+    {keyPattern: {"$**": 1, other: 1}, wildcardProjection: {other: 0}}
+];
 
-// Verify that the $** index can cover an exact match on a string value.
-assertWildcardProvidesCoveredSolution({"a.c": "10"}, {_id: 0, "a.c": 1});
+for (const indexSpec of wildcardIndexes) {
+    const isCompound = Object.keys(indexSpec.keyPattern).length > 1;
+    if (!allowCompoundWildcardIndexes && isCompound) {
+        continue;
+    }
+    const option = {};
+    if (indexSpec.wildcardProjection) {
+        option['wildcardProjection'] = indexSpec.wildcardProjection;
+    }
+    assert.commandWorked(coll.createIndex(indexSpec.keyPattern, option));
 
-// Verify that the $** index can cover a range query for integer values.
-assertWildcardProvidesCoveredSolution({"a.b": {$gt: 10, $lt: 99}}, {_id: 0, "a.b": 1});
+    // Verify that the $** index can cover an exact match on an integer value.
+    assertWildcardProvidesCoveredSolution({"a.b": 10}, {_id: 0, "a.b": 1});
 
-// Verify that the $** index can cover a range query for string values.
-assertWildcardProvidesCoveredSolution({"a.c": {$gt: "10", $lt: "99"}}, {_id: 0, "a.c": 1});
+    // Verify that the $** index can cover an exact match on a string value.
+    assertWildcardProvidesCoveredSolution({"a.c": "10"}, {_id: 0, "a.c": 1});
 
-// Verify that the $** index can cover an $in query for integer values.
-assertWildcardProvidesCoveredSolution({"a.b": {$in: [0, 50, 100, 150]}}, {_id: 0, "a.b": 1});
+    // Verify that the $** index can cover a range query for integer values.
+    assertWildcardProvidesCoveredSolution({"a.b": {$gt: 10, $lt: 99}}, {_id: 0, "a.b": 1});
 
-// Verify that the $** index can cover an $in query for string values.
-assertWildcardProvidesCoveredSolution({"a.c": {$in: ["0", "50", "100", "150"]}},
-                                      {_id: 0, "a.c": 1});
+    // Verify that the $** index can cover a range query for string values.
+    assertWildcardProvidesCoveredSolution({"a.c": {$gt: "10", $lt: "99"}}, {_id: 0, "a.c": 1});
 
-// Verify that attempting to project the virtual $_path field from the $** keyPattern will produce
-// an error, as it is a dollar-prefixed name.
-const shouldFailToCover = true;
-const err = assert.throws(
-    () => coll.find({d: {$in: [0, 25, 50, 75, 100]}}, {_id: 0, d: 1, $_path: 1}).toArray());
-assert.commandFailedWithCode(err, 16410);
+    // Verify that the $** index can cover an $in query for integer values.
+    assertWildcardProvidesCoveredSolution({"a.b": {$in: [0, 50, 100, 150]}}, {_id: 0, "a.b": 1});
 
-// Verify that predicates which produce inexact-fetch bounds are not covered by a $** index.
-assertWildcardProvidesCoveredSolution(
-    {d: {$elemMatch: {$eq: 50}}}, {_id: 0, d: 1}, shouldFailToCover);
+    // Verify that the $** index can cover an $in query for string values.
+    assertWildcardProvidesCoveredSolution({"a.c": {$in: ["0", "50", "100", "150"]}},
+                                          {_id: 0, "a.c": 1});
+
+    // Verify that the compound wildcard index can cover a query on all fields in the index.
+    assertWildcardProvidesCoveredSolution(
+        {"a.b": {$gt: 10}, other: {$gt: 10}}, {_id: 0, "a.b": 1, other: 1}, !isCompound);
+
+    // Verify that attempting to project the virtual $_path field from the $** keyPattern will
+    // produce an error, as it is a dollar-prefixed name.
+    const shouldFailToCover = true;
+    const err = assert.throws(
+        () => coll.find({d: {$in: [0, 25, 50, 75, 100]}}, {_id: 0, d: 1, $_path: 1}).toArray());
+    assert.commandFailedWithCode(err, 16410);
+
+    // Verify that predicates which produce inexact-fetch bounds are not covered by a $** index.
+    assertWildcardProvidesCoveredSolution(
+        {d: {$elemMatch: {$eq: 50}}}, {_id: 0, d: 1}, shouldFailToCover);
+}
 })();

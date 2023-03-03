@@ -3,6 +3,7 @@
  * @tags: [
  *   # Uses index building in background
  *   requires_background_index,
+ *   does_not_support_stepdowns,
  * ]
  */
 (function() {

@@ -444,6 +444,88 @@ TEST_F(IndexSignatureTest,
         ErrorCodes::IndexOptionsConflict);
 }
 
+TEST_F(IndexSignatureTest,
+       CanCreateMultipleCompoundWildcardIndexesOnSameKeyPatternWithDifferentWildcardProjections) {
+    RAIIServerParameterControllerForTest controllerCWI{"featureFlagCompoundWildcardIndexes", true};
+
+    // Creates a base wildcard index to verify 'wildcardProjection' option is part of index
+    // signature.
+    auto* wildcardIndex = unittest::assertGet(createIndex(
+        fromjson("{v: 2, name: 'cwi_all', key: {'$**': 1, b: 1}, wildcardProjection: {b: 0}}")));
+
+    // Verifies that an index with the same value for 'wildcardProjection' option as the
+    // wcProjAIndex compares identical.
+    auto wcProjADesc =
+        makeIndexDescriptor(normalizeIndexSpec(wildcardIndex->descriptor()->infoObj()));
+    ASSERT(wcProjADesc->compareIndexOptions(opCtx(), coll()->ns(), wildcardIndex) ==
+           IndexDescriptor::Comparison::kIdentical);
+
+    // Verifies that creating an index with the same value for 'wildcardProjection' option and the
+    // same name fails with IndexAlreadyExists error.
+    ASSERT_EQ(createIndex(
+                  wildcardIndex->descriptor()->infoObj().addFields(fromjson("{name: 'cwi_all'}"))),
+              ErrorCodes::IndexAlreadyExists);
+    // Verifies that creating an index with the same value for 'wildcardProjection' option and a
+    // different name fails with IndexOptionsConflict error.
+    ASSERT_EQ(createIndex(
+                  wildcardIndex->descriptor()->infoObj().addFields(fromjson("{name: 'cwi_a_1'}"))),
+              ErrorCodes::IndexOptionsConflict);
+
+    // Verifies that an index with a different value for 'wildcardProjection' option compares
+    // different from the base wildcard index or 'cwi_a' and thus can be created.
+    auto wcProjABDesc =
+        makeIndexDescriptor(normalizeIndexSpec(wildcardIndex->descriptor()->infoObj().addFields(
+            fromjson("{wildcardProjection: {a: 1}}"))));
+    ASSERT(wcProjABDesc->compareIndexOptions(opCtx(), coll()->ns(), wildcardIndex) ==
+           IndexDescriptor::Comparison::kDifferent);
+    auto* wcProjABIndex = unittest::assertGet(
+        createIndex(wcProjABDesc->infoObj().addFields(fromjson("{name: 'cwi_a_b'}"))));
+
+    // Verifies that an index with sub fields for 'wildcardProjection' option compares
+    // different from the base wildcard index or 'cwi_a' or 'cwi_a_b' and thus can be created.
+    auto wcProjASubBCDesc =
+        makeIndexDescriptor(normalizeIndexSpec(wildcardIndex->descriptor()->infoObj().addFields(
+            fromjson("{wildcardProjection: {a: {b: 1, c: 1}}}"))));
+    ASSERT(wcProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), wildcardIndex) ==
+           IndexDescriptor::Comparison::kDifferent);
+    ASSERT(wcProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), wcProjABIndex) ==
+           IndexDescriptor::Comparison::kDifferent);
+    auto* wcProjASubBCIndex = unittest::assertGet(
+        createIndex(wcProjASubBCDesc->infoObj().addFields(fromjson("{name: 'cwi_a_sub_b_c'}"))));
+
+    // Verifies that two indexes with the same projection in different order compares identical.
+    auto wcProjASubCBDesc =
+        makeIndexDescriptor(normalizeIndexSpec(wildcardIndex->descriptor()->infoObj().addFields(
+            fromjson("{wildcardProjection: {a: {c: 1, b: 1}}}"))));
+    ASSERT(wcProjASubCBDesc->compareIndexOptions(opCtx(), coll()->ns(), wcProjASubBCIndex) ==
+           IndexDescriptor::Comparison::kIdentical);
+    // Verifies that two indexes with the same projection in different order can not be created.
+    ASSERT_EQ(
+        createIndex(wcProjASubCBDesc->infoObj().addFields(fromjson("{name: 'cwi_a_sub_b_c'}"))),
+        ErrorCodes::IndexAlreadyExists);
+    ASSERT_EQ(
+        createIndex(wcProjASubCBDesc->infoObj().addFields(fromjson("{name: 'cwi_a_sub_c_b'}"))),
+        ErrorCodes::IndexOptionsConflict);
+
+    // Verifies that an index with the same value for 'wildcardProjection' option and an
+    // non-signature index option compares equivalent as the 'wcProjAIndex'
+    auto wcProjAWithNonSigDesc =
+        makeIndexDescriptor(wildcardIndex->descriptor()->infoObj().addFields(
+            fromjson("{storageEngine: {wiredTiger: {}}}")));
+    ASSERT(wcProjAWithNonSigDesc->compareIndexOptions(opCtx(), coll()->ns(), wildcardIndex) ==
+           IndexDescriptor::Comparison::kEquivalent);
+
+    // Verifies that an index with the same value for 'wildcardProjection' option, non-signature
+    // index option, and the same name fails with IndexOptionsConflict error.
+    ASSERT_EQ(createIndex(wcProjAWithNonSigDesc->infoObj().addFields(fromjson("{name: 'cwi_a'}"))),
+              ErrorCodes::IndexOptionsConflict);
+    // Verifies that an index with the same value for 'wildcardProjection' option, non-signature
+    // index option, and a different name fails with IndexOptionsConflict error too.
+    ASSERT_EQ(
+        createIndex(wcProjAWithNonSigDesc->infoObj().addFields(fromjson("{name: 'cwi_a_nonsig'}"))),
+        ErrorCodes::IndexOptionsConflict);
+}
+
 TEST_F(IndexSignatureTest, NormalizeOnlyColumnstoreAllKeyPattern) {
     RAIIServerParameterControllerForTest controller("featureFlagColumnstoreIndexes", true);
 

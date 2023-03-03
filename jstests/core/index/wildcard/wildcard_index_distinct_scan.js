@@ -2,6 +2,7 @@
  * Tests that a $** index can provide a DISTINCT_SCAN or indexed solution where appropriate.
  * @tags: [
  *   assumes_read_concern_local,
+ *   does_not_support_stepdowns,
  *   no_selinux,
  * ]
  */
@@ -10,11 +11,16 @@
 
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
 load("jstests/libs/analyze_plan.js");         // For planHasStage and getPlanStages.
+load("jstests/libs/feature_flag_util.js");    // For "FeatureFlagUtil"
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 
 const coll = db.all_paths_distinct_scan;
 coll.drop();
+
+// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
+const allowCompoundWildcardIndexes =
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
 
 // Records whether the field which we are distinct-ing over is multikey.
 let distinctFieldIsMultikey = false;
@@ -42,44 +48,64 @@ function insertTestData(fieldName, listOfValues) {
  */
 function assertWildcardDistinctScan(
     {distinctKey, query, pathProjection, expectedScanType, expectedResults, expectedPath}) {
-    // Drop all indexes before running the test. This allows us to perform the distinct with a
-    // COLLSCAN at first, to confirm that the results are as expected.
-    assert.commandWorked(coll.dropIndexes());
+    const wildcardIndexes = [
+        {keyPattern: {"$**": 1}},
+        {keyPattern: {"$**": 1, other: 1}, wildcardProjection: {other: 0}}
+    ];
+    for (const indexSpec of wildcardIndexes) {
+        if (!allowCompoundWildcardIndexes && indexSpec.wildcardProjection) {
+            continue;
+        }
+        // Drop all indexes before running the test. This allows us to perform the distinct with a
+        // COLLSCAN at first, to confirm that the results are as expected.
+        assert.commandWorked(coll.dropIndexes());
 
-    // Confirm that the distinct runs with a COLLSCAN.
-    let winningPlan = getWinningPlan(coll.explain().distinct(distinctKey, query).queryPlanner);
-    assert(planHasStage(coll.getDB(), winningPlan, "COLLSCAN"));
-    // Run the distinct and confirm that it produces the expected results.
-    assertArrayEq(coll.distinct(distinctKey, query), expectedResults);
-
-    // Build a wildcard index on the collection and re-run the test.
-    const options = (pathProjection ? {wildcardProjection: pathProjection} : {});
-    assert.commandWorked(coll.createIndex({"$**": 1}, options));
-
-    // We expect the following outcomes for a 'distinct' that attempts to use a $** index:
-    // - No query: COLLSCAN.
-    // - Query for object value on distinct field: COLLSCAN.
-    // - Query for non-object value on non-multikey distinct field: DISTINCT_SCAN.
-    // - Query for non-object value on multikey distinct field: IXSCAN with FETCH.
-    // - Query for non-object value on field other than the distinct field: IXSCAN with FETCH.
-    const fetchIsExpected = (expectedScanType !== "DISTINCT_SCAN");
-
-    // Explain the query, and determine whether an indexed solution is available. If
-    // 'expectedPath' is null, then we do not expect the $** index to provide a plan.
-    winningPlan = getWinningPlan(coll.explain().distinct(distinctKey, query).queryPlanner);
-    if (!expectedPath) {
+        // Confirm that the distinct runs with a COLLSCAN.
+        let winningPlan = getWinningPlan(coll.explain().distinct(distinctKey, query).queryPlanner);
         assert(planHasStage(coll.getDB(), winningPlan, "COLLSCAN"));
-        assert.eq(expectedScanType, "COLLSCAN");
-        return;
-    }
+        // Run the distinct and confirm that it produces the expected results.
+        assertArrayEq(coll.distinct(distinctKey, query), expectedResults);
 
-    // Confirm that the $** distinct scan produces the expected results.
-    assertArrayEq(coll.distinct(distinctKey, query), expectedResults);
-    // Confirm that the $** plan adheres to 'fetchIsExpected' and 'expectedScanType'.
-    assert.eq(planHasStage(coll.getDB(), winningPlan, "FETCH"), fetchIsExpected);
-    assert(planHasStage(coll.getDB(), winningPlan, expectedScanType));
-    assert.docEq({$_path: 1, [expectedPath]: 1},
-                 getPlanStages(winningPlan, expectedScanType).shift().keyPattern);
+        const expectedKeyPattern =
+            indexSpec.wildcardProjection ? {$_path: 1, other: 1} : {$_path: 1};
+        if (expectedPath) {
+            expectedKeyPattern[expectedPath] = 1;
+        }
+
+        const wildcardProjection =
+            Object.assign(indexSpec.wildcardProjection || {}, pathProjection || {});
+
+        // Build a wildcard index on the collection and re-run the test.
+        assert.commandWorked(coll.createIndex(indexSpec.keyPattern,
+                                              Object.keys(wildcardProjection).length === 0
+                                                  ? {}
+                                                  : {wildcardProjection: wildcardProjection}));
+
+        // We expect the following outcomes for a 'distinct' that attempts to use a $** index:
+        // - No query: COLLSCAN.
+        // - Query for object value on distinct field: COLLSCAN.
+        // - Query for non-object value on non-multikey distinct field: DISTINCT_SCAN.
+        // - Query for non-object value on multikey distinct field: IXSCAN with FETCH.
+        // - Query for non-object value on field other than the distinct field: IXSCAN with FETCH.
+        const fetchIsExpected = (expectedScanType !== "DISTINCT_SCAN");
+
+        // Explain the query, and determine whether an indexed solution is available. If
+        // 'expectedPath' is null, then we do not expect the $** index to provide a plan.
+        winningPlan = getWinningPlan(coll.explain().distinct(distinctKey, query).queryPlanner);
+        if (!expectedPath) {
+            assert(planHasStage(coll.getDB(), winningPlan, "COLLSCAN"));
+            assert.eq(expectedScanType, "COLLSCAN");
+            return;
+        }
+
+        // Confirm that the $** distinct scan produces the expected results.
+        assertArrayEq(coll.distinct(distinctKey, query), expectedResults);
+        // Confirm that the $** plan adheres to 'fetchIsExpected' and 'expectedScanType'.
+        assert.eq(planHasStage(coll.getDB(), winningPlan, "FETCH"), fetchIsExpected);
+        assert(planHasStage(coll.getDB(), winningPlan, expectedScanType));
+        assert.docEq(expectedKeyPattern,
+                     getPlanStages(winningPlan, expectedScanType).shift().keyPattern);
+    }
 }
 
 // The set of distinct values that should be produced by each of the test listed below.

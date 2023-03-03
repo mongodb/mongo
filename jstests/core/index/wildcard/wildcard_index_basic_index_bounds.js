@@ -12,8 +12,9 @@
 (function() {
 "use strict";
 
-load("jstests/libs/analyze_plan.js");     // For getPlanStages.
-load("jstests/libs/fixture_helpers.js");  // For isMongos and numberOfShardsForCollection.
+load("jstests/libs/analyze_plan.js");       // For getPlanStages.
+load("jstests/libs/fixture_helpers.js");    // For isMongos and numberOfShardsForCollection.
+load("jstests/libs/feature_flag_util.js");  // For "FeatureFlagUtil"
 
 // Asserts that the given cursors produce identical result sets.
 function assertResultsEq(cursor1, cursor2) {
@@ -26,6 +27,10 @@ function assertResultsEq(cursor1, cursor2) {
 
 const coll = db.wildcard_index_bounds;
 coll.drop();
+
+// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
+const allowCompoundWildcardIndexes =
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
 
 // Template document which defines the 'schema' of the documents in the test collection.
 const templateDoc = {
@@ -82,8 +87,82 @@ const operationList = [
     {expression: {$ne: null, $exists: true}, bounds: ["[MinKey, MaxKey]"], subpathBounds: true},
     // In principle we could have tighter bounds for this. See SERVER-36765.
     {expression: {$eq: null, $exists: true}, bounds: ['[MinKey, MaxKey]'], subpathBounds: true},
-    {expression: {$eq: []}, bounds: ['[undefined, undefined]', '[[], []]']}
+    {expression: {$eq: []}, bounds: ['[undefined, undefined]', '[[], []]']},
+
 ];
+
+// Operations for compound wildcard indexes.
+const operationListCompound = [
+    {
+        query: {'a': 3, 'b.c': {$gte: 3}},
+        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[3.0, inf.0]'], 'c': ['[MinKey, MaxKey]']},
+        path: 'b.c',
+        subpathBounds: false,
+        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
+    },
+    {
+        query: {'a': 3, 'b.c': {$gte: 3}, 'c': {$lt: 3}},
+        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[3.0, inf.0]'], 'c': ['[-inf.0, 3.0)']},
+        path: 'b.c',
+        subpathBounds: false,
+        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
+    },
+    {
+        query: {'a': 3, 'b.c': {$exists: true}, 'c': {$lt: 3}},
+        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[MinKey, MaxKey]'], 'c': ['[-inf.0, 3.0)']},
+        path: 'b.c',
+        subpathBounds: true,
+        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
+    },
+    {
+        query: {'a': 3, 'b.c': {$in: [1, 2]}},
+        bounds:
+            {'a': ['[3.0, 3.0]'], 'b.c': ['[1.0, 1.0]', '[2.0, 2.0]'], 'c': ['[MinKey, MaxKey]']},
+        path: 'b.c',
+        subpathBounds: false,
+        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
+    },
+    {
+        query: {'a': 3, 'b.c': {$in: [null, 1, 2]}},
+        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[MinKey, MaxKey]'], 'c': ['[MinKey, MaxKey]']},
+        path: 'b.c',
+        subpathBounds: true,
+        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
+    },
+    {
+        query: {'a': {$gt: 3}, 'b.c': {$eq: {abc: 1}}},
+        bounds: {'a': ['(3.0, inf.0]'], 'b.c': ['[MinKey, MaxKey]'], 'c': ['[MinKey, MaxKey]']},
+        path: 'b.c',
+        subpathBounds: true,  // Object query is not supported, so we will check all sub paths.
+        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
+    },
+
+    // Queries cannot use the compound wildcard index.
+    {query: {'b.c': {$gt: 3}}, bounds: null},
+    {query: {'abc': {$gt: 3}}, bounds: null},
+    {query: {'b.c': {$gt: 3}, 'abc': 10}, bounds: null},
+    {query: {'c': 5}, bounds: null},
+];
+
+function makeExpectedBounds(op, path) {
+    // The bounds on '$_path' will always include a point-interval on the path, i.e.
+    // ["path.to.field", "path.to.field"]. If 'subpathBounds' is 'true' for this
+    // operation, then we add bounds that include all subpaths as well, i.e.
+    // ["path.to.field.", "path.to.field/")
+    const pointPathBound = `["${path}", "${path}"]`;
+    const pathBounds =
+        op.subpathBounds ? [pointPathBound, `["${path}.", "${path}/")`] : [pointPathBound];
+
+    // {$_path: pathBounds, path.to.field: [[computed bounds]]}
+    let expectedBounds = {$_path: pathBounds};
+    if (Array.isArray(op.bounds)) {
+        expectedBounds[path] = op.bounds;
+    } else {
+        expectedBounds = Object.assign(expectedBounds, op.bounds);
+    }
+
+    return expectedBounds;
+}
 
 // Given a keyPattern and (optional) pathProjection, this function builds a $** index on the
 // collection and then tests each of the match expression in the 'operationList' on each indexed
@@ -107,15 +186,7 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
         const orQueryBounds = [];
 
         for (let path of pathList) {
-            // The bounds on '$_path' will always include a point-interval on the path, i.e.
-            // ["path.to.field", "path.to.field"]. If 'subpathBounds' is 'true' for this
-            // operation, then we add bounds that include all subpaths as well, i.e.
-            // ["path.to.field.", "path.to.field/")
-            const pointPathBound = `["${path}", "${path}"]`;
-            const pathBounds =
-                op.subpathBounds ? [pointPathBound, `["${path}.", "${path}/")`] : [pointPathBound];
-            // {$_path: pathBounds, path.to.field: [[computed bounds]]}
-            const expectedBounds = {$_path: pathBounds, [path]: op.bounds};
+            const expectedBounds = makeExpectedBounds(op, path);
             const query = {[path]: op.expression};
 
             // Explain the query, and determine whether an indexed solution is available.
@@ -215,6 +286,47 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
     }
 }
 
+// Given a compound wildcard key pattern, runs tests similar to 'runWildcardIndexTest()'.
+function runCompoundWildcardIndexTest(keyPattern, pathProjection) {
+    if (!allowCompoundWildcardIndexes) {
+        return;
+    }
+    assert.commandWorked(coll.dropIndexes());
+    assert.commandWorked(
+        coll.createIndex(keyPattern, pathProjection ? {wildcardProjection: pathProjection} : {}));
+
+    // Verify the expected behaviour for every combination of path and operator.
+    for (let op of operationListCompound) {
+        const expectedBounds = makeExpectedBounds(op, op.path);
+
+        // Explain the query, and determine whether an indexed solution is available.
+        const explainRes = coll.find(op.query).explain();
+        const ixScans = getPlanStages(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
+
+        // If the current operation is not supported by $** indexes, confirm that no indexed
+        // solution was found.
+        if (op.bounds === null) {
+            assert.eq(ixScans.length,
+                      0,
+                      () => "Bounds check for operation: " + tojson(op) +
+                          " failed. Expected no IXSCAN plans to be generated, but got " +
+                          tojson(explainRes));
+            continue;
+        }
+
+        // Verify that the winning plan uses the compound wildcard index with the expected bounds.
+        assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
+        assert.docEq(op.expectedKeyPattern, ixScans[0].keyPattern);
+        assert.docEq(expectedBounds, ixScans[0].indexBounds);
+
+        // Verify that the results obtained from the compound wildcard index are identical to a
+        // COLLSCAN. We must explicitly hint the wildcard index, because we also sort on {_id: 1} to
+        // ensure that both result sets are in the same order.
+        assertResultsEq(coll.find(op.query).sort({_id: 1}).hint(keyPattern),
+                        coll.find(op.query).sort({_id: 1}).hint({$natural: 1}));
+    }
+}
+
 // Test a $** index that indexes the entire document.
 runWildcardIndexTest({'$**': 1}, null, ['a', 'b.c', 'b.d.e', 'b.f']);
 
@@ -234,4 +346,8 @@ runWildcardIndexTest({'$**': 1}, {a: 0}, ['b.c', 'b.d.e', 'b.f']);
 runWildcardIndexTest({'$**': 1}, {b: 0}, ['a']);
 runWildcardIndexTest({'$**': 1}, {'b.d': 0}, ['a', 'b.c', 'b.f']);
 runWildcardIndexTest({'$**': 1}, {a: 0, 'b.d': 0}, ['b.c', 'b.f']);
+
+// Test a compound wildcard index.
+runCompoundWildcardIndexTest({'a': 1, 'b.$**': 1, 'c': 1}, null);
+runCompoundWildcardIndexTest({'a': 1, '$**': 1, 'c': 1}, {'a': 0, 'c': 0});
 })();

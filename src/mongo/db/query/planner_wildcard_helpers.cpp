@@ -566,6 +566,14 @@ BoundsTightness translateWildcardIndexBoundsAndTightness(
     }
     invariant(oil);
 
+    // If 'oil' was not filled the filter type may not be supported, but we can still use this
+    // wildcard index for queries on prefix fields. The index bounds for the wildcard field will be
+    // filled later to include all values. Therefore, we should use INEXACT_FETCH to avoid false
+    // positives.
+    if (oil->name.empty()) {
+        return BoundsTightness::INEXACT_FETCH;
+    }
+
     // If our bounds include any objects -- anything in the range ({}, []) -- then we will need to
     // use subpath bounds; that is, we will add the interval ["path.","path/") at the point where we
     // finalize the index scan. If the subpath interval is required but the bounds do not already
@@ -653,10 +661,11 @@ void finalizeWildcardIndexScanConfiguration(
     FieldRef queryPath{wildcardFieldName};
     auto& multikeyPaths = index->multikeyPaths[index->wildcardFieldPos];
 
-    // If the bounds overlap the object type bracket, then we must retrieve all documents which
-    // include the given path. We must therefore add bounds that encompass all its subpaths,
-    // specifically the interval ["path.","path/") on "$_path".
-    const bool requiresSubpathBounds =
+    // If the bounds overlap the object type bracket or the wildcard field's bounds were not filled,
+    // then we must retrieve all documents which include the given path. We must therefore add
+    // bounds that encompass all its subpaths, specifically the interval ["path.","path/") on
+    // "$_path".
+    const bool requiresSubpathBounds = bounds->fields[index->wildcardFieldPos].name.empty() ||
         boundsOverlapObjectTypeBracket(bounds->fields[index->wildcardFieldPos]);
 
     // Account for fieldname-or-array-index semantics. $** indexes do not explicitly encode array

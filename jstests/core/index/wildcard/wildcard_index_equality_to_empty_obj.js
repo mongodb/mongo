@@ -1,8 +1,14 @@
 /**
  * Tests that a $** index can support queries which test for equality to empty nested objects.
+ *
+ * @tags: [
+ *   does_not_support_stepdowns,
+ * ]
  */
 (function() {
 "use strict";
+
+load("jstests/libs/feature_flag_util.js");  // For "FeatureFlagUtil"
 
 const coll = db.wildcard_index_equality_to_empty_obj;
 coll.drop();
@@ -21,54 +27,78 @@ assert.commandWorked(coll.insert([
     {_id: 10, a: [0, {b: {}}]},
 ]));
 
-assert.commandWorked(coll.createIndex({"$**": 1}));
+const wildcardIndexes =
+    [{keyPattern: {"$**": 1}}, {keyPattern: {"$**": 1, b: 1}, wildcardProjection: {b: 0}}];
+// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
+const allowCompoundWildcardIndexes =
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
 
-// Test that a comparison to empty object query returns the expected results when the $** index
-// is hinted.
-let results = coll.find({a: {}}, {_id: 1}).sort({_id: 1}).hint({"$**": 1}).toArray();
-assert.eq(results, [{_id: 3}, {_id: 4}, {_id: 6}]);
+for (const indexSpec of wildcardIndexes) {
+    if (!allowCompoundWildcardIndexes && indexSpec.wildcardProjection) {
+        continue;
+    }
+    const option = {};
+    if (indexSpec.wildcardProjection) {
+        option['wildcardProjection'] = indexSpec.wildcardProjection;
+    }
+    assert.commandWorked(coll.createIndex(indexSpec.keyPattern, option));
 
-// Result set should be the same as when hinting a COLLSCAN and with no hint.
-assert.eq(results, coll.find({a: {}}, {_id: 1}).sort({_id: 1}).hint({$natural: 1}).toArray());
-assert.eq(results, coll.find({a: {}}, {_id: 1}).sort({_id: 1}).toArray());
+    // Test that a comparison to empty object query returns the expected results when the $** index
+    // is hinted.
+    let results = coll.find({a: {}}, {_id: 1}).sort({_id: 1}).hint(indexSpec.keyPattern).toArray();
+    assert.eq(results, [{_id: 3}, {_id: 4}, {_id: 6}]);
 
-// Repeat the above query, but express it using $lte:{}, which is a synonym for $eq:{}.
-results = coll.find({a: {$lte: {}}}, {_id: 1}).sort({_id: 1}).hint({"$**": 1}).toArray();
-assert.eq(results, [{_id: 3}, {_id: 4}, {_id: 6}]);
-assert.eq(results,
-          coll.find({a: {$lte: {}}}, {_id: 1}).sort({_id: 1}).hint({$natural: 1}).toArray());
-assert.eq(results, coll.find({a: {$lte: {}}}, {_id: 1}).sort({_id: 1}).toArray());
+    // Result set should be the same as when hinting a COLLSCAN and with no hint.
+    assert.eq(results, coll.find({a: {}}, {_id: 1}).sort({_id: 1}).hint({$natural: 1}).toArray());
+    assert.eq(results, coll.find({a: {}}, {_id: 1}).sort({_id: 1}).toArray());
 
-// Test that an inequality to empty object query results in an error when the $** index is
-// hinted.
-assert.throws(() => coll.find({a: {$gte: {}}}, {_id: 1}).sort({_id: 1}).hint({"$**": 1}).toArray());
+    // Repeat the above query, but express it using $lte:{}, which is a synonym for $eq:{}.
+    results =
+        coll.find({a: {$lte: {}}}, {_id: 1}).sort({_id: 1}).hint(indexSpec.keyPattern).toArray();
+    assert.eq(results, [{_id: 3}, {_id: 4}, {_id: 6}]);
+    assert.eq(results,
+              coll.find({a: {$lte: {}}}, {_id: 1}).sort({_id: 1}).hint({$natural: 1}).toArray());
+    assert.eq(results, coll.find({a: {$lte: {}}}, {_id: 1}).sort({_id: 1}).toArray());
 
-// Test that an inequality to empty object query returns the expected results in the presence of
-// the $** index.
-results = coll.find({a: {$gte: {}}}, {_id: 1}).sort({_id: 1}).toArray();
-assert.eq(results, [{_id: 3}, {_id: 4}, {_id: 6}, {_id: 7}, {_id: 9}, {_id: 10}]);
+    // Test that an inequality to empty object query results in an error when the $** index is
+    // hinted.
+    assert.throws(() => coll.find({a: {$gte: {}}}, {_id: 1})
+                            .sort({_id: 1})
+                            .hint(indexSpec.keyPattern)
+                            .toArray());
 
-// Result set should be the same as when hinting a COLLSCAN and with no hint.
-assert.eq(results,
-          coll.find({a: {$gte: {}}}, {_id: 1}).sort({_id: 1}).hint({$natural: 1}).toArray());
-assert.eq(results, coll.find({a: {$gte: {}}}, {_id: 1}).sort({_id: 1}).toArray());
+    // Test that an inequality to empty object query returns the expected results in the presence of
+    // the $** index.
+    results = coll.find({a: {$gte: {}}}, {_id: 1}).sort({_id: 1}).toArray();
+    assert.eq(results, [{_id: 3}, {_id: 4}, {_id: 6}, {_id: 7}, {_id: 9}, {_id: 10}]);
 
-// Test that an $in with an empty object returns the expected results when the $** index is
-// hinted.
-results = coll.find({a: {$in: [3, {}]}}, {_id: 1}).sort({_id: 1}).hint({"$**": 1}).toArray();
-assert.eq(results, [{_id: 3}, {_id: 4}, {_id: 6}, {_id: 8}]);
+    // Result set should be the same as when hinting a COLLSCAN and with no hint.
+    assert.eq(results,
+              coll.find({a: {$gte: {}}}, {_id: 1}).sort({_id: 1}).hint({$natural: 1}).toArray());
+    assert.eq(results, coll.find({a: {$gte: {}}}, {_id: 1}).sort({_id: 1}).toArray());
 
-// Result set should be the same as when hinting a COLLSCAN and with no hint.
-assert.eq(results,
-          coll.find({a: {$in: [3, {}]}}, {_id: 1}).sort({_id: 1}).hint({$natural: 1}).toArray());
-assert.eq(results, coll.find({a: {$in: [3, {}]}}, {_id: 1}).sort({_id: 1}).toArray());
+    // Test that an $in with an empty object returns the expected results when the $** index is
+    // hinted.
+    results = coll.find({a: {$in: [3, {}]}}, {_id: 1})
+                  .sort({_id: 1})
+                  .hint(indexSpec.keyPattern)
+                  .toArray();
+    assert.eq(results, [{_id: 3}, {_id: 4}, {_id: 6}, {_id: 8}]);
 
-// Test that a wildcard index can support equality to an empty object on a dotted field.
-results = coll.find({"a.b": {$eq: {}}}, {_id: 1}).sort({_id: 1}).hint({"$**": 1}).toArray();
-assert.eq(results, [{_id: 9}, {_id: 10}]);
+    // Result set should be the same as when hinting a COLLSCAN and with no hint.
+    assert.eq(
+        results,
+        coll.find({a: {$in: [3, {}]}}, {_id: 1}).sort({_id: 1}).hint({$natural: 1}).toArray());
+    assert.eq(results, coll.find({a: {$in: [3, {}]}}, {_id: 1}).sort({_id: 1}).toArray());
 
-// Result set should be the same as when hinting a COLLSCAN and with no hint.
-assert.eq(results,
-          coll.find({"a.b": {$eq: {}}}, {_id: 1}).sort({_id: 1}).hint({$natural: 1}).toArray());
-assert.eq(results, coll.find({"a.b": {$eq: {}}}, {_id: 1}).sort({_id: 1}).toArray());
+    // Test that a wildcard index can support equality to an empty object on a dotted field.
+    results =
+        coll.find({"a.b": {$eq: {}}}, {_id: 1}).sort({_id: 1}).hint(indexSpec.keyPattern).toArray();
+    assert.eq(results, [{_id: 9}, {_id: 10}]);
+
+    // Result set should be the same as when hinting a COLLSCAN and with no hint.
+    assert.eq(results,
+              coll.find({"a.b": {$eq: {}}}, {_id: 1}).sort({_id: 1}).hint({$natural: 1}).toArray());
+    assert.eq(results, coll.find({"a.b": {$eq: {}}}, {_id: 1}).sort({_id: 1}).toArray());
+}
 }());

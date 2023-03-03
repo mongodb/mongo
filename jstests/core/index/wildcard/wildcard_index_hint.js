@@ -2,6 +2,7 @@
  * Tests that $** indexes obey hinting.
  * @tags: [
  *   assumes_read_concern_local,
+ *   does_not_support_stepdowns,
  * ]
  */
 (function() {

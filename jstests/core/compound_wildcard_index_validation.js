@@ -4,6 +4,7 @@
  * command.
  *
  * @tags: [
+ *   does_not_support_stepdowns,
  *   featureFlagCompoundWildcardIndexes,
  * ]
  */
