@@ -111,7 +111,7 @@ Status ShardingLogging::logChangeChecked(OperationContext* opCtx,
                                          const WriteConcernOptions& writeConcern,
                                          std::shared_ptr<Shard> configShard,
                                          ShardingCatalogClient* catalogClient) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         // If we're using a non-majority write concern, we should have provided an overriden
         // configShard and catalogClient to perform local operations.
         invariant(writeConcern.isMajority() || (configShard && catalogClient));
@@ -163,7 +163,7 @@ Status ShardingLogging::_log(OperationContext* opCtx,
     ChangeLogType changeLog;
     changeLog.setChangeId(changeId);
     changeLog.setServer(serverName);
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         changeLog.setShard("config");
     } else {
         auto shardingState = ShardingState::get(opCtx);

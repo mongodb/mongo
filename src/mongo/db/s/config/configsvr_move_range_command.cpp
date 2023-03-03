@@ -67,7 +67,7 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << Request::kCommandName
                                   << " can only be run on the config server",
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 

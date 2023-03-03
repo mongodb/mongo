@@ -64,7 +64,7 @@ public:
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
                     "tenant migrations are not available on config servers",
-                    serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
+                    !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
             uassert(
@@ -180,7 +180,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
                     "tenant migrations are not available on config servers",
-                    serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
+                    !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             const auto& cmd = request();
 
@@ -254,7 +254,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
                     "tenant migrations are not available on config servers",
-                    serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
+                    !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             const RequestType& cmd = request();
 

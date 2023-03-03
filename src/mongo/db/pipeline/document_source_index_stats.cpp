@@ -54,7 +54,7 @@ DocumentSource::GetNextResult DocumentSourceIndexStats::doGetNext() {
             pExpCtx->opCtx,
             pExpCtx->ns,
             _processName,
-            serverGlobalParams.clusterRole != ClusterRole::None);
+            !serverGlobalParams.clusterRole.has(ClusterRole::None));
         _indexStatsIter = _indexStats.cbegin();
     }
 

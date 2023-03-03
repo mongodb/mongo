@@ -96,7 +96,7 @@ public:
 
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "_shardsvrCloneCatalogData can only be run on shard servers",
-                serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+                serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
         CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
 

@@ -172,14 +172,14 @@ const ReplicaSetAwareServiceRegistry::Registerer<UserWritesRecoverableCriticalSe
         "UserWritesRecoverableCriticalSectionService");
 
 bool UserWritesRecoverableCriticalSectionService::shouldRegisterReplicaSetAwareService() const {
-    return serverGlobalParams.clusterRole == ClusterRole::None ||
-        serverGlobalParams.clusterRole.isShardRole();
+    return serverGlobalParams.clusterRole.has(ClusterRole::None) ||
+        serverGlobalParams.clusterRole.has(ClusterRole::ShardServer);
 }
 
 void UserWritesRecoverableCriticalSectionService::
     acquireRecoverableCriticalSectionBlockingUserWrites(OperationContext* opCtx,
                                                         const NamespaceString& nss) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::None,
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::None),
               "Acquiring the user writes recoverable critical section directly to start blocking "
               "writes is only allowed on non-sharded cluster.");
 
@@ -190,7 +190,7 @@ void UserWritesRecoverableCriticalSectionService::
 void UserWritesRecoverableCriticalSectionService::
     acquireRecoverableCriticalSectionBlockNewShardedDDL(OperationContext* opCtx,
                                                         const NamespaceString& nss) {
-    invariant(serverGlobalParams.clusterRole != ClusterRole::None,
+    invariant(!serverGlobalParams.clusterRole.has(ClusterRole::None),
               "Acquiring the user writes recoverable critical section blocking only sharded DDL is "
               "only allowed on sharded clusters");
 
@@ -202,7 +202,7 @@ void UserWritesRecoverableCriticalSectionService::
 void UserWritesRecoverableCriticalSectionService::
     promoteRecoverableCriticalSectionToBlockUserWrites(OperationContext* opCtx,
                                                        const NamespaceString& nss) {
-    invariant(serverGlobalParams.clusterRole != ClusterRole::None,
+    invariant(!serverGlobalParams.clusterRole.has(ClusterRole::None),
               "Promoting the user writes recoverable critical section to also block user writes is "
               "only allowed on sharded clusters");
 
@@ -258,7 +258,7 @@ void UserWritesRecoverableCriticalSectionService::
 void UserWritesRecoverableCriticalSectionService::
     demoteRecoverableCriticalSectionToNoLongerBlockUserWrites(OperationContext* opCtx,
                                                               const NamespaceString& nss) {
-    invariant(serverGlobalParams.clusterRole != ClusterRole::None,
+    invariant(!serverGlobalParams.clusterRole.has(ClusterRole::None),
               "Demoting the user writes recoverable critical section to also block user writes is "
               "only allowed on sharded clusters");
 

@@ -316,7 +316,7 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
     // In sharded queryableBackupMode mode, we ignore the shardIdentity document on disk and instead
     // *require* a shardIdentity document to be passed through --overrideShardIdentity
     if (storageGlobalParams.queryableBackupMode) {
-        if (serverGlobalParams.clusterRole.isExclusivelyShardRole()) {
+        if (serverGlobalParams.clusterRole.exclusivelyHasShardRole()) {
             uassert(ErrorCodes::InvalidOptions,
                     "If started with --shardsvr in queryableBackupMode, a shardIdentity document "
                     "must be provided through --overrideShardIdentity",
@@ -369,9 +369,9 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
                                 shardIdentityBSON);
     }();
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         if (!foundShardIdentity) {
-            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
                 LOGV2_WARNING(7445900,
                               "Started with ShardServer role, but no shardIdentity document was "
                               "found on disk.",
@@ -415,7 +415,7 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
 
 void ShardingInitializationMongoD::initializeFromShardIdentity(
     OperationContext* opCtx, const ShardIdentityType& shardIdentity) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
     invariant(opCtx->lockState()->isLocked());
 
     uassertStatusOKWithContext(
@@ -445,7 +445,7 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
                 shardingState->clusterId() == shardIdentity.getClusterId());
 
         // If run on a config server, we may not know our connection string yet.
-        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             auto prevConfigsvrConnStr = shardRegistry->getConfigServerConnectionString();
             uassert(
                 40373,
@@ -475,7 +475,7 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
         shardingState->setInitialized(ex.toStatus());
     }
 
-    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+    if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         Grid::get(opCtx)->setShardingInitialized();
     } else {
         // A config server always initializes sharding at startup.
@@ -529,7 +529,7 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
 }
 
 void ShardingInitializationMongoD::onSetCurrentConfig(OperationContext* opCtx) {
-    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer ||
+    if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
         !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
         // Only config servers capable of acting as a shard set up the config shard in their shard
         // registry with a real connection string.
@@ -542,7 +542,7 @@ void ShardingInitializationMongoD::onSetCurrentConfig(OperationContext* opCtx) {
 
 void ShardingInitializationMongoD::onInitialDataAvailable(OperationContext* opCtx,
                                                           bool isMajorityDataAvailable) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         initializeGlobalShardingStateForConfigServerIfNeeded(opCtx);
     }
 
@@ -656,7 +656,7 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
 
     auto initKeysClient =
         [service](ShardingCatalogClient* catalogClient) -> std::unique_ptr<KeysCollectionClient> {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             // The direct keys client must use local read concern if the storage engine can't
             // support majority read concern.
             bool keysClientMustUseLocalReads =
@@ -677,7 +677,7 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
         initKeysClient));
 
     auto const replCoord = repl::ReplicationCoordinator::get(service);
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
         replCoord->getMemberState().primary()) {
         LogicalTimeValidator::get(opCtx)->enableKeyGenerator(opCtx, true);
     }
@@ -702,7 +702,7 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
     bool isStandaloneOrPrimary =
         !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
 
-    if (serverGlobalParams.clusterRole.isExclusivelyShardRole()) {
+    if (serverGlobalParams.clusterRole.exclusivelyHasShardRole()) {
         // A config server added as a shard would have already set this up at startup.
         if (storageGlobalParams.queryableBackupMode) {
             CatalogCacheLoader::set(service, std::make_unique<ReadOnlyCatalogCacheLoader>());
@@ -733,7 +733,7 @@ void initializeShardingAwarenessIfNeededAndLoadGlobalSettings(OperationContext* 
         ShardingInitializationMongoD::get(opCtx)->initializeShardingAwarenessIfNeeded(opCtx);
     if (shardingInitialized) {
         // Config servers can't always perform remote reads here, so they use a local client.
-        auto catalogClient = serverGlobalParams.clusterRole == ClusterRole::ConfigServer
+        auto catalogClient = serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)
             ? ShardingCatalogManager::get(opCtx)->localCatalogClient()
             : Grid::get(opCtx)->catalogClient();
         auto status = loadGlobalSettingsFromConfigServer(opCtx, catalogClient);

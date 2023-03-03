@@ -171,7 +171,7 @@ Status ReplSetConfig::_initialize(bool forInitiate,
     //
     // Initialize configServer
     //
-    if (forInitiate && serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+    if (forInitiate && serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
         !getConfigServer().has_value()) {
         setConfigServer(true);
     }
@@ -402,7 +402,7 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
                               "servers cannot have a non-zero secondaryDelaySecs");
             }
         }
-        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
+        if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
             !skipShardingConfigurationChecks) {
             return Status(ErrorCodes::BadValue,
                           "Nodes being used for config servers must be started with the "
@@ -414,7 +414,7 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
                                         << " must be true in replica set configurations being "
                                            "used for config servers");
         }
-    } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    } else if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         return Status(ErrorCodes::BadValue,
                       "Nodes started with the --configsvr flag must have configsvr:true in "
                       "their config");

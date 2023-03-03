@@ -264,7 +264,7 @@ Status ShardingStateRecovery_DEPRECATED::recover(OperationContext* opCtx) {
     // perform majority writes. The write isn't required in this case, since the node must be in a
     // recent enough version where configTime guarantees are maintained via the vector clock.
     Status status = Status::OK();
-    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+    if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         status = ShardingLogging::get(opCtx)->logChangeChecked(
             opCtx,
             "Sharding minOpTime recovery",

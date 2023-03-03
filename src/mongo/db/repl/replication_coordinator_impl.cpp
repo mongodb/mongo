@@ -358,7 +358,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
 
     // If this is a config server, then we set the periodic no-op interval to 1 second. This is to
     // ensure that the config server will not unduly hold up change streams running on the cluster.
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         periodicNoopIntervalSecs.store(1);
     }
 
@@ -3801,7 +3801,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
         // If the new config changes the replica set's implicit default write concern, we fail the
         // reconfig command. This includes force reconfigs.
         // The user should set a cluster-wide write concern and attempt the reconfig command again.
-        if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+        if (!serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
             if (!repl::enableDefaultWriteConcernUpdatesForInitiate.load() && currIDWC != newIDWC &&
                 !ReadWriteConcernDefaults::get(opCtx).isCWWCSet(opCtx)) {
                 return Status(
@@ -3845,7 +3845,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
 
         // If we are currently using a custom write concern as the default, check that the
         // corresponding definition still exists in the new config.
-        if (serverGlobalParams.clusterRole == ClusterRole::None) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
             try {
                 const auto rwcDefaults =
                     ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
@@ -5246,7 +5246,7 @@ WriteConcernOptions ReplicationCoordinatorImpl::getGetLastErrorDefault() {
 
 Status ReplicationCoordinatorImpl::checkReplEnabledForCommand(BSONObjBuilder* result) {
     if (!_settings.usingReplSets()) {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             result->append("info", "configsvr");  // for shell prompt
         }
         return Status(ErrorCodes::NoReplicationEnabled, "not running with --replSet");
@@ -6342,7 +6342,7 @@ void ReplicationCoordinatorImpl::recordIfCWWCIsSetOnConfigServerOnStartup(Operat
 }
 
 void ReplicationCoordinatorImpl::_validateDefaultWriteConcernOnShardStartup(WithLock lk) const {
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         // Checking whether the shard is part of a sharded cluster or not by checking if CWWC
         // flag is set as we record it during sharding initialization phase, as on restarting a
         // shard node for upgrading or any other reason, sharding initialization happens before

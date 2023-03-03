@@ -83,7 +83,7 @@ void GlobalUserWriteBlockState::disableUserShardedDDLBlocking(OperationContext* 
 
 void GlobalUserWriteBlockState::checkShardedDDLAllowedToStart(OperationContext* opCtx,
                                                               const NamespaceString& nss) const {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
     uassert(ErrorCodes::UserWritesBlocked,
             "User writes blocked",
             !_userShardedDDLBlocked.load() ||

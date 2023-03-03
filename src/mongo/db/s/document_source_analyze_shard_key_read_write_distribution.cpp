@@ -74,7 +74,7 @@ void fetchSplitPoints(OperationContext* opCtx,
     auto readConcern = repl::ReadConcernArgs(LogicalTime{splitPointsAfterClusterTime},
                                              repl::ReadConcernLevel::kLocalReadConcern);
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         uassert(ErrorCodes::InvalidOptions,
                 "The id of the shard that contains the temporary collection storing the split "
                 "points for the shard key must be specified when running on a sharded cluster",

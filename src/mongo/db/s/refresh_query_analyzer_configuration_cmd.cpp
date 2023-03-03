@@ -66,7 +66,7 @@ public:
             uassert(
                 ErrorCodes::IllegalOperation,
                 "_refreshQueryAnalyzerConfiguration command is not supported on a shardsvr mongod",
-                !serverGlobalParams.clusterRole.isExclusivelyShardRole());
+                !serverGlobalParams.clusterRole.exclusivelyHasShardRole());
 
             auto coodinator = analyze_shard_key::QueryAnalysisCoordinator::get(opCtx);
             auto configurations = coodinator->getNewConfigurationsForSampler(

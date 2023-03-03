@@ -62,7 +62,7 @@ void QueryAnalysisOpObserver::onInserts(OperationContext* opCtx,
                         insertedDoc);
                 });
             }
-        } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
                    coll->ns() == MongosType::ConfigNS) {
             for (auto it = begin; it != end; ++it) {
                 const auto& insertedDoc = it->doc;
@@ -85,7 +85,7 @@ void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdat
                     analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationUpdate(
                         updatedDoc);
                 });
-        } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
                    args.coll->ns() == MongosType::ConfigNS) {
             const auto& updatedDoc = args.updateArgs->updatedDoc;
             opCtx->recoveryUnit()->onCommit(
@@ -131,7 +131,7 @@ void QueryAnalysisOpObserver::onDelete(OperationContext* opCtx,
                                                   boost::optional<Timestamp>) {
                 analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationDelete(doc);
             });
-        } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
                    coll->ns() == MongosType::ConfigNS) {
             auto& doc = docToDeleteDecoration(opCtx);
             invariant(!doc.isEmpty());

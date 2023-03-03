@@ -147,7 +147,7 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx,
         // Standalone replica set, so there is no need to advance the OpLog on the primary. The only
         // exception is after a tenant migration because the target time may be from the other
         // replica set and is not guaranteed to be in the oplog of this node's set.
-        if (serverGlobalParams.clusterRole == ClusterRole::None &&
+        if (serverGlobalParams.clusterRole.has(ClusterRole::None) &&
             !tenant_migration_access_blocker::hasActiveTenantMigration(opCtx, dbName)) {
             return Status::OK();
         }
@@ -428,7 +428,8 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
             return Status::OK();
         }
 
-        const int debugLevel = serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 1 : 2;
+        const int debugLevel =
+            serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ? 1 : 2;
 
         LOGV2_DEBUG(
             20991,

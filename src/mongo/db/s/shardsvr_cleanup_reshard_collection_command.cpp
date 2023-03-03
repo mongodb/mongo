@@ -59,7 +59,7 @@ public:
 
             uassert(ErrorCodes::IllegalOperation,
                     "_shardsvrCleanupReshardCollection can only be run on shard servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);

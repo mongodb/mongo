@@ -2094,7 +2094,7 @@ CmdUMCTyped<GetUserCacheGenerationCommand, UMCGetUserCacheGenParams>::Invocation
     OperationContext* opCtx) {
     uassert(ErrorCodes::IllegalOperation,
             "_getUserCacheGeneration can only be run on config servers",
-            serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+            serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
     cmdGetUserCacheGeneration.skipApiVersionCheck();
     GetUserCacheGenerationReply reply;

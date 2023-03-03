@@ -75,7 +75,7 @@ Status ShardIdentityType::validate() const {
     }
 
     if (getShardName() == ShardId::kConfigServerId &&
-        serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         return {
             ErrorCodes::UnsupportedFormat,
             str::stream()
@@ -84,7 +84,7 @@ Status ShardIdentityType::validate() const {
     }
 
     if (getShardName() != ShardId::kConfigServerId &&
-        serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         return {ErrorCodes::UnsupportedFormat,
                 str::stream() << "Invalid shard identity document: the shard name for a config "
                                  "server cannot be \""

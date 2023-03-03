@@ -215,7 +215,7 @@ Status createIndexOnCollection(OperationContext* opCtx,
 Status createShardingIndexCatalogIndexes(OperationContext* opCtx) {
     bool unique = true;
     NamespaceString indexCatalogNamespace;
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         indexCatalogNamespace = NamespaceString::kConfigsvrIndexCatalogNamespace;
     } else {
         indexCatalogNamespace = NamespaceString::kShardIndexCatalogNamespace;

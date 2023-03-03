@@ -87,7 +87,7 @@ public:
         if (!rcStatus.isOK()) {
             if (ErrorCodes::isExceededTimeLimitError(rcStatus.code())) {
                 const int debugLevel =
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ? 0 : 2;
                 LOGV2_DEBUG(21975,
                             debugLevel,
                             "Command on database {db} timed out waiting for read concern to be "

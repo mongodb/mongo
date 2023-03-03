@@ -153,7 +153,7 @@ Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceStri
         return validationStatus;
     }
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
         !gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility)) {
         return {
             ErrorCodes::InvalidOptions,

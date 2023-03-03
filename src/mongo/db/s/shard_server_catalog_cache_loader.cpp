@@ -296,7 +296,7 @@ StatusWith<CollectionAndChangedChunks> getIncompletePersistedMetadataSinceVersio
 }
 
 ShardId getSelfShardId(OperationContext* opCtx) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         return ShardId::kConfigServerId;
     }
 
@@ -353,7 +353,7 @@ void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx, S
 // TODO: SERVER-74105 remove
 bool shouldSkipStoringLocally() {
     // Note: cannot use isExclusivelyConfigSvrRole as it ignores fcv.
-    return serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+    return serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
         !gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility);
 }
 

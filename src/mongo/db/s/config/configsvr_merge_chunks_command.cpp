@@ -77,7 +77,7 @@ public:
         ConfigSvrMergeResponse typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrCommitChunksMerge can only be run on config servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
             uassert(ErrorCodes::InvalidNamespace,
                     "invalid namespace specified for request",
                     ns().isValid());

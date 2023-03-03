@@ -83,8 +83,8 @@ void assertNotStandaloneOrShardServer(OperationContext* opCtx, StringData cmdNam
 
     uassert(51301,
             str::stream() << "'" << cmdName << "' is not supported on shard nodes.",
-            serverGlobalParams.clusterRole == ClusterRole::None ||
-                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+            serverGlobalParams.clusterRole.has(ClusterRole::None) ||
+                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 }
 
 auto makeResponse(const ReadWriteConcernDefaults::RWConcernDefaultAndTime& rwcDefault,
@@ -136,7 +136,7 @@ public:
                 opCtx, request().getDefaultReadConcern(), request().getDefaultWriteConcern());
             // We don't want to check if the custom write concern exists on the config servers
             // because it only has to exist on the actual shards in order to be valid.
-            if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+            if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
                 if (auto optWC = newDefaults.getDefaultWriteConcern()) {
                     uassertStatusOK(replCoord->validateWriteConcern(*optWC));
                 }

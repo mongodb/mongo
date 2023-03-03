@@ -51,7 +51,7 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             ChunkVersion sinceVersion) {
     const auto readConcern = [&]() -> repl::ReadConcernArgs {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
             !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
             // When the feature flag is on, the config server may read from a secondary which may
             // need to wait for replication, so we should use afterClusterTime.

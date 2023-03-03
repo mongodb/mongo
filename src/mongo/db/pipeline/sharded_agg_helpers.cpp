@@ -1640,7 +1640,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
 
             if (!cm.isSharded() &&
                 // TODO SERVER-75391: Remove this condition.
-                (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
+                (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
                  expCtx->ns != NamespaceString::kConfigsvrCollectionsNamespace)) {
                 // If the collection is unsharded and we are on the primary, we should be able to
                 // do a local read. The primary may be moved right after the primary shard check,

@@ -44,7 +44,7 @@ Status validateChangeStreamsClusterParameter(
     auto* repl = repl::ReplicationCoordinator::get(getGlobalServiceContext());
     bool isStandalone = repl &&
         repl->getReplicationMode() == repl::ReplicationCoordinator::modeNone &&
-        serverGlobalParams.clusterRole == ClusterRole::None;
+        serverGlobalParams.clusterRole.has(ClusterRole::None);
     if (isStandalone) {
         return {ErrorCodes::IllegalOperation,
                 "The 'changeStreams' parameter is unsupported in standalone."};

@@ -202,7 +202,7 @@ void VectorClockMongoD::onStepDown() {
 
 void VectorClockMongoD::onInitialDataAvailable(OperationContext* opCtx,
                                                bool isMajorityDataAvailable) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         const auto maxTopologyTime{[&opCtx]() -> boost::optional<Timestamp> {
             DBDirectClient client{opCtx};
             FindCommandRequest findRequest{NamespaceString::kConfigsvrShardsNamespace};
@@ -409,8 +409,8 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
 
 VectorClock::ComponentSet VectorClockMongoD::_gossipOutInternal() const {
     VectorClock::ComponentSet toGossip{Component::ClusterTime};
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
-        serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
+        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         toGossip.insert(Component::ConfigTime);
         toGossip.insert(Component::TopologyTime);
     }
@@ -419,7 +419,7 @@ VectorClock::ComponentSet VectorClockMongoD::_gossipOutInternal() const {
 
 VectorClock::ComponentSet VectorClockMongoD::_gossipInInternal() const {
     VectorClock::ComponentSet toGossip{Component::ClusterTime};
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         toGossip.insert(Component::ConfigTime);
         toGossip.insert(Component::TopologyTime);
     }
@@ -463,7 +463,7 @@ void VectorClockMongoD::_tickTo(Component component, LogicalTime newTime) {
     }
 
     if (component == Component::TopologyTime &&
-        serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         _advanceComponentTimeTo(component, std::move(newTime));
         return;
     }

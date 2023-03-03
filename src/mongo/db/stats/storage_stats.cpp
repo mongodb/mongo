@@ -112,7 +112,8 @@ void _appendRecordStats(OperationContext* opCtx,
         }
     }
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer && !isNamespaceAlwaysUnsharded) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
+        !isNamespaceAlwaysUnsharded) {
         result->appendNumber(
             kOrphanCountField,
             BalancerStatsRegistry::get(opCtx)->getCollNumOrphanDocsFromDiskIfNeeded(

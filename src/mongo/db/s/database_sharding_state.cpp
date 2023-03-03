@@ -198,7 +198,7 @@ void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx,
     if (dbName == DatabaseName::kConfig || dbName == DatabaseName::kAdmin) {
         uassert(7393700,
                 "The config server is the primary shard for database: {}"_format(dbName.toString()),
-                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
         return;
     }
 

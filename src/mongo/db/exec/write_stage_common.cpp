@@ -53,7 +53,7 @@ namespace write_stage_common {
 PreWriteFilter::PreWriteFilter(OperationContext* opCtx, NamespaceString nss)
     : _opCtx(opCtx), _nss(std::move(nss)), _skipFiltering([&] {
           // Always allow writes on replica sets.
-          if (serverGlobalParams.clusterRole == ClusterRole::None) {
+          if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
               return true;
           }
 

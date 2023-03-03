@@ -59,7 +59,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << Request::kCommandName << " can only be run on config servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             const auto coordinatorCompletionFuture = [&]() -> SharedSemiFuture<void> {
                 std::unique_ptr<ServerParameterService> sps =

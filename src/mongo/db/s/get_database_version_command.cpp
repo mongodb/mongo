@@ -78,7 +78,7 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << definition()->getName() << " can only be run on shard servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
             DatabaseName dbName(boost::none, _targetDb());
             AutoGetDb autoDb(opCtx, dbName, MODE_IS);

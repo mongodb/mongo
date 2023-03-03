@@ -57,7 +57,7 @@ public:
 
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrSetAllowMigrations can only be run on config servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 

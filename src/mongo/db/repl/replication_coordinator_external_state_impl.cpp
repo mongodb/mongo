@@ -825,14 +825,14 @@ void ReplicationCoordinatorExternalStateImpl::onStepDownHook() {
 }
 
 void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepDown();
         TransactionCoordinatorService::get(_service)->onStepDown();
     }
     if (ShardingState::get(_service)->enabled()) {
         CatalogCacheLoader::get(_service).onStepDown();
 
-        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             // Called earlier for config servers.
             TransactionCoordinatorService::get(_service)->onStepDown();
         }
@@ -895,7 +895,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTr
 
 void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook(
     OperationContext* opCtx) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         Status status = ShardingCatalogManager::get(opCtx)->initializeConfigDatabaseIfNeeded(opCtx);
         if (!status.isOK() && status != ErrorCodes::AlreadyInitialized) {
             // If the node is shutting down or it lost quorum just as it was becoming primary,
@@ -943,7 +943,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             CatalogCacheLoader::get(_service).onStepUp();
         }
     }
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         if (ShardingState::get(opCtx)->enabled()) {
             VectorClockMutable::get(opCtx)->recoverDirect(opCtx);
             Status status = ShardingStateRecovery_DEPRECATED::recover(opCtx);
@@ -959,7 +959,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
             CatalogCacheLoader::get(_service).onStepUp();
 
-            if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+            if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
                 // Called earlier for config servers.
                 TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
             }
@@ -1047,14 +1047,14 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             }
         }
     }
-    if (serverGlobalParams.clusterRole == ClusterRole::None) {  // unsharded
+    if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {  // unsharded
         if (auto validator = LogicalTimeValidator::get(_service)) {
             validator->enableKeyGenerator(opCtx, true);
         }
     }
 
     if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV() &&
-        serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
         !ShardingState::get(opCtx)->enabled()) {
         // Note this must be called after the config server has created the cluster ID and also
         // after the onStepUp logic for the shard role because this triggers sharding state
@@ -1273,7 +1273,7 @@ void ReplicationCoordinatorExternalStateImpl::setupNoopWriter(Seconds waitTime) 
 
 bool ReplicationCoordinatorExternalStateImpl::isShardPartOfShardedCluster(
     OperationContext* opCtx) const {
-    return serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+    return serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
         ShardingState::get(opCtx)->enabled();
 }
 

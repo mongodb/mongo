@@ -62,7 +62,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassert(50876,
                     "Cannot run addShard on a node started without --shardsvr",
-                    serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
             tassert(5624104,
                     "Cannot run addShard on a node that contains customized getLastErrorDefaults, "
                     "which has been deprecated and is now ignored. Use setDefaultRWConcern instead "

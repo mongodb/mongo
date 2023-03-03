@@ -149,7 +149,7 @@ void runLocalAggregate(OperationContext* opCtx,
 void runClusterAggregate(OperationContext* opCtx,
                          AggregateCommandRequest aggRequest,
                          std::function<void(const BSONObj&)> callbackFn) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
     auto nss = aggRequest.getNamespace();
     boost::optional<UUID> collUuid;
@@ -211,7 +211,7 @@ void runClusterAggregate(OperationContext* opCtx,
 void runAggregate(OperationContext* opCtx,
                   AggregateCommandRequest aggRequest,
                   std::function<void(const BSONObj&)> callbackFn) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         return runClusterAggregate(opCtx, aggRequest, callbackFn);
     }
     return runLocalAggregate(opCtx, aggRequest, callbackFn);
@@ -516,7 +516,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
         throw;
     }
 
-    uassert(serverGlobalParams.clusterRole == ClusterRole::ShardServer
+    uassert(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)
                 ? ErrorCodes::CollectionIsEmptyLocally
                 : ErrorCodes::IllegalOperation,
             "Cannot analyze the monotonicity of a shard key for an empty collection",
@@ -580,7 +580,7 @@ CollStatsMetrics calculateCollStats(OperationContext* opCtx, const NamespaceStri
     aggRequest.setReadConcern(extractReadConcern(opCtx));
 
     auto isShardedCollection = [&] {
-        if (serverGlobalParams.clusterRole.isShardRole()) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
             auto cm = uassertStatusOK(
                           Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss))
                           .cm;
@@ -756,7 +756,7 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
 
         DBDirectClient client(opCtx);
         auto doc = client.findOne(nss, {});
-        uassert(serverGlobalParams.clusterRole == ClusterRole::ShardServer
+        uassert(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)
                     ? ErrorCodes::CollectionIsEmptyLocally
                     : ErrorCodes::IllegalOperation,
                 "Cannot analyze the characteristics of a shard key for an empty collection",

@@ -47,7 +47,7 @@ void setMongos(const bool state) {
 }
 
 bool isClusterNode() {
-    return serverGlobalParams.clusterRole != ClusterRole::None;
+    return !serverGlobalParams.clusterRole.has(ClusterRole::None);
 }
 
 bool isClusterNodeOrRouter() {

@@ -389,7 +389,7 @@ public:
                 str::stream()
                     << "Cannot set parameter requireApiVersion=true on a shard or config server",
                 parameterName != "requireApiVersion" || !parameter.trueValue() ||
-                    (serverGlobalParams.clusterRole == ClusterRole::None));
+                    (serverGlobalParams.clusterRole.has(ClusterRole::None)));
 
             auto oldValueObj = ([&] {
                 BSONObjBuilder bb;

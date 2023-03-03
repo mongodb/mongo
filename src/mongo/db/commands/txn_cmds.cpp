@@ -150,7 +150,7 @@ public:
                     opCtx, optionalCommitTimestamp.value(), {});
             } else {
                 if (ShardingState::get(opCtx)->canAcceptShardedCommands().isOK() ||
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
                     TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
                         opCtx, *opCtx->getLogicalSessionId(), txnNumberAndRetryCounter);
                 }
@@ -258,7 +258,7 @@ public:
 
             if (!MONGO_unlikely(dontRemoveTxnCoordinatorOnAbort.shouldFail()) &&
                 (ShardingState::get(opCtx)->canAcceptShardedCommands().isOK() ||
-                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer)) {
+                 serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer))) {
                 TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
                     opCtx, *opCtx->getLogicalSessionId(), txnNumberAndRetryCounter);
             }

@@ -142,7 +142,7 @@ public:
             uassert(
                 ErrorCodes::IllegalOperation,
                 format(FMT_STRING("{} can only be run on config servers"), definition()->getName()),
-                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());

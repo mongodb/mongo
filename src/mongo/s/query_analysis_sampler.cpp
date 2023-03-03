@@ -73,7 +73,7 @@ StatusWith<std::vector<CollectionQueryAnalyzerConfiguration>> executeRefreshComm
     cmd.setNumQueriesExecutedPerSecond(lastAvgCount);
 
     BSONObj resObj;
-    if (isMongos() || serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+    if (isMongos() || serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
         auto swResponse = configShard->runCommandWithFixedRetryAttempts(
             opCtx,
@@ -85,7 +85,7 @@ StatusWith<std::vector<CollectionQueryAnalyzerConfiguration>> executeRefreshComm
             return status;
         }
         resObj = swResponse.getValue().response;
-    } else if (serverGlobalParams.clusterRole == ClusterRole::None) {
+    } else if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         resObj = executeCommandOnPrimary(
             opCtx, DatabaseName::kAdmin, cmd.toBSON({}), [&](const BSONObj& resObj) {});
         if (auto status = getStatusFromCommandResult(resObj); !status.isOK()) {
@@ -170,11 +170,11 @@ double QueryAnalysisSampler::QueryStats::_calculateExponentialMovingAverage(
 
 void QueryAnalysisSampler::QueryStats::refreshTotalCount() {
     long long newTotalCount = [&] {
-        if (isMongos() || serverGlobalParams.clusterRole == ClusterRole::None) {
+        if (isMongos() || serverGlobalParams.clusterRole.has(ClusterRole::None)) {
             return globalOpCounters.getUpdate()->load() + globalOpCounters.getDelete()->load() +
                 _lastFindAndModifyQueriesCount + globalOpCounters.getQuery()->load() +
                 _lastAggregateQueriesCount + _lastCountQueriesCount + _lastDistinctQueriesCount;
-        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
             return globalOpCounters.getNestedAggregate()->load();
         }
         MONGO_UNREACHABLE;

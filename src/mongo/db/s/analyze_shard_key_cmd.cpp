@@ -72,7 +72,7 @@ public:
                     repl::ReplicationCoordinator::get(opCtx)->isReplEnabled());
             uassert(ErrorCodes::IllegalOperation,
                     "analyzeShardKey command is not supported on a configsvr mongod",
-                    !serverGlobalParams.clusterRole.isExclusivelyConfigSvrRole());
+                    !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
 
             const auto& nss = ns();
             const auto& key = request().getKey();

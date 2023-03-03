@@ -51,20 +51,15 @@ public:
         return *this;
     }
 
-    bool operator==(const ClusterRole& other) const;
+    bool has(const ClusterRole& other) const;
 
-    bool operator!=(const ClusterRole& other) const {
-        return !ClusterRole::operator==(other);
-    }
-
-    // Returns true if this mongod was started with --shardsvr or --configsvr in a catalog shard
-    // topology, false otherwise.
-    bool isShardRole();
     // Returns true if this mongod was started with --shardsvr, false otherwise.
-    bool isExclusivelyShardRole();
-    // Returns true if this mongod was started with --configServer in a non-catalog shard topology,
+    bool exclusivelyHasShardRole();
+
+    // Returns true if this mongod was started with --configsvr in a non-catalog shard topology,
     // false otherwise.
-    bool isExclusivelyConfigSvrRole();
+    // TODO SERVER-75391: Remove.
+    bool exclusivelyHasConfigRole();
 
 private:
     Value _value;

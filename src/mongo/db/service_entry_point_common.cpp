@@ -312,8 +312,8 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
                 "received command without explicit readConcern on an internalClient connection {}"_format(
                     redact(cmdObj.toString())),
                 readConcernArgs.isSpecified());
-        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
-                   serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
+                   serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             if (!readConcernArgs.isSpecified()) {
                 // TODO: Disabled until after SERVER-44539, to avoid log spam.
                 // LOGV2(21954, "Missing readConcern on {command}", "Missing readConcern "
@@ -1161,8 +1161,8 @@ Future<void> CheckoutSessionAndInvokeCommand::_commitInvocation() {
         // succeeds.
         _stashTransaction(txnParticipant);
 
-        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
-            serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
+            serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             auto txnResponseMetadata = txnParticipant.getResponseMetadata();
             auto bodyBuilder = replyBuilder->getBodyBuilder();
             txnResponseMetadata.serialize(&bodyBuilder);
@@ -1361,8 +1361,8 @@ void RunCommandAndWaitForWriteConcern::_setup() {
                     "received command without explicit writeConcern on an internalClient connection {}"_format(
                         redact(request.body.toString())),
                     request.body.hasField(WriteConcernOptions::kWriteConcernField));
-            } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
-                       serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
+                       serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
                 if (!request.body.hasField(WriteConcernOptions::kWriteConcernField)) {
                     // TODO: Disabled until after SERVER-44539, to avoid log spam.
                     // LOGV2(21959, "Missing writeConcern on {command}", "Missing "
@@ -1508,8 +1508,8 @@ void ExecCommandDatabase::_initiateCommand() {
     _scopedMetrics.emplace(opCtx, dbname, collect);
 
     const auto allowTransactionsOnConfigDatabase =
-        (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
-         serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+        (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
+         serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
     const auto invocationNss = _invocation->ns();
 
@@ -1805,8 +1805,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
             auto opCtx = _execContext->getOpCtx();
 
             if (!opCtx->getClient()->isInDirectClient() &&
-                !serverGlobalParams.clusterRole.isExclusivelyConfigSvrRole() &&
-                !_refreshedDatabase) {
+                !serverGlobalParams.clusterRole.exclusivelyHasConfigRole() && !_refreshedDatabase) {
                 auto sce = s.extraInfo<StaleDbRoutingVersion>();
                 invariant(sce);
 
@@ -1837,7 +1836,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
             ShardingStatistics::get(opCtx).countStaleConfigErrors.addAndFetch(1);
 
             if (!opCtx->getClient()->isInDirectClient() &&
-                !serverGlobalParams.clusterRole.isExclusivelyConfigSvrRole() &&
+                !serverGlobalParams.clusterRole.exclusivelyHasConfigRole() &&
                 !_refreshedCollection) {
                 if (auto sce = s.extraInfo<StaleConfigInfo>()) {
                     bool inCriticalSection = sce->getCriticalSectionSignal().has_value();
@@ -1885,7 +1884,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
         .onError<ErrorCodes::ShardCannotRefreshDueToLocksHeld>([this](Status s) -> Future<void> {
             // This exception can never happen on the config server. Config servers can't receive
             // SSV either, because they never have commands with shardVersion sent.
-            invariant(!serverGlobalParams.clusterRole.isExclusivelyConfigSvrRole());
+            invariant(!serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
 
             auto opCtx = _execContext->getOpCtx();
             if (!opCtx->getClient()->isInDirectClient() && !_refreshedCatalogCache) {

@@ -368,12 +368,12 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
 
     std::vector<std::unique_ptr<repl::PrimaryOnlyService>> services;
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         services.push_back(std::make_unique<ReshardingCoordinatorService>(serviceContext));
         services.push_back(std::make_unique<ConfigsvrCoordinatorService>(serviceContext));
     }
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         services.push_back(std::make_unique<RenameCollectionParticipantService>(serviceContext));
         services.push_back(std::make_unique<ShardingDDLCoordinatorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingDonorService>(serviceContext));
@@ -386,7 +386,7 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
         }
     }
 
-    if (serverGlobalParams.clusterRole == ClusterRole::None) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
         services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
         if (getGlobalReplSettings().isServerless()) {
@@ -697,7 +697,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     WaitForMajorityService::get(serviceContext).startup(serviceContext);
 
-    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+    if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         // A catalog shard initializes sharding awareness after setting up its config server state.
 
         // This function may take the global lock.
@@ -705,8 +705,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     try {
-        if ((serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
-             serverGlobalParams.clusterRole == ClusterRole::None) &&
+        if ((serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
+             serverGlobalParams.clusterRole.has(ClusterRole::None)) &&
             replSettings.usingReplSets()) {
             ReadWriteConcernDefaults::get(startupOpCtx.get()->getServiceContext())
                 .refreshIfNecessary(startupOpCtx.get());
@@ -750,7 +750,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
         startFreeMonitoring(serviceContext);
 
-        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
             // Note: For replica sets, ShardingStateRecovery happens on transition to primary.
             if (!replCoord->isReplEnabled()) {
                 if (ShardingState::get(startupOpCtx.get())->enabled()) {
@@ -759,14 +759,14 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             }
         }
 
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             initializeGlobalShardingStateForConfigServerIfNeeded(startupOpCtx.get());
 
             // This function may take the global lock.
             initializeShardingAwarenessIfNeededAndLoadGlobalSettings(startupOpCtx.get());
         }
 
-        if (serverGlobalParams.clusterRole == ClusterRole::None &&
+        if (serverGlobalParams.clusterRole.has(ClusterRole::None) &&
             replSettings.usingReplSets()) {  // standalone replica set
             // The keys client must use local read concern if the storage engine can't support
             // majority read concern.
@@ -869,7 +869,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     if (computeModeEnabled) {
-        if (!isStandalone || serverGlobalParams.clusterRole != ClusterRole::None) {
+        if (!isStandalone || !serverGlobalParams.clusterRole.has(ClusterRole::None)) {
             LOGV2_ERROR(6968200, "'enableComputeMode' can be used only in standalone server");
             exitCleanly(ExitCode::badOptions);
         }
@@ -895,9 +895,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     // Set up the logical session cache
     LogicalSessionCacheServer kind = LogicalSessionCacheServer::kStandalone;
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         kind = LogicalSessionCacheServer::kConfigServer;
-    } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+    } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         kind = LogicalSessionCacheServer::kSharded;
     } else if (replSettings.usingReplSets()) {
         kind = LogicalSessionCacheServer::kReplicaSet;
@@ -906,7 +906,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     LogicalSessionCache::set(serviceContext, makeLogicalSessionCacheD(kind));
 
     if (analyze_shard_key::supportsSamplingQueries(serviceContext, true /* ignoreFCV */) &&
-        serverGlobalParams.clusterRole == ClusterRole::None) {
+        serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onStartup();
     }
 
@@ -1131,7 +1131,7 @@ void startupConfigActions(const std::vector<std::string>& args) {
 }
 
 void setUpCollectionShardingState(ServiceContext* serviceContext) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         CollectionShardingStateFactory::set(
             serviceContext, std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
     } else {
@@ -1211,7 +1211,7 @@ void setUpReplication(ServiceContext* serviceContext) {
         SecureRandom().nextInt64());
     // Only create a ReplicaSetNodeExecutor if sharding is disabled and replication is enabled.
     // Note that sharding sets up its own executors for scheduling work to remote nodes.
-    if (serverGlobalParams.clusterRole == ClusterRole::None && replCoord->isReplEnabled())
+    if (serverGlobalParams.clusterRole.has(ClusterRole::None) && replCoord->isReplEnabled())
         ReplicaSetNodeProcessInterface::setReplicaSetNodeExecutor(
             serviceContext, makeReplicaSetNodeExecutor(serviceContext));
 
@@ -1231,7 +1231,7 @@ void setUpReplication(ServiceContext* serviceContext) {
 
 void setUpObservers(ServiceContext* serviceContext) {
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         DurableHistoryRegistry::get(serviceContext)
             ->registerPin(std::make_unique<ReshardingHistoryHook>());
         opObserverRegistry->addObserver(std::make_unique<OpObserverShardingImpl>(
@@ -1249,7 +1249,7 @@ void setUpObservers(ServiceContext* serviceContext) {
         }
     }
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
             opObserverRegistry->addObserver(
                 std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
@@ -1259,7 +1259,7 @@ void setUpObservers(ServiceContext* serviceContext) {
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
     }
 
-    if (serverGlobalParams.clusterRole == ClusterRole::None) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         opObserverRegistry->addObserver(
             std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
         opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationDonorOpObserver>());
@@ -1445,7 +1445,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         repl::ReplicationCoordinator::get(serviceContext)->shutdown(opCtx);
 
         // Terminate the index consistency check.
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             LOGV2_OPTIONS(4784904,
                           {LogComponent::kSharding},
                           "Shutting down the PeriodicShardedIndexConsistencyChecker");

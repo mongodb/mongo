@@ -710,7 +710,7 @@ bool TransactionParticipant::Participant::_verifyCanBeginMultiDocumentTransactio
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     "Only servers in a sharded cluster can start a new transaction at the active "
                     "transaction number",
-                    serverGlobalParams.clusterRole != ClusterRole::None);
+                    !serverGlobalParams.clusterRole.has(ClusterRole::None));
 
             if (_isInternalSessionForRetryableWrite() &&
                 o().txnState.isInSet(TransactionState::kCommitted)) {
@@ -942,7 +942,7 @@ void TransactionParticipant::Participant::beginOrContinue(
                 "Transactions are not allowed on shard servers when "
                 "writeConcernMajorityJournalDefault=false",
                 replCoord->getWriteConcernMajorityShouldJournal() ||
-                    serverGlobalParams.clusterRole != ClusterRole::ShardServer || !autocommit ||
+                    !serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) || !autocommit ||
                     getTestCommandsEnabled());
     }
 
@@ -987,7 +987,7 @@ void TransactionParticipant::Participant::beginOrContinue(
     if (txnNumberAndRetryCounter.getTxnRetryCounter()) {
         uassert(ErrorCodes::InvalidOptions,
                 "txnRetryCounter is only supported in sharded clusters",
-                serverGlobalParams.clusterRole != ClusterRole::None);
+                !serverGlobalParams.clusterRole.has(ClusterRole::None));
         invariant(*txnNumberAndRetryCounter.getTxnRetryCounter() >= 0,
                   "Cannot specify a negative txnRetryCounter");
     } else {

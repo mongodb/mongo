@@ -291,7 +291,7 @@ template <class ActualService>
 class ReplicaSetAwareServiceConfigSvr : public ReplicaSetAwareService<ActualService> {
 private:
     virtual bool shouldRegisterReplicaSetAwareService() const final {
-        return serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
+        return serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer);
     }
 };
 
@@ -303,7 +303,7 @@ template <class ActualService>
 class ReplicaSetAwareServiceShardSvr : public ReplicaSetAwareService<ActualService> {
 private:
     virtual bool shouldRegisterReplicaSetAwareService() const final {
-        return serverGlobalParams.clusterRole == ClusterRole::ShardServer;
+        return serverGlobalParams.clusterRole.has(ClusterRole::ShardServer);
     }
 };
 

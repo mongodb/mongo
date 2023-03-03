@@ -74,7 +74,7 @@ public:
 
             uassert(ErrorCodes::IllegalOperation,
                     "_shardsvrNotifyShardingEvent can only run on shard servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
             switch (request().getEventType()) {
                 case EventTypeEnum::kDatabasesAdded: {

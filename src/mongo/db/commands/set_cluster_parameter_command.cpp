@@ -78,7 +78,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::ErrorCodes::NotImplemented,
                     "setClusterParameter can only run on mongos in sharded clusters",
-                    (serverGlobalParams.clusterRole == ClusterRole::None));
+                    (serverGlobalParams.clusterRole.has(ClusterRole::None)));
 
             if (!feature_flags::gFeatureFlagAuditConfigClusterParameter.isEnabled(
                     serverGlobalParams.featureCompatibility)) {

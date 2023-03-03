@@ -69,7 +69,7 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << Request::kCommandName
                                   << " cannot be run on shardsvrs nor configsvrs",
-                    serverGlobalParams.clusterRole == ClusterRole::None);
+                    serverGlobalParams.clusterRole.has(ClusterRole::None));
 
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << Request::kCommandName << " cannot be run on standalones",

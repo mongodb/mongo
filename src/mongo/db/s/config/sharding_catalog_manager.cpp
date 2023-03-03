@@ -489,7 +489,7 @@ void ShardingCatalogManager::create(ServiceContext* serviceContext,
                                     std::unique_ptr<executor::TaskExecutor> addShardExecutor,
                                     std::shared_ptr<Shard> localConfigShard,
                                     std::unique_ptr<ShardingCatalogClient> localCatalogClient) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
     auto& shardingCatalogManager = getShardingCatalogManager(serviceContext);
     invariant(!shardingCatalogManager);
@@ -603,12 +603,12 @@ Status ShardingCatalogManager::upgradeConfigSettings(OperationContext* opCtx) {
 }
 
 ShardingCatalogClient* ShardingCatalogManager::localCatalogClient() {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     return _localCatalogClient.get();
 }
 
 const std::shared_ptr<Shard>& ShardingCatalogManager::localConfigShard() {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     return _localConfigShard;
 }
 

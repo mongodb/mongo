@@ -431,7 +431,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
     // featureCompatibilityVersion is the downgrade version, so that it can be safely added to a
     // downgrade version cluster. The config server will run setFeatureCompatibilityVersion as
     // part of addShard.
-    const bool storeUpgradeVersion = !serverGlobalParams.clusterRole.isExclusivelyShardRole();
+    const bool storeUpgradeVersion = !serverGlobalParams.clusterRole.exclusivelyHasShardRole();
 
     UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
     NamespaceString nss(NamespaceString::kServerConfigurationNamespace);

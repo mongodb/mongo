@@ -180,7 +180,7 @@ ReshardingCoordinatorCleaner::ReshardingCoordinatorCleaner(NamespaceString nss, 
     : ReshardingCleaner(NamespaceString::kConfigReshardingOperationsNamespace,
                         std::move(nss),
                         std::move(reshardingUUID)) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 }
 
 void ReshardingCoordinatorCleaner::_doClean(OperationContext* opCtx,
@@ -261,14 +261,14 @@ ReshardingDonorCleaner::ReshardingDonorCleaner(NamespaceString nss, UUID reshard
     : ReshardingCleaner(NamespaceString::kDonorReshardingOperationsNamespace,
                         std::move(nss),
                         std::move(reshardingUUID)) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 }
 
 ReshardingRecipientCleaner::ReshardingRecipientCleaner(NamespaceString nss, UUID reshardingUUID)
     : ReshardingCleaner(NamespaceString::kRecipientReshardingOperationsNamespace,
                         std::move(nss),
                         std::move(reshardingUUID)) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 }
 
 void ReshardingRecipientCleaner::_doClean(OperationContext* opCtx,

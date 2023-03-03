@@ -123,7 +123,7 @@ StatusWith<UUID> validateCollectionOptionsOnPrimaryShard(OperationContext* opCtx
 }
 
 StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
-    if (serverGlobalParams.clusterRole == ClusterRole::None) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         return validateCollectionOptionsLocally(opCtx, nss);
     }
     return validateCollectionOptionsOnPrimaryShard(opCtx, nss);
@@ -147,7 +147,7 @@ public:
                     !gMultitenancySupport);
             uassert(ErrorCodes::IllegalOperation,
                     "configQueryAnalyzer command is not supported on a shardsvr mongod",
-                    !serverGlobalParams.clusterRole.isExclusivelyShardRole());
+                    !serverGlobalParams.clusterRole.exclusivelyHasShardRole());
 
             const auto& nss = ns();
             const auto mode = request().getMode();

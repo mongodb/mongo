@@ -142,7 +142,7 @@ void QueryAnalysisCoordinator::Sampler::resetLastNumQueriesExecutedPerSecond() {
 }
 
 void QueryAnalysisCoordinator::onSamplerInsert(const BSONObj& doc) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     stdx::lock_guard<Latch> lk(_mutex);
 
     auto mongosDoc = uassertStatusOK(MongosType::fromBSON(doc));
@@ -154,7 +154,7 @@ void QueryAnalysisCoordinator::onSamplerInsert(const BSONObj& doc) {
 }
 
 void QueryAnalysisCoordinator::onSamplerUpdate(const BSONObj& doc) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     stdx::lock_guard<Latch> lk(_mutex);
 
     auto mongosDoc = uassertStatusOK(MongosType::fromBSON(doc));
@@ -168,7 +168,7 @@ void QueryAnalysisCoordinator::onSamplerUpdate(const BSONObj& doc) {
 }
 
 void QueryAnalysisCoordinator::onSamplerDelete(const BSONObj& doc) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     stdx::lock_guard<Latch> lk(_mutex);
 
     auto mongosDoc = uassertStatusOK(MongosType::fromBSON(doc));
@@ -199,7 +199,7 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
         }
     }
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         invariant(_samplers.empty());
 
         auto minPingTime = _getMinLastPingTime();
@@ -216,7 +216,7 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
 }
 
 void QueryAnalysisCoordinator::onSetCurrentConfig(OperationContext* opCtx) {
-    if (serverGlobalParams.clusterRole == ClusterRole::None) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         stdx::lock_guard<Latch> lk(_mutex);
 
         StringMap<Sampler> samplers;

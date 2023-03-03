@@ -152,7 +152,7 @@ std::unique_ptr<ShardRegistry> ShardingMongodTestFixture::makeShardRegistry(
         {ConnectionString::ConnectionType::kStandalone, std::move(standaloneBuilder)}};
 
     // Only config servers use ShardLocal for now.
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         ShardFactory::BuilderCallable localBuilder = [](const ShardId& shardId,
                                                         const ConnectionString& connStr) {
             return std::make_unique<ShardLocal>(shardId);
@@ -184,8 +184,8 @@ std::unique_ptr<CatalogCache> ShardingMongodTestFixture::makeCatalogCache() {
 
 Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
     const ConnectionString& configConnStr) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
-              serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
+              serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
     // Create and initialize each sharding component individually before moving them to the Grid
     // in order to control the order of initialization, since some components depend on others.

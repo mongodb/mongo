@@ -96,7 +96,7 @@ bool ShardingState::enabled() const {
 }
 
 Status ShardingState::canAcceptShardedCommands() const {
-    if (!serverGlobalParams.clusterRole.isShardRole()) {
+    if (!serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         return {ErrorCodes::NoShardingEnabled,
                 "Cannot accept sharding commands if node does not have shard role"};
     }

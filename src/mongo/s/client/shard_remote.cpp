@@ -315,7 +315,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
 
 Milliseconds getExhaustiveFindOnConfigMaxTimeMS(OperationContext* opCtx,
                                                 const NamespaceString& nss) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         // Don't use a timeout on the config server to guarantee it can always refresh.
         return Milliseconds::max();
     }

@@ -129,7 +129,7 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
         invariant(helloResponse->getTopologyVersion());
 
         // Only shard servers will respond with the isImplicitDefaultMajorityWC field.
-        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
             result->append(HelloCommandReply::kIsImplicitDefaultMajorityWCFieldName,
                            replCoord->getConfig().isImplicitDefaultWriteConcernMajority());
 
@@ -480,7 +480,7 @@ public:
 
         timerGuard.reset();  // Resume curOp timer.
 
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             constexpr int kConfigServerModeNumber = 2;
             result.append(HelloCommandReply::kConfigsvrFieldName, kConfigServerModeNumber);
         }

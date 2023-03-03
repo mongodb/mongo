@@ -53,7 +53,7 @@ public:
                     !gMultitenancySupport);
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << kStageName << " is not supported on a configsvr mongod",
-                    !serverGlobalParams.clusterRole.isExclusivelyConfigSvrRole());
+                    !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
             uassert(6875700,
                     str::stream() << kStageName
                                   << " must take a nested object but found: " << specElem,

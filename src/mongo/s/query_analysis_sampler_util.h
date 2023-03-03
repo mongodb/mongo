@@ -121,7 +121,7 @@ boost::optional<UUID> getOrGenerateSampleId(OperationContext* opCtx,
     if (!supportsPersistingSampledQueries(opCtx)) {
         return boost::none;
     }
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         const auto isInternalClient = !opCtx->getClient()->session() ||
             (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
         uassert(ErrorCodes::InvalidOptions,
@@ -129,7 +129,7 @@ boost::optional<UUID> getOrGenerateSampleId(OperationContext* opCtx,
                 !request.getSampleId() || (isInternalClient || getTestCommandsEnabled()));
         return request.getSampleId();
     }
-    if (serverGlobalParams.clusterRole == ClusterRole::None) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         uassert(ErrorCodes::InvalidOptions,
                 "Cannot specify 'sampleRate' since it is an internal field",
                 !request.getSampleId());

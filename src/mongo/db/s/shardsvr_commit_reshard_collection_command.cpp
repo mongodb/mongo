@@ -62,7 +62,7 @@ public:
 
             uassert(ErrorCodes::IllegalOperation,
                     "_shardsvrCommitReshardCollection can only be run on shard servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 

@@ -120,7 +120,7 @@ GetClusterParameterInvocation::Reply GetClusterParameterInvocation::getCachedPar
     auto* repl = repl::ReplicationCoordinator::get(opCtx);
     bool isStandalone = repl &&
         repl->getReplicationMode() == repl::ReplicationCoordinator::modeNone &&
-        serverGlobalParams.clusterRole == ClusterRole::None;
+        serverGlobalParams.clusterRole.has(ClusterRole::None);
 
     auto [parameterNames, parameterValues] =
         retrieveRequestedParameters(opCtx, cmdBody, request.getDbName().tenantId(), isStandalone);

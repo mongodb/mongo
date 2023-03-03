@@ -145,7 +145,7 @@ public:
         // To calculate the number of sharded collection we simply get the number of records from
         // `config.collections` collection. This count must only be appended when serverStatus is
         // invoked on the config server.
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             AutoGetCollectionForReadLockFree autoColl(opCtx, CollectionType::ConfigNS);
             const auto& collection = autoColl.getCollection();
             const auto numShardedCollections = collection ? collection->numRecords(opCtx) : 0;

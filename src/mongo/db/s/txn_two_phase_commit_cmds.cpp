@@ -87,7 +87,7 @@ public:
 
         Response typedRun(OperationContext* opCtx) {
             if (!getTestCommandsEnabled() &&
-                serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+                !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
                 uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
             }
 
@@ -256,7 +256,7 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             // Only config servers or initialized shard servers can act as transaction coordinators.
-            if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+            if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
                 uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
             }
 

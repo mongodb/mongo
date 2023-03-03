@@ -121,7 +121,7 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     // Instantiate the right custom TXN client to ensure that the queries to the config DB will be
     // routed to the CSRS.
     auto customTxnClient = [&]() -> std::unique_ptr<txn_api::TransactionClient> {
-        if (serverGlobalParams.clusterRole.isExclusivelyShardRole()) {
+        if (serverGlobalParams.clusterRole.exclusivelyHasShardRole()) {
             return std::make_unique<txn_api::details::SEPTransactionClient>(
                 opCtx,
                 executor,
@@ -129,7 +129,7 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
                     opCtx->getServiceContext()));
         }
 
-        invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+        invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
         return nullptr;
     }();
 
@@ -552,7 +552,7 @@ bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx
                                                          ShardingCatalogClient* catalogClient,
                                                          const NamespaceString& nss,
                                                          const WriteConcernOptions& writeConcern) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
 
     ON_BLOCK_EXIT(
@@ -576,7 +576,7 @@ void shardedRenameMetadata(OperationContext* opCtx,
                            CollectionType& fromCollType,
                            const NamespaceString& toNss,
                            const WriteConcernOptions& writeConcern) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
     auto fromNss = fromCollType.getNss();
     auto fromUUID = fromCollType.getUuid();

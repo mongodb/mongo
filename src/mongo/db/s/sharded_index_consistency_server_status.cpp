@@ -37,7 +37,7 @@ namespace mongo {
 namespace {
 
 bool isConfigServerWithShardedIndexConsistencyCheckEnabled() {
-    return serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+    return serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
         enableShardedIndexConsistencyCheck.load();
 }
 

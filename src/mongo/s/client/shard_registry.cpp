@@ -424,7 +424,7 @@ std::unique_ptr<Shard> ShardRegistry::createConnection(const ConnectionString& c
 }
 
 std::shared_ptr<Shard> ShardRegistry::createLocalConfigShard() const {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     return _shardFactory->createShard(ShardId::kConfigServerId, ConnectionString::forLocal());
 }
 

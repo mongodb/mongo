@@ -85,7 +85,7 @@ public:
 
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrCleanupReshardCollection can only be run on config servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);

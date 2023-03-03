@@ -71,7 +71,7 @@ bool isChangeStreamEnabled(OperationContext* opCtx, const TenantId& tenantId) {
 
 bool canInitializeServices() {
     // A change collection must not be enabled on the config server.
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         return false;
     }
 

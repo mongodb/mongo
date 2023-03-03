@@ -220,7 +220,7 @@ Status initializeGlobalShardingState(
 }
 
 void loadCWWCFromConfigServerForReplication(OperationContext* opCtx) {
-    if (!serverGlobalParams.clusterRole.isExclusivelyShardRole()) {
+    if (!serverGlobalParams.clusterRole.exclusivelyHasShardRole()) {
         // Cluster wide read/write concern in a sharded cluster lives on the config server, so a
         // config server node's local cache will be correct and explicitly checking for a default
         // write concern via remote command is unnecessary.
@@ -245,7 +245,7 @@ Status loadGlobalSettingsFromConfigServer(OperationContext* opCtx,
             // inserting a cluster id and adding a shard, there is at least one majority write on
             // the added shard (dropping the sessions collection), so we should be guaranteed the
             // cluster id cannot roll back.
-            auto readConcern = serverGlobalParams.clusterRole == ClusterRole::ConfigServer
+            auto readConcern = serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)
                 ? repl::ReadConcernLevel::kLocalReadConcern
                 : repl::ReadConcernLevel::kMajorityReadConcern;
             uassertStatusOK(ClusterIdentityLoader::get(opCtx)->loadClusterId(
@@ -278,7 +278,7 @@ void preCacheMongosRoutingInfo(OperationContext* opCtx) {
     // mongos, and we'd need to consider the implications of it running on either kind of mongod.
     tassert(71960,
             "Unexpectedly pre caching mongos routing info on shard or config server node",
-            serverGlobalParams.clusterRole == ClusterRole::None);
+            serverGlobalParams.clusterRole.has(ClusterRole::None));
 
     auto grid = Grid::get(opCtx);
     auto catalogClient = grid->catalogClient();
@@ -308,7 +308,7 @@ Status preWarmConnectionPool(OperationContext* opCtx) {
     // mongos, and we'd need to consider the implications of it running on either kind of mongod.
     tassert(71961,
             "Unexpectedly pre warming connection pool on shard or config server node",
-            serverGlobalParams.clusterRole == ClusterRole::None);
+            serverGlobalParams.clusterRole.has(ClusterRole::None));
 
     std::vector<HostAndPort> allHosts;
     auto const grid = Grid::get(opCtx);

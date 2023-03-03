@@ -140,7 +140,7 @@ public:
         Reply typedRun(OperationContext* opCtx) final {
             auto dbName = request().getDbName();
             // disallow dropping the config database
-            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+            if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
                 (dbName == DatabaseName::kConfig)) {
                 uasserted(ErrorCodes::IllegalOperation,
                           "Cannot drop 'config' database if mongod started "

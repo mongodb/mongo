@@ -812,10 +812,11 @@ Status runAggregate(OperationContext* opCtx,
             }
 
             // Assert that a change stream on the config server is always opened on the oplog.
-            tassert(6763400,
-                    str::stream() << "Change stream was unexpectedly opened on the namespace: "
-                                  << nss << " in the config server",
-                    serverGlobalParams.clusterRole != ClusterRole::ConfigServer || nss.isOplog());
+            tassert(
+                6763400,
+                str::stream() << "Change stream was unexpectedly opened on the namespace: " << nss
+                              << " in the config server",
+                !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) || nss.isOplog());
 
             // Upgrade and wait for read concern if necessary.
             _adjustChangeStreamReadConcern(opCtx);
@@ -925,7 +926,7 @@ Status runAggregate(OperationContext* opCtx,
             // Set this operation's shard version for the underlying collection to unsharded.
             // This is prerequisite for future shard versioning checks.
             boost::optional<ScopedSetShardRole> scopeSetShardRole;
-            if (serverGlobalParams.clusterRole != ClusterRole::None) {
+            if (!serverGlobalParams.clusterRole.has(ClusterRole::None)) {
                 scopeSetShardRole.emplace(opCtx,
                                           resolvedView.getNamespace(),
                                           ShardVersion::UNSHARDED() /* shardVersion */,

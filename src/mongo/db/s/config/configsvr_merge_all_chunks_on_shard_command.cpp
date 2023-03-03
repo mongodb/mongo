@@ -75,7 +75,7 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << Request::kCommandName
                                   << " can only be run on the config server",
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             // Set read concern level to local for reads into the config database
             repl::ReadConcernArgs::get(opCtx) =

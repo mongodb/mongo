@@ -101,7 +101,7 @@ Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement
     auto* repl = repl::ReplicationCoordinator::get(getGlobalServiceContext());
     bool isStandalone = repl &&
         repl->getReplicationMode() == repl::ReplicationCoordinator::modeNone &&
-        serverGlobalParams.clusterRole == ClusterRole::None;
+        serverGlobalParams.clusterRole.has(ClusterRole::None);
     if (isStandalone) {
         return {ErrorCodes::IllegalOperation,
                 "The 'changeStreamOptions' parameter is unsupported in standalone."};

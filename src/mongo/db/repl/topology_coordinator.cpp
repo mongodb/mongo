@@ -2596,7 +2596,8 @@ MemberState TopologyCoordinator::getMemberState() const {
     }
 
     if (_rsConfig.getConfigServer()) {
-        if (_options.clusterRole != ClusterRole::ConfigServer && !skipShardingConfigurationChecks) {
+        if (!_options.clusterRole.has(ClusterRole::ConfigServer) &&
+            !skipShardingConfigurationChecks) {
             return MemberState::RS_REMOVED;
         } else {
             invariant(_storageEngineSupportsReadCommitted != ReadCommittedSupport::kUnknown);
@@ -2605,7 +2606,8 @@ MemberState TopologyCoordinator::getMemberState() const {
             }
         }
     } else {
-        if (_options.clusterRole == ClusterRole::ConfigServer && !skipShardingConfigurationChecks) {
+        if (_options.clusterRole.has(ClusterRole::ConfigServer) &&
+            !skipShardingConfigurationChecks) {
             return MemberState::RS_REMOVED;
         }
     }

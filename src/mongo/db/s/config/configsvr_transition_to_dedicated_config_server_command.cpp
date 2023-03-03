@@ -97,7 +97,7 @@ public:
 
         uassert(ErrorCodes::IllegalOperation,
                 "_configsvrTransitionToDedicatedConfigServer can only be run on config servers",
-                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
         CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
 
         auto shardingState = ShardingState::get(opCtx);

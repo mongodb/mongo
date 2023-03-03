@@ -51,7 +51,7 @@ public:
 
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrGetHistoricalPlacement can only be run on config servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             // Set the operation context read concern level to majority for reads into the config
             // database.

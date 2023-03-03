@@ -56,8 +56,8 @@ public:
                         serverGlobalParams.featureCompatibility));
             uassert(ErrorCodes::IllegalOperation,
                     "Shard split is not available on config servers",
-                    serverGlobalParams.clusterRole == ClusterRole::None ||
-                        serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::None) ||
+                        serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
             uassert(ErrorCodes::CommandNotSupported,
                     "Shard split is only supported in serverless mode",
                     getGlobalReplSettings().isServerless());

@@ -70,7 +70,7 @@ public:
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
                     "The autoSplitVector command can only be invoked on shards (no CSRS).",
-                    serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();

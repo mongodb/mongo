@@ -935,25 +935,22 @@ TEST(SetupOptions, ForkOptionAlwaysFalseWithNoforkEnvVar) {
 #endif
 
 TEST(ClusterRole, Equality) {
-    ASSERT_TRUE(ClusterRole(ClusterRole::None) == ClusterRole::None);
-    ASSERT_TRUE(ClusterRole(ClusterRole::None) != ClusterRole::ConfigServer);
-    ASSERT_TRUE(ClusterRole(ClusterRole::None) != ClusterRole::ShardServer);
+    ASSERT_TRUE(ClusterRole(ClusterRole::None).has(ClusterRole::None));
+    ASSERT_TRUE(!ClusterRole(ClusterRole::None).has(ClusterRole::ConfigServer));
+    ASSERT_TRUE(!ClusterRole(ClusterRole::None).has(ClusterRole::ShardServer));
 
-    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) != ClusterRole::None);
-    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) == ClusterRole::ConfigServer);
-    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) == ClusterRole::ShardServer);
+    ASSERT_TRUE(!ClusterRole(ClusterRole::ConfigServer).has(ClusterRole::None));
+    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer).has(ClusterRole::ConfigServer));
+    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer).has(ClusterRole::ShardServer));
 
-    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) != ClusterRole::None);
-    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) != ClusterRole::ConfigServer);
-    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) == ClusterRole::ShardServer);
+    ASSERT_TRUE(!ClusterRole(ClusterRole::ShardServer).has(ClusterRole::None));
+    ASSERT_TRUE(!ClusterRole(ClusterRole::ShardServer).has(ClusterRole::ConfigServer));
+    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer).has(ClusterRole::ShardServer));
 
-    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer).isShardRole());
-    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer).isShardRole());
+    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer).exclusivelyHasShardRole());
+    ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).exclusivelyHasShardRole());
 
-    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer).isExclusivelyShardRole());
-    ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).isExclusivelyShardRole());
-
-    ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).isExclusivelyConfigSvrRole());
+    ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).exclusivelyHasConfigRole());
 }
 
 #if !defined(_WIN32) && !(defined(__APPLE__) && TARGET_OS_TV)

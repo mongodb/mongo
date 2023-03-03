@@ -62,7 +62,7 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
                            serverParameter,
                            parameterName,
                            tenantId,
-                           serverGlobalParams.clusterRole.isExclusivelyShardRole());
+                           serverGlobalParams.clusterRole.exclusivelyHasShardRole());
 
     BSONObjBuilder oldValueBob;
     serverParameter->append(opCtx, &oldValueBob, parameterName.toString(), tenantId);

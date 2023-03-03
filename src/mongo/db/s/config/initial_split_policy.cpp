@@ -777,8 +777,8 @@ SamplingBasedSplitPolicy::_makePipelineDocumentSource(OperationContext* opCtx,
     resolvedNamespaces[ns.coll()] = {ns, std::vector<BSONObj>{}};
 
     auto pi = [&]() -> std::shared_ptr<MongoProcessInterface> {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
-            serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
+            serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
             // For the pipeline to be dispatched to shards, the ShardServerProcessInterface must be
             // used. However, the generic factory would only return a ShardServerProcessInterface
             // if the mongod is a shardsvr and the connection is internal. That is, if the mongod is
