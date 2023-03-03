@@ -164,7 +164,6 @@ void OplogApplierImplTest::setUp() {
 
     serviceContext = getServiceContext();
     _opCtx = cc().makeOperationContext();
-    std::cout << "XFA OpCtx upon create: " << _opCtx.get()->getOpID() << "\n";
 
     ReplicationCoordinator::set(serviceContext,
                                 std::make_unique<ReplicationCoordinatorMock>(serviceContext));
@@ -205,7 +204,6 @@ void OplogApplierImplTest::setUp() {
 
 void OplogApplierImplTest::tearDown() {
     HealthLogInterface::get(serviceContext)->shutdown();
-    std::cout << "XFA Resetting opCtx with id: " << _opCtx.get()->getOpID() << "\n";
     _opCtx.reset();
     _consistencyMarkers = {};
     DropPendingCollectionReaper::set(serviceContext, {});
