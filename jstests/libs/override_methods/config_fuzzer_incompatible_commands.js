@@ -15,6 +15,14 @@ function runCommandOverride(conn, dbName, commandName, commandObj, func, makeFun
             tojson(commandObj));
     }
 
+    if (commandName == "emptycapped") {
+        // The emptycapped command is a test only command, so we do not expect users to run it with
+        // different WiredTiger configurations on mongod.
+        throw new Error(
+            "Cowardly refusing to run test that uses command 'emptycapped' with the config fuzzer enabled. " +
+            tojson(commandObj));
+    }
+
     const serverResponse = func.apply(conn, makeFuncArgs(commandObj));
     return serverResponse;
 }
