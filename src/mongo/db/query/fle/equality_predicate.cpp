@@ -106,21 +106,33 @@ template <typename PayloadT>
 boost::intrusive_ptr<ExpressionInternalFLEEqual> generateFleEqualMatch(StringData path,
                                                                        const PayloadT& ffp,
                                                                        ExpressionContext* expCtx) {
-    // Generate { $_internalFleEq: { field: "$field_name", server: f_3, counter: cm, edc: k_EDC]  }
-    // }
     auto tokens = ParsedFindEqualityPayload(ffp);
 
-    uassert(6672401,
-            "Missing required field server encryption token in find payload",
-            tokens.serverToken.has_value());
+    // TODO: SERVER-73303 refactor when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        // Generate { $_internalFleEq: { field: "$field_name", server: f_3, counter: cm, edc: k_EDC]
+        // }
+        // }
+        uassert(6672401,
+                "Missing required field server encryption token in find payload",
+                tokens.serverToken.has_value());
 
+        return make_intrusive<ExpressionInternalFLEEqual>(
+            expCtx,
+            ExpressionFieldPath::createPathFromString(
+                expCtx, path.toString(), expCtx->variablesParseState),
+            tokens.serverToken.value().data,
+            tokens.maxCounter.value_or(0LL),
+            tokens.edcToken.data);
+    }
+
+    // Generate { $_internalFleEq: { field: "$field_name", server:  F_s[ f, 2, v, 2 ] }
     return make_intrusive<ExpressionInternalFLEEqual>(
         expCtx,
         ExpressionFieldPath::createPathFromString(
             expCtx, path.toString(), expCtx->variablesParseState),
-        tokens.serverToken.value().data,
-        tokens.maxCounter.value_or(0LL),
-        tokens.edcToken.data);
+        FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(
+            tokens.serverDataDerivedToken));
 }
 
 
@@ -128,20 +140,32 @@ template <typename PayloadT>
 std::unique_ptr<ExpressionInternalFLEEqual> generateFleEqualMatchUnique(StringData path,
                                                                         const PayloadT& ffp,
                                                                         ExpressionContext* expCtx) {
-    // Generate { $_internalFleEq: { field: "$field_name", server: f_3, counter: cm, edc: k_EDC] } }
     auto tokens = ParsedFindEqualityPayload(ffp);
 
-    uassert(6672419,
-            "Missing required field server encryption token in find payload",
-            tokens.serverToken.has_value());
+    // TODO: SERVER-73303 refactor when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        // Generate { $_internalFleEq: { field: "$field_name", server: f_3, counter: cm, edc: k_EDC]
+        // } }
+        uassert(6672419,
+                "Missing required field server encryption token in find payload",
+                tokens.serverToken.has_value());
 
+        return std::make_unique<ExpressionInternalFLEEqual>(
+            expCtx,
+            ExpressionFieldPath::createPathFromString(
+                expCtx, path.toString(), expCtx->variablesParseState),
+            tokens.serverToken.value().data,
+            tokens.maxCounter.value_or(0LL),
+            tokens.edcToken.data);
+    }
+
+    // Generate { $_internalFleEq: { field: "$field_name", server:  F_s[ f, 2, v, 2 ] }
     return std::make_unique<ExpressionInternalFLEEqual>(
         expCtx,
         ExpressionFieldPath::createPathFromString(
             expCtx, path.toString(), expCtx->variablesParseState),
-        tokens.serverToken.value().data,
-        tokens.maxCounter.value_or(0LL),
-        tokens.edcToken.data);
+        FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(
+            tokens.serverDataDerivedToken));
 }
 
 std::unique_ptr<MatchExpression> generateFleEqualMatchAndExpr(StringData path,

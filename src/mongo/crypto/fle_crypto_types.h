@@ -238,7 +238,6 @@ using ServerCountAndContentionFactorEncryptionToken =
     FLEToken<FLETokenType::ServerCountAndContentionFactorEncryptionToken>;
 using ServerZerosEncryptionToken = FLEToken<FLETokenType::ServerZerosEncryptionToken>;
 
-
 /**
  * A pair of a (ESCDerivedFromDataTokenAndContentionFactorToken, optional
  * EDCDerivedFromDataTokenAndContentionFactorToken) that will be used to lookup a count for the ESC

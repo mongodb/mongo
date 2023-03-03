@@ -100,17 +100,36 @@ std::unique_ptr<ExpressionInternalFLEBetween> RangePredicate::fleBetweenFromPayl
     tassert(7030501,
             "$internalFleBetween can only be generated from a non-stub payload.",
             !payload.isStub());
-    auto cm = payload.maxCounter;
-    ServerDataEncryptionLevel1Token serverToken = std::move(payload.serverToken);
-    std::vector<ConstDataRange> edcTokens;
-    std::transform(std::make_move_iterator(payload.edges.value().begin()),
-                   std::make_move_iterator(payload.edges.value().end()),
-                   std::back_inserter(edcTokens),
-                   [](FLEFindEdgeTokenSet&& edge) { return edge.edc.toCDR(); });
+    // TODO: SERVER-73303 refactor when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        auto cm = payload.maxCounter;
+        ServerDataEncryptionLevel1Token serverToken = std::move(payload.serverToken);
+        std::vector<ConstDataRange> edcTokens;
+        std::transform(std::make_move_iterator(payload.edges.value().begin()),
+                       std::make_move_iterator(payload.edges.value().end()),
+                       std::back_inserter(edcTokens),
+                       [](FLEFindEdgeTokenSet&& edge) { return edge.edc.toCDR(); });
+
+        auto* expCtx = _rewriter->getExpressionContext();
+        return std::make_unique<ExpressionInternalFLEBetween>(
+            expCtx, fieldpath, serverToken.toCDR(), cm, std::move(edcTokens));
+    }
+
+    std::vector<ServerZerosEncryptionToken> serverZerosTokens;
+    serverZerosTokens.reserve(payload.edges.value().size());
+
+    std::transform(
+        std::make_move_iterator(payload.edges.value().begin()),
+        std::make_move_iterator(payload.edges.value().end()),
+        std::back_inserter(serverZerosTokens),
+        [](FLEFindEdgeTokenSet&& edge) {
+            return FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(
+                edge.server);
+        });
 
     auto* expCtx = _rewriter->getExpressionContext();
     return std::make_unique<ExpressionInternalFLEBetween>(
-        expCtx, fieldpath, serverToken.toCDR(), cm, std::move(edcTokens));
+        expCtx, fieldpath, std::move(serverZerosTokens));
 }
 
 std::vector<PrfBlock> RangePredicate::generateTags(BSONValue payload) const {

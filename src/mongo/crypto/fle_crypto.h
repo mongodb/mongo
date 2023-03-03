@@ -1045,7 +1045,7 @@ struct FLE2TagAndEncryptedMetadataBlock {
      * Decrypts and returns only the zeros blob from the serialized
      * FLE2TagAndEncryptedMetadataBlock in serializedBlock.
      */
-    static StatusWith<ZerosBlob> decryptZerosBlob(ServerDerivedFromDataToken token,
+    static StatusWith<ZerosBlob> decryptZerosBlob(ServerZerosEncryptionToken token,
                                                   ConstDataRange serializedBlock);
 
     static bool isValidZerosBlob(const ZerosBlob& blob);

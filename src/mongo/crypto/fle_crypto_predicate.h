@@ -51,12 +51,14 @@
 
 namespace mongo {
 
-
+// TODO: SERVER-73303 delete class when v2 is enabled by default
 class EncryptedPredicateEvaluator {
 public:
     EncryptedPredicateEvaluator(ConstDataRange serverToken,
                                 int64_t contentionFactor,
                                 std::vector<ConstDataRange> edcTokens);
+
+    EncryptedPredicateEvaluator() {}
 
     /**
      * Evaluates an encrypted predicate (equality or range), as defined by a contention factor along
@@ -86,6 +88,30 @@ private:
     std::vector<PrfBlock> _edcTokens;
     int64_t _contentionFactor;
     stdx::unordered_set<PrfBlock> _cachedEDCTokens;
+};
+
+class EncryptedPredicateEvaluatorV2 {
+public:
+    EncryptedPredicateEvaluatorV2(std::vector<ServerZerosEncryptionToken> zerosTokens);
+
+    EncryptedPredicateEvaluatorV2() {}
+
+    /**
+     * Evaluates an encrypted predicate (equality or range) over an encrypted value.
+     *
+     * Returns a boolean indicator.
+     */
+    bool evaluate(
+        Value fieldValue,
+        EncryptedBinDataType indexedValueType,
+        std::function<std::vector<ConstDataRange>(ConstDataRange)> extractMetadataBlocks) const;
+
+    std::vector<ServerZerosEncryptionToken> zerosDecryptionTokens() const {
+        return _zerosDecryptionTokens;
+    }
+
+private:
+    std::vector<ServerZerosEncryptionToken> _zerosDecryptionTokens;
 };
 
 }  // namespace mongo

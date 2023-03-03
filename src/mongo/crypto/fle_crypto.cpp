@@ -3746,7 +3746,10 @@ StatusWith<FLE2TagAndEncryptedMetadataBlock> FLE2TagAndEncryptedMetadataBlock::d
         return swTag.getStatus();
     }
 
-    auto swZeros = decryptZerosBlob(token, serializedBlock);
+    auto zerosEncryptionToken =
+        FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(token);
+
+    auto swZeros = decryptZerosBlob(zerosEncryptionToken, serializedBlock);
 
     auto countEncryptionToken = FLEServerMetadataEncryptionTokenGenerator::
         generateServerCountAndContentionFactorEncryptionToken(token);
@@ -3773,7 +3776,7 @@ StatusWith<PrfBlock> FLE2TagAndEncryptedMetadataBlock::parseTag(ConstDataRange s
 }
 
 StatusWith<FLE2TagAndEncryptedMetadataBlock::ZerosBlob>
-FLE2TagAndEncryptedMetadataBlock::decryptZerosBlob(ServerDerivedFromDataToken token,
+FLE2TagAndEncryptedMetadataBlock::decryptZerosBlob(ServerZerosEncryptionToken zerosEncryptionToken,
                                                    ConstDataRange serializedBlock) {
     ConstDataRangeCursor blobCdrc(serializedBlock);
 
@@ -3785,9 +3788,6 @@ FLE2TagAndEncryptedMetadataBlock::decryptZerosBlob(ServerDerivedFromDataToken to
     if (!swZerosBlob.isOK()) {
         return swZerosBlob.getStatus();
     }
-
-    auto zerosEncryptionToken =
-        FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(token);
 
     auto swDecryptedZeros =
         FLEUtil::decryptData(zerosEncryptionToken.toCDR(), ConstDataRange(swZerosBlob.getValue()));
@@ -5846,6 +5846,39 @@ bool EncryptedPredicateEvaluator::evaluate(
         std::make_move_iterator(tokens.begin()),
         std::make_move_iterator(tokens.end()),
         [this](auto&& token) { return _cachedEDCTokens.count(std::move(token.data)) == 1; });
+}
+
+EncryptedPredicateEvaluatorV2::EncryptedPredicateEvaluatorV2(
+    std::vector<ServerZerosEncryptionToken> zerosTokens)
+    : _zerosDecryptionTokens(std::move(zerosTokens)){};
+
+bool EncryptedPredicateEvaluatorV2::evaluate(
+    Value fieldValue,
+    EncryptedBinDataType indexedValueType,
+    std::function<std::vector<ConstDataRange>(ConstDataRange)> extractMetadataBlocks) const {
+
+    if (fieldValue.getType() != BinData) {
+        return false;
+    }
+
+    auto [subSubType, data] = fromEncryptedBinData(fieldValue);
+
+    uassert(7399501, "Invalid encrypted indexed field", subSubType == indexedValueType);
+
+    auto metadataBlocks = extractMetadataBlocks(data);
+
+    for (const auto& zeroDecryptionToken : _zerosDecryptionTokens) {
+        for (auto metadataBlock : metadataBlocks) {
+            auto swZerosBlob = FLE2TagAndEncryptedMetadataBlock::decryptZerosBlob(
+                zeroDecryptionToken, metadataBlock);
+            uassertStatusOK(swZerosBlob);
+            if (FLE2TagAndEncryptedMetadataBlock::isValidZerosBlob(swZerosBlob.getValue())) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 // Edges

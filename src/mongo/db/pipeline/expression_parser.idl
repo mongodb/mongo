@@ -32,7 +32,7 @@ imports:
     - "mongo/db/basic_types.idl"
 
 structs:
-
+    # TODO: SERVER-73303 remove when v2 is enabled by default
     InternalFleEqStruct:
         description: "Struct for $_internalFleEq"
         strict: true
@@ -57,6 +57,20 @@ structs:
               gte: 0
               lt: 10000
 
+    InternalFleEqStructV2:
+        description: "Struct for $_internalFleEq"
+        strict: true
+        fields:
+          field:
+            description: "Expression"
+            type: IDLAnyType
+            cpp_name: field
+          server:
+            description: "ServerZerosEncryptionToken"
+            type: bindata_encrypt
+            cpp_name: serverZerosEncryptionToken
+
+    # TODO: SERVER-73303 remove when v2 is enabled by default
     InternalFleBetweenStruct:
         description: "Struct for $_internalFleBetween"
         strict: true
@@ -78,4 +92,15 @@ structs:
             type: long
             cpp_name: maxCounter
 
-
+    InternalFleBetweenStructV2:
+        description: "Struct for $_internalFleBetween"
+        strict: true
+        fields:
+          field:
+            description: "Expression"
+            type: IDLAnyType
+            cpp_name: field
+          server:
+            description: "ServerZerosEncryptionTokens"
+            type: array<bindata_encrypt>
+            cpp_name: serverZerosEncryptionTokens

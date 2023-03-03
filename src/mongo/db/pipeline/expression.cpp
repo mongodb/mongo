@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/expression.h"
@@ -3904,6 +3903,13 @@ ExpressionInternalFLEEqual::ExpressionInternalFLEEqual(ExpressionContext* const 
     expCtx->sbeCompatible = false;
 }
 
+ExpressionInternalFLEEqual::ExpressionInternalFLEEqual(ExpressionContext* const expCtx,
+                                                       boost::intrusive_ptr<Expression> field,
+                                                       ServerZerosEncryptionToken zerosToken)
+    : Expression(expCtx, {std::move(field)}), _evaluatorV2({std::move(zerosToken)}) {
+    expCtx->sbeCompatible = false;
+}
+
 REGISTER_STABLE_EXPRESSION(_internalFleEq, ExpressionInternalFLEEqual::parse);
 
 intrusive_ptr<Expression> ExpressionInternalFLEEqual::parse(ExpressionContext* const expCtx,
@@ -3911,29 +3917,47 @@ intrusive_ptr<Expression> ExpressionInternalFLEEqual::parse(ExpressionContext* c
                                                             const VariablesParseState& vps) {
 
     IDLParserContext ctx(kInternalFleEq);
-    auto fleEq = InternalFleEqStruct::parse(ctx, expr.Obj());
+
+    // TODO: SERVER-73303 remove when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        auto fleEq = InternalFleEqStruct::parse(ctx, expr.Obj());
+
+        auto fieldExpr = Expression::parseOperand(expCtx, fleEq.getField().getElement(), vps);
+
+        auto serverTokenPair = fromEncryptedConstDataRange(fleEq.getServerEncryptionToken());
+
+        uassert(6762901,
+                "Invalid server token",
+                serverTokenPair.first == EncryptedBinDataType::kFLE2TransientRaw &&
+                    serverTokenPair.second.length() == sizeof(PrfBlock));
+
+        auto edcTokenPair = fromEncryptedConstDataRange(fleEq.getEdcDerivedToken());
+
+        uassert(6762902,
+                "Invalid edc token",
+                edcTokenPair.first == EncryptedBinDataType::kFLE2TransientRaw &&
+                    edcTokenPair.second.length() == sizeof(PrfBlock));
+
+
+        auto cf = fleEq.getMaxCounter();
+
+        return new ExpressionInternalFLEEqual(
+            expCtx, std::move(fieldExpr), serverTokenPair.second, cf, edcTokenPair.second);
+    }
+
+    auto fleEq = InternalFleEqStructV2::parse(ctx, expr.Obj());
 
     auto fieldExpr = Expression::parseOperand(expCtx, fleEq.getField().getElement(), vps);
 
-    auto serverTokenPair = fromEncryptedConstDataRange(fleEq.getServerEncryptionToken());
+    auto serverTokenPair = fromEncryptedConstDataRange(fleEq.getServerZerosEncryptionToken());
 
-    uassert(6762901,
+    uassert(7399502,
             "Invalid server token",
             serverTokenPair.first == EncryptedBinDataType::kFLE2TransientRaw &&
                 serverTokenPair.second.length() == sizeof(PrfBlock));
 
-    auto edcTokenPair = fromEncryptedConstDataRange(fleEq.getEdcDerivedToken());
-
-    uassert(6762902,
-            "Invalid edc token",
-            edcTokenPair.first == EncryptedBinDataType::kFLE2TransientRaw &&
-                edcTokenPair.second.length() == sizeof(PrfBlock));
-
-
-    auto cf = fleEq.getMaxCounter();
-
     return new ExpressionInternalFLEEqual(
-        expCtx, std::move(fieldExpr), serverTokenPair.second, cf, edcTokenPair.second);
+        expCtx, std::move(fieldExpr), PrfBlockfromCDR(serverTokenPair.second));
 }
 
 Value toValue(const std::array<std::uint8_t, 32>& buf) {
@@ -3942,12 +3966,20 @@ Value toValue(const std::array<std::uint8_t, 32>& buf) {
 }
 
 Value ExpressionInternalFLEEqual::serialize(SerializationOptions options) const {
-    return Value(Document{
-        {kInternalFleEq,
-         Document{{"field", _children[0]->serialize(options)},
-                  {"edc", toValue(_evaluator.edcTokens()[0])},
-                  {"counter", Value(static_cast<long long>(_evaluator.contentionFactor()))},
-                  {"server", toValue(_evaluator.serverToken())}}}});
+    // TODO: SERVER-73303 remove when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        return Value(Document{
+            {kInternalFleEq,
+             Document{{"field", _children[0]->serialize(options)},
+                      {"edc", toValue(_evaluator.edcTokens()[0])},
+                      {"counter", Value(static_cast<long long>(_evaluator.contentionFactor()))},
+                      {"server", toValue(_evaluator.serverToken())}}}});
+    }
+
+    return Value(
+        Document{{kInternalFleEq,
+                  Document{{"field", _children[0]->serialize(options)},
+                           {"server", toValue((_evaluatorV2.zerosDecryptionTokens()[0]).data)}}}});
 }
 
 Value ExpressionInternalFLEEqual::evaluate(const Document& root, Variables* variables) const {
@@ -3955,14 +3987,28 @@ Value ExpressionInternalFLEEqual::evaluate(const Document& root, Variables* vari
     if (fieldValue.nullish()) {
         return Value(BSONNULL);
     }
-    return Value(_evaluator.evaluate(
-        fieldValue,
-        EncryptedBinDataType::kFLE2EqualityIndexedValue,
-        [](auto token, auto serverValue) {
-            auto swIndexed = EDCServerCollection::decryptAndParse(token, serverValue);
-            uassertStatusOK(swIndexed);
-            auto indexed = swIndexed.getValue();
-            return std::vector<EDCDerivedFromDataTokenAndContentionFactorToken>{indexed.edc};
+
+    // TODO: SERVER-73303 remove when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        return Value(_evaluator.evaluate(
+            fieldValue,
+            EncryptedBinDataType::kFLE2EqualityIndexedValue,
+            [](auto token, auto serverValue) {
+                auto swIndexed = EDCServerCollection::decryptAndParse(token, serverValue);
+                uassertStatusOK(swIndexed);
+                const auto& indexed = swIndexed.getValue();
+                return std::vector<EDCDerivedFromDataTokenAndContentionFactorToken>{indexed.edc};
+            }));
+    }
+
+    return Value(_evaluatorV2.evaluate(
+        fieldValue, EncryptedBinDataType::kFLE2EqualityIndexedValueV2, [](auto serverValue) {
+            auto swParsedFields =
+                FLE2IndexedEqualityEncryptedValueV2::parseAndValidateFields(serverValue);
+            uassertStatusOK(swParsedFields.getStatus());
+            std::vector<ConstDataRange> metadataBlocks;
+            metadataBlocks.push_back(swParsedFields.getValue().metadataBlock);
+            return metadataBlocks;
         }));
 }
 
@@ -3983,52 +4029,97 @@ ExpressionInternalFLEBetween::ExpressionInternalFLEBetween(ExpressionContext* co
     expCtx->sbeCompatible = false;
 }
 
+ExpressionInternalFLEBetween::ExpressionInternalFLEBetween(
+    ExpressionContext* const expCtx,
+    boost::intrusive_ptr<Expression> field,
+    std::vector<ServerZerosEncryptionToken> zerosTokens)
+    : Expression(expCtx, {std::move(field)}), _evaluatorV2(std::move(zerosTokens)) {
+    expCtx->sbeCompatible = false;
+}
+
 REGISTER_STABLE_EXPRESSION(_internalFleBetween, ExpressionInternalFLEBetween::parse);
 
 intrusive_ptr<Expression> ExpressionInternalFLEBetween::parse(ExpressionContext* const expCtx,
                                                               BSONElement expr,
                                                               const VariablesParseState& vps) {
     IDLParserContext ctx(kInternalFleBetween);
-    auto fleBetween = InternalFleBetweenStruct::parse(ctx, expr.Obj());
+
+    // TODO: SERVER-73303 remove when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        auto fleBetween = InternalFleBetweenStruct::parse(ctx, expr.Obj());
+
+        auto fieldExpr = Expression::parseOperand(expCtx, fleBetween.getField().getElement(), vps);
+
+        auto serverTokenPair = fromEncryptedConstDataRange(fleBetween.getServerEncryptionToken());
+
+        uassert(6762904,
+                "Invalid server token",
+                serverTokenPair.first == EncryptedBinDataType::kFLE2TransientRaw &&
+                    serverTokenPair.second.length() == sizeof(PrfBlock));
+
+        std::vector<ConstDataRange> edcTokens;
+        for (auto& elem : fleBetween.getEdcDerivedTokens()) {
+            auto [first, second] = fromEncryptedConstDataRange(elem);
+            uassert(6762905,
+                    "Invalid edc token",
+                    first == EncryptedBinDataType::kFLE2TransientRaw &&
+                        second.length() == sizeof(PrfBlock));
+            edcTokens.push_back(second);
+        }
+
+        auto cf = fleBetween.getMaxCounter();
+        uassert(6762906, "Contention factor must be between 0 and 10000", cf >= 0 && cf < 10000);
+
+        return new ExpressionInternalFLEBetween(
+            expCtx, std::move(fieldExpr), serverTokenPair.second, cf, edcTokens);
+    }
+
+    auto fleBetween = InternalFleBetweenStructV2::parse(ctx, expr.Obj());
 
     auto fieldExpr = Expression::parseOperand(expCtx, fleBetween.getField().getElement(), vps);
 
-    auto serverTokenPair = fromEncryptedConstDataRange(fleBetween.getServerEncryptionToken());
+    std::vector<ServerZerosEncryptionToken> serverZerosEncryptionTokens;
+    serverZerosEncryptionTokens.reserve(fleBetween.getServerZerosEncryptionTokens().size());
 
-    uassert(6762904,
-            "Invalid server token",
-            serverTokenPair.first == EncryptedBinDataType::kFLE2TransientRaw &&
-                serverTokenPair.second.length() == sizeof(PrfBlock));
-
-    std::vector<ConstDataRange> edcTokens;
-    for (auto& elem : fleBetween.getEdcDerivedTokens()) {
+    for (auto& elem : fleBetween.getServerZerosEncryptionTokens()) {
         auto [first, second] = fromEncryptedConstDataRange(elem);
-        uassert(6762905,
-                "Invalid edc token",
+
+        uassert(7399503,
+                "Invalid ServerDerivedFromDataToken",
                 first == EncryptedBinDataType::kFLE2TransientRaw &&
                     second.length() == sizeof(PrfBlock));
-        edcTokens.push_back(second);
+
+        serverZerosEncryptionTokens.emplace_back(PrfBlockfromCDR(second));
     }
 
-    auto cf = fleBetween.getMaxCounter();
-    uassert(6762906, "Contention factor must be between 0 and 10000", cf >= 0 && cf < 10000);
-
     return new ExpressionInternalFLEBetween(
-        expCtx, std::move(fieldExpr), serverTokenPair.second, cf, edcTokens);
+        expCtx, std::move(fieldExpr), std::move(serverZerosEncryptionTokens));
 }
 
 Value ExpressionInternalFLEBetween::serialize(SerializationOptions options) const {
-    std::vector<Value> edcValues;
-    edcValues.reserve(_evaluator.edcTokens().size());
-    for (auto& token : _evaluator.edcTokens()) {
-        edcValues.push_back(toValue(PrfBlockfromCDR(token)));
+    // TODO: SERVER-73303 remove when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        std::vector<Value> edcValues;
+        edcValues.reserve(_evaluator.edcTokens().size());
+        for (auto& token : _evaluator.edcTokens()) {
+            edcValues.push_back(toValue(PrfBlockfromCDR(token)));
+        }
+        return Value(Document{
+            {kInternalFleBetween,
+             Document{{"field", _children[0]->serialize(options)},
+                      {"edc", Value(edcValues)},
+                      {"counter", Value(static_cast<long long>(_evaluator.contentionFactor()))},
+                      {"server", toValue(_evaluator.serverToken())}}}});
     }
-    return Value(Document{
-        {kInternalFleBetween,
-         Document{{"field", _children[0]->serialize(options)},
-                  {"edc", Value(edcValues)},
-                  {"counter", Value(static_cast<long long>(_evaluator.contentionFactor()))},
-                  {"server", toValue(_evaluator.serverToken())}}}});
+
+    std::vector<Value> serverDerivedValues;
+    serverDerivedValues.reserve(_evaluatorV2.zerosDecryptionTokens().size());
+    for (auto& token : _evaluatorV2.zerosDecryptionTokens()) {
+        serverDerivedValues.push_back(toValue(token.data));
+    }
+    return Value(Document{{kInternalFleBetween,
+                           Document{{"field", _children[0]->serialize(options)},
+                                    {"server", Value(serverDerivedValues)}}}});
 }
 
 Value ExpressionInternalFLEBetween::evaluate(const Document& root, Variables* variables) const {
@@ -4036,16 +4127,29 @@ Value ExpressionInternalFLEBetween::evaluate(const Document& root, Variables* va
     if (fieldValue.nullish()) {
         return Value(BSONNULL);
     }
-    return Value(_evaluator.evaluate(
-        fieldValue, EncryptedBinDataType::kFLE2RangeIndexedValue, [](auto token, auto serverValue) {
-            auto indexed =
-                uassertStatusOK(EDCServerCollection::decryptAndParseRange(token, serverValue));
-            std::vector<EDCDerivedFromDataTokenAndContentionFactorToken> edcTokens;
-            edcTokens.reserve(indexed.tokens.size());
-            for (auto& edge : indexed.tokens) {
-                edcTokens.push_back(std::move(edge.edc));
-            }
-            return edcTokens;
+
+    // TODO: SERVER-73303 remove when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        return Value(_evaluator.evaluate(
+            fieldValue,
+            EncryptedBinDataType::kFLE2RangeIndexedValue,
+            [](auto token, auto serverValue) {
+                auto indexed =
+                    uassertStatusOK(EDCServerCollection::decryptAndParseRange(token, serverValue));
+                std::vector<EDCDerivedFromDataTokenAndContentionFactorToken> edcTokens;
+                edcTokens.reserve(indexed.tokens.size());
+                for (auto& edge : indexed.tokens) {
+                    edcTokens.push_back(std::move(edge.edc));
+                }
+                return edcTokens;
+            }));
+    }
+    return Value(_evaluatorV2.evaluate(
+        fieldValue, EncryptedBinDataType::kFLE2RangeIndexedValueV2, [](auto serverValue) {
+            auto swParsedFields =
+                FLE2IndexedRangeEncryptedValueV2::parseAndValidateFields(serverValue);
+            uassertStatusOK(swParsedFields.getStatus());
+            return swParsedFields.getValue().metadataBlocks;
         }));
 }
 
