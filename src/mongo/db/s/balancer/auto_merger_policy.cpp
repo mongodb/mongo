@@ -103,6 +103,11 @@ boost::optional<BalancerStreamAction> AutoMergerPolicy::getNextStreamingAction(
         _firstAction = false;
     }
 
+    // Issue at most 10 concurrent auto merge requests
+    if (_outstandingActions >= MAX_NUMBER_OF_CONCURRENT_MERGE_ACTIONS) {
+        return boost::none;
+    }
+
     // Get next <shardId, collection> pair to merge
     for (auto it = _collectionsToMergePerShard.begin(); it != _collectionsToMergePerShard.end();) {
         auto& [shardId, collections] = *it;
@@ -129,33 +134,25 @@ void AutoMergerPolicy::applyActionResult(OperationContext* opCtx,
                                          const BalancerStreamActionResponse& response) {
     stdx::unique_lock<Latch> lk(_mutex);
 
-    stdx::visit(OverloadedVisitor{
-                    [&](const MergeAllChunksOnShardInfo& action) {
-                        const auto& swResponse = stdx::get<StatusWith<NumMergedChunks>>(response);
-                        --_outstandingActions;
-                        if (!swResponse.isOK()) {
-                            // Reset the history window to consider during next round
-                            // because chunk merges may have been potentially missed
-                            _maxHistoryTimeCurrentRound = _maxHistoryTimePreviousRound;
-                            LOGV2_DEBUG(7312600,
-                                        1,
-                                        "Hit error while automerging chunks",
-                                        "shard"_attr = action.shardId,
-                                        "nss"_attr = action.nss,
-                                        "error"_attr = redact(swResponse.getStatus()));
-                        }
-                    },
-                    [&](const DataSizeInfo& _) {
-                        uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                    },
-                    [&](const MigrateInfo& _) {
-                        uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                    },
-                    [&](const MergeInfo& _) {
-                        uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                    }},
+    const auto& mergeAction = stdx::get<MergeAllChunksOnShardInfo>(action);
+    const auto& swResponse = stdx::get<StatusWith<NumMergedChunks>>(response);
 
-                action);
+    --_outstandingActions;
+    if (_outstandingActions < MAX_NUMBER_OF_CONCURRENT_MERGE_ACTIONS) {
+        _onStateUpdated();
+    }
+
+    if (!swResponse.isOK()) {
+        // Reset the history window to consider during next round
+        // because chunk merges may have been potentially missed
+        _maxHistoryTimeCurrentRound = _maxHistoryTimePreviousRound;
+        LOGV2_DEBUG(7312600,
+                    1,
+                    "Hit error while automerging chunks",
+                    "shard"_attr = mergeAction.shardId,
+                    "nss"_attr = mergeAction.nss,
+                    "error"_attr = redact(swResponse.getStatus()));
+    }
 }
 
 void AutoMergerPolicy::_init(WithLock lk) {

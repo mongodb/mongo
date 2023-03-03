@@ -37,7 +37,7 @@
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/logv2/log.h"
+#include "mongo/idl/server_parameter_test_util.h"
 
 namespace mongo {
 
@@ -69,7 +69,7 @@ protected:
         return Timestamp(currTimeSeconds, 0);
     }
 
-    /* Generates chunks for a collection with the given chunk attributes per shard */
+    /* Generates 3 chunks per shard for the given collection */
     std::vector<ChunkType> generateChunks(const UUID& collUuid,
                                           bool allAreSupportedForHistoryOnShard0,
                                           bool allAreSupportedForHistoryOnShard1) {
@@ -78,7 +78,7 @@ protected:
         std::vector<ChunkType> chunks;
         ChunkVersion collVersion{{_epoch, _ts}, {1, 1}};
 
-        // Generate chunks for shard0
+        // Generate  3 chunks for shard0
         {
             ChunkType chunkRef;
             chunkRef.setShard(_shard0);
@@ -111,7 +111,7 @@ protected:
             }
         }
 
-        // Generate chunks for shard1
+        // Generate 3 chunks for shard1
         {
             ChunkType chunkRef;
             chunkRef.setShard(_shard1);
@@ -145,6 +145,13 @@ protected:
         }
 
         return chunks;
+    }
+
+    /* Generates 3 mergeable chunks per shard for the given collection */
+    std::vector<ChunkType> generateMergeableChunks(const UUID& collUuid) {
+        return generateChunks(collUuid,
+                              false /*allChunksAreSupportedForHistoryOnShard0*/,
+                              false /*allChunksAreSupportedForHistoryOnShard1*/);
     }
 
     void setupCollectionWithCustomBalancingFields(const NamespaceString& nss,
@@ -196,6 +203,10 @@ protected:
         }
     }
 
+    int getMaxNumberOfConcurrentMergeActions() {
+        return AutoMergerPolicy::MAX_NUMBER_OF_CONCURRENT_MERGE_ACTIONS;
+    }
+
 protected:
     AutoMergerPolicy _automerger{[]() {
     }};
@@ -210,6 +221,8 @@ protected:
     const Timestamp _ts = Timestamp(43);
 
     const KeyPattern _keyPattern{BSON("x" << 1)};
+
+    RAIIServerParameterControllerForTest myFeatureFlag{"featureFlagAutoMerger", true};
 };
 
 TEST_F(AutoMergerPolicyTest, FetchCollectionsWithMergeableChunks) {
@@ -222,8 +235,8 @@ TEST_F(AutoMergerPolicyTest, FetchCollectionsWithMergeableChunks) {
         //  - enableAutoMerge: true
         //  - defragmentatCollection: false
         //  - routing table:
-        //       - shard0: 3 chunks (jumbo: false, supportedForHistory: false)
-        //       - shard1: 3 chunks (jumbo: false, supportedForHistory: false)
+        //       - shard0: 3 chunks (supportedForHistory: false)
+        //       - shard1: 3 chunks (supportedForHistory: false)
         const auto collUuid = UUID::gen();
         const auto nss = NamespaceString::createNamespaceString_forTest("test.coll1");
         const auto chunks = generateChunks(collUuid,
@@ -297,5 +310,47 @@ TEST_F(AutoMergerPolicyTest, FetchCollectionsWithMergeableChunks) {
     // Run the test
     assertAutomergerConsidersCollectionsWithMergeableChunks(expectedNamespacesPerShard);
 };
+
+TEST_F(AutoMergerPolicyTest, MaxConcurrentMergeActionsIsHonored) {
+
+    const auto maxConcurrentActions = getMaxNumberOfConcurrentMergeActions();
+    const auto numCollections = maxConcurrentActions + 10;
+
+    for (auto i = 0; i < numCollections; ++i) {
+
+        const auto collUuid = UUID::gen();
+        const auto nss =
+            NamespaceString::createNamespaceString_forTest("test.coll" + std::to_string(i));
+        const auto chunks = generateMergeableChunks(collUuid);
+
+        ConfigServerTestFixture::setupCollection(nss, _keyPattern, chunks);
+    }
+
+    _automerger.enable();
+
+    std::deque<BalancerStreamAction> actions;
+    auto i = 0;
+    for (; i < maxConcurrentActions; ++i) {
+        const auto action = _automerger.getNextStreamingAction(operationContext());
+        ASSERT(action.has_value());
+        actions.emplace_back(action.value());
+    }
+
+    for (; i < numCollections; ++i) {
+        for (auto j = 0; j < 3; j++) {
+            const auto action = _automerger.getNextStreamingAction(operationContext());
+            ASSERT(!action.has_value());
+        }
+
+        _automerger.applyActionResult(operationContext(),
+                                      actions.front(),
+                                      BalancerStreamActionResponse(StatusWith<NumMergedChunks>(0)));
+        actions.pop_front();
+
+        const auto action = _automerger.getNextStreamingAction(operationContext());
+        ASSERT(action.has_value());
+        actions.emplace_back(action.value());
+    }
+}
 
 }  // namespace mongo

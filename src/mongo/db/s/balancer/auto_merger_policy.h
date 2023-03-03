@@ -77,6 +77,8 @@ private:
 private:
     Mutex _mutex = MONGO_MAKE_LATCH("AutoMergerPolicyPolicyImpl::_mutex");
 
+    inline static constexpr int MAX_NUMBER_OF_CONCURRENT_MERGE_ACTIONS = 10;
+
     const std::function<void()> _onStateUpdated;
 
     bool _enabled;
