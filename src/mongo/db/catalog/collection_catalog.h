@@ -247,7 +247,7 @@ public:
     /**
      * Returns a shared_ptr to a drop pending index if it's found and not expired.
      */
-    std::shared_ptr<IndexCatalogEntry> findDropPendingIndex(const std::string& ident) const;
+    std::shared_ptr<IndexCatalogEntry> findDropPendingIndex(StringData ident) const;
 
     /**
      * Handles committing a collection to the catalog within a WriteUnitOfWork.
@@ -819,7 +819,7 @@ private:
 
     // Inserts a catalogId for namespace and UUID at given Timestamp, if not boost::none. Used after
     // scanning the durable catalog for a correct mapping at the given timestamp.
-    void _insertCatalogIdForNSSAndUUIDAfterScan(boost::optional<NamespaceString> nss,
+    void _insertCatalogIdForNSSAndUUIDAfterScan(boost::optional<const NamespaceString&> nss,
                                                 boost::optional<UUID> uuid,
                                                 boost::optional<RecordId> catalogId,
                                                 Timestamp ts);

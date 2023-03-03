@@ -73,7 +73,7 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const Timestamp& dropTimestam
     }
 }
 
-std::shared_ptr<Ident> KVDropPendingIdentReaper::markIdentInUse(const std::string& ident) {
+std::shared_ptr<Ident> KVDropPendingIdentReaper::markIdentInUse(StringData ident) {
     stdx::lock_guard<Latch> lock(_mutex);
     auto identToTimestampIt = _identToTimestamp.find(ident);
     if (identToTimestampIt == _identToTimestamp.end()) {

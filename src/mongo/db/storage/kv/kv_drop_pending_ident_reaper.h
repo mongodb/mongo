@@ -90,7 +90,7 @@ public:
      * `kDropped`. Returns a shared_ptr to the `dropToken` if it isn't expired, otherwise a new
      * shared_ptr is generated, stored in `dropToken`, and returned.
      */
-    std::shared_ptr<Ident> markIdentInUse(const std::string& ident);
+    std::shared_ptr<Ident> markIdentInUse(StringData ident);
 
     /**
      * Returns earliest drop timestamp in '_dropPendingIdents'.

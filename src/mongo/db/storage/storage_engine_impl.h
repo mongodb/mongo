@@ -321,7 +321,7 @@ public:
 
     void dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) override;
 
-    std::shared_ptr<Ident> markIdentInUse(const std::string& ident) override;
+    std::shared_ptr<Ident> markIdentInUse(StringData ident) override;
 
     void startTimestampMonitor() override;
 

@@ -174,7 +174,7 @@ public:
                              std::shared_ptr<Ident> ident,
                              DropIdentCallback&& onDrop) final {}
     void dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) final {}
-    std::shared_ptr<Ident> markIdentInUse(const std::string& ident) final {
+    std::shared_ptr<Ident> markIdentInUse(StringData ident) final {
         return nullptr;
     }
     void startTimestampMonitor() final {}

@@ -490,7 +490,7 @@ public:
      * Returns nullptr if the ident is not known to the reaper, is already being dropped, or is
      * already dropped.
      */
-    virtual std::shared_ptr<Ident> markIdentInUse(const std::string& ident) = 0;
+    virtual std::shared_ptr<Ident> markIdentInUse(StringData ident) = 0;
 
     /**
      * Starts the timestamp monitor. This periodically drops idents queued by addDropPendingIdent,

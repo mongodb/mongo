@@ -232,7 +232,7 @@ StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opC
     }
 
     // Next check the CollectionCatalog for a compatible drop pending index.
-    auto dropPendingEntry = CollectionCatalog::get(opCtx)->findDropPendingIndex(ident.toString());
+    auto dropPendingEntry = CollectionCatalog::get(opCtx)->findDropPendingIndex(ident);
 
     // The index entries are incompatible with the read timestamp, but we need to use the same
     // shared ident to prevent the reaper from dropping idents prematurely.

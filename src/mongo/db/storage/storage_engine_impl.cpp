@@ -1253,7 +1253,7 @@ void StorageEngineImpl::dropIdentsOlderThan(OperationContext* opCtx, const Times
     _dropPendingIdentReaper.dropIdentsOlderThan(opCtx, ts);
 }
 
-std::shared_ptr<Ident> StorageEngineImpl::markIdentInUse(const std::string& ident) {
+std::shared_ptr<Ident> StorageEngineImpl::markIdentInUse(StringData ident) {
     return _dropPendingIdentReaper.markIdentInUse(ident);
 }
 
