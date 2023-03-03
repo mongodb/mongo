@@ -111,4 +111,17 @@ res = local
                 .toArray()[0];
 
 assert.eq(res.array[0].results.length, 1);
+
+// Geo operators are not allowed within a $match as they require a sort on the data.
+assert.throwsWithCode(() => local
+                .aggregate([{
+                        $graphLookup: {
+                            from: "foreign",
+                            startWith: "$starting",
+                            connectFromField: "neighbors",
+                            connectToField: "_id",
+                            as: "integers",
+                            restrictSearchWithMatch: {neighbors: {$near: [10, 20]}}
+                            }
+                        }]), 5626500);
 })();

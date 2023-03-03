@@ -1216,7 +1216,12 @@ StatusWithMatchExpression parseGeo(boost::optional<StringData> name,
 
         if ((allowedFeatures & MatchExpressionParser::AllowedFeatures::kGeoNear) == 0u) {
             return {Status(ErrorCodes::Error(5626500),
-                           "$geoNear, $near, and $nearSphere are not allowed in this context")};
+                           "$geoNear, $near, and $nearSphere are not allowed in this context, "
+                           "as these operators require sorting geospatial data. If you do not "
+                           "need sort, consider using $geoWithin instead. Check out "
+                           "https://dochub.mongodb.org/core/near-sort-operation and "
+                           "https://dochub.mongodb.org/core/nearSphere-sort-operation"
+                           "for more details.")};
         }
 
         auto nq = std::make_unique<GeoNearExpression>(name ? name->toString() : "");
