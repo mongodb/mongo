@@ -58,13 +58,13 @@ public:
         _observers.push_back(std::move(observer));
     }
 
-    void onModifyShardedCollectionGlobalIndexCatalogEntry(OperationContext* opCtx,
-                                                          const NamespaceString& nss,
-                                                          const UUID& uuid,
-                                                          BSONObj indexDoc) override {
+    void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const UUID& uuid,
+                                                BSONObj indexDoc) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onModifyShardedCollectionGlobalIndexCatalogEntry(opCtx, nss, uuid, indexDoc);
+            o->onModifyCollectionShardingIndexCatalog(opCtx, nss, uuid, indexDoc);
     }
 
     void onCreateGlobalIndex(OperationContext* opCtx,

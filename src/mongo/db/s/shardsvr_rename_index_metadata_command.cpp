@@ -31,8 +31,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/sharded_index_catalog_commands_gen.h"
+#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
@@ -108,7 +108,7 @@ public:
                                ns().toString()),
                         scopedCsr->getCriticalSectionSignal(
                             opCtx, ShardingMigrationCriticalSection::kWrite));
-                if (scopedCsr->getIndexes(opCtx, true)) {
+                if (scopedCsr->getIndexesInCritSec(opCtx)) {
                     renameOp = RenameIndexCatalogOperationEnum::kRename;
                 }
             }
@@ -125,7 +125,7 @@ public:
                                ns().toString()),
                         scopedToCsr->getCriticalSectionSignal(
                             opCtx, ShardingMigrationCriticalSection::kWrite));
-                const auto& indexMetadata = scopedToCsr->getIndexes(opCtx, true);
+                const auto& indexMetadata = scopedToCsr->getIndexesInCritSec(opCtx);
                 if (indexMetadata &&
                     indexMetadata->getCollectionIndexes().uuid() ==
                         request().getIndexVersion().uuid()) {
@@ -139,13 +139,15 @@ public:
 
             switch (renameOp) {
                 case RenameIndexCatalogOperationEnum::kRename:
-                    renameGlobalIndexesMetadata(opCtx,
-                                                ns(),
-                                                request().getToNss(),
-                                                request().getIndexVersion().indexVersion());
+                    renameCollectionShardingIndexCatalog(
+                        opCtx,
+                        ns(),
+                        request().getToNss(),
+                        request().getIndexVersion().indexVersion());
                     break;
                 case RenameIndexCatalogOperationEnum::kClearTo:
-                    clearCollectionGlobalIndexes(opCtx, request().getToNss(), toUuid.value());
+                    clearCollectionShardingIndexCatalog(
+                        opCtx, request().getToNss(), toUuid.value());
                     break;
                 case RenameIndexCatalogOperationEnum::kNoop: {
                     // Since no write happened on this txnNumber, we need to make a dummy write

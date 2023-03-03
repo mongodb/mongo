@@ -81,7 +81,7 @@ public:
         Timestamp afterClusterTime,
         StringData reason) = 0;
 
-    virtual boost::optional<GlobalIndexesCache> getCollectionIndexInfoWithRefresh(
+    virtual boost::optional<ShardingIndexesCatalogCache> getCollectionIndexInfoWithRefresh(
         OperationContext* opCtx, const NamespaceString& nss) = 0;
 
     virtual void withShardVersionRetry(OperationContext* opCtx,
@@ -134,7 +134,7 @@ public:
                                                                         StringData reason) override;
 
 
-    boost::optional<GlobalIndexesCache> getCollectionIndexInfoWithRefresh(
+    boost::optional<ShardingIndexesCatalogCache> getCollectionIndexInfoWithRefresh(
         OperationContext* opCtx, const NamespaceString& nss) override;
 
     void withShardVersionRetry(OperationContext* opCtx,

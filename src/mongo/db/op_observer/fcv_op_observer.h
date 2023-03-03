@@ -79,10 +79,10 @@ public:
                              const NamespaceString& globalIndexNss,
                              const UUID& globalIndexUUID) final{};
 
-    void onModifyShardedCollectionGlobalIndexCatalogEntry(OperationContext* opCtx,
-                                                          const NamespaceString& nss,
-                                                          const UUID& uuid,
-                                                          BSONObj indexDoc) final {}
+    void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const UUID& uuid,
+                                                BSONObj indexDoc) final {}
     void onDropGlobalIndex(OperationContext* opCtx,
                            const NamespaceString& globalIndexNss,
                            const UUID& globalIndexUUID,

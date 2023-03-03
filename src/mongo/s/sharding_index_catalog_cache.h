@@ -38,9 +38,9 @@ namespace mongo {
 
 using IndexCatalogTypeMap = StringMap<IndexCatalogType>;
 
-class GlobalIndexesCache {
+class ShardingIndexesCatalogCache {
 public:
-    GlobalIndexesCache(CollectionIndexes collectionIndexes, IndexCatalogTypeMap&& indexes)
+    ShardingIndexesCatalogCache(CollectionIndexes collectionIndexes, IndexCatalogTypeMap&& indexes)
         : _collectionIndexes(std::move(collectionIndexes)), _indexes(std::move(indexes)) {}
 
     bool empty() const;
@@ -66,8 +66,9 @@ public:
     template <typename Callable>
     void forEachGlobalIndex(Callable&& handler) const {
         for (auto it = _indexes.begin(); it != _indexes.end(); it++) {
-            auto options = it->second.getOptions();
-            if (options.getBoolField(IndexOptionsType::kGlobalFieldName) && !handler(it->second)) {
+            auto options = IndexOptionsType::parse(IDLParserContext("forEachGlobalIndexCtx"),
+                                                   it->second.getOptions());
+            if (options.getGlobal() && !handler(it->second)) {
                 return;
             }
         }
@@ -167,19 +168,19 @@ private:
  * indexes in the cache. The cache does not allow for an empty value, so this intermediate structure
  * is needed.
  */
-struct OptionalGlobalIndexesInfo {
+struct OptionalShardingIndexCatalogInfo {
     // No indexes constructor.
-    OptionalGlobalIndexesInfo() = default;
+    OptionalShardingIndexCatalogInfo() = default;
 
     // Constructor with global indexes
-    OptionalGlobalIndexesInfo(GlobalIndexesCache gii) : optGii(std::move(gii)) {}
+    OptionalShardingIndexCatalogInfo(ShardingIndexesCatalogCache sii) : optSii(std::move(sii)) {}
 
     // If nullptr, the collection has an index version of boost::none and no global indexes.
     // Otherwise, the index version is some valid timestamp (there still may be no global indexes).
-    boost::optional<GlobalIndexesCache> optGii;
+    boost::optional<ShardingIndexesCatalogCache> optSii;
 };
 
-using GlobalIndexesCacheBase =
-    ReadThroughCache<NamespaceString, OptionalGlobalIndexesInfo, ComparableIndexVersion>;
+using ShardingIndexesCatalogRTCBase =
+    ReadThroughCache<NamespaceString, OptionalShardingIndexCatalogInfo, ComparableIndexVersion>;
 
 }  // namespace mongo

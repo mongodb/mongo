@@ -53,10 +53,10 @@ public:
     OpObserverImpl(std::unique_ptr<OplogWriter> oplogWriter);
     virtual ~OpObserverImpl() = default;
 
-    void onModifyShardedCollectionGlobalIndexCatalogEntry(OperationContext* opCtx,
-                                                          const NamespaceString& nss,
-                                                          const UUID& uuid,
-                                                          BSONObj indexDoc) final;
+    void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const UUID& uuid,
+                                                BSONObj indexDoc) final;
 
     void onCreateGlobalIndex(OperationContext* opCtx,
                              const NamespaceString& globalIndexNss,

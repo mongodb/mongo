@@ -144,7 +144,7 @@ protected:
                                                UUID uuid,
                                                const ShardKeyPattern& shardKeyPattern,
                                                boost::optional<Timestamp> indexVersion,
-                                               const std::vector<BSONObj>& globalIndexes);
+                                               const std::vector<BSONObj>& indexes);
 
     const HostAndPort kConfigHostAndPort{"DummyConfig", 1234};
 };

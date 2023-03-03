@@ -69,6 +69,16 @@ public:
         return {kUnshardedCollection};
     }
 
+    boost::optional<CollectionIndexes> getCollectionIndexes(
+        OperationContext* opCtx) const override {
+        return boost::none;
+    }
+
+    boost::optional<ShardingIndexesCatalogCache> getIndexes(
+        OperationContext* opCtx) const override {
+        return boost::none;
+    }
+
     ScopedCollectionFilter getOwnershipFilter(
         OperationContext*,
         OrphanCleanupPolicy orphanCleanupPolicy,

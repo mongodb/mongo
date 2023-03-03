@@ -75,15 +75,15 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     auto* catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
 
     // Since we are only checking the epoch, don't advance the time in store of the index cache
-    auto currentGlobalIndexesInfo =
-        uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss)).gii;
+    auto currentShardingIndexCatalogInfo =
+        uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss)).sii;
 
     // Mark the cache entry routingInfo for the 'nss' and 'shardId' if the entry is staler than
     // 'targetCollectionPlacementVersion'.
     const ShardVersion ignoreIndexVersion = ShardVersionFactory::make(
         targetCollectionPlacementVersion,
-        currentGlobalIndexesInfo
-            ? boost::make_optional(currentGlobalIndexesInfo->getCollectionIndexes())
+        currentShardingIndexCatalogInfo
+            ? boost::make_optional(currentShardingIndexCatalogInfo->getCollectionIndexes())
             : boost::none);
     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         nss, ignoreIndexVersion, shardId);

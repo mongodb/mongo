@@ -724,7 +724,7 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
     auto [indexShard, listIndexesCmd] = [&]() -> std::pair<std::shared_ptr<Shard>, BSONObj> {
-        const auto& [cm, gii] = cri;
+        const auto& [cm, sii] = cri;
         auto cmdNoVersion = applyReadWriteConcern(
             opCtx, true /* appendRC */, false /* appendWC */, BSON("listIndexes" << nss.coll()));
         if (cm.isSharded()) {

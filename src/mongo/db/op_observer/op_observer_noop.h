@@ -35,10 +35,10 @@ namespace mongo {
 
 class OpObserverNoop : public OpObserver {
 public:
-    void onModifyShardedCollectionGlobalIndexCatalogEntry(OperationContext* opCtx,
-                                                          const NamespaceString& nss,
-                                                          const UUID& uuid,
-                                                          BSONObj indexDoc) override {}
+    void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const UUID& uuid,
+                                                BSONObj indexDoc) override {}
 
     void onCreateGlobalIndex(OperationContext* opCtx,
                              const NamespaceString& globalIndexNss,

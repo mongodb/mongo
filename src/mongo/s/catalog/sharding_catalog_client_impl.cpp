@@ -788,9 +788,8 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
 };
 
 std::pair<CollectionType, std::vector<IndexCatalogType>>
-ShardingCatalogClientImpl::getCollectionAndGlobalIndexes(OperationContext* opCtx,
-                                                         const NamespaceString& nss,
-                                                         const repl::ReadConcernArgs& readConcern) {
+ShardingCatalogClientImpl::getCollectionAndShardingIndexCatalogEntries(
+    OperationContext* opCtx, const NamespaceString& nss, const repl::ReadConcernArgs& readConcern) {
     auto aggRequest = makeCollectionAndIndexesAggregation(opCtx, nss);
 
     std::vector<BSONObj> aggResult = runCatalogAggregation(opCtx,

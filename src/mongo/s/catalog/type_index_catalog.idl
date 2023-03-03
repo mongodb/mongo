@@ -33,7 +33,7 @@ imports:
     - "mongo/db/basic_types.idl"
 
 enums:
-    ShardingIndexCatalogOpEnum:
+    ShardingIndexCatalogOp:
         description: "Sharding index catalog operation"
         type: string
         values:
@@ -84,7 +84,7 @@ structs:
         strict: false
         fields:
             op:
-                type: ShardingIndexCatalogOpEnum
+                type: ShardingIndexCatalogOp
                 description: "Index catalog operation type"
 
     ShardingIndexCatalogInsertEntryBase:

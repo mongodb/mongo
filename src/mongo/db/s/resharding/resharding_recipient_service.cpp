@@ -43,7 +43,6 @@
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
@@ -54,6 +53,7 @@
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
+#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/write_block_bypass.h"
@@ -856,7 +856,7 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
     if (aborted) {
         if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
                 serverGlobalParams.featureCompatibility)) {
-            dropCollectionGlobalIndexesMetadata(opCtx.get(), _metadata.getTempReshardingNss());
+            dropCollectionShardingIndexCatalog(opCtx.get(), _metadata.getTempReshardingNss());
         }
 
         resharding::data_copy::ensureCollectionDropped(

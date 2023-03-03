@@ -574,12 +574,12 @@ void writeToConfigIndexesForTempNss(OperationContext* opCtx,
 
     switch (nextState) {
         case CoordinatorStateEnum::kPreparingToDonate: {
-            auto [_, optGii] =
+            auto [_, optSii] =
                 uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
                     opCtx, coordinatorDoc.getSourceNss()));
-            if (optGii) {
+            if (optSii) {
                 std::vector<BSONObj> indexes;
-                optGii->forEachIndex([&](const auto index) {
+                optSii->forEachIndex([&](const auto index) {
                     IndexCatalogType copyIdx(index);
                     copyIdx.setCollectionUUID(coordinatorDoc.getReshardingUUID());
                     // TODO SERVER-73304: add the new index collection UUID here if neccessary.
@@ -998,9 +998,9 @@ ChunkVersion ReshardingCoordinatorExternalState::calculateChunkVersionForInitial
 
 boost::optional<CollectionIndexes> ReshardingCoordinatorExternalState::getCatalogIndexVersion(
     OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid) {
-    auto [_, optGii] =
+    auto [_, optSii] =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-    if (optGii) {
+    if (optSii) {
         VectorClock::VectorTime vt = VectorClock::get(opCtx)->getTime();
         auto time = vt.clusterTime().asTimestamp();
         return CollectionIndexes{uuid, time};
@@ -1011,10 +1011,10 @@ boost::optional<CollectionIndexes> ReshardingCoordinatorExternalState::getCatalo
 boost::optional<CollectionIndexes>
 ReshardingCoordinatorExternalState::getCatalogIndexVersionForCommit(OperationContext* opCtx,
                                                                     const NamespaceString& nss) {
-    auto [_, optGii] =
+    auto [_, optSii] =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-    if (optGii) {
-        return optGii->getCollectionIndexes();
+    if (optSii) {
+        return optSii->getCollectionIndexes();
     }
     return boost::none;
 }

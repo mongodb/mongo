@@ -38,12 +38,12 @@
 #include "mongo/db/s/collection_critical_section_document_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
+#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
@@ -532,22 +532,23 @@ void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
     }
 }
 
-void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
-    OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid, BSONObj indexDoc) {
+void ShardServerOpObserver::onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
+                                                                   const NamespaceString& nss,
+                                                                   const UUID& uuid,
+                                                                   BSONObj indexDoc) {
     // If we are in recovery mode (STARTUP or ROLLBACK) let the sharding recovery service to take
     // care of the in-memory state.
     if (sharding_recovery_util::inRecoveryMode(opCtx)) {
         return;
     }
-    LOGV2_DEBUG(
-        6712303,
-        1,
-        "Updating sharding in-memory state onModifyShardedCollectionGlobalIndexCatalogEntry",
-        "indexDoc"_attr = indexDoc);
+    LOGV2_DEBUG(6712303,
+                1,
+                "Updating sharding in-memory state onModifyCollectionShardingIndexCatalog",
+                "indexDoc"_attr = indexDoc);
     auto indexCatalogOplog = ShardingIndexCatalogOplogEntry::parse(
-        IDLParserContext("onModifyShardedCollectionGlobalIndexCatalogEntry"), indexDoc);
+        IDLParserContext("onModifyCollectionShardingIndexCatalogCtx"), indexDoc);
     switch (indexCatalogOplog.getOp()) {
-        case ShardingIndexCatalogOpEnumEnum::insert: {
+        case ShardingIndexCatalogOpEnum::insert: {
             auto indexEntry = ShardingIndexCatalogInsertEntry::parse(
                 IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
             opCtx->recoveryUnit()->onCommit([nss, indexEntry](OperationContext* opCtx,
@@ -561,7 +562,7 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             });
             break;
         }
-        case ShardingIndexCatalogOpEnumEnum::remove: {
+        case ShardingIndexCatalogOpEnum::remove: {
             auto removeEntry = ShardingIndexCatalogRemoveEntry::parse(
                 IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
             opCtx->recoveryUnit()->onCommit([nss, removeEntry](OperationContext* opCtx,
@@ -574,7 +575,7 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             });
             break;
         }
-        case ShardingIndexCatalogOpEnumEnum::replace: {
+        case ShardingIndexCatalogOpEnum::replace: {
             auto replaceEntry = ShardingIndexCatalogReplaceEntry::parse(
                 IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
             opCtx->recoveryUnit()->onCommit([nss, replaceEntry](OperationContext* opCtx,
@@ -587,7 +588,7 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             });
             break;
         }
-        case ShardingIndexCatalogOpEnumEnum::clear:
+        case ShardingIndexCatalogOpEnum::clear:
             opCtx->recoveryUnit()->onCommit([nss](OperationContext* opCtx,
                                                   boost::optional<Timestamp>) {
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
@@ -596,7 +597,7 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             });
 
             break;
-        case ShardingIndexCatalogOpEnumEnum::drop: {
+        case ShardingIndexCatalogOpEnum::drop: {
             opCtx->recoveryUnit()->onCommit([nss](OperationContext* opCtx,
                                                   boost::optional<Timestamp>) {
                 auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
@@ -606,7 +607,7 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
 
             break;
         }
-        case ShardingIndexCatalogOpEnumEnum::rename: {
+        case ShardingIndexCatalogOpEnum::rename: {
             auto renameEntry = ShardingIndexCatalogRenameEntry::parse(
                 IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
             opCtx->recoveryUnit()->onCommit([renameEntry](OperationContext* opCtx,
@@ -617,7 +618,7 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
                     auto fromCSR =
                         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                             opCtx, renameEntry.getFromNss());
-                    auto indexCache = fromCSR->getIndexes(opCtx, true);
+                    auto indexCache = fromCSR->getIndexesInCritSec(opCtx);
                     indexCache->forEachGlobalIndex([&](const auto& index) {
                         fromIndexes.push_back(index);
                         return true;

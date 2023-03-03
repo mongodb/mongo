@@ -508,7 +508,7 @@ public:
         kCommitTransaction,
         kAbortTransaction,
         kImportCollection,
-        kModifyShardedCollectionGlobalIndexCatalog,
+        kModifyCollectionShardingIndexCatalog,
         kCreateGlobalIndex,
         kDropGlobalIndex,
     };

@@ -36,8 +36,8 @@
 #include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/global_index_cache.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/read_through_cache.h"
@@ -54,10 +54,10 @@ using CachedDatabaseInfo = DatabaseTypeValueHandle;
 
 struct CollectionRoutingInfo {
     CollectionRoutingInfo(ChunkManager&& chunkManager,
-                          boost::optional<GlobalIndexesCache>&& globalIndexes)
-        : cm(std::move(chunkManager)), gii(std::move(globalIndexes)) {}
+                          boost::optional<ShardingIndexesCatalogCache>&& shardingIndexesCatalog)
+        : cm(std::move(chunkManager)), sii(std::move(shardingIndexesCatalog)) {}
     ChunkManager cm;
-    boost::optional<GlobalIndexesCache> gii;
+    boost::optional<ShardingIndexesCatalogCache> sii;
 
     ShardVersion getCollectionVersion() const;
     ShardVersion getShardVersion(const ShardId& shardId) const;
@@ -377,7 +377,7 @@ private:
         void _updateRefreshesStats(bool isIncremental, bool add);
     };
 
-    class IndexCache : public GlobalIndexesCacheBase {
+    class IndexCache : public ShardingIndexesCatalogRTCBase {
     public:
         IndexCache(ServiceContext* service, ThreadPoolInterface& threadPool);
 
@@ -394,9 +394,8 @@ private:
                                                            boost::optional<Timestamp> atClusterTime,
                                                            bool allowLocks = false);
 
-    boost::optional<GlobalIndexesCache> _getCollectionIndexInfoAt(OperationContext* opCtx,
-                                                                  const NamespaceString& nss,
-                                                                  bool allowLocks = false);
+    boost::optional<ShardingIndexesCatalogCache> _getCollectionIndexInfoAt(
+        OperationContext* opCtx, const NamespaceString& nss, bool allowLocks = false);
 
     void _triggerPlacementVersionRefresh(OperationContext* opCtx, const NamespaceString& nss);
 

@@ -164,11 +164,11 @@ bool isMetadataDifferent(const CollectionRoutingInfo& managerA,
         if (managerA.cm.getVersion() != managerB.cm.getVersion())
             return true;
 
-        if (managerA.gii.is_initialized() != managerB.gii.is_initialized())
+        if (managerA.sii.is_initialized() != managerB.sii.is_initialized())
             return true;
 
-        return managerA.gii.is_initialized() &&
-            managerA.gii->getCollectionIndexes() != managerB.gii->getCollectionIndexes();
+        return managerA.sii.is_initialized() &&
+            managerA.sii->getCollectionIndexes() != managerB.sii->getCollectionIndexes();
     }
 
     return managerA.cm.dbVersion() != managerB.cm.dbVersion();
@@ -198,7 +198,7 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
         uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
     }
-    auto [cm, gii] = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
+    auto [cm, sii] = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
 
     // For a sharded time-series collection, only the underlying buckets collection is stored on the
     // config servers. If the user operation is on the time-series view namespace, we should check
@@ -223,7 +223,7 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
         if (bucketsPlacementInfo.isSharded()) {
             _nss = bucketsNs;
             cm = std::move(bucketsPlacementInfo);
-            gii = std::move(bucketsIndexInfo);
+            sii = std::move(bucketsIndexInfo);
             _isRequestOnTimeseriesViewNamespace = true;
         }
     } else if (!cm.isSharded() && _isRequestOnTimeseriesViewNamespace) {
@@ -235,9 +235,9 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
             uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
         }
-        auto [newCm, newGii] = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
+        auto [newCm, newSii] = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
         cm = std::move(newCm);
-        gii = std::move(newGii);
+        sii = std::move(newSii);
         _isRequestOnTimeseriesViewNamespace = false;
     }
 
@@ -247,7 +247,7 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
                 "Collection epoch has changed",
                 cm.getVersion().epoch() == *_targetEpoch);
     }
-    return CollectionRoutingInfo(std::move(cm), std::move(gii));
+    return CollectionRoutingInfo(std::move(cm), std::move(sii));
 }
 
 const NamespaceString& CollectionRoutingInfoTargeter::getNS() const {

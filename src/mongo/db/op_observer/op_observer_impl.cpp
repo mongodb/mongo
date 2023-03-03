@@ -2154,12 +2154,12 @@ void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
         opCtx, &oplogEntry, DurableTxnStateEnum::kAborted, _oplogWriter.get());
 }
 
-void OpObserverImpl::onModifyShardedCollectionGlobalIndexCatalogEntry(OperationContext* opCtx,
-                                                                      const NamespaceString& nss,
-                                                                      const UUID& uuid,
-                                                                      BSONObj opDoc) {
+void OpObserverImpl::onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
+                                                            const NamespaceString& nss,
+                                                            const UUID& uuid,
+                                                            BSONObj opDoc) {
     repl::MutableOplogEntry oplogEntry;
-    auto obj = BSON("modifyShardedCollectionGlobalIndexCatalog" << nss.toString()).addFields(opDoc);
+    auto obj = BSON(kShardingIndexCatalogOplogEntryName << nss.toString()).addFields(opDoc);
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setNss(nss);
     oplogEntry.setUuid(uuid);

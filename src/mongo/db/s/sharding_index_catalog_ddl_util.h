@@ -39,10 +39,10 @@ namespace mongo {
  * migrations and holding the critical section in all shards with data for userCollectionNss. This
  * function is not currently compatible with transactions.
  */
-void renameGlobalIndexesMetadata(OperationContext* opCtx,
-                                 const NamespaceString& fromNss,
-                                 const NamespaceString& toNss,
-                                 const Timestamp& indexVersion);
+void renameCollectionShardingIndexCatalog(OperationContext* opCtx,
+                                          const NamespaceString& fromNss,
+                                          const NamespaceString& toNss,
+                                          const Timestamp& indexVersion);
 
 /**
  * Adds a new index entry into the in-memory catalog and persist it to disk. It effectively executes
@@ -50,14 +50,14 @@ void renameGlobalIndexesMetadata(OperationContext* opCtx,
  * section in all shards with data for userCollectionNss. This function is not currently compatible
  * with transactions.
  */
-void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
-                                            const NamespaceString& userCollectionNss,
-                                            const std::string& name,
-                                            const BSONObj& keyPattern,
-                                            const BSONObj& options,
-                                            const UUID& collectionUUID,
-                                            const Timestamp& lastmod,
-                                            const boost::optional<UUID>& indexCollectionUUID);
+void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
+                                              const NamespaceString& userCollectionNss,
+                                              const std::string& name,
+                                              const BSONObj& keyPattern,
+                                              const BSONObj& options,
+                                              const UUID& collectionUUID,
+                                              const Timestamp& lastmod,
+                                              const boost::optional<UUID>& indexCollectionUUID);
 
 /**
  * Removes the index identified by indexName from the catalog. This function updates the in-memory
@@ -65,11 +65,11 @@ void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
  * the critical section in all shards with data for nss. This function is not
  * currently compatible with transactions.
  */
-void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 const UUID& uuid,
-                                                 const StringData& indexName,
-                                                 const Timestamp& lastmod);
+void removeShardingIndexCatalogEntryFromCollection(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const UUID& uuid,
+                                                   const StringData& indexName,
+                                                   const Timestamp& lastmod);
 
 /**
  * Removes all the indexes and the current index version, and replace them for the specified indexes
@@ -77,26 +77,26 @@ void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
  * critical section in all shards with data for userCollectionNss. This function is not currently
  * compatible with transactions.
  */
-void replaceCollectionGlobalIndexes(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    const UUID& uuid,
-                                    const Timestamp& indexVersion,
-                                    const std::vector<IndexCatalogType>& indexes);
+void replaceCollectionShardingIndexCatalog(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const UUID& uuid,
+                                           const Timestamp& indexVersion,
+                                           const std::vector<IndexCatalogType>& indexes);
 
 /**
  * Drops all indexes and the collection entry. This function should only be called after stopping
  * migrations and holding the critical section in all shards with data for userCollectionNss. This
  * function is not currently compatible with transactions.
  */
-void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx, const NamespaceString& nss);
+void dropCollectionShardingIndexCatalog(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
  * Removes all the indexes and unset the current index version. This function should only be called
  * after stopping migrations and holding the critical section in all shards with data for
  * userCollectionNss. This function is not currently compatible with transactions.
  */
-void clearCollectionGlobalIndexes(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const UUID& uuid);
+void clearCollectionShardingIndexCatalog(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const UUID& uuid);
 
 }  // namespace mongo

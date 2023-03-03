@@ -91,8 +91,8 @@
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
-#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
@@ -1220,18 +1220,19 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           -> Status {
          return applyAbortTransaction(opCtx, op, mode);
      }}},
-    {"modifyShardedCollectionGlobalIndexCatalog",
+    {kShardingIndexCatalogOplogEntryName,
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {
          const auto& entry = *op;
          auto indexCatalogOplog = ShardingIndexCatalogOplogEntry::parse(
-             IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
+             IDLParserContext("OplogModifyCollectionShardingIndexCatalogCtx"), entry.getObject());
          try {
              switch (indexCatalogOplog.getOp()) {
-                 case ShardingIndexCatalogOpEnumEnum::insert: {
+                 case ShardingIndexCatalogOpEnum::insert: {
                      auto indexEntry = ShardingIndexCatalogInsertEntry::parse(
-                         IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
-                     addGlobalIndexCatalogEntryToCollection(
+                         IDLParserContext("OplogModifyCollectionShardingIndexCatalogCtx"),
+                         entry.getObject());
+                     addShardingIndexCatalogEntryToCollection(
                          opCtx,
                          entry.getNss(),
                          indexEntry.getI().getName().toString(),
@@ -1242,42 +1243,43 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                          indexEntry.getI().getIndexCollectionUUID());
                      break;
                  }
-                 case ShardingIndexCatalogOpEnumEnum::remove: {
+                 case ShardingIndexCatalogOpEnum::remove: {
                      auto removeEntry = ShardingIndexCatalogRemoveEntry::parse(
                          IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
-                     removeGlobalIndexCatalogEntryFromCollection(opCtx,
-                                                                 entry.getNss(),
-                                                                 removeEntry.getUuid(),
-                                                                 removeEntry.getName(),
-                                                                 removeEntry.getLastmod());
+                     removeShardingIndexCatalogEntryFromCollection(opCtx,
+                                                                   entry.getNss(),
+                                                                   removeEntry.getUuid(),
+                                                                   removeEntry.getName(),
+                                                                   removeEntry.getLastmod());
                      break;
                  }
-                 case ShardingIndexCatalogOpEnumEnum::replace: {
+                 case ShardingIndexCatalogOpEnum::replace: {
                      auto replaceEntry = ShardingIndexCatalogReplaceEntry::parse(
                          IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
-                     replaceCollectionGlobalIndexes(opCtx,
-                                                    entry.getNss(),
-                                                    replaceEntry.getUuid(),
-                                                    replaceEntry.getLastmod(),
-                                                    replaceEntry.getI());
+                     replaceCollectionShardingIndexCatalog(opCtx,
+                                                           entry.getNss(),
+                                                           replaceEntry.getUuid(),
+                                                           replaceEntry.getLastmod(),
+                                                           replaceEntry.getI());
                      break;
                  }
-                 case ShardingIndexCatalogOpEnumEnum::clear: {
+                 case ShardingIndexCatalogOpEnum::clear: {
                      auto clearEntry = ShardingIndexCatalogClearEntry::parse(
                          IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
-                     clearCollectionGlobalIndexes(opCtx, entry.getNss(), clearEntry.getUuid());
+                     clearCollectionShardingIndexCatalog(
+                         opCtx, entry.getNss(), clearEntry.getUuid());
                      break;
                  }
-                 case ShardingIndexCatalogOpEnumEnum::drop:
-                     dropCollectionGlobalIndexesMetadata(opCtx, entry.getNss());
+                 case ShardingIndexCatalogOpEnum::drop:
+                     dropCollectionShardingIndexCatalog(opCtx, entry.getNss());
                      break;
-                 case ShardingIndexCatalogOpEnumEnum::rename: {
+                 case ShardingIndexCatalogOpEnum::rename: {
                      auto renameEntry = ShardingIndexCatalogRenameEntry::parse(
                          IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
-                     renameGlobalIndexesMetadata(opCtx,
-                                                 renameEntry.getFromNss(),
-                                                 renameEntry.getToNss(),
-                                                 renameEntry.getLastmod());
+                     renameCollectionShardingIndexCatalog(opCtx,
+                                                          renameEntry.getFromNss(),
+                                                          renameEntry.getToNss(),
+                                                          renameEntry.getLastmod());
                      break;
                  }
                  default:
@@ -1285,7 +1287,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
              }
          } catch (const DBException& ex) {
              LOGV2_ERROR(6712302,
-                         "Failed to apply modifyShardedCollectionGlobalIndexCatalog with entry obj",
+                         "Failed to apply modifyCollectionShardingIndexCatalog with entry obj",
                          "entry"_attr = redact(entry.getObject()),
                          "error"_attr = redact(ex));
              return ex.toStatus();

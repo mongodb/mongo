@@ -34,11 +34,11 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/sharded_index_catalog_commands_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
+#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -76,7 +76,7 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
             ->clearFilteringMetadataForDroppedCollection(opCtx);
     }
 
-    dropCollectionGlobalIndexesMetadata(opCtx, nss);
+    dropCollectionShardingIndexCatalog(opCtx, nss);
 
     // Remove all range deletion task documents present on disk for the collection to drop. This is
     // a best-effort tentative considering that migrations are not blocked, hence some new document

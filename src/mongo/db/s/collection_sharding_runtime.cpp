@@ -190,6 +190,11 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
     return {std::move(optMetadata)};
 }
 
+boost::optional<ShardingIndexesCatalogCache> CollectionShardingRuntime::getIndexesInCritSec(
+    OperationContext* opCtx) const {
+    return _shardingIndexesCatalogInfo;
+}
+
 boost::optional<CollectionMetadata> CollectionShardingRuntime::getCurrentMetadataIfKnown() const {
     auto optMetadata = _getCurrentMetadataIfKnown(boost::none);
     if (!optMetadata)
@@ -572,53 +577,53 @@ boost::optional<CollectionIndexes> CollectionShardingRuntime::getCollectionIndex
     OperationContext* opCtx) const {
     _checkCritSecForIndexMetadata(opCtx);
 
-    return _globalIndexesInfo ? boost::make_optional(_globalIndexesInfo->getCollectionIndexes())
-                              : boost::none;
+    return _shardingIndexesCatalogInfo
+        ? boost::make_optional(_shardingIndexesCatalogInfo->getCollectionIndexes())
+        : boost::none;
 }
 
-boost::optional<GlobalIndexesCache> CollectionShardingRuntime::getIndexes(OperationContext* opCtx,
-                                                                          bool withCritSec) const {
-    if (!withCritSec)
-        _checkCritSecForIndexMetadata(opCtx);
-
-    return _globalIndexesInfo;
+boost::optional<ShardingIndexesCatalogCache> CollectionShardingRuntime::getIndexes(
+    OperationContext* opCtx) const {
+    _checkCritSecForIndexMetadata(opCtx);
+    return _shardingIndexesCatalogInfo;
 }
 
 void CollectionShardingRuntime::addIndex(OperationContext* opCtx,
                                          const IndexCatalogType& index,
                                          const CollectionIndexes& collectionIndexes) {
-    if (_globalIndexesInfo) {
-        _globalIndexesInfo->add(index, collectionIndexes);
+    if (_shardingIndexesCatalogInfo) {
+        _shardingIndexesCatalogInfo->add(index, collectionIndexes);
     } else {
         IndexCatalogTypeMap indexMap;
         indexMap.emplace(index.getName(), index);
-        _globalIndexesInfo.emplace(collectionIndexes, std::move(indexMap));
+        _shardingIndexesCatalogInfo.emplace(collectionIndexes, std::move(indexMap));
     }
 }
 
 void CollectionShardingRuntime::removeIndex(OperationContext* opCtx,
                                             const std::string& name,
                                             const CollectionIndexes& collectionIndexes) {
-    tassert(
-        7019500, "Index information does not exist on CSR", _globalIndexesInfo.is_initialized());
-    _globalIndexesInfo->remove(name, collectionIndexes);
+    tassert(7019500,
+            "Index information does not exist on CSR",
+            _shardingIndexesCatalogInfo.is_initialized());
+    _shardingIndexesCatalogInfo->remove(name, collectionIndexes);
 }
 
 void CollectionShardingRuntime::clearIndexes(OperationContext* opCtx) {
-    _globalIndexesInfo = boost::none;
+    _shardingIndexesCatalogInfo = boost::none;
 }
 
 void CollectionShardingRuntime::replaceIndexes(OperationContext* opCtx,
                                                const std::vector<IndexCatalogType>& indexes,
                                                const CollectionIndexes& collectionIndexes) {
-    if (_globalIndexesInfo) {
-        _globalIndexesInfo = boost::none;
+    if (_shardingIndexesCatalogInfo) {
+        _shardingIndexesCatalogInfo = boost::none;
     }
     IndexCatalogTypeMap indexMap;
     for (const auto& index : indexes) {
         indexMap.emplace(index.getName(), index);
     }
-    _globalIndexesInfo.emplace(collectionIndexes, std::move(indexMap));
+    _shardingIndexesCatalogInfo.emplace(collectionIndexes, std::move(indexMap));
 }
 
 CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,

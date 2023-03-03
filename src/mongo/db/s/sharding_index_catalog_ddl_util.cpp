@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/global_index_ddl_util.h"
+#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -48,9 +48,9 @@ namespace {
 /**
  * Remove all indexes by uuid.
  */
-void deleteGlobalIndexes(OperationContext* opCtx,
-                         const CollectionPtr& collection,
-                         const UUID& uuid) {
+void deleteShardingIndexCatalogEntries(OperationContext* opCtx,
+                                       const CollectionPtr& collection,
+                                       const UUID& uuid) {
     mongo::deleteObjects(opCtx,
                          collection,
                          NamespaceString::kShardIndexCatalogNamespace,
@@ -59,13 +59,13 @@ void deleteGlobalIndexes(OperationContext* opCtx,
 }
 }  // namespace
 
-void renameGlobalIndexesMetadata(OperationContext* opCtx,
-                                 const NamespaceString& fromNss,
-                                 const NamespaceString& toNss,
-                                 const Timestamp& indexVersion) {
+void renameCollectionShardingIndexCatalog(OperationContext* opCtx,
+                                          const NamespaceString& fromNss,
+                                          const NamespaceString& toNss,
+                                          const Timestamp& indexVersion) {
     writeConflictRetry(
         opCtx,
-        "RenameGlobalIndexesMetadata",
+        "RenameCollectionShardingIndexCatalog",
         NamespaceString::kShardIndexCatalogNamespace.ns(),
         [&]() {
             boost::optional<UUID> toUuid;
@@ -86,14 +86,15 @@ void renameGlobalIndexesMetadata(OperationContext* opCtx,
                     Helpers::findOne(opCtx, collsColl.getCollection(), queryTo, collectionToDoc);
                 if (docExists) {
                     auto collectionTo = ShardAuthoritativeCollectionType::parse(
-                        IDLParserContext("renameGlobalIndexesMetadata"), collectionToDoc);
+                        IDLParserContext("RenameCollectionShardingIndexCatalogCtx"),
+                        collectionToDoc);
                     auto toIndexVersion =
                         collectionTo.getIndexVersion().get_value_or(Timestamp(0, 0));
                     if (indexVersion <= toIndexVersion) {
                         LOGV2_DEBUG(7079500,
                                     1,
-                                    "renameGlobalIndexesMetadata has index version older than "
-                                    "current collection index version",
+                                    "renameCollectionShardingIndexCatalog has index version older "
+                                    "than current collection index version",
                                     "collectionIndexVersion"_attr = toIndexVersion,
                                     "expectedIndexVersion"_attr = indexVersion,
                                     "fromNss"_attr = redact(fromNss.toString()),
@@ -120,7 +121,7 @@ void renameGlobalIndexesMetadata(OperationContext* opCtx,
                         Helpers::findOne(
                             opCtx, collsColl.getCollection(), queryFrom, collectionFromDoc));
                 auto collectionFrom = ShardAuthoritativeCollectionType::parse(
-                    IDLParserContext("renameGlobalIndexesMetadata"), collectionFromDoc);
+                    IDLParserContext("RenameCollectionShardingIndexCatalogCtx"), collectionFromDoc);
                 collectionFrom.setNss(toNss);
 
                 mongo::deleteObjects(opCtx,
@@ -147,25 +148,23 @@ void renameGlobalIndexesMetadata(OperationContext* opCtx,
                     false);
             }
 
-            opCtx->getServiceContext()
-                ->getOpObserver()
-                ->onModifyShardedCollectionGlobalIndexCatalogEntry(
-                    opCtx,
-                    fromNss,
-                    idxColl->uuid(),
-                    ShardingIndexCatalogRenameEntry(fromNss, toNss, indexVersion).toBSON());
+            opCtx->getServiceContext()->getOpObserver()->onModifyCollectionShardingIndexCatalog(
+                opCtx,
+                fromNss,
+                idxColl->uuid(),
+                ShardingIndexCatalogRenameEntry(fromNss, toNss, indexVersion).toBSON());
             wunit.commit();
         });
 }
 
-void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
-                                            const NamespaceString& userCollectionNss,
-                                            const std::string& name,
-                                            const BSONObj& keyPattern,
-                                            const BSONObj& options,
-                                            const UUID& collectionUUID,
-                                            const Timestamp& lastmod,
-                                            const boost::optional<UUID>& indexCollectionUUID) {
+void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
+                                              const NamespaceString& userCollectionNss,
+                                              const std::string& name,
+                                              const BSONObj& keyPattern,
+                                              const BSONObj& options,
+                                              const UUID& collectionUUID,
+                                              const Timestamp& lastmod,
+                                              const boost::optional<UUID>& indexCollectionUUID) {
     IndexCatalogType indexCatalogEntry(name, keyPattern, options, lastmod, collectionUUID);
     indexCatalogEntry.setIndexCollectionUUID(indexCollectionUUID);
 
@@ -194,7 +193,7 @@ void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
                     if (collection.getIndexVersion() && lastmod <= *collection.getIndexVersion()) {
                         LOGV2_DEBUG(6712300,
                                     1,
-                                    "addGlobalIndexCatalogEntryToCollection has index version "
+                                    "addShardingIndexCatalogEntryToCollection has index version "
                                     "older than current collection index version",
                                     "collectionIndexVersion"_attr = *collection.getIndexVersion(),
                                     "expectedIndexVersion"_attr = lastmod,
@@ -231,24 +230,25 @@ void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
                                                                     false));
             }
 
-            opCtx->getServiceContext()
-                ->getOpObserver()
-                ->onModifyShardedCollectionGlobalIndexCatalogEntry(
-                    opCtx,
-                    userCollectionNss,
-                    idxColl->uuid(),
-                    ShardingIndexCatalogInsertEntry(indexCatalogEntry).toBSON());
+            opCtx->getServiceContext()->getOpObserver()->onModifyCollectionShardingIndexCatalog(
+                opCtx,
+                userCollectionNss,
+                idxColl->uuid(),
+                ShardingIndexCatalogInsertEntry(indexCatalogEntry).toBSON());
             wunit.commit();
         });
 }
 
-void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 const UUID& uuid,
-                                                 const StringData& indexName,
-                                                 const Timestamp& lastmod) {
+void removeShardingIndexCatalogEntryFromCollection(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const UUID& uuid,
+                                                   const StringData& indexName,
+                                                   const Timestamp& lastmod) {
     writeConflictRetry(
-        opCtx, "RemoveIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
+        opCtx,
+        "RemoveShardingIndexCatalogEntryFromCollection",
+        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, nss, MODE_IX);
             AutoGetCollection collsColl(opCtx,
@@ -270,8 +270,8 @@ void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
                     if (collection.getIndexVersion() && lastmod <= *collection.getIndexVersion()) {
                         LOGV2_DEBUG(6712301,
                                     1,
-                                    "removeGlobalIndexCatalogEntryFromCollection has index version "
-                                    "older than current collection index version",
+                                    "removeShardingIndexCatalogEntryFromCollection has index "
+                                    "version older than current collection index version",
                                     "collectionIndexVersion"_attr = *collection.getIndexVersion(),
                                     "expectedIndexVersion"_attr = lastmod,
                                     "nss"_attr = redact(nss.toString()));
@@ -304,24 +304,25 @@ void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
                                      true);
             }
 
-            opCtx->getServiceContext()
-                ->getOpObserver()
-                ->onModifyShardedCollectionGlobalIndexCatalogEntry(
-                    opCtx,
-                    nss,
-                    idxColl->uuid(),
-                    ShardingIndexCatalogRemoveEntry(indexName.toString(), uuid, lastmod).toBSON());
+            opCtx->getServiceContext()->getOpObserver()->onModifyCollectionShardingIndexCatalog(
+                opCtx,
+                nss,
+                idxColl->uuid(),
+                ShardingIndexCatalogRemoveEntry(indexName.toString(), uuid, lastmod).toBSON());
             wunit.commit();
         });
 }
 
-void replaceCollectionGlobalIndexes(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    const UUID& uuid,
-                                    const Timestamp& indexVersion,
-                                    const std::vector<IndexCatalogType>& indexes) {
+void replaceCollectionShardingIndexCatalog(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const UUID& uuid,
+                                           const Timestamp& indexVersion,
+                                           const std::vector<IndexCatalogType>& indexes) {
     writeConflictRetry(
-        opCtx, "ReplaceIndexCatalog", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
+        opCtx,
+        "ReplaceCollectionShardingIndexCatalog",
+        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, nss, MODE_IX);
             AutoGetCollection collsColl(opCtx,
@@ -371,7 +372,7 @@ void replaceCollectionGlobalIndexes(OperationContext* opCtx,
             {
                 // Clear old indexes.
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
-                deleteGlobalIndexes(opCtx, idxColl.getCollection(), uuid);
+                deleteShardingIndexCatalogEntries(opCtx, idxColl.getCollection(), uuid);
 
                 // Add new indexes.
                 for (const auto& i : indexes) {
@@ -390,20 +391,21 @@ void replaceCollectionGlobalIndexes(OperationContext* opCtx,
                 }
             }
 
-            opCtx->getServiceContext()
-                ->getOpObserver()
-                ->onModifyShardedCollectionGlobalIndexCatalogEntry(
-                    opCtx,
-                    nss,
-                    idxColl->uuid(),
-                    ShardingIndexCatalogReplaceEntry(uuid, indexVersion, indexes).toBSON());
+            opCtx->getServiceContext()->getOpObserver()->onModifyCollectionShardingIndexCatalog(
+                opCtx,
+                nss,
+                idxColl->uuid(),
+                ShardingIndexCatalogReplaceEntry(uuid, indexVersion, indexes).toBSON());
             wunit.commit();
         });
 }
 
-void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx, const NamespaceString& nss) {
+void dropCollectionShardingIndexCatalog(OperationContext* opCtx, const NamespaceString& nss) {
     writeConflictRetry(
-        opCtx, "DropIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
+        opCtx,
+        "DropCollectionShardingIndexCatalog",
+        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        [&]() {
             boost::optional<UUID> collectionUUID;
             WriteUnitOfWork wunit(opCtx);
             Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
@@ -427,7 +429,7 @@ void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx, const Namespac
                     return;
                 }
                 auto collection = ShardAuthoritativeCollectionType::parse(
-                    IDLParserContext("DropIndexCatalogEntry"), collectionDoc);
+                    IDLParserContext("dropCollectionShardingIndexCatalog"), collectionDoc);
                 collectionUUID.emplace(collection.getUuid());
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 mongo::deleteObjects(opCtx,
@@ -441,25 +443,26 @@ void dropCollectionGlobalIndexesMetadata(OperationContext* opCtx, const Namespac
 
             {
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
-                deleteGlobalIndexes(opCtx, idxColl.getCollection(), *collectionUUID);
+                deleteShardingIndexCatalogEntries(opCtx, idxColl.getCollection(), *collectionUUID);
             }
 
-            opCtx->getServiceContext()
-                ->getOpObserver()
-                ->onModifyShardedCollectionGlobalIndexCatalogEntry(
-                    opCtx,
-                    nss,
-                    idxColl->uuid(),
-                    ShardingIndexCatalogDropEntry(*collectionUUID).toBSON());
+            opCtx->getServiceContext()->getOpObserver()->onModifyCollectionShardingIndexCatalog(
+                opCtx,
+                nss,
+                idxColl->uuid(),
+                ShardingIndexCatalogDropEntry(*collectionUUID).toBSON());
             wunit.commit();
         });
 }
 
-void clearCollectionGlobalIndexes(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const UUID& uuid) {
+void clearCollectionShardingIndexCatalog(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const UUID& uuid) {
     writeConflictRetry(
-        opCtx, "ClearIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
+        opCtx,
+        "ClearCollectionShardingIndexCatalog",
+        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, nss, MODE_IX);
             AutoGetCollection collsColl(opCtx,
@@ -482,7 +485,7 @@ void clearCollectionGlobalIndexes(OperationContext* opCtx,
                 }
 
                 auto collection = ShardAuthoritativeCollectionType::parse(
-                    IDLParserContext("ClearIndexCatalogEntry"), collectionDoc);
+                    IDLParserContext("clearCollectionShardingIndexCatalogCtx"), collectionDoc);
 
                 if (!collection.getIndexVersion()) {
                     return;
@@ -506,13 +509,11 @@ void clearCollectionGlobalIndexes(OperationContext* opCtx,
 
             {
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
-                deleteGlobalIndexes(opCtx, idxColl.getCollection(), uuid);
+                deleteShardingIndexCatalogEntries(opCtx, idxColl.getCollection(), uuid);
             }
 
-            opCtx->getServiceContext()
-                ->getOpObserver()
-                ->onModifyShardedCollectionGlobalIndexCatalogEntry(
-                    opCtx, nss, idxColl->uuid(), ShardingIndexCatalogClearEntry(uuid).toBSON());
+            opCtx->getServiceContext()->getOpObserver()->onModifyCollectionShardingIndexCatalog(
+                opCtx, nss, idxColl->uuid(), ShardingIndexCatalogClearEntry(uuid).toBSON());
             wunit.commit();
         });
 }

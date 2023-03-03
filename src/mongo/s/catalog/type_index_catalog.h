@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+static constexpr auto kShardingIndexCatalogOplogEntryName = "modifyCollectionShardingIndexCatalog";
+
 class ShardingIndexCatalogInsertEntry : public ShardingIndexCatalogInsertEntryBase {
 public:
     ShardingIndexCatalogInsertEntry(const IndexCatalogType& idx);

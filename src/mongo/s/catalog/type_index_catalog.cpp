@@ -34,7 +34,7 @@ namespace mongo {
 ShardingIndexCatalogInsertEntry::ShardingIndexCatalogInsertEntry(const IndexCatalogType& idx) {
     setI(idx);
     setShardingIndexCatalogOplogEntry(
-        ShardingIndexCatalogOplogEntry(ShardingIndexCatalogOpEnumEnum::insert));
+        ShardingIndexCatalogOplogEntry(ShardingIndexCatalogOpEnum::insert));
 }
 
 ShardingIndexCatalogRemoveEntry::ShardingIndexCatalogRemoveEntry(const std::string& name,
@@ -42,20 +42,20 @@ ShardingIndexCatalogRemoveEntry::ShardingIndexCatalogRemoveEntry(const std::stri
                                                                  const Timestamp& lastmod)
     : ShardingIndexCatalogRemoveEntryBase(name, uuid, lastmod) {
     setShardingIndexCatalogOplogEntry(
-        ShardingIndexCatalogOplogEntry(ShardingIndexCatalogOpEnumEnum::remove));
+        ShardingIndexCatalogOplogEntry(ShardingIndexCatalogOpEnum::remove));
 }
 
 ShardingIndexCatalogReplaceEntry::ShardingIndexCatalogReplaceEntry(
     const UUID& uuid, const Timestamp& lastmod, const std::vector<IndexCatalogType>& i)
     : ShardingIndexCatalogReplaceEntryBase(uuid, lastmod, i) {
     setShardingIndexCatalogOplogEntry(
-        ShardingIndexCatalogOplogEntry(ShardingIndexCatalogOpEnumEnum::replace));
+        ShardingIndexCatalogOplogEntry(ShardingIndexCatalogOpEnum::replace));
 }
 
 ShardingIndexCatalogDropEntry::ShardingIndexCatalogDropEntry(const UUID& uuid)
     : ShardingIndexCatalogDropEntryBase(uuid) {
     setShardingIndexCatalogOplogEntry(
-        ShardingIndexCatalogOplogEntry(ShardingIndexCatalogOpEnumEnum::drop));
+        ShardingIndexCatalogOplogEntry(ShardingIndexCatalogOpEnum::drop));
 }
 
 
@@ -64,13 +64,13 @@ ShardingIndexCatalogRenameEntry::ShardingIndexCatalogRenameEntry(const Namespace
                                                                  const Timestamp& lastmod)
     : ShardingIndexCatalogRenameEntryBase(fromNss, toNss, lastmod) {
     setShardingIndexCatalogOplogEntry(
-        ShardingIndexCatalogOplogEntry(ShardingIndexCatalogOpEnumEnum::rename));
+        ShardingIndexCatalogOplogEntry(ShardingIndexCatalogOpEnum::rename));
 }
 
 
 ShardingIndexCatalogClearEntry::ShardingIndexCatalogClearEntry(const UUID& uuid)
     : ShardingIndexCatalogClearEntryBase(uuid) {
     setShardingIndexCatalogOplogEntry(
-        ShardingIndexCatalogOplogEntry(ShardingIndexCatalogOpEnumEnum::clear));
+        ShardingIndexCatalogOplogEntry(ShardingIndexCatalogOpEnum::clear));
 }
 }  // namespace mongo

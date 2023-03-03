@@ -212,7 +212,7 @@ Status createIndexOnCollection(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status createGlobalIndexesIndexes(OperationContext* opCtx) {
+Status createShardingIndexCatalogIndexes(OperationContext* opCtx) {
     bool unique = true;
     NamespaceString indexCatalogNamespace;
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {

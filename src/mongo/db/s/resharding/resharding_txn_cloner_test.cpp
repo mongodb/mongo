@@ -148,7 +148,8 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
                 return repl::OpTimeWith<std::vector<ShardType>>(shardTypes);
             }
 
-            std::pair<CollectionType, std::vector<IndexCatalogType>> getCollectionAndGlobalIndexes(
+            std::pair<CollectionType, std::vector<IndexCatalogType>>
+            getCollectionAndShardingIndexCatalogEntries(
                 OperationContext* opCtx,
                 const NamespaceString& nss,
                 const repl::ReadConcernArgs& readConcern) override {

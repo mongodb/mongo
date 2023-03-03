@@ -67,7 +67,6 @@
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
@@ -75,6 +74,7 @@
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/shard_authoritative_catalog_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -537,7 +537,7 @@ private:
         }
 
         if (requestedVersion > actualVersion) {
-            _createGlobalIndexesIndexes(opCtx, requestedVersion);
+            _createShardingIndexCatalogIndexes(opCtx, requestedVersion);
         }
     }
 
@@ -656,11 +656,11 @@ private:
         }
     }
 
-    void _createGlobalIndexesIndexes(
+    void _createShardingIndexCatalogIndexes(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        // TODO SERVER-67392: Remove once FCV 7.0 becomes last-lts.
+        // TODO SERVER-67392: Remove once gGlobalIndexesShardingCatalog is enabled.
         if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
-            uassertStatusOK(sharding_util::createGlobalIndexesIndexes(opCtx));
+            uassertStatusOK(sharding_util::createShardingIndexCatalogIndexes(opCtx));
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
                 uassertStatusOK(sharding_util::createShardCollectionCatalogIndexes(opCtx));
             }
@@ -772,7 +772,7 @@ private:
             // TODO SERVER-68551: Remove once 7.0 becomes last-lts
             dropDistLockCollections(opCtx);
 
-            _createGlobalIndexesIndexes(opCtx, requestedVersion);
+            _createShardingIndexCatalogIndexes(opCtx, requestedVersion);
 
             // Tell the shards to enter phase-2 of setFCV (fully upgraded)
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
@@ -833,15 +833,15 @@ private:
 
             if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(
                     requestedVersion)) {
-                bool hasGlobalIndexes;
+                bool hasShardingIndexCatalogEntries;
                 BSONObj indexDoc, collDoc;
                 {
                     AutoGetCollection indexesColl(
                         opCtx, NamespaceString::kConfigsvrIndexCatalogNamespace, MODE_IS);
-                    hasGlobalIndexes =
+                    hasShardingIndexCatalogEntries =
                         Helpers::findOne(opCtx, indexesColl.getCollection(), BSONObj(), indexDoc);
                 }
-                if (hasGlobalIndexes) {
+                if (hasShardingIndexCatalogEntries) {
                     auto uuid = uassertStatusOK(
                         UUID::parse(indexDoc[IndexCatalogType::kCollectionUUIDFieldName]));
                     AutoGetCollection collsColl(
@@ -860,7 +860,7 @@ private:
                             << "' on collection '"
                             << NamespaceString(collDoc[CollectionType::kNssFieldName].String())
                             << "'",
-                        !hasGlobalIndexes);
+                        !hasShardingIndexCatalogEntries);
             }
             return;
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
@@ -1014,7 +1014,7 @@ private:
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         _cleanUpClusterParameters(opCtx, requestedVersion);
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            _dropInternalGlobalIndexesCollection(opCtx, requestedVersion);
+            _dropInternalShardingIndexCatalogCollection(opCtx, requestedVersion);
             _removeSchemaOnConfigSettings(opCtx, requestedVersion);
             // Always abort the reshardCollection regardless of version to ensure that it will
             // run on a consistent version from start to finish. This will ensure that it will
@@ -1030,13 +1030,13 @@ private:
                 ShardingDDLCoordinatorService::getService(opCtx)
                     ->waitForOngoingCoordinatorsToFinish(opCtx);
             }
-            _dropInternalGlobalIndexesCollection(opCtx, requestedVersion);
+            _dropInternalShardingIndexCatalogCollection(opCtx, requestedVersion);
         } else {
             return;
         }
     }
 
-    void _dropInternalGlobalIndexesCollection(
+    void _dropInternalShardingIndexCatalogCollection(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         // TODO SERVER-67392: Remove when 7.0 branches-out.
         // Coordinators that commits indexes to the csrs must be drained before this point. Older
@@ -1045,7 +1045,7 @@ private:
         if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
                 // There cannot be any global indexes at this point, but calling
-                // clearCollectionGlobalIndexes removes the index version from
+                // clearCollectionShardingIndexCatalog removes the index version from
                 // config.shard.collections and the csr transactionally.
                 LOGV2(7013200, "Clearing global indexes for all collections");
                 DBDirectClient client(opCtx);
@@ -1056,8 +1056,9 @@ private:
                 while (cursor->more()) {
                     const auto collectionDoc = cursor->next();
                     auto collection = ShardAuthoritativeCollectionType::parse(
-                        IDLParserContext("FCVDropIndexCatalog"), collectionDoc);
-                    clearCollectionGlobalIndexes(opCtx, collection.getNss(), collection.getUuid());
+                        IDLParserContext("FCVDropIndexCatalogCtx"), collectionDoc);
+                    clearCollectionShardingIndexCatalog(
+                        opCtx, collection.getNss(), collection.getUuid());
                 }
 
                 LOGV2(6711905,

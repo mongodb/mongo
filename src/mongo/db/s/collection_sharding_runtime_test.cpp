@@ -36,12 +36,12 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deleter_service_test.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
@@ -573,13 +573,13 @@ public:
     }
 };
 
-TEST_F(CollectionShardingRuntimeWithCatalogTest, TestGlobalIndexesCache) {
+TEST_F(CollectionShardingRuntimeWithCatalogTest, TestShardingIndexesCatalogCache) {
     OperationContext* opCtx = operationContext();
 
     ASSERT_EQ(false, csr()->getIndexes(opCtx).is_initialized());
 
     Timestamp indexVersion(1, 0);
-    addGlobalIndexCatalogEntryToCollection(
+    addShardingIndexCatalogEntryToCollection(
         opCtx, kTestNss, "x_1", BSON("x" << 1), BSONObj(), uuid(), indexVersion, boost::none);
 
     ASSERT_EQ(true, csr()->getIndexes(opCtx).is_initialized());

@@ -295,8 +295,8 @@ void CollectionRoutingInfoTargeterTest::
                                                       << "hashed"));
 
     auto cm = makeCustomChunkManager(shardKeyPattern, splitPoints);
-    auto criTargeter = CollectionRoutingInfoTargeter(
-        CollectionRoutingInfo{std::move(cm), boost::optional<GlobalIndexesCache>(boost::none)});
+    auto criTargeter = CollectionRoutingInfoTargeter(CollectionRoutingInfo{
+        std::move(cm), boost::optional<ShardingIndexesCatalogCache>(boost::none)});
     ASSERT_EQ(criTargeter.getRoutingInfo().cm.numChunks(), 5);
 
     // Cause the global chunk manager to have some other configuration.

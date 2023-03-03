@@ -707,7 +707,7 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
             opCtx, originalNss()));
     auto& cm = cri.cm;
-    auto& gii = cri.gii;
+    auto& sii = cri.sii;
     if (cm.isSharded()) {
         auto requestMatchesExistingCollection = [&] {
             // No timeseries fields in request
@@ -751,7 +751,7 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
     cri = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, bucketsNss));
     cm = cri.cm;
-    gii = cri.gii;
+    sii = cri.sii;
     if (!cm.isSharded()) {
         return boost::none;
     }

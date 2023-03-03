@@ -55,13 +55,13 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -295,9 +295,9 @@ bool migrationRecipientRecoveryDocumentExists(OperationContext* opCtx,
                             << sessionId.toString())) > 0;
 }
 
-void replaceGlobalIndexesInShardIfNeeded(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         const UUID& uuid) {
+void replaceShardingIndexCatalogInShardIfNeeded(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const UUID& uuid) {
     auto currentShardHasAnyChunks = [&]() -> bool {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
         const auto scsr =
@@ -311,19 +311,19 @@ void replaceGlobalIndexesInShardIfNeeded(OperationContext* opCtx,
         return;
     }
 
-    auto [_, optGii] = uassertStatusOK(
+    auto [_, optSii] = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithIndexRefresh(opCtx, nss));
 
-    if (optGii) {
+    if (optSii) {
         std::vector<IndexCatalogType> indexes;
-        optGii->forEachIndex([&](const auto& index) {
+        optSii->forEachIndex([&](const auto& index) {
             indexes.push_back(index);
             return true;
         });
-        replaceCollectionGlobalIndexes(
-            opCtx, nss, uuid, optGii->getCollectionIndexes().indexVersion(), indexes);
+        replaceCollectionShardingIndexCatalog(
+            opCtx, nss, uuid, optSii->getCollectionIndexes().indexVersion(), indexes);
     } else {
-        clearCollectionGlobalIndexes(opCtx, nss, uuid);
+        clearCollectionShardingIndexCatalog(opCtx, nss, uuid);
     }
 }
 
@@ -1316,7 +1316,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             // Get the global indexes and install them.
             if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
                     serverGlobalParams.featureCompatibility)) {
-                replaceGlobalIndexesInShardIfNeeded(
+                replaceShardingIndexCatalogInShardIfNeeded(
                     altOpCtx.get(), _nss, donorCollectionOptionsAndIndexes.uuid);
             }
 

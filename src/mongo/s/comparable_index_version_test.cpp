@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/global_index_cache.h"
+#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

@@ -202,10 +202,10 @@ public:
      * Retrieves the collection metadata and its global index metadata. This function will return
      * all of the global idexes for a collection.
      */
-    virtual std::pair<CollectionType, std::vector<IndexCatalogType>> getCollectionAndGlobalIndexes(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const repl::ReadConcernArgs& readConcern) = 0;
+    virtual std::pair<CollectionType, std::vector<IndexCatalogType>>
+    getCollectionAndShardingIndexCatalogEntries(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const repl::ReadConcernArgs& readConcern) = 0;
 
     /**
      * Retrieves all zones defined for the specified collection. The returned vector is sorted based

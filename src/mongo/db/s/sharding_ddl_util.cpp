@@ -219,9 +219,9 @@ void deleteCollection(OperationContext* opCtx,
     runTransactionOnShardingCatalog(opCtx, std::move(transactionChain), writeConcern);
 }
 
-void deleteGlobalIndexesMetadata(OperationContext* opCtx,
-                                 const UUID& uuid,
-                                 const WriteConcernOptions& writeConcern) {
+void deleteShardingIndexCatalogMetadata(OperationContext* opCtx,
+                                        const UUID& uuid,
+                                        const WriteConcernOptions& writeConcern) {
     BatchedCommandRequest request([&] {
         write_ops::DeleteCommandRequest deleteOp(NamespaceString::kConfigsvrIndexCatalogNamespace);
         deleteOp.setDeletes({[&] {
@@ -506,7 +506,7 @@ void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx,
 
     deleteChunks(opCtx, uuid, writeConcern);
 
-    deleteGlobalIndexesMetadata(opCtx, uuid, writeConcern);
+    deleteShardingIndexCatalogMetadata(opCtx, uuid, writeConcern);
 }
 
 bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx,

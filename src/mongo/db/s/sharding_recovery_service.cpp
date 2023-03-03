@@ -69,7 +69,7 @@ bool inRecoveryMode(OperationContext* opCtx) {
 }  // namespace sharding_recovery_util
 
 namespace {
-const StringData kGlobalIndexesFieldName = "globalIndexes"_sd;
+const StringData kShardingIndexCatalogEntriesFieldName = "indexes"_sd;
 const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecoveryService>();
 
 AggregateCommandRequest makeCollectionsAndIndexesAggregation(OperationContext* opCtx) {
@@ -104,18 +104,18 @@ AggregateCommandRequest makeCollectionsAndIndexesAggregation(OperationContext* o
     // config.shard.collections document.
     //
     // The $lookup stage gets the config.shard.indexes documents and puts them in a field called
-    // "globalIndexes" in the document produced during stage 1.
+    // "indexes" in the document produced during stage 1.
     //
     // {
     //      $lookup: {
     //          from: "shard.indexes",
-    //          as: "globalIndexes",
+    //          as: "indexes",
     //          localField: "uuid",
     //          foreignField: "collectionUUID"
     //      }
     // }
     const Doc lookupPipeline{{"from", NamespaceString::kShardIndexCatalogNamespace.coll()},
-                             {"as", kGlobalIndexesFieldName},
+                             {"as", kShardingIndexCatalogEntriesFieldName},
                              {"localField", ShardAuthoritativeCollectionType::kUuidFieldName},
                              {"foreignField", IndexCatalogType::kCollectionUUIDFieldName}};
 
@@ -618,7 +618,7 @@ void ShardingRecoveryService::recoverIndexesCatalog(OperationContext* opCtx) {
         auto doc = cursor->nextSafe();
         auto nss = NamespaceString(doc[CollectionType::kNssFieldName].String());
         auto indexVersion = doc[CollectionType::kIndexVersionFieldName].timestamp();
-        for (const auto& idx : doc[kGlobalIndexesFieldName].Array()) {
+        for (const auto& idx : doc[kShardingIndexCatalogEntriesFieldName].Array()) {
             auto indexEntry = IndexCatalogType::parse(
                 IDLParserContext("recoverIndexesCatalogContext"), idx.Obj());
             AutoGetCollection collLock(opCtx, nss, MODE_X);

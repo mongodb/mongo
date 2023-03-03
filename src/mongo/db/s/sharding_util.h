@@ -88,9 +88,9 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShardsWithVersion(
     bool throwOnError = true);
 
 /**
- * Creates the necessary indexes for the globalIndexes collections.
+ * Creates the necessary indexes for the sharding index catalog collections.
  */
-Status createGlobalIndexesIndexes(OperationContext* opCtx);
+Status createShardingIndexCatalogIndexes(OperationContext* opCtx);
 
 /**
  * Creates the necessary indexes for the collections collection.

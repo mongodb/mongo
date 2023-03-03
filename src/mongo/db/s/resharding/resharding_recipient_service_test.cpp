@@ -98,8 +98,8 @@ public:
                                                boost::none /* chunkSizeBytes */,
                                                true /* allowMigrations */,
                                                chunks);
-        IndexCatalogTypeMap globalIndexesMap;
-        globalIndexesMap.emplace(
+        IndexCatalogTypeMap shardingIndexesCatalogMap;
+        shardingIndexesCatalogMap.emplace(
             "randomKey_1",
             IndexCatalogType(
                 "randomKey_1", BSON("randomKey" << 1), BSONObj(), Timestamp(1, 0), _sourceUUID));
@@ -109,8 +109,8 @@ public:
                          DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
                          _makeStandaloneRoutingTableHistory(std::move(rt)),
                          boost::none /* clusterTime */),
-            GlobalIndexesCache(CollectionIndexes(_sourceUUID, Timestamp(1, 0)),
-                               std::move(globalIndexesMap))};
+            ShardingIndexesCatalogCache(CollectionIndexes(_sourceUUID, Timestamp(1, 0)),
+                                        std::move(shardingIndexesCatalogMap))};
     }
 
     MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
@@ -133,7 +133,7 @@ public:
         return {std::vector<BSONObj>{}, BSONObj()};
     }
 
-    boost::optional<GlobalIndexesCache> getCollectionIndexInfoWithRefresh(
+    boost::optional<ShardingIndexesCatalogCache> getCollectionIndexInfoWithRefresh(
         OperationContext* opCtx, const NamespaceString& nss) {
         return boost::none;
     }

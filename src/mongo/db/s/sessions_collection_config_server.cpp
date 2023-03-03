@@ -80,12 +80,12 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
                 // (SERVER-61214) wait for the catalog cache to acknowledge that the sessions
                 // collection is sharded in order to be sure to get a valid routing table
                 while (true) {
-                    auto [cm, gii] = uassertStatusOK(
+                    auto [cm, sii] = uassertStatusOK(
                         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx,
                                                                                               nss));
 
                     if (cm.isSharded()) {
-                        return CollectionRoutingInfo(std::move(cm), std::move(gii));
+                        return CollectionRoutingInfo(std::move(cm), std::move(sii));
                     }
                 }
             }();

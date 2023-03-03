@@ -33,13 +33,12 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
-#include "mongo/s/global_index_cache.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
 
-typedef std::pair<CollectionMetadata, boost::optional<GlobalIndexesCache>>
+typedef std::pair<CollectionMetadata, boost::optional<ShardingIndexesCatalogCache>>
     CollectionPlacementAndIndexInfo;
 
 /**
@@ -133,6 +132,10 @@ public:
         OrphanCleanupPolicy orphanCleanupPolicy,
         const ShardVersion& receivedShardVersion) const override;
 
+    boost::optional<CollectionIndexes> getCollectionIndexes(OperationContext* opCtx) const override;
+
+    boost::optional<ShardingIndexesCatalogCache> getIndexes(OperationContext* opCtx) const override;
+
     void checkShardVersionOrThrow(OperationContext* opCtx) const override;
 
     void checkShardVersionOrThrow(OperationContext* opCtx,
@@ -141,6 +144,8 @@ public:
     void appendShardVersion(BSONObjBuilder* builder) const override;
 
     size_t numberOfRangesScheduledForDeletion() const override;
+
+    boost::optional<ShardingIndexesCatalogCache> getIndexesInCritSec(OperationContext* opCtx) const;
 
     /**
      * Returns boost::none if the description for the collection is not known yet. Otherwise
@@ -269,19 +274,6 @@ public:
     void resetPlacementVersionRecoverRefreshFuture();
 
     /**
-     * Gets the shard's index version.
-     */
-    boost::optional<CollectionIndexes> getCollectionIndexes(OperationContext* opCtx) const;
-
-    /**
-     * Gets the shard's index cache.
-     *
-     * If withCritSec is true, then this function is being called under a critical section.
-     */
-    boost::optional<GlobalIndexesCache> getIndexes(OperationContext* opCtx,
-                                                   bool withCritSec = false) const;
-
-    /**
      * Add a new index to the shard-role index info under a lock.
      */
     void addIndex(OperationContext* opCtx,
@@ -405,7 +397,7 @@ private:
 
     // Contains the global indexes for the collection. This will be boost::none if no global indexes
     // have ever been created for the collection.
-    boost::optional<GlobalIndexesCache> _globalIndexesInfo;
+    boost::optional<ShardingIndexesCatalogCache> _shardingIndexesCatalogInfo;
 };
 
 /**

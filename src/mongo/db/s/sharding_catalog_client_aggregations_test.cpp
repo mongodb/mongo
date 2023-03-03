@@ -1079,7 +1079,7 @@ TEST_F(CatalogClientAggregationsTest, TestCollectionAndIndexesAggregationWithNoI
                                           BSONObjBuilder().appendMaxKey("_id").obj()),
                                placementVersion,
                                ShardId("shard01"))});
-    auto [collection, indexes] = catalogClient()->getCollectionAndGlobalIndexes(
+    auto [collection, indexes] = catalogClient()->getCollectionAndShardingIndexCatalogEntries(
         operationContext(), nss, {repl::ReadConcernLevel::kSnapshotReadConcern});
 
     ASSERT_EQ(indexes.size(), 0);
@@ -1109,7 +1109,7 @@ TEST_F(CatalogClientAggregationsTest, TestCollectionAndIndexesWithIndexes) {
     uassertStatusOK(insertToConfigCollection(
         operationContext(), NamespaceString::kConfigsvrIndexCatalogNamespace, index2.toBSON()));
 
-    auto [collection, indexes] = catalogClient()->getCollectionAndGlobalIndexes(
+    auto [collection, indexes] = catalogClient()->getCollectionAndShardingIndexCatalogEntries(
         operationContext(), nss, {repl::ReadConcernLevel::kSnapshotReadConcern});
 
     ASSERT_EQ(indexes.size(), 2);
@@ -1150,7 +1150,7 @@ TEST_F(CatalogClientAggregationsTest, TestCollectionAndIndexesWithMultipleCollec
     uassertStatusOK(insertToConfigCollection(
         operationContext(), NamespaceString::kConfigsvrIndexCatalogNamespace, index2.toBSON()));
 
-    auto [collection, indexes] = catalogClient()->getCollectionAndGlobalIndexes(
+    auto [collection, indexes] = catalogClient()->getCollectionAndShardingIndexCatalogEntries(
         operationContext(), nssColl1, {repl::ReadConcernLevel::kSnapshotReadConcern});
 
     ASSERT_EQ(indexes.size(), 1);

@@ -27,45 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/s/global_index_cache.h"
+#include "mongo/s/sharding_index_catalog_cache.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 
-bool GlobalIndexesCache::empty() const {
+bool ShardingIndexesCatalogCache::empty() const {
     return _indexes.empty();
 }
 
-CollectionIndexes GlobalIndexesCache::getCollectionIndexes() const {
+CollectionIndexes ShardingIndexesCatalogCache::getCollectionIndexes() const {
     return _collectionIndexes;
 }
 
-size_t GlobalIndexesCache::numIndexes() const {
+size_t ShardingIndexesCatalogCache::numIndexes() const {
     return _indexes.size();
 }
 
-bool GlobalIndexesCache::contains(const StringData& name) const {
+bool ShardingIndexesCatalogCache::contains(const StringData& name) const {
     return _indexes.contains(name);
 }
 
-void GlobalIndexesCache::add(const IndexCatalogType& index,
-                             const CollectionIndexes& collectionIndexes) {
+void ShardingIndexesCatalogCache::add(const IndexCatalogType& index,
+                                      const CollectionIndexes& collectionIndexes) {
     tassert(7019900,
-            str::stream()
-                << "Cannot add global index with different uuid than is in the GlobalIndexesCache.",
+            str::stream() << "Cannot add global index with different uuid than is in the "
+                             "ShardingIndexesCatalogCache.",
             collectionIndexes.uuid() == _collectionIndexes.uuid());
     _collectionIndexes = collectionIndexes;
     _indexes.emplace(index.getName(), index);
 }
 
-void GlobalIndexesCache::remove(const StringData& name,
-                                const CollectionIndexes& collectionIndexes) {
-    tassert(
-        7019901,
-        str::stream()
-            << "Cannot remove global index with different uuid than is in the GlobalIndexesCache.",
-        collectionIndexes.uuid() == _collectionIndexes.uuid());
+void ShardingIndexesCatalogCache::remove(const StringData& name,
+                                         const CollectionIndexes& collectionIndexes) {
+    tassert(7019901,
+            str::stream() << "Cannot remove global index with different uuid than is in the "
+                             "ShardingIndexesCatalogCache.",
+            collectionIndexes.uuid() == _collectionIndexes.uuid());
     _collectionIndexes = collectionIndexes;
     _indexes.erase(name);
 }

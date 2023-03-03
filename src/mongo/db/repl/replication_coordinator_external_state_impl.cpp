@@ -1015,7 +1015,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
         if (mongo::feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
             // Create indexes in config.shard.indexes if needed.
-            indexStatus = sharding_util::createGlobalIndexesIndexes(opCtx);
+            indexStatus = sharding_util::createShardingIndexCatalogIndexes(opCtx);
             if (!indexStatus.isOK()) {
                 // If the node is shutting down or it lost quorum just as it was becoming primary,
                 // don't run the sharding onStepUp machinery. The onStepDown counterpart to these

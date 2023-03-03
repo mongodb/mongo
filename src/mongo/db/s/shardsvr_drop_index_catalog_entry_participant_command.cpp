@@ -32,8 +32,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/sharded_index_catalog_commands_gen.h"
+#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_index_catalog_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -104,11 +104,11 @@ public:
             }
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-            removeGlobalIndexCatalogEntryFromCollection(opCtx,
-                                                        ns(),
-                                                        request().getCollectionUUID(),
-                                                        request().getName(),
-                                                        request().getLastmod());
+            removeShardingIndexCatalogEntryFromCollection(opCtx,
+                                                          ns(),
+                                                          request().getCollectionUUID(),
+                                                          request().getName(),
+                                                          request().getLastmod());
         }
 
     private:

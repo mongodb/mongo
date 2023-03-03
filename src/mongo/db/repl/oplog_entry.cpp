@@ -38,6 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/time_support.h"
 
@@ -167,8 +168,8 @@ DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
         return DurableOplogEntry::CommandType::kAbortTransaction;
     } else if (commandString == "importCollection") {
         return DurableOplogEntry::CommandType::kImportCollection;
-    } else if (commandString == "modifyShardedCollectionGlobalIndexCatalog") {
-        return DurableOplogEntry::CommandType::kModifyShardedCollectionGlobalIndexCatalog;
+    } else if (commandString == kShardingIndexCatalogOplogEntryName) {
+        return DurableOplogEntry::CommandType::kModifyCollectionShardingIndexCatalog;
     } else if (commandString == "createGlobalIndex") {
         return DurableOplogEntry::CommandType::kCreateGlobalIndex;
     } else if (commandString == "dropGlobalIndex") {

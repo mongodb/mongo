@@ -30,7 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/logv2/log.h"
-#include "mongo/s/global_index_cache.h"
+#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -38,13 +38,13 @@
 namespace mongo {
 namespace {
 
-using ShardingGlobalIndexCacheTest = ShardingTestFixture;
+using ShardinglIndexCatalogCacheTest = ShardingTestFixture;
 
-TEST_F(ShardingGlobalIndexCacheTest, CheckGlobalIndexes) {
+TEST_F(ShardinglIndexCatalogCacheTest, CheckGlobalIndexes) {
     const UUID collUUID = UUID::gen();
     IndexCatalogTypeMap indexMap;
     IndexOptionsType options;
-    GlobalIndexesCache indexCache({collUUID, Timestamp(0, 0)}, std::move(indexMap));
+    ShardingIndexesCatalogCache indexCache({collUUID, Timestamp(0, 0)}, std::move(indexMap));
     IndexCatalogType index("x_1", BSON("x" << 1), options.toBSON(), Timestamp(1, 0), collUUID);
     options.setGlobal(true);
     IndexCatalogType globalIndex(

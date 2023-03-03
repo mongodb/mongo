@@ -438,7 +438,8 @@ public:
             return _colls;
         }
 
-        std::pair<CollectionType, std::vector<IndexCatalogType>> getCollectionAndGlobalIndexes(
+        std::pair<CollectionType, std::vector<IndexCatalogType>>
+        getCollectionAndShardingIndexCatalogEntries(
             OperationContext* opCtx,
             const NamespaceString& nss,
             const repl::ReadConcernArgs& readConcern) override {

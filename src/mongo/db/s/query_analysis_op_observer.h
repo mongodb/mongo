@@ -45,10 +45,10 @@ public:
     QueryAnalysisOpObserver() = default;
     ~QueryAnalysisOpObserver() = default;
 
-    void onModifyShardedCollectionGlobalIndexCatalogEntry(OperationContext* opCtx,
-                                                          const NamespaceString& nss,
-                                                          const UUID& uuid,
-                                                          BSONObj indexDoc) final {}
+    void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const UUID& uuid,
+                                                BSONObj indexDoc) final {}
 
     void onCreateGlobalIndex(OperationContext* opCtx,
                              const NamespaceString& globalIndexNss,

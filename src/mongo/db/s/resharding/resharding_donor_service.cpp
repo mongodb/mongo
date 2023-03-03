@@ -46,13 +46,13 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/write_block_bypass.h"
@@ -829,7 +829,7 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
 
         if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
                 serverGlobalParams.featureCompatibility)) {
-            dropCollectionGlobalIndexesMetadata(opCtx.get(), _metadata.getSourceNss());
+            dropCollectionShardingIndexCatalog(opCtx.get(), _metadata.getSourceNss());
         }
         resharding::data_copy::ensureCollectionDropped(
             opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());

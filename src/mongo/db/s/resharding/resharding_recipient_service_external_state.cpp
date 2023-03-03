@@ -30,8 +30,8 @@
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
@@ -92,19 +92,19 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
 
     if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        auto optGii = getCollectionIndexInfoWithRefresh(opCtx, metadata.getTempReshardingNss());
+        auto optSii = getCollectionIndexInfoWithRefresh(opCtx, metadata.getTempReshardingNss());
 
-        if (optGii) {
+        if (optSii) {
             std::vector<IndexCatalogType> indexes;
-            optGii->forEachIndex([&](const auto& index) {
+            optSii->forEachIndex([&](const auto& index) {
                 indexes.push_back(index);
                 return true;
             });
-            replaceCollectionGlobalIndexes(opCtx,
-                                           metadata.getTempReshardingNss(),
-                                           metadata.getReshardingUUID(),
-                                           optGii->getCollectionIndexes().indexVersion(),
-                                           indexes);
+            replaceCollectionShardingIndexCatalog(opCtx,
+                                                  metadata.getTempReshardingNss(),
+                                                  metadata.getReshardingUUID(),
+                                                  optSii->getCollectionIndexes().indexVersion(),
+                                                  indexes);
         }
     }
 
@@ -175,11 +175,11 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
     });
 }
 
-boost::optional<GlobalIndexesCache>
+boost::optional<ShardingIndexesCatalogCache>
 RecipientStateMachineExternalStateImpl::getCollectionIndexInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
-    return uassertStatusOK(catalogCache->getCollectionRoutingInfoWithIndexRefresh(opCtx, nss)).gii;
+    return uassertStatusOK(catalogCache->getCollectionRoutingInfoWithIndexRefresh(opCtx, nss)).sii;
 }
 
 void RecipientStateMachineExternalStateImpl::withShardVersionRetry(

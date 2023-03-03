@@ -40,11 +40,11 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/session_catalog_migration.h"
+#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -144,11 +144,11 @@ void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
                 "Temporary resharding collection exists but doesn't have a UUID matching the"
                 " resharding operation",
                 !tempReshardingColl || tempReshardingColl->uuid() == metadata.getReshardingUUID());
-        auto gii = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
+        auto sii = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
                        opCtx, metadata.getTempReshardingNss())
-                       ->getIndexes(opCtx, true);
-        indexVersion = gii
-            ? boost::make_optional<Timestamp>(gii->getCollectionIndexes().indexVersion())
+                       ->getIndexesInCritSec(opCtx);
+        indexVersion = sii
+            ? boost::make_optional<Timestamp>(sii->getCollectionIndexes().indexVersion())
             : boost::none;
         return bool(tempReshardingColl);
     }();
@@ -164,7 +164,7 @@ void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
     }
 
     if (indexVersion) {
-        renameGlobalIndexesMetadata(
+        renameCollectionShardingIndexCatalog(
             opCtx, metadata.getTempReshardingNss(), metadata.getSourceNss(), *indexVersion);
     }
 
