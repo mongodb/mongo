@@ -123,17 +123,13 @@ if test $? -eq 0; then
 fi
 echo "$COMMANDS" | xargs $xp -I{} /bin/sh -c {}
 
-for f in `find . -name ${t_pfx}\*`; do
-    if `test -s $f`; then
-        LOCAL_NAME=$(basename "$f")
-        # Find original command and trim redirect garbage
-        # If one command in $COMMANDS is a substring of another like s_evergreen and
-        # s_evergree_validate, $FAILED_CMD can be parsed incorrectly and result in a failing
-        # script being ignored. Use `[^\w]` to ensure we match on the full command name and
-        # not just a substring
-        FAILED_CMD=$(echo "$COMMANDS" | grep "${LOCAL_NAME}[^\w]")
-        TRIMMED_CMD=$(echo "$FAILED_CMD" | sed -e 's/ >.*//' -e 's/2>&1 //')
-        errchk "$TRIMMED_CMD" "$f"
+# For each command check if an output file has been generated. If it has, report the contents and
+# the command used to populate it.
+echo "$COMMANDS" | while read -r line; do
+    outputfile=$(echo "$line" | sed -e 's/.* > //')
+    if test -s "$outputfile" ; then
+        check=$(echo "$line" | sed -e 's/ >.*//' -e 's/2>&1 //')
+        errchk "$check" "$outputfile"
     fi
 done
 
