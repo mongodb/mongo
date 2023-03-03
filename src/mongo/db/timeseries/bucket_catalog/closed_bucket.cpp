@@ -37,6 +37,9 @@ ClosedBucket::~ClosedBucket() {
             *_bucketStateRegistry,
             bucketId,
             [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
+                uassert(7443900,
+                        "Expected bucket to be pending compression",
+                        input.has_value() && input->isSet(BucketStateFlag::kPendingCompression));
                 return boost::none;
             });
     }
@@ -52,7 +55,9 @@ ClosedBucket::ClosedBucket(BucketStateRegistry* bsr,
         *_bucketStateRegistry,
         bucketId,
         [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            invariant(input.has_value());
+            uassert(7443901,
+                    "Expected bucket to be in normal state",
+                    input.has_value() && !input->conflictsWithInsertion());
             return input.value().setFlag(BucketStateFlag::kPendingCompression);
         });
 }

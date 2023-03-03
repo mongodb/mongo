@@ -29,6 +29,7 @@
 
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_state.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/bson_test_util.h"
 
@@ -649,6 +650,35 @@ TEST_F(BucketStateRegistryTest, TestDirectWriteStartCounter) {
     directWriteFinish(ns1, bucketId.oid);
     state = getBucketState(_bucketStateRegistry, bucketId);
     ASSERT_TRUE(hasBeenCleared(bucket));
+}
+
+TEST_F(BucketStateRegistryTest, ConflictingDirectWrites) {
+    // While two direct writes (e.g. two racing updates) should correctly conflict at the storage
+    // engine layer, we expect the directWriteStart/Finish pairs to work successfully.
+    BucketId bucketId{ns1, OID()};
+    auto state = getBucketState(_bucketStateRegistry, bucketId);
+    ASSERT_FALSE(state.has_value());
+
+    // First direct write initializes state as untracked.
+    directWriteStart(bucketId.ns, bucketId.oid);
+    state = getBucketState(_bucketStateRegistry, bucketId);
+    ASSERT(state.has_value());
+    ASSERT(state.value().isSet(BucketStateFlag::kPendingDirectWrite));
+    ASSERT(state.value().isSet(BucketStateFlag::kUntracked));
+
+    directWriteStart(bucketId.ns, bucketId.oid);
+
+    // First finish does not remove the state from the registry.
+    directWriteFinish(bucketId.ns, bucketId.oid);
+    state = getBucketState(_bucketStateRegistry, bucketId);
+    ASSERT(state.has_value());
+    ASSERT(state.value().isSet(BucketStateFlag::kPendingDirectWrite));
+    ASSERT(state.value().isSet(BucketStateFlag::kUntracked));
+
+    // Second one removes it.
+    directWriteFinish(bucketId.ns, bucketId.oid);
+    state = getBucketState(_bucketStateRegistry, bucketId);
+    ASSERT_FALSE(state.has_value());
 }
 
 }  // namespace
