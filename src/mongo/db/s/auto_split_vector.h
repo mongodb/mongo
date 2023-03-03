@@ -117,7 +117,8 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
                                                       const BSONObj& min,
                                                       const BSONObj& max,
                                                       long long maxChunkSizeBytes,
-                                                      boost::optional<int> limit = boost::none);
+                                                      boost::optional<int> limit = boost::none,
+                                                      bool forward = true);
 
 /*
  * Utility function for deserializing autoSplitVector/splitVector responses.

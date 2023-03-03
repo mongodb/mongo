@@ -169,8 +169,24 @@ void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& cluste
                   "shardVersions"_attr = shardVersions.done());
 }
 
+Chunk getChunkForMaxBound(const ChunkManager& cm, const BSONObj& max) {
+    boost::optional<Chunk> chunkWithMaxBound;
+    cm.forEachChunk([&](const auto& chunk) {
+        if (chunk.getMax().woCompare(max) == 0) {
+            chunkWithMaxBound.emplace(chunk);
+            return false;
+        }
+        return true;
+    });
+    if (chunkWithMaxBound) {
+        return *chunkWithMaxBound;
+    }
+    return cm.findIntersectingChunkWithSimpleCollation(max);
+}
+
 Status processManualMigrationOutcome(OperationContext* opCtx,
-                                     const BSONObj& chunkMin,
+                                     const boost::optional<BSONObj>& min,
+                                     const boost::optional<BSONObj>& max,
                                      const NamespaceString& nss,
                                      const ShardId& destination,
                                      Status outcome) {
@@ -190,9 +206,11 @@ Status processManualMigrationOutcome(OperationContext* opCtx,
     if (!swCM.isOK()) {
         return swCM.getStatus();
     }
+    const auto& cm = swCM.getValue().cm;
 
     const auto currentChunkInfo =
-        swCM.getValue().cm.findIntersectingChunkWithSimpleCollation(chunkMin);
+        min ? cm.findIntersectingChunkWithSimpleCollation(*min) : getChunkForMaxBound(cm, *max);
+
     if (currentChunkInfo.getShardId() == destination &&
         outcome != ErrorCodes::BalancerInterrupted) {
         // Migration calls can be interrupted after the metadata is committed but before the command
@@ -395,7 +413,8 @@ Status Balancer::rebalanceSingleChunk(OperationContext* opCtx,
         _commandScheduler
             ->requestMoveChunk(opCtx, *migrateInfo, settings, true /* issuedByRemoteUser */)
             .getNoThrow(opCtx);
-    return processManualMigrationOutcome(opCtx, chunk.getMin(), nss, migrateInfo->to, response);
+    return processManualMigrationOutcome(
+        opCtx, chunk.getMin(), boost::none, nss, migrateInfo->to, response);
 }
 
 Status Balancer::moveSingleChunk(OperationContext* opCtx,
@@ -422,7 +441,8 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
         _commandScheduler
             ->requestMoveChunk(opCtx, migrateInfo, settings, true /* issuedByRemoteUser */)
             .getNoThrow(opCtx);
-    return processManualMigrationOutcome(opCtx, chunk.getMin(), nss, newShardId, response);
+    return processManualMigrationOutcome(
+        opCtx, chunk.getMin(), boost::none, nss, newShardId, response);
 }
 
 Status Balancer::moveRange(OperationContext* opCtx,
@@ -434,13 +454,16 @@ Status Balancer::moveRange(OperationContext* opCtx,
         catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
     const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
 
-    const auto [fromShardId, min] = [&]() {
+    const auto fromShardId = [&]() {
         const auto [cm, _] = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(
                 opCtx, nss));
-        // TODO SERVER-64926 do not assume min always present
-        const auto& chunk = cm.findIntersectingChunkWithSimpleCollation(*request.getMin());
-        return std::tuple<ShardId, BSONObj>{chunk.getShardId(), *request.getMin()};
+        if (request.getMin()) {
+            const auto& chunk = cm.findIntersectingChunkWithSimpleCollation(*request.getMin());
+            return chunk.getShardId();
+        } else {
+            return getChunkForMaxBound(cm, *request.getMax()).getShardId();
+        }
     }();
 
     ShardsvrMoveRange shardSvrRequest(nss);
@@ -457,8 +480,12 @@ Status Balancer::moveRange(OperationContext* opCtx,
     auto response =
         _commandScheduler->requestMoveRange(opCtx, shardSvrRequest, wc, issuedByRemoteUser)
             .getNoThrow(opCtx);
-    return processManualMigrationOutcome(
-        opCtx, min, nss, shardSvrRequest.getToShard(), std::move(response));
+    return processManualMigrationOutcome(opCtx,
+                                         request.getMin(),
+                                         request.getMax(),
+                                         nss,
+                                         shardSvrRequest.getToShard(),
+                                         std::move(response));
 }
 
 void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {

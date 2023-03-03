@@ -68,8 +68,9 @@ public:
             const auto nss = ns();
             const auto& req = request();
 
-            // TODO SERVER-64926 do not assume min always present
-            uassert(ErrorCodes::InvalidOptions, "Missing required parameter 'min'", req.getMin());
+            uassert(ErrorCodes::InvalidOptions,
+                    "Missing required parameter 'min' or 'max'",
+                    req.getMin() || req.getMax());
 
             ConfigsvrMoveRange configsvrRequest(nss);
             configsvrRequest.setDbName(DatabaseName::kAdmin);

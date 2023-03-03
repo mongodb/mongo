@@ -78,24 +78,43 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
 std::string kEmptyErrMsgForMoveTimingHelper;
 
 /*
- * Taking into account the provided max chunk size, returns:
- * - A `max` bound to perform split+move in case the chunk owning `min` is splittable.
- * - The `max` bound of the chunk owning `min in case it can't be split (too small or jumbo).
+ * Calculates the max or min bound perform split+move in case the chunk in question is splittable.
+ * If the chunk is not splittable, returns the bound of the existing chunk for the max or min.Finds
+ * a max bound if needMaxBound is true and a min bound if forward is false.
  */
-BSONObj computeMaxBound(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        const BSONObj& min,
-                        const Chunk& owningChunk,
-                        const ShardKeyPattern& skPattern,
-                        const long long maxChunkSizeBytes) {
-    // TODO SERVER-64926 do not assume min always present
+BSONObj computeOtherBound(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const BSONObj& min,
+                          const BSONObj& max,
+                          const ShardKeyPattern& skPattern,
+                          const long long maxChunkSizeBytes,
+                          bool needMaxBound) {
     auto [splitKeys, _] = autoSplitVector(
-        opCtx, nss, skPattern.toBSON(), min, owningChunk.getMax(), maxChunkSizeBytes, 1);
+        opCtx, nss, skPattern.toBSON(), min, max, maxChunkSizeBytes, 1, needMaxBound);
     if (splitKeys.size()) {
         return std::move(splitKeys.front());
     }
 
-    return owningChunk.getMax();
+    return needMaxBound ? max : min;
+}
+
+/**
+ * If `max` is the max bound of some chunk, returns that chunk. Otherwise, returns the chunk that
+ * contains the key `max`.
+ */
+Chunk getChunkForMaxBound(const ChunkManager& cm, const BSONObj& max) {
+    boost::optional<Chunk> chunkWithMaxBound;
+    cm.forEachChunk([&](const auto& chunk) {
+        if (chunk.getMax().woCompare(max) == 0) {
+            chunkWithMaxBound.emplace(chunk);
+            return false;
+        }
+        return true;
+    });
+    if (chunkWithMaxBound) {
+        return *chunkWithMaxBound;
+    }
+    return cm.findIntersectingChunkWithSimpleCollation(max);
 }
 
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep1);
@@ -205,21 +224,36 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
             std::move(metadata), std::move(indexInfo), std::move(collectionUUID));
     }();
 
-    // Compute the max bound in case only `min` is set (moveRange)
+    // Compute the max or min bound in case only one is set (moveRange)
     if (!_args.getMax().has_value()) {
-        // TODO SERVER-64926 do not assume min always present
         const auto& min = *_args.getMin();
 
         const auto cm = collectionMetadata.getChunkManager();
         const auto owningChunk = cm->findIntersectingChunkWithSimpleCollation(min);
-        const auto max = computeMaxBound(_opCtx,
-                                         nss(),
-                                         min,
-                                         owningChunk,
-                                         cm->getShardKeyPattern(),
-                                         _args.getMaxChunkSizeBytes());
+        const auto max = computeOtherBound(_opCtx,
+                                           nss(),
+                                           min,
+                                           owningChunk.getMax(),
+                                           cm->getShardKeyPattern(),
+                                           _args.getMaxChunkSizeBytes(),
+                                           true /* needMaxBound */);
         _args.getMoveRangeRequestBase().setMax(max);
         _moveTimingHelper.setMax(max);
+    } else if (!_args.getMin().has_value()) {
+        const auto& max = *_args.getMax();
+
+        const auto cm = collectionMetadata.getChunkManager();
+        const auto owningChunk = getChunkForMaxBound(*cm, max);
+        const auto min = computeOtherBound(_opCtx,
+                                           nss(),
+                                           owningChunk.getMin(),
+                                           max,
+                                           cm->getShardKeyPattern(),
+                                           _args.getMaxChunkSizeBytes(),
+                                           false /* needMaxBound */);
+
+        _args.getMoveRangeRequestBase().setMin(min);
+        _moveTimingHelper.setMin(min);
     }
 
     checkShardKeyPattern(_opCtx,
@@ -783,8 +817,7 @@ BSONObj MigrationSourceManager::getMigrationStatusReport(
         _args.getFromShard(),
         _args.getToShard(),
         true,
-        // TODO SERVER-64926 do not assume min always present
-        *_args.getMin(),
+        _args.getMin().value_or(BSONObj()),
         _args.getMax().value_or(BSONObj()),
         sessionOplogEntriesToBeMigratedSoFar,
         sessionOplogEntriesSkippedSoFarLowerBound);
