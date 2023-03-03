@@ -5433,8 +5433,8 @@ export const authCommandsLib = {
           testname: "updateSearchIndex",
           command: {
               updateSearchIndex: "foo",
-              indexID: 'index-ID-number',
-              indexDefinition: {"textBlob": "blob"},
+              id: 'index-ID-number',
+              definition: {"textBlob": "blob"},
           },
           // Only enterprise knows of this command.
           skipTest: (conn) => {
