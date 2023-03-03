@@ -438,13 +438,28 @@ public:
             return _colls;
         }
 
+        std::pair<CollectionType, std::vector<IndexCatalogType>> getCollectionAndGlobalIndexes(
+            OperationContext* opCtx,
+            const NamespaceString& nss,
+            const repl::ReadConcernArgs& readConcern) override {
+            if (!_coll) {
+                uasserted(ErrorCodes::NamespaceNotFound, "dummy errmsg");
+            }
+            return std::make_pair(*_coll, std::vector<IndexCatalogType>());
+        }
+
         void setCollections(std::vector<CollectionType> colls) {
             _colls = std::move(colls);
+        }
+
+        void setCollection(boost::optional<CollectionType> coll) {
+            _coll = coll;
         }
 
     private:
         const std::vector<ShardType> _shards;
         std::vector<CollectionType> _colls;
+        boost::optional<CollectionType> _coll;
     };
 
     UUID createCollectionAndGetUUID(const NamespaceString& nss) {
@@ -610,6 +625,7 @@ TEST_F(SubmitRangeDeletionTaskTest, SucceedsIfFilteringMetadataUUIDMatchesTaskUU
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
         makeChangedChunks(ChunkVersion({kEpoch, kDefaultTimestamp}, {1, 0})));
     _mockCatalogClient->setCollections({coll});
+    _mockCatalogClient->setCollection(coll);
     forceShardFilteringMetadataRefresh(opCtx, kTestNss);
 
     // The task should have been submitted successfully.
@@ -675,6 +691,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
         makeChangedChunks(ChunkVersion({kEpoch, kDefaultTimestamp}, {10, 0})));
     _mockCatalogClient->setCollections({matchingColl});
+    _mockCatalogClient->setCollection({matchingColl});
 
     auto metadata = makeShardedMetadata(opCtx, collectionUUID);
     csr()->setFilteringMetadata(opCtx, metadata);

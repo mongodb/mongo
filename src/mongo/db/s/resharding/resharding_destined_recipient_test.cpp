@@ -147,6 +147,13 @@ public:
             _colls = std::move(colls);
         }
 
+        std::pair<CollectionType, std::vector<IndexCatalogType>> getCollectionAndGlobalIndexes(
+            OperationContext* opCtx,
+            const NamespaceString& nss,
+            const repl::ReadConcernArgs& readConcern) override {
+            return std::make_pair(CollectionType(), std::vector<IndexCatalogType>());
+        }
+
     private:
         const std::vector<ShardType> _shards;
         std::vector<CollectionType> _colls;
