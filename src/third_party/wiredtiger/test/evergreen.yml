@@ -812,6 +812,17 @@ functions:
           . test/evergreen/find_cmake.sh
           . test/evergreen/install_gcp_dependencies.sh $CMAKE
 
+  "split stress test":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/bench/workgen/runner"
+      script: |
+        set -o errexit
+        set -o verbose
+        for i in $(seq ${times|15}); do
+            ${test_env_vars|} ${python_binary|python3} split_stress.py
+        done
+
 #######################################
 #               Variables             #
 #######################################
@@ -3674,32 +3685,24 @@ tasks:
             done
 
   - name: split-stress-test
-    tags: ["stress-test-1", "stress-test-zseries-1"]
+    tags: ["stress-test-1", "stress-test-ppc-1", "stress-test-zseries-1"]
+    # Set 2.5 hours timeout (60 * 60 * 2.5)
+    exec_timeout_secs: 9000
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/bench/workgen/runner"
-          script: |
-            set -o errexit
-            set -o verbose
-            for i in {1..10}; do ${test_env_vars|} ${python_binary|python3} split_stress.py; done
+      - func: "split stress test"
 
   - name: split-stress-test-nonstandalone
     tags: ["stress-test-1-nonstandalone"]
+    # Set 2.5 hours timeout (60 * 60 * 2.5)
+    exec_timeout_secs: 9000
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
           NONSTANDALONE: -DWT_STANDALONE_BUILD=0
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/bench/workgen/runner"
-          script: |
-            set -o errexit
-            set -o verbose
-            for i in {1..10}; do ${test_env_vars|} ${python_binary|python3} split_stress.py; done
+      - func: "split stress test"
 
   - name: format-stress-zseries-test
     tags: ["stress-test-zseries-1"]
