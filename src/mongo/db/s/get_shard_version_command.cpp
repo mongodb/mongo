@@ -140,6 +140,28 @@ public:
             }
         }
 
+        if (scopedCsr->getCollectionIndexes(opCtx)) {
+            result.append("indexVersion", scopedCsr->getCollectionIndexes(opCtx)->indexVersion());
+
+            if (cmdObj["fullMetadata"].trueValue()) {
+                BSONArrayBuilder indexesArrBuilder;
+                bool exceedsSizeLimit = false;
+                scopedCsr->getIndexes(opCtx)->forEachIndex([&](const auto& index) {
+                    BSONObjBuilder indexB(index.toBSON());
+                    if (result.len() + indexesArrBuilder.len() + indexB.len() >
+                        BSONObjMaxUserSize) {
+                        exceedsSizeLimit = true;
+                    } else {
+                        indexesArrBuilder.append(indexB.done());
+                    }
+
+                    return !exceedsSizeLimit;
+                });
+
+                result.append("indexes", indexesArrBuilder.arr());
+            }
+        }
+
         return true;
     }
 

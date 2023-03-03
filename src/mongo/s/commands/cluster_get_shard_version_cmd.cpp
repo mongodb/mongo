@@ -110,6 +110,11 @@ public:
             result.append("versionEpoch", cm.getVersion().epoch());
             result.append("versionTimestamp", cm.getVersion().getTimestamp());
 
+
+            if (gii) {
+                result.append("indexVersion", gii->getCollectionIndexes().indexVersion());
+            }
+
             if (cmdObj["fullMetadata"].trueValue()) {
                 BSONArrayBuilder chunksArrBuilder;
                 bool exceedsSizeLimit = false;
@@ -135,6 +140,23 @@ public:
 
                 if (!exceedsSizeLimit) {
                     result.append("chunks", chunksArrBuilder.arr());
+
+                    if (gii) {
+                        BSONArrayBuilder indexesArrBuilder;
+                        gii->forEachIndex([&](const auto& index) {
+                            BSONObjBuilder indexB(index.toBSON());
+                            if (result.len() + indexesArrBuilder.len() + indexB.len() >
+                                BSONObjMaxUserSize) {
+                                exceedsSizeLimit = true;
+                            } else {
+                                indexesArrBuilder.append(indexB.done());
+                            }
+
+                            return !exceedsSizeLimit;
+                        });
+
+                        result.append("indexes", indexesArrBuilder.arr());
+                    }
                 }
             }
         }
