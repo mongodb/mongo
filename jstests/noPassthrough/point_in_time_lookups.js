@@ -108,6 +108,10 @@ jsTestLog("Recreated timestamp: " + tojson(recreatedTS));
 const thirdInsertTS = insert({x: 1});
 jsTestLog("Third insert timestamp: " + tojson(thirdInsertTS));
 
+// Create an index and drop it immediately.
+const createIndexTS = assert.commandWorked(coll().createIndex({x: 1})).operationTime;
+const dropIndexTS = assert.commandWorked(coll().dropIndex({x: 1})).operationTime;
+
 const runPointInTimeTests = function() {
     (function oldestTimestampTests() {
         // Point-in-time reads on a collection before it was created should have like reading from a
@@ -228,6 +232,21 @@ const runPointInTimeTests = function() {
         // was non-existent.
         find("renamed", /*withIndex=*/ false, thirdInsertTS, /*numDocs=*/ 0);
         find("renamed", /*withIndex=*/ true, thirdInsertTS, /*numDocs=*/ 0);
+    })();
+
+    (function createAndDropIndexTimestampTests() {
+        // Reading at 'createIndexTS' will instantiate a collection and we should be able to use the
+        // index that was dropped in the future.
+        find(coll().getName(), /*withIndex=*/ true, createIndexTS, /*numDocs=*/ 1);
+        find(coll().getName(), /*withIndex=*/ false, createIndexTS, /*numDocs=*/ 1);
+
+        // Reading at 'dropIndexTS' will prevent us from using the index.
+        find(coll().getName(),
+             /*withIndex=*/ true,
+             dropIndexTS,
+             /*numDocs=*/ 1,
+             /*expectedError=*/ true);
+        find(coll().getName(), /*withIndex=*/ false, dropIndexTS, /*numDocs=*/ 1);
     })();
 };
 
