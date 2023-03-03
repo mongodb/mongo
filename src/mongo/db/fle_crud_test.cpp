@@ -683,8 +683,15 @@ void FleCrudTest::doSingleUpdateWithUpdateDoc(int id,
                                               Fle2AlgorithmInt alg) {
 
     auto efc = getTestEncryptedFieldConfig(alg);
-    auto doc = EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
-        _edcNs, efc, &_keyVault);
+
+    auto doc = EncryptionInformationHelpers::encryptionInformationSerialize(_edcNs, efc);
+
+    // TODO: SERVER-73303 delete when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabledAndIgnoreFCV()) {
+        doc = EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
+            _edcNs, efc, &_keyVault);
+    }
+
     auto ei = EncryptionInformation::parse(IDLParserContext("test"), doc);
 
     write_ops::UpdateOpEntry entry;
@@ -1163,6 +1170,7 @@ TEST_F(FleCrudTest, InsertUnindexedV1AgainstV2Protocol) {
         7413902);
 }
 
+// TODO: SERVER-73303 delete when v2 is enabled by default
 #define ASSERT_ECC_DOC(assertElement, assertPosition, assertStart, assertEnd)            \
     {                                                                                    \
         auto _eccDoc = getECCDocument(getTestECCToken((assertElement)), assertPosition); \
@@ -1375,8 +1383,9 @@ TEST_F(FleCrudTest, InsertOneButDeleteAnother) {
     assertECOCDocumentCountByField("encrypted", 1);
 }
 
+// TODO: SERVER-73303 delete when v2 is enabled by default
 // Update one document
-TEST_F(FleCrudTest, UpdateOne) {
+TEST_F(FleCrudTest, UpdateOneV1) {
 
     doSingleInsert(1,
                    BSON("encrypted"
@@ -1399,7 +1408,33 @@ TEST_F(FleCrudTest, UpdateOne) {
                      Fle2AlgorithmInt::kEquality);
 }
 
-TEST_F(FleCrudTest, UpdateOneRange) {
+// Update one document
+TEST_F(FleCrudTest, UpdateOne) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    doSingleUpdate(1,
+                   BSON("encrypted"
+                        << "top secret"));
+
+    assertDocumentCounts(1, 2, 0, 2);
+    assertECOCDocumentCountByField("encrypted", 2);
+
+    validateDocument(1,
+                     BSON("_id" << 1 << "counter" << 2 << "plainText"
+                                << "sample"
+                                << "encrypted"
+                                << "top secret"),
+                     Fle2AlgorithmInt::kEquality);
+}
+
+// TODO: SERVER-73303 delete when v2 is enabled by default
+TEST_F(FleCrudTest, UpdateOneRangeV1) {
     RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
     auto doc = BSON("encrypted" << 5);
     auto element = doc.firstElement();
@@ -1422,8 +1457,32 @@ TEST_F(FleCrudTest, UpdateOneRange) {
                      Fle2AlgorithmInt::kRange);
 }
 
+TEST_F(FleCrudTest, UpdateOneRange) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    auto doc = BSON("encrypted" << 5);
+    auto element = doc.firstElement();
+
+    doSingleInsert(1, element, Fle2AlgorithmInt::kRange);
+
+    assertDocumentCounts(1, 5, 0, 5);
+
+    auto doc2 = BSON("encrypted" << 2);
+    auto elem2 = doc2.firstElement();
+
+    doSingleUpdate(1, elem2, Fle2AlgorithmInt::kRange);
+
+    assertDocumentCounts(1, 10, 0, 10);
+
+    validateDocument(1,
+                     BSON("_id" << 1 << "counter" << 2 << "plainText"
+                                << "sample"
+                                << "encrypted" << 2),
+                     Fle2AlgorithmInt::kRange);
+}
+
+// TODO: SERVER-73303 delete when v2 is enabled by default
 // Update one document but to the same value
-TEST_F(FleCrudTest, UpdateOneSameValue) {
+TEST_F(FleCrudTest, UpdateOneSameValueV1) {
 
     doSingleInsert(1,
                    BSON("encrypted"
@@ -1446,8 +1505,33 @@ TEST_F(FleCrudTest, UpdateOneSameValue) {
                      Fle2AlgorithmInt::kEquality);
 }
 
+// Update one document but to the same value
+TEST_F(FleCrudTest, UpdateOneSameValue) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    doSingleUpdate(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 2, 0, 2);
+    assertECOCDocumentCountByField("encrypted", 2);
+
+    validateDocument(1,
+                     BSON("_id" << 1 << "counter" << 2 << "plainText"
+                                << "sample"
+                                << "encrypted"
+                                << "secret"),
+                     Fle2AlgorithmInt::kEquality);
+}
+
+// TODO: SERVER-73303 delete when v2 is enabled by default
 // Update one document with replacement
-TEST_F(FleCrudTest, UpdateOneReplace) {
+TEST_F(FleCrudTest, UpdateOneReplaceV1) {
 
     doSingleInsert(1,
                    BSON("encrypted"
@@ -1484,7 +1568,46 @@ TEST_F(FleCrudTest, UpdateOneReplace) {
                      Fle2AlgorithmInt::kEquality);
 }
 
-TEST_F(FleCrudTest, UpdateOneReplaceRange) {
+// Update one document with replacement
+TEST_F(FleCrudTest, UpdateOneReplace) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    auto replace = BSON("encrypted"
+                        << "top secret");
+
+    auto buf = generateSinglePlaceholder(replace.firstElement());
+
+    auto replaceEP = BSON("plainText"
+                          << "fake"
+                          << "encrypted"
+                          << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt));
+
+    auto result = FLEClientCrypto::transformPlaceholders(replaceEP, &_keyVault);
+
+    doSingleUpdateWithUpdateDoc(
+        1,
+        write_ops::UpdateModification(result, write_ops::UpdateModification::ReplacementTag{}),
+        Fle2AlgorithmInt::kEquality);
+
+
+    assertDocumentCounts(1, 2, 0, 2);
+    assertECOCDocumentCountByField("encrypted", 2);
+
+    validateDocument(1,
+                     BSON("_id" << 1 << "plainText"
+                                << "fake"
+                                << "encrypted"
+                                << "top secret"),
+                     Fle2AlgorithmInt::kEquality);
+}
+
+// TODO: SERVER-73303 delete when v2 is enabled by default
+TEST_F(FleCrudTest, UpdateOneReplaceRangeV1) {
     RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
     auto doc = BSON("encrypted" << 5);
     auto element = doc.firstElement();
@@ -1517,6 +1640,39 @@ TEST_F(FleCrudTest, UpdateOneReplaceRange) {
                      Fle2AlgorithmInt::kRange);
 }
 
+TEST_F(FleCrudTest, UpdateOneReplaceRange) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    auto doc = BSON("encrypted" << 5);
+    auto element = doc.firstElement();
+
+    doSingleInsert(1, element, Fle2AlgorithmInt::kRange);
+
+    assertDocumentCounts(1, 5, 0, 5);
+
+    auto replace = BSON("encrypted" << 2);
+    auto buf = generateSinglePlaceholder(replace.firstElement(), Fle2AlgorithmInt::kRange);
+
+    auto replaceEP = BSON("plaintext"
+                          << "fake"
+                          << "encrypted"
+                          << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt));
+
+    auto result = FLEClientCrypto::transformPlaceholders(replaceEP, &_keyVault);
+
+    doSingleUpdateWithUpdateDoc(
+        1,
+        write_ops::UpdateModification(result, write_ops::UpdateModification::ReplacementTag{}),
+        Fle2AlgorithmInt::kRange);
+
+    assertDocumentCounts(1, 10, 0, 10);
+
+    validateDocument(1,
+                     BSON("_id" << 1 << "plaintext"
+                                << "fake"
+                                << "encrypted" << 2),
+                     Fle2AlgorithmInt::kRange);
+}
+
 // Rename safeContent
 TEST_F(FleCrudTest, RenameSafeContent) {
 
@@ -1535,8 +1691,47 @@ TEST_F(FleCrudTest, RenameSafeContent) {
         doSingleUpdateWithUpdateDoc(1, result, Fle2AlgorithmInt::kEquality), DBException, 6371506);
 }
 
+// TODO: SERVER-73303 delete when v2 is enabled by default
+// Rename safeContent
+TEST_F(FleCrudTest, RenameSafeContentV2) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    BSONObjBuilder builder;
+    builder.append("$inc", BSON("counter" << 1));
+    builder.append("$rename", BSON(kSafeContent << "foo"));
+    auto result = builder.obj();
+
+    ASSERT_THROWS_CODE(
+        doSingleUpdateWithUpdateDoc(1, result, Fle2AlgorithmInt::kEquality), DBException, 6371506);
+}
+
+
 // Mess with __safeContent__ and ensure the update errors
 TEST_F(FleCrudTest, SetSafeContent) {
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    BSONObjBuilder builder;
+    builder.append("$inc", BSON("counter" << 1));
+    builder.append("$set", BSON(kSafeContent << "foo"));
+    auto result = builder.obj();
+
+    ASSERT_THROWS_CODE(
+        doSingleUpdateWithUpdateDoc(1, result, Fle2AlgorithmInt::kEquality), DBException, 6666200);
+}
+
+// TODO: SERVER-73303 delete when v2 is enabled by default
+// Mess with __safeContent__ and ensure the update errors
+TEST_F(FleCrudTest, SetSafeContentV2) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
     doSingleInsert(1,
                    BSON("encrypted"
                         << "secret"));
@@ -1906,7 +2101,8 @@ TEST_F(FleTagsTest, InsertTwoDifferentAndDeleteOne) {
     ASSERT_EQ(1, readTags(doc2).size());
 }
 
-TEST_F(FleTagsTest, InsertAndUpdate) {
+// TODO: SERVER-73303 delete when v2 is enabled by default
+TEST_F(FleTagsTest, InsertAndUpdateV1) {
     auto doc1 = BSON("encrypted"
                      << "a");
     auto doc2 = BSON("encrypted"
@@ -1916,6 +2112,21 @@ TEST_F(FleTagsTest, InsertAndUpdate) {
     doSingleUpdate(1, doc2);
 
     ASSERT_EQ(0, readTags(doc1).size());
+    ASSERT_EQ(1, readTags(doc2).size());
+}
+
+TEST_F(FleTagsTest, InsertAndUpdate) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    auto doc1 = BSON("encrypted"
+                     << "a");
+    auto doc2 = BSON("encrypted"
+                     << "b");
+
+    doSingleInsert(1, doc1);
+    doSingleUpdate(1, doc2);
+
+    // In v2, readTags returns 1 tag for doc1 because stale tags are no longer removed.
+    ASSERT_EQ(1, readTags(doc1).size());
     ASSERT_EQ(1, readTags(doc2).size());
 }
 

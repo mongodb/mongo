@@ -59,6 +59,7 @@
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/rpc/object_check.h"
@@ -1611,6 +1612,14 @@ std::vector<uint8_t> toEncryptedVector(EncryptedBinDataType dt, T t) {
     return buf;
 }
 
+template <>
+std::vector<uint8_t> toEncryptedVector(EncryptedBinDataType dt, ConstDataRange data) {
+    std::vector<uint8_t> buf(data.length() + 1);
+    buf[0] = static_cast<uint8_t>(dt);
+    std::copy(data.data(), data.data() + data.length(), buf.data() + 1);
+    return buf;
+}
+
 template <typename T>
 void toEncryptedBinData(StringData field, EncryptedBinDataType dt, T t, BSONObjBuilder* builder) {
     auto buf = toEncryptedVector(dt, t);
@@ -1765,6 +1774,10 @@ TEST(FLE_EDC, ServerSide_Equality_Payloads_V2) {
     ASSERT_EQ(metadataBlock.count, 123456);
     ASSERT(metadataBlock.tag == tag);
     ASSERT_TRUE(metadataBlock.isValidZerosBlob(metadataBlock.zeros));
+
+    auto swTag = FLE2IndexedEqualityEncryptedValueV2::parseMetadataBlockTag(swBuf.getValue());
+    ASSERT_OK(swTag.getStatus());
+    ASSERT_EQ(swTag.getValue(), tag);
 }
 
 TEST(FLE_EDC, ServerSide_Payloads_V2_InvalidArgs) {
@@ -1860,6 +1873,9 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_ParseInvalidInput) {
                            serverDataDerivedToken, shortInput),
                        DBException,
                        7290802);
+    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::parseMetadataBlockTag(shortInput),
+                       DBException,
+                       7290802);
 
     // test short input for range payload
     ASSERT_THROWS_CODE(
@@ -1876,6 +1892,8 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_ParseInvalidInput) {
                            {serverDataDerivedToken}, shortInput),
                        DBException,
                        7290908);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedRangeEncryptedValueV2::parseMetadataBlockTags(shortInput), DBException, 7290908);
 
     // test bad bson type for equality payload
     std::vector<uint8_t> badTypeInput(edgeCountOffset + 1 + cipherTextSize +
@@ -1898,6 +1916,9 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_ParseInvalidInput) {
                            serverDataDerivedToken, badTypeInput),
                        DBException,
                        7290801);
+    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::parseMetadataBlockTag(badTypeInput),
+                       DBException,
+                       7290801);
 
     // test bad bson type for range payload
     ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2::parseAndValidateFields(badTypeInput),
@@ -1913,6 +1934,9 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_ParseInvalidInput) {
         7290906);
     ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2::parseAndDecryptMetadataBlocks(
                            {serverDataDerivedToken}, badTypeInput),
+                       DBException,
+                       7290906);
+    ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2::parseMetadataBlockTags(badTypeInput),
                        DBException,
                        7290906);
 
@@ -2230,6 +2254,12 @@ TEST(FLE_EDC, ServerSide_Range_Payloads_V2) {
     ASSERT(std::equal(serverPayload.clientEncryptedValue.begin(),
                       serverPayload.clientEncryptedValue.end(),
                       value.data<uint8_t>()));
+
+    auto swTags = FLE2IndexedRangeEncryptedValueV2::parseMetadataBlockTags(swBuf.getValue());
+    ASSERT_OK(swTags.getStatus());
+    ASSERT_EQ(swTags.getValue().size(), 2);
+    ASSERT(swTags.getValue()[0] == tag);
+    ASSERT(swTags.getValue()[1] == tag);
 }
 
 TEST(FLE_EDC, DuplicateSafeContent_CompatibleType) {
@@ -2523,63 +2553,63 @@ TEST(TagDelta, Basic) {
     std::vector<EDCIndexedFields> origFields4 = {{v2, "a"}, {v1, "b"}};
 
     {
-        auto removedFields = EDCServerCollection::getRemovedTags(origFields, origFields);
+        auto removedFields = EDCServerCollection::getRemovedFields(origFields, origFields);
         ASSERT_EQ(removedFields.size(), 0);
     }
 
     {
-        auto removedFields = EDCServerCollection::getRemovedTags(origFields, newFields);
+        auto removedFields = EDCServerCollection::getRemovedFields(origFields, newFields);
         ASSERT_EQ(removedFields.size(), 0);
     }
 
     {
-        auto removedFields = EDCServerCollection::getRemovedTags(newFields, origFields);
+        auto removedFields = EDCServerCollection::getRemovedFields(newFields, origFields);
         ASSERT_EQ(removedFields.size(), 1);
         ASSERT_EQ(removedFields[0].fieldPathName, "c");
     }
 
     {
-        auto removedFields = EDCServerCollection::getRemovedTags(emptyFields, origFields);
+        auto removedFields = EDCServerCollection::getRemovedFields(emptyFields, origFields);
         ASSERT_EQ(removedFields.size(), 0);
     }
 
     {
-        auto removedFields = EDCServerCollection::getRemovedTags(newFields, emptyFields);
+        auto removedFields = EDCServerCollection::getRemovedFields(newFields, emptyFields);
         ASSERT_EQ(removedFields.size(), 3);
     }
 
     {
-        auto removedFields = EDCServerCollection::getRemovedTags(newFields, newFieldsReverse);
+        auto removedFields = EDCServerCollection::getRemovedFields(newFields, newFieldsReverse);
         ASSERT_EQ(removedFields.size(), 0);
     }
 
     {
-        auto removedFields = EDCServerCollection::getRemovedTags(origFields, origFields2);
+        auto removedFields = EDCServerCollection::getRemovedFields(origFields, origFields2);
         ASSERT_EQ(removedFields.size(), 1);
         ASSERT_EQ(removedFields[0].fieldPathName, "b");
     }
 
 
     {
-        auto removedFields = EDCServerCollection::getRemovedTags(origFields, origFields2);
+        auto removedFields = EDCServerCollection::getRemovedFields(origFields, origFields2);
         ASSERT_EQ(removedFields.size(), 1);
         ASSERT_EQ(removedFields[0].fieldPathName, "b");
     }
 
 
     {
-        auto removedFields = EDCServerCollection::getRemovedTags(origFields2, origFields3);
+        auto removedFields = EDCServerCollection::getRemovedFields(origFields2, origFields3);
         ASSERT_EQ(removedFields.size(), 1);
         ASSERT_EQ(removedFields[0].fieldPathName, "a");
     }
 
     {
-        auto removedFields = EDCServerCollection::getRemovedTags(origFields3, origFields3);
+        auto removedFields = EDCServerCollection::getRemovedFields(origFields3, origFields3);
         ASSERT_EQ(removedFields.size(), 0);
     }
 
     {
-        auto removedFields = EDCServerCollection::getRemovedTags(origFields3, origFields4);
+        auto removedFields = EDCServerCollection::getRemovedFields(origFields3, origFields4);
         ASSERT_EQ(removedFields.size(), 2);
         ASSERT_EQ(removedFields[0].fieldPathName, "a");
         ASSERT_EQ(removedFields[1].fieldPathName, "b");
@@ -2821,11 +2851,23 @@ TEST(FLE_Update, Basic) {
     auto doc = BSON("value"
                     << "123456");
     auto element = doc.firstElement();
-
     auto buf = generatePlaceholder(element, Operation::kInsert);
     auto inputDoc = BSON(
         "$set" << BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
     auto finalDoc = encryptUpdateDocument(inputDoc, &keyVault);
+
+    std::cout << finalDoc << std::endl;
+
+    ASSERT_TRUE(finalDoc["$set"]["encrypted"].isBinData(BinDataType::Encrypt));
+    ASSERT_TRUE(finalDoc["$push"][kSafeContent]["$each"].type() == Array);
+    ASSERT_EQ(finalDoc["$push"][kSafeContent]["$each"].Array().size(), 1);
+    ASSERT_TRUE(
+        finalDoc["$push"][kSafeContent]["$each"].Array()[0].isBinData(BinDataType::BinDataGeneral));
+
+    // TODO: SERVER-73303 remove below once v2 is enabled by default
+    // test w/ v2 enabled
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    finalDoc = encryptUpdateDocument(inputDoc, &keyVault);
 
     std::cout << finalDoc << std::endl;
 
@@ -2847,6 +2889,16 @@ TEST(FLE_Update, Empty) {
 
     ASSERT_EQ(finalDoc["$set"]["count"].type(), NumberInt);
     ASSERT(finalDoc["$push"].eoo());
+
+    // TODO: SERVER-73303 remove below once v2 is enabled by default
+    // test w/ v2 enabled
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    finalDoc = encryptUpdateDocument(inputDoc, &keyVault);
+
+    std::cout << finalDoc << std::endl;
+
+    ASSERT_EQ(finalDoc["$set"]["count"].type(), NumberInt);
+    ASSERT(finalDoc["$push"].eoo());
 }
 
 TEST(FLE_Update, BadPush) {
@@ -2861,6 +2913,11 @@ TEST(FLE_Update, BadPush) {
         "$push" << 123 << "$set"
                 << BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
     ASSERT_THROWS_CODE(encryptUpdateDocument(inputDoc, &keyVault), DBException, 6371511);
+
+    // TODO: SERVER-73303 remove below once v2 is enabled by default
+    // test w/ v2 enabled
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    ASSERT_THROWS_CODE(encryptUpdateDocument(inputDoc, &keyVault), DBException, 6371511);
 }
 
 TEST(FLE_Update, PushToSafeContent) {
@@ -2874,6 +2931,11 @@ TEST(FLE_Update, PushToSafeContent) {
     auto inputDoc = BSON(
         "$push" << 123 << "$set"
                 << BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
+    ASSERT_THROWS_CODE(encryptUpdateDocument(inputDoc, &keyVault), DBException, 6371511);
+
+    // TODO: SERVER-73303 remove below once v2 is enabled by default
+    // test w/ v2 enabled
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
     ASSERT_THROWS_CODE(encryptUpdateDocument(inputDoc, &keyVault), DBException, 6371511);
 }
 
@@ -2897,8 +2959,23 @@ TEST(FLE_Update, PushToOtherfield) {
     ASSERT_EQ(finalDoc["$push"][kSafeContent]["$each"].Array().size(), 1);
     ASSERT_TRUE(
         finalDoc["$push"][kSafeContent]["$each"].Array()[0].isBinData(BinDataType::BinDataGeneral));
+
+    // TODO: SERVER-73303 remove below once v2 is enabled by default
+    // test w/ v2 enabled
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    finalDoc = encryptUpdateDocument(inputDoc, &keyVault);
+    std::cout << finalDoc << std::endl;
+
+    ASSERT_TRUE(finalDoc["$set"]["encrypted"].isBinData(BinDataType::Encrypt));
+    ASSERT_TRUE(finalDoc["$push"]["abc"].type() == NumberInt);
+    ASSERT_TRUE(finalDoc["$push"][kSafeContent]["$each"].type() == Array);
+    ASSERT_EQ(finalDoc["$push"][kSafeContent]["$each"].Array().size(), 1);
+    ASSERT_TRUE(
+        finalDoc["$push"][kSafeContent]["$each"].Array()[0].isBinData(BinDataType::BinDataGeneral));
 }
 
+// TODO: SERVER-73303 remove below once v2 is enabled by default
+// In v2, the GetRemovedTags and GenerateUpdateToRemoveTags tests replaces this test.
 TEST(FLE_Update, PullTokens) {
     TestKeyVault keyVault;
     NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
@@ -2948,6 +3025,128 @@ TEST(FLE_Update, PullTokens) {
     ASSERT_THROWS_CODE(EDCServerCollection::generateUpdateToRemoveTags(removedFields, tokenMap),
                        DBException,
                        6371513);
+}
+
+TEST(FLE_Update, GetRemovedTags) {
+    PrfBlock tag1 = decodePrf("BD53ACAC665EDD01E0CA30CB648B2B8F4967544047FD4E7D12B1A9BF07339928");
+    PrfBlock tag2 = decodePrf("C17FDF249DE234F9AB15CD95137EA7EC82AE4E5B51F6BFB0FC1B8FEB6800F74C");
+    ServerDerivedFromDataToken serverDerivedFromDataToken(
+        decodePrf("986F23F132FF7F14F748AC69373CFC982AD0AD4BAD25BE92008B83AB43E96029"));
+    ServerDataEncryptionLevel1Token serverToken(
+        decodePrf("786F23F132FF7F14F748AC69373CFC982AD0AD4BAD25BE92008B83AB437EC82A"));
+
+    std::vector<uint8_t> clientBlob(64);
+
+    FLE2IndexedEqualityEncryptedValueV2 value1(
+        BSONType::String, indexKeyId, clientBlob, FLE2TagAndEncryptedMetadataBlock(1, 0, tag1));
+    FLE2IndexedEqualityEncryptedValueV2 value2(
+        BSONType::String, indexKeyId, clientBlob, FLE2TagAndEncryptedMetadataBlock(1, 0, tag2));
+
+    auto swValue1Blob = value1.serialize(serverToken, serverDerivedFromDataToken);
+    ASSERT_OK(swValue1Blob.getStatus());
+    auto swValue2Blob = value2.serialize(serverToken, serverDerivedFromDataToken);
+    ASSERT_OK(swValue2Blob.getStatus());
+
+    auto value1Blob = toEncryptedVector(EncryptedBinDataType::kFLE2EqualityIndexedValueV2,
+                                        ConstDataRange(swValue1Blob.getValue()));
+    auto value2Blob = toEncryptedVector(EncryptedBinDataType::kFLE2EqualityIndexedValueV2,
+                                        ConstDataRange(swValue2Blob.getValue()));
+
+    std::vector<EDCIndexedFields> oldFields = {{value1Blob, "a"}, {value2Blob, "b"}};
+    std::vector<EDCIndexedFields> swappedFields = {{value2Blob, "a"}, {value1Blob, "b"}};
+    std::vector<EDCIndexedFields> oneFieldChanged = {{value1Blob, "a"}, {value1Blob, "b"}};
+    std::vector<EDCIndexedFields> oneFieldRemoved = {{value2Blob, "b"}};
+    std::vector<EDCIndexedFields> empty;
+
+    // Test all fields changed
+    auto tagsToPull = EDCServerCollection::getRemovedTags(oldFields, swappedFields);
+
+    ASSERT_EQ(tagsToPull.size(), 2);
+    ASSERT(tagsToPull[0] == tag1 || tagsToPull[1] == tag1);
+    ASSERT(tagsToPull[0] == tag2 || tagsToPull[1] == tag2);
+
+    // Test field "b" changed
+    tagsToPull = EDCServerCollection::getRemovedTags(oldFields, oneFieldChanged);
+    ASSERT_EQ(tagsToPull.size(), 1);
+    ASSERT(tagsToPull[0] == tag2);
+
+    // Test all fields removed
+    tagsToPull = EDCServerCollection::getRemovedTags(oldFields, empty);
+    ASSERT_EQ(tagsToPull.size(), 2);
+    ASSERT(tagsToPull[0] == tag1 || tagsToPull[1] == tag1);
+    ASSERT(tagsToPull[0] == tag2 || tagsToPull[1] == tag2);
+
+    // Test field "a" removed
+    tagsToPull = EDCServerCollection::getRemovedTags(oldFields, oneFieldRemoved);
+    ASSERT_EQ(tagsToPull.size(), 1);
+    ASSERT(tagsToPull[0] == tag1);
+
+    // Test no fields changed
+    tagsToPull = EDCServerCollection::getRemovedTags(oldFields, oldFields);
+    ASSERT_EQ(tagsToPull.size(), 0);
+
+    tagsToPull = EDCServerCollection::getRemovedTags(empty, empty);
+    ASSERT_EQ(tagsToPull.size(), 0);
+
+    // Test field added
+    tagsToPull = EDCServerCollection::getRemovedTags(empty, oldFields);
+    ASSERT_EQ(tagsToPull.size(), 0);
+
+    // Test exception if old fields contain deprecated FLE2 subtype...
+    auto v1ValueBlob = toEncryptedVector(EncryptedBinDataType::kFLE2EqualityIndexedValue,
+                                         ConstDataRange(swValue1Blob.getValue()));
+    std::vector<EDCIndexedFields> v1Fields = {{v1ValueBlob, "a"}};
+    ASSERT_THROWS_CODE(EDCServerCollection::getRemovedTags(v1Fields, empty), DBException, 7293204);
+
+    // .. but not if the v1 field is also in the new document.
+    tagsToPull = EDCServerCollection::getRemovedTags(v1Fields, v1Fields);
+    ASSERT_EQ(tagsToPull.size(), 0);
+}
+
+TEST(FLE_Update, GenerateUpdateToRemoveTags) {
+    // TODO: SERVER-73303 remove when v2 is enabled by default
+    // This feature flag is needed for encryptDocument() to generate v2 payloads, since
+    // getRemovedTags() only supports v2.
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+
+    TestKeyVault keyVault;
+
+    auto doc = BSON("value"
+                    << "123456");
+    auto element = doc.firstElement();
+    auto buf = generatePlaceholder(element, Operation::kInsert);
+
+    BSONObjBuilder builder;
+    builder.append(kSafeContent, BSON_ARRAY(1 << 2 << 4));
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+    {
+        BSONObjBuilder sub(builder.subobjStart("nested"));
+        auto buf2 = generatePlaceholder(
+            element, Operation::kInsert, Fle2AlgorithmInt::kEquality, indexKey2Id);
+        sub.appendBinData("encrypted", buf2.size(), BinDataType::Encrypt, buf2.data());
+    }
+    auto encDoc = encryptDocument(builder.obj(), &keyVault);
+
+    auto oldFields = EDCServerCollection::getEncryptedIndexedFields(encDoc);
+    std::vector<EDCIndexedFields> newFields;
+
+    auto removedTags = EDCServerCollection::getRemovedTags(oldFields, newFields);
+    auto pullUpdate = EDCServerCollection::generateUpdateToRemoveTags(removedTags);
+
+    std::cout << "PULL: " << pullUpdate << std::endl;
+
+    ASSERT_EQ(pullUpdate["$pull"].type(), Object);
+    ASSERT_EQ(pullUpdate["$pull"][kSafeContent].type(), Object);
+    ASSERT_EQ(pullUpdate["$pull"][kSafeContent]["$in"].type(), Array);
+    auto tagsArray = pullUpdate["$pull"][kSafeContent]["$in"].Array();
+
+    ASSERT_EQ(tagsArray.size(), removedTags.size());
+    for (auto& tag : tagsArray) {
+        ASSERT_TRUE(tag.isBinData(BinDataType::BinDataGeneral));
+    }
+
+    // Verify failure when list of tags is empty
+    ASSERT_THROWS_CODE(EDCServerCollection::generateUpdateToRemoveTags({}), DBException, 7293203);
 }
 
 TEST(CompactionHelpersTest, parseCompactionTokensTest) {
@@ -3062,6 +3261,35 @@ TEST(EDCServerCollectionTest, GenerateEDCTokens) {
     ASSERT_EQ(EDCServerCollection::generateEDCTokens(edcDatakey, 1).size(), 2);
     ASSERT_EQ(EDCServerCollection::generateEDCTokens(edcDatakey, 2).size(), 3);
     ASSERT_EQ(EDCServerCollection::generateEDCTokens(edcDatakey, 3).size(), 4);
+}
+
+TEST(EDCServerCollectionTest, ValidateModifiedDocumentCompatibility) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+
+    std::vector<uint8_t> blob;
+    std::vector<EncryptedBinDataType> badTypes = {
+        EncryptedBinDataType::kFLE2EqualityIndexedValue,
+        EncryptedBinDataType::kFLE2RangeIndexedValue,
+        EncryptedBinDataType::kFLE2UnindexedEncryptedValue};
+    std::vector<EncryptedBinDataType> okTypes = {
+        EncryptedBinDataType::kFLE2EqualityIndexedValueV2,
+        EncryptedBinDataType::kFLE2RangeIndexedValueV2,
+        EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2};
+
+    for (auto& badType : badTypes) {
+        BSONObjBuilder builder;
+        toEncryptedBinData("sample", badType, ConstDataRange(blob), &builder);
+        auto doc = builder.obj();
+        ASSERT_THROWS_CODE(
+            EDCServerCollection::validateModifiedDocumentCompatibility(doc), DBException, 7293202);
+    }
+
+    for (auto& okType : okTypes) {
+        BSONObjBuilder builder;
+        toEncryptedBinData("sample", okType, ConstDataRange(blob), &builder);
+        auto doc = builder.obj();
+        ASSERT_DOES_NOT_THROW(EDCServerCollection::validateModifiedDocumentCompatibility(doc));
+    }
 }
 
 TEST(RangeTest, Int32_NoBounds) {

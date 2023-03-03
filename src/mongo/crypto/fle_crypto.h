@@ -1022,6 +1022,8 @@ struct FLE2TagAndEncryptedMetadataBlock {
     static StatusWith<FLE2TagAndEncryptedMetadataBlock> decryptAndParse(
         ServerDerivedFromDataToken token, ConstDataRange serializedBlock);
 
+    static StatusWith<PrfBlock> parseTag(ConstDataRange serializedBlock);
+
     /*
      * Decrypts and returns only the zeros blob from the serialized
      * FLE2TagAndEncryptedMetadataBlock in serializedBlock.
@@ -1079,6 +1081,8 @@ struct FLE2IndexedEqualityEncryptedValueV2 {
 
     static StatusWith<FLE2TagAndEncryptedMetadataBlock> parseAndDecryptMetadataBlock(
         ServerDerivedFromDataToken serverDataDerivedToken, ConstDataRange serializedServerValue);
+
+    static StatusWith<PrfBlock> parseMetadataBlockTag(ConstDataRange serializedServerValue);
 
     static StatusWith<UUID> readKeyId(ConstDataRange serializedServerValue);
 
@@ -1268,6 +1272,9 @@ struct FLE2IndexedRangeEncryptedValueV2 {
         const std::vector<ServerDerivedFromDataToken>& serverDataDerivedTokens,
         ConstDataRange serializedServerValue);
 
+    static StatusWith<std::vector<PrfBlock>> parseMetadataBlockTags(
+        ConstDataRange serializedServerValue);
+
     static StatusWith<UUID> readKeyId(ConstDataRange serializedServerValue);
 
     static StatusWith<BSONType> readBsonType(ConstDataRange serializedServerValue);
@@ -1396,6 +1403,14 @@ public:
                                            bool bypassDocumentValidation);
 
     /**
+     * Validates that the on-disk encrypted values in the input document are
+     * compatible with the current QE protocol version.
+     * Used during updates to verify that the modified document's pre-image can be
+     * safely updated per the protocol compatibility rules.
+     */
+    static void validateModifiedDocumentCompatibility(BSONObj& originalDocument);
+
+    /**
      * Get information about all FLE2InsertUpdatePayload payloads
      */
     static std::vector<EDCServerPayloadInfo> getEncryptedFieldInfo(BSONObj& obj);
@@ -1447,6 +1462,7 @@ public:
     static BSONObj finalizeForUpdate(const BSONObj& doc,
                                      const std::vector<EDCServerPayloadInfo>& serverPayload);
 
+    // TODO: SERVER-73303 remove once v2 is enabled by default
     /**
      * Generate an update modifier document with $pull to remove stale tags.
      *
@@ -1458,12 +1474,21 @@ public:
                                               const StringMap<FLEDeleteToken>& tokenMap);
 
     /**
+     * Generate an update modifier document with $pull to remove stale tags.
+     *
+     * Generates:
+     *
+     * { $pull : {__safeContent__ : {$in : [tag..] } } }
+     */
+    static BSONObj generateUpdateToRemoveTags(const std::vector<PrfBlock>& tagsToPull);
+
+    /**
      * Get a list of encrypted, indexed fields.
      */
     static std::vector<EDCIndexedFields> getEncryptedIndexedFields(BSONObj& obj);
 
     /**
-     * Get a list of tags to remove and add.
+     * Get a list of fields to remove.
      *
      * An update is performed in two steps:
      * 1. Perform the update of the encrypted fields
@@ -1475,9 +1500,20 @@ public:
      * fields in both and subtract the fields in the newDocument from originalDocument. The
      * remaining fields are the ones we need to remove.
      */
-    static std::vector<EDCIndexedFields> getRemovedTags(
+    static std::vector<EDCIndexedFields> getRemovedFields(
         std::vector<EDCIndexedFields>& originalDocument,
         std::vector<EDCIndexedFields>& newDocument);
+
+    /**
+     * Generates the list of stale tags that need to be removed on an update.
+     * This first calculates the set difference between the original document and
+     * the new document using getRemovedFields(), then acquires the tags for each of the
+     * fields left over. These are the tags that need to be removed from __safeContent__.
+     *
+     * This sorts the input vectors.
+     */
+    static std::vector<PrfBlock> getRemovedTags(std::vector<EDCIndexedFields>& originalDocument,
+                                                std::vector<EDCIndexedFields>& newDocument);
 };
 
 

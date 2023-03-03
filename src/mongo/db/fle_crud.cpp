@@ -1108,7 +1108,7 @@ bool hasIndexedFieldsInSchema(const std::vector<EncryptedField>& fields) {
  * 3. Run the update with findAndModify to get the pre-image
  * 4. Run a find to get the post-image update with the id from the pre-image
  * -- Fail if we cannot find the new document. This could happen if they updated _id.
- * 5. Find the removed fields and update ECC
+ * 5. Find the removed fields
  * 6. Remove the stale tags from the original document with a new push
  */
 write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
@@ -1119,7 +1119,15 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
     auto ei = updateRequest.getEncryptionInformation().value();
 
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
-    auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
+
+    // TODO: SERVER-73303 delete when v2 is enabled by default
+    StringMap<FLEDeleteToken> tokenMap;
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
+    } else if (ei.getDeleteTokens().has_value()) {
+        uasserted(7293201, "Illegal delete tokens encountered in EncryptionInformation");
+    }
+
     const auto updateOpEntry = updateRequest.getUpdates()[0];
 
     auto bypassDocumentValidation =
@@ -1198,6 +1206,10 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
         return updateReply;
     }
 
+    // Validate that the original document does not contain values with on-disk version
+    // incompatible with the current protocol version.
+    EDCServerCollection::validateModifiedDocumentCompatibility(originalDocument);
+
     // Step 4 ----
     auto idElement = originalDocument.firstElement();
     uassert(6371504,
@@ -1217,23 +1229,53 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
     // Step 5 ----
     auto originalFields = EDCServerCollection::getEncryptedIndexedFields(originalDocument);
     auto newFields = EDCServerCollection::getEncryptedIndexedFields(newDocument);
-    auto deletedFields = EDCServerCollection::getRemovedTags(originalFields, newFields);
 
-    processRemovedFields(queryImpl, edcNss, efc, tokenMap, deletedFields, &stmtId);
+    // TODO: SERVER-73303 delete when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+
+        auto deletedFields = EDCServerCollection::getRemovedFields(originalFields, newFields);
+
+        processRemovedFields(queryImpl, edcNss, efc, tokenMap, deletedFields, &stmtId);
+
+        // Step 6 ----
+        BSONObj pullUpdate =
+            EDCServerCollection::generateUpdateToRemoveTags(deletedFields, tokenMap);
+        auto pullUpdateOpEntry = write_ops::UpdateOpEntry();
+        pullUpdateOpEntry.setUpsert(false);
+        pullUpdateOpEntry.setMulti(false);
+        pullUpdateOpEntry.setQ(BSON("_id"_sd << idElement));
+        pullUpdateOpEntry.setU(mongo::write_ops::UpdateModification(
+            pullUpdate, write_ops::UpdateModification::ModifierUpdateTag{}));
+        newUpdateRequest.setUpdates({pullUpdateOpEntry});
+        newUpdateRequest.getWriteCommandRequestBase().setStmtId(boost::none);
+        newUpdateRequest.setLegacyRuntimeConstants(boost::none);
+        newUpdateRequest.getWriteCommandRequestBase().setEncryptionInformation(boost::none);
+        /* ignore */ queryImpl->update(edcNss, stmtId, newUpdateRequest);
+
+        return updateReply;
+    }
 
     // Step 6 ----
-    BSONObj pullUpdate = EDCServerCollection::generateUpdateToRemoveTags(deletedFields, tokenMap);
-    auto pullUpdateOpEntry = write_ops::UpdateOpEntry();
-    pullUpdateOpEntry.setUpsert(false);
-    pullUpdateOpEntry.setMulti(false);
-    pullUpdateOpEntry.setQ(BSON("_id"_sd << idElement));
-    pullUpdateOpEntry.setU(mongo::write_ops::UpdateModification(
-        pullUpdate, write_ops::UpdateModification::ModifierUpdateTag{}));
-    newUpdateRequest.setUpdates({pullUpdateOpEntry});
-    newUpdateRequest.getWriteCommandRequestBase().setStmtId(boost::none);
-    newUpdateRequest.setLegacyRuntimeConstants(boost::none);
-    newUpdateRequest.getWriteCommandRequestBase().setEncryptionInformation(boost::none);
-    /* ignore */ queryImpl->update(edcNss, stmtId, newUpdateRequest);
+    // GarbageCollect steps:
+    //  1. Gather the tags from the metadata block(s) of each removed field. These are stale tags.
+    //  2. Generate the update command that pulls the stale tags from __safeContent__
+    //  3. Perform the update
+    auto staleTags = EDCServerCollection::getRemovedTags(originalFields, newFields);
+
+    if (!staleTags.empty()) {
+        BSONObj pullUpdate = EDCServerCollection::generateUpdateToRemoveTags(staleTags);
+        auto pullUpdateOpEntry = write_ops::UpdateOpEntry();
+        pullUpdateOpEntry.setUpsert(false);
+        pullUpdateOpEntry.setMulti(false);
+        pullUpdateOpEntry.setQ(BSON("_id"_sd << idElement));
+        pullUpdateOpEntry.setU(mongo::write_ops::UpdateModification(
+            pullUpdate, write_ops::UpdateModification::ModifierUpdateTag{}));
+        newUpdateRequest.setUpdates({pullUpdateOpEntry});
+        newUpdateRequest.getWriteCommandRequestBase().setStmtId(boost::none);
+        newUpdateRequest.setLegacyRuntimeConstants(boost::none);
+        newUpdateRequest.getWriteCommandRequestBase().setEncryptionInformation(boost::none);
+        /* ignore */ queryImpl->update(edcNss, stmtId, newUpdateRequest);
+    }
 
     return updateReply;
 }
@@ -1467,7 +1509,7 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
 
     // Step 5 ----
     auto originalFields = EDCServerCollection::getEncryptedIndexedFields(originalDocument);
-    auto deletedFields = EDCServerCollection::getRemovedTags(originalFields, newFields);
+    auto deletedFields = EDCServerCollection::getRemovedFields(originalFields, newFields);
 
     processRemovedFields(queryImpl, edcNss, efc, tokenMap, deletedFields, &stmtId);
 

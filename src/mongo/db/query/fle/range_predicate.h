@@ -65,7 +65,8 @@ protected:
         if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
             return false;
         }
-        return type == EncryptedBinDataType::kFLE2FindRangePayload;
+        return type == EncryptedBinDataType::kFLE2FindRangePayload ||
+            type == EncryptedBinDataType::kFLE2UnindexedEncryptedValue;
     }
 
 private:
