@@ -877,7 +877,10 @@ bool confirmBoundsProvideSortComponentGivenMultikeyness(
     return true;
 }
 
-std::set<std::string> extractEqualityFields(const IndexBounds& bounds, const IndexEntry& index) {
+std::set<std::string> extractEqualityFields(
+    const IndexBounds& bounds,
+    const IndexEntry& index,
+    const std::vector<interval_evaluation_tree::IET>* iets) {
     std::set<std::string> equalityFields;
 
     // Find all equality predicate fields.
@@ -892,9 +895,38 @@ std::set<std::string> extractEqualityFields(const IndexBounds& bounds, const Ind
             if (!ival.isPoint()) {
                 continue;
             }
+
+            // If we have an IET for this field in our index bounds, we determine whether it
+            // guarantees that, upon evaluation, we will have point bounds for the corresponding
+            // field in our index. In particular, if the IET evaluates to a ConstNode or an equality
+            // EvalNode, then this field represents an equality.
+            if (iets && !iets->empty()) {
+                const auto& iet = (*iets)[i];
+                const auto* constNodePtr = iet.cast<interval_evaluation_tree::ConstNode>();
+                const auto* evalNodePtr = iet.cast<interval_evaluation_tree::EvalNode>();
+                const auto isEquality =
+                    evalNodePtr && evalNodePtr->matchType() == MatchExpression::MatchType::EQ;
+                if (!constNodePtr && !isEquality)
+                    continue;
+
+                // If we have 'constNodePtr', it must be the case that the interval that it contains
+                // is the same as 'ival'.
+                if (constNodePtr) {
+                    tassert(7426201,
+                            "'constNodePtr' must have a single interval",
+                            constNodePtr->oil.intervals.size() == 1);
+                    tassert(
+                        7426202,
+                        "'constNodePtr' must have the same point interval as the one in 'bounds'",
+                        constNodePtr->oil.intervals[0].equals(ival));
+                }
+            }
             equalityFields.insert(oil.name);
         }
     } else {
+        tassert(7426200,
+                "Should not have IETs when evaluating min/max index bounds",
+                !iets || iets->empty());
         BSONObjIterator keyIter(index.keyPattern);
         BSONObjIterator startIter(bounds.startKey);
         BSONObjIterator endIter(bounds.endKey);
@@ -917,7 +949,8 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
                                     int direction,
                                     const IndexBounds& bounds,
                                     const CollatorInterface* queryCollator,
-                                    const std::set<StringData>& multikeyFields) {
+                                    const std::set<StringData>& multikeyFields,
+                                    const std::vector<interval_evaluation_tree::IET>* iets) {
     BSONObj sortPatternProvidedByIndex = index.keyPattern;
 
     // If 'index' is the result of expanding a wildcard index, then its key pattern should look like
@@ -990,6 +1023,11 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
     // sort order on this field or any subsequent fields. When we encounter such a field in the
     // index key pattern, we truncate it and any later fields to form the "base sort pattern".
     //
+    // When dealing with autoparameterization (that is, when 'iets' is non-empty), the requirement
+    // for a field to be considered an equality field is stricter. In particular, we must be able to
+    // prove that the index bounds will always yield point bounds for any future value of the input
+    // parameter.
+    //
     // Example, consider an index pattern {a: 1, b: 1, c: 1, d: 1},
     // - If the query predicate is {a: 1} and 'c' is a multikey field then, unsupportedFields = {c},
     // equalityFields = {a}, ignoreFields = {} and baseSortPattern = {b: 1}. Field 'a' is dropped
@@ -1009,7 +1047,7 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
     // So we can provide sorts {a: 1, d: 1}, {a: 1, c: 1, d: 1} but not sort patterns that include
     // field 'b'.
     //
-    std::set<std::string> equalityFields = extractEqualityFields(bounds, index);
+    std::set<std::string> equalityFields = extractEqualityFields(bounds, index, iets);
     std::set<StringData> unsupportedFields;
     std::set<StringData> ignoreFields;
     if (!CollatorInterface::collatorsMatch(queryCollator, index.collator)) {
@@ -1069,7 +1107,8 @@ std::pair<ProvidedSortSet, std::set<StringData>> computeSortsAndMultikeyPathsFor
     const IndexEntry& index,
     int direction,
     const IndexBounds& bounds,
-    const CollatorInterface* queryCollator) {
+    const CollatorInterface* queryCollator,
+    const std::vector<interval_evaluation_tree::IET>* iets) {
     // If the index is multikey but does not have path-level multikey metadata, then this index
     // cannot provide any sorts and we need not populate 'multikeyFieldsOut'.
     if (index.multikey && index.multikeyPaths.empty()) {
@@ -1080,14 +1119,14 @@ std::pair<ProvidedSortSet, std::set<StringData>> computeSortsAndMultikeyPathsFor
     if (index.multikey) {
         multikeyFieldsOut = getMultikeyFields(index.keyPattern, index.multikeyPaths);
     }
-    return {computeSortsForScan(index, direction, bounds, queryCollator, multikeyFieldsOut),
+    return {computeSortsForScan(index, direction, bounds, queryCollator, multikeyFieldsOut, iets),
             std::move(multikeyFieldsOut)};
 }
 }  // namespace
 
 void IndexScanNode::computeProperties() {
     std::tie(sortSet, multikeyFields) =
-        computeSortsAndMultikeyPathsForScan(index, direction, bounds, queryCollator);
+        computeSortsAndMultikeyPathsForScan(index, direction, bounds, queryCollator, &iets);
 }
 
 std::unique_ptr<QuerySolutionNode> IndexScanNode::clone() const {
@@ -1474,7 +1513,9 @@ std::unique_ptr<QuerySolutionNode> DistinctNode::clone() const {
 void DistinctNode::computeProperties() {
     // Note that we don't need to save the returned multikey fields for a DISTINCT_SCAN. They are
     // only needed for explodeForSort(), which works on IXSCAN but not DISTINCT_SCAN.
-    sortSet = computeSortsAndMultikeyPathsForScan(index, direction, bounds, queryCollator).first;
+    sortSet = computeSortsAndMultikeyPathsForScan(
+                  index, direction, bounds, queryCollator, nullptr /* iets */)
+                  .first;
 }
 
 //

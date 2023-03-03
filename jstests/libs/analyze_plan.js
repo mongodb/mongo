@@ -524,17 +524,36 @@ function assertStagesForExplainOfCommand({coll, cmdObj, expectedStages, stagesNo
 }
 
 /**
- * Get the "planCacheKey" from the explain result.
+ * Utility to obtain a value from 'explainRes' using 'getValueCallback'.
+ */
+function getFieldValueFromExplain(explainRes, getValueCallback) {
+    assert(explainRes.hasOwnProperty("queryPlanner"), explainRes);
+    const plannerOutput = explainRes.queryPlanner;
+    const fieldValue = getValueCallback(plannerOutput);
+    assert.eq(typeof fieldValue, "string");
+    return fieldValue;
+}
+
+/**
+ * Get the 'planCacheKey' from 'explainRes'.
  */
 function getPlanCacheKeyFromExplain(explainRes, db) {
-    const hash = FixtureHelpers.isMongos(db) &&
-            explainRes.queryPlanner.hasOwnProperty("winningPlan") &&
-            explainRes.queryPlanner.winningPlan.hasOwnProperty("shards")
-        ? explainRes.queryPlanner.winningPlan.shards[0].planCacheKey
-        : explainRes.queryPlanner.planCacheKey;
-    assert.eq(typeof hash, "string");
+    return getFieldValueFromExplain(explainRes, function(plannerOutput) {
+        return FixtureHelpers.isMongos(db) && plannerOutput.hasOwnProperty("winningPlan") &&
+                plannerOutput.winningPlan.hasOwnProperty("shards")
+            ? plannerOutput.winningPlan.shards[0].planCacheKey
+            : plannerOutput.planCacheKey;
+    });
+}
 
-    return hash;
+/**
+ * Get the 'queryHash' from 'explainRes'.
+ */
+function getQueryHashFromExplain(explainRes, db) {
+    return getFieldValueFromExplain(explainRes, function(plannerOutput) {
+        return FixtureHelpers.isMongos(db) ? plannerOutput.winningPlan.shards[0].queryHash
+                                           : plannerOutput.queryHash;
+    });
 }
 
 /**
