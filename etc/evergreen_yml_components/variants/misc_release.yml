@@ -275,7 +275,6 @@ buildvariants:
     multiversion_edition: enterprise
     multiversion_architecture: arm64
     multiversion_architecture_42_or_later: aarch64
-    multiversion_skip_install_for_40: "true"
     packager_script: packager_enterprise.py
     packager_arch: aarch64
     packager_distro: amazon2
