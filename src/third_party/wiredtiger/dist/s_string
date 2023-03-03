@@ -64,6 +64,18 @@ while :
         for f in $l; do
             replace $f
         done | sort -u > $t
+
+        # Between aspell versions 0.60.7-20110707 and 0.60.8 the following program names have been
+        # added to the dictionary and are no longer considered spelling errors. This means
+        # that building a replacement list of words with the newer version of aspell will omit them
+        # from s_string.ok, and subsequently running s_string with older aspell version will
+        # report spelling errors. Manually whitelist these names to address this.
+        prog_names="AWS AWS's MongoDB MONGODB PostgreSQL sanitizer sanitizers"
+        for name in $prog_names; do
+            echo $name >> $t
+        done
+        sort -u -o $t $t
+
 	if ! diff $t s_string.ok >/dev/null 2>&1; then
             echo "The string.ok list will be updated."
             cp $t s_string.ok

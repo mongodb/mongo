@@ -15,6 +15,8 @@ ARGS
 ASAN
 ASM
 AUS
+AWS
+AWS's
 Addr
 Alakuijala
 Alexandrescu's
@@ -214,6 +216,7 @@ MEM
 MEMALIGN
 MEMORDER
 MERCHANTABILITY
+MONGODB
 MOVEFILE
 MRXB
 MRXBOPC
@@ -226,6 +229,7 @@ Marsaglia's
 Mellor
 Mewhort
 Mitzenmacher
+MongoDB
 MoveFileExW
 MultiByteToWideChar
 Multithreaded
@@ -274,6 +278,7 @@ Phong
 PlatformSDK
 Podir
 Posix
+PostgreSQL
 Pre
 Preload
 Prepend
@@ -1107,6 +1112,8 @@ rw
 rwlock
 sH
 sHQ
+sanitizer
+sanitizers
 scr
 sd
 sdk
