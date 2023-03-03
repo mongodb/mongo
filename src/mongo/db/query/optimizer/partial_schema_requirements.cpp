@@ -145,7 +145,9 @@ size_t PartialSchemaRequirements::numConjuncts() const {
 
 boost::optional<ProjectionName> PartialSchemaRequirements::findProjection(
     const PartialSchemaKey& key) const {
-    assertIsSingletonDisjunction();
+    tassert(7453908,
+            "Expected PartialSchemaRequirement to be a singleton disjunction",
+            PSRExpr::isSingletonDisjunction(getRoot()));
 
     boost::optional<ProjectionName> proj;
     PSRExpr::visitDNF(_expr, [&](const Entry& entry) {
@@ -158,7 +160,9 @@ boost::optional<ProjectionName> PartialSchemaRequirements::findProjection(
 
 boost::optional<std::pair<size_t, PartialSchemaRequirement>>
 PartialSchemaRequirements::findFirstConjunct(const PartialSchemaKey& key) const {
-    assertIsSingletonDisjunction();
+    tassert(7453907,
+            "Expected PartialSchemaRequirement to be a singleton disjunction",
+            PSRExpr::isSingletonDisjunction(getRoot()));
 
     size_t i = 0;
     boost::optional<std::pair<size_t, PartialSchemaRequirement>> res;
@@ -183,14 +187,6 @@ void PartialSchemaRequirements::add(PartialSchemaKey key, PartialSchemaRequireme
         }
     });
     normalize();
-}
-
-void PartialSchemaRequirements::assertIsSingletonDisjunction() const {
-    if (auto disjunction = _expr.cast<PSRExpr::Disjunction>();
-        disjunction && disjunction->nodes().size() == 1) {
-        return;
-    }
-    tasserted(7016405, "Expected PartialSchemaRequirement to be a singleton disjunction");
 }
 
 namespace {
@@ -259,6 +255,27 @@ bool PartialSchemaRequirements::simplify(
         return simplifyExpr<true /*isCNF*/>(_expr, func);
     }
     return simplifyExpr<false /*isCNF*/>(_expr, func);
+}
+
+/**
+ * Returns a vector of ((input binding, path), output binding). The output binding names
+ * are unique and you can think of the vector as a product: every row has all the projections
+ * available.
+ */
+std::vector<std::pair<PartialSchemaKey, ProjectionName>> getBoundProjections(
+    const PartialSchemaRequirements& reqs) {
+    // For now we assume no projections inside a nontrivial disjunction.
+    std::vector<std::pair<PartialSchemaKey, ProjectionName>> result;
+    PSRExpr::visitAnyShape(reqs.getRoot(), [&](const PartialSchemaEntry& e) {
+        const auto& [key, req] = e;
+        if (auto proj = req.getBoundProjectionName()) {
+            result.emplace_back(key, *proj);
+        }
+    });
+    tassert(7453906,
+            "Expected no bound projections in a nontrivial disjunction",
+            result.empty() || PSRExpr::isSingletonDisjunction(reqs.getRoot()));
+    return result;
 }
 
 }  // namespace mongo::optimizer

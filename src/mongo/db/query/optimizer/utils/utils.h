@@ -244,8 +244,8 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
  * Schema Requirement structure. Following that the intervals of any remaining non-multikey paths
  * (following simplification) on the same key are intersected. Intervals of multikey paths are
  * checked for subsumption and if one subsumes the other, the subsuming one is retained. Returns
- * true if we have an empty result after simplification. Each redundant binding gets an entry in
- * 'projectionRenames', which maps redundant name to the de-duplicated name.
+ * true if we have an always-false predicate after simplification. Each redundant binding gets an
+ * entry in 'projectionRenames', which maps redundant name to the de-duplicated name.
  */
 [[nodiscard]] bool simplifyPartialSchemaReqPaths(
     const boost::optional<ProjectionName>& scanProjName,

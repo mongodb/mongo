@@ -351,6 +351,7 @@ public:
  *
  *      int transport(const NodeType&, int childResult0, int childResult1)
  *
+ * This method guarantees depth-first, left-to-right order.
  */
 template <bool withSlot = false, typename D, typename N, typename... Args>
 auto transport(N&& node, D& domain, Args&&... args) {

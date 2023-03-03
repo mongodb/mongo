@@ -363,6 +363,16 @@ struct CandidateIndexEntry {
     size_t _intervalPrefixSize;
 };
 
+/**
+ * ScanParams describes a set of predicates and projections to use for a collection scan or fetch.
+ *
+ * The semantics are:
+ * 1. Apply the FieldProjectionMap to introduce some bindings.
+ * 2. Apply the ResidualRequirements (a filter), which can read any of those bindings.
+ *
+ * We represent projections specially because SBE 'ScanStage' is more efficient at handling multiple
+ * fields, compared to doing N separate getField calls.
+ */
 struct ScanParams {
     bool operator==(const ScanParams& other) const;
 

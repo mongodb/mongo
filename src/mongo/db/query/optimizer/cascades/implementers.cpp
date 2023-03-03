@@ -417,9 +417,16 @@ public:
         }
 
         const ProjectionName& scanProjectionName = indexingAvailability.getScanProjection();
-        for (const auto& [key, req] : reqMap.conjuncts()) {
-            if (key._projectionName != scanProjectionName) {
-                // We can only satisfy partial schema requirements using our root projection.
+
+        // We can only satisfy partial schema requirements using our root projection.
+        {
+            bool anyNonRoot = false;
+            PSRExpr::visitAnyShape(reqMap.getRoot(), [&](const PartialSchemaEntry& e) {
+                if (e.first._projectionName != scanProjectionName) {
+                    anyNonRoot = true;
+                }
+            });
+            if (anyNonRoot) {
                 return;
             }
         }
@@ -438,11 +445,8 @@ public:
                 requiresRootProjection = projectionsLeftToSatisfy.erase(scanProjectionName);
             }
 
-            for (const auto& entry : reqMap.conjuncts()) {
-                if (const auto& boundProjName = entry.second.getBoundProjectionName()) {
-                    // Project field only if it required.
-                    projectionsLeftToSatisfy.erase(*boundProjName);
-                }
+            for (const auto& [key, boundProjName] : getBoundProjections(reqMap.getRoot())) {
+                projectionsLeftToSatisfy.erase(boundProjName);
             }
             if (!projectionsLeftToSatisfy.getVector().empty()) {
                 // Unknown projections remain. Reject.
