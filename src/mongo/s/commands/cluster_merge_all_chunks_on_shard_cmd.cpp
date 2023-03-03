@@ -72,6 +72,8 @@ public:
             ShardSvrMergeAllChunksOnShard shardSvrMergeAllChunksOnShard(nss);
             shardSvrMergeAllChunksOnShard.setDbName(DatabaseName::kAdmin);
             shardSvrMergeAllChunksOnShard.setShard(req.getShard());
+            shardSvrMergeAllChunksOnShard.setMaxNumberOfChunksToMerge(
+                req.getMaxNumberOfChunksToMerge());
 
             auto swCommandResponse = shard->runCommandWithFixedRetryAttempts(
                 opCtx,

@@ -188,10 +188,13 @@ struct DataSizeResponse {
     bool maxSizeReached;
 };
 
+typedef int NumMergedChunks;
+
 typedef stdx::variant<MergeInfo, DataSizeInfo, MigrateInfo, MergeAllChunksOnShardInfo>
     BalancerStreamAction;
 
-typedef stdx::variant<Status, StatusWith<DataSizeResponse>> BalancerStreamActionResponse;
+typedef stdx::variant<Status, StatusWith<DataSizeResponse>, StatusWith<NumMergedChunks>>
+    BalancerStreamActionResponse;
 
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
 typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;

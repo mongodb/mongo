@@ -1040,10 +1040,11 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
     return ShardAndCollectionVersion{mergeVersion /*shardVersion*/, mergeVersion /*collVersion*/};
 }
 
-StatusWith<ShardingCatalogManager::ShardAndCollectionVersion>
+StatusWith<std::pair<ShardingCatalogManager::ShardAndCollectionVersion, int>>
 ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                                                     const NamespaceString& nss,
-                                                    const ShardId& shardId) {
+                                                    const ShardId& shardId,
+                                                    int maxNumberOfChunksToMerge) {
     // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
     // under the exclusive _kChunkOpLock happen on the same term.
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -1085,8 +1086,8 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
 
         // 3. Prepare the data for the merge.
 
-        // Track the number of merged chunks for each new chunk
-        std::vector<size_t> numMergedChunks;
+        // Track the total and per-range number of merged chunks
+        std::pair<int, std::vector<size_t>> numMergedChunks;
 
         const auto newChunks = [&]() -> std::shared_ptr<std::vector<ChunkType>> {
             auto newChunks = std::make_shared<std::vector<ChunkType>>();
@@ -1094,7 +1095,7 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
 
             BSONObj rangeMin, rangeMax;
             Timestamp rangeOnCurrentShardSince = minValidTimestamp;
-            size_t nChunksInRange = 0;
+            int nChunksInRange = 0;
 
             // Lambda generating the new chunk to be committed if a merge can be issued on the range
             auto processRange = [&]() {
@@ -1103,7 +1104,8 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                     ChunkType newChunk(collUuid, {rangeMin, rangeMax}, newVersion, shardId);
                     newChunk.setOnCurrentShardSince(rangeOnCurrentShardSince);
                     newChunk.setHistory({ChunkHistory{rangeOnCurrentShardSince, shardId}});
-                    numMergedChunks.push_back(nChunksInRange);
+                    numMergedChunks.first += nChunksInRange;
+                    numMergedChunks.second.push_back(nChunksInRange);
                     newChunks->push_back(std::move(newChunk));
                 }
                 nChunksInRange = 0;
@@ -1133,6 +1135,10 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                     rangeOnCurrentShardSince = chunkOnCurrentShardSince;
                 }
                 nChunksInRange++;
+
+                if (numMergedChunks.first + nChunksInRange == maxNumberOfChunksToMerge) {
+                    break;
+                }
             }
             processRange();
 
@@ -1148,7 +1154,8 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
             // gets majority written before to return from this command, otherwise next RoutingInfo
             // cache refresh from the shard may not see those newest information.
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-            return ShardAndCollectionVersion{currentShardVersion, originalVersion};
+            return std::pair<ShardingCatalogManager::ShardAndCollectionVersion, int>{
+                ShardAndCollectionVersion{currentShardVersion, originalVersion}, 0};
         }
 
         // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications
@@ -1169,7 +1176,7 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
 
         // 5. Log changes
         auto prevVersion = originalVersion;
-        invariant(numMergedChunks.size() == newChunks->size());
+        invariant(numMergedChunks.second.size() == newChunks->size());
         for (auto i = 0U; i < newChunks->size(); ++i) {
             const auto& newChunk = newChunks->at(i);
             logMergeToChangelog(opCtx,
@@ -1178,13 +1185,15 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                                 newChunk.getVersion(),
                                 shardId,
                                 newChunk.getRange(),
-                                numMergedChunks.at(i));
+                                numMergedChunks.second.at(i));
 
             // we can know the prevVersion since newChunks vector is sorted by version
             prevVersion = newChunk.getVersion();
         }
 
-        return ShardAndCollectionVersion{newVersion /*shardVersion*/, newVersion /*collVersion*/};
+        return std::pair<ShardingCatalogManager::ShardAndCollectionVersion, int>{
+            ShardAndCollectionVersion{newVersion /*shardVersion*/, newVersion /*collVersion*/},
+            numMergedChunks.first};
     }
 
     uasserted(ErrorCodes::ConflictingOperationInProgress,

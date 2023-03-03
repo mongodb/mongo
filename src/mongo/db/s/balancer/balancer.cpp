@@ -668,12 +668,14 @@ void Balancer::_consumeActionStreamLoop() {
                             ->requestMergeAllChunksOnShard(
                                 opCtx.get(), mergeAllChunksAction.nss, mergeAllChunksAction.shardId)
                             .thenRunOn(*executor)
-                            .onCompletion([this,
-                                           stream,
-                                           &applyActionResponseTo,
-                                           action = mergeAllChunksAction](const Status& status) {
-                                applyActionResponseTo(action, status, stream);
-                            });
+                            .onCompletion(
+                                [this,
+                                 stream,
+                                 &applyActionResponseTo,
+                                 action = mergeAllChunksAction](
+                                    const StatusWith<NumMergedChunks>& swNumMergedChunks) {
+                                    applyActionResponseTo(action, swNumMergedChunks, stream);
+                                });
                 },
                 [](MigrateInfo&& _) {
                     uasserted(ErrorCodes::BadValue,

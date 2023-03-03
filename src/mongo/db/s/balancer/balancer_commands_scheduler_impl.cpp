@@ -334,12 +334,27 @@ SemiFuture<DataSizeResponse> BalancerCommandsSchedulerImpl::requestDataSize(
         .semi();
 }
 
-SemiFuture<void> BalancerCommandsSchedulerImpl::requestMergeAllChunksOnShard(
+SemiFuture<NumMergedChunks> BalancerCommandsSchedulerImpl::requestMergeAllChunksOnShard(
     OperationContext* opCtx, const NamespaceString& nss, const ShardId& shardId) {
     auto commandInfo = std::make_shared<MergeAllChunksOnShardCommandInfo>(nss, shardId);
     return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
-        .then([](const executor::RemoteCommandResponse& remoteResponse) {
-            return processRemoteResponse(remoteResponse);
+        .then([](const executor::RemoteCommandResponse& remoteResponse)
+                  -> StatusWith<NumMergedChunks> {
+            auto responseStatus = processRemoteResponse(remoteResponse);
+            if (!responseStatus.isOK()) {
+                return responseStatus;
+            }
+
+            try {
+                return MergeAllChunksOnShardResponse::parse(
+                           IDLParserContext{"MergeAllChunksOnShardResponse"}, remoteResponse.data)
+                    .getNumMergedChunks();
+            } catch (const DBException&) {
+                // TODO SERVER-74573 remove try-catch once 7.0 branches out
+                // It may happen in multiversion scenarios for the command not to return a
+                // MergeAllChunksOnShardResponse (in v6.3 the reply was empty)
+                return 0;
+            }
         })
         .semi();
 }

@@ -216,6 +216,28 @@ function mergeAllChunksOnShardTest(st, testDB) {
     assertExpectedChunksOnShard(configDB, coll, shard1, [{min: 1, max: 3}, {min: 7, max: 10}]);
 }
 
+function mergeAllChunksWithMaxNumberOfChunksTest(st, testDB) {
+    // Consider all chunks mergeable
+    setHistoryWindowInSecs(st, -10 /* seconds */);
+
+    const coll = newShardedColl(st, testDB);
+
+    // Split unique chunk in 11 chunks on the same shard
+    for (var i = 0; i < 10; i++) {
+        splitChunk(st, coll, i /* middle */);
+    }
+
+    // Verify the `maxNumberOfChunksToMerge` is honored
+    for (var i = 10; i > 0; i--) {
+        assert.commandWorked(st.s.adminCommand({
+            mergeAllChunksOnShard: coll.getFullName(),
+            shard: st.shard0.shardName,
+            maxNumberOfChunksToMerge: NumberInt(2)
+        }));
+        assert.eq(findChunksUtil.findChunksByNs(st.config, coll.getFullName()).toArray().length, i);
+    }
+}
+
 /* Tests mergeAllChunks command considering history window preservation */
 function mergeAllChunksOnShardConsideringHistoryWindowTest(st, testDB) {
     jsTestLog("Testing mergeAllChunksOnShard command considering history window preservation");
@@ -408,6 +430,7 @@ function executeTestCase(testFunc) {
 }
 
 executeTestCase(mergeAllChunksOnShardTest);
+executeTestCase(mergeAllChunksWithMaxNumberOfChunksTest);
 executeTestCase(mergeAllChunksOnShardConsideringHistoryWindowTest);
 executeTestCase(mergeAllChunksOnShardConsideringJumboFlagTest);
 executeTestCase(balancerTriggersAutomergerWhenIsEnabledTest);

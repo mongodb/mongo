@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/s/balancer/auto_merger_policy.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler.h"
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
@@ -350,6 +351,7 @@ public:
 
     BSONObj serialise() const override {
         ShardSvrMergeAllChunksOnShard req(getNameSpace(), getTarget());
+        req.setMaxNumberOfChunksToMerge(AutoMergerPolicy::MAX_NUMBER_OF_CHUNKS_TO_MERGE);
         return req.toBSON({});
     }
 };
@@ -500,9 +502,9 @@ public:
                                                  bool estimatedValue,
                                                  int64_t maxSize) override;
 
-    SemiFuture<void> requestMergeAllChunksOnShard(OperationContext* opCtx,
-                                                  const NamespaceString& nss,
-                                                  const ShardId& shardId) override;
+    SemiFuture<NumMergedChunks> requestMergeAllChunksOnShard(OperationContext* opCtx,
+                                                             const NamespaceString& nss,
+                                                             const ShardId& shardId) override;
 
 private:
     enum class SchedulerState { Recovering, Running, Stopping, Stopped };

@@ -49,13 +49,26 @@ types:
 
 structs:
     ConfigSvrMergeResponse:
-        description: "Response of the _configsvrCommitChunksMerge and _configsvrCommitMergeAllChunksOnShard commands."
+        description: "Response of the _configsvrCommitChunksMerge command"
         strict: false
         is_command_reply: true
         fields:
             shardVersion:
                 type: ChunkVersion
                 description: "Latest data placement of the shard."
+
+    MergeAllChunksOnShardResponse:
+        description: "Response of the _configsvrCommitMergeAllChunksOnShard and _shardsvrMergeAllChunksOnShard commands"
+        strict: false
+        is_command_reply: true
+        fields:
+            shardVersion:
+                type: ChunkVersion
+                description: "Latest data placement of the shard."
+            numMergedChunks:
+                type: int
+                description: "Number of chunks that were merged"
+                default: 0 # TODO SERVER-74573 remove default once 7.0 branches out
 
 commands:
     _configsvrCommitChunksMerge:
@@ -102,6 +115,10 @@ commands:
                 type: shard_id
                 validator:
                     callback: "ShardId::validate"
+            maxNumberOfChunksToMerge:
+                description: "The maximum number of chunks to merge"
+                type: int
+                default: 2147483647  # INT_MAX
 
     _shardsvrMergeAllChunksOnShard:
         command_name: _shardsvrMergeAllChunksOnShard
@@ -117,6 +134,10 @@ commands:
                 type: shard_id
                 validator:
                     callback: "ShardId::validate"
+            maxNumberOfChunksToMerge:
+                description: "The maximum number of chunks to merge"
+                type: int
+                default: 2147483647  # INT_MAX
 
     _configsvrCommitMergeAllChunksOnShard:
         command_name: _configsvrCommitMergeAllChunksOnShard
@@ -133,3 +154,7 @@ commands:
                 type: shard_id
                 validator:
                     callback: "ShardId::validate"
+            maxNumberOfChunksToMerge:
+                description: "The maximum number of chunks to merge"
+                type: int
+                default: 2147483647  # INT_MAX

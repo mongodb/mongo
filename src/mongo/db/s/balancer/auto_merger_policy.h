@@ -63,6 +63,11 @@ public:
                            const BalancerStreamAction& action,
                            const BalancerStreamActionResponse& result) override;
 
+    /*
+     * Maximum number of chunks to merge in one request
+     */
+    inline static constexpr int MAX_NUMBER_OF_CHUNKS_TO_MERGE = 1000;
+
 private:
     void _init(WithLock lk);
     void _checkInternalUpdatesWithLock(WithLock lk);

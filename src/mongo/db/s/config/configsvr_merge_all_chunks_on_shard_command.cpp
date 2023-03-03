@@ -71,7 +71,7 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        ConfigSvrMergeResponse typedRun(OperationContext* opCtx) {
+        MergeAllChunksOnShardResponse typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << Request::kCommandName
                                   << " can only be run on the config server",
@@ -81,12 +81,15 @@ public:
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-            StatusWith<ShardingCatalogManager::ShardAndCollectionVersion> response =
-                ShardingCatalogManager::get(opCtx)->commitMergeAllChunksOnShard(
-                    opCtx, ns(), request().getShard());
+            auto response =
+                uassertStatusOK(ShardingCatalogManager::get(opCtx)->commitMergeAllChunksOnShard(
+                    opCtx, ns(), request().getShard(), request().getMaxNumberOfChunksToMerge()));
 
-            auto shardAndCollVers = uassertStatusOK(response);
-            return ConfigSvrMergeResponse{shardAndCollVers.shardVersion};
+            auto shardAndCollVers = response.first;
+            auto numMergedChunks = response.second;
+            auto res = MergeAllChunksOnShardResponse{shardAndCollVers.shardVersion};
+            res.setNumMergedChunks(numMergedChunks);
+            return res;
         }
 
     private:

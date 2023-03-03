@@ -297,10 +297,13 @@ public:
      * the specified shard for the given collection are merged within one transaction.
      *
      * Returns a ShardAndCollectionVersion object containing the new collection version produced by
-     * the merge(s).
+     * the merge(s) and the total number of chunks that were merged.
      */
-    StatusWith<ShardingCatalogManager::ShardAndCollectionVersion> commitMergeAllChunksOnShard(
-        OperationContext* opCtx, const NamespaceString& nss, const ShardId& shardId);
+    StatusWith<std::pair<ShardingCatalogManager::ShardAndCollectionVersion, int>>
+    commitMergeAllChunksOnShard(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const ShardId& shardId,
+                                int maxNumberOfChunksToMerge = INT_MAX);
 
 
     /**

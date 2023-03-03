@@ -43,6 +43,9 @@ namespace {
 
 class ShardSvrMergeAllChunksOnShardCommand final
     : public TypedCommand<ShardSvrMergeAllChunksOnShardCommand> {
+
+    static inline IDLParserContext IDL_PARSER_CONTEXT{"MergeAllChunksOnShardResponse"};
+
 public:
     using Request = ShardSvrMergeAllChunksOnShard;
 
@@ -68,7 +71,7 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        void typedRun(OperationContext* opCtx) {
+        MergeAllChunksOnShardResponse typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
             uassert(ErrorCodes::InvalidNamespace,
@@ -78,6 +81,8 @@ public:
             ConfigSvrCommitMergeAllChunksOnShard configSvrCommitMergeAllChunksOnShard(ns());
             configSvrCommitMergeAllChunksOnShard.setDbName(DatabaseName::kAdmin);
             configSvrCommitMergeAllChunksOnShard.setShard(request().getShard());
+            configSvrCommitMergeAllChunksOnShard.setMaxNumberOfChunksToMerge(
+                request().getMaxNumberOfChunksToMerge());
 
             auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto swCommandResponse = config->runCommandWithFixedRetryAttempts(
@@ -90,6 +95,9 @@ public:
                 Shard::RetryPolicy::kIdempotent);
 
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swCommandResponse));
+
+            return MergeAllChunksOnShardResponse::parse(IDL_PARSER_CONTEXT,
+                                                        swCommandResponse.getValue().response);
         }
 
     private:
