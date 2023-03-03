@@ -74,18 +74,18 @@ bool isStandaloneOrPrimary(OperationContext* opCtx) {
 }
 
 /**
- * Used to notify the catalog cache loader of a new collection version and invalidate the in-memory
+ * Used to notify the catalog cache loader of a new placement version and invalidate the in-memory
  * routing table cache once the oplog updates are committed and become visible.
  */
-class CollectionVersionLogOpHandler final : public RecoveryUnit::Change {
+class CollectionPlacementVersionLogOpHandler final : public RecoveryUnit::Change {
 public:
-    CollectionVersionLogOpHandler(const NamespaceString& nss, bool droppingCollection)
+    CollectionPlacementVersionLogOpHandler(const NamespaceString& nss, bool droppingCollection)
         : _nss(nss), _droppingCollection(droppingCollection) {}
 
     void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {
         invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IX));
 
-        CatalogCacheLoader::get(opCtx).notifyOfCollectionVersionUpdate(_nss);
+        CatalogCacheLoader::get(opCtx).notifyOfCollectionPlacementVersionUpdate(_nss);
 
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
@@ -152,13 +152,13 @@ void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext*
             bsonExtractStringField(query, ShardCollectionType::kNssFieldName, &deletedCollection));
     const NamespaceString deletedNss(deletedCollection);
 
-    // Need the WUOW to retain the lock for CollectionVersionLogOpHandler::commit().
+    // Need the WUOW to retain the lock for CollectionPlacementVersionLogOpHandler::commit().
     // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
     AutoGetCollection autoColl(opCtx, deletedNss, MODE_IX);
 
-    opCtx->recoveryUnit()->registerChange(
-        std::make_unique<CollectionVersionLogOpHandler>(deletedNss, /* droppingCollection */ true));
+    opCtx->recoveryUnit()->registerChange(std::make_unique<CollectionPlacementVersionLogOpHandler>(
+        deletedNss, /* droppingCollection */ true));
 }
 
 /**
@@ -358,12 +358,13 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         // This logic runs on updates to the shard's persisted cache of the config server's
         // config.collections collection.
         //
-        // If an update occurs to the 'lastRefreshedCollectionVersion' field it notifies the catalog
-        // cache loader of a new collection version and clears the routing table so the next caller
-        // with routing information will provoke a routing table refresh.
+        // If an update occurs to the 'lastRefreshedCollectionPlacementVersion' field it notifies
+        // the catalog cache loader of a new placement version and clears the routing table so the
+        // next caller with routing information will provoke a routing table refresh.
         //
-        // When 'lastRefreshedCollectionVersion' is in 'update', it means that a chunk metadata
-        // refresh has finished being applied to the collection's locally persisted metadata store.
+        // When 'lastRefreshedCollectionPlacementVersion' is in 'update', it means that a chunk
+        // metadata refresh has finished being applied to the collection's locally persisted
+        // metadata store.
         //
         // If an update occurs to the 'enterCriticalSectionSignal' field, simply clear the routing
         // table immediately. This will provoke the next secondary caller to refresh through the
@@ -383,13 +384,14 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         auto refreshingFieldNewVal = update_oplog_entry::extractNewValueForField(
             updateDoc, ShardCollectionType::kRefreshingFieldName);
 
-        // Need the WUOW to retain the lock for CollectionVersionLogOpHandler::commit().
+        // Need the WUOW to retain the lock for CollectionPlacementVersionLogOpHandler::commit().
         // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
         AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, updatedNss, MODE_IX);
         if (refreshingFieldNewVal.isBoolean() && !refreshingFieldNewVal.boolean()) {
-            opCtx->recoveryUnit()->registerChange(std::make_unique<CollectionVersionLogOpHandler>(
-                updatedNss, /* droppingCollection */ false));
+            opCtx->recoveryUnit()->registerChange(
+                std::make_unique<CollectionPlacementVersionLogOpHandler>(
+                    updatedNss, /* droppingCollection */ false));
         }
 
         if (enterCriticalSectionFieldNewVal.ok()) {
@@ -801,7 +803,7 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
             oss._allowCollectionCreation);
 
     // If the check above passes, this means the collection doesn't exist and is being created and
-    // that the caller will be responsible to eventially set the proper shard version
+    // that the caller will be responsible to eventially set the proper placement version
     auto scopedCsr =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, collectionName);
     if (!scopedCsr->getCurrentMetadataIfKnown()) {

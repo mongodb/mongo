@@ -371,7 +371,8 @@ ShardServerCatalogCacheLoader::~ShardServerCatalogCacheLoader() {
     shutDown();
 }
 
-void ShardServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(const NamespaceString& nss) {
+void ShardServerCatalogCacheLoader::notifyOfCollectionPlacementVersionUpdate(
+    const NamespaceString& nss) {
     _namespaceNotifications.notifyChange(nss);
 }
 
@@ -661,7 +662,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
 
     // Disallow reading on an older snapshot because this relies on being able to read the
     // side effects of writes during secondary replication after being signalled from the
-    // CollectionVersionLogOpHandler.
+    // CollectionPlacementVersionLogOpHandler.
     BlockSecondaryReadsDuringBatchApplication_DONT_USE secondaryReadsBlockBehindReplication(opCtx);
 
     return _getCompletePersistedMetadataForSecondarySinceVersion(
@@ -707,10 +708,10 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
             24107,
             1,
             "Cache loader remotely refreshed for collection {namespace} from version "
-            "{oldCollectionVersion} and no metadata was found",
+            "{oldCollectionPlacementVersion} and no metadata was found",
             "Cache loader remotely refreshed for collection and no metadata was found",
             "namespace"_attr = nss,
-            "oldCollectionVersion"_attr = maxLoaderVersion);
+            "oldCollectionPlacementVersion"_attr = maxLoaderVersion);
         return swCollectionAndChangedChunks;
     }
 
@@ -742,12 +743,14 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     LOGV2_FOR_CATALOG_REFRESH(
         24108,
         1,
-        "Cache loader remotely refreshed for collection {namespace} from collection version "
-        "{oldCollectionVersion} and found collection version {refreshedCollectionVersion}",
+        "Cache loader remotely refreshed for collection {namespace} from collection placement "
+        "version {oldCollectionPlacementVersion} and found collection placement version "
+        "{refreshedCollectionPlacementVersion}",
         "Cache loader remotely refreshed for collection",
         "namespace"_attr = nss,
-        "oldCollectionVersion"_attr = maxLoaderVersion,
-        "refreshedCollectionVersion"_attr = collAndChunks.changedChunks.back().getVersion());
+        "oldCollectionPlacementVersion"_attr = maxLoaderVersion,
+        "refreshedCollectionPlacementVersion"_attr =
+            collAndChunks.changedChunks.back().getVersion());
 
     // Metadata was found remotely
     // -- otherwise we would have received NamespaceNotFound rather than Status::OK().
@@ -1216,11 +1219,12 @@ void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
         24112,
         1,
         "Successfully updated persisted chunk metadata for collection {namespace} from "
-        "{oldCollectionVersion} to collection version {newCollectionVersion}",
+        "{oldCollectionPlacementVersion} to collection placement version "
+        "{newCollectionPlacementVersion}",
         "Successfully updated persisted chunk metadata for collection",
         "namespace"_attr = nss,
-        "oldCollectionVersion"_attr = task.minQueryVersion,
-        "newCollectionVersion"_attr = task.maxQueryVersion);
+        "oldCollectionPlacementVersion"_attr = task.minQueryVersion,
+        "newCollectionPlacementVersion"_attr = task.maxQueryVersion);
 }
 
 void ShardServerCatalogCacheLoader::_updatePersistedDbMetadata(OperationContext* opCtx,

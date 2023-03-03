@@ -51,7 +51,7 @@ public:
 
     void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& nss,
-                                      ChunkVersion targetCollectionVersion) const final;
+                                      ChunkVersion targetCollectionPlacementVersion) const final;
 
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const final {

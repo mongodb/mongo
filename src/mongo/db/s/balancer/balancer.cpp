@@ -629,7 +629,7 @@ void Balancer::_consumeActionStreamLoop() {
                                                  mergeAction.nss,
                                                  mergeAction.shardId,
                                                  mergeAction.chunkRange,
-                                                 mergeAction.collectionVersion)
+                                                 mergeAction.collectionPlacementVersion)
                             .thenRunOn(*executor)
                             .onCompletion([this,
                                            stream,
@@ -1047,15 +1047,15 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
 
         const auto& [cm, _] = routingInfoStatus.getValue();
 
-        auto splitStatus =
-            shardutil::splitChunkAtMultiplePoints(opCtx,
-                                                  splitInfo.shardId,
-                                                  splitInfo.nss,
-                                                  cm.getShardKeyPattern(),
-                                                  splitInfo.collectionVersion.epoch(),
-                                                  splitInfo.collectionVersion.getTimestamp(),
-                                                  ChunkRange(splitInfo.minKey, splitInfo.maxKey),
-                                                  splitInfo.splitKeys);
+        auto splitStatus = shardutil::splitChunkAtMultiplePoints(
+            opCtx,
+            splitInfo.shardId,
+            splitInfo.nss,
+            cm.getShardKeyPattern(),
+            splitInfo.collectionPlacementVersion.epoch(),
+            splitInfo.collectionPlacementVersion.getTimestamp(),
+            ChunkRange(splitInfo.minKey, splitInfo.maxKey),
+            splitInfo.splitKeys);
         if (!splitStatus.isOK()) {
             LOGV2_WARNING(21879,
                           "Failed to split chunk {splitInfo} {error}",

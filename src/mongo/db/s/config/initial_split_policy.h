@@ -76,7 +76,7 @@ public:
     struct ShardCollectionConfig {
         std::vector<ChunkType> chunks;
 
-        const auto& collVersion() const {
+        const auto& collPlacementVersion() const {
             return chunks.back().getVersion();
         }
     };

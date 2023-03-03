@@ -708,14 +708,14 @@ boost::optional<int64_t> MigrateInfo::getMaxChunkSizeBytes() const {
 
 SplitInfo::SplitInfo(const ShardId& inShardId,
                      const NamespaceString& inNss,
-                     const ChunkVersion& inCollectionVersion,
+                     const ChunkVersion& inCollectionPlacementVersion,
                      const ChunkVersion& inChunkVersion,
                      const BSONObj& inMinKey,
                      const BSONObj& inMaxKey,
                      std::vector<BSONObj> inSplitKeys)
     : shardId(inShardId),
       nss(inNss),
-      collectionVersion(inCollectionVersion),
+      collectionPlacementVersion(inCollectionPlacementVersion),
       chunkVersion(inChunkVersion),
       minKey(inMinKey),
       maxKey(inMaxKey),
@@ -727,30 +727,33 @@ std::string SplitInfo::toString() const {
         splitKeysBuilder << splitKey.toString() << ", ";
     }
 
-    return "Splitting chunk in {} [ {}, {} ), residing on {} at [ {} ] with version {} and collection version {}"_format(
+    return "Splitting chunk in {} [ {}, {} ), residing on {} at [ {} ] with version {} and collection placement version {}"_format(
         nss.ns(),
         minKey.toString(),
         maxKey.toString(),
         shardId.toString(),
         splitKeysBuilder.str(),
         chunkVersion.toString(),
-        collectionVersion.toString());
+        collectionPlacementVersion.toString());
 }
 
 MergeInfo::MergeInfo(const ShardId& shardId,
                      const NamespaceString& nss,
                      const UUID& uuid,
-                     const ChunkVersion& collectionVersion,
+                     const ChunkVersion& collectionPlacementVersion,
                      const ChunkRange& chunkRange)
     : shardId(shardId),
       nss(nss),
       uuid(uuid),
-      collectionVersion(collectionVersion),
+      collectionPlacementVersion(collectionPlacementVersion),
       chunkRange(chunkRange) {}
 
 std::string MergeInfo::toString() const {
-    return "Merging chunk range {} in {} residing on {} with collection version {}"_format(
-        chunkRange.toString(), nss.toString(), shardId.toString(), collectionVersion.toString());
+    return "Merging chunk range {} in {} residing on {} with collection placement version {}"_format(
+        chunkRange.toString(),
+        nss.toString(),
+        shardId.toString(),
+        collectionPlacementVersion.toString());
 }
 
 MergeAllChunksOnShardInfo::MergeAllChunksOnShardInfo(const ShardId& shardId,

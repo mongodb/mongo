@@ -179,7 +179,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     _moveTimingHelper.done(1);
     moveChunkHangAtStep1.pauseWhileSet();
 
-    // Make sure the latest shard version is recovered as of the time of the invocation of the
+    // Make sure the latest placement version is recovered as of the time of the invocation of the
     // command.
     onCollectionPlacementVersionMismatch(_opCtx, nss(), boost::none);
 
@@ -482,7 +482,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
                                             _args.getFromShard(),
                                             _args.getToShard(),
                                             migratedChunk,
-                                            metadata.getCollVersion(),
+                                            metadata.getCollPlacementVersion(),
                                             currentTime.clusterTime().asTimestamp());
 
         request.serialize({}, &builder);
@@ -579,9 +579,10 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
 
 
     LOGV2(22018,
-          "Migration succeeded and updated collection version to {updatedCollectionVersion}",
-          "Migration succeeded and updated collection version",
-          "updatedCollectionVersion"_attr = refreshedMetadata.getCollVersion(),
+          "Migration succeeded and updated collection placement version to "
+          "{updatedCollectionPlacementVersion}",
+          "Migration succeeded and updated collection placement version",
+          "updatedCollectionPlacementVersion"_attr = refreshedMetadata.getCollPlacementVersion(),
           "migrationId"_attr = _coordinator->getMigrationId());
 
     // If the migration has succeeded, clear the BucketCatalog so that the buckets that got migrated
@@ -689,9 +690,11 @@ CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoch() {
             str::stream() << "The collection's epoch has changed since the migration began. "
                              "Expected collection epoch: "
                           << _collectionEpoch->toString() << ", but found: "
-                          << (metadata.isSharded() ? metadata.getCollVersion().epoch().toString()
-                                                   : "unsharded collection"),
-            metadata.isSharded() && metadata.getCollVersion().epoch() == *_collectionEpoch);
+                          << (metadata.isSharded()
+                                  ? metadata.getCollPlacementVersion().epoch().toString()
+                                  : "unsharded collection"),
+            metadata.isSharded() &&
+                metadata.getCollPlacementVersion().epoch() == *_collectionEpoch);
 
     return metadata;
 }
@@ -759,13 +762,13 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
                 //
                 // Wait for the updates to the cache of the routing table to be fully written to
                 // disk before clearing the 'minOpTime recovery' document. This way, we ensure that
-                // all nodes from a shard, which donated a chunk will always be at the shard version
-                // of the last migration it performed.
+                // all nodes from a shard, which donated a chunk will always be at the placement
+                // version of the last migration it performed.
                 //
                 // If the metadata is not persisted before clearing the 'inMigration' flag below, it
                 // is possible that the persisted metadata is rolled back after step down, but the
                 // write which cleared the 'inMigration' flag is not, a secondary node will report
-                // itself at an older shard version.
+                // itself at an older placement version.
                 CatalogCacheLoader::get(newOpCtx).waitForCollectionFlush(newOpCtx, nss());
 
                 // Clear the 'minOpTime recovery' document so that the next time a node from this

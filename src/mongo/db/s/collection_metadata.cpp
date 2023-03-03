@@ -135,10 +135,11 @@ BSONObj CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {
 
 std::string CollectionMetadata::toStringBasic() const {
     if (isSharded()) {
-        return str::stream() << "collection version: " << _cm->getVersion().toString()
-                             << ", shard version: " << getShardVersionForLogging().toString();
+        return str::stream() << "collection placement version: " << _cm->getVersion().toString()
+                             << ", shard placement version: "
+                             << getShardPlacementVersionForLogging().toString();
     } else {
-        return "collection version: <unsharded>";
+        return "collection placement version: <unsharded>";
     }
 }
 

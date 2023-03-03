@@ -477,9 +477,9 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
 
         // Once we know we need to visit all shards no need to keep looping.
         // However, this optimization does not apply when we are reading from a snapshot
-        // because _shardVersions contains shards with chunks and is built based on the last
-        // refresh. Therefore, it is possible for _shardVersions to have fewer entries if a shard
-        // no longer owns chunks when it used to at _clusterTime.
+        // because _shardPlacementVersions contains shards with chunks and is built based on the
+        // last refresh. Therefore, it is possible for _shardPlacementVersions to have fewer entries
+        // if a shard no longer owns chunks when it used to at _clusterTime.
         if (!cm.isAtPointInTime() && shardIds->size() == cm.getNShardsOwningChunks()) {
             break;
         }

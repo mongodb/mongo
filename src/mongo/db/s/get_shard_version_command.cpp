@@ -110,23 +110,25 @@ public:
             }
         } else {
             const auto& metadata = *optMetadata;
-            result.appendTimestamp("global", metadata.getShardVersion().toLong());
+            result.appendTimestamp("global", metadata.getShardPlacementVersion().toLong());
 
             if (cmdObj["fullMetadata"].trueValue()) {
                 BSONObjBuilder metadataBuilder(result.subobjStart("metadata"));
                 if (metadata.isSharded()) {
                     metadataBuilder.appendTimestamp("collVersion",
-                                                    metadata.getCollVersion().toLong());
-                    metadataBuilder.append("collVersionEpoch", metadata.getCollVersion().epoch());
+                                                    metadata.getCollPlacementVersion().toLong());
+                    metadataBuilder.append("collVersionEpoch",
+                                           metadata.getCollPlacementVersion().epoch());
                     metadataBuilder.append("collVersionTimestamp",
-                                           metadata.getCollVersion().getTimestamp());
+                                           metadata.getCollPlacementVersion().getTimestamp());
 
-                    metadataBuilder.appendTimestamp("shardVersion",
-                                                    metadata.getShardVersionForLogging().toLong());
+                    metadataBuilder.appendTimestamp(
+                        "shardVersion", metadata.getShardPlacementVersionForLogging().toLong());
                     metadataBuilder.append("shardVersionEpoch",
-                                           metadata.getShardVersionForLogging().epoch());
-                    metadataBuilder.append("shardVersionTimestamp",
-                                           metadata.getShardVersionForLogging().getTimestamp());
+                                           metadata.getShardPlacementVersionForLogging().epoch());
+                    metadataBuilder.append(
+                        "shardVersionTimestamp",
+                        metadata.getShardPlacementVersionForLogging().getTimestamp());
 
                     metadataBuilder.append("keyPattern", metadata.getShardKeyPattern().toBSON());
 

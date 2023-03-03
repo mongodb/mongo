@@ -51,7 +51,7 @@ struct TargeterStats {
         SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>()};
 };
 
-using StaleShardVersionMap = std::map<ShardId, ChunkVersion>;
+using StaleShardPlacementVersionMap = std::map<ShardId, ChunkVersion>;
 
 /**
  * NSTargeter based on a CollectionRoutingInfo implementation. Wraps all exception codepaths and

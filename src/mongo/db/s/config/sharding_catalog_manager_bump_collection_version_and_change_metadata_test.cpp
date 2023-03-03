@@ -49,7 +49,7 @@ const KeyPattern kKeyPattern(BSON("a" << 1));
 const ShardType kShard0("shard0000", "shard0000:1234");
 const ShardType kShard1("shard0001", "shard0001:1234");
 
-class ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest
+class ShardingCatalogManagerBumpCollectionPlacementVersionAndChangeMetadataTest
     : public ConfigServerTestFixture {
     void setUp() {
         ConfigServerTestFixture::setUp();
@@ -112,7 +112,7 @@ protected:
     }
 };
 
-TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
+TEST_F(ShardingCatalogManagerBumpCollectionPlacementVersionAndChangeMetadataTest,
        BumpsOnlyMinorVersionOfNewestChunk) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = Timestamp(42);
@@ -134,22 +134,23 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
                                                 BSON("a" << 21),
                                                 BSON("a" << 100));
 
-    const auto collectionVersion = shard0Chunk1.getVersion();
-    auto targetCollectionVersion = collectionVersion;
-    targetCollectionVersion.incMinor();
+    const auto collectionPlacementVersion = shard0Chunk1.getVersion();
+    auto targetCollectionPlacementVersion = collectionPlacementVersion;
+    targetCollectionPlacementVersion.incMinor();
 
     setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard0Chunk1, shard1Chunk0});
 
     auto opCtx = operationContext();
-    ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
+    ShardingCatalogManager::get(opCtx)->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
         opCtx, kNss, [&](OperationContext*, TxnNumber) {});
 
     assertChunkUnchanged(shard0Chunk0);
-    assertChunkVersionChangedAndOtherFieldsUnchanged(shard0Chunk1, targetCollectionVersion);
+    assertChunkVersionChangedAndOtherFieldsUnchanged(shard0Chunk1,
+                                                     targetCollectionPlacementVersion);
     assertChunkUnchanged(shard1Chunk0);
 }
 
-TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest, NoChunks) {
+TEST_F(ShardingCatalogManagerBumpCollectionPlacementVersionAndChangeMetadataTest, NoChunks) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = Timestamp(42);
     const auto collUUID = UUID::gen();
@@ -167,13 +168,13 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest, NoChunk
         opCtx, ChunkType::ConfigNS, BSON(ChunkType::name << shard0Chunk0.getName()), false));
 
     ASSERT_THROWS_CODE(
-        ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
+        ShardingCatalogManager::get(opCtx)->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
             opCtx, kNss, [&](OperationContext*, TxnNumber) {}),
         DBException,
         ErrorCodes::IncompatibleShardingMetadata);
 }
 
-TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
+TEST_F(ShardingCatalogManagerBumpCollectionPlacementVersionAndChangeMetadataTest,
        SucceedsInThePresenceOfTransientTransactionErrors) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = Timestamp(42);
@@ -189,13 +190,13 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
                                                 kShard1.getName(),
                                                 BSON("a" << 11),
                                                 BSON("a" << 20));
-    const auto initialCollectionVersion = shard1Chunk0.getVersion();
+    const auto initialCollectionPlacementVersion = shard1Chunk0.getVersion();
 
     setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard1Chunk0});
 
     size_t numCalls = 0;
     ShardingCatalogManager::get(operationContext())
-        ->bumpCollectionVersionAndChangeMetadataInTxn(
+        ->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
             operationContext(), kNss, [&](OperationContext*, TxnNumber) {
                 ++numCalls;
                 if (numCalls < 5) {
@@ -203,11 +204,12 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
                 }
             });
 
-    auto targetCollectionVersion = initialCollectionVersion;
-    targetCollectionVersion.incMinor();
+    auto targetCollectionPlacementVersion = initialCollectionPlacementVersion;
+    targetCollectionPlacementVersion.incMinor();
 
     assertChunkUnchanged(shard0Chunk0);
-    assertChunkVersionChangedAndOtherFieldsUnchanged(shard1Chunk0, targetCollectionVersion);
+    assertChunkVersionChangedAndOtherFieldsUnchanged(shard1Chunk0,
+                                                     targetCollectionPlacementVersion);
 
     ASSERT_EQ(numCalls, 5) << "transaction succeeded after unexpected number of attempts";
 
@@ -219,7 +221,7 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
 
     numCalls = 0;
     ShardingCatalogManager::get(operationContext())
-        ->bumpCollectionVersionAndChangeMetadataInTxn(
+        ->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
             operationContext(), kNss, [&](OperationContext*, TxnNumber) {
                 ++numCalls;
                 if (numCalls >= 5) {
@@ -227,15 +229,16 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
                 }
             });
 
-    targetCollectionVersion.incMinor();
+    targetCollectionPlacementVersion.incMinor();
 
     assertChunkUnchanged(shard0Chunk0);
-    assertChunkVersionChangedAndOtherFieldsUnchanged(shard1Chunk0, targetCollectionVersion);
+    assertChunkVersionChangedAndOtherFieldsUnchanged(shard1Chunk0,
+                                                     targetCollectionPlacementVersion);
 
     ASSERT_EQ(numCalls, 5) << "transaction succeeded after unexpected number of attempts";
 }
 
-TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
+TEST_F(ShardingCatalogManagerBumpCollectionPlacementVersionAndChangeMetadataTest,
        StopsRetryingOnPermanentServerErrors) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = Timestamp(42);
@@ -256,7 +259,7 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
 
     size_t numCalls = 0;
     ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
-                           ->bumpCollectionVersionAndChangeMetadataInTxn(
+                           ->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
                                operationContext(),
                                kNss,
                                [&](OperationContext*, TxnNumber) {
@@ -274,7 +277,7 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
 
     numCalls = 0;
     ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
-                           ->bumpCollectionVersionAndChangeMetadataInTxn(
+                           ->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
                                operationContext(),
                                kNss,
                                [&](OperationContext*, TxnNumber) {
@@ -292,7 +295,7 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
 
     numCalls = 0;
     ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
-                           ->bumpCollectionVersionAndChangeMetadataInTxn(
+                           ->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
                                operationContext(),
                                kNss,
                                [&](OperationContext*, TxnNumber) {
@@ -300,8 +303,9 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
                                    cc().getOperationContext()->markKilled(ErrorCodes::Interrupted);
 
                                    // Throw a LockTimeout exception so
-                                   // bumpCollectionVersionAndChangeMetadataInTxn() makes another
-                                   // retry attempt and discovers operation context has been killed.
+                                   // bumpCollectionPlacementVersionAndChangeMetadataInTxn() makes
+                                   // another retry attempt and discovers operation context has been
+                                   // killed.
                                    uasserted(ErrorCodes::LockTimeout,
                                              "simulating lock timeout error from test");
                                }),

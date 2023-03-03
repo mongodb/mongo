@@ -615,7 +615,7 @@ protected:
 
     void writeStateTransitionUpdateExpectSuccess(
         OperationContext* opCtx, ReshardingCoordinatorDocument expectedCoordinatorDoc) {
-        writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+        writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
             opCtx, _metrics.get(), expectedCoordinatorDoc);
 
         // Check that config.reshardingOperations and config.collections entries are updated
@@ -747,7 +747,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoSucceeds) {
     // the state transition to kPreparingToDonate.
     auto donorChunk = makeAndInsertChunksForDonorShard(
         _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
-    auto collectionVersion = donorChunk.getVersion();
+    auto collectionPlacementVersion = donorChunk.getVersion();
 
     auto initialChunks =
         makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
@@ -776,13 +776,13 @@ TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoSucceeds) {
     writeInitialStateAndCatalogUpdatesExpectSuccess(
         operationContext(), expectedCoordinatorDoc, initialChunks, newZones);
 
-    // Confirm the shard version was increased for the donor shard. The collection version was
-    // bumped twice in 'writeInitialStateAndCatalogUpdatesExpectSuccess': once when reshardingFields
-    // is inserted to the collection doc, and once again when the state transitions to
-    // kPreparingToDonate.
-    const auto postTransitionCollectionVersion =
-        assertGet(getCollectionVersion(operationContext(), _originalNss));
-    ASSERT_TRUE(collectionVersion.isOlderThan(postTransitionCollectionVersion));
+    // Confirm the placement version was increased for the donor shard. The collection placement
+    // version was bumped twice in 'writeInitialStateAndCatalogUpdatesExpectSuccess': once when
+    // reshardingFields is inserted to the collection doc, and once again when the state transitions
+    // to kPreparingToDonate.
+    const auto postTransitionCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
+    ASSERT_TRUE(collectionPlacementVersion.isOlderThan(postTransitionCollectionPlacementVersion));
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, BasicStateTransitionSucceeds) {
@@ -793,25 +793,28 @@ TEST_F(ReshardingCoordinatorPersistenceTest, BasicStateTransitionSucceeds) {
     // as a product of the state transition to kBlockingWrites.
     makeAndInsertChunksForDonorShard(
         _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
-    auto initialOriginalCollectionVersion =
-        assertGet(getCollectionVersion(operationContext(), _originalNss));
+    auto initialOriginalCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
 
     makeAndInsertChunksForRecipientShard(
         _reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
-    auto initialTempCollectionVersion =
-        assertGet(getCollectionVersion(operationContext(), _tempNss));
+    auto initialTempCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _tempNss));
 
     // Persist the updates on disk
     auto expectedCoordinatorDoc = coordinatorDoc;
     expectedCoordinatorDoc.setState(CoordinatorStateEnum::kBlockingWrites);
 
     writeStateTransitionUpdateExpectSuccess(operationContext(), expectedCoordinatorDoc);
-    auto finalOriginalCollectionVersion =
-        assertGet(getCollectionVersion(operationContext(), _originalNss));
-    ASSERT_TRUE(initialOriginalCollectionVersion.isOlderThan(finalOriginalCollectionVersion));
+    auto finalOriginalCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
+    ASSERT_TRUE(initialOriginalCollectionPlacementVersion.isOlderThan(
+        finalOriginalCollectionPlacementVersion));
 
-    auto finalTempCollectionVersion = assertGet(getCollectionVersion(operationContext(), _tempNss));
-    ASSERT_TRUE(initialTempCollectionVersion.isOlderThan(finalTempCollectionVersion));
+    auto finalTempCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _tempNss));
+    ASSERT_TRUE(
+        initialTempCollectionPlacementVersion.isOlderThan(finalTempCollectionPlacementVersion));
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWithFetchTimestampSucceeds) {
@@ -837,19 +840,22 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWithFetchTimestampSu
         return approxCopySize;
     }());
 
-    auto initialOriginalCollectionVersion =
-        assertGet(getCollectionVersion(operationContext(), _originalNss));
-    auto initialTempCollectionVersion =
-        assertGet(getCollectionVersion(operationContext(), _tempNss));
+    auto initialOriginalCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
+    auto initialTempCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _tempNss));
 
     writeStateTransitionUpdateExpectSuccess(operationContext(), expectedCoordinatorDoc);
 
-    auto finalOriginalCollectionVersion =
-        assertGet(getCollectionVersion(operationContext(), _originalNss));
-    ASSERT_TRUE(initialOriginalCollectionVersion.isOlderThan(finalOriginalCollectionVersion));
+    auto finalOriginalCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
+    ASSERT_TRUE(initialOriginalCollectionPlacementVersion.isOlderThan(
+        finalOriginalCollectionPlacementVersion));
 
-    auto finalTempCollectionVersion = assertGet(getCollectionVersion(operationContext(), _tempNss));
-    ASSERT_TRUE(initialTempCollectionVersion.isOlderThan(finalTempCollectionVersion));
+    auto finalTempCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _tempNss));
+    ASSERT_TRUE(
+        initialTempCollectionPlacementVersion.isOlderThan(finalTempCollectionPlacementVersion));
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToDecisionPersistedSucceeds) {
@@ -875,16 +881,17 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToDecisionPersistedS
     auto updatedChunks = makeChunks(_originalUUID, _finalEpoch, _newShardKey, initialChunksIds);
     auto updatedZones = makeZones(_originalNss, _newShardKey);
 
-    auto initialCollectionVersion =
-        assertGet(getCollectionVersion(operationContext(), _originalNss));
+    auto initialCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
 
 
     writeDecisionPersistedStateExpectSuccess(
         operationContext(), expectedCoordinatorDoc, fetchTimestamp, updatedChunks, updatedZones);
 
     // Since the epoch is changed, there is no need to bump the chunk versions with the transition.
-    auto finalCollectionVersion = assertGet(getCollectionVersion(operationContext(), _originalNss));
-    ASSERT_EQ(initialCollectionVersion.toLong(), finalCollectionVersion.toLong());
+    auto finalCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
+    ASSERT_EQ(initialCollectionPlacementVersion.toLong(), finalCollectionPlacementVersion.toLong());
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToErrorSucceeds) {
@@ -904,21 +911,22 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToDoneSucceeds) {
     makeAndInsertChunksForRecipientShard(
         _reshardingUUID, _finalEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
 
-    auto initialOriginalCollectionVersion =
-        assertGet(getCollectionVersion(operationContext(), _originalNss));
+    auto initialOriginalCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
 
     removeCoordinatorDocAndReshardingFieldsExpectSuccess(operationContext(), coordinatorDoc);
 
-    auto finalOriginalCollectionVersion =
-        assertGet(getCollectionVersion(operationContext(), _originalNss));
-    ASSERT_TRUE(initialOriginalCollectionVersion.isOlderThan(finalOriginalCollectionVersion));
+    auto finalOriginalCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
+    ASSERT_TRUE(initialOriginalCollectionPlacementVersion.isOlderThan(
+        finalOriginalCollectionPlacementVersion));
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWhenCoordinatorDocDoesNotExistFails) {
     // Do not insert initial entry into config.reshardingOperations. Attempt to update coordinator
     // state documents.
     auto coordinatorDoc = makeCoordinatorDoc(CoordinatorStateEnum::kCloning, Timestamp(1, 1));
-    ASSERT_THROWS_CODE(writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+    ASSERT_THROWS_CODE(writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
                            operationContext(), _metrics.get(), coordinatorDoc),
                        AssertionException,
                        ErrorCodes::NamespaceNotFound);
@@ -962,16 +970,17 @@ TEST_F(ReshardingCoordinatorPersistenceTest, SourceCleanupBetweenTransitionsSucc
     auto updatedChunks = makeChunks(_originalUUID, _finalEpoch, _newShardKey, initialChunksIds);
     auto updatedZones = makeZones(_originalNss, _newShardKey);
 
-    auto initialCollectionVersion =
-        assertGet(getCollectionVersion(operationContext(), _originalNss));
+    auto initialCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
 
 
     writeDecisionPersistedStateExpectSuccess(
         operationContext(), expectedCoordinatorDoc, fetchTimestamp, updatedChunks, updatedZones);
 
     // Since the epoch is changed, there is no need to bump the chunk versions with the transition.
-    auto finalCollectionVersion = assertGet(getCollectionVersion(operationContext(), _originalNss));
-    ASSERT_EQ(initialCollectionVersion.toLong(), finalCollectionVersion.toLong());
+    auto finalCollectionPlacementVersion =
+        assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
+    ASSERT_EQ(initialCollectionPlacementVersion.toLong(), finalCollectionPlacementVersion.toLong());
 
     cleanupSourceCollectionExpectSuccess(
         operationContext(), expectedCoordinatorDoc, updatedChunks, updatedZones);

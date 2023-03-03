@@ -118,9 +118,9 @@ protected:
  * Version configurations (format: major version, epoch):
  *
  * 1. (0, 0) - collection is dropped.
- * 2. (0, n), n > 0 - applicable only to shardVersion; shard has no chunk.
+ * 2. (0, n), n > 0 - applicable only to shard placement version; shard has no chunk.
  * 3. (n, 0), n > 0 - invalid configuration.
- * 4. (n, m), n > 0, m > 0 - normal sharded collection version.
+ * 4. (n, m), n > 0, m > 0 - normal sharded collection placement version.
  */
 class ChunkVersion : public CollectionGeneration, public CollectionPlacement {
 public:
@@ -143,7 +143,7 @@ public:
     }
 
     /**
-     * Indicates that the shard version checking must be skipped.
+     * Indicates that placement version checking must be skipped.
      */
     static ChunkVersion IGNORED() {
         return ChunkVersion(CollectionGeneration::IGNORED(), {0, 0});

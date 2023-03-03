@@ -70,17 +70,17 @@ struct QueryAndSort {
  * due to the yield described above. If updates are applied in ascending version order, the newer
  * update is applied last.
  */
-QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionVersion);
+QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionPlacementVersion);
 
 /**
  * Writes a persisted signal to indicate that it is once again safe to read from the chunks
- * collection for 'nss' and updates the collection's collection version to 'refreshedVersion'. It is
- * essential to call this after updating the chunks collection so that secondaries know they can
- * safely use the chunk metadata again.
+ * collection for 'nss' and updates the collection's collection placement version to
+ * 'refreshedVersion'. It is essential to call this after updating the chunks collection so that
+ * secondaries know they can safely use the chunk metadata again.
  *
  * It is safe to call this multiple times: it's an idempotent action.
  *
- * refreshedVersion - the new collection version for the completed refresh.
+ * refreshedVersion - the new collection placement version for the completed refresh.
  *
  * Note: if there is no document present in the collections collection for 'nss', nothing is
  * updated.
@@ -104,9 +104,9 @@ struct RefreshState {
     // Whether a refresh is currently in progress.
     bool refreshing;
 
-    // The collection version after the last complete refresh. Indicates change if refreshing has
-    // started and finished since last loaded.
-    ChunkVersion lastRefreshedCollectionVersion;
+    // The collection placement version after the last complete refresh. Indicates change if
+    // refreshing has started and finished since last loaded.
+    ChunkVersion lastRefreshedCollectionPlacementVersion;
 };
 
 /**
@@ -130,8 +130,8 @@ StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, S
  * Updates the collections collection entry matching 'query' with 'update' using local write
  * concern.
  *
- * If 'upsert' is true, expects 'lastRefreshedCollectionVersion' to be absent in the update:
- * these refreshing fields should only be added to an existing document.
+ * If 'upsert' is true, expects 'lastRefreshedCollectionPlacementVersion' to be absent in the
+ * update: these refreshing fields should only be added to an existing document.
  */
 Status updateShardCollectionsEntry(OperationContext* opCtx,
                                    const BSONObj& query,

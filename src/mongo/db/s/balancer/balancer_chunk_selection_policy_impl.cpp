@@ -193,9 +193,9 @@ class SplitCandidatesBuffer {
     SplitCandidatesBuffer& operator=(const SplitCandidatesBuffer&) = delete;
 
 public:
-    SplitCandidatesBuffer(NamespaceString nss, ChunkVersion collectionVersion)
+    SplitCandidatesBuffer(NamespaceString nss, ChunkVersion collectionPlacementVersion)
         : _nss(std::move(nss)),
-          _collectionVersion(collectionVersion),
+          _collectionPlacementVersion(collectionPlacementVersion),
           _chunkSplitPoints(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<SplitInfo>()) {
     }
 
@@ -209,7 +209,7 @@ public:
             _chunkSplitPoints.emplace(chunk.getMin(),
                                       SplitInfo(chunk.getShardId(),
                                                 _nss,
-                                                _collectionVersion,
+                                                _collectionPlacementVersion,
                                                 chunk.getLastmod(),
                                                 chunk.getMin(),
                                                 chunk.getMax(),
@@ -236,9 +236,9 @@ public:
     }
 
 private:
-    // Namespace and expected collection version
+    // Namespace and expected collection placement version
     const NamespaceString _nss;
-    const ChunkVersion _collectionVersion;
+    const ChunkVersion _collectionPlacementVersion;
 
     // Chunk min key and split vector associated with that chunk
     BSONObjIndexedMap<SplitInfo> _chunkSplitPoints;

@@ -688,7 +688,7 @@ void removeChunkAndTagsDocs(OperationContext* opCtx,
 }
 
 /**
- * Executes metadata changes in a transaction without bumping the collection version.
+ * Executes metadata changes in a transaction without bumping the collection placement version.
  */
 void executeMetadataChangesInTxn(
     OperationContext* opCtx,
@@ -831,7 +831,7 @@ void updateTagsDocsForTempNss(OperationContext* opCtx,
 void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
                                           ReshardingMetrics* metrics,
                                           const ReshardingCoordinatorDocument& coordinatorDoc) {
-    ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
+    ShardingCatalogManager::get(opCtx)->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
         opCtx,
         coordinatorDoc.getSourceNss(),
         [&](OperationContext* opCtx, TxnNumber txnNumber) {
@@ -876,7 +876,7 @@ void writeParticipantShardsAndTempCollInfo(
     removeChunkAndTagsDocs(opCtx, tagsQuery, updatedCoordinatorDoc.getReshardingUUID());
     insertChunkAndTagDocsForTempNss(opCtx, initialChunks, zones);
 
-    ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
+    ShardingCatalogManager::get(opCtx)->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
         opCtx,
         updatedCoordinatorDoc.getSourceNss(),
         [&](OperationContext* opCtx, TxnNumber txnNumber) {
@@ -900,7 +900,7 @@ void writeParticipantShardsAndTempCollInfo(
         ShardingCatalogClient::kLocalWriteConcern);
 }
 
-void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
     const ReshardingCoordinatorDocument& coordinatorDoc) {
@@ -912,30 +912,31 @@ void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
         collNames.emplace_back(coordinatorDoc.getTempReshardingNss());
     }
 
-    ShardingCatalogManager::get(opCtx)->bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
-        opCtx,
-        collNames,
-        [&](OperationContext* opCtx, TxnNumber txnNumber) {
-            // Update the config.reshardingOperations entry
-            writeToCoordinatorStateNss(opCtx, metrics, coordinatorDoc, txnNumber);
+    ShardingCatalogManager::get(opCtx)
+        ->bumpMultipleCollectionPlacementVersionsAndChangeMetadataInTxn(
+            opCtx,
+            collNames,
+            [&](OperationContext* opCtx, TxnNumber txnNumber) {
+                // Update the config.reshardingOperations entry
+                writeToCoordinatorStateNss(opCtx, metrics, coordinatorDoc, txnNumber);
 
-            // Update the config.collections entry for the original collection
-            updateConfigCollectionsForOriginalNss(
-                opCtx, coordinatorDoc, boost::none, boost::none, boost::none, txnNumber);
-
-            // Update the config.collections entry for the temporary resharding collection. If we've
-            // already successfully committed that the operation will succeed, we've removed the
-            // entry for the temporary collection and updated the entry with original namespace to
-            // have the new shard key, UUID, and epoch
-            if (nextState < CoordinatorStateEnum::kCommitting) {
-                writeToConfigCollectionsForTempNss(
+                // Update the config.collections entry for the original collection
+                updateConfigCollectionsForOriginalNss(
                     opCtx, coordinatorDoc, boost::none, boost::none, boost::none, txnNumber);
 
-                // Copy the original indexes to the temporary uuid.
-                writeToConfigIndexesForTempNss(opCtx, coordinatorDoc, txnNumber);
-            }
-        },
-        ShardingCatalogClient::kLocalWriteConcern);
+                // Update the config.collections entry for the temporary resharding collection. If
+                // we've already successfully committed that the operation will succeed, we've
+                // removed the entry for the temporary collection and updated the entry with
+                // original namespace to have the new shard key, UUID, and epoch
+                if (nextState < CoordinatorStateEnum::kCommitting) {
+                    writeToConfigCollectionsForTempNss(
+                        opCtx, coordinatorDoc, boost::none, boost::none, boost::none, txnNumber);
+
+                    // Copy the original indexes to the temporary uuid.
+                    writeToConfigIndexesForTempNss(opCtx, coordinatorDoc, txnNumber);
+                }
+            },
+            ShardingCatalogClient::kLocalWriteConcern);
 }
 
 void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
@@ -970,7 +971,7 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
 
         removeChunkAndTagsDocs(opCtx, tagsQuery, coordinatorDoc.getReshardingUUID());
     }
-    ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
+    ShardingCatalogManager::get(opCtx)->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
         opCtx,
         updatedCoordinatorDoc.getSourceNss(),
         [&](OperationContext* opCtx, TxnNumber txnNumber) {
@@ -2190,7 +2191,7 @@ void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
     resharding::emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    resharding::writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+    resharding::writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
         opCtx.get(), _metrics.get(), updatedCoordinatorDoc);
 
     // Update in-memory coordinator doc

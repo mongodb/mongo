@@ -69,12 +69,12 @@ public:
         const boost::optional<LogicalTime>& atClusterTime);
 
     /**
-     * Returns the shard version of the active metadata object.
+     * Returns the placement version of the active metadata object.
      */
-    ChunkVersion getActiveShardVersion() {
+    ChunkVersion getActivePlacementVersion() {
         stdx::lock_guard<Latch> lg(_managerLock);
         invariant(!_metadata.empty());
-        return _metadata.back()->metadata->getShardVersion();
+        return _metadata.back()->metadata->getShardPlacementVersion();
     }
 
     /**

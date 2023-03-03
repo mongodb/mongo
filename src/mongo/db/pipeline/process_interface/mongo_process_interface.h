@@ -470,12 +470,14 @@ public:
 
     /**
      * Consults the CatalogCache to determine if this node has routing information for the
-     * collection given by 'nss' which reports the same epoch as given by 'targetCollectionVersion'.
-     * Major and minor versions in 'targetCollectionVersion' are ignored.
+     * collection given by 'nss' which reports the same epoch as given by
+     * 'targetCollectionPlacementVersion'. Major and minor versions in
+     * 'targetCollectionPlacementVersion' are ignored.
      */
-    virtual void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                              const NamespaceString& nss,
-                                              ChunkVersion targetCollectionVersion) const = 0;
+    virtual void checkRoutingInfoEpochOrThrow(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        ChunkVersion targetCollectionPlacementVersion) const = 0;
 
     /**
      * Used to enforce the constraint that the foreign collection must be unsharded.
@@ -503,14 +505,15 @@ public:
      * which can be either the "_id" field, or a shard key, depending on the 'outputNs' collection
      * type and the server type (mongod or mongos). Also returns an optional ChunkVersion,
      * populated with the version stored in the sharding catalog when we asked for the shard key
-     * (on mongos only). On mongod, this is the value of the 'targetCollectionVersion' parameter,
-     * which is the target shard version of the collection, as sent by mongos.
+     * (on mongos only). On mongod, this is the value of the 'targetCollectionPlacementVersion'
+     * parameter, which is the target placement version of the collection, as sent by mongos.
      */
     virtual std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
-    ensureFieldsUniqueOrResolveDocumentKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           boost::optional<std::set<FieldPath>> fieldPaths,
-                                           boost::optional<ChunkVersion> targetCollectionVersion,
-                                           const NamespaceString& outputNs) const = 0;
+    ensureFieldsUniqueOrResolveDocumentKey(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::optional<std::set<FieldPath>> fieldPaths,
+        boost::optional<ChunkVersion> targetCollectionPlacementVersion,
+        const NamespaceString& outputNs) const = 0;
 
     std::shared_ptr<executor::TaskExecutor> taskExecutor;
 

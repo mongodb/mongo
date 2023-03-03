@@ -72,8 +72,8 @@ public:
     }
 
     // The command intentionally uses the permission control of split/mergeChunks since it only
-    // modifies the contents of chunk entries and increments the collection/shard versions without
-    // causing any data placement changes
+    // modifies the contents of chunk entries and increments the collection/shard placement versions
+    // without causing any data placement changes
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {

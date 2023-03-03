@@ -46,7 +46,8 @@ protected:
     const ShardId kShardId1 = ShardId("shard1");
     const ShardId kShardId2 = ShardId("shard2");
     const ShardId kShardId3 = ShardId("shard3");
-    const ChunkVersion kCollectionVersion = ChunkVersion({OID::gen(), Timestamp(10)}, {1, 1});
+    const ChunkVersion kCollectionPlacementVersion =
+        ChunkVersion({OID::gen(), Timestamp(10)}, {1, 1});
     const KeyPattern kShardKeyPattern = KeyPattern(BSON("x" << 1));
     const BSONObj kKeyAtMin = BSONObjBuilder().appendMinKey("x").obj();
     const BSONObj kKeyAtZero = BSON("x" << 0);
@@ -110,14 +111,18 @@ protected:
     }
 
     ChunkType makeConfigChunkEntry(const boost::optional<int64_t>& estimatedSize = boost::none) {
-        ChunkType chunk(kUuid, ChunkRange(kKeyAtMin, kKeyAtMax), kCollectionVersion, kShardId0);
+        ChunkType chunk(
+            kUuid, ChunkRange(kKeyAtMin, kKeyAtMax), kCollectionPlacementVersion, kShardId0);
         chunk.setEstimatedSizeBytes(estimatedSize);
         return chunk;
     }
 
     std::vector<ChunkType> makeMergeableConfigChunkEntries() {
-        return {ChunkType(kUuid, ChunkRange(kKeyAtMin, kKeyAtTen), kCollectionVersion, kShardId0),
-                ChunkType(kUuid, ChunkRange(kKeyAtTen, kKeyAtMax), kCollectionVersion, kShardId0)};
+        return {
+            ChunkType(
+                kUuid, ChunkRange(kKeyAtMin, kKeyAtTen), kCollectionPlacementVersion, kShardId0),
+            ChunkType(
+                kUuid, ChunkRange(kKeyAtTen, kKeyAtMax), kCollectionPlacementVersion, kShardId0)};
     }
 
     BSONObj getConfigCollectionEntry() {
@@ -396,8 +401,11 @@ TEST_F(BalancerDefragmentationPolicyTest, TestNonRetriableErrorRebuildsCurrentPh
 TEST_F(BalancerDefragmentationPolicyTest,
        TestNonRetriableErrorWaitsForAllOutstandingActionsToComplete) {
     auto coll = setupCollectionWithPhase(
-        {ChunkType{kUuid, ChunkRange(kKeyAtMin, kKeyAtTen), kCollectionVersion, kShardId0},
-         ChunkType{kUuid, ChunkRange(BSON("x" << 11), kKeyAtMax), kCollectionVersion, kShardId0}});
+        {ChunkType{kUuid, ChunkRange(kKeyAtMin, kKeyAtTen), kCollectionPlacementVersion, kShardId0},
+         ChunkType{kUuid,
+                   ChunkRange(BSON("x" << 11), kKeyAtMax),
+                   kCollectionPlacementVersion,
+                   kShardId0}});
     _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     DataSizeInfo failingDataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
@@ -503,23 +511,23 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAllConsecutive) {
     for (int i = 0; i < 5; i++) {
         const auto minKey = (i == 0) ? kKeyAtMin : BSON("x" << i);
         const auto maxKey = BSON("x" << i + 1);
-        ChunkType chunk(
-            kUuid,
-            ChunkRange(minKey, maxKey),
-            ChunkVersion({kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()},
-                         {1, uint32_t(i)}),
-            kShardId0);
+        ChunkType chunk(kUuid,
+                        ChunkRange(minKey, maxKey),
+                        ChunkVersion({kCollectionPlacementVersion.epoch(),
+                                      kCollectionPlacementVersion.getTimestamp()},
+                                     {1, uint32_t(i)}),
+                        kShardId0);
         chunkList.push_back(chunk);
     }
     for (int i = 5; i < 10; i++) {
         const auto minKey = BSON("x" << i);
         const auto maxKey = (i == 9) ? kKeyAtMax : BSON("x" << i + 1);
-        ChunkType chunk(
-            kUuid,
-            ChunkRange(minKey, maxKey),
-            ChunkVersion({kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()},
-                         {1, uint32_t(i)}),
-            kShardId1);
+        ChunkType chunk(kUuid,
+                        ChunkRange(minKey, maxKey),
+                        ChunkVersion({kCollectionPlacementVersion.epoch(),
+                                      kCollectionPlacementVersion.getTimestamp()},
+                                     {1, uint32_t(i)}),
+                        kShardId1);
         chunkList.push_back(chunk);
     }
     auto coll = setupCollectionWithPhase(chunkList, boost::none, boost::none);
@@ -554,12 +562,12 @@ TEST_F(BalancerDefragmentationPolicyTest, PhaseOneNotConsecutive) {
         const auto minKey = (i == 0) ? kKeyAtMin : BSON("x" << i);
         const auto maxKey = (i == 9) ? kKeyAtMax : BSON("x" << i + 1);
         ShardId chosenShard = (i == 5) ? kShardId1 : kShardId0;
-        ChunkType chunk(
-            kUuid,
-            ChunkRange(minKey, maxKey),
-            ChunkVersion({kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()},
-                         {1, uint32_t(i)}),
-            chosenShard);
+        ChunkType chunk(kUuid,
+                        ChunkRange(minKey, maxKey),
+                        ChunkVersion({kCollectionPlacementVersion.epoch(),
+                                      kCollectionPlacementVersion.getTimestamp()},
+                                     {1, uint32_t(i)}),
+                        chosenShard);
         chunkList.push_back(chunk);
     }
     auto coll = setupCollectionWithPhase(chunkList, boost::none, boost::none);
@@ -632,17 +640,19 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoMissingDataSizeRestartsPha
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoChunkCanBeMovedAndMergedWithSibling) {
-    ChunkType biggestChunk(
-        kUuid,
-        ChunkRange(kKeyAtMin, kKeyAtZero),
-        ChunkVersion({kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()}, {1, 0}),
-        kShardId0);
+    ChunkType biggestChunk(kUuid,
+                           ChunkRange(kKeyAtMin, kKeyAtZero),
+                           ChunkVersion({kCollectionPlacementVersion.epoch(),
+                                         kCollectionPlacementVersion.getTimestamp()},
+                                        {1, 0}),
+                           kShardId0);
     biggestChunk.setEstimatedSizeBytes(2048);
-    ChunkType smallestChunk(
-        kUuid,
-        ChunkRange(kKeyAtZero, kKeyAtMax),
-        ChunkVersion({kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()}, {1, 1}),
-        kShardId1);
+    ChunkType smallestChunk(kUuid,
+                            ChunkRange(kKeyAtZero, kKeyAtMax),
+                            ChunkVersion({kCollectionPlacementVersion.epoch(),
+                                          kCollectionPlacementVersion.getTimestamp()},
+                                         {1, 1}),
+                            kShardId1);
     smallestChunk.setEstimatedSizeBytes(1024);
 
     auto coll = setupCollectionWithPhase({smallestChunk, biggestChunk},
@@ -704,46 +714,52 @@ TEST_F(BalancerDefragmentationPolicyTest,
        TestPhaseTwoMultipleCollectionChunkMigrationsMayBeIssuedConcurrently) {
     // Define a single collection, distributing 6 chunks across the 4 shards so that there cannot be
     // a merge without migrations
-    ChunkType firstChunkOnShard0(
-        kUuid,
-        ChunkRange(kKeyAtMin, kKeyAtZero),
-        ChunkVersion({kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()}, {1, 0}),
-        kShardId0);
+    ChunkType firstChunkOnShard0(kUuid,
+                                 ChunkRange(kKeyAtMin, kKeyAtZero),
+                                 ChunkVersion({kCollectionPlacementVersion.epoch(),
+                                               kCollectionPlacementVersion.getTimestamp()},
+                                              {1, 0}),
+                                 kShardId0);
     firstChunkOnShard0.setEstimatedSizeBytes(1);
 
-    ChunkType firstChunkOnShard1(
-        kUuid,
-        ChunkRange(kKeyAtZero, kKeyAtTen),
-        ChunkVersion({kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()}, {1, 1}),
-        kShardId1);
+    ChunkType firstChunkOnShard1(kUuid,
+                                 ChunkRange(kKeyAtZero, kKeyAtTen),
+                                 ChunkVersion({kCollectionPlacementVersion.epoch(),
+                                               kCollectionPlacementVersion.getTimestamp()},
+                                              {1, 1}),
+                                 kShardId1);
     firstChunkOnShard1.setEstimatedSizeBytes(1);
 
-    ChunkType chunkOnShard2(
-        kUuid,
-        ChunkRange(kKeyAtTen, kKeyAtTwenty),
-        ChunkVersion({kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()}, {1, 2}),
-        kShardId2);
+    ChunkType chunkOnShard2(kUuid,
+                            ChunkRange(kKeyAtTen, kKeyAtTwenty),
+                            ChunkVersion({kCollectionPlacementVersion.epoch(),
+                                          kCollectionPlacementVersion.getTimestamp()},
+                                         {1, 2}),
+                            kShardId2);
     chunkOnShard2.setEstimatedSizeBytes(1);
 
-    ChunkType chunkOnShard3(
-        kUuid,
-        ChunkRange(kKeyAtTwenty, kKeyAtThirty),
-        ChunkVersion({kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()}, {1, 3}),
-        kShardId3);
+    ChunkType chunkOnShard3(kUuid,
+                            ChunkRange(kKeyAtTwenty, kKeyAtThirty),
+                            ChunkVersion({kCollectionPlacementVersion.epoch(),
+                                          kCollectionPlacementVersion.getTimestamp()},
+                                         {1, 3}),
+                            kShardId3);
     chunkOnShard3.setEstimatedSizeBytes(1);
 
-    ChunkType secondChunkOnShard0(
-        kUuid,
-        ChunkRange(kKeyAtThirty, kKeyAtForty),
-        ChunkVersion({kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()}, {1, 4}),
-        kShardId0);
+    ChunkType secondChunkOnShard0(kUuid,
+                                  ChunkRange(kKeyAtThirty, kKeyAtForty),
+                                  ChunkVersion({kCollectionPlacementVersion.epoch(),
+                                                kCollectionPlacementVersion.getTimestamp()},
+                                               {1, 4}),
+                                  kShardId0);
     secondChunkOnShard0.setEstimatedSizeBytes(1);
 
-    ChunkType secondChunkOnShard1(
-        kUuid,
-        ChunkRange(kKeyAtForty, kKeyAtMax),
-        ChunkVersion({kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()}, {1, 5}),
-        kShardId1);
+    ChunkType secondChunkOnShard1(kUuid,
+                                  ChunkRange(kKeyAtForty, kKeyAtMax),
+                                  ChunkVersion({kCollectionPlacementVersion.epoch(),
+                                                kCollectionPlacementVersion.getTimestamp()},
+                                               {1, 5}),
+                                  kShardId1);
     secondChunkOnShard1.setEstimatedSizeBytes(1);
 
     auto coll = setupCollectionWithPhase({firstChunkOnShard0,

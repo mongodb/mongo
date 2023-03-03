@@ -294,15 +294,16 @@ public:
     }
 
     std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
-    ensureFieldsUniqueOrResolveDocumentKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           boost::optional<std::set<FieldPath>> fieldPaths,
-                                           boost::optional<ChunkVersion> targetCollectionVersion,
-                                           const NamespaceString& outputNs) const override {
+    ensureFieldsUniqueOrResolveDocumentKey(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::optional<std::set<FieldPath>> fieldPaths,
+        boost::optional<ChunkVersion> targetCollectionPlacementVersion,
+        const NamespaceString& outputNs) const override {
         if (!fieldPaths) {
-            return {std::set<FieldPath>{"_id"}, targetCollectionVersion};
+            return {std::set<FieldPath>{"_id"}, targetCollectionPlacementVersion};
         }
 
-        return {*fieldPaths, targetCollectionVersion};
+        return {*fieldPaths, targetCollectionPlacementVersion};
     }
 
     std::unique_ptr<ScopedExpectUnshardedCollection> expectUnshardedCollectionInScope(

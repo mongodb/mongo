@@ -72,10 +72,11 @@ void ShardCollectionType::setAllowMigrations(bool allowMigrations) {
         setPre50CompatibleAllowMigrations(false);
 }
 
-boost::optional<ChunkVersion> ShardCollectionType::getLastRefreshedCollectionVersion() const {
-    // Last refreshed collection version is stored as a timestamp in the BSON representation of
-    // shard collection type for legacy reasons. We therefore explicitly convert this timestamp, if
-    // it exists, into a chunk version.
+boost::optional<ChunkVersion> ShardCollectionType::getLastRefreshedCollectionPlacementVersion()
+    const {
+    // Last refreshed collection placement version is stored as a timestamp in the BSON
+    // representation of shard collection type for legacy reasons. We therefore explicitly convert
+    // this timestamp, if it exists, into a chunk version.
     if (!getLastRefreshedCollectionMajorMinorVersion())
         return boost::none;
 

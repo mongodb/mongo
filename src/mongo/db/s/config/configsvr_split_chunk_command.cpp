@@ -134,8 +134,8 @@ public:
                 parsedRequest.getShardName(),
                 parsedRequest.isFromChunkSplitter()));
 
-        shardAndCollVers.collectionVersion.serialize(kCollectionVersionField, &result);
-        shardAndCollVers.shardVersion.serialize(ChunkVersion::kChunkVersionField, &result);
+        shardAndCollVers.collectionPlacementVersion.serialize(kCollectionVersionField, &result);
+        shardAndCollVers.shardPlacementVersion.serialize(ChunkVersion::kChunkVersionField, &result);
 
         return true;
     }

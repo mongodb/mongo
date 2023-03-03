@@ -75,27 +75,28 @@ Status setPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& 
 
 }  // namespace
 
-QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionVersion) {
-    return {BSON(ChunkType::lastmod() << BSON("$gte" << Timestamp(collectionVersion.toLong()))),
+QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionPlacementVersion) {
+    return {BSON(ChunkType::lastmod()
+                 << BSON("$gte" << Timestamp(collectionPlacementVersion.toLong()))),
             BSON(ChunkType::lastmod() << 1)};
 }
 
 bool RefreshState::operator==(const RefreshState& other) const {
     return generation.isSameCollection(other.generation) && (refreshing == other.refreshing) &&
-        (lastRefreshedCollectionVersion == other.lastRefreshedCollectionVersion);
+        (lastRefreshedCollectionPlacementVersion == other.lastRefreshedCollectionPlacementVersion);
 }
 
 std::string RefreshState::toString() const {
     return str::stream() << "generation: " << generation.toString()
                          << ", refreshing: " << (refreshing ? "true" : "false")
-                         << ", lastRefreshedCollectionVersion: "
-                         << lastRefreshedCollectionVersion.toString();
+                         << ", lastRefreshedCollectionPlacementVersion: "
+                         << lastRefreshedCollectionPlacementVersion.toString();
 }
 
 Status unsetPersistedRefreshFlags(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   const ChunkVersion& refreshedVersion) {
-    // Set 'refreshing' to false and update the last refreshed collection version.
+    // Set 'refreshing' to false and update the last refreshed collection placement version.
     BSONObjBuilder updateBuilder;
     updateBuilder.append(ShardCollectionType::kRefreshingFieldName, false);
     updateBuilder.appendTimestamp(
@@ -121,10 +122,11 @@ StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
         // If 'refreshing' is present and false, a refresh must have occurred (otherwise the field
         // would never have been added to the document) and there should always be a refresh
         // version.
-        invariant(*entry.getRefreshing() ? true : !!entry.getLastRefreshedCollectionVersion());
+        invariant(*entry.getRefreshing() ? true
+                                         : !!entry.getLastRefreshedCollectionPlacementVersion());
     } else {
         // If 'refreshing' is not present, no refresh version should exist.
-        invariant(!entry.getLastRefreshedCollectionVersion());
+        invariant(!entry.getLastRefreshedCollectionPlacementVersion());
     }
 
     return RefreshState{CollectionGeneration(entry.getEpoch(), entry.getTimestamp()),
@@ -133,8 +135,8 @@ StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
                         // which these flags are set. So default to refreshing true because the
                         // chunk metadata is being updated and is not yet ready to be read.
                         entry.getRefreshing() ? *entry.getRefreshing() : true,
-                        entry.getLastRefreshedCollectionVersion()
-                            ? *entry.getLastRefreshedCollectionVersion()
+                        entry.getLastRefreshedCollectionPlacementVersion()
+                            ? *entry.getLastRefreshedCollectionPlacementVersion()
                             : ChunkVersion({entry.getEpoch(), entry.getTimestamp()}, {0, 0})};
 }
 
@@ -337,7 +339,7 @@ Status updateShardChunks(OperationContext* opCtx,
          * the operations, which can be read from the config server, not any that were removed, so
          * we must delete any chunks that overlap with the new 'chunks'.
          *
-         * CollectionVersion = 10.3
+         * collectionPlacementVersion = 10.3
          *
          * moveChunk
          * {_id: 3, max: 5, version: 10.1} --> {_id: 3, max: 5, version: 11.0}

@@ -141,14 +141,14 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
                                                          validAfter));
 
     // Verify the versions returned match expected values.
-    auto mver = versions.shardVersion;
+    auto mver = versions.shardPlacementVersion;
     ASSERT_EQ(ChunkVersion(
                   {migratedChunk.getVersion().epoch(), migratedChunk.getVersion().getTimestamp()},
                   {migratedChunk.getVersion().majorVersion() + 1, 1}),
               mver);
 
-    // Verify that a collection version is returned
-    auto cver = versions.collectionVersion;
+    // Verify that a collection placement version is returned
+    auto cver = versions.collectionPlacementVersion;
     ASSERT_TRUE(mver.isOlderOrEqualThan(cver));
 
     // Verify the chunks ended up in the right shards.
@@ -212,7 +212,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
 
     Timestamp validAfter{101, 0};
 
-    StatusWith<ShardingCatalogManager::ShardAndCollectionVersion> result =
+    StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> result =
         ShardingCatalogManager::get(operationContext())
             ->commitChunkMigration(operationContext(),
                                    kNamespace,
@@ -227,11 +227,11 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
 
     // Verify the version returned matches expected value.
     auto versions = result.getValue();
-    auto mver = versions.shardVersion;
+    auto mver = versions.shardPlacementVersion;
     ASSERT_EQ(ChunkVersion({origVersion.epoch(), origVersion.getTimestamp()}, {0, 0}), mver);
 
-    // Verify that a collection version is returned
-    auto cver = versions.collectionVersion;
+    // Verify that a collection placement version is returned
+    auto cver = versions.collectionPlacementVersion;
     ASSERT_EQ(ChunkVersion({collEpoch, collTimestamp}, {origMajorVersion + 1, 0}), cver);
 
     // Verify the chunk ended up in the right shard.
@@ -281,7 +281,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
     // Make the time distance between the last history element large enough.
     Timestamp validAfter{200, 0};
 
-    StatusWith<ShardingCatalogManager::ShardAndCollectionVersion> result =
+    StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> result =
         ShardingCatalogManager::get(operationContext())
             ->commitChunkMigration(operationContext(),
                                    kNamespace,
@@ -296,7 +296,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
 
     // Verify the version returned matches expected value.
     auto versions = result.getValue();
-    auto mver = versions.shardVersion;
+    auto mver = versions.shardPlacementVersion;
     ASSERT_EQ(ChunkVersion({origVersion.epoch(), origVersion.getTimestamp()}, {0, 0}), mver);
 
     // Verify the chunk ended up in the right shard.
@@ -345,7 +345,7 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
     // Make the time before the last change to trigger the failure.
     Timestamp validAfter{99, 0};
 
-    StatusWith<ShardingCatalogManager::ShardAndCollectionVersion> result =
+    StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> result =
         ShardingCatalogManager::get(operationContext())
             ->commitChunkMigration(operationContext(),
                                    kNamespace,
@@ -401,7 +401,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
 
     Timestamp validAfter{1};
 
-    StatusWith<ShardingCatalogManager::ShardAndCollectionVersion> result =
+    StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> result =
         ShardingCatalogManager::get(operationContext())
             ->commitChunkMigration(operationContext(),
                                    kNamespace,
@@ -459,7 +459,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
 
     Timestamp validAfter{1};
 
-    StatusWith<ShardingCatalogManager::ShardAndCollectionVersion> result =
+    StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> result =
         ShardingCatalogManager::get(operationContext())
             ->commitChunkMigration(operationContext(),
                                    kNamespace,
@@ -522,7 +522,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     setupCollection(kNamespace, kKeyPattern, {chunk0, chunk1});
 
     Timestamp validAfter{101, 0};
-    StatusWith<ShardingCatalogManager::ShardAndCollectionVersion> result =
+    StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> result =
         ShardingCatalogManager::get(operationContext())
             ->commitChunkMigration(operationContext(),
                                    kNamespace,
@@ -537,7 +537,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
 
     // Verify the versions returned match expected values.
     auto versions = result.getValue();
-    auto mver = versions.shardVersion;
+    auto mver = versions.shardPlacementVersion;
     ASSERT_EQ(ChunkVersion({origVersion.epoch(), origVersion.getTimestamp()}, {0, 0}), mver);
 
     // Verify the chunks ended up in the right shards.
@@ -802,7 +802,7 @@ public:
         const auto recipient =
             migratedChunk.getShard() == _shardIds.at(0) ? _shardIds.at(1) : _shardIds.at(0);
 
-        auto collVersionBefore = [&]() {
+        auto collPlacementVersionBefore = [&]() {
             const auto chunkDoc = uassertStatusOK(
                 findOneOnConfigCollection(operationContext(),
                                           ChunkType::ConfigNS,
@@ -834,7 +834,8 @@ public:
             ASSERT(migratedChunk.getMax().woCompare(newChunk.getMax()) == 0);
 
             // The migrated chunk's version must have been bumped
-            ASSERT_EQ(newChunk.getVersion().majorVersion(), collVersionBefore.majorVersion() + 1);
+            ASSERT_EQ(newChunk.getVersion().majorVersion(),
+                      collPlacementVersionBefore.majorVersion() + 1);
             ASSERT_EQ(0, newChunk.getVersion().minorVersion());
 
             // The migrated chunk's history should have been updated with a new `validAfter` entry
@@ -866,7 +867,7 @@ public:
             ASSERT(leftSplitChunk.getMax().woCompare(migratedChunk.getMin()) == 0);
 
             // The major and minor versions of the left split chunk must have been bumped
-            ASSERT_EQ(collVersionBefore.majorVersion() + 1,
+            ASSERT_EQ(collPlacementVersionBefore.majorVersion() + 1,
                       leftSplitChunk.getVersion().majorVersion());
             ASSERT_EQ(expectedMinVersion++, leftSplitChunk.getVersion().minorVersion());
 
@@ -891,7 +892,7 @@ public:
             ASSERT(rightSplitChunk.getMax().woCompare(origChunk.getMax()) == 0);
 
             // The major and minor versions of the right split chunk must have been bumped
-            ASSERT_EQ(collVersionBefore.majorVersion() + 1,
+            ASSERT_EQ(collPlacementVersionBefore.majorVersion() + 1,
                       rightSplitChunk.getVersion().majorVersion());
             ASSERT_EQ(expectedMinVersion++, rightSplitChunk.getVersion().minorVersion());
 

@@ -86,7 +86,7 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
 
         tassert(7032310,
                 fmt::format("allowMigrations field of collection '{}' changed without changing the "
-                            "collection version {}. Old value: {}, new value: {}",
+                            "collection placement version {}. Old value: {}, new value: {}",
                             nss.toString(),
                             existingHistory->optRt->getVersion().toString(),
                             existingHistory->optRt->allowMigrations(),
@@ -97,7 +97,7 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
         const auto& newReshardingFields = collectionAndChunks.reshardingFields;
         tassert(7032311,
                 fmt::format("reshardingFields field of collection '{}' changed without changing "
-                            "the collection version {}. Old value: {}, new value: {}",
+                            "the collection placement version {}. Old value: {}, new value: {}",
                             nss.toString(),
                             existingHistory->optRt->getVersion().toString(),
                             oldReshardingFields->toBSON().toString(),

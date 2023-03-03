@@ -337,14 +337,14 @@ bool joinCollectionPlacementVersionOperation(OperationContext* opCtx,
         return true;
     }
 
-    if (auto inRecoverOrRefresh = (**scopedCsr)->getShardVersionRecoverRefreshFuture(opCtx)) {
+    if (auto inRecoverOrRefresh = (**scopedCsr)->getPlacementVersionRecoverRefreshFuture(opCtx)) {
         scopedCsr->reset();
         collLock->reset();
         dbLock->reset();
 
         try {
             inRecoverOrRefresh->get(opCtx);
-        } catch (const ExceptionFor<ErrorCodes::ShardVersionRefreshCanceled>&) {
+        } catch (const ExceptionFor<ErrorCodes::PlacementVersionRefreshCanceled>&) {
             // The ongoing refresh has finished, although it was canceled by a
             // 'clearFilteringMetadata'.
         }
@@ -385,7 +385,7 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
                 // Can be uninterruptible because the work done under it can never block
                 UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
                 auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-                scopedCsr->resetShardVersionRecoverRefreshFuture();
+                scopedCsr->resetPlacementVersionRecoverRefreshFuture();
             });
 
             if (runRecover) {
@@ -429,12 +429,12 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
                 }
             }
 
-            // Only if all actions taken as part of refreshing the shard version completed
+            // Only if all actions taken as part of refreshing the placement version completed
             // successfully do we want to install the current metadata.
             // A view can potentially be created after spawning a thread to recover nss's shard
             // version. It is then ok to lock views in order to clear filtering metadata.
             //
-            // DBLock and CollectionLock must be used in order to avoid shard version checks
+            // DBLock and CollectionLock must be used in order to avoid placement version checks
             Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
             Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
             auto scopedCsr =
@@ -446,14 +446,14 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
                 scopedCsr->setFilteringMetadata(opCtx, currentMetadata);
             }
 
-            scopedCsr->resetShardVersionRecoverRefreshFuture();
+            scopedCsr->resetPlacementVersionRecoverRefreshFuture();
             resetRefreshFutureOnError.dismiss();
         })
         .onCompletion([=](Status status) {
             // Check the cancellation token here to ensure we throw in all cancelation events.
             if (cancellationToken.isCanceled() &&
                 (status.isOK() || status == ErrorCodes::Interrupted)) {
-                uasserted(ErrorCodes::ShardVersionRefreshCanceled,
+                uasserted(ErrorCodes::PlacementVersionRefreshCanceled,
                           "Collection placement version refresh canceled by an interruption, "
                           "probably due to a 'clearFilteringMetadata'");
             }
@@ -473,8 +473,9 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
     Timer t{};
-    ScopeGuard finishTiming(
-        [&] { CurOp::get(opCtx)->debug().shardVersionRefreshMillis += Milliseconds(t.millis()); });
+    ScopeGuard finishTiming([&] {
+        CurOp::get(opCtx)->debug().placementVersionRefreshMillis += Milliseconds(t.millis());
+    });
 
     if (nss.isNamespaceAlwaysUnsharded()) {
         return;
@@ -507,7 +508,8 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
                 }
 
                 if (auto metadata = (*scopedCsr)->getCurrentMetadataIfKnown()) {
-                    const auto currentCollectionPlacementVersion = metadata->getShardVersion();
+                    const auto currentCollectionPlacementVersion =
+                        metadata->getShardPlacementVersion();
                     // Don't need to remotely reload if the requested version is smaller than the
                     // known one. This means that the remote side is behind.
                     if (chunkVersionReceived->isOlderOrEqualThan(
@@ -532,16 +534,16 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
             CancellationSource cancellationSource;
             CancellationToken cancellationToken = cancellationSource.token();
             (*scopedCsr)
-                ->setShardVersionRecoverRefreshFuture(
+                ->setPlacementVersionRecoverRefreshFuture(
                     recoverRefreshCollectionPlacementVersion(
                         opCtx->getServiceContext(), nss, runRecover, std::move(cancellationToken)),
                     std::move(cancellationSource));
-            inRecoverOrRefresh = (*scopedCsr)->getShardVersionRecoverRefreshFuture(opCtx);
+            inRecoverOrRefresh = (*scopedCsr)->getPlacementVersionRecoverRefreshFuture(opCtx);
         }
 
         try {
             inRecoverOrRefresh->get(opCtx);
-        } catch (const ExceptionFor<ErrorCodes::ShardVersionRefreshCanceled>&) {
+        } catch (const ExceptionFor<ErrorCodes::PlacementVersionRefreshCanceled>&) {
             // The refresh was canceled by a 'clearFilteringMetadata'. Retry the refresh.
             continue;
         }
@@ -639,14 +641,15 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         if (auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
             const auto& metadata = *optMetadata;
             if (metadata.isSharded() &&
-                (cm.getVersion().isOlderOrEqualThan(metadata.getCollVersion()))) {
+                (cm.getVersion().isOlderOrEqualThan(metadata.getCollPlacementVersion()))) {
                 LOGV2_DEBUG(22063,
                             1,
                             "Skipping metadata refresh because collection already is up-to-date",
                             "namespace"_attr = nss,
-                            "latestCollectionVersion"_attr = metadata.getCollVersion(),
-                            "refreshedCollectionVersion"_attr = cm.getVersion());
-                return metadata.getShardVersion();
+                            "latestCollectionPlacementVersion"_attr =
+                                metadata.getCollPlacementVersion(),
+                            "refreshedCollectionPlacementVersion"_attr = cm.getVersion());
+                return metadata.getShardPlacementVersion();
             }
         }
     }
@@ -663,22 +666,23 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     if (auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
         const auto& metadata = *optMetadata;
         if (metadata.isSharded() &&
-            (cm.getVersion().isOlderOrEqualThan(metadata.getCollVersion()))) {
+            (cm.getVersion().isOlderOrEqualThan(metadata.getCollPlacementVersion()))) {
             LOGV2_DEBUG(22064,
                         1,
                         "Skipping metadata refresh because collection already is up-to-date",
                         "namespace"_attr = nss,
-                        "latestCollectionVersion"_attr = metadata.getCollVersion(),
-                        "refreshedCollectionVersion"_attr = cm.getVersion());
-            return metadata.getShardVersion();
+                        "latestCollectionPlacementVersion"_attr =
+                            metadata.getCollPlacementVersion(),
+                        "refreshedCollectionPlacementVersion"_attr = cm.getVersion());
+            return metadata.getShardPlacementVersion();
         }
     }
 
     CollectionMetadata metadata(cm, shardingState->shardId());
-    auto newShardVersion = metadata.getShardVersion();
+    auto newPlacementVersion = metadata.getShardPlacementVersion();
 
     scopedCsr->setFilteringMetadata(opCtx, std::move(metadata));
-    return newShardVersion;
+    return newPlacementVersion;
 }
 
 Status onDbVersionMismatchNoExcept(OperationContext* opCtx,

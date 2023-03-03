@@ -110,7 +110,8 @@ void ConfigServerCatalogCacheLoader::shutDown() {
     _executor->join();
 }
 
-void ConfigServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(const NamespaceString& nss) {
+void ConfigServerCatalogCacheLoader::notifyOfCollectionPlacementVersionUpdate(
+    const NamespaceString& nss) {
     MONGO_UNREACHABLE;
 }
 

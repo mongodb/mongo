@@ -77,7 +77,7 @@ void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
                                            std::vector<BSONObj> zones,
                                            boost::optional<CollectionIndexes> indexVersion);
 
-void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
     const ReshardingCoordinatorDocument& coordinatorDoc);

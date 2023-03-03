@@ -83,30 +83,33 @@ public:
     void throwIfReshardingInProgress(NamespaceString const& nss) const;
 
     /**
-     * Returns the current shard version for the collection or UNSHARDED if it is not sharded.
+     * Returns the current shard's placement version for the collection or UNSHARDED if it is not
+     * sharded.
      *
      * Will throw ShardInvalidatedForTargeting if _thisShardId is marked as stale by
      * the CollectionMetadata's current chunk manager.
      */
-    ChunkVersion getShardVersion() const {
+    ChunkVersion getShardPlacementVersion() const {
         return (isSharded() ? _cm->getVersion(_thisShardId) : ChunkVersion::UNSHARDED());
     }
 
     /**
-     * Returns the current shard version for the collection or UNSHARDED if it is not sharded.
+     * Returns the current shard's placement version for the collection or UNSHARDED if it is not
+     * sharded.
      *
      * Will not throw an exception if _thisShardId is marked as stale by the CollectionMetadata's
      * current chunk manager. Only use this function when logging the returned ChunkVersion. If the
-     * caller must execute logic based on the returned ChunkVersion, use getShardVersion() instead.
+     * caller must execute logic based on the returned ChunkVersion, use getShardPlacementVersion()
+     * instead.
      */
-    ChunkVersion getShardVersionForLogging() const {
+    ChunkVersion getShardPlacementVersionForLogging() const {
         return (isSharded() ? _cm->getVersionForLogging(_thisShardId) : ChunkVersion::UNSHARDED());
     }
 
     /**
-     * Returns the current collection version or UNSHARDED if it is not sharded.
+     * Returns the current collection placement version or UNSHARDED if it is not sharded.
      */
-    ChunkVersion getCollVersion() const {
+    ChunkVersion getCollPlacementVersion() const {
         return (isSharded() ? _cm->getVersion() : ChunkVersion::UNSHARDED());
     }
 
@@ -168,7 +171,7 @@ public:
     static BSONObj extractDocumentKey(const ShardKeyPattern* shardKeyPattern, const BSONObj& doc);
 
     /**
-     * String output of the collection and shard versions.
+     * String output of the collection and shard placement versions.
      */
     std::string toStringBasic() const;
 

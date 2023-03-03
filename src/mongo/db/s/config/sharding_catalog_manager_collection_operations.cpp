@@ -216,7 +216,7 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
-    // strictly monotonously increasing collection versions
+    // strictly monotonously increasing collection placement versions
     Lock::ExclusiveLock chunkLk(opCtx, _kChunkOpLock);
     Lock::ExclusiveLock zoneLk(opCtx, _kZoneOpLock);
 
@@ -518,7 +518,7 @@ void ShardingCatalogManager::renameShardedMetadata(
     const WriteConcernOptions& writeConcern,
     boost::optional<CollectionType> optFromCollType) {
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
-    // strictly monotonously increasing collection versions
+    // strictly monotonously increasing collection placement versions
     Lock::ExclusiveLock chunkLk(opCtx, _kChunkOpLock);
     Lock::ExclusiveLock zoneLk(opCtx, _kZoneOpLock);
 
@@ -555,7 +555,8 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const CollModTimeseries& timeseriesParameters) {
-    // Take _kChunkOpLock in exclusive mode to prevent concurrent updates of the collection version.
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent updates of the collection
+    // placement version.
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     const auto [cm, _] = uassertStatusOK(

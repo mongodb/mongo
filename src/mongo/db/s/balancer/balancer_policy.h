@@ -111,7 +111,7 @@ typedef std::vector<BSONObj> SplitPoints;
 struct SplitInfo {
     SplitInfo(const ShardId& shardId,
               const NamespaceString& nss,
-              const ChunkVersion& collectionVersion,
+              const ChunkVersion& collectionPlacementVersion,
               const ChunkVersion& chunkVersion,
               const BSONObj& minKey,
               const BSONObj& maxKey,
@@ -121,7 +121,7 @@ struct SplitInfo {
 
     ShardId shardId;
     NamespaceString nss;
-    ChunkVersion collectionVersion;
+    ChunkVersion collectionPlacementVersion;
     ChunkVersion chunkVersion;
     BSONObj minKey;
     BSONObj maxKey;
@@ -134,7 +134,7 @@ struct MergeInfo {
     MergeInfo(const ShardId& shardId,
               const NamespaceString& nss,
               const UUID& uuid,
-              const ChunkVersion& collectionVersion,
+              const ChunkVersion& collectionPlacementVersion,
               const ChunkRange& chunkRange);
 
     std::string toString() const;
@@ -142,7 +142,7 @@ struct MergeInfo {
     ShardId shardId;
     NamespaceString nss;
     UUID uuid;
-    ChunkVersion collectionVersion;
+    ChunkVersion collectionPlacementVersion;
     ChunkRange chunkRange;
 };
 

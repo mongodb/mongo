@@ -75,7 +75,7 @@ public:
      * Sets any notifications waiting for this version to arrive and invalidates the catalog cache's
      * chunk metadata for collection 'nss' so that the next caller provokes a refresh.
      */
-    void notifyOfCollectionVersionUpdate(const NamespaceString& nss) override;
+    void notifyOfCollectionPlacementVersionUpdate(const NamespaceString& nss) override;
 
     SemiFuture<CollectionAndChangedChunks> getChunksSince(const NamespaceString& nss,
                                                           ChunkVersion version) override;

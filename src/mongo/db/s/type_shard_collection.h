@@ -94,7 +94,7 @@ public:
     }
     void setAllowMigrations(bool allowMigrations);
 
-    boost::optional<ChunkVersion> getLastRefreshedCollectionVersion() const;
+    boost::optional<ChunkVersion> getLastRefreshedCollectionPlacementVersion() const;
 };
 
 }  // namespace mongo

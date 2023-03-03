@@ -48,19 +48,20 @@ namespace mongo {
 
 class ChunkManager;
 
-struct ShardVersionTargetingInfo {
+struct PlacementVersionTargetingInfo {
     // Indicates whether the shard is stale and thus needs a catalog cache refresh
     AtomicWord<bool> isStale{false};
 
     // Max chunk version for the shard
-    ChunkVersion shardVersion;
+    ChunkVersion placementVersion;
 
-    ShardVersionTargetingInfo(const OID& epoch, const Timestamp& timestamp);
+    PlacementVersionTargetingInfo(const OID& epoch, const Timestamp& timestamp);
 };
 
 // Map from a shard to a struct indicating both the max chunk version on that shard and whether the
 // shard is currently marked as needing a catalog cache refresh (stale).
-using ShardVersionMap = stdx::unordered_map<ShardId, ShardVersionTargetingInfo, ShardId::Hasher>;
+using ShardPlacementVersionMap =
+    stdx::unordered_map<ShardId, PlacementVersionTargetingInfo, ShardId::Hasher>;
 
 /**
  * This class serves as a Facade around how the mapping of ranges to chunks is represented. It also
@@ -79,7 +80,7 @@ public:
     }
 
     ChunkVersion getVersion() const {
-        return _collectionVersion;
+        return _collectionPlacementVersion;
     }
 
     template <typename Callable>
@@ -105,7 +106,7 @@ public:
         }
     }
 
-    ShardVersionMap constructShardVersionMap() const;
+    ShardPlacementVersionMap constructShardPlacementVersionMap() const;
     std::shared_ptr<ChunkInfo> findIntersectingChunk(const BSONObj& shardKey) const;
 
     void appendChunk(const std::shared_ptr<ChunkInfo>& chunk);
@@ -125,7 +126,7 @@ private:
     ChunkVector _chunkMap;
 
     // Max version across all chunks
-    ChunkVersion _collectionVersion;
+    ChunkVersion _collectionPlacementVersion;
 };
 
 /**
@@ -221,13 +222,13 @@ public:
     }
 
     /**
-     * Retrieves the shard version for the given shard. Will throw a ShardInvalidatedForTargeting
-     * exception if the shard is marked as stale.
+     * Retrieves the placement version for the given shard. Will throw a
+     * ShardInvalidatedForTargeting exception if the shard is marked as stale.
      */
     ChunkVersion getVersion(const ShardId& shardId) const;
 
     /**
-     * Retrieves the shard version for the given shard. Will not throw if the shard is marked as
+     * Retrieves the placement version for the given shard. Will not throw if the shard is marked as
      * stale. Only use when logging the given chunk version -- if the caller must execute logic
      * based on the returned version, use getVersion() instead.
      */
@@ -269,7 +270,7 @@ public:
      * Returns the number of shards on which the collection has any chunks
      */
     size_t getNShardsOwningChunks() const {
-        return _shardVersions.size();
+        return _placementVersions.size();
     }
 
     /**
@@ -352,11 +353,10 @@ private:
     // ranges must cover the complete space from [MinKey, MaxKey).
     ChunkMap _chunkMap;
 
-    // The representation of shard versions and staleness indicators for this namespace. If a
-    // shard does not exist, it will not have an entry in the map.
-    // Note: this declaration must not be moved before _chunkMap since it is initialized by using
-    // the _chunkMap instance.
-    ShardVersionMap _shardVersions;
+    // The representation of shards' placement versions and staleness indicators for this namespace.
+    // If a shard does not exist, it will not have an entry in the map. Note: this declaration must
+    // not be moved before _chunkMap since it is initialized by using the _chunkMap instance.
+    ShardPlacementVersionMap _placementVersions;
 };
 
 /**

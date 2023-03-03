@@ -132,9 +132,10 @@ public:
     virtual void shutDown() = 0;
 
     /**
-     * Notifies the loader that the persisted collection version for 'nss' has been updated.
+     * Notifies the loader that the persisted collection placement version for 'nss' has been
+     * updated.
      */
-    virtual void notifyOfCollectionVersionUpdate(const NamespaceString& nss) = 0;
+    virtual void notifyOfCollectionPlacementVersionUpdate(const NamespaceString& nss) = 0;
 
     /**
      * Non-blocking call, which returns the chunks changed since the specified version to be

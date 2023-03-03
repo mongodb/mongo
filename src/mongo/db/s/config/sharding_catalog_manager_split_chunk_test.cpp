@@ -108,18 +108,18 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
                                                          splitPoints,
                                                          "shard0000",
                                                          false /* fromChunkSplitter*/));
-        auto collVersion = versions.collectionVersion;
-        auto shardVersion = versions.shardVersion;
+        auto collPlacementVersion = versions.collectionPlacementVersion;
+        auto shardPlacementVersion = versions.shardPlacementVersion;
 
-        ASSERT_TRUE(origVersion.isOlderThan(shardVersion));
-        ASSERT_EQ(collVersion, shardVersion);
+        ASSERT_TRUE(origVersion.isOlderThan(shardPlacementVersion));
+        ASSERT_EQ(collPlacementVersion, shardPlacementVersion);
 
         // Check for increment on mergedChunk's minor version
-        auto expectedShardVersion =
+        auto expectedShardPlacementVersion =
             ChunkVersion({collEpoch, collTimestamp},
                          {origVersion.majorVersion(), origVersion.minorVersion() + 2});
-        ASSERT_EQ(expectedShardVersion, shardVersion);
-        ASSERT_EQ(shardVersion, collVersion);
+        ASSERT_EQ(expectedShardPlacementVersion, shardPlacementVersion);
+        ASSERT_EQ(shardPlacementVersion, collPlacementVersion);
 
         // First chunkDoc should have range [chunkMin, chunkSplitPoint]
         auto chunkDocStatus =

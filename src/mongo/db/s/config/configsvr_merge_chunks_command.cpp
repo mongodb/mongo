@@ -95,7 +95,7 @@ public:
                                                                       request().getCollectionUUID(),
                                                                       request().getChunkRange(),
                                                                       request().getShard()));
-            return ConfigSvrMergeResponse{shardAndCollVers.shardVersion};
+            return ConfigSvrMergeResponse{shardAndCollVers.shardPlacementVersion};
         }
 
     private:

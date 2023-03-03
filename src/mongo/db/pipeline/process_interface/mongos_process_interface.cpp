@@ -338,11 +338,12 @@ std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
 MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<std::set<FieldPath>> fieldPaths,
-    boost::optional<ChunkVersion> targetCollectionVersion,
+    boost::optional<ChunkVersion> targetCollectionPlacementVersion,
     const NamespaceString& outputNs) const {
     invariant(expCtx->inMongos);
-    uassert(
-        51179, "Received unexpected 'targetCollectionVersion' on mongos", !targetCollectionVersion);
+    uassert(51179,
+            "Received unexpected 'targetCollectionPlacementVersion' on mongos",
+            !targetCollectionPlacementVersion);
 
     if (fieldPaths) {
         uassert(51190,
@@ -367,14 +368,16 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     // collection was dropped a long time ago. Because of this, we are okay with piggy-backing
     // off another thread's request to refresh the cache, simply waiting for that request to
     // return instead of forcing another refresh.
-    boost::optional<ShardVersion> targetVersion = refreshAndGetCollectionVersion(expCtx, outputNs);
-    targetCollectionVersion =
-        targetVersion ? boost::make_optional(targetVersion->placementVersion()) : boost::none;
+    boost::optional<ShardVersion> targetCollectionVersion =
+        refreshAndGetCollectionVersion(expCtx, outputNs);
+    targetCollectionPlacementVersion = targetCollectionVersion
+        ? boost::make_optional(targetCollectionVersion->placementVersion())
+        : boost::none;
 
     auto docKeyPaths = collectDocumentKeyFieldsActingAsRouter(expCtx->opCtx, outputNs);
     return {std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),
                                 std::make_move_iterator(docKeyPaths.end())),
-            targetCollectionVersion};
+            targetCollectionPlacementVersion};
 }
 
 }  // namespace mongo

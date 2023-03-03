@@ -68,7 +68,7 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
             "The collection was not found locally even though it is marked as sharded.",
             collection);
 
-    const auto placementVersion = metadata.getShardVersion();
+    const auto placementVersion = metadata.getShardPlacementVersion();
     const auto shardVersion =
         ShardVersionFactory::make(metadata, scopedCsr->getCollectionIndexes(opCtx));
 

@@ -205,7 +205,7 @@ boost::optional<ChunkType> getControlChunkForMigrate(OperationContext* opCtx,
 }
 
 /**
- * Helper function to find collection version and shard version.
+ * Helper function to find collection and shard placement versions.
  */
 StatusWith<ChunkVersion> getMaxChunkVersionFromQueryResponse(
     const CollectionType& coll, const StatusWith<Shard::QueryResponse>& queryResponse) {
@@ -265,15 +265,15 @@ StatusWith<std::pair<CollectionType, ChunkVersion>> getCollectionAndVersion(
     return std::pair<CollectionType, ChunkVersion>{std::move(coll), std::move(version)};
 }
 
-ChunkVersion getShardVersion(OperationContext* opCtx,
-                             Shard* configShard,
-                             const CollectionType& coll,
-                             const ShardId& fromShard,
-                             const ChunkVersion& collectionVersion) {
+ChunkVersion getShardPlacementVersion(OperationContext* opCtx,
+                                      Shard* configShard,
+                                      const CollectionType& coll,
+                                      const ShardId& fromShard,
+                                      const ChunkVersion& collectionPlacementVersion) {
     const auto chunksQuery =
         BSON(ChunkType::collectionUUID << coll.getUuid() << ChunkType::shard(fromShard.toString()));
 
-    auto swDonorShardVersion = getMaxChunkVersionFromQueryResponse(
+    auto swDonorPlacementVersion = getMaxChunkVersionFromQueryResponse(
         coll,
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -282,18 +282,19 @@ ChunkVersion getShardVersion(OperationContext* opCtx,
                                             chunksQuery,
                                             BSON(ChunkType::lastmod << -1),  // Sort by version.
                                             1));
-    if (!swDonorShardVersion.isOK()) {
-        if (swDonorShardVersion.getStatus().code() == 50577) {
+    if (!swDonorPlacementVersion.isOK()) {
+        if (swDonorPlacementVersion.getStatus().code() == 50577) {
             // The query to find 'nss' chunks belonging to the donor shard didn't return any chunks,
             // meaning the last chunk for fromShard was donated. Gracefully handle the error.
-            return ChunkVersion({collectionVersion.epoch(), collectionVersion.getTimestamp()},
-                                {0, 0});
+            return ChunkVersion(
+                {collectionPlacementVersion.epoch(), collectionPlacementVersion.getTimestamp()},
+                {0, 0});
         } else {
             // Bubble up any other error
-            uassertStatusOK(swDonorShardVersion);
+            uassertStatusOK(swDonorPlacementVersion);
         }
     }
-    return swDonorShardVersion.getValue();
+    return swDonorPlacementVersion.getValue();
 }
 
 void bumpCollectionMinorVersion(OperationContext* opCtx,
@@ -382,13 +383,13 @@ unsigned int getHistoryWindowInSeconds() {
 
 void logMergeToChangelog(OperationContext* opCtx,
                          const NamespaceString& nss,
-                         const ChunkVersion& prevShardVersion,
+                         const ChunkVersion& prevPlacementVersion,
                          const ChunkVersion& mergedVersion,
                          const ShardId& owningShard,
                          const ChunkRange& chunkRange,
                          const size_t numChunks) {
     BSONObjBuilder logDetail;
-    prevShardVersion.serialize("prevShardVersion", &logDetail);
+    prevPlacementVersion.serialize("prevPlacementVersion", &logDetail);
     mergedVersion.serialize("mergedVersion", &logDetail);
     logDetail.append("owningShard", owningShard);
     chunkRange.append(&logDetail);
@@ -483,11 +484,11 @@ void ShardingCatalogManager::bumpMajorVersionOneChunkPerShard(
     const NamespaceString& nss,
     TxnNumber txnNumber,
     const std::vector<ShardId>& shardIds) {
-    const auto [coll, curCollectionVersion] =
+    const auto [coll, curCollectionPlacementVersion] =
         uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
     ChunkVersion targetChunkVersion(
-        {curCollectionVersion.epoch(), curCollectionVersion.getTimestamp()},
-        {curCollectionVersion.majorVersion() + 1, 0});
+        {curCollectionPlacementVersion.epoch(), curCollectionPlacementVersion.getTimestamp()},
+        {curCollectionPlacementVersion.majorVersion() + 1, 0});
 
     for (const auto& shardId : shardIds) {
         BSONObjBuilder updateBuilder;
@@ -529,7 +530,7 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
                                                  const ChunkRange& range,
                                                  const std::string& shardName,
                                                  const ChunkType& origChunk,
-                                                 const ChunkVersion& collVersion,
+                                                 const ChunkVersion& collPlacementVersion,
                                                  const std::vector<BSONObj>& splitPoints) {
     auto newChunkBounds = std::make_shared<std::vector<BSONObj>>(splitPoints);
     newChunkBounds->push_back(range.getMax());
@@ -562,7 +563,7 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
         std::shared_ptr<std::vector<ChunkType>> newChunks;
     };
     auto sharedBlock = std::make_shared<SharedBlock>(
-        nss, range, origChunk, shardName, collVersion, newChunkBounds);
+        nss, range, origChunk, shardName, collPlacementVersion, newChunkBounds);
 
     auto updateChunksFn = [sharedBlock](const txn_api::TransactionClient& txnClient,
                                         ExecutorPtr txnExec) {
@@ -705,7 +706,7 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
                                                                  sharedBlock->newChunks};
 }
 
-StatusWith<ShardingCatalogManager::ShardAndCollectionVersion>
+StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions>
 ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          const OID& requestEpoch,
@@ -720,7 +721,7 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
-    // strictly monotonously increasing collection versions
+    // strictly monotonously increasing collection placement versions
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     // Get collection entry and max chunk version for this namespace.
@@ -739,7 +740,7 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
                           << "` is undergoing a defragmentation.",
             !(coll.getDefragmentCollection() && fromChunkSplitter));
 
-    auto collVersion = version;
+    auto collPlacementVersion = version;
 
     // Return an error if collection epoch does not match epoch of request.
     if (coll.getEpoch() != requestEpoch ||
@@ -759,8 +760,13 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         return origChunkStatus.getStatus();
     }
 
-    auto splitChunkResult = _splitChunkInTransaction(
-        opCtx, nss, range, shardName, origChunkStatus.getValue(), collVersion, splitPoints);
+    auto splitChunkResult = _splitChunkInTransaction(opCtx,
+                                                     nss,
+                                                     range,
+                                                     shardName,
+                                                     origChunkStatus.getValue(),
+                                                     collPlacementVersion,
+                                                     splitPoints);
 
     // log changes
     BSONObjBuilder logDetail;
@@ -768,7 +774,7 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         BSONObjBuilder b(logDetail.subobjStart("before"));
         b.append(ChunkType::min(), range.getMin());
         b.append(ChunkType::max(), range.getMax());
-        collVersion.serialize(ChunkType::lastmod(), &b);
+        collPlacementVersion.serialize(ChunkType::lastmod(), &b);
     }
 
     if (splitChunkResult.newChunks->size() == 2) {
@@ -801,8 +807,9 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         }
     }
 
-    return ShardAndCollectionVersion{splitChunkResult.currentMaxVersion /*shardVersion*/,
-                                     splitChunkResult.currentMaxVersion /*collectionVersion*/};
+    return ShardAndCollectionPlacementVersions{
+        splitChunkResult.currentMaxVersion /*shardPlacementVersion*/,
+        splitChunkResult.currentMaxVersion /*collectionPlacementVersion*/};
 }
 
 void ShardingCatalogManager::_mergeChunksInTransaction(
@@ -906,7 +913,7 @@ void ShardingCatalogManager::_mergeChunksInTransaction(
     txn.run(opCtx, updateChunksFn);
 }
 
-StatusWith<ShardingCatalogManager::ShardAndCollectionVersion>
+StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions>
 ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const boost::optional<OID>& epoch,
@@ -920,16 +927,16 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
-    // strictly monotonously increasing collection versions
+    // strictly monotonously increasing collection placement versions
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
-    // 1. Retrieve the initial collection version info to build up the logging info.
-    const auto [coll, collVersion] =
+    // 1. Retrieve the initial collection placement version info to build up the logging info.
+    const auto [coll, collPlacementVersion] =
         uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
     uassert(ErrorCodes::StaleEpoch,
             "Collection changed",
-            (!epoch || collVersion.epoch() == epoch) &&
-                (!timestamp || collVersion.getTimestamp() == timestamp));
+            (!epoch || collPlacementVersion.epoch() == epoch) &&
+                (!timestamp || collPlacementVersion.getTimestamp() == timestamp));
 
     if (coll.getUuid() != requestCollectionUUID) {
         return {
@@ -969,14 +976,16 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
                           << chunkRange.toString(),
             chunk.getRange() == chunkRange);
 
-        const auto currentShardVersion =
-            getShardVersion(opCtx, _localConfigShard.get(), coll, shardId, collVersion);
+        const auto currentShardPlacementVersion = getShardPlacementVersion(
+            opCtx, _localConfigShard.get(), coll, shardId, collPlacementVersion);
 
-        // Makes sure that the last thing we read in getCollectionAndVersion and getShardVersion
-        // gets majority written before to return from this command, otherwise next RoutingInfo
-        // cache refresh from the shard may not see those newest information.
+        // Makes sure that the last thing we read in getCollectionAndVersion and
+        // getShardPlacementVersion gets majority written before to return from this command,
+        // otherwise next RoutingInfo cache refresh from the shard may not see those newest
+        // information.
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-        return ShardAndCollectionVersion{currentShardVersion, collVersion};
+        return ShardAndCollectionPlacementVersions{currentShardPlacementVersion,
+                                                   collPlacementVersion};
     }
 
     // 3. Prepare the data for the merge
@@ -1025,7 +1034,7 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
             !chunksToMerge->empty() &&
                 chunksToMerge->back().getMax().woCompare(chunkRange.getMax()) == 0);
 
-    ChunkVersion initialVersion = collVersion;
+    ChunkVersion initialVersion = collPlacementVersion;
     ChunkVersion mergeVersion = initialVersion;
     mergeVersion.incMinor();
 
@@ -1037,10 +1046,11 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
     logMergeToChangelog(
         opCtx, nss, initialVersion, mergeVersion, shardId, chunkRange, chunksToMerge->size());
 
-    return ShardAndCollectionVersion{mergeVersion /*shardVersion*/, mergeVersion /*collVersion*/};
+    return ShardAndCollectionPlacementVersions{mergeVersion /*shardPlacementVersion*/,
+                                               mergeVersion /*collectionPlacementVersion*/};
 }
 
-StatusWith<std::pair<ShardingCatalogManager::ShardAndCollectionVersion, int>>
+StatusWith<std::pair<ShardingCatalogManager::ShardAndCollectionPlacementVersions, int>>
 ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                                                     const NamespaceString& nss,
                                                     const ShardId& shardId,
@@ -1147,22 +1157,25 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
 
         // If there is no mergeable chunk for the given shard, return success.
         if (newChunks->empty()) {
-            const auto currentShardVersion =
-                getShardVersion(opCtx, _localConfigShard.get(), coll, shardId, originalVersion);
+            const auto currentShardPlacementVersion = getShardPlacementVersion(
+                opCtx, _localConfigShard.get(), coll, shardId, originalVersion);
 
-            // Makes sure that the last thing we read in getCollectionAndVersion and getShardVersion
-            // gets majority written before to return from this command, otherwise next RoutingInfo
-            // cache refresh from the shard may not see those newest information.
+            // Makes sure that the last thing we read in getCollectionAndVersion and
+            // getShardPlacementVersion gets majority written before to return from this command,
+            // otherwise next RoutingInfo cache refresh from the shard may not see those newest
+            // information.
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-            return std::pair<ShardingCatalogManager::ShardAndCollectionVersion, int>{
-                ShardAndCollectionVersion{currentShardVersion, originalVersion}, 0};
+
+            return std::pair<ShardingCatalogManager::ShardAndCollectionPlacementVersions, int>{
+                ShardAndCollectionPlacementVersions{currentShardPlacementVersion, originalVersion},
+                0};
         }
 
         // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications
         Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
-        // Precondition for merges to be safely committed: make sure the current collection version
-        // fits the one retrieved before acquiring the lock.
+        // Precondition for merges to be safely committed: make sure the current collection
+        // placement version fits the one retrieved before acquiring the lock.
         const auto [_, versionRetrievedUnderLock] =
             uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
 
@@ -1191,8 +1204,9 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
             prevVersion = newChunk.getVersion();
         }
 
-        return std::pair<ShardingCatalogManager::ShardAndCollectionVersion, int>{
-            ShardAndCollectionVersion{newVersion /*shardVersion*/, newVersion /*collVersion*/},
+        return std::pair<ShardingCatalogManager::ShardAndCollectionPlacementVersions, int>{
+            ShardAndCollectionPlacementVersions{newVersion /*shardPlacementVersion*/,
+                                                newVersion /*collPlacementVersion*/},
             numMergedChunks.first};
     }
 
@@ -1202,7 +1216,7 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                                "happening for the same collection");
 }
 
-StatusWith<ShardingCatalogManager::ShardAndCollectionVersion>
+StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions>
 ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const ChunkType& migratedChunk,
@@ -1241,7 +1255,7 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
             !shard.getDraining());
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
-    // strictly monotonously increasing collection versions
+    // strictly monotonously increasing collection placement versions
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     auto findCollResponse = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
@@ -1278,7 +1292,7 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
 
     const auto chunk = uassertStatusOK(
         ChunkType::parseFromConfigBSON(findResponse.docs[0], coll.getEpoch(), coll.getTimestamp()));
-    const auto& currentCollectionVersion = chunk.getVersion();
+    const auto& currentCollectionPlacementVersion = chunk.getVersion();
 
     if (MONGO_unlikely(migrationCommitVersionError.shouldFail())) {
         uasserted(ErrorCodes::StaleEpoch,
@@ -1290,13 +1304,13 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
     // failed to recover the migration. Check that the collection has not been dropped and recreated
     // or had its shard key refined since the migration began, unbeknown to the shard when the
     // command was sent.
-    if (currentCollectionVersion.epoch() != collectionEpoch ||
-        currentCollectionVersion.getTimestamp() != collectionTimestamp) {
+    if (currentCollectionPlacementVersion.epoch() != collectionEpoch ||
+        currentCollectionPlacementVersion.getTimestamp() != collectionTimestamp) {
         return {ErrorCodes::StaleEpoch,
                 str::stream() << "The epoch of collection '" << nss.ns()
                               << "' has changed since the migration began. The config server's "
-                                 "collection version epoch is now '"
-                              << currentCollectionVersion.epoch().toString()
+                                 "collection placement version epoch is now '"
+                              << currentCollectionPlacementVersion.epoch().toString()
                               << "', but the shard's is " << collectionEpoch.toString()
                               << "'. Aborting migration commit for chunk ("
                               << migratedChunk.getRange().toString() << ")."};
@@ -1323,14 +1337,15 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
 
     if (currentChunk.getShard() == toShard) {
         // The commit was already done successfully
-        const auto currentShardVersion = getShardVersion(
-            opCtx, _localConfigShard.get(), coll, fromShard, currentCollectionVersion);
-        // Makes sure that the last thing we read in findChunkContainingRange, getShardVersion, and
-        // getCollectionAndVersion gets majority written before to return from this command,
-        // otherwise next RoutingInfo cache refresh from the shard may not see those newest
-        // information.
+        const auto currentShardPlacementVersion = getShardPlacementVersion(
+            opCtx, _localConfigShard.get(), coll, fromShard, currentCollectionPlacementVersion);
+        // Makes sure that the last thing we read in findChunkContainingRange,
+        // getShardPlacementVersion, and getCollectionAndVersion gets majority written before to
+        // return from this command, otherwise next RoutingInfo cache refresh from the shard may not
+        // see those newest information.
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-        return ShardAndCollectionVersion{currentShardVersion, currentCollectionVersion};
+        return ShardAndCollectionPlacementVersions{currentShardPlacementVersion,
+                                                   currentCollectionPlacementVersion};
     }
 
     uassert(4914702,
@@ -1357,9 +1372,10 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
     newMigratedChunk->setMin(migratedChunk.getMin());
     newMigratedChunk->setMax(migratedChunk.getMax());
     newMigratedChunk->setShard(toShard);
-    newMigratedChunk->setVersion(
-        ChunkVersion({currentCollectionVersion.epoch(), currentCollectionVersion.getTimestamp()},
-                     {currentCollectionVersion.majorVersion() + 1, minVersionIncrement++}));
+    newMigratedChunk->setVersion(ChunkVersion(
+        {currentCollectionPlacementVersion.epoch(),
+         currentCollectionPlacementVersion.getTimestamp()},
+        {currentCollectionPlacementVersion.majorVersion() + 1, minVersionIncrement++}));
 
     // Copy the complete history.
     auto newHistory = currentChunk.getHistory();
@@ -1449,22 +1465,25 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
         newControlChunk = std::make_shared<ChunkType>(origControlChunk);
         // Setting control chunk's minor version to 1 on the donor shard.
         newControlChunk->setVersion(ChunkVersion(
-            {currentCollectionVersion.epoch(), currentCollectionVersion.getTimestamp()},
-            {currentCollectionVersion.majorVersion() + 1, minVersionIncrement++}));
+            {currentCollectionPlacementVersion.epoch(),
+             currentCollectionPlacementVersion.getTimestamp()},
+            {currentCollectionPlacementVersion.majorVersion() + 1, minVersionIncrement++}));
     }
 
     _commitChunkMigrationInTransaction(
         opCtx, nss, newMigratedChunk, newSplitChunks, newControlChunk, fromShard);
 
-    ShardAndCollectionVersion response;
+    ShardAndCollectionPlacementVersions response;
     if (!newControlChunk) {
         // We migrated the last chunk from the donor shard.
-        response.collectionVersion = newMigratedChunk->getVersion();
-        response.shardVersion = ChunkVersion(
-            {currentCollectionVersion.epoch(), currentCollectionVersion.getTimestamp()}, {0, 0});
+        response.collectionPlacementVersion = newMigratedChunk->getVersion();
+        response.shardPlacementVersion =
+            ChunkVersion({currentCollectionPlacementVersion.epoch(),
+                          currentCollectionPlacementVersion.getTimestamp()},
+                         {0, 0});
     } else {
-        response.collectionVersion = newControlChunk->getVersion();
-        response.shardVersion = newControlChunk->getVersion();
+        response.collectionPlacementVersion = newControlChunk->getVersion();
+        response.shardPlacementVersion = newControlChunk->getVersion();
     }
     return response;
 }
@@ -1512,7 +1531,7 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
     // migrations.
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
-    const auto [coll, collVersion] =
+    const auto [coll, collPlacementVersion] =
         uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
 
     if (force) {
@@ -1562,12 +1581,13 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
     }();
 
     // Bump the major version in order to be guaranteed to trigger refresh on every shard
-    ChunkVersion newCollectionVersion({collVersion.epoch(), collVersion.getTimestamp()},
-                                      {collVersion.majorVersion() + 1, 0});
+    ChunkVersion newCollectionPlacementVersion(
+        {collPlacementVersion.epoch(), collPlacementVersion.getTimestamp()},
+        {collPlacementVersion.majorVersion() + 1, 0});
     std::set<ShardId> changedShardIds;
     for (const auto& chunk : allChunksVector) {
-        auto upgradeChunk = uassertStatusOK(
-            ChunkType::parseFromConfigBSON(chunk, collVersion.epoch(), collVersion.getTimestamp()));
+        auto upgradeChunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
+            chunk, collPlacementVersion.epoch(), collPlacementVersion.getTimestamp()));
         bool historyIsAt40 = chunk[ChunkType::historyIsAt40()].booleanSafe();
         if (historyIsAt40) {
             uassert(
@@ -1580,8 +1600,8 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
             continue;
         }
 
-        upgradeChunk.setVersion(newCollectionVersion);
-        newCollectionVersion.incMinor();
+        upgradeChunk.setVersion(newCollectionPlacementVersion);
+        newCollectionPlacementVersion.incMinor();
         changedShardIds.emplace(upgradeChunk.getShard());
 
         // Construct the fresh history.
@@ -1684,7 +1704,7 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
-    // strictly monotonously increasing collection versions
+    // strictly monotonously increasing collection placement versions
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     auto findCollResponse = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
@@ -1746,7 +1766,7 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
 
     const auto highestVersionChunk = uassertStatusOK(
         ChunkType::parseFromConfigBSON(chunksVector.front(), coll.getEpoch(), coll.getTimestamp()));
-    const auto currentCollectionVersion = highestVersionChunk.getVersion();
+    const auto currentCollectionPlacementVersion = highestVersionChunk.getVersion();
 
     // It is possible for a migration to end up running partly without the protection of the
     // distributed lock if the config primary stepped down since the start of the migration and
@@ -1756,15 +1776,15 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
     uassert(ErrorCodes::StaleEpoch,
             str::stream() << "The epoch of collection '" << nss.ns()
                           << "' has changed since the migration began. The config server's "
-                             "collection version epoch is now '"
-                          << currentCollectionVersion.epoch().toString() << "', but the shard's is "
-                          << collectionEpoch.toString() << "'. Aborting clear jumbo on chunk ("
-                          << chunk.toString() << ").",
-            currentCollectionVersion.epoch() == collectionEpoch);
+                             "collection placement version epoch is now '"
+                          << currentCollectionPlacementVersion.epoch().toString()
+                          << "', but the shard's is " << collectionEpoch.toString()
+                          << "'. Aborting clear jumbo on chunk (" << chunk.toString() << ").",
+            currentCollectionPlacementVersion.epoch() == collectionEpoch);
 
-    ChunkVersion newVersion(
-        {currentCollectionVersion.epoch(), currentCollectionVersion.getTimestamp()},
-        {currentCollectionVersion.majorVersion() + 1, 0});
+    ChunkVersion newVersion({currentCollectionPlacementVersion.epoch(),
+                             currentCollectionPlacementVersion.getTimestamp()},
+                            {currentCollectionPlacementVersion.majorVersion() + 1, 0});
 
     BSONObj chunkQuery(BSON(ChunkType::min(chunk.getMin())
                             << ChunkType::max(chunk.getMax()) << ChunkType::collectionUUID
@@ -1804,7 +1824,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
-    // strictly monotonously increasing collection versions
+    // strictly monotonously increasing collection placement versions
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     ScopeGuard earlyReturnBeforeDoingWriteGuard([&] {
@@ -1889,7 +1909,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
         }
     }
 
-    // Get the chunk with the current collectionVersion for this epoch.
+    // Get the chunk with the current collection placement version for this epoch.
     ChunkType highestChunk;
     {
         const auto query = BSON(ChunkType::collectionUUID() << collUuid);
@@ -1907,12 +1927,14 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
             LOGV2(23886,
                   "ensureChunkVersionIsGreaterThan did not find any chunks with epoch {epoch} "
                   "when "
-                  "attempting to find the collectionVersion. The collection must have been "
+                  "attempting to find the collection placement version. The collection must have "
+                  "been "
                   "dropped "
                   "concurrently or had its shard key refined. Returning success.",
                   "ensureChunkVersionIsGreaterThan did not find any chunks with a matching epoch "
                   "when "
-                  "attempting to find the collectionVersion. The collection must have been "
+                  "attempting to find the collection placement version. The collection must have "
+                  "been "
                   "dropped "
                   "concurrently or had its shard key refined. Returning success.",
                   "epoch"_attr = version.epoch());
@@ -1922,7 +1944,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
             highestChunksVector.front(), coll.getEpoch(), coll.getTimestamp()));
     }
 
-    // Generate a new version for the chunk by incrementing the collectionVersion's major
+    // Generate a new version for the chunk by incrementing the collection placement version's major
     // version.
     auto newChunk = matchingChunk;
     newChunk.setVersion(ChunkVersion({coll.getEpoch(), coll.getTimestamp()},
@@ -1964,35 +1986,35 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
     }
 }
 
-void ShardingCatalogManager::bumpCollectionVersionAndChangeMetadataInTxn(
+void ShardingCatalogManager::bumpCollectionPlacementVersionAndChangeMetadataInTxn(
     OperationContext* opCtx,
     const NamespaceString& nss,
     unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc) {
-    bumpCollectionVersionAndChangeMetadataInTxn(
+    bumpCollectionPlacementVersionAndChangeMetadataInTxn(
         opCtx, nss, std::move(changeMetadataFunc), ShardingCatalogClient::kMajorityWriteConcern);
 }
 
-void ShardingCatalogManager::bumpCollectionVersionAndChangeMetadataInTxn(
+void ShardingCatalogManager::bumpCollectionPlacementVersionAndChangeMetadataInTxn(
     OperationContext* opCtx,
     const NamespaceString& nss,
     unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc,
     const WriteConcernOptions& writeConcern) {
-    bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
+    bumpMultipleCollectionPlacementVersionsAndChangeMetadataInTxn(
         opCtx, {nss}, std::move(changeMetadataFunc), writeConcern);
 }
 
-void ShardingCatalogManager::bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
+void ShardingCatalogManager::bumpMultipleCollectionPlacementVersionsAndChangeMetadataInTxn(
     OperationContext* opCtx,
     const std::vector<NamespaceString>& collNames,
     unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc) {
-    bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
+    bumpMultipleCollectionPlacementVersionsAndChangeMetadataInTxn(
         opCtx,
         collNames,
         std::move(changeMetadataFunc),
         ShardingCatalogClient::kMajorityWriteConcern);
 }
 
-void ShardingCatalogManager::bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
+void ShardingCatalogManager::bumpMultipleCollectionPlacementVersionsAndChangeMetadataInTxn(
     OperationContext* opCtx,
     const std::vector<NamespaceString>& collNames,
     unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc,
@@ -2217,7 +2239,7 @@ void ShardingCatalogManager::setChunkEstimatedSize(OperationContext* opCtx,
     uassert(6049442, "Estimated chunk size cannot be negative", estimatedDataSizeBytes >= 0);
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
-    // strictly monotonously increasing collection versions
+    // strictly monotonously increasing collection placement versions
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     const auto chunkQuery = BSON(ChunkType::collectionUUID()

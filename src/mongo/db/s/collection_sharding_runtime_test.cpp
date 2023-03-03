@@ -144,7 +144,7 @@ TEST_F(
     const auto optCurrMetadata = csr.getCurrentMetadataIfKnown();
     ASSERT_TRUE(optCurrMetadata);
     ASSERT_FALSE(optCurrMetadata->isSharded());
-    ASSERT_EQ(optCurrMetadata->getShardVersion(), ChunkVersion::UNSHARDED());
+    ASSERT_EQ(optCurrMetadata->getShardPlacementVersion(), ChunkVersion::UNSHARDED());
 }
 
 TEST_F(
@@ -157,7 +157,7 @@ TEST_F(
     const auto optCurrMetadata = csr.getCurrentMetadataIfKnown();
     ASSERT_TRUE(optCurrMetadata);
     ASSERT_TRUE(optCurrMetadata->isSharded());
-    ASSERT_EQ(optCurrMetadata->getShardVersion(), metadata.getShardVersion());
+    ASSERT_EQ(optCurrMetadata->getShardPlacementVersion(), metadata.getShardPlacementVersion());
 }
 
 TEST_F(CollectionShardingRuntimeTest,

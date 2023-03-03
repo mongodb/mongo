@@ -166,15 +166,15 @@ protected:
         return {chunk};
     }
 
-    CollectionType makeCollectionType(const ShardVersion& collVersion) {
+    CollectionType makeCollectionType(const ShardVersion& collPlacementVersion) {
         CollectionType coll{kNss,
-                            collVersion.placementVersion().epoch(),
-                            collVersion.placementVersion().getTimestamp(),
+                            collPlacementVersion.placementVersion().epoch(),
+                            collPlacementVersion.placementVersion().getTimestamp(),
                             Date_t::now(),
                             kUUID,
                             kShardKeyPattern.getKeyPattern()};
-        if (collVersion.indexVersion()) {
-            coll.setIndexVersion(CollectionIndexes(kUUID, *collVersion.indexVersion()));
+        if (collPlacementVersion.indexVersion()) {
+            coll.setIndexVersion(CollectionIndexes(kUUID, *collPlacementVersion.indexVersion()));
         }
         return coll;
     }
@@ -374,9 +374,9 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
         coll.setTimeseriesFields(tsFields);
 
         auto& lastChunk = chunks.back();
-        ChunkVersion newCollectionVersion = lastChunk.getVersion();
-        newCollectionVersion.incMinor();
-        lastChunk.setVersion(newCollectionVersion);
+        ChunkVersion newCollectionPlacementVersion = lastChunk.getVersion();
+        newCollectionPlacementVersion.incMinor();
+        lastChunk.setVersion(newCollectionPlacementVersion);
 
         const auto scopedCollProv = scopedCollectionProvider(coll);
         const auto scopedChunksProv = scopedChunksProvider(std::vector{lastChunk});

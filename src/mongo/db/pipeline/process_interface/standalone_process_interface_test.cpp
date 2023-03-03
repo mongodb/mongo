@@ -62,38 +62,38 @@ public:
 };
 
 TEST_F(ProcessInterfaceStandaloneTest,
-       FailsToEnsureFieldsUniqueIfTargetCollectionVersionIsSpecifiedOnMongos) {
+       FailsToEnsureFieldsUniqueIftargetCollectionPlacementVersionIsSpecifiedOnMongos) {
     auto expCtx = getExpCtx();
-    auto targetCollectionVersion =
+    auto targetCollectionPlacementVersion =
         boost::make_optional(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {0, 0}));
     auto processInterface = makeProcessInterface();
 
-    // Test that 'targetCollectionVersion' is not accepted if not from mongos.
+    // Test that 'targetCollectionPlacementVersion' is not accepted if not from mongos.
     expCtx->fromMongos = false;
     ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(
-                           expCtx, {{"_id"}}, targetCollectionVersion, expCtx->ns),
+                           expCtx, {{"_id"}}, targetCollectionPlacementVersion, expCtx->ns),
                        AssertionException,
                        51123);
 
-    // Test that 'targetCollectionVersion' is accepted if from mongos.
+    // Test that 'targetCollectionPlacementVersion' is accepted if from mongos.
     expCtx->fromMongos = true;
     auto [joinKey, chunkVersion] = processInterface->ensureFieldsUniqueOrResolveDocumentKey(
-        expCtx, {{"_id"}}, targetCollectionVersion, expCtx->ns);
+        expCtx, {{"_id"}}, targetCollectionPlacementVersion, expCtx->ns);
     ASSERT_EQ(joinKey.size(), 1UL);
     ASSERT_EQ(joinKey.count(FieldPath("_id")), 1UL);
     ASSERT(chunkVersion);
-    ASSERT_EQ(*chunkVersion, *targetCollectionVersion);
+    ASSERT_EQ(*chunkVersion, *targetCollectionPlacementVersion);
 }
 
 TEST_F(ProcessInterfaceStandaloneTest, FailsToEnsureFieldsUniqueIfJoinFieldsAreNotSentFromMongos) {
     auto expCtx = getExpCtx();
-    auto targetCollectionVersion =
+    auto targetCollectionPlacementVersion =
         boost::make_optional(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {0, 0}));
     auto processInterface = makeProcessInterface();
 
     expCtx->fromMongos = true;
     ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(
-                           expCtx, boost::none, targetCollectionVersion, expCtx->ns),
+                           expCtx, boost::none, targetCollectionPlacementVersion, expCtx->ns),
                        AssertionException,
                        51124);
 }
@@ -101,13 +101,13 @@ TEST_F(ProcessInterfaceStandaloneTest, FailsToEnsureFieldsUniqueIfJoinFieldsAreN
 TEST_F(ProcessInterfaceStandaloneTest,
        FailsToEnsureFieldsUniqueIfFieldsDoesNotHaveSupportingUniqueIndex) {
     auto expCtx = getExpCtx();
-    auto targetCollectionVersion = boost::none;
+    auto targetCollectionPlacementVersion = boost::none;
     auto processInterface = makeProcessInterface();
 
     expCtx->fromMongos = false;
     processInterface->hasSupportingIndexForFields = false;
     ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(
-                           expCtx, {{"x"}}, targetCollectionVersion, expCtx->ns),
+                           expCtx, {{"x"}}, targetCollectionPlacementVersion, expCtx->ns),
                        AssertionException,
                        51183);
 }

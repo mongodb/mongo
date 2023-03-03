@@ -140,7 +140,7 @@ public:
         maxKey = cm.getShardKeyPattern().normalizeShardKey(maxKey);
 
         const auto firstChunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
-        ChunkVersion shardVersion = cm.getVersion(firstChunk.getShardId());
+        ChunkVersion placementVersion = cm.getVersion(firstChunk.getShardId());
 
         BSONObjBuilder remoteCmdObjB;
         remoteCmdObjB.append(cmdObj[ClusterMergeChunksCommand::nsField()]);
@@ -150,8 +150,8 @@ public:
             Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
         remoteCmdObjB.append(ClusterMergeChunksCommand::shardNameField(),
                              firstChunk.getShardId().toString());
-        remoteCmdObjB.append("epoch", shardVersion.epoch());
-        remoteCmdObjB.append("timestamp", shardVersion.getTimestamp());
+        remoteCmdObjB.append("epoch", placementVersion.epoch());
+        remoteCmdObjB.append("timestamp", placementVersion.getTimestamp());
 
         BSONObj remoteResult;
 

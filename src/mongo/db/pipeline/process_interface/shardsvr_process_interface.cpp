@@ -70,7 +70,7 @@ bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const Names
 void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
-    ChunkVersion targetCollectionVersion) const {
+    ChunkVersion targetCollectionPlacementVersion) const {
     auto const shardId = ShardingState::get(expCtx->opCtx)->shardId();
     auto* catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
 
@@ -79,9 +79,9 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
         uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss)).gii;
 
     // Mark the cache entry routingInfo for the 'nss' and 'shardId' if the entry is staler than
-    // 'targetCollectionVersion'.
+    // 'targetCollectionPlacementVersion'.
     const ShardVersion ignoreIndexVersion = ShardVersionFactory::make(
-        targetCollectionVersion,
+        targetCollectionPlacementVersion,
         currentGlobalIndexesInfo
             ? boost::make_optional(currentGlobalIndexesInfo->getCollectionIndexes())
             : boost::none);
@@ -96,9 +96,9 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
 
     uassert(StaleEpochInfo(nss),
             str::stream() << "Could not act as router for " << nss.ns() << ", wanted "
-                          << targetCollectionVersion.toString() << ", but found "
+                          << targetCollectionPlacementVersion.toString() << ", but found "
                           << foundVersion.toString(),
-            foundVersion.isSameCollection(targetCollectionVersion));
+            foundVersion.isSameCollection(targetCollectionPlacementVersion));
 }
 
 boost::optional<Document> ShardServerProcessInterface::lookupSingleDocument(

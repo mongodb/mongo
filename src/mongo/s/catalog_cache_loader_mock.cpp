@@ -63,7 +63,7 @@ void CatalogCacheLoaderMock::onStepUp() {
 
 void CatalogCacheLoaderMock::shutDown() {}
 
-void CatalogCacheLoaderMock::notifyOfCollectionVersionUpdate(const NamespaceString& nss) {
+void CatalogCacheLoaderMock::notifyOfCollectionPlacementVersionUpdate(const NamespaceString& nss) {
     MONGO_UNREACHABLE;
 }
 

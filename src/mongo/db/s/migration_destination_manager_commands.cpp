@@ -144,7 +144,7 @@ public:
                                     boost::none),
                     "The collection's sharding state was cleared by a concurrent operation",
                     optMetadata);
-            return optMetadata->getShardVersion().epoch();
+            return optMetadata->getShardPlacementVersion().epoch();
         }();
 
         uassertStatusOK(

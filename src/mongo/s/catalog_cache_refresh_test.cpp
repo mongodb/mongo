@@ -857,11 +857,11 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdde
 
     auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
-    ChunkVersion expectedDestShardVersion;
+    ChunkVersion expectedDestPlacementVersion;
 
     // Return set of chunks, which represent a move
     version.incMajor();
-    expectedDestShardVersion = version;
+    expectedDestPlacementVersion = version;
     ChunkType chunk1(
         uuid, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"1"});
     chunk1.setName(OID::gen());
@@ -888,7 +888,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdde
     ASSERT_EQ(reshardingUUID, cri.cm.getReshardingFields()->getReshardingUUID());
     ASSERT_EQ(version, cri.cm.getVersion());
     ASSERT_EQ(version, cri.cm.getVersion({"0"}));
-    ASSERT_EQ(expectedDestShardVersion, cri.cm.getVersion({"1"}));
+    ASSERT_EQ(expectedDestPlacementVersion, cri.cm.getVersion({"1"}));
 }
 
 TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingFieldsRemoved) {

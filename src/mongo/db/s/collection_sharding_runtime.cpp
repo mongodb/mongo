@@ -212,8 +212,8 @@ void CollectionShardingRuntime::checkShardVersionOrThrow(
 void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(const BSONObj& reason) {
     _critSec.enterCriticalSectionCatchUpPhase(reason);
 
-    if (_shardVersionInRecoverOrRefresh) {
-        _shardVersionInRecoverOrRefresh->cancellationSource.cancel();
+    if (_placementVersionInRecoverOrRefresh) {
+        _placementVersionInRecoverOrRefresh->cancellationSource.cancel();
     }
 }
 
@@ -250,9 +250,9 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
     // If the collection was sharded and the new metadata represents a new collection we might need
     // to clean up some sharding-related state
     if (_metadataManager) {
-        const auto oldShardVersion = _metadataManager->getActiveShardVersion();
-        const auto newShardVersion = newMetadata.getShardVersion();
-        if (!oldShardVersion.isSameCollection(newShardVersion))
+        const auto oldShardPlacementVersion = _metadataManager->getActivePlacementVersion();
+        const auto newShardPlacementVersion = newMetadata.getShardPlacementVersion();
+        if (!oldShardPlacementVersion.isSameCollection(newShardPlacementVersion))
             _cleanupBeforeInstallingNewCollectionMetadata(lk, opCtx);
     }
 
@@ -281,8 +281,8 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
 
 void CollectionShardingRuntime::_clearFilteringMetadata(OperationContext* opCtx,
                                                         bool collIsDropped) {
-    if (_shardVersionInRecoverOrRefresh) {
-        _shardVersionInRecoverOrRefresh->cancellationSource.cancel();
+    if (_placementVersionInRecoverOrRefresh) {
+        _placementVersionInRecoverOrRefresh->cancellationSource.cancel();
     }
 
     stdx::lock_guard lk(_metadataManagerLock);
@@ -479,7 +479,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     const auto indexFeatureFlag = feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
         serverGlobalParams.featureCompatibility);
-    const auto wantedPlacementVersion = currentMetadata.getShardVersion();
+    const auto wantedPlacementVersion = currentMetadata.getShardPlacementVersion();
     const auto wantedCollectionIndexes =
         indexFeatureFlag ? getCollectionIndexes(opCtx) : boost::none;
     const auto wantedIndexVersion = wantedCollectionIndexes
@@ -536,8 +536,8 @@ void CollectionShardingRuntime::appendShardVersion(BSONObjBuilder* builder) cons
     if (optCollDescr) {
         BSONObjBuilder versionBuilder(builder->subobjStart(_nss.ns()));
         versionBuilder.appendTimestamp("placementVersion",
-                                       optCollDescr->getShardVersion().toLong());
-        versionBuilder.append("timestamp", optCollDescr->getShardVersion().getTimestamp());
+                                       optCollDescr->getShardPlacementVersion().toLong());
+        versionBuilder.append("timestamp", optCollDescr->getShardPlacementVersion().getTimestamp());
     }
 }
 
@@ -550,22 +550,22 @@ size_t CollectionShardingRuntime::numberOfRangesScheduledForDeletion() const {
 }
 
 
-void CollectionShardingRuntime::setShardVersionRecoverRefreshFuture(
+void CollectionShardingRuntime::setPlacementVersionRecoverRefreshFuture(
     SharedSemiFuture<void> future, CancellationSource cancellationSource) {
-    invariant(!_shardVersionInRecoverOrRefresh);
-    _shardVersionInRecoverOrRefresh.emplace(std::move(future), std::move(cancellationSource));
+    invariant(!_placementVersionInRecoverOrRefresh);
+    _placementVersionInRecoverOrRefresh.emplace(std::move(future), std::move(cancellationSource));
 }
 
 boost::optional<SharedSemiFuture<void>>
-CollectionShardingRuntime::getShardVersionRecoverRefreshFuture(OperationContext* opCtx) const {
-    return _shardVersionInRecoverOrRefresh
-        ? boost::optional<SharedSemiFuture<void>>(_shardVersionInRecoverOrRefresh->future)
+CollectionShardingRuntime::getPlacementVersionRecoverRefreshFuture(OperationContext* opCtx) const {
+    return _placementVersionInRecoverOrRefresh
+        ? boost::optional<SharedSemiFuture<void>>(_placementVersionInRecoverOrRefresh->future)
         : boost::none;
 }
 
-void CollectionShardingRuntime::resetShardVersionRecoverRefreshFuture() {
-    invariant(_shardVersionInRecoverOrRefresh);
-    _shardVersionInRecoverOrRefresh = boost::none;
+void CollectionShardingRuntime::resetPlacementVersionRecoverRefreshFuture() {
+    invariant(_placementVersionInRecoverOrRefresh);
+    _placementVersionInRecoverOrRefresh = boost::none;
 }
 
 boost::optional<CollectionIndexes> CollectionShardingRuntime::getCollectionIndexes(
@@ -673,7 +673,7 @@ void CollectionShardingRuntime::_cleanupBeforeInstallingNewCollectionMetadata(
     }
 
     const auto oldUUID = _metadataManager->getCollectionUuid();
-    const auto oldShardVersion = _metadataManager->getActiveShardVersion();
+    const auto oldShardVersion = _metadataManager->getActivePlacementVersion();
     ExecutorFuture<void>{Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()}
         .then([svcCtx{opCtx->getServiceContext()}, oldUUID, oldShardVersion] {
             ThreadClient tc{"CleanUpShardedMetadata", svcCtx};
@@ -686,27 +686,30 @@ void CollectionShardingRuntime::_cleanupBeforeInstallingNewCollectionMetadata(
 
             try {
                 auto& planCache = sbe::getPlanCache(opCtx);
-                planCache.removeIf([&](const sbe::PlanCacheKey& key,
-                                       const sbe::PlanCacheEntry& entry) -> bool {
-                    const auto matchingCollState =
-                        [&](const sbe::PlanCacheKeyCollectionState& entryCollState) {
-                            return entryCollState.uuid == oldUUID && entryCollState.shardVersion &&
-                                entryCollState.shardVersion->epoch == oldShardVersion.epoch() &&
-                                entryCollState.shardVersion->ts == oldShardVersion.getTimestamp();
-                        };
+                planCache.removeIf(
+                    [&](const sbe::PlanCacheKey& key, const sbe::PlanCacheEntry& entry) -> bool {
+                        const auto matchingCollState =
+                            [&](const sbe::PlanCacheKeyCollectionState& entryCollState) {
+                                return entryCollState.uuid == oldUUID &&
+                                    entryCollState.collectionGeneration &&
+                                    entryCollState.collectionGeneration->epoch ==
+                                    oldShardVersion.epoch() &&
+                                    entryCollState.collectionGeneration->ts ==
+                                    oldShardVersion.getTimestamp();
+                            };
 
-                    // Check whether the main collection of this plan is the one being removed
-                    if (matchingCollState(key.getMainCollectionState()))
-                        return true;
-
-                    // Check whether a secondary collection is the one being removed
-                    for (const auto& secCollState : key.getSecondaryCollectionStates()) {
-                        if (matchingCollState(secCollState))
+                        // Check whether the main collection of this plan is the one being removed
+                        if (matchingCollState(key.getMainCollectionState()))
                             return true;
-                    }
 
-                    return false;
-                });
+                        // Check whether a secondary collection is the one being removed
+                        for (const auto& secCollState : key.getSecondaryCollectionStates()) {
+                            if (matchingCollState(secCollState))
+                                return true;
+                        }
+
+                        return false;
+                    });
             } catch (const DBException& ex) {
                 LOGV2(6549200,
                       "Interrupted deferred clean up of sharded metadata",

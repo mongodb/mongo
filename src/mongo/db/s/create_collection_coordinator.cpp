@@ -1257,8 +1257,8 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
     // the memory footprint, such variables get instantiated as shared_ptrs.
     auto coll =
         std::make_shared<CollectionType>(nss(),
-                                         _initialChunks->collVersion().epoch(),
-                                         _initialChunks->collVersion().getTimestamp(),
+                                         _initialChunks->collPlacementVersion().epoch(),
+                                         _initialChunks->collPlacementVersion().getTimestamp(),
                                          Date_t::now(),
                                          *_collectionUUID,
                                          _doc.getTranslatedRequestParams()->getKeyPattern());
@@ -1304,11 +1304,11 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
         forceShardFilteringMetadataRefresh(opCtx, nss());
     } catch (const DBException& ex) {
         LOGV2(5277908,
-              "Failed to obtain collection's shard version, so it will be recovered",
+              "Failed to obtain collection's placement version, so it will be recovered",
               "namespace"_attr = nss(),
               "error"_attr = redact(ex));
 
-        // If the refresh fails, then set the shard version to UNKNOWN and let a future
+        // If the refresh fails, then set the placement version to UNKNOWN and let a future
         // operation to refresh the metadata.
 
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
@@ -1341,7 +1341,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
           "Created initial chunk(s)",
           "namespace"_attr = nss(),
           "numInitialChunks"_attr = _initialChunks->chunks.size(),
-          "initialCollectionVersion"_attr = _initialChunks->collVersion());
+          "initialCollectionPlacementVersion"_attr = _initialChunks->collPlacementVersion());
 
     auto result = CreateCollectionResponse(ShardVersionFactory::make(
         placementVersion, boost::optional<CollectionIndexes>(boost::none)));
@@ -1352,7 +1352,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
           "Collection created",
           "namespace"_attr = nss(),
           "UUID"_attr = _result->getCollectionUUID(),
-          "version"_attr = _result->getCollectionVersion());
+          "placementVersion"_attr = _result->getCollectionVersion());
 }
 
 void CreateCollectionCoordinator::_logStartCreateCollection(OperationContext* opCtx) {
@@ -1367,7 +1367,7 @@ void CreateCollectionCoordinator::_logStartCreateCollection(OperationContext* op
 void CreateCollectionCoordinator::_logEndCreateCollection(OperationContext* opCtx) {
     BSONObjBuilder collectionDetail;
     _result->getCollectionUUID()->appendToBuilder(&collectionDetail, "uuid");
-    collectionDetail.append("version", _result->getCollectionVersion().toString());
+    collectionDetail.append("placementVersion", _result->getCollectionVersion().toString());
     if (_collectionEmpty)
         collectionDetail.append("empty", *_collectionEmpty);
     if (_initialChunks)

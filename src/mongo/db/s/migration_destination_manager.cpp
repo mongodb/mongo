@@ -1879,7 +1879,7 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
 
     // Wait for the updates to the catalog cache to be written to disk before removing the
     // recovery document. This ensures that on case of stepdown, the new primary will know of a
-    // shardVersion inclusive of the migration. NOTE: We rely on the
+    // placement version inclusive of the migration. NOTE: We rely on the
     // deleteMigrationRecipientRecoveryDocument call below to wait for the CatalogCache on-disk
     // persistence to be majority committed.
     CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, _nss);

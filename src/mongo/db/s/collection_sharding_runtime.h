@@ -248,25 +248,25 @@ public:
     }
 
     /**
-     * Initializes the shard version recover/refresh shared semifuture for other threads to wait on
-     * it.
+     * Initializes the placement version recover/refresh shared semifuture for other threads to wait
+     * on it.
      *
      * To invoke this method, the criticalSectionSignal must not be hold by a different thread.
      */
-    void setShardVersionRecoverRefreshFuture(SharedSemiFuture<void> future,
-                                             CancellationSource cancellationSource);
+    void setPlacementVersionRecoverRefreshFuture(SharedSemiFuture<void> future,
+                                                 CancellationSource cancellationSource);
 
     /**
-     * If there an ongoing shard version recover/refresh, it returns the shared semifuture to be
+     * If there an ongoing placement version recover/refresh, it returns the shared semifuture to be
      * waited on. Otherwise, returns boost::none.
      */
-    boost::optional<SharedSemiFuture<void>> getShardVersionRecoverRefreshFuture(
+    boost::optional<SharedSemiFuture<void>> getPlacementVersionRecoverRefreshFuture(
         OperationContext* opCtx) const;
 
     /**
-     * Resets the shard version recover/refresh shared semifuture to boost::none.
+     * Resets the placement version recover/refresh shared semifuture to boost::none.
      */
-    void resetShardVersionRecoverRefreshFuture();
+    void resetPlacementVersionRecoverRefreshFuture();
 
     /**
      * Gets the shard's index version.
@@ -308,16 +308,16 @@ public:
                         const CollectionIndexes& collectionIndexes);
 
 private:
-    struct ShardVersionRecoverOrRefresh {
+    struct PlacementVersionRecoverOrRefresh {
     public:
-        ShardVersionRecoverOrRefresh(SharedSemiFuture<void> future,
-                                     CancellationSource cancellationSource)
+        PlacementVersionRecoverOrRefresh(SharedSemiFuture<void> future,
+                                         CancellationSource cancellationSource)
             : future(std::move(future)), cancellationSource(std::move(cancellationSource)){};
 
-        // Tracks ongoing shard version recover/refresh.
+        // Tracks ongoing placement version recover/refresh.
         SharedSemiFuture<void> future;
 
-        // Cancellation source to cancel the ongoing recover/refresh shard version.
+        // Cancellation source to cancel the ongoing recover/refresh placement version.
         CancellationSource cancellationSource;
     };
 
@@ -399,9 +399,9 @@ private:
     // Used for testing to check the number of times a new MetadataManager has been installed.
     std::uint64_t _numMetadataManagerChanges{0};
 
-    // Tracks ongoing shard version recover/refresh. Eventually set to the semifuture to wait on and
-    // a CancellationSource to cancel it
-    boost::optional<ShardVersionRecoverOrRefresh> _shardVersionInRecoverOrRefresh;
+    // Tracks ongoing placement version recover/refresh. Eventually set to the semifuture to wait on
+    // and a CancellationSource to cancel it
+    boost::optional<PlacementVersionRecoverOrRefresh> _placementVersionInRecoverOrRefresh;
 
     // Contains the global indexes for the collection. This will be boost::none if no global indexes
     // have ever been created for the collection.
@@ -412,8 +412,8 @@ private:
  * RAII-style class, which obtains a reference to the critical section for the specified collection.
  *
  *
- * Shard version recovery/refresh procedures always wait for the critical section to be released in
- * order to serialise with concurrent moveChunk/shardCollection commit operations.
+ * Placement version recovery/refresh procedures always wait for the critical section to be released
+ * in order to serialise with concurrent moveChunk/shardCollection commit operations.
  *
  * Entering the critical section doesn't serialise with concurrent recovery/refresh, because
  * causally such refreshes would have happened *before* the critical section was entered.

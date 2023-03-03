@@ -75,7 +75,7 @@ CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const Namesp
 
 /**
  * Unconditionally causes the shard's filtering metadata to be refreshed from the config server and
- * returns the resulting shard version (which might not have changed), or throws.
+ * returns the resulting placement version (which might not have changed), or throws.
  *
  * NOTE: Does network I/O and acquires collection lock on the specified namespace, so it must not be
  * called with a lock

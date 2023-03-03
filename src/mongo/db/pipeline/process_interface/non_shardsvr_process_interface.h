@@ -64,9 +64,10 @@ public:
         return boost::none;  // Nothing is sharded here.
     }
 
-    virtual void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                              const NamespaceString& nss,
-                                              ChunkVersion targetCollectionVersion) const override {
+    virtual void checkRoutingInfoEpochOrThrow(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        ChunkVersion targetCollectionPlacementVersion) const override {
         uasserted(51020, "unexpected request to consult sharding catalog on non-shardsvr");
     }
 

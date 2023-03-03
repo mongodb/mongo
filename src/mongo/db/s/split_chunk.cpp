@@ -119,7 +119,7 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
                             shardId),
             str::stream() << "Collection " << nss.ns() << " is not sharded",
             metadataAfterSplit->isSharded());
-    const auto placementVersion = metadataAfterSplit->getShardVersion();
+    const auto placementVersion = metadataAfterSplit->getShardPlacementVersion();
     const auto epoch = placementVersion.epoch();
     uassert(StaleConfigInfo(nss,
                             ShardVersion::IGNORED() /* receivedVersion */,

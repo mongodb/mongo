@@ -114,12 +114,12 @@ void validateChunkIsNotOlderThan(const std::shared_ptr<ChunkInfo>& chunk,
 }  // namespace
 
 ChunkMap::ChunkMap(OID epoch, const Timestamp& timestamp, size_t initialCapacity)
-    : _collectionVersion({epoch, timestamp}, {0, 0}) {
+    : _collectionPlacementVersion({epoch, timestamp}, {0, 0}) {
     _chunkMap.reserve(initialCapacity);
 }
 
-ShardVersionMap ChunkMap::constructShardVersionMap() const {
-    ShardVersionMap shardVersions;
+ShardPlacementVersionMap ChunkMap::constructShardPlacementVersionMap() const {
+    ShardPlacementVersionMap placementVersions;
     ChunkVector::const_iterator current = _chunkMap.cbegin();
 
     boost::optional<BSONObj> firstMin = boost::none;
@@ -129,28 +129,29 @@ ShardVersionMap ChunkMap::constructShardVersionMap() const {
         const auto& firstChunkInRange = *current;
         const auto& currentRangeShardId = firstChunkInRange->getShardIdAt(boost::none);
 
-        // Tracks the max shard version for the shard on which the current range will reside
-        auto shardVersionIt = shardVersions.find(currentRangeShardId);
-        if (shardVersionIt == shardVersions.end()) {
-            shardVersionIt = shardVersions
-                                 .emplace(std::piecewise_construct,
-                                          std::forward_as_tuple(currentRangeShardId),
-                                          std::forward_as_tuple(_collectionVersion.epoch(),
-                                                                _collectionVersion.getTimestamp()))
-                                 .first;
+        // Tracks the max placement version for the shard on which the current range will reside
+        auto placementVersionIt = placementVersions.find(currentRangeShardId);
+        if (placementVersionIt == placementVersions.end()) {
+            placementVersionIt =
+                placementVersions
+                    .emplace(std::piecewise_construct,
+                             std::forward_as_tuple(currentRangeShardId),
+                             std::forward_as_tuple(_collectionPlacementVersion.epoch(),
+                                                   _collectionPlacementVersion.getTimestamp()))
+                    .first;
         }
 
-        auto& maxShardVersion = shardVersionIt->second.shardVersion;
+        auto& maxPlacementVersion = placementVersionIt->second.placementVersion;
 
         current =
             std::find_if(current,
                          _chunkMap.cend(),
-                         [&currentRangeShardId, &maxShardVersion](const auto& currentChunk) {
+                         [&currentRangeShardId, &maxPlacementVersion](const auto& currentChunk) {
                              if (currentChunk->getShardIdAt(boost::none) != currentRangeShardId)
                                  return true;
 
-                             if (maxShardVersion.isOlderThan(currentChunk->getLastmod()))
-                                 maxShardVersion = currentChunk->getLastmod();
+                             if (maxPlacementVersion.isOlderThan(currentChunk->getLastmod()))
+                                 maxPlacementVersion = currentChunk->getLastmod();
 
                              return false;
                          });
@@ -179,13 +180,13 @@ ShardVersionMap ChunkMap::constructShardVersionMap() const {
 
         lastMax = rangeMax;
 
-        // If a shard has chunks it must have a shard version, otherwise we have an invalid chunk
-        // somewhere, which should have been caught at chunk load time
-        invariant(maxShardVersion.isSet());
+        // If a shard has chunks it must have a placement version, otherwise we have an invalid
+        // chunk somewhere, which should have been caught at chunk load time
+        invariant(maxPlacementVersion.isSet());
     }
 
     if (!_chunkMap.empty()) {
-        invariant(!shardVersions.empty());
+        invariant(!placementVersions.empty());
         invariant(firstMin.has_value());
         invariant(lastMax.has_value());
 
@@ -193,14 +194,14 @@ ShardVersionMap ChunkMap::constructShardVersionMap() const {
         checkAllElementsAreOfType(MaxKey, lastMax.value());
     }
 
-    return shardVersions;
+    return placementVersions;
 }
 
 void ChunkMap::appendChunk(const std::shared_ptr<ChunkInfo>& chunk) {
     appendChunkTo(_chunkMap, chunk);
     const auto chunkVersion = chunk->getLastmod();
-    if (_collectionVersion.isOlderThan(chunkVersion)) {
-        _collectionVersion = chunkVersion;
+    if (_collectionPlacementVersion.isOlderThan(chunkVersion)) {
+        _collectionPlacementVersion = chunkVersion;
     }
 }
 
@@ -310,8 +311,9 @@ ChunkMap::_overlappingBounds(const BSONObj& min, const BSONObj& max, bool isMaxI
     return {itMin, itMax};
 }
 
-ShardVersionTargetingInfo::ShardVersionTargetingInfo(const OID& epoch, const Timestamp& timestamp)
-    : shardVersion({epoch, timestamp}, {0, 0}) {}
+PlacementVersionTargetingInfo::PlacementVersionTargetingInfo(const OID& epoch,
+                                                             const Timestamp& timestamp)
+    : placementVersion({epoch, timestamp}, {0, 0}) {}
 
 RoutingTableHistory::RoutingTableHistory(
     NamespaceString nss,
@@ -334,12 +336,12 @@ RoutingTableHistory::RoutingTableHistory(
       _maxChunkSizeBytes(maxChunkSizeBytes),
       _allowMigrations(allowMigrations),
       _chunkMap(std::move(chunkMap)),
-      _shardVersions(_chunkMap.constructShardVersionMap()) {}
+      _placementVersions(_chunkMap.constructShardPlacementVersionMap()) {}
 
 void RoutingTableHistory::setShardStale(const ShardId& shardId) {
     if (gEnableFinerGrainedCatalogCacheRefresh) {
-        auto it = _shardVersions.find(shardId);
-        if (it != _shardVersions.end()) {
+        auto it = _placementVersions.find(shardId);
+        if (it != _placementVersions.end()) {
             it->second.isStale.store(true);
         }
     }
@@ -347,7 +349,7 @@ void RoutingTableHistory::setShardStale(const ShardId& shardId) {
 
 void RoutingTableHistory::setAllShardsRefreshed() {
     if (gEnableFinerGrainedCatalogCacheRefresh) {
-        for (auto& [shard, targetingInfo] : _shardVersions) {
+        for (auto& [shard, targetingInfo] : _placementVersions) {
             targetingInfo.isStale.store(false);
         }
     }
@@ -407,10 +409,10 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
                                        std::set<ShardId>* shardIds,
                                        std::set<ChunkRange>* chunkRanges) const {
     // If our range is [MinKey, MaxKey], we can simply return all shard ids right away. However,
-    // this optimization does not apply when we are reading from a snapshot because _shardVersions
-    // contains shards with chunks and is built based on the last refresh. Therefore, it is
-    // possible for _shardVersions to have fewer entries if a shard no longer owns chunks when it
-    // used to at _clusterTime.
+    // this optimization does not apply when we are reading from a snapshot because
+    // _placementVersions contains shards with chunks and is built based on the last refresh.
+    // Therefore, it is possible for _placementVersions to have fewer entries if a shard no longer
+    // owns chunks when it used to at _clusterTime.
     if (!_clusterTime && ChunkMap::allElementsAreOfType(MinKey, min) &&
         ChunkMap::allElementsAreOfType(MaxKey, max)) {
         getAllShardIds(shardIds);
@@ -427,10 +429,10 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
 
         // No need to iterate through the rest of the ranges, because we already know we need to use
         // all shards. However, this optimization does not apply when we are reading from a snapshot
-        // because _shardVersions contains shards with chunks and is built based on the last
-        // refresh. Therefore, it is possible for _shardVersions to have fewer entries if a shard
-        // no longer owns chunks when it used to at _clusterTime.
-        if (!_clusterTime && shardIds->size() == _rt->optRt->_shardVersions.size()) {
+        // because _placementVersions contains shards with chunks and is built based on the last
+        // refresh. Therefore, it is possible for _placementVersions to have fewer entries if a
+        // shard no longer owns chunks when it used to at _clusterTime.
+        if (!_clusterTime && shardIds->size() == _rt->optRt->_placementVersions.size()) {
             return false;
         }
 
@@ -478,10 +480,10 @@ ShardId ChunkManager::getMinKeyShardIdWithSimpleCollation() const {
 void RoutingTableHistory::getAllShardIds(std::set<ShardId>* all) const {
     invariant(all->empty());
 
-    std::transform(_shardVersions.begin(),
-                   _shardVersions.end(),
+    std::transform(_placementVersions.begin(),
+                   _placementVersions.end(),
                    std::inserter(*all, all->begin()),
-                   [](const ShardVersionMap::value_type& pair) { return pair.first; });
+                   [](const ShardPlacementVersionMap::value_type& pair) { return pair.first; });
 }
 
 void RoutingTableHistory::getAllChunkRanges(std::set<ChunkRange>* all) const {
@@ -521,19 +523,20 @@ std::string ChunkManager::toString() const {
 
 bool RoutingTableHistory::compatibleWith(const RoutingTableHistory& other,
                                          const ShardId& shardName) const {
-    // Return true if the shard version is the same in the two chunk managers
+    // Return true if the placement version is the same in the two chunk managers
     // TODO: This doesn't need to be so strong, just major vs
     return other.getVersion(shardName) == getVersion(shardName);
 }
 
 ChunkVersion RoutingTableHistory::_getVersion(const ShardId& shardName,
                                               bool throwOnStaleShard) const {
-    auto it = _shardVersions.find(shardName);
-    if (it == _shardVersions.end()) {
-        // Shards without explicitly tracked shard versions (meaning they have no chunks) always
+    auto it = _placementVersions.find(shardName);
+    if (it == _placementVersions.end()) {
+        // Shards without explicitly tracked placement versions (meaning they have no chunks) always
         // have a version of (0, 0, epoch, timestamp)
-        const auto collVersion = _chunkMap.getVersion();
-        return ChunkVersion({collVersion.epoch(), collVersion.getTimestamp()}, {0, 0});
+        const auto collPlacementVersion = _chunkMap.getVersion();
+        return ChunkVersion({collPlacementVersion.epoch(), collPlacementVersion.getTimestamp()},
+                            {0, 0});
     }
 
     if (throwOnStaleShard && gEnableFinerGrainedCatalogCacheRefresh) {
@@ -542,7 +545,7 @@ ChunkVersion RoutingTableHistory::_getVersion(const ShardId& shardName,
                 !it->second.isStale.load());
     }
 
-    return it->second.shardVersion;
+    return it->second.placementVersion;
 }
 
 ChunkVersion RoutingTableHistory::getVersion(const ShardId& shardName) const {
@@ -563,9 +566,9 @@ std::string RoutingTableHistory::toString() const {
         return true;
     });
 
-    sb << "Shard versions:\n";
-    for (const auto& entry : _shardVersions) {
-        sb << "\t" << entry.first << ": " << entry.second.shardVersion.toString() << '\n';
+    sb << "Shard placement versions:\n";
+    for (const auto& entry : _placementVersions) {
+        sb << "\t" << entry.first << ": " << entry.second.placementVersion.toString() << '\n';
     }
 
     return sb.str();

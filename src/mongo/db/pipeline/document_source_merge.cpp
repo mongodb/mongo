@@ -379,15 +379,16 @@ PrivilegeVector DocumentSourceMerge::LiteParsed::requiredPrivileges(
     return {{ResourcePattern::forExactNamespace(*_foreignNss), actions}};
 }
 
-DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,
-                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         const MergeStrategyDescriptor& descriptor,
-                                         boost::optional<BSONObj> letVariables,
-                                         boost::optional<std::vector<BSONObj>> pipeline,
-                                         std::set<FieldPath> mergeOnFields,
-                                         boost::optional<ChunkVersion> targetCollectionVersion)
+DocumentSourceMerge::DocumentSourceMerge(
+    NamespaceString outputNs,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const MergeStrategyDescriptor& descriptor,
+    boost::optional<BSONObj> letVariables,
+    boost::optional<std::vector<BSONObj>> pipeline,
+    std::set<FieldPath> mergeOnFields,
+    boost::optional<ChunkVersion> targetCollectionPlacementVersion)
     : DocumentSourceWriter(kStageName.rawData(), std::move(outputNs), expCtx),
-      _targetCollectionVersion(targetCollectionVersion),
+      _targetCollectionPlacementVersion(targetCollectionPlacementVersion),
       _descriptor(descriptor),
       _pipeline(std::move(pipeline)),
       _mergeOnFields(std::move(mergeOnFields)),
@@ -414,7 +415,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
     boost::optional<BSONObj> letVariables,
     boost::optional<std::vector<BSONObj>> pipeline,
     std::set<FieldPath> mergeOnFields,
-    boost::optional<ChunkVersion> targetCollectionVersion) {
+    boost::optional<ChunkVersion> targetCollectionPlacementVersion) {
     uassert(51189,
             "Combination of {} modes 'whenMatched: {}' and 'whenNotMatched: {}' "
             "is not supported"_format(kStageName,
@@ -466,7 +467,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
                                    std::move(letVariables),
                                    std::move(pipeline),
                                    std::move(mergeOnFields),
-                                   targetCollectionVersion);
+                                   targetCollectionPlacementVersion);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
@@ -482,7 +483,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
     auto whenNotMatched = mergeSpec.getWhenNotMatched().value_or(kDefaultWhenNotMatched);
     auto pipeline = mergeSpec.getWhenMatched() ? mergeSpec.getWhenMatched()->pipeline : boost::none;
     auto fieldPaths = convertToFieldPaths(mergeSpec.getOn());
-    auto [mergeOnFields, targetCollectionVersion] =
+    auto [mergeOnFields, targetCollectionPlacementVersion] =
         expCtx->mongoProcessInterface->ensureFieldsUniqueOrResolveDocumentKey(
             expCtx, std::move(fieldPaths), mergeSpec.getTargetCollectionVersion(), targetNss);
 
@@ -493,7 +494,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
                                        mergeSpec.getLet(),
                                        std::move(pipeline),
                                        std::move(mergeOnFields),
-                                       targetCollectionVersion);
+                                       targetCollectionPlacementVersion);
 }
 
 StageConstraints DocumentSourceMerge::constraints(Pipeline::SplitState pipeState) const {
@@ -553,7 +554,7 @@ Value DocumentSourceMerge::serialize(boost::optional<ExplainOptions::Verbosity> 
         }
         return mergeOnFields;
     }());
-    spec.setTargetCollectionVersion(_targetCollectionVersion);
+    spec.setTargetCollectionVersion(_targetCollectionPlacementVersion);
     return Value(Document{{getSourceName(), spec.toBSON()}});
 }
 
@@ -581,8 +582,8 @@ std::pair<DocumentSourceMerge::BatchObject, int> DocumentSourceMerge::makeBatchO
 
 void DocumentSourceMerge::spill(BatchedObjects&& batch) try {
     DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
-    auto targetEpoch = _targetCollectionVersion
-        ? boost::optional<OID>(_targetCollectionVersion->epoch())
+    auto targetEpoch = _targetCollectionPlacementVersion
+        ? boost::optional<OID>(_targetCollectionPlacementVersion->epoch())
         : boost::none;
 
     _descriptor.strategy(

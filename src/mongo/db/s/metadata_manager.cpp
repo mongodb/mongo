@@ -172,17 +172,17 @@ void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
     invariant(_metadata.back()->metadata);
     const auto& activeMetadata = _metadata.back()->metadata.value();
 
-    const auto remoteCollVersion = remoteMetadata.getCollVersion();
-    const auto activeCollVersion = activeMetadata.getCollVersion();
+    const auto remoteCollPlacementVersion = remoteMetadata.getCollPlacementVersion();
+    const auto activeCollPlacementVersion = activeMetadata.getCollPlacementVersion();
     // Do nothing if the remote version is older than or equal to the current active one
-    if (remoteCollVersion.isOlderOrEqualThan(activeCollVersion)) {
+    if (remoteCollPlacementVersion.isOlderOrEqualThan(activeCollPlacementVersion)) {
         LOGV2_DEBUG(21984,
                     1,
                     "Ignoring incoming metadata update {activeMetadata} for {namespace} because "
                     "the active (current) metadata {remoteMetadata} has the same or a newer "
-                    "collection version",
+                    "collection placement version",
                     "Ignoring incoming metadata update for this namespace because the active "
-                    "(current) metadata has the same or a newer collection version",
+                    "(current) metadata has the same or a newer collection placement version",
                     "namespace"_attr = _nss.ns(),
                     "activeMetadata"_attr = activeMetadata.toStringBasic(),
                     "remoteMetadata"_attr = remoteMetadata.toStringBasic());
@@ -191,9 +191,9 @@ void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
 
     LOGV2(21985,
           "Updating metadata {activeMetadata} for {namespace} because the remote metadata "
-          "{remoteMetadata} has a newer collection version",
+          "{remoteMetadata} has a newer collection placement version",
           "Updating metadata for this namespace because the remote metadata has a newer "
-          "collection version",
+          "collection placement version",
           "namespace"_attr = _nss.ns(),
           "activeMetadata"_attr = activeMetadata.toStringBasic(),
           "remoteMetadata"_attr = remoteMetadata.toStringBasic());

@@ -355,8 +355,8 @@ StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opC
     return ChunkType::parseFromConfigBSON(doc.getValue(), collEpoch, collTimestamp);
 }
 
-StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionVersion(OperationContext* opCtx,
-                                                                       const NamespaceString& nss) {
+StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionPlacementVersion(
+    OperationContext* opCtx, const NamespaceString& nss) {
     auto collectionDoc = findOneOnConfigCollection(
         opCtx, CollectionType::ConfigNS, BSON(CollectionType::kNssFieldName << nss.ns()));
     if (!collectionDoc.isOK())

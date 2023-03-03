@@ -175,7 +175,7 @@ auto translateOutReplace(boost::intrusive_ptr<ExpressionContext> expCtx,
 
 auto translateOutMerge(boost::intrusive_ptr<ExpressionContext> expCtx,
                        NamespaceString targetNss,
-                       boost::optional<ChunkVersion> targetCollectionVersion) {
+                       boost::optional<ChunkVersion> targetCollectionPlacementVersion) {
     return DocumentSourceMerge::create(std::move(targetNss),
                                        expCtx,
                                        MergeWhenMatchedModeEnum::kReplace,
@@ -183,12 +183,12 @@ auto translateOutMerge(boost::intrusive_ptr<ExpressionContext> expCtx,
                                        boost::none,  // Let variables
                                        boost::none,  // pipeline
                                        std::set<FieldPath>{FieldPath("_id"s)},
-                                       std::move(targetCollectionVersion));
+                                       std::move(targetCollectionPlacementVersion));
 }
 
 auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
                         NamespaceString targetNss,
-                        boost::optional<ChunkVersion> targetCollectionVersion,
+                        boost::optional<ChunkVersion> targetCollectionPlacementVersion,
                         std::string reduceCode,
                         boost::optional<MapReduceJavascriptCodeOrNull> finalizeCode) {
     // Because of communication for sharding, $merge must hold on to a serializable BSON object
@@ -222,12 +222,12 @@ auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
                                        boost::none,  // Let variables
                                        pipelineSpec,
                                        std::set<FieldPath>{FieldPath("_id"s)},
-                                       std::move(targetCollectionVersion));
+                                       std::move(targetCollectionPlacementVersion));
 }
 
 void rejectRequestsToCreateShardedCollections(
     const MapReduceOutOptions& outOptions,
-    const boost::optional<ChunkVersion>& targetCollectionVersion) {
+    const boost::optional<ChunkVersion>& targetCollectionPlacementVersion) {
     uassert(ErrorCodes::InvalidOptions,
             "Combination of 'out.sharded' and 'replace' output mode is not supported. Cannot "
             "replace an existing sharded collection or create a new sharded collection. Please "
@@ -237,29 +237,30 @@ void rejectRequestsToCreateShardedCollections(
     uassert(ErrorCodes::InvalidOptions,
             "Cannot use mapReduce to create a new sharded collection. Please create and shard the"
             " target collection before proceeding.",
-            targetCollectionVersion || !outOptions.isSharded());
+            targetCollectionPlacementVersion || !outOptions.isSharded());
 }
 
 auto translateOut(boost::intrusive_ptr<ExpressionContext> expCtx,
                   const MapReduceOutOptions& outOptions,
                   NamespaceString targetNss,
-                  boost::optional<ChunkVersion> targetCollectionVersion,
+                  boost::optional<ChunkVersion> targetCollectionPlacementVersion,
                   std::string reduceCode,
                   boost::optional<MapReduceJavascriptCodeOrNull> finalizeCode) {
-    rejectRequestsToCreateShardedCollections(outOptions, targetCollectionVersion);
+    rejectRequestsToCreateShardedCollections(outOptions, targetCollectionPlacementVersion);
 
     switch (outOptions.getOutputType()) {
         case OutputType::Replace:
             return boost::make_optional(translateOutReplace(expCtx, std::move(targetNss)));
         case OutputType::Merge:
             return boost::make_optional(translateOutMerge(
-                expCtx, std::move(targetNss), std::move(targetCollectionVersion)));
+                expCtx, std::move(targetNss), std::move(targetCollectionPlacementVersion)));
         case OutputType::Reduce:
-            return boost::make_optional(translateOutReduce(expCtx,
-                                                           std::move(targetNss),
-                                                           std::move(targetCollectionVersion),
-                                                           std::move(reduceCode),
-                                                           std::move(finalizeCode)));
+            return boost::make_optional(
+                translateOutReduce(expCtx,
+                                   std::move(targetNss),
+                                   std::move(targetCollectionPlacementVersion),
+                                   std::move(reduceCode),
+                                   std::move(finalizeCode)));
         case OutputType::InMemory:;
     }
     return boost::optional<boost::intrusive_ptr<mongo::DocumentSource>>{};
@@ -394,11 +395,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
                                   parsedMr.getOutOptions().getCollectionName()};
 
     std::set<FieldPath> shardKey;
-    boost::optional<ChunkVersion> targetCollectionVersion;
+    boost::optional<ChunkVersion> targetCollectionPlacementVersion;
     // If non-inline output, verify that the target collection is *not* sharded by anything other
     // than _id.
     if (parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {
-        std::tie(shardKey, targetCollectionVersion) =
+        std::tie(shardKey, targetCollectionPlacementVersion) =
             expCtx->mongoProcessInterface->ensureFieldsUniqueOrResolveDocumentKey(
                 expCtx, boost::none, boost::none, outNss);
         uassert(31313,
@@ -423,7 +424,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
                 translateOut(expCtx,
                              parsedMr.getOutOptions(),
                              std::move(outNss),
-                             std::move(targetCollectionVersion),
+                             std::move(targetCollectionPlacementVersion),
                              parsedMr.getReduce().getCode(),
                              parsedMr.getFinalize())),
             expCtx);

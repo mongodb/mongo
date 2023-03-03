@@ -50,14 +50,15 @@ const ShardId kShardId = ShardId("shard0");
 class ShardServerCatalogCacheLoaderTest : public ShardServerTestFixture {
 public:
     /**
-     * Returns five chunks using collVersion as a starting version.
+     * Returns five chunks using collectionPlacementVersion as a starting version.
      */
-    vector<ChunkType> makeFiveChunks(const ChunkVersion& collectionVersion);
+    vector<ChunkType> makeFiveChunks(const ChunkVersion& collectionPlacementVersion);
 
     /**
-     * Returns a chunk update diff GTE 'collVersion' for the chunks created by makeFiveChunks above.
+     * Returns a chunk update diff GTE 'collectionPlacementVersion' for the chunks created by
+     * makeFiveChunks above.
      */
-    vector<ChunkType> makeThreeUpdatedChunksDiff(const ChunkVersion& collectionVersion);
+    vector<ChunkType> makeThreeUpdatedChunksDiff(const ChunkVersion& collectionPlacementVersion);
 
     /**
      * Returns a routing table applying 'threeUpdatedChunks' (the result of
@@ -67,9 +68,9 @@ public:
         const vector<ChunkType>& originalFiveChunks, const vector<ChunkType>& threeUpdatedChunks);
 
     /**
-     * This helper makes a CollectionType with the current _maxCollVersion.
+     * This helper makes a CollectionType with the current _maxCollPlacementVersion.
      */
-    CollectionType makeCollectionType(const ChunkVersion& collVersion);
+    CollectionType makeCollectionType(const ChunkVersion& collPlacementVersion);
 
     /**
      * Sets up the _shardLoader with the results of makeFiveChunks().
@@ -108,8 +109,8 @@ void ShardServerCatalogCacheLoaderTest::tearDown() {
 }
 
 vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeFiveChunks(
-    const ChunkVersion& collectionVersion) {
-    ChunkVersion collVersion(collectionVersion);
+    const ChunkVersion& collectionPlacementVersion) {
+    ChunkVersion collPlacementVersion(collectionPlacementVersion);
     vector<ChunkType> chunks;
     const UUID uuid = UUID::gen();
 
@@ -119,14 +120,14 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeFiveChunks(
         BSON("a" << 10), BSON("a" << 50), BSON("a" << 100), BSON("a" << 200), BSON("a" << MAXKEY)};
 
     for (int i = 0; i < 5; ++i) {
-        collVersion.incMajor();
+        collPlacementVersion.incMajor();
 
         ChunkType chunk;
         chunk.setCollectionUUID(uuid);
         chunk.setMin(mins[i]);
         chunk.setMax(maxs[i]);
         chunk.setShard(kShardId);
-        chunk.setVersion(collVersion);
+        chunk.setVersion(collPlacementVersion);
 
         chunks.push_back(chunk);
     }
@@ -135,8 +136,8 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeFiveChunks(
 }
 
 vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeThreeUpdatedChunksDiff(
-    const ChunkVersion& collectionVersion) {
-    ChunkVersion collVersion(collectionVersion);
+    const ChunkVersion& collectionPlacementVersion) {
+    ChunkVersion collPlacementVersion(collectionPlacementVersion);
     vector<ChunkType> chunks;
     const UUID uuid = UUID::gen();
 
@@ -150,7 +151,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeThreeUpdatedChunksDiff(
     oldChunk.setMin(BSON("a" << 200));
     oldChunk.setMax(BSON("a" << MAXKEY));
     oldChunk.setShard(kShardId);
-    oldChunk.setVersion(collVersion);
+    oldChunk.setVersion(collPlacementVersion);
     chunks.push_back(oldChunk);
 
 
@@ -159,14 +160,14 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeThreeUpdatedChunksDiff(
     BSONObj maxs[] = {BSON("a" << 5), BSON("a" << 10), BSON("a" << 100)};
 
     for (int i = 0; i < 3; ++i) {
-        collVersion.incMinor();
+        collPlacementVersion.incMinor();
 
         ChunkType chunk;
         chunk.setCollectionUUID(uuid);
         chunk.setMin(mins[i]);
         chunk.setMax(maxs[i]);
         chunk.setShard(kShardId);
-        chunk.setVersion(collVersion);
+        chunk.setVersion(collPlacementVersion);
 
         chunks.push_back(chunk);
     }
@@ -188,10 +189,10 @@ ShardServerCatalogCacheLoaderTest::makeCombinedOriginalFiveChunksAndThreeNewChun
 }
 
 CollectionType ShardServerCatalogCacheLoaderTest::makeCollectionType(
-    const ChunkVersion& collVersion) {
+    const ChunkVersion& collPlacementVersion) {
     return {kNss,
-            collVersion.epoch(),
-            collVersion.getTimestamp(),
+            collPlacementVersion.epoch(),
+            collPlacementVersion.getTimestamp(),
             Date_t::now(),
             UUID::gen(),
             kKeyPattern};
@@ -199,10 +200,10 @@ CollectionType ShardServerCatalogCacheLoaderTest::makeCollectionType(
 
 std::pair<CollectionType, vector<ChunkType>>
 ShardServerCatalogCacheLoaderTest::setUpChunkLoaderWithFiveChunks() {
-    ChunkVersion collectionVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
+    ChunkVersion collectionPlacementVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
 
-    CollectionType collectionType = makeCollectionType(collectionVersion);
-    vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
+    CollectionType collectionType = makeCollectionType(collectionPlacementVersion);
+    vector<ChunkType> chunks = makeFiveChunks(collectionPlacementVersion);
     _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
     _remoteLoaderMock->setChunkRefreshReturnValue(chunks);
 
@@ -301,8 +302,8 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindDiff) {
 
     // Then refresh again and find updated chunks.
 
-    ChunkVersion collVersion = chunks.back().getVersion();
-    vector<ChunkType> updatedChunksDiff = makeThreeUpdatedChunksDiff(collVersion);
+    ChunkVersion collPlacementVersion = chunks.back().getVersion();
+    vector<ChunkType> updatedChunksDiff = makeThreeUpdatedChunksDiff(collPlacementVersion);
     _remoteLoaderMock->setChunkRefreshReturnValue(updatedChunksDiff);
 
     auto collAndChunksRes = _shardLoader->getChunksSince(kNss, chunks.back().getVersion()).get();
@@ -367,9 +368,10 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindNewEpoch)
 
     // Then refresh again and find that the collection has been dropped and recreated.
 
-    ChunkVersion collVersionWithNewEpoch({OID::gen(), Timestamp(2, 0)}, {1, 0});
-    CollectionType collectionTypeWithNewEpoch = makeCollectionType(collVersionWithNewEpoch);
-    vector<ChunkType> chunksWithNewEpoch = makeFiveChunks(collVersionWithNewEpoch);
+    ChunkVersion collPlacementVersionWithNewEpoch({OID::gen(), Timestamp(2, 0)}, {1, 0});
+    CollectionType collectionTypeWithNewEpoch =
+        makeCollectionType(collPlacementVersionWithNewEpoch);
+    vector<ChunkType> chunksWithNewEpoch = makeFiveChunks(collPlacementVersionWithNewEpoch);
     _remoteLoaderMock->setCollectionRefreshReturnValue(collectionTypeWithNewEpoch);
     _remoteLoaderMock->setChunkRefreshReturnValue(chunksWithNewEpoch);
 
@@ -394,9 +396,10 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChun
     // Then refresh again and retrieve chunks from the config server that have mixed epoches, like
     // as if the chunks read yielded around a drop and recreate of the collection.
 
-    ChunkVersion collVersionWithNewEpoch({OID::gen(), Timestamp(2, 0)}, {1, 0});
-    CollectionType collectionTypeWithNewEpoch = makeCollectionType(collVersionWithNewEpoch);
-    vector<ChunkType> chunksWithNewEpoch = makeFiveChunks(collVersionWithNewEpoch);
+    ChunkVersion collPlacementVersionWithNewEpoch({OID::gen(), Timestamp(2, 0)}, {1, 0});
+    CollectionType collectionTypeWithNewEpoch =
+        makeCollectionType(collPlacementVersionWithNewEpoch);
+    vector<ChunkType> chunksWithNewEpoch = makeFiveChunks(collPlacementVersionWithNewEpoch);
     vector<ChunkType> mixedChunks;
     mixedChunks.push_back(chunks.back());
     mixedChunks.insert(mixedChunks.end(), chunksWithNewEpoch.begin(), chunksWithNewEpoch.end());
@@ -437,10 +440,10 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChun
 }
 
 TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedOnSSCCL) {
-    ChunkVersion collectionVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
+    ChunkVersion collectionPlacementVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
 
-    CollectionType collectionType = makeCollectionType(collectionVersion);
-    vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
+    CollectionType collectionType = makeCollectionType(collectionPlacementVersion);
+    vector<ChunkType> chunks = makeFiveChunks(collectionPlacementVersion);
     auto timeseriesOptions = TimeseriesOptions("fieldName");
 
     {
@@ -461,9 +464,9 @@ TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedO
     {
         auto& lastChunk = chunks.back();
         const auto maxLoaderVersion = lastChunk.getVersion();
-        ChunkVersion newCollectionVersion = maxLoaderVersion;
-        newCollectionVersion.incMinor();
-        lastChunk.setVersion(newCollectionVersion);
+        ChunkVersion newCollectionPlacementVersion = maxLoaderVersion;
+        newCollectionPlacementVersion.incMinor();
+        lastChunk.setVersion(newCollectionPlacementVersion);
 
         TypeCollectionTimeseriesFields tsFields;
         timeseriesOptions.setGranularity(BucketGranularityEnum::Hours);
@@ -480,9 +483,9 @@ TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedO
 }
 
 void ShardServerCatalogCacheLoaderTest::refreshCollectionEpochOnRemoteLoader() {
-    ChunkVersion collectionVersion({OID::gen(), Timestamp(1, 1)}, {1, 2});
-    CollectionType collectionType = makeCollectionType(collectionVersion);
-    vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
+    ChunkVersion collectionPlacementVersion({OID::gen(), Timestamp(1, 1)}, {1, 2});
+    CollectionType collectionType = makeCollectionType(collectionPlacementVersion);
+    vector<ChunkType> chunks = makeFiveChunks(collectionPlacementVersion);
     _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
     _remoteLoaderMock->setChunkRefreshReturnValue(chunks);
 }

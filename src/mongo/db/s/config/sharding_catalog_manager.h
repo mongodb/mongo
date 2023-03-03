@@ -94,9 +94,9 @@ public:
                            std::unique_ptr<ShardingCatalogClient> localCatalogClient);
     ~ShardingCatalogManager();
 
-    struct ShardAndCollectionVersion {
-        ChunkVersion shardVersion;
-        ChunkVersion collectionVersion;
+    struct ShardAndCollectionPlacementVersions {
+        ChunkVersion shardPlacementVersion;
+        ChunkVersion collectionPlacementVersion;
     };
 
     /**
@@ -248,7 +248,7 @@ public:
     //
 
     /**
-     * Bumps the major component of the shard version for each 'shardIds'.
+     * Bumps the major component of the placement version for each 'shardIds'.
      */
     void bumpMajorVersionOneChunkPerShard(OperationContext* opCtx,
                                           const NamespaceString& nss,
@@ -259,12 +259,12 @@ public:
      * Updates metadata in the config.chunks collection to show the given chunk as split into
      * smaller chunks at the specified split points.
      *
-     * Returns a ShardAndCollectionVersion object with the newly produced chunk versions after the
-     * migration:
-     *   - shardVersion - The new shard version of the source shard
-     *   - collectionVersion - The new collection version after the commit
+     * Returns a ShardAndCollectionPlacementVersions object with the newly produced chunk versions
+     * after the migration:
+     *   - shardPlacementVersion - The new placement version of the source shard
+     *   - collectionPlacementVersion - The new collection placement version after the commit
      */
-    StatusWith<ShardAndCollectionVersion> commitChunkSplit(
+    StatusWith<ShardAndCollectionPlacementVersions> commitChunkSplit(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const OID& requestEpoch,
@@ -278,12 +278,12 @@ public:
      * Updates metadata in the config.chunks collection so the chunks within the specified key range
      * are seen merged into a single larger chunk.
      *
-     * Returns a ShardAndCollectionVersion object with the newly produced chunk versions after the
-     * migration:
-     *   - shardVersion - The new shard version of the source shard
-     *   - collectionVersion - The new collection version after the commit
+     * Returns a ShardAndCollectionPlacementVersions object with the newly produced chunk versions
+     * after the migration:
+     *   - shardPlacementVersion - The new placement version of the source shard
+     *   - collectionPlacementVersion - The new collection placement version after the commit
      */
-    StatusWith<ShardAndCollectionVersion> commitChunksMerge(
+    StatusWith<ShardAndCollectionPlacementVersions> commitChunksMerge(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const boost::optional<OID>& epoch,
@@ -296,10 +296,10 @@ public:
      * Updates metadata in the config.chunks collection so that all mergeable chunks belonging to
      * the specified shard for the given collection are merged within one transaction.
      *
-     * Returns a ShardAndCollectionVersion object containing the new collection version produced by
-     * the merge(s) and the total number of chunks that were merged.
+     * Returns a ShardAndCollectionPlacementVersions object containing the new collection placement
+     * version produced by the merge(s) and the total number of chunks that were merged.
      */
-    StatusWith<std::pair<ShardingCatalogManager::ShardAndCollectionVersion, int>>
+    StatusWith<std::pair<ShardingCatalogManager::ShardAndCollectionPlacementVersions, int>>
     commitMergeAllChunksOnShard(OperationContext* opCtx,
                                 const NamespaceString& nss,
                                 const ShardId& shardId,
@@ -311,19 +311,20 @@ public:
      * If 'validAfter' is not set, this means the commit request came from an older server version,
      * which is not history-aware.
      *
-     * Returns a ShardAndCollectionVersion object with the newly produced chunk versions after the
-     * migration:
-     *   - shardVersion - The new shard version of the source shard
-     *   - collectionVersion - The new collection version after the commit
+     * Returns a ShardAndCollectionPlacementVersions object with the newly produced chunk versions
+     * after the migration:
+     *   - shardPlacementVersion - The new placement version of the source shard
+     *   - collectionPlacementVersion - The new collection placement version after the commit
      */
-    StatusWith<ShardAndCollectionVersion> commitChunkMigration(OperationContext* opCtx,
-                                                               const NamespaceString& nss,
-                                                               const ChunkType& migratedChunk,
-                                                               const OID& collectionEpoch,
-                                                               const Timestamp& collectionTimestamp,
-                                                               const ShardId& fromShard,
-                                                               const ShardId& toShard,
-                                                               const Timestamp& validAfter);
+    StatusWith<ShardAndCollectionPlacementVersions> commitChunkMigration(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ChunkType& migratedChunk,
+        const OID& collectionEpoch,
+        const Timestamp& collectionTimestamp,
+        const ShardId& fromShard,
+        const ShardId& toShard,
+        const Timestamp& validAfter);
 
     /**
      * Removes the jumbo flag from the specified chunk.
@@ -334,7 +335,7 @@ public:
                         const ChunkRange& chunk);
     /**
      * If a chunk matching 'requestedChunk' exists, bumps the chunk's version to one greater than
-     * the current collection version.
+     * the current collection placement version.
      *
      * 'nss' and 'collUUID' were added to the ConfigsvrEnsureChunkVersionIsGreaterThanCommand
      * in 5.0. They are optional in 5.0 because the request may come from a previous version (4.4)
@@ -347,29 +348,29 @@ public:
                                          const ChunkVersion& version);
 
     /**
-     * In a single transaction, effectively bumps the shard version for each shard in the collection
-     * to be the current collection version's major version + 1 inside an already-running
-     * transaction.
+     * In a single transaction, effectively bumps the placement version for each shard in the
+     * collection to be the current collection placement version's major version + 1 inside an
+     * already-running transaction.
      */
-    void bumpCollectionVersionAndChangeMetadataInTxn(
+    void bumpCollectionPlacementVersionAndChangeMetadataInTxn(
         OperationContext* opCtx,
         const NamespaceString& nss,
         unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc);
-    void bumpCollectionVersionAndChangeMetadataInTxn(
+    void bumpCollectionPlacementVersionAndChangeMetadataInTxn(
         OperationContext* opCtx,
         const NamespaceString& nss,
         unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc,
         const WriteConcernOptions& writeConcern);
 
     /**
-     * Same as bumpCollectionVersionAndChangeMetadataInTxn, but bumps the version for several
-     * collections in a single transaction.
+     * Same as bumpCollectionPlacementVersionAndChangeMetadataInTxn, but bumps the placement version
+     * for several collections in a single transaction.
      */
-    void bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
+    void bumpMultipleCollectionPlacementVersionsAndChangeMetadataInTxn(
         OperationContext* opCtx,
         const std::vector<NamespaceString>& collNames,
         unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc);
-    void bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
+    void bumpMultipleCollectionPlacementVersionsAndChangeMetadataInTxn(
         OperationContext* opCtx,
         const std::vector<NamespaceString>& collNames,
         unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc,
@@ -458,8 +459,8 @@ public:
                                       boost::optional<bool> enableAutoMerger);
 
     /**
-     * Updates the bucketing parameters of a time-series collection. Also bumps the shard versions
-     * for all shards.
+     * Updates the bucketing parameters of a time-series collection. Also bumps the placement
+     * versions for all shards.
      */
     void updateTimeSeriesBucketingParameters(OperationContext* opCtx,
                                              const NamespaceString& nss,
@@ -786,7 +787,7 @@ private:
                                                            const ChunkRange& range,
                                                            const std::string& shardName,
                                                            const ChunkType& origChunk,
-                                                           const ChunkVersion& collVersion,
+                                                           const ChunkVersion& collPlacementVersion,
                                                            const std::vector<BSONObj>& splitPoints);
 
     // The owning service context

@@ -61,7 +61,7 @@ ShardVersion ShardVersionFactory::make(
                           << cm.getUUID() << " and index version has uuid "
                           << collectionIndexes->uuid(),
             !collectionIndexes || !cm.isSharded() || cm.uuidMatches(collectionIndexes->uuid()));
-    return ShardVersion(cm.getShardVersion(), collectionIndexes);
+    return ShardVersion(cm.getShardPlacementVersion(), collectionIndexes);
 }
 
 

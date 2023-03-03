@@ -882,8 +882,8 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("databaseVersionRefreshDuration", databaseVersionRefreshMillis);
     }
 
-    if (shardVersionRefreshMillis > Milliseconds::zero()) {
-        pAttrs->add("shardVersionRefreshDuration", shardVersionRefreshMillis);
+    if (placementVersionRefreshMillis > Milliseconds::zero()) {
+        pAttrs->add("placementVersionRefreshDuration", placementVersionRefreshMillis);
     }
 
     if (dataThroughputLastSecond) {

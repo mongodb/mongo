@@ -101,7 +101,8 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
  * shardId The shard, which currently owns the chunk.
  * nss Namespace, which owns the chunk.
  * shardKeyPattern The shard key which corresponds to this sharded namespace.
- * collectionVersion The expected collection version when doing the split.
+ * epoch The expected collection epoch when doing the split.
+ * timestamp The expected collection timestamp when doing the split
  * chunkRange Bounds of the chunk to be split.
  * splitPoints The set of points at which the chunk should be split.
  */

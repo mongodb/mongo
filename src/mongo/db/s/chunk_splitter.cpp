@@ -82,7 +82,7 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
                                   const ShardId& shardId,
                                   const NamespaceString& nss,
                                   const ShardKeyPattern& shardKeyPattern,
-                                  const ChunkVersion& collectionVersion,
+                                  const ChunkVersion& collectionPlacementVersion,
                                   const ChunkRange& chunkRange,
                                   std::vector<BSONObj>&& splitPoints) {
     invariant(!splitPoints.empty());
@@ -102,8 +102,8 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
                       chunkRange,
                       std::move(splitPoints),
                       shardId.toString(),
-                      collectionVersion.epoch(),
-                      collectionVersion.getTimestamp(),
+                      collectionPlacementVersion.epoch(),
+                      collectionPlacementVersion.getTimestamp(),
                       true /* fromChunkSplitter */)
         .getStatus()
         .withContext("split failed");

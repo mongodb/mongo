@@ -167,10 +167,10 @@ protected:
                                       const Timestamp& collTimestamp);
 
     /**
-     * Returns the collection version.
+     * Returns the collection placement version.
      */
-    StatusWith<ChunkVersion> getCollectionVersion(OperationContext* opCtx,
-                                                  const NamespaceString& nss);
+    StatusWith<ChunkVersion> getCollectionPlacementVersion(OperationContext* opCtx,
+                                                           const NamespaceString& nss);
 
     /**
      * Inserts a document for the database into the config.databases collection.

@@ -325,7 +325,7 @@ public:
 
     // Stores the duration of time spent waiting for the shard to refresh the collection and wait
     // for the collection critical section.
-    Milliseconds shardVersionRefreshMillis{0};
+    Milliseconds placementVersionRefreshMillis{0};
 
     // Stores the duration of time spent waiting for the specified user write concern to
     // be fulfilled.

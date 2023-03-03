@@ -102,12 +102,13 @@ public:
                 ns(), collEntry.getReshardingFields()->getReshardingUUID());
             cleaner.clean(opCtx);
 
-            ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
-                opCtx, ns(), [&](OperationContext* opCtx, TxnNumber txnNumber) {
-                    auto update = constructFinalMetadataRemovalUpdateOperation(opCtx, ns());
-                    auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-                        opCtx, CollectionType::ConfigNS, update, txnNumber);
-                });
+            ShardingCatalogManager::get(opCtx)
+                ->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
+                    opCtx, ns(), [&](OperationContext* opCtx, TxnNumber txnNumber) {
+                        auto update = constructFinalMetadataRemovalUpdateOperation(opCtx, ns());
+                        auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+                            opCtx, CollectionType::ConfigNS, update, txnNumber);
+                    });
 
             collEntry = catalogClient->getCollection(opCtx, ns());
 

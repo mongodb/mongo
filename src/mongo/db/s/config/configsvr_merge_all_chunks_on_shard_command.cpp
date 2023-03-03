@@ -87,7 +87,7 @@ public:
 
             auto shardAndCollVers = response.first;
             auto numMergedChunks = response.second;
-            auto res = MergeAllChunksOnShardResponse{shardAndCollVers.shardVersion};
+            auto res = MergeAllChunksOnShardResponse{shardAndCollVers.shardPlacementVersion};
             res.setNumMergedChunks(numMergedChunks);
             return res;
         }

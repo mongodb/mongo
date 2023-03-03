@@ -98,8 +98,8 @@ public:
                 try {
                     forceShardFilteringMetadataRefresh(opCtx, bucketNs);
                 } catch (const DBException&) {
-                    // If the refresh fails, then set the shard version to UNKNOWN and let a future
-                    // operation to refresh the metadata.
+                    // If the refresh fails, then set the placement version to UNKNOWN and let a
+                    // future operation to refresh the metadata.
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
                     UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
                     AutoGetCollection autoColl(opCtx, bucketNs, MODE_IX);

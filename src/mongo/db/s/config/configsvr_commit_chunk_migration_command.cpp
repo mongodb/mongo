@@ -128,7 +128,7 @@ public:
             const NamespaceString nss = ns();
             auto migratedChunk = toChunkType(request().getMigratedChunk());
 
-            StatusWith<ShardingCatalogManager::ShardAndCollectionVersion> response =
+            StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> response =
                 ShardingCatalogManager::get(opCtx)->commitChunkMigration(
                     opCtx,
                     nss,
@@ -141,7 +141,7 @@ public:
 
             auto shardAndCollVers = uassertStatusOK(response);
 
-            return Response{shardAndCollVers.shardVersion};
+            return Response{shardAndCollVers.shardPlacementVersion};
         }
 
     private:

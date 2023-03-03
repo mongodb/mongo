@@ -129,17 +129,17 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
                                                       rangeToBeMerged,
                                                       _shardId));
 
-    auto collVersion = versions.collectionVersion;
-    auto shardVersion = versions.shardVersion;
+    auto collPlacementVersion = versions.collectionPlacementVersion;
+    auto shardPlacementVersion = versions.shardPlacementVersion;
 
-    ASSERT_TRUE(origVersion.isOlderThan(versions.shardVersion));
-    ASSERT_EQ(shardVersion, collVersion);
+    ASSERT_TRUE(origVersion.isOlderThan(versions.shardPlacementVersion));
+    ASSERT_EQ(shardPlacementVersion, collPlacementVersion);
 
     // Check for increment on mergedChunk's minor version
-    auto expectedShardVersion =
+    auto expectedShardPlacementVersion =
         ChunkVersion({origVersion.epoch(), origVersion.getTimestamp()},
                      {origVersion.majorVersion(), origVersion.minorVersion() + 1});
-    ASSERT_EQ(expectedShardVersion, shardVersion);
+    ASSERT_EQ(expectedShardPlacementVersion, shardPlacementVersion);
 
 
     const auto query = BSON(ChunkType::collectionUUID() << collUuid);
@@ -159,12 +159,12 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
 
     // MergedChunk should have range [chunkMin, chunkMax]
     auto mergedChunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
-        chunksVector.front(), collVersion.epoch(), collVersion.getTimestamp()));
+        chunksVector.front(), collPlacementVersion.epoch(), collPlacementVersion.getTimestamp()));
     ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
     ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 
-    // Check that the shard version returned by the merge matches the CSRS one
-    ASSERT_EQ(shardVersion, mergedChunk.getVersion());
+    // Check that the shard placement version returned by the merge matches the CSRS one
+    ASSERT_EQ(shardPlacementVersion, mergedChunk.getVersion());
 
     // Make sure history is there
     ASSERT_EQ(1UL, mergedChunk.getHistory().size());
@@ -335,7 +335,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 
     {
-        // Check for minor increment on collection version
+        // Check for minor increment on collection placement version
         ASSERT_EQ(competingVersion.majorVersion(), mergedChunk.getVersion().majorVersion());
         ASSERT_EQ(competingVersion.minorVersion() + 1, mergedChunk.getVersion().minorVersion());
     }
@@ -697,14 +697,15 @@ protected:
     /* Setup shareded collection randomly spreading chunks across shards */
     void setupCollectionWithRandomRoutingTable() {
         PseudoRandom random(SecureRandom().nextInt64());
-        ChunkVersion collVersion{{_epoch, _ts}, {1, 0}};
+        ChunkVersion collPlacementVersion{{_epoch, _ts}, {1, 0}};
 
-        // Generate chunk with the provided parameters and increase current collection version
+        // Generate chunk with the provided parameters and increase current collection placement
+        // version
         auto generateChunk = [&](ShardType& shard, BSONObj min, BSONObj max) -> ChunkType {
             ChunkType chunk;
             chunk.setCollectionUUID(_collUuid);
-            chunk.setVersion(collVersion);
-            collVersion.incMinor();
+            chunk.setVersion(collPlacementVersion);
+            collPlacementVersion.incMinor();
             chunk.setShard(shard.getName());
             chunk.setMin(min);
             chunk.setMax(max);
@@ -821,17 +822,17 @@ protected:
         const std::vector<ChunkType>& mergedRoutingTable) {
 
         auto getMaxChunkVersion = [](const std::vector<ChunkType>& routingTable) -> ChunkVersion {
-            auto maxCollVersion = routingTable.front().getVersion();
+            auto maxCollPlacementVersion = routingTable.front().getVersion();
             for (const auto& chunk : routingTable) {
-                if (maxCollVersion.isOlderThan(chunk.getVersion())) {
-                    maxCollVersion = chunk.getVersion();
+                if (maxCollPlacementVersion.isOlderThan(chunk.getVersion())) {
+                    maxCollPlacementVersion = chunk.getVersion();
                 }
             }
-            return maxCollVersion;
+            return maxCollPlacementVersion;
         };
 
-        const auto originalCollVersion = getMaxChunkVersion(originalRoutingTable);
-        const auto mergedCollVersion = getMaxChunkVersion(mergedRoutingTable);
+        const auto originalCollPlacementVersion = getMaxChunkVersion(originalRoutingTable);
+        const auto mergedCollPlacementVersion = getMaxChunkVersion(mergedRoutingTable);
 
         // Calculate chunks that are in the merged routing table but aren't in the original one
         std::vector<ChunkType> chunksDiff = [&]() {
@@ -851,17 +852,20 @@ protected:
         const int nMerges = chunksDiff.size();
 
         // Merged max minor version = original max minor version + number of merges
-        ASSERT_EQ(originalCollVersion.minorVersion() + nMerges, mergedCollVersion.minorVersion());
+        ASSERT_EQ(originalCollPlacementVersion.minorVersion() + nMerges,
+                  mergedCollPlacementVersion.minorVersion());
 
         // Sort `chunksDiff` by minor version and check all intermediate versions are properly set
         std::sort(chunksDiff.begin(), chunksDiff.end(), [](ChunkType& l, ChunkType& r) {
             return l.getVersion().isOlderThan(r.getVersion());
         });
 
-        int expectedMergedChunkMinorVersion = originalCollVersion.minorVersion() + 1;
+        int expectedMergedChunkMinorVersion = originalCollPlacementVersion.minorVersion() + 1;
         for (const auto& newChunk : chunksDiff) {
-            ASSERT_EQ(newChunk.getVersion().getTimestamp(), originalCollVersion.getTimestamp());
-            ASSERT_EQ(newChunk.getVersion().majorVersion(), originalCollVersion.majorVersion());
+            ASSERT_EQ(newChunk.getVersion().getTimestamp(),
+                      originalCollPlacementVersion.getTimestamp());
+            ASSERT_EQ(newChunk.getVersion().majorVersion(),
+                      originalCollPlacementVersion.majorVersion());
             ASSERT_EQ(newChunk.getVersion().minorVersion(), expectedMergedChunkMinorVersion++);
         }
     }

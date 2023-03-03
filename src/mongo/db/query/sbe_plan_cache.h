@@ -60,7 +60,7 @@ struct PlanCacheKeyCollectionState {
     bool operator==(const PlanCacheKeyCollectionState& other) const {
         return other.uuid == uuid && other.version == version &&
             other.newestVisibleIndexTimestamp == newestVisibleIndexTimestamp &&
-            other.shardVersion == shardVersion;
+            other.collectionGeneration == collectionGeneration;
     }
 
     size_t hashCode() const {
@@ -69,9 +69,9 @@ struct PlanCacheKeyCollectionState {
         if (newestVisibleIndexTimestamp) {
             boost::hash_combine(hash, newestVisibleIndexTimestamp->asULL());
         }
-        if (shardVersion) {
-            shardVersion->epoch.hash_combine(hash);
-            boost::hash_combine(hash, shardVersion->ts.asULL());
+        if (collectionGeneration) {
+            collectionGeneration->epoch.hash_combine(hash);
+            boost::hash_combine(hash, collectionGeneration->ts.asULL());
         }
         return hash;
     }
@@ -106,7 +106,7 @@ struct PlanCacheKeyCollectionState {
     // changed its shard key. The cached plan may no longer be valid after sharding or shard key
     // refining since the structure of the plan depends on whether the collection is sharded, and if
     // sharded depends on the shard key.
-    const boost::optional<PlanCacheKeyShardingEpoch> shardVersion;
+    const boost::optional<PlanCacheKeyShardingEpoch> collectionGeneration;
 };
 
 /**
@@ -120,13 +120,14 @@ public:
         : _info{std::move(info)},
           _mainCollectionState{std::move(mainCollectionState)},
           _secondaryCollectionStates{std::move(secondaryCollectionStates)} {
-        // For secondary collections, we don't encode shard version in the key since we don't shard
-        // version these collections. This is OK because we only push down $lookup queries to SBE
-        // when involved collections are unsharded.
+        // For secondary collections, we don't encode collection generation in the key since we
+        // don't shard version these collections. This is OK because we only push down $lookup
+        // queries to SBE when involved collections are unsharded.
         for (const auto& collState : _secondaryCollectionStates) {
-            tassert(6443202,
-                    "Secondary collections should not encode shard version in plan cache key",
-                    collState.shardVersion == boost::none);
+            tassert(
+                6443202,
+                "Secondary collections should not encode collection generation in plan cache key",
+                collState.collectionGeneration == boost::none);
         }
     }
 
