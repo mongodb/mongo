@@ -2196,6 +2196,47 @@ TEST(PhysRewriter, EvalIndexing2) {
         optimized);
 }
 
+TEST(PhysRewriter, EvalIndexing3) {
+    using namespace properties;
+    using namespace unit_test_abt_literals;
+    auto prefixId = PrefixId::createForTests();
+
+    ABT rootNode = NodeBuilder{}
+                       .root("pa")
+                       .eval("pa", _evalp(_get("a", _traverseN(_get("b", _id()))), "root"_var))
+                       .finish(_scan("root", "c1"));
+
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1",
+           createScanDef(
+               {},
+               {{"index1",
+                 makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    phaseManager.getHints()._fastIndexNullHandling = true;
+    phaseManager.optimize(optimized);
+    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // Demonstrate the traverse is removed.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{pa}]\n"
+        "Evaluation [{pa}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [evalTemp_0]\n"
+        "|   PathGet [b]\n"
+        "|   PathIdentity []\n"
+        "IndexScan [{'<indexKey> 0': evalTemp_0}, scanDefName: c1, indexDefName: index1, interval: "
+        "{<fully open>}]\n",
+        optimized);
+}
+
 TEST(PhysRewriter, MultiKeyIndex) {
     using namespace properties;
     auto prefixId = PrefixId::createForTests();

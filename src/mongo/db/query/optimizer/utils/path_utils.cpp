@@ -126,10 +126,6 @@ public:
                     PathTraverse& traverse,
                     const MultikeynessTrie& trie,
                     bool skippedParentTraverse) {
-        tassert(6859603,
-                "Unexpected maxDepth for Traverse in MultikeynessSimplifier",
-                traverse.getMaxDepth() == PathTraverse::kSingleLevel);
-
         if (!trie.isMultiKey) {
             // This path is never applied to an array: we can remove any number of Traverse nodes,
             // of any maxDepth.

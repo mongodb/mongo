@@ -560,7 +560,7 @@ static boost::optional<ABT> mergeSargableNodes(
 
     const ProjectionName& scanProjName = indexingAvailability.getScanProjection();
     ProjectionRenames projectionRenames;
-    bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
+    const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
         scanProjName, multikeynessTrie, mergedReqs, projectionRenames, ctx.getConstFold());
     if (hasEmptyInterval) {
         return createEmptyValueScanNode(ctx);
@@ -572,16 +572,8 @@ static boost::optional<ABT> mergeSargableNodes(
 
     const ScanDefinition& scanDef =
         ctx.getMetadata()._scanDefs.at(indexingAvailability.getScanDefName());
-    auto candidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
-                                                    scanProjName,
-                                                    mergedReqs,
-                                                    scanDef,
-                                                    ctx.getHints(),
-                                                    hasEmptyInterval,
-                                                    ctx.getConstFold());
-    if (hasEmptyInterval) {
-        return createEmptyValueScanNode(ctx);
-    }
+    auto candidateIndexes = computeCandidateIndexes(
+        ctx.getPrefixId(), scanProjName, mergedReqs, scanDef, ctx.getHints(), ctx.getConstFold());
 
     auto scanParams = computeScanParams(ctx.getPrefixId(), mergedReqs, scanProjName);
     ABT result = make<SargableNode>(std::move(mergedReqs),
@@ -683,11 +675,11 @@ static void convertFilterToSargableNode(ABT::reference_type node,
     }
 
     ProjectionRenames projectionRenames_unused;
-    bool hasEmptyInterval = simplifyPartialSchemaReqPaths(scanProjName,
-                                                          scanDef.getMultikeynessTrie(),
-                                                          conversion->_reqMap,
-                                                          projectionRenames_unused,
-                                                          ctx.getConstFold());
+    const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(scanProjName,
+                                                                scanDef.getMultikeynessTrie(),
+                                                                conversion->_reqMap,
+                                                                projectionRenames_unused,
+                                                                ctx.getConstFold());
     tassert(6624156,
             "We should not be seeing renames from a converted Filter",
             projectionRenames_unused.empty());
@@ -706,13 +698,7 @@ static void convertFilterToSargableNode(ABT::reference_type node,
                                                     conversion->_reqMap,
                                                     scanDef,
                                                     ctx.getHints(),
-                                                    hasEmptyInterval,
                                                     ctx.getConstFold());
-
-    if (hasEmptyInterval) {
-        addEmptyValueScanNode(ctx);
-        return;
-    }
 
     auto scanParams = computeScanParams(ctx.getPrefixId(), conversion->_reqMap, scanProjName);
     ABT sargableNode = make<SargableNode>(std::move(conversion->_reqMap),
@@ -1122,19 +1108,23 @@ struct SubstituteConvert<EvaluationNode> {
                     isIntervalReqFullyOpenDNF(req.getIntervals()));
         });
 
-        bool hasEmptyInterval = false;
+        ProjectionRenames projectionRenames_unused;
+        const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(scanProjName,
+                                                                    scanDef.getMultikeynessTrie(),
+                                                                    conversion->_reqMap,
+                                                                    projectionRenames_unused,
+                                                                    ctx.getConstFold());
+        if (hasEmptyInterval) {
+            addEmptyValueScanNode(ctx);
+            return;
+        }
+
         auto candidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
                                                         scanProjName,
                                                         conversion->_reqMap,
                                                         scanDef,
                                                         ctx.getHints(),
-                                                        hasEmptyInterval,
                                                         ctx.getConstFold());
-
-        if (hasEmptyInterval) {
-            addEmptyValueScanNode(ctx);
-            return;
-        }
 
         auto scanParams = computeScanParams(ctx.getPrefixId(), conversion->_reqMap, scanProjName);
         ABT newNode = make<SargableNode>(std::move(conversion->_reqMap),
@@ -1380,20 +1370,17 @@ struct ExploreConvert<SargableNode> {
                 continue;
             }
 
-            bool hasEmptyLeftInterval = false;
             auto leftCandidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
                                                                 scanProjectionName,
                                                                 *leftReqs,
                                                                 scanDef,
                                                                 hints,
-                                                                hasEmptyLeftInterval,
                                                                 ctx.getConstFold());
             if (isIndex && leftCandidateIndexes.empty()) {
                 // Reject rewrite.
                 continue;
             }
 
-            bool hasEmptyRightInterval = false;
             CandidateIndexes rightCandidateIndexes;
             if (rightReqs) {
                 rightCandidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
@@ -1401,7 +1388,6 @@ struct ExploreConvert<SargableNode> {
                                                                 *rightReqs,
                                                                 scanDef,
                                                                 hints,
-                                                                hasEmptyRightInterval,
                                                                 ctx.getConstFold());
             }
 
@@ -1409,9 +1395,6 @@ struct ExploreConvert<SargableNode> {
                 // With empty candidate map, reject only if we cannot implement as Seek.
                 continue;
             }
-            uassert(6624116,
-                    "Empty intervals should already be rewritten to empty ValueScan nodes",
-                    !hasEmptyLeftInterval && !hasEmptyRightInterval);
 
             ABT scanDelegator = make<MemoLogicalDelegatorNode>(scanGroupId);
             ABT leftChild = make<SargableNode>(std::move(*leftReqs),

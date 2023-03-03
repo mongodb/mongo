@@ -303,16 +303,12 @@ size_t decodeIndexKeyName(const std::string& fieldName);
  * Compute a list of candidate indexes. A CandidateIndexEntry describes intervals that could be
  * used for accessing each of the indexes in the map. The intervals themselves are derived from
  * 'reqMap'.
- * If the intersection of any of the interval requirements in 'reqMap' results in an empty
- * interval, return an empty mapping and set 'hasEmptyInterval' to true.
- * Otherwise return the computed mapping, and set 'hasEmptyInterval' to false.
  */
 CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const ProjectionName& scanProjectionName,
                                          const PartialSchemaRequirements& reqMap,
                                          const ScanDefinition& scanDef,
                                          const QueryHints& hints,
-                                         bool& hasEmptyInterval,
                                          const ConstFoldFn& constFold);
 
 /**
