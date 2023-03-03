@@ -74,12 +74,29 @@ private:
 
 class EphemeralForTestRecordStore::TruncateChange : public RecoveryUnit::Change {
 public:
-    TruncateChange(OperationContext* opCtx, Data* data) : _opCtx(opCtx), _data(data), _dataSize(0) {
+    TruncateChange(OperationContext* opCtx, Data* data, const RecordId& begin, const RecordId& end)
+        : _opCtx(opCtx), _data(data), _dataSize(0) {
         using std::swap;
 
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
-        swap(_dataSize, _data->dataSize);
-        swap(_records, _data->records);
+
+        auto it = _data->records.begin();
+        while (it != _data->records.end() && it->first < begin) {
+            it++;
+        }
+
+        auto beginId = it->first;
+
+        while (it != _data->records.end() && it->first <= end) {
+            _deletedRecords.try_emplace(it->first, it->second);
+            // RecordId size + value size.
+            _dataSize += it->first.memUsage() + it->second.size;
+            it++;
+        }
+        auto endId = it->first;
+
+        _data->records.erase(_data->records.find(beginId), _data->records.find(endId));
+        _data->dataSize -= _dataSize;
     }
 
     virtual void commit(OperationContext* opCtx, boost::optional<Timestamp>) {}
@@ -87,15 +104,15 @@ public:
         using std::swap;
 
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
-        swap(_dataSize, _data->dataSize);
-        swap(_records, _data->records);
+        _data->records.merge(std::move(_deletedRecords));
+        _data->dataSize += _dataSize;
     }
 
 private:
     OperationContext* _opCtx;
+    Records _deletedRecords;
     Data* const _data;
     int64_t _dataSize;
-    Records _records;
 };
 
 class EphemeralForTestRecordStore::Cursor final : public SeekableRecordCursor {
@@ -476,7 +493,20 @@ std::unique_ptr<SeekableRecordCursor> EphemeralForTestRecordStore::getCursor(
 Status EphemeralForTestRecordStore::doTruncate(OperationContext* opCtx) {
     // Unlike other changes, TruncateChange mutates _data on construction to perform the
     // truncate
-    opCtx->recoveryUnit()->registerChange(std::make_unique<TruncateChange>(opCtx, _data));
+    opCtx->recoveryUnit()->registerChange(
+        std::make_unique<TruncateChange>(opCtx, _data, RecordId::minLong(), RecordId::maxLong()));
+    return Status::OK();
+}
+
+Status EphemeralForTestRecordStore::doRangeTruncate(OperationContext* opCtx,
+                                                    const RecordId& minRecordId,
+                                                    const RecordId& maxRecordId,
+                                                    int64_t hintDataSizeDiff,
+                                                    int64_t hintNumRecordsDiff) {
+    // Unlike other changes, TruncateChange mutates _data on construction to perform the
+    // truncate.
+    opCtx->recoveryUnit()->registerChange(
+        std::make_unique<TruncateChange>(opCtx, _data, minRecordId, maxRecordId));
     return Status::OK();
 }
 

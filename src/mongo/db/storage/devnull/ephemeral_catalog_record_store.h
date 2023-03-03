@@ -85,6 +85,11 @@ public:
                                                     bool forward) const final;
 
     Status doTruncate(OperationContext* opCtx) override;
+    Status doRangeTruncate(OperationContext* opCtx,
+                           const RecordId& minRecordId,
+                           const RecordId& maxRecordId,
+                           int64_t hintDataSizeDiff,
+                           int64_t hintNumRecordsDiff) override;
 
     void doCappedTruncateAfter(OperationContext* opCtx,
                                const RecordId& end,

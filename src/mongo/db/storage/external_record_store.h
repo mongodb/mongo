@@ -127,6 +127,15 @@ protected:
         return {ErrorCodes::Error::UnknownError, "Unknown error"};
     }
 
+    Status doRangeTruncate(OperationContext* opCtx,
+                           const RecordId& minRecordId,
+                           const RecordId& maxRecordId,
+                           int64_t hintDataSizeIncrement,
+                           int64_t hintNumRecordsIncrement) final {
+        unimplementedTasserted();
+        return {ErrorCodes::Error::UnknownError, "Unknown error"};
+    }
+
     void doCappedTruncateAfter(OperationContext*,
                                const RecordId&,
                                bool,

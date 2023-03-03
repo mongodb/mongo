@@ -45,6 +45,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -977,6 +978,107 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
         ASSERT_EQ(1, wtrs->numRecords(opCtx.get()));
         ASSERT_EQ(100, wtrs->dataSize(opCtx.get()));
     }
+}
+
+void testTruncateRange(int64_t numRecordsToInsert,
+                       int64_t deletionPosBegin,
+                       int64_t deletionPosEnd) {
+    auto harnessHelper = newRecordStoreHarnessHelper();
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+
+    auto wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
+
+    std::vector<RecordId> recordIds;
+
+    auto opCtx = harnessHelper->newOperationContext();
+
+    for (int i = 0; i < numRecordsToInsert; i++) {
+        auto recordId = insertBSONWithSize(opCtx.get(), wtrs, Timestamp(1, i), 100);
+        ASSERT_OK(recordId);
+        recordIds.emplace_back(std::move(recordId.getValue()));
+    }
+
+    auto sizePerRecord = wtrs->dataSize(opCtx.get()) / wtrs->numRecords(opCtx.get());
+
+    std::sort(recordIds.begin(), recordIds.end());
+
+    const auto& beginId = recordIds[deletionPosBegin];
+    const auto& endId = recordIds[deletionPosEnd];
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+
+        auto numRecordsDeleted = deletionPosEnd - deletionPosBegin + 1;
+
+        ASSERT_OK(wtrs->rangeTruncate(
+            opCtx.get(), beginId, endId, -(sizePerRecord * numRecordsDeleted), -numRecordsDeleted));
+
+        ASSERT_EQ(wtrs->dataSize(opCtx.get()),
+                  sizePerRecord * (numRecordsToInsert - numRecordsDeleted));
+        ASSERT_EQ(wtrs->numRecords(opCtx.get()), (numRecordsToInsert - numRecordsDeleted));
+
+        wuow.commit();
+    }
+    std::set<RecordId> expectedRemainingRecordIds;
+    std::copy(recordIds.begin(),
+              recordIds.begin() + deletionPosBegin,
+              std::inserter(expectedRemainingRecordIds, expectedRemainingRecordIds.end()));
+    std::copy(recordIds.begin() + deletionPosEnd + 1,
+              recordIds.end(),
+              std::inserter(expectedRemainingRecordIds, expectedRemainingRecordIds.end()));
+
+    std::set<RecordId> actualRemainingRecordIds;
+
+    auto cursor = wtrs->getCursor(opCtx.get(), true);
+    while (auto record = cursor->next()) {
+        actualRemainingRecordIds.emplace(record->id);
+    }
+    ASSERT_EQ(expectedRemainingRecordIds, actualRemainingRecordIds);
+}
+
+TEST(WiredTigerRecordStoreTest, RangeTruncateTest) {
+    testTruncateRange(100, 3, 50);
+}
+
+TEST(WiredTigerRecordStoreTest, RangeTruncateSameValueTest) {
+    testTruncateRange(100, 3, 3);
+}
+
+DEATH_TEST(WiredTigerRecordStoreTest,
+           RangeTruncateIncorrectOrderTest,
+           "Start position cannot be after end position") {
+    testTruncateRange(100, 4, 3);
+}
+
+TEST(WiredTigerRecordStoreTest, RangeTruncateAllTest) {
+    unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+
+    auto wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
+
+    auto opCtx = harnessHelper->newOperationContext();
+
+    static constexpr auto kNumRecordsToInsert = 100;
+    for (int i = 0; i < kNumRecordsToInsert; i++) {
+        auto recordId = insertBSONWithSize(opCtx.get(), wtrs, Timestamp(1, 0), 100);
+        ASSERT_OK(recordId);
+    }
+
+    auto sizePerRecord = wtrs->dataSize(opCtx.get()) / wtrs->numRecords(opCtx.get());
+
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(wtrs->rangeTruncate(opCtx.get(),
+                                      RecordId(),
+                                      RecordId(),
+                                      -(sizePerRecord * kNumRecordsToInsert),
+                                      -kNumRecordsToInsert));
+        ASSERT_EQ(wtrs->dataSize(opCtx.get()), 0);
+        ASSERT_EQ(wtrs->numRecords(opCtx.get()), 0);
+        wuow.commit();
+    }
+
+    auto cursor = wtrs->getCursor(opCtx.get(), true);
+    ASSERT_FALSE(cursor->next());
 }
 
 TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {

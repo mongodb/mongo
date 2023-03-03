@@ -176,6 +176,11 @@ public:
     std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx) const final;
 
     Status doTruncate(OperationContext* opCtx) final;
+    Status doRangeTruncate(OperationContext* opCtx,
+                           const RecordId& minRecordId,
+                           const RecordId& maxRecordId,
+                           int64_t hintDataSizeDiff,
+                           int64_t hintNumRecordsDiff) final;
 
     virtual bool compactSupported() const {
         return !_isEphemeral;

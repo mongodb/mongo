@@ -81,6 +81,16 @@ Status RecordStore::truncate(OperationContext* opCtx) {
     return doTruncate(opCtx);
 }
 
+Status RecordStore::rangeTruncate(OperationContext* opCtx,
+                                  const RecordId& minRecordId,
+                                  const RecordId& maxRecordId,
+                                  int64_t hintDataSizeDiff,
+                                  int64_t hintNumRecordsDiff) {
+    validateWriteAllowed(opCtx);
+    invariant(minRecordId <= maxRecordId, "Start position cannot be after end position");
+    return doRangeTruncate(opCtx, minRecordId, maxRecordId, hintDataSizeDiff, hintNumRecordsDiff);
+}
+
 void RecordStore::cappedTruncateAfter(OperationContext* opCtx,
                                       const RecordId& end,
                                       bool inclusive,

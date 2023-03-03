@@ -532,9 +532,23 @@ public:
     // higher level
 
     /**
-     * removes all Records
+     * Removes all Records.
      */
     Status truncate(OperationContext* opCtx);
+
+    /**
+     * Removes all Records in the range [minRecordId, maxRecordId] inclusive of both. The hint*
+     * arguments serve as a hint to the record store of how much data will be truncated. This is
+     * necessary for some implementations to avoid reading the data between the two RecordIds in
+     * order to update numRecords and dataSize correctly. Implementations are free to ignore the
+     * hints if they have a way of obtaining the correct values without the help of external
+     * callers.
+     */
+    Status rangeTruncate(OperationContext* opCtx,
+                         const RecordId& minRecordId = RecordId(),
+                         const RecordId& maxRecordId = RecordId(),
+                         int64_t hintDataSizeIncrement = 0,
+                         int64_t hintNumRecordsIncrement = 0);
 
     /**
      * Truncate documents newer than the document at 'end' from the capped
@@ -722,6 +736,11 @@ protected:
         const char* damageSource,
         const mutablebson::DamageVector& damages) = 0;
     virtual Status doTruncate(OperationContext* opCtx) = 0;
+    virtual Status doRangeTruncate(OperationContext* opCtx,
+                                   const RecordId& minRecordId,
+                                   const RecordId& maxRecordId,
+                                   int64_t hintDataSizeDiff,
+                                   int64_t hintNumRecordsDiff) = 0;
     virtual void doCappedTruncateAfter(OperationContext* opCtx,
                                        const RecordId& end,
                                        bool inclusive,

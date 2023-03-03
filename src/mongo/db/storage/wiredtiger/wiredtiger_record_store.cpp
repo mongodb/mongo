@@ -1343,6 +1343,45 @@ Status WiredTigerRecordStore::doTruncate(OperationContext* opCtx) {
     return Status::OK();
 }
 
+Status WiredTigerRecordStore::doRangeTruncate(OperationContext* opCtx,
+                                              const RecordId& minRecordId,
+                                              const RecordId& maxRecordId,
+                                              int64_t hintDataSizeDiff,
+                                              int64_t hintNumRecordsDiff) {
+    WiredTigerCursor startWrap(_uri, _tableId, true, opCtx);
+    WT_CURSOR* start = startWrap.get();
+    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return start->next(start); });
+    // Empty collections don't have anything to truncate.
+    if (ret == WT_NOTFOUND) {
+        return Status::OK();
+    }
+    invariantWTOK(ret, start->session);
+
+    boost::optional<CursorKey> startKey;
+    if (minRecordId != RecordId()) {
+        invariantWTOK(start->reset(start), start->session);
+        startKey = makeCursorKey(minRecordId, _keyFormat);
+        setKey(start, &(*startKey));
+    }
+    WiredTigerCursor endWrap(_uri, _tableId, true, opCtx);
+    boost::optional<CursorKey> endKey;
+    WT_CURSOR* finish = [&]() -> WT_CURSOR* {
+        if (maxRecordId == RecordId()) {
+            return nullptr;
+        }
+        endKey = makeCursorKey(maxRecordId, _keyFormat);
+        setKey(endWrap.get(), &(*endKey));
+        return endWrap.get();
+    }();
+
+    WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
+    invariantWTOK(WT_OP_CHECK(session->truncate(session, nullptr, start, finish, nullptr)),
+                  session);
+    _changeNumRecordsAndDataSize(opCtx, hintNumRecordsDiff, hintDataSizeDiff);
+
+    return Status::OK();
+}
+
 Status WiredTigerRecordStore::doCompact(OperationContext* opCtx) {
     dassert(opCtx->lockState()->isWriteLocked());
 

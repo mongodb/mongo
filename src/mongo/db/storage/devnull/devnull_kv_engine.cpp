@@ -144,6 +144,14 @@ public:
         return Status::OK();
     }
 
+    Status doRangeTruncate(OperationContext* opCtx,
+                           const RecordId& minRecordId,
+                           const RecordId& maxRecordId,
+                           int64_t hintDataSizeDiff,
+                           int64_t hintNumRecordsDiff) override {
+        return Status::OK();
+    }
+
     void doCappedTruncateAfter(OperationContext* opCtx,
                                const RecordId& end,
                                bool inclusive,
