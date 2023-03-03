@@ -2787,6 +2787,7 @@ buildvariants:
       - name: ycsb_60GB
       - name: ycsb_60GB.long
       - name: crud_workloads_majority
+      - name: crud_workloads_w1
       - name: genny_canaries
       - name: cursor_manager
       - name: mixed_workloads
@@ -2798,6 +2799,7 @@ buildvariants:
       - name: bestbuy_agg_merge_same_db
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_query
+      - name: tpcc
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
