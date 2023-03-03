@@ -159,7 +159,7 @@ class GoldenTestApp(object):
         if config_path is None:
             raise AppError((
                 "Can't load config. GOLDEN_TEST_CONFIG_PATH envrionment variable is not set. Golden test CLI must be configured before use.\n"
-                "To configure it, follow the instructions in https://github.com/10gen/mongo/blob/master/docs/golden_data_test_framework.md#how-to-diff-and-accept-new-test-outputs-on-a-workstation\n"
+                "To configure it, follow the instructions in https://github.com/mongodb/mongo/blob/master/docs/golden_data_test_framework.md#how-to-diff-and-accept-new-test-outputs-on-a-workstation\n"
                 "Note: After setup you may need to rerun the tests for this utility to find them."))
 
         self.vprint(f"Loading config from path: '{config_path}'")

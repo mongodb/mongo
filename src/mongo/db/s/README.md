@@ -958,7 +958,7 @@ For retry images saved in the image collection, the source will "downconvert" op
 `needsRetryImage: true` into two oplog entries, simulating the old format. As chunk migrations use
 internal commands, [this downconverting procedure](https://github.com/mongodb/mongo/blob/0beb0cacfcaf7b24259207862e1d0d489e1c16f1/src/mongo/db/s/session_catalog_migration_source.cpp#L58-L97)
 is installed under the hood. For resharding and tenant migrations, a new aggregation stage,
-[_internalFindAndModifyImageLookup](https://github.com/10gen/mongo/blob/e27dfa10b994f6deff7c59a122b87771cdfa8aba/src/mongo/db/pipeline/document_source_find_and_modify_image_lookup.cpp#L61),
+[_internalFindAndModifyImageLookup](https://github.com/mongodb/mongo/blob/e27dfa10b994f6deff7c59a122b87771cdfa8aba/src/mongo/db/pipeline/document_source_find_and_modify_image_lookup.cpp#L61),
 was introduced to perform the identical substitution. In order for this stage to have a valid timestamp
 to assign to the forged no-op oplog entry as result of the "downconvert", we must always assign an
 extra oplog slot when writing the original retryable findAndModify oplog entry with
@@ -1367,23 +1367,23 @@ privilege.
 The `UserWriteBlockModeOpObserver` is responsible for blocking disallowed writes. Upon any operation
 which writes, this `OpObserver` checks whether the `GlobalUserWriteBlockState` [allows writes to the
 target
-namespace](https://github.com/10gen/mongo/blob/387f8c0e26a352b95ecfc6bc51f749d26a929390/src/mongo/db/op_observer/user_write_block_mode_op_observer.cpp#L281-L288).
+namespace](https://github.com/mongodb/mongo/blob/387f8c0e26a352b95ecfc6bc51f749d26a929390/src/mongo/db/op_observer/user_write_block_mode_op_observer.cpp#L281-L288).
 The `GlobalUserWriteBlockState` stores whether user write blocking is enabled in a given
 `ServiceContext`. As part of its write access check, it [checks whether the `WriteBlockBypass`
 associated with the given `OperationContext` is
-enabled](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/s/global_user_write_block_state.cpp#L59-L67).
+enabled](https://github.com/mongodb/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/s/global_user_write_block_state.cpp#L59-L67).
 The `WriteBlockBypass` stores whether the user that initiated the write is able to perform writes
 when user write blocking is enabled.  On internal requests (i.e. from other `mongod` or `mongos`
 instances in the sharded cluster/replica set), the request originator propagates `WriteBlockBypass`
 [through the request
-metadata](https://github.com/10gen/mongo/blob/182616b7b45a1e360839c612c9ee8acaa130fe17/src/mongo/rpc/metadata.cpp#L115).
+metadata](https://github.com/mongodb/mongo/blob/182616b7b45a1e360839c612c9ee8acaa130fe17/src/mongo/rpc/metadata.cpp#L115).
 On external requests, `WriteBlockBypass` is enabled [if the authenticated user is privileged to
 bypass user
-writes](https://github.com/10gen/mongo/blob/07c3d2ebcd3ca8127ed5a5aaabf439b57697b530/src/mongo/db/write_block_bypass.cpp#L60-L63).
+writes](https://github.com/mongodb/mongo/blob/07c3d2ebcd3ca8127ed5a5aaabf439b57697b530/src/mongo/db/write_block_bypass.cpp#L60-L63).
 The `AuthorizationSession`, which is responsible for maintaining the authorization state, keeps track
 of whether the user has the privilege to bypass user write blocking by [updating a cached variable
 upon any changes to the authorization
-state](https://github.com/10gen/mongo/blob/e4032fe5c39f1974c76de4cefdc07d98ab25aeef/src/mongo/db/auth/authorization_session_impl.cpp#L1119-L1121).
+state](https://github.com/mongodb/mongo/blob/e4032fe5c39f1974c76de4cefdc07d98ab25aeef/src/mongo/db/auth/authorization_session_impl.cpp#L1119-L1121).
 This structure enables, for example, sharded writes to work correctly with user write blocking,
 because the `WriteBlockBypass` state is initially set on the `mongos` based on the
 `AuthorizationSession`, which knows the privileges of the user making the write request, and then
@@ -1407,26 +1407,26 @@ those operations from completing.
 
 #### Code references
 * The [`UserWriteBlockModeOpObserver`
-  class](https://github.com/10gen/mongo/blob/387f8c0e26a352b95ecfc6bc51f749d26a929390/src/mongo/db/op_observer/user_write_block_mode_op_observer.h#L40)
+  class](https://github.com/mongodb/mongo/blob/387f8c0e26a352b95ecfc6bc51f749d26a929390/src/mongo/db/op_observer/user_write_block_mode_op_observer.h#L40)
 * The [`GlobalUserWriteBlockState`
-  class](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/s/global_user_write_block_state.h#L37)
+  class](https://github.com/mongodb/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/s/global_user_write_block_state.h#L37)
 * The [`WriteBlockBypass`
-  class](https://github.com/10gen/mongo/blob/07c3d2ebcd3ca8127ed5a5aaabf439b57697b530/src/mongo/db/write_block_bypass.h#L38)
+  class](https://github.com/mongodb/mongo/blob/07c3d2ebcd3ca8127ed5a5aaabf439b57697b530/src/mongo/db/write_block_bypass.h#L38)
 * The [`abortUserIndexBuildsForUserWriteBlocking`
-  function](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/index_builds_coordinator.cpp#L850),
+  function](https://github.com/mongodb/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/index_builds_coordinator.cpp#L850),
   used to abort and drain all current user index builds
 * The [`SetUserWriteBlockModeCoordinator`
-  class](https://github.com/10gen/mongo/blob/ce908a66890bcdd87e709b584682c6b3a3a851be/src/mongo/db/s/config/set_user_write_block_mode_coordinator.h#L38),
+  class](https://github.com/mongodb/mongo/blob/ce908a66890bcdd87e709b584682c6b3a3a851be/src/mongo/db/s/config/set_user_write_block_mode_coordinator.h#L38),
   used to coordinate the `setUserWriteBlockMode` command for sharded clusters
 * The [`UserWritesRecoverableCriticalSectionService`
-  class](https://github.com/10gen/mongo/blob/1c4e5ba241829145026f8aa0db70707f15fbe7b3/src/mongo/db/s/user_writes_recoverable_critical_section_service.h#L88),
+  class](https://github.com/mongodb/mongo/blob/1c4e5ba241829145026f8aa0db70707f15fbe7b3/src/mongo/db/s/user_writes_recoverable_critical_section_service.h#L88),
   used to manage and persist the user write blocking state
 * The `setUserWriteBlockMode` command invocation:
     - [On a non-sharded
-      `mongod`](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/commands/set_user_write_block_mode_command.cpp#L68)
+      `mongod`](https://github.com/mongodb/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/commands/set_user_write_block_mode_command.cpp#L68)
     - [On a shard
-      server](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/s/shardsvr_set_user_write_block_mode_command.cpp#L61)
+      server](https://github.com/mongodb/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/s/shardsvr_set_user_write_block_mode_command.cpp#L61)
     - [On a config
-      server](https://github.com/10gen/mongo/blob/c96f8dacc4c71b4774c932a07be4fac71b6db628/src/mongo/db/s/config/configsvr_set_user_write_block_mode_command.cpp#L56)
+      server](https://github.com/mongodb/mongo/blob/c96f8dacc4c71b4774c932a07be4fac71b6db628/src/mongo/db/s/config/configsvr_set_user_write_block_mode_command.cpp#L56)
     - [On a
-      `mongos`](https://github.com/10gen/mongo/blob/4ba31bc8627426538307848866d3165a17aa29fb/src/mongo/s/commands/cluster_set_user_write_block_mode_command.cpp#L61)
+      `mongos`](https://github.com/mongodb/mongo/blob/4ba31bc8627426538307848866d3165a17aa29fb/src/mongo/s/commands/cluster_set_user_write_block_mode_command.cpp#L61)

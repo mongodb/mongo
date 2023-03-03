@@ -604,14 +604,14 @@ The `replSetUpdatePosition` command response does not include any information un
 error, such as in a `ReplSetConfig` mismatch.
 
 #### Code References
-- [OplogFetcher passes on the metadata it received from its sync source](https://github.com/10gen/mongo/blob/r6.2.0/src/mongo/db/repl/oplog_fetcher.cpp#L897)
-- [Node handles heartbeat response and schedules the next heartbeat after it receives heartbeat response](https://github.com/10gen/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L190)
-- [Node responds to heartbeat request](https://github.com/10gen/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_commands.cpp#L752)
+- [OplogFetcher passes on the metadata it received from its sync source](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/oplog_fetcher.cpp#L897)
+- [Node handles heartbeat response and schedules the next heartbeat after it receives heartbeat response](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L190)
+- [Node responds to heartbeat request](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_commands.cpp#L752)
 - [Primary advances the replica set's commit point after receiving replSetUpdatePosition command](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L1889)
 - [Secondary advances its understanding of the replica set commit point using metadata fetched from its sync source](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L5649)
-- [TopologyCoordinator updates commit optime](https://github.com/10gen/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L2885)
-- [SyncSourceFeedback triggers replSetUpdatePosition command using Reporter](https://github.com/10gen/mongo/blob/r6.2.0/src/mongo/db/repl/reporter.cpp#L189)
-- [Node updates replica set metadata after receiving replSetUpdatePosition command](https://github.com/10gen/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_commands.cpp#L675)
+- [TopologyCoordinator updates commit optime](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L2885)
+- [SyncSourceFeedback triggers replSetUpdatePosition command using Reporter](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/reporter.cpp#L189)
+- [Node updates replica set metadata after receiving replSetUpdatePosition command](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_commands.cpp#L675)
 
 ## Read Concern
 

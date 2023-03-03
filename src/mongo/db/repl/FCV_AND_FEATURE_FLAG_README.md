@@ -40,7 +40,7 @@ As part of initial sync, the in-memory FCV value is always initially set to be
 `kUnsetDefaultLastLTSBehavior`. This is to ensure compatibility between the sync source and sync
 target. If the sync source is actually in a different feature compatibility version, we will find
 out when we clone the `admin.system.version` collection. However, since we can't guarantee that we 
-will clone the `admin.system.version` collection first, we first [manually set our in-memory FCV value to match the sync source's FCV](https://github.com/10gen/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/repl/initial_syncer.cpp#L1142-L1146).
+will clone the `admin.system.version` collection first, we first [manually set our in-memory FCV value to match the sync source's FCV](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/repl/initial_syncer.cpp#L1142-L1146).
 We won't persist the FCV on disk nor will we update our minWireVersion until we clone the actual
 document, but this in-memory FCV value will ensure that we clone collections using the same FCV as
 the sync source.
@@ -127,16 +127,16 @@ There are three locks used in the setFCV command:
 * [setFCVCommandLock](https://github.com/mongodb/mongo/blob/eb5d4ed00d889306f061428f5652431301feba8e/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L294)
     * This ensures that only one invocation of the setFCV command can run at a time (i.e. if you 
     ran setFCV twice in a row, the second invocation would not run until the first had completed)
-* [fcvDocumentLock](https://github.com/10gen/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/feature_compatibility_version.cpp#L215) 
+* [fcvDocumentLock](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/feature_compatibility_version.cpp#L215) 
     * The setFCV command takes this lock in X mode when it modifies the FCV document. This includes
-    from [fully upgraded -> downgrading](https://github.com/10gen/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L350), 
-    [downgrading -> fully downgraded](https://github.com/10gen/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L422),
+    from [fully upgraded -> downgrading](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L350), 
+    [downgrading -> fully downgraded](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L422),
     and vice versa. 
-    * Other operations should [take this lock in shared mode](https://github.com/10gen/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/feature_compatibility_version.cpp#L594-L599)
+    * Other operations should [take this lock in shared mode](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/feature_compatibility_version.cpp#L594-L599)
     if they want to ensure that the FCV state _does not change at all_ during the operation. 
-    See [example](https://github.com/10gen/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/s/config/sharding_catalog_manager_collection_operations.cpp#L489-L490)
-* [FCV full transition lock](https://github.com/10gen/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/concurrency/lock_manager_defs.h#L326)
-    * The setFCV command [takes this lock in S mode and then releases it immediately](https://github.com/10gen/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L515-L525)
+    See [example](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/s/config/sharding_catalog_manager_collection_operations.cpp#L489-L490)
+* [FCV full transition lock](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/concurrency/lock_manager_defs.h#L326)
+    * The setFCV command [takes this lock in S mode and then releases it immediately](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L515-L525)
     after we are in the upgrading/downgrading state,
     but before we transition from the upgrading/downgrading state to the fully upgraded/downgraded 
     state.
@@ -153,7 +153,7 @@ There are three locks used in the setFCV command:
     FCV does not change during our operation, **you must take the global IX or X lock first, and 
     then check the feature flag/FCV value after that point**
     * Other operations that take the global IX or X locks already conflict with the FCV full 
-    transition lock by default, unless [_shouldConflictWithSetFeatureCompatibilityVersion](https://github.com/10gen/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/concurrency/locker.h#L489-L495)
+    transition lock by default, unless [_shouldConflictWithSetFeatureCompatibilityVersion](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/concurrency/locker.h#L489-L495)
     is specifically set to false. This should only be set to false in very special cases.
 
 _Code spelunking starting points:_
