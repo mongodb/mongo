@@ -20,15 +20,6 @@ const st = new ShardingTest({shards: 1});
 const donorRstShard = st.rs0;
 const donorRstConfig = st.configRS;
 
-if (CatalogShardUtil.isEnabledIgnoringFCV(st)) {
-    // TODO SERVER-73409: Decide how to handle tenant migrations on a config server then revisit
-    // this test. Currently it does not pass when the catalog shard feature flag is enabled because
-    // the config server will have the shard role, so it won't reject tenant migration commands.
-    jsTestLog("Skipping test because catalog shard mode is enabled");
-    st.stop();
-    return;
-}
-
 const recipientRst = new ReplSetTest({nodes: 1});
 recipientRst.startSet();
 recipientRst.initiate();
