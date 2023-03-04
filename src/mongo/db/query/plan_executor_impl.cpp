@@ -612,9 +612,9 @@ long long PlanExecutorImpl::executeDelete() {
             const SpecificStats* stats = _root->child()->getSpecificStats();
             return static_cast<const DeleteStats*>(stats)->docsDeleted;
         }
-        case StageType::STAGE_TIMESERIES_WRITE: {
+        case StageType::STAGE_TIMESERIES_MODIFY: {
             const auto* tsWriteStats =
-                static_cast<const TimeseriesWriteStats*>(_root->getSpecificStats());
+                static_cast<const TimeseriesModifyStats*>(_root->getSpecificStats());
             return tsWriteStats->measurementsDeleted;
         }
         default: {

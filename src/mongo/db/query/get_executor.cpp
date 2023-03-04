@@ -53,7 +53,7 @@
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/subplan.h"
-#include "mongo/db/exec/timeseries_write.h"
+#include "mongo/db/exec/timeseries_modify.h"
 #include "mongo/db/exec/unpack_timeseries_bucket.h"
 #include "mongo/db/exec/upsert_stage.h"
 #include "mongo/db/index/columns_access_method.h"
@@ -1981,14 +1981,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     if (parsedDelete->getResidualExpr()) {
         // Checks if the delete is on a time-series collection and cannot run on bucket documents
         // directly.
-        root = std::make_unique<UnpackTimeseriesBucket>(
+        root = std::make_unique<TimeseriesModifyStage>(
             expCtxRaw,
             ws.get(),
             std::move(root),
+            collection,
             BucketUnpacker(*collection->getTimeseriesOptions()),
-            /*isUnpackingForTsWrite=*/true);
-        root = std::make_unique<TimeseriesWriteStage>(
-            expCtxRaw, ws.get(), std::move(root), collection, parsedDelete->releaseResidualExpr());
+            parsedDelete->releaseResidualExpr());
     } else if (batchDelete) {
         root = std::make_unique<BatchedDeleteStage>(expCtxRaw,
                                                     std::move(deleteStageParams),

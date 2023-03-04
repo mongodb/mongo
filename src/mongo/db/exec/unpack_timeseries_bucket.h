@@ -45,8 +45,7 @@ public:
     UnpackTimeseriesBucket(ExpressionContext* expCtx,
                            WorkingSet* ws,
                            std::unique_ptr<PlanStage> child,
-                           BucketUnpacker bucketUnpacker,
-                           bool isUnpackingForTsWrite = false);
+                           BucketUnpacker bucketUnpacker);
 
     StageType stageType() const final {
         return STAGE_UNPACK_TIMESERIES_BUCKET;
@@ -68,10 +67,5 @@ private:
     WorkingSet& _ws;
     BucketUnpacker _bucketUnpacker;
     UnpackTimeseriesBucketStats _specificStats;
-
-    // If the parent stage is TS_WRITE, we'll need to pass the current bucket document's recordId
-    // with each measurement in that bucket.
-    bool _isUnpackingForTsWrite;
-    boost::optional<RecordId> _currentRid;
 };
 }  //  namespace mongo

@@ -30,22 +30,31 @@
 
 #pragma once
 
+#include "mongo/db/exec/bucket_unpacker.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
 
 namespace mongo {
 
-class TimeseriesWriteStage final : public RequiresMutableCollectionStage {
+/**
+ * Unpacks time-series bucket documents and writes the modified documents.
+ *
+ * The stage processes one measurement at a time, but only performs a write after each bucket is
+ * exhausted.
+ */
+class TimeseriesModifyStage final : public RequiresMutableCollectionStage {
 public:
     static const char* kStageType;
 
-    TimeseriesWriteStage(ExpressionContext* expCtx,
-                         WorkingSet* ws,
-                         std::unique_ptr<PlanStage> child,
-                         const CollectionPtr& coll,
-                         std::unique_ptr<MatchExpression> residualPredicate);
+    TimeseriesModifyStage(ExpressionContext* expCtx,
+                          WorkingSet* ws,
+                          std::unique_ptr<PlanStage> child,
+                          const CollectionPtr& coll,
+                          BucketUnpacker bucketUnpacker,
+                          std::unique_ptr<MatchExpression> residualPredicate);
 
     StageType stageType() const {
-        return STAGE_TIMESERIES_WRITE;
+        return STAGE_TIMESERIES_MODIFY;
     }
 
     bool isEOF() final;
@@ -75,6 +84,8 @@ private:
     // Main execution machinery data structures.
     //
 
+    BucketUnpacker _bucketUnpacker;
+
     // Determines the measurements to delete from this bucket, and by inverse, those to keep
     // unmodified.
     std::unique_ptr<MatchExpression> _residualPredicate;
@@ -85,6 +96,6 @@ private:
     std::vector<BSONObj> _unchangedMeasurements;
     std::vector<BSONObj> _deletedMeasurements;
 
-    TimeseriesWriteStats _specificStats{};
+    TimeseriesModifyStats _specificStats{};
 };
 }  //  namespace mongo

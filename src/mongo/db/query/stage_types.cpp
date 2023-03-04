@@ -75,7 +75,7 @@ StringData stageTypeToString(StageType stageType) {
         {STAGE_SUBPLAN, "SUBPLAN"_sd},
         {STAGE_TEXT_OR, "TEXT_OR"_sd},
         {STAGE_TEXT_MATCH, "TEXT_MATCH"_sd},
-        {STAGE_TIMESERIES_WRITE, "TIMESERIES_WRITE"_sd},
+        {STAGE_TIMESERIES_MODIFY, "TIMESERIES_MODIFY"_sd},
         {STAGE_TRIAL, "TRIAL"_sd},
         {STAGE_UNKNOWN, "UNKNOWN"_sd},
         {STAGE_UNPACK_TIMESERIES_BUCKET, "UNPACK_TIMESERIES_BUCKET"_sd},

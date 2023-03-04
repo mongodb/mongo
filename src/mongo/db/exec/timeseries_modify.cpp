@@ -27,40 +27,42 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/timeseries_write.h"
+#include "mongo/db/exec/timeseries_modify.h"
 
 #include "mongo/db/timeseries/timeseries_write_util.h"
 
 namespace mongo {
 
-const char* TimeseriesWriteStage::kStageType = "TS_WRITE";
+const char* TimeseriesModifyStage::kStageType = "TS_MODIFY";
 
-TimeseriesWriteStage::TimeseriesWriteStage(ExpressionContext* expCtx,
-                                           WorkingSet* ws,
-                                           std::unique_ptr<PlanStage> child,
-                                           const CollectionPtr& coll,
-                                           std::unique_ptr<MatchExpression> residualPredicate)
+TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
+                                             WorkingSet* ws,
+                                             std::unique_ptr<PlanStage> child,
+                                             const CollectionPtr& coll,
+                                             BucketUnpacker bucketUnpacker,
+                                             std::unique_ptr<MatchExpression> residualPredicate)
     : RequiresCollectionStage(kStageType, expCtx, coll),
       _ws(ws),
+      _bucketUnpacker{std::move(bucketUnpacker)},
       _residualPredicate(std::move(residualPredicate)) {
     _children.emplace_back(std::move(child));
 }
 
-bool TimeseriesWriteStage::isEOF() {
-    return child()->isEOF();
+bool TimeseriesModifyStage::isEOF() {
+    return !_bucketUnpacker.hasNext() && child()->isEOF();
 }
 
-std::unique_ptr<PlanStageStats> TimeseriesWriteStage::getStats() {
+std::unique_ptr<PlanStageStats> TimeseriesModifyStage::getStats() {
     _commonStats.isEOF = isEOF();
     auto ret = std::make_unique<PlanStageStats>(_commonStats, stageType());
-    ret->specific = std::make_unique<TimeseriesWriteStats>(_specificStats);
+    ret->specific = std::make_unique<TimeseriesModifyStats>(_specificStats);
     for (const auto& child : _children) {
         ret->children.emplace_back(child->getStats());
     }
     return ret;
 }
 
-void TimeseriesWriteStage::_writeToTimeseriesBuckets() {
+void TimeseriesModifyStage::_writeToTimeseriesBuckets() {
     ON_BLOCK_EXIT([&] {
         _specificStats.measurementsDeleted += _deletedMeasurements.size();
         _deletedMeasurements.clear();
@@ -100,45 +102,41 @@ void TimeseriesWriteStage::_writeToTimeseriesBuckets() {
     }
 }
 
-PlanStage::StageState TimeseriesWriteStage::doWork(WorkingSetID* out) {
+PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
 
-    WorkingSetID id;
-    auto status = child()->work(&id);
-
-    switch (status) {
-        case PlanStage::ADVANCED:
-            break;
-        case PlanStage::IS_EOF:
-            // Perform writes for the last bucket document.
-            _writeToTimeseriesBuckets();
-            return PlanStage::NEED_TIME;
-        case PlanStage::NEED_YIELD:
-            *out = id;
-            return status;
-        case PlanStage::NEED_TIME:
-            return status;
-    }
-
-    auto member = _ws->get(id);
-    invariant(member->hasRecordId());
-    auto bucketRid = member->recordId;
-
-    // Set to the first bucket's RecordId.
-    if (_currentBucketRid.isNull()) {
-        _currentBucketRid = bucketRid;
-    }
-
-    // The current bucket is exhausted and we will need to perform an atomic write to modify the
-    // bucket.
-    if (_currentBucketRid != bucketRid) {
+    // The current bucket is exhausted. Perform an atomic write to modify the bucket and move on to
+    // the next.
+    if (!_bucketUnpacker.hasNext()) {
         _writeToTimeseriesBuckets();
-        _currentBucketRid = bucketRid;
+
+        auto id = WorkingSet::INVALID_ID;
+        auto status = child()->work(&id);
+
+        if (PlanStage::ADVANCED == status) {
+            auto member = _ws->get(id);
+            tassert(7459100, "Expected a RecordId from the child stage", member->hasRecordId());
+            _currentBucketRid = member->recordId;
+
+            // Make an owned copy of the bucket document if necessary. The bucket will be
+            // unwound across multiple calls to 'doWork()', so we need to hold our own copy in
+            // the query execution layer in case the storage engine reclaims the memory for the
+            // bucket between calls to 'doWork()'.
+            auto ownedBucket = member->doc.value().toBson().getOwned();
+            _bucketUnpacker.reset(std::move(ownedBucket));
+            ++_specificStats.bucketsUnpacked;
+        } else {
+            if (PlanStage::NEED_YIELD == status) {
+                *out = id;
+            }
+            return status;
+        }
     }
 
-    auto measurement = member->doc.value().toBson().getOwned();
+    invariant(_bucketUnpacker.hasNext());
+    auto measurement = _bucketUnpacker.getNext().toBson().getOwned();
     if (_residualPredicate->matchesBSON(measurement)) {
         _deletedMeasurements.push_back(measurement);
     } else {

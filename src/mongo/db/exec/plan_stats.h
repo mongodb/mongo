@@ -1164,9 +1164,9 @@ struct UnpackTimeseriesBucketStats final : public SpecificStats {
     size_t nBucketsUnpacked = 0u;
 };
 
-struct TimeseriesWriteStats final : public SpecificStats {
+struct TimeseriesModifyStats final : public SpecificStats {
     std::unique_ptr<SpecificStats> clone() const final {
-        return std::make_unique<TimeseriesWriteStats>(*this);
+        return std::make_unique<TimeseriesModifyStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -1181,6 +1181,7 @@ struct TimeseriesWriteStats final : public SpecificStats {
         visitor->visit(this);
     }
 
+    size_t bucketsUnpacked = 0u;
     size_t measurementsDeleted = 0u;
 };
 

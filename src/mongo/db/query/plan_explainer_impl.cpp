@@ -482,6 +482,14 @@ void statsToBSON(const PlanStageStats& stats,
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->fetches));
         }
+    } else if (STAGE_TIMESERIES_MODIFY == stats.stageType) {
+        TimeseriesModifyStats* spec = static_cast<TimeseriesModifyStats*>(stats.specific.get());
+
+        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+            bob->appendNumber("bucketsUnpacked", static_cast<long long>(spec->bucketsUnpacked));
+            bob->appendNumber("measurementsDeleted",
+                              static_cast<long long>(spec->measurementsDeleted));
+        }
     } else if (STAGE_UNPACK_TIMESERIES_BUCKET == stats.stageType) {
         UnpackTimeseriesBucketStats* spec =
             static_cast<UnpackTimeseriesBucketStats*>(stats.specific.get());
