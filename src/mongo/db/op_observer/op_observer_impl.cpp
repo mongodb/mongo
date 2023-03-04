@@ -131,11 +131,14 @@ repl::OpTime logOperation(OperationContext* opCtx,
  *
  * 'fromMigrate' is generally hard-coded to false, but is supplied by a few
  * scenarios from mongos related behavior.
+ *
+ * If in a transaction, returns a null OpTime. Otherwise, returns the OpTime the operation
+ * was logged with.
  */
-void logMutableOplogEntry(OperationContext* opCtx,
-                          MutableOplogEntry* entry,
-                          OplogWriter* oplogWriter,
-                          bool isRequiredInMultiDocumentTransaction = false) {
+repl::OpTime logMutableOplogEntry(OperationContext* opCtx,
+                                  MutableOplogEntry* entry,
+                                  OplogWriter* oplogWriter,
+                                  bool isRequiredInMultiDocumentTransaction = false) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
@@ -146,8 +149,9 @@ void logMutableOplogEntry(OperationContext* opCtx,
 
     if (inMultiDocumentTransaction) {
         txnParticipant.addTransactionOperation(opCtx, entry->toReplOperation());
+        return {};
     } else {
-        logOperation(opCtx, entry, /*assignWallClockTime=*/true, oplogWriter);
+        return logOperation(opCtx, entry, /*assignWallClockTime=*/true, oplogWriter);
     }
 }
 
@@ -414,7 +418,24 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
     oplogEntry.setObject(builder.done());
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
 
-    logMutableOplogEntry(opCtx, &oplogEntry, _oplogWriter.get());
+    auto opTime = logMutableOplogEntry(opCtx, &oplogEntry, _oplogWriter.get());
+
+    if (opCtx->writesAreReplicated()) {
+        if (opTime.isNull()) {
+            LOGV2(7360100,
+                  "Added oplog entry for createIndexes to transaction",
+                  "namespace"_attr = oplogEntry.getNss(),
+                  "uuid"_attr = oplogEntry.getUuid(),
+                  "object"_attr = oplogEntry.getObject());
+        } else {
+            LOGV2(7360101,
+                  "Wrote oplog entry for createIndexes",
+                  "namespace"_attr = oplogEntry.getNss(),
+                  "uuid"_attr = oplogEntry.getUuid(),
+                  "opTime"_attr = opTime,
+                  "object"_attr = oplogEntry.getObject());
+        }
+    }
 }
 
 void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
@@ -1188,8 +1209,23 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
     if (!createOpTime.isNull()) {
         oplogEntry.setOpTime(createOpTime);
     }
-
-    logMutableOplogEntry(opCtx, &oplogEntry, _oplogWriter.get());
+    auto opTime = logMutableOplogEntry(opCtx, &oplogEntry, _oplogWriter.get());
+    if (opCtx->writesAreReplicated()) {
+        if (opTime.isNull()) {
+            LOGV2(7360102,
+                  "Added oplog entry for create to transaction",
+                  "namespace"_attr = oplogEntry.getNss(),
+                  "uuid"_attr = oplogEntry.getUuid(),
+                  "object"_attr = oplogEntry.getObject());
+        } else {
+            LOGV2(7360103,
+                  "Wrote oplog entry for create",
+                  "namespace"_attr = oplogEntry.getNss(),
+                  "uuid"_attr = oplogEntry.getUuid(),
+                  "opTime"_attr = opTime,
+                  "object"_attr = oplogEntry.getObject());
+        }
+    }
 }
 
 void OpObserverImpl::onCollMod(OperationContext* opCtx,
@@ -1231,7 +1267,16 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         oplogEntry.setUuid(uuid);
         oplogEntry.setObject(repl::makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo));
         oplogEntry.setObject2(o2Builder.done());
-        logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
+        auto opTime =
+            logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
+        if (opCtx->writesAreReplicated()) {
+            LOGV2(7360104,
+                  "Wrote oplog entry for collMod",
+                  "namespace"_attr = oplogEntry.getNss(),
+                  "uuid"_attr = oplogEntry.getUuid(),
+                  "opTime"_attr = opTime,
+                  "object"_attr = oplogEntry.getObject());
+        }
     }
 
     // Make sure the UUID values in the Collection metadata, the Collection object, and the UUID
@@ -1255,7 +1300,15 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName&
     oplogEntry.setTid(dbName.tenantId());
     oplogEntry.setNss({dbName, "$cmd"});
     oplogEntry.setObject(BSON("dropDatabase" << 1));
-    logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
+    auto opTime =
+        logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
+    if (opCtx->writesAreReplicated()) {
+        LOGV2(7360105,
+              "Wrote oplog entry for dropDatabase",
+              "namespace"_attr = oplogEntry.getNss(),
+              "opTime"_attr = opTime,
+              "object"_attr = oplogEntry.getObject());
+    }
 
     uassert(50714,
             "dropping the admin database is not allowed.",
@@ -1295,7 +1348,16 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
         oplogEntry.setFromMigrateIfTrue(markFromMigrate);
         oplogEntry.setObject(BSON("drop" << collectionName.coll()));
         oplogEntry.setObject2(makeObject2ForDropOrRename(numRecords));
-        logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
+        auto opTime =
+            logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
+        if (opCtx->writesAreReplicated()) {
+            LOGV2(7360106,
+                  "Wrote oplog entry for drop",
+                  "namespace"_attr = oplogEntry.getNss(),
+                  "uuid"_attr = oplogEntry.getUuid(),
+                  "opTime"_attr = opTime,
+                  "object"_attr = oplogEntry.getObject());
+        }
     }
 
     uassert(50715,
@@ -1349,7 +1411,16 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
     oplogEntry.setUuid(uuid);
     oplogEntry.setObject(BSON("dropIndexes" << nss.coll() << "index" << indexName));
     oplogEntry.setObject2(indexInfo);
-    logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
+    auto opTime =
+        logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
+    if (opCtx->writesAreReplicated()) {
+        LOGV2(7360107,
+              "Wrote oplog entry for dropIndexes",
+              "namespace"_attr = oplogEntry.getNss(),
+              "uuid"_attr = oplogEntry.getUuid(),
+              "opTime"_attr = opTime,
+              "object"_attr = oplogEntry.getObject());
+    }
 }
 
 repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
@@ -1396,8 +1467,16 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
     oplogEntry.setObject(builder.done());
     if (dropTargetUUID)
         oplogEntry.setObject2(makeObject2ForDropOrRename(numRecords));
-    logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
-
+    auto opTime =
+        logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
+    if (opCtx->writesAreReplicated()) {
+        LOGV2(7360108,
+              "Wrote oplog entry for renameCollection",
+              "namespace"_attr = oplogEntry.getNss(),
+              "uuid"_attr = oplogEntry.getUuid(),
+              "opTime"_attr = opTime,
+              "object"_attr = oplogEntry.getObject());
+    }
     return {};
 }
 

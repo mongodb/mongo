@@ -171,6 +171,12 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
         oplogBatcherPauseAfterSuccessfulPeek.pauseWhileSet();
         auto entry = OplogEntry(op);
 
+        if (entry.shouldLogAsDDLOperation()) {
+            LOGV2(7360109,
+                  "Processing DDL command oplog entry in OplogBatcher",
+                  "oplogEntry"_attr = entry.toBSONForLogging());
+        }
+
         // Check for oplog version change.
         if (entry.getVersion() != OplogEntry::kOplogVersion) {
             static constexpr char message[] = "Unexpected oplog version";

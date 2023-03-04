@@ -781,6 +781,12 @@ public:
     bool isSingleOplogEntryTransactionWithCommand() const;
 
     /**
+     * Returns whether this oplog entry contains a DDL operation. Used to determine whether to
+     * log the entry.
+     */
+    bool shouldLogAsDDLOperation() const;
+
+    /**
      * Returns an index of this operation in the "applyOps" entry, if the operation is packed in the
      * "applyOps" entry. Otherwise returns 0.
      */

@@ -2155,13 +2155,21 @@ Status applyOperation_inlock(OperationContext* opCtx,
 Status applyCommand_inlock(OperationContext* opCtx,
                            const ApplierOperation& op,
                            OplogApplication::Mode mode) {
-    LOGV2_DEBUG(21255,
-                3,
-                "applying command op: {oplogEntry}, oplog application mode: "
-                "{oplogApplicationMode}",
-                "Applying command op",
-                "oplogEntry"_attr = redact(op->toBSONForLogging()),
-                "oplogApplicationMode"_attr = OplogApplication::modeToString(mode));
+    if (op->shouldLogAsDDLOperation()) {
+        LOGV2(7360110,
+              "Applying DDL command oplog entry",
+              "oplogEntry"_attr = op->toBSONForLogging(),
+              "oplogApplicationMode"_attr = OplogApplication::modeToString(mode));
+    } else {
+        LOGV2_DEBUG(21255,
+                    3,
+                    "applying command op: {oplogEntry}, oplog application mode: "
+                    "{oplogApplicationMode}",
+                    "Applying command op",
+                    "oplogEntry"_attr = redact(op->toBSONForLogging()),
+                    "oplogApplicationMode"_attr = OplogApplication::modeToString(mode));
+    }
+
 
     // Only commands are processed here.
     invariant(op->getOpType() == OpTypeEnum::kCommand);

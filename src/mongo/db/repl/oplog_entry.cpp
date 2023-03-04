@@ -799,6 +799,20 @@ bool OplogEntry::isSingleOplogEntryTransactionWithCommand() const {
     return _entry.isSingleOplogEntryTransactionWithCommand();
 }
 
+bool OplogEntry::shouldLogAsDDLOperation() const {
+    constexpr std::array<std::string_view, 7> ddlOpsToLog{"create",
+                                                          "drop",
+                                                          "renameCollection",
+                                                          "collMod",
+                                                          "dropDatabase",
+                                                          "createIndexes",
+                                                          "dropIndexes"};
+    return _entry.isCommand() &&
+        std::find(ddlOpsToLog.begin(),
+                  ddlOpsToLog.end(),
+                  _entry.getObject().firstElementFieldName()) != ddlOpsToLog.end();
+}
+
 uint64_t OplogEntry::getApplyOpsIndex() const {
     return _applyOpsIndex;
 }
