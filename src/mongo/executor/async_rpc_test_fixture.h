@@ -107,6 +107,10 @@ public:
 
     void tearDown() override {
         _networkTestEnv.reset();
+        // We must shutdown and join the executor to ensure there are no tasks running in the
+        // background as we proceed with tearing down the test environment.
+        _executor->shutdown();
+        _executor->join();
         _executor.reset();
         _net.reset();
         ServiceContextTest::tearDown();

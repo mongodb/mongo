@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands/kill_operations_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/service_context.h"
@@ -43,6 +44,7 @@
 #include "mongo/executor/hedging_metrics.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/util/assert_util.h"
@@ -53,6 +55,8 @@
 #include <cstddef>
 #include <memory>
 #include <vector>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kExecutor
 
 namespace mongo {
 namespace async_rpc {
@@ -103,6 +107,33 @@ HedgingMetrics* getHedgingMetrics(ServiceContext* svcCtx) {
     invariant(hm);
     return hm;
 }
+
+/**
+ * Schedules a remote `_killOperations` on `exec` (or `baton`) for all targets, aiming to kill any
+ * operations identified by `opKey`.
+ */
+void killOperations(ServiceContext* svcCtx,
+                    std::vector<HostAndPort>& targets,
+                    std::shared_ptr<executor::TaskExecutor> exec,
+                    UUID opKey) {
+    KillOperationsRequest cmd({opKey});
+    auto options = std::make_shared<AsyncRPCOptions<KillOperationsRequest>>(
+        std::move(cmd),
+        std::move(exec),
+        CancellationToken::uncancelable(),
+        std::make_shared<NeverRetryPolicy>(),
+        GenericArgs());
+    for (const auto& target : targets) {
+        LOGV2_DEBUG(7301601,
+                    2,
+                    "Sending killOperations to cancel the remote command",
+                    "operationKey"_attr = opKey,
+                    "target"_attr = target);
+        sendCommand(options, svcCtx, std::make_unique<FixedTargeter>(target))
+            .ignoreValue()
+            .getAsync([](Status) {});
+    }
+}
 }  // namespace hedging_rpc_details
 
 /**
@@ -114,6 +145,8 @@ HedgingMetrics* getHedgingMetrics(ServiceContext* svcCtx) {
  * must be enabled, and multiple hosts must be provided by the targeter. If any of those conditions
  * is false, then the function will not hedge, and instead will just target the first host in the
  * vector provided by resolve.
+ *
+ * Accepts an optional UUID to be used as `clientOperationKey` for all remote requests.
  */
 template <typename CommandType>
 SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
@@ -125,14 +158,42 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
     ReadPreferenceSetting readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly),
     GenericArgs genericArgs = GenericArgs(),
-    BatonHandle baton = nullptr) {
+    BatonHandle baton = nullptr,
+    boost::optional<UUID> clientOperationKey = boost::none) {
     using SingleResponse = AsyncRPCResponse<typename CommandType::Reply>;
+
+    invariant(opCtx);
+    auto svcCtx = opCtx->getServiceContext();
+
+    if (MONGO_unlikely(clientOperationKey && !genericArgs.stable.getClientOperationKey())) {
+        genericArgs.stable.setClientOperationKey(*clientOperationKey);
+    }
 
     // Set up cancellation token to cancel remaining hedged operations.
     CancellationSource hedgeCancellationToken{token};
     auto targetsAttempted = std::make_shared<std::vector<HostAndPort>>();
     auto proxyExec = std::make_shared<detail::ProxyingExecutor>(baton, exec);
-    auto tryBody = [=, targeter = std::move(targeter)] {
+    auto tryBody = [=, targeter = std::move(targeter)]() mutable {
+        HedgeOptions opts = getHedgeOptions(CommandType::kCommandName, readPref);
+        auto operationKey = [&] {
+            // Check if the caller has provided an operation key, and hedging is not enabled. If so,
+            // we will attach the caller-provided key to all remote commands sent to resolved
+            // targets. Note that doing so may have side-effects if the operation is retried:
+            // cancelling the Nth attempt may impact the (N + 1)th attempt as they share `opKey`.
+            if (auto& opKey = genericArgs.stable.getClientOperationKey();
+                opKey && !opts.isHedgeEnabled) {
+                return *opKey;
+            }
+
+            // The caller has not provided an operation key or hedging is enabled, so we generate a
+            // new `clientOperationKey` for each attempt. The operationKey allows cancelling remote
+            // operations. A new one is generated here to ensure retry attempts are isolated:
+            // cancelling the Nth attempt does not impact the (N + 1)th attempt.
+            auto opKey = UUID::gen();
+            genericArgs.stable.setClientOperationKey(opKey);
+            return opKey;
+        }();
+
         return targeter->resolve(token)
             .thenRunOn(proxyExec)
             .onError([](Status status) -> StatusWith<std::vector<HostAndPort>> {
@@ -145,7 +206,6 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                           "Successful targeting implies there are hosts to target.");
                 *targetsAttempted = targets;
 
-                HedgeOptions opts = getHedgeOptions(CommandType::kCommandName, readPref);
                 auto hm = hedging_rpc_details::getHedgingMetrics(getGlobalServiceContext());
                 if (opts.isHedgeEnabled) {
                     hm->incrementNumTotalOperations();
@@ -193,35 +253,56 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                  * hedging or there is only 1 target provided.
                  */
                 return hedging_rpc_details::whenAnyThat(
-                    std::move(requests), [&](StatusWith<SingleResponse> response, size_t index) {
-                        Status commandStatus = response.getStatus();
+                           std::move(requests),
+                           [&](StatusWith<SingleResponse> response, size_t index) {
+                               Status commandStatus = response.getStatus();
 
-                        if (index == 0) {
-                            return true;
-                        }
+                               if (index == 0) {
+                                   return true;
+                               }
 
-                        if (commandStatus.code() == Status::OK()) {
-                            hedging_rpc_details::getHedgingMetrics(getGlobalServiceContext())
-                                ->incrementNumAdvantageouslyHedgedOperations();
-                            return true;
-                        }
+                               if (commandStatus.code() == Status::OK()) {
+                                   hedging_rpc_details::getHedgingMetrics(getGlobalServiceContext())
+                                       ->incrementNumAdvantageouslyHedgedOperations();
+                                   return true;
+                               }
 
-                        // TODO SERVER-69592 Account for interior executor shutdown
-                        invariant(commandStatus.code() == ErrorCodes::RemoteCommandExecutionError,
-                                  commandStatus.toString());
-                        boost::optional<Status> remoteErr;
-                        auto extraInfo = commandStatus.extraInfo<AsyncRPCErrorInfo>();
-                        if (extraInfo->isRemote()) {
-                            remoteErr = extraInfo->asRemote().getRemoteCommandResult();
-                        }
+                               // TODO SERVER-69592 Account for interior executor shutdown
+                               invariant(commandStatus.code() ==
+                                             ErrorCodes::RemoteCommandExecutionError,
+                                         commandStatus.toString());
+                               boost::optional<Status> remoteErr;
+                               auto extraInfo = commandStatus.extraInfo<AsyncRPCErrorInfo>();
+                               if (extraInfo->isRemote()) {
+                                   remoteErr = extraInfo->asRemote().getRemoteCommandResult();
+                               }
 
-                        if (remoteErr && isIgnorableAsHedgeResult(*remoteErr)) {
-                            return false;
-                        }
+                               if (remoteErr && isIgnorableAsHedgeResult(*remoteErr)) {
+                                   return false;
+                               }
 
-                        hedging_rpc_details::getHedgingMetrics(getGlobalServiceContext())
-                            ->incrementNumAdvantageouslyHedgedOperations();
-                        return true;
+                               hedging_rpc_details::getHedgingMetrics(getGlobalServiceContext())
+                                   ->incrementNumAdvantageouslyHedgedOperations();
+                               return true;
+                           })
+                    .tap([=](const SingleResponse& response) {
+                        // We received a successful response, so we should try to clean state on
+                        // other hosts. Note that there is no guarantee the clean-up happens after
+                        // the target receives the original command.
+                        std::vector<HostAndPort> targets;
+                        std::copy_if(targetsAttempted->begin(),
+                                     targetsAttempted->end(),
+                                     std::back_inserter(targets),
+                                     [&](HostAndPort& h) { return h != response.targetUsed; });
+                        hedging_rpc_details::killOperations(svcCtx, targets, exec, operationKey);
+                    })
+                    .tapError([=](const Status&) {
+                        // The hedged operation failed, so we should try to clean state on all
+                        // targets. Note that this is just an attempt and does not guarantee no
+                        // state is leaked, as the clean-up command may be received by a target
+                        // before the original operaiton.
+                        hedging_rpc_details::killOperations(
+                            svcCtx, *targetsAttempted, exec, operationKey);
                     });
             });
     };
@@ -266,3 +347,5 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
 
 }  // namespace async_rpc
 }  // namespace mongo
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT

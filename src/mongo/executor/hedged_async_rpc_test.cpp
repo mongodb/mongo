@@ -51,6 +51,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
+#include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
@@ -112,7 +113,8 @@ public:
         std::vector<HostAndPort> hosts,
         std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
         GenericArgs genericArgs = GenericArgs(),
-        BatonHandle bh = nullptr) {
+        BatonHandle bh = nullptr,
+        boost::optional<UUID> opKey = boost::none) {
         // Use a readPreference that's elgible for hedging.
         ReadPreferenceSetting readPref(ReadPreference::Nearest);
         readPref.hedgingMode = HedgingMode();
@@ -134,7 +136,15 @@ public:
                                  retryPolicy,
                                  readPref,
                                  genericArgs,
-                                 bh);
+                                 bh,
+                                 opKey);
+    }
+
+    void ignoreKillOperations() {
+        onCommand([](const auto& request) {
+            ASSERT(request.cmdObj["_killOperations"]);
+            return OkReply().toBSON();
+        });
     }
 
     const NamespaceString testNS =
@@ -231,8 +241,6 @@ TEST_F(HedgedAsyncRPCTest, HelloHedgeRequestWithGenericArgs) {
     // to BSON.
     GenericArgsAPIV1 genericArgsApiV1;
     GenericArgsAPIV1Unstable genericArgsUnstable;
-    const UUID clientOpKey = UUID::gen();
-    genericArgsApiV1.setClientOperationKey(clientOpKey);
     auto configTime = Timestamp(1, 1);
     genericArgsUnstable.setDollarConfigTime(configTime);
 
@@ -245,7 +253,7 @@ TEST_F(HedgedAsyncRPCTest, HelloHedgeRequestWithGenericArgs) {
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
         // Confirm that the generic arguments are present in the BSON command object.
-        ASSERT_EQ(UUID::fromCDR(request.cmdObj["clientOperationKey"].uuid()), clientOpKey);
+        ASSERT(request.cmdObj["clientOperationKey"]);
         ASSERT_EQ(request.cmdObj["$configTime"].timestamp(), configTime);
         return helloReply.toBSON();
     });
@@ -331,10 +339,11 @@ TEST_F(HedgedAsyncRPCTest, HedgedAsyncRPCWithRetryPolicy) {
     // condition for the runner to stop retrying.
     for (auto i = 0; i <= maxNumRetries; i++) {
         scheduleRequestAndAdvanceClockForRetry(testPolicy, onCommandFunc, retryDelay);
+        ignoreKillOperations();
     }
 
     auto counters = getNetworkInterfaceCounters();
-    ASSERT_EQ(counters.succeeded, 4);
+    ASSERT_EQ(counters.succeeded, 8);  // counting both `hello` and `killOperations`
     ASSERT_EQ(counters.canceled, 0);
 
     AsyncRPCResponse<HelloCommandReply> res = resultFuture.get();
@@ -903,6 +912,7 @@ TEST_F(HedgedAsyncRPCTest, DynamicDelayBetweenRetries) {
     // Advance the clock appropriately based on each retry delay.
     for (auto i = 0; i < maxNumRetries; i++) {
         scheduleRequestAndAdvanceClockForRetry(testPolicy, onCommandFunc, retryDelays[i]);
+        ignoreKillOperations();
     }
     // Schedule a response to the final retry. No need to advance clock since no more
     // retries should be attemped after this third one.
@@ -1059,6 +1069,143 @@ TEST_F(HedgedAsyncRPCTest, BatonShutdownExecutorAlive) {
     ASSERT_EQ(localError, expectedDetachError);
 
     ASSERT_EQ(0, retryPolicy->getNumRetriesPerformed());
+}
+
+auto extractUUID(const BSONElement& element) {
+    return UUID::fromCDR(element.uuid());
+}
+
+auto getOpKeyFromCommand(const BSONObj& cmdObj) {
+    return extractUUID(cmdObj["clientOperationKey"]);
+}
+
+TEST_F(HedgedAsyncRPCTest, OperationKeyIsSetByDefault) {
+    auto future = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts);
+    ASSERT_DOES_NOT_THROW([&] {
+        onCommand([&](const auto& request) {
+            (void)getOpKeyFromCommand(request.cmdObj);
+            return CursorResponse(testNS, 0LL, {testFirstBatch})
+                .toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
+    }());
+    auto network = getNetworkInterfaceMock();
+    network->enterNetwork();
+    network->runReadyNetworkOperations();
+    network->exitNetwork();
+
+    future.get();
+}
+
+TEST_F(HedgedAsyncRPCTest, UseOperationKeyWhenProvided) {
+    const auto opKey = UUID::gen();
+    auto future =
+        sendHedgedCommandWithHosts(write_ops::InsertCommandRequest(testNS, {BSON("id" << 1)}),
+                                   kTwoHosts,
+                                   std::make_shared<NeverRetryPolicy>(),
+                                   GenericArgs(),
+                                   nullptr,
+                                   opKey);
+    onCommand([&](const auto& request) {
+        ASSERT_EQ(getOpKeyFromCommand(request.cmdObj), opKey);
+        return write_ops::InsertCommandReply().toBSON();
+    });
+    future.get();
+}
+
+TEST_F(HedgedAsyncRPCTest, RewriteOperationKeyWhenHedging) {
+    const auto opKey = UUID::gen();
+    auto future = sendHedgedCommandWithHosts(testFindCmd,
+                                             kTwoHosts,
+                                             std::make_shared<NeverRetryPolicy>(),
+                                             GenericArgs(),
+                                             nullptr,
+                                             opKey);
+    onCommand([&](const auto& request) {
+        ASSERT_NE(getOpKeyFromCommand(request.cmdObj), opKey);
+        return CursorResponse(testNS, 0LL, {testFirstBatch})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+    future.get();
+}
+
+TEST_F(HedgedAsyncRPCTest, KillOpsAfterSuccessfulHedgedOperation) {
+    // We expect all targets to receive a `killOperations`, except for the one used to fulfill the
+    // hedged operation.
+    auto future = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts);
+
+    boost::optional<UUID> opKey;
+    HostAndPort success;  // Host that successfully responded to the hedged request.
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        success = request.target;
+        opKey = getOpKeyFromCommand(request.cmdObj);
+        return CursorResponse(testNS, 0LL, {testFirstBatch})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+    ASSERT_TRUE(!!opKey);
+
+    ASSERT_DOES_NOT_THROW(std::move(future).ignoreValue().get(););
+
+    HostAndPort killed;  // Host that receives a `killOperations`.
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["_killOperations"]);
+        killed = request.target;
+        ASSERT_EQ(extractUUID(request.cmdObj["operationKeys"].Array()[0]), *opKey);
+        return OkReply().toBSON();
+    });
+
+    // We expect only one `killOperations` to be sent, which should be targeted to the host that did
+    // not fulfill the hedged operation.
+    ASSERT_FALSE([&] {
+        auto network = getNetworkInterfaceMock();
+        NetworkInterfaceMock::InNetworkGuard guard(network);
+        return network->hasReadyRequests();
+    }());
+    ASSERT_NOT_EQUALS(success, killed);
+}
+
+TEST_F(HedgedAsyncRPCTest, KillOpsAfterFailedHedgedOperation) {
+    // We expect all targets to receive a `killOperations`.
+    auto future = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts);
+    auto network = getNetworkInterfaceMock();
+
+    auto failCommandAndReturnOpKey = [&]() -> UUID {
+        auto it = network->getNextReadyRequest();
+        const auto& request = it->getRequestOnAny();
+        ASSERT(request.cmdObj["find"]);
+        auto opKey = getOpKeyFromCommand(request.cmdObj);
+        RemoteCommandResponse rcr(createErrorResponse(ignorableMaxTimeMSExpiredStatus),
+                                  Milliseconds(1));  // Arbitrary duration
+        network->scheduleResponse(it, network->now(), rcr);
+        return opKey;
+    };
+
+    // Fail both operations with an ignorable error response.
+    const auto opKey = [&] {
+        NetworkInterfaceMock::InNetworkGuard guard(network);
+        const auto opKey1 = failCommandAndReturnOpKey();
+        const auto opKey2 = failCommandAndReturnOpKey();
+        ASSERT_EQ(opKey1, opKey2);
+        network->runReadyNetworkOperations();
+        return opKey1;
+    }();
+
+    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::RemoteCommandExecutionError);
+
+    // Verify that all targets receive a `killOperations`.
+    std::vector<HostAndPort> attemptedTargets;
+    for (auto _ : kTwoHosts) {
+        onCommand([&](const auto& request) {
+            ASSERT(request.cmdObj["_killOperations"]);
+            attemptedTargets.push_back(request.target);
+            ASSERT_EQ(extractUUID(request.cmdObj["operationKeys"].Array()[0]), opKey);
+            return OkReply().toBSON();
+        });
+    }
+
+    auto matcher = m::AnyOf(m::ElementsAre(m::Eq(kTwoHosts[0]), m::Eq(kTwoHosts[1])),
+                            m::ElementsAre(m::Eq(kTwoHosts[1]), m::Eq(kTwoHosts[0])));
+    ASSERT_THAT(attemptedTargets, matcher);
 }
 }  // namespace
 }  // namespace async_rpc

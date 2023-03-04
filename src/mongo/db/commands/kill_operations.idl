@@ -36,6 +36,7 @@ commands:
     _killOperations:
         command_name: "_killOperations"
         cpp_name: KillOperationsRequest
+        reply_type: OkReply
         description: "Interrupt a list of operations on a remote server"
         namespace: ignored
         api_version: ""
