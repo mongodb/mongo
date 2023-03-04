@@ -207,14 +207,14 @@ validateReconstructedEvent(reconstructedEvent2, "bbb");
 {
     // Test that projecting out one of the large fields in the resumed pipeline changes the split
     // such that the resume point won't be generated, and we therefore throw an exception.
-    assert.throwsWithCode(
-        () => testColl
-                  .watch([{$project: {"fullDocument.a": 0}}, {$changeStreamSplitLargeEvent: {}}], {
-                      fullDocument: "required",
-                      fullDocumentBeforeChange: "required",
-                      resumeAfter: resumeTokens[fragmentCount - 1]
-                  })
-                  .hasNext(),
-        ErrorCodes.ChangeStreamFatalError);
+    const csCursor =
+        testColl.watch([{$project: {"fullDocument.a": 0}}, {$changeStreamSplitLargeEvent: {}}], {
+            batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
+            fullDocument: "required",
+            fullDocumentBeforeChange: "required",
+            resumeAfter: resumeTokens[fragmentCount - 1]
+        });
+    assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()),
+                          ErrorCodes.ChangeStreamFatalError);
 }
 }());
