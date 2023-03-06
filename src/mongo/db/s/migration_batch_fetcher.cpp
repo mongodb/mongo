@@ -71,7 +71,8 @@ MigrationBatchFetcher<Inserter>::MigrationBatchFetcher(
       _collectionUuid(collectionId),
       _migrationId{migrationId},
       _writeConcern{writeConcern},
-      _isParallelFetchingSupported{parallelFetchingSupported} {
+      _isParallelFetchingSupported{parallelFetchingSupported},
+      _secondaryThrottleTicket(1, outerOpCtx->getServiceContext()) {
     _inserterWorkers->startup();
 }
 
@@ -162,7 +163,8 @@ void MigrationBatchFetcher<Inserter>::_runFetcher() try {
                           _collectionUuid,
                           _migrationProgress,
                           _migrationId,
-                          _chunkMigrationConcurrency};
+                          _chunkMigrationConcurrency,
+                          &_secondaryThrottleTicket};
 
         _inserterWorkers->schedule([batchSize,
                                     fetchTime,
@@ -214,8 +216,14 @@ MigrationBatchFetcher<Inserter>::~MigrationBatchFetcher() {
     LOGV2(6718401,
           "Shutting down and joining inserter threads for migration {migrationId}",
           "migrationId"_attr = _migrationId);
+
+    // Call waitForIdle first since join can spawn another thread while ignoring the maxPoolSize
+    // to finish the pending task. This is safe as long as ThreadPool::shutdown can't be
+    // interleaved with this call.
+    _inserterWorkers->waitForIdle();
     _inserterWorkers->shutdown();
     _inserterWorkers->join();
+
     LOGV2(6718415,
           "Inserter threads for migration {migrationId} joined",
           "migrationId"_attr = _migrationId);

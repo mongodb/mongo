@@ -48,6 +48,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -107,7 +108,8 @@ public:
                            const UUID& collectionUuid,
                            std::shared_ptr<MigrationCloningProgressSharedState> migrationProgress,
                            const UUID& migrationId,
-                           int threadCount)
+                           int threadCount,
+                           SemaphoreTicketHolder* secondaryThrottleTicket)
         : _outerOpCtx{outerOpCtx},
           _innerOpCtx{innerOpCtx},
           _batch{batch},
@@ -117,7 +119,8 @@ public:
           _collectionUuid{collectionUuid},
           _migrationProgress{migrationProgress},
           _migrationId{migrationId},
-          _threadCount{threadCount} {}
+          _threadCount{threadCount},
+          _secondaryThrottleTicket{secondaryThrottleTicket} {}
 
     static void onCreateThread(const std::string& threadName);
 
@@ -132,6 +135,7 @@ private:
     std::shared_ptr<MigrationCloningProgressSharedState> _migrationProgress;
     UUID _migrationId;
     int _threadCount;
+    SemaphoreTicketHolder* _secondaryThrottleTicket;
 };
 
 }  // namespace mongo

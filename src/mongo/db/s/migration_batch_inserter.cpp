@@ -30,6 +30,7 @@
 #include "mongo/db/s/migration_batch_inserter.h"
 
 #include "mongo/db/s/sharding_statistics.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 
@@ -173,20 +174,27 @@ void MigrationBatchInserter::run(Status status) const try {
         _migrationProgress->incNumBytes(batchClonedBytes);
 
         if (_writeConcern.needToWaitForOtherNodes() && _threadCount == 1) {
-            runWithoutSession(_outerOpCtx, [&] {
-                repl::ReplicationCoordinator::StatusAndDuration replStatus =
-                    repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
-                        opCtx,
-                        repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                        _writeConcern);
-                if (replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
-                    LOGV2_WARNING(22011,
-                                  "secondaryThrottle on, but doc insert timed out; continuing",
-                                  "migrationId"_attr = _migrationId.toBSON());
-                } else {
-                    uassertStatusOK(replStatus.status);
-                }
-            });
+            AdmissionContext admissionContext;
+            if (auto ticket = _secondaryThrottleTicket->tryAcquire(&admissionContext)) {
+                runWithoutSession(_outerOpCtx, [&] {
+                    repl::ReplicationCoordinator::StatusAndDuration replStatus =
+                        repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
+                            opCtx,
+                            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+                            _writeConcern);
+                    if (replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
+                        LOGV2_WARNING(22011,
+                                      "secondaryThrottle on, but doc insert timed out; continuing",
+                                      "migrationId"_attr = _migrationId.toBSON());
+                    } else {
+                        uassertStatusOK(replStatus.status);
+                    }
+                });
+            } else {
+                // Ticket should always be available unless thread pool max size 1 setting is not
+                // being respected.
+                dassert(false);
+            }
         }
 
         sleepmillis(migrateCloneInsertionBatchDelayMS.load());
