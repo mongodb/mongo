@@ -106,10 +106,10 @@ const runParallelMoveChunk = (numThreads) => {
     MongoRunner.stopMongod(staticMongod);
 };
 
-// Run test 10 times with random concurrency levels.
-for (let i = 1; i <= 5; i++) {
+runParallelMoveChunk(1);
+
+// Run test a few times with random concurrency levels.
+for (let i = 1; i <= 4; i++) {
     runParallelMoveChunk(Math.floor(Math.random() * 31) + 1);
 }
-}
-
- )();
+})();

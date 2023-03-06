@@ -40,6 +40,7 @@
 #include "mongo/s/shard_id.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/producer_consumer_queue.h"
 
 #pragma once
@@ -136,6 +137,8 @@ private:
 
     // Indicates if source is prepared to service _migrateClone requests in parallel.
     bool _isParallelFetchingSupported;
+
+    TicketHolder _secondaryThrottleTicket;
 
     // Given session id and namespace, create migrateCloneRequest.
     // Only should be created once for the lifetime of the object.

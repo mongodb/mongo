@@ -56,7 +56,8 @@ public:
                                UUID,
                                std::shared_ptr<MigrationCloningProgressSharedState>,
                                UUID,
-                               int) {}
+                               int,
+                               TicketHolder*) {}
 
     static void onCreateThread(const std::string& threadName) {}
 

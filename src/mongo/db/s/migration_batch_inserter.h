@@ -45,6 +45,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/uuid.h"
 
 #pragma once
@@ -106,7 +107,8 @@ public:
                            const UUID& collectionUuid,
                            std::shared_ptr<MigrationCloningProgressSharedState> migrationProgress,
                            const UUID& migrationId,
-                           int threadCount)
+                           int threadCount,
+                           TicketHolder* secondaryThrottleTicket)
         : _outerOpCtx{outerOpCtx},
           _innerOpCtx{innerOpCtx},
           _batch{batch},
@@ -116,7 +118,8 @@ public:
           _collectionUuid{collectionUuid},
           _migrationProgress{migrationProgress},
           _migrationId{migrationId},
-          _threadCount{threadCount} {}
+          _threadCount{threadCount},
+          _secondaryThrottleTicket{secondaryThrottleTicket} {}
 
     static void onCreateThread(const std::string& threadName);
 
@@ -131,6 +134,7 @@ private:
     std::shared_ptr<MigrationCloningProgressSharedState> _migrationProgress;
     UUID _migrationId;
     int _threadCount;
+    TicketHolder* _secondaryThrottleTicket;
 };
 
 }  // namespace mongo
