@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wiredtiger, wttest, sys
 from wtscenario import make_scenarios
 
 # test_hs20.py
@@ -101,3 +101,8 @@ class test_hs20(wttest.WiredTigerTestCase):
         for i in range(0, 10):
             with self.transaction(read_timestamp = 3, rollback = True):
                 self.assertEqual(cursor[self.make_key(i)], value1 + "B")
+
+        if (sys.platform.startswith('darwin')):
+            # Ignore the eviction generation drain warning as it is possible for eviction to take 
+            # longer to evict pages due to overflow items on the page.
+            self.ignoreStdoutPatternIfExists('Eviction took more than 1 minute')
