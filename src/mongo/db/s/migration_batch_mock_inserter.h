@@ -56,7 +56,8 @@ public:
                                UUID,
                                std::shared_ptr<MigrationCloningProgressSharedState>,
                                UUID,
-                               int) {}
+                               int,
+                               SemaphoreTicketHolder*) {}
 
     static void onCreateThread(const std::string& threadName) {}
 
