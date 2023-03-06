@@ -76,7 +76,7 @@ DDLLockManager::ScopedLock DDLLockManager::lock(OperationContext* opCtx,
             uasserted(
                 ErrorCodes::LockBusy,
                 "Failed to acquire DDL lock for namespace '{}' after {} that is currently locked with reason '{}'"_format(
-                    ns, timeout.toString(), reason));
+                    ns, timeout.toString(), nsLock->reason));
         }
         guard.dismiss();
         nsLock->reason = reason.toString();
