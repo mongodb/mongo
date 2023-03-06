@@ -1399,7 +1399,15 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
     auto ei = findAndModifyRequest.getEncryptionInformation().value();
 
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
-    auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
+
+    // TODO: SERVER-73303 delete when v2 is enabled by default
+    StringMap<FLEDeleteToken> tokenMap;
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
+    } else if (ei.getDeleteTokens().has_value()) {
+        uasserted(7293301, "Illegal delete tokens encountered in EncryptionInformation");
+    }
+
     int32_t stmtId = findAndModifyRequest.getStmtId().value_or(0);
 
     auto newFindAndModifyRequest = findAndModifyRequest;
@@ -1485,39 +1493,95 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
             "Missing _id field in pre-image document, the fields document must contain _id",
             idElement.fieldNameStringData() == "_id"_sd);
 
-    BSONObj newDocument;
-    std::vector<EDCIndexedFields> newFields;
+    // TODO: SERVER-73303 remove once v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        BSONObj newDocument;
+        std::vector<EDCIndexedFields> newFields;
 
-    // Is this a delete
-    bool isDelete = findAndModifyRequest.getRemove().value_or(false);
+        // Is this a delete
+        bool isDelete = findAndModifyRequest.getRemove().value_or(false);
 
-    // Unlike update, there will not always be a new document since users can delete the document
-    if (!isDelete) {
-        newDocument = queryImpl->getById(edcNss, idElement);
+        // Unlike update, there will not always be a new document since users can delete the
+        // document
+        if (!isDelete) {
+            newDocument = queryImpl->getById(edcNss, idElement);
 
-        // Fail if we could not find the new document
-        uassert(6371404, "Could not find pre-image document by _id", !newDocument.isEmpty());
+            // Fail if we could not find the new document
+            uassert(6371404, "Could not find pre-image document by _id", !newDocument.isEmpty());
 
-        if (hasIndexedFieldsInSchema(efc.getFields())) {
-            // Check the user did not remove/destroy the __safeContent__ array. If there are no
-            // indexed fields, then there will not be a safeContent array in the document.
-            FLEClientCrypto::validateTagsArray(newDocument);
+            if (hasIndexedFieldsInSchema(efc.getFields())) {
+                // Check the user did not remove/destroy the __safeContent__ array. If there are no
+                // indexed fields, then there will not be a safeContent array in the document.
+                FLEClientCrypto::validateTagsArray(newDocument);
+            }
+
+            newFields = EDCServerCollection::getEncryptedIndexedFields(newDocument);
         }
 
-        newFields = EDCServerCollection::getEncryptedIndexedFields(newDocument);
+        // Step 5 ----
+        auto originalFields = EDCServerCollection::getEncryptedIndexedFields(originalDocument);
+        auto deletedFields = EDCServerCollection::getRemovedFields(originalFields, newFields);
+
+        processRemovedFields(queryImpl, edcNss, efc, tokenMap, deletedFields, &stmtId);
+
+        // Step 6 ----
+        // We don't need to make a second update in the case of a delete
+        if (!isDelete) {
+            BSONObj pullUpdate =
+                EDCServerCollection::generateUpdateToRemoveTags(deletedFields, tokenMap);
+            auto newUpdateRequest =
+                write_ops::UpdateCommandRequest(findAndModifyRequest.getNamespace());
+            auto pullUpdateOpEntry = write_ops::UpdateOpEntry();
+            pullUpdateOpEntry.setUpsert(false);
+            pullUpdateOpEntry.setMulti(false);
+            pullUpdateOpEntry.setQ(BSON("_id"_sd << idElement));
+            pullUpdateOpEntry.setU(mongo::write_ops::UpdateModification(
+                pullUpdate, write_ops::UpdateModification::ModifierUpdateTag{}));
+            newUpdateRequest.setUpdates({pullUpdateOpEntry});
+            newUpdateRequest.setLegacyRuntimeConstants(boost::none);
+            newUpdateRequest.getWriteCommandRequestBase().setStmtId(boost::none);
+            newUpdateRequest.getWriteCommandRequestBase().setEncryptionInformation(boost::none);
+
+            auto finalUpdateReply = queryImpl->update(edcNss, stmtId, newUpdateRequest);
+            checkWriteErrors(finalUpdateReply);
+        }
+
+        return reply;
+    }
+
+    // Is this a delete? If so, there's no need to GarbageCollect.
+    if (findAndModifyRequest.getRemove().value_or(false)) {
+        return reply;
+    }
+
+    // Validate that the original document does not contain values with on-disk version
+    // incompatible with the current protocol version.
+    EDCServerCollection::validateModifiedDocumentCompatibility(originalDocument);
+
+    auto newDocument = queryImpl->getById(edcNss, idElement);
+
+    // Fail if we could not find the new document
+    uassert(7293302, "Could not find pre-image document by _id", !newDocument.isEmpty());
+
+    if (hasIndexedFieldsInSchema(efc.getFields())) {
+        // Check the user did not remove/destroy the __safeContent__ array. If there are no
+        // indexed fields, then there will not be a safeContent array in the document.
+        FLEClientCrypto::validateTagsArray(newDocument);
     }
 
     // Step 5 ----
     auto originalFields = EDCServerCollection::getEncryptedIndexedFields(originalDocument);
-    auto deletedFields = EDCServerCollection::getRemovedFields(originalFields, newFields);
-
-    processRemovedFields(queryImpl, edcNss, efc, tokenMap, deletedFields, &stmtId);
+    auto newFields = EDCServerCollection::getEncryptedIndexedFields(newDocument);
 
     // Step 6 ----
-    // We don't need to make a second update in the case of a delete
-    if (!isDelete) {
-        BSONObj pullUpdate =
-            EDCServerCollection::generateUpdateToRemoveTags(deletedFields, tokenMap);
+    // GarbageCollect steps:
+    //  1. Gather the tags from the metadata block(s) of each removed field. These are stale tags.
+    //  2. Generate the update command that pulls the stale tags from __safeContent__
+    //  3. Perform the update
+    auto staleTags = EDCServerCollection::getRemovedTags(originalFields, newFields);
+
+    if (!staleTags.empty()) {
+        BSONObj pullUpdate = EDCServerCollection::generateUpdateToRemoveTags(staleTags);
         auto newUpdateRequest =
             write_ops::UpdateCommandRequest(findAndModifyRequest.getNamespace());
         auto pullUpdateOpEntry = write_ops::UpdateOpEntry();
