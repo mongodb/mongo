@@ -150,6 +150,7 @@ Fsync
 Fuerst
 GBR
 GCP
+GCP's
 GF
 GIDs
 GLIBC
@@ -209,6 +210,8 @@ LeafGreen
 LibFuzzer
 LoadLoad
 LockFile
+LogBackend
+LogSink
 LogSystemInterface
 MADV
 MALLOC

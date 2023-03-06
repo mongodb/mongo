@@ -88,7 +88,7 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
         fs = ss.ss_customize_file_system(session, self.bucket, self.auth_token, self.get_fs_config(prefix))
 
         # Error cases.
-        err_msg = 'Exception: Invalid argument'
+        err_msg = '/Exception: Invalid argument/'
 
         # Do not provide bucket name and credentials.
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
@@ -215,7 +215,7 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
 
 
         # We expect an exception to be raised when flushing a file that does not exist.
-        err_msg = "Exception: No such file or directory"
+        err_msg = "/Exception: No such file or directory/"
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda: ss.ss_flush(session, fs, 'non_existing_file', 'non_existing_file', None), err_msg)
         # Check that file does not exist in GCP.
