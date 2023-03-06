@@ -352,9 +352,7 @@ StatusWith<MutableOplogEntry> MutableOplogEntry::parse(const BSONObj& object) {
 }
 
 ReplOperation MutableOplogEntry::toReplOperation() const noexcept {
-    return ReplOperation::parseOwned(
-        IDLParserContext("ReplOperation", /*apiStrict=*/false, getDurableReplOperation().getTid()),
-        getDurableReplOperation().toBSON());
+    return ReplOperation(getDurableReplOperation());
 }
 
 void MutableOplogEntry::setTid(boost::optional<mongo::TenantId> value) & {

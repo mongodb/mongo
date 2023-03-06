@@ -415,7 +415,7 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
     oplogEntry.setTid(nss.tenantId());
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(uuid);
-    oplogEntry.setObject(builder.done());
+    oplogEntry.setObject(builder.obj());
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
 
     auto opTime = logMutableOplogEntry(opCtx, &oplogEntry, _oplogWriter.get());
