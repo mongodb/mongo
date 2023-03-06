@@ -1,5 +1,5 @@
 // Tests that $$USER_ROLES is not available when the server parameter is set to false.
-// @tags: [featureFlagUserRoles]
+// @tags: [featureFlagUserRoles, requires_fcv_70]
 
 (function() {
 "use strict";

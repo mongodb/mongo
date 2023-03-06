@@ -1,5 +1,5 @@
 // Tests that $$USER_ROLES is not able to be accessed within an update command.
-// @tags: [featureFlagUserRoles]
+// @tags: [featureFlagUserRoles, requires_fcv_70]
 
 (function() {
 "use strict";

@@ -105,7 +105,8 @@ feature_flags:
     featureFlagUserRoles:
       description: "Feature flag to enable usage of $$USER_ROLES."
       cpp_varname: gFeatureFlagUserRoles
-      default: false
+      default: true
+      version: 7.0
 
     featureFlagApproxPercentiles:
       description: "Feature flag to enable approximate $percentile accumulator/expression."

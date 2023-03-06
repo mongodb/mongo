@@ -1,6 +1,6 @@
 // Tests that $$USER_ROLES works as expected in a find command and an aggregate command (on both a
 // standalone mongod and a sharded cluster).
-// @tags: [featureFlagUserRoles]
+// @tags: [featureFlagUserRoles, requires_fcv_70]
 
 (function() {
 "use strict";
