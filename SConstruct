@@ -6360,6 +6360,7 @@ if has_option("cache"):
         addNoCacheEmitter(env['BUILDERS']['Program'])
         addNoCacheEmitter(env['BUILDERS']['StaticLibrary'])
         addNoCacheEmitter(env['BUILDERS']['SharedLibrary'])
+        addNoCacheEmitter(env['BUILDERS']['SharedArchive'])
         addNoCacheEmitter(env['BUILDERS']['LoadableModule'])
 
 env.SConscript(
