@@ -49,9 +49,7 @@ public:
     StringData getForOp() const;
     StringData getForOriginatingCommand() const;
     StringData getForOpTimeElapsed() const;
-    StringData getForCriticalSectionTimeElapsed() const;
     StringData getForRemainingOpTimeEstimated() const;
-    StringData getForCopyTimeElapsed() const;
     StringData getForCountWritesDuringCriticalSection() const;
     StringData getForCountWritesToStashCollections() const;
     StringData getForCountReadsDuringCriticalSection() const;

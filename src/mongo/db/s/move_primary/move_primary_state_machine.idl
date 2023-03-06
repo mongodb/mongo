@@ -35,6 +35,7 @@ imports:
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/basic_types.idl"
     - "mongo/db/s/move_primary/move_primary_recipient_cmds.idl"
+    - "mongo/db/s/move_primary/move_primary_common_metadata.idl"
 
 enums:
     MovePrimaryDonorState:
@@ -62,22 +63,6 @@ enums:
             kDone: 6
 
 structs:
-    MovePrimaryDonorMetadata:
-        description: "Immutable metadata fields for a movePrimary donor."
-        strict: false
-        fields:
-            _id:
-                type: uuid
-                description: "Unique identifier for the movePrimary operation."
-                cpp_name: id
-            databaseName:
-                type: string
-                description: >-
-                    The name of the database being moved as part of movePrimary operation.
-            toShard:
-                type: string
-                description: "The name of the recipient shard."
-    
     MovePrimaryDonorMutableFields:
         description: >-
             Contains fields for a move primary donor which can be updated throughout the lifetime
@@ -104,7 +89,7 @@ structs:
         strict: false
         inline_chained_structs: true
         chained_structs:
-            MovePrimaryDonorMetadata: metadata
+            MovePrimaryCommonMetadata: metadata
         fields:
             mutableFields:
                 type: MovePrimaryDonorMutableFields
@@ -115,14 +100,8 @@ structs:
         strict: false
         inline_chained_structs: true
         chained_structs:
-            MovePrimaryRecipientMetadata: MovePrimaryRecipientMetadata
+            MovePrimaryCommonMetadata: metadata
         fields:
-            _id:
-                type: uuid
-                description: >-
-                    Unique identifier for the movePrimary operation. 
-                    This is sent as migrationId to the recipient by the donor.
-                cpp_name: id
             state:
                 type: MovePrimaryRecipientState
                 description: "The state of the recipient during an in progress movePrimary operation."

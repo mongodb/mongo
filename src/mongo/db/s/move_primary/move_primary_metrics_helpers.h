@@ -29,16 +29,39 @@
 
 #pragma once
 
-#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
-#include "mongo/db/s/metrics/field_names/with_document_copy_count_field_name_overrides.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_count_metrics_field_names.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_latency_metrics_field_names.h"
+#include "mongo/db/s/move_primary/move_primary_state_machine_gen.h"
+#include <type_traits>
 
 namespace mongo {
 
-class MovePrimaryCumulativeMetricsFieldNameProvider
-    : public WithOplogApplicationLatencyMetricsFieldNames<
-          WithOplogApplicationCountFieldNames<WithDocumentCopyCountFieldNameOverrides<
-              ShardingDataTransformCumulativeMetricsFieldNameProvider>>> {};
+namespace move_primary_metrics {
+
+template <class T>
+inline constexpr bool isStateDocument =
+    std::disjunction_v<std::is_same<T, MovePrimaryRecipientDocument>,
+                       std::is_same<T, MovePrimaryDonorDocument>>;
+
+template <typename T>
+inline constexpr auto getState(const T& document) {
+    static_assert(isStateDocument<T>);
+    if constexpr (std::is_same_v<T, MovePrimaryDonorDocument>) {
+        return document.getMutableFields().getState();
+    } else {
+        return document.getState();
+    }
+}
+
+template <typename T>
+inline constexpr ShardingDataTransformMetrics::Role getRoleForStateDocument() {
+    static_assert(isStateDocument<T>);
+    using Role = ShardingDataTransformMetrics::Role;
+    if constexpr (std::is_same_v<T, MovePrimaryDonorDocument>) {
+        return Role::kDonor;
+    } else {
+        return Role::kRecipient;
+    }
+}
+
+}  // namespace move_primary_metrics
 
 }  // namespace mongo

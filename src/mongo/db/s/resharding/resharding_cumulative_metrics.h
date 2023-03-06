@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/s/cumulative_metrics_state_holder.h"
+#include "mongo/db/s/metrics/cumulative_metrics_state_holder.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_macros.h"
 #include "mongo/db/s/metrics/with_oplog_application_count_metrics.h"

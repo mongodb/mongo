@@ -77,36 +77,24 @@ public:
     void onFailure();
     void onCanceled();
 
-    void onCopyingBegin();
-    void onCopyingEnd();
-    void onApplyingBegin();
-    void onApplyingEnd();
     void onDocumentsProcessed(int64_t documentCount,
                               int64_t totalDocumentsSizeBytes,
                               Milliseconds elapsed);
-    Date_t getCopyingBegin() const;
-    Date_t getCopyingEnd() const;
     int64_t getDocumentsProcessedCount() const;
     int64_t getBytesWrittenCount() const;
     int64_t getApproxBytesToScanCount() const;
     void setDocumentsToProcessCounts(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void setCoordinatorHighEstimateRemainingTimeMillis(Milliseconds milliseconds);
     void setCoordinatorLowEstimateRemainingTimeMillis(Milliseconds milliseconds);
-    void setCopyingBegin(Date_t date);
-    void setCopyingEnd(Date_t date);
+
     void onCloningRemoteBatchRetrieval(Milliseconds elapsed);
     void onWriteToStashedCollections();
 
     void onReadDuringCriticalSection();
     void onWriteDuringCriticalSection();
-    void onCriticalSectionBegin();
-    void onCriticalSectionEnd();
 
     Role getRole() const;
     Seconds getOperationRunningTimeSecs() const;
-    Seconds getCopyingElapsedTimeSecs() const;
-    Seconds getApplyingElapsedTimeSecs() const;
-    Seconds getCriticalSectionElapsedTimeSecs() const;
 
     void setLastOpEndingChunkImbalance(int64_t imbalanceCount);
 
@@ -128,8 +116,6 @@ protected:
         }
         return duration_cast<T>(end - start);
     }
-    void restoreCopyingBegin(Date_t date);
-    void restoreCopyingEnd(Date_t date);
     void restoreDocumentsProcessed(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void restoreWritesToStashCollections(int64_t writesToStashCollections);
     virtual std::string createOperationDescription() const noexcept;
@@ -153,20 +139,16 @@ private:
     ObserverPtr _observer;
     ShardingDataTransformCumulativeMetrics* _cumulativeMetrics;
 
-    AtomicWord<Date_t> _copyingStartTime;
-    AtomicWord<Date_t> _copyingEndTime;
-    AtomicWord<int32_t> _approxDocumentsToProcess;
-    AtomicWord<int32_t> _documentsProcessed;
-    AtomicWord<int32_t> _approxBytesToScan;
-    AtomicWord<int32_t> _bytesWritten;
+    AtomicWord<int64_t> _approxDocumentsToProcess;
+    AtomicWord<int64_t> _documentsProcessed;
+    AtomicWord<int64_t> _approxBytesToScan;
+    AtomicWord<int64_t> _bytesWritten;
 
     AtomicWord<int64_t> _writesToStashCollections;
 
     AtomicWord<Milliseconds> _coordinatorHighEstimateRemainingTimeMillis;
     AtomicWord<Milliseconds> _coordinatorLowEstimateRemainingTimeMillis;
 
-    AtomicWord<Date_t> _criticalSectionStartTime;
-    AtomicWord<Date_t> _criticalSectionEndTime;
     AtomicWord<int64_t> _readsDuringCriticalSection;
     AtomicWord<int64_t> _writesDuringCriticalSection;
 };

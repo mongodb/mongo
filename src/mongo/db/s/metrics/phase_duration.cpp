@@ -27,18 +27,46 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
-#include "mongo/db/s/metrics/field_names/with_document_copy_count_field_name_overrides.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_count_metrics_field_names.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_latency_metrics_field_names.h"
+#include "mongo/db/s/metrics/phase_duration.h"
 
 namespace mongo {
 
-class MovePrimaryCumulativeMetricsFieldNameProvider
-    : public WithOplogApplicationLatencyMetricsFieldNames<
-          WithOplogApplicationCountFieldNames<WithDocumentCopyCountFieldNameOverrides<
-              ShardingDataTransformCumulativeMetricsFieldNameProvider>>> {};
+namespace {
+static constexpr auto kNoDate = Date_t::min();
+boost::optional<Date_t> readAtomicDate(const AtomicWord<Date_t>& date) {
+    auto value = date.load();
+    if (value == kNoDate) {
+        return boost::none;
+    }
+    return value;
+}
+}  // namespace
+
+PhaseDuration::PhaseDuration() : _start{kNoDate}, _end{kNoDate} {}
+
+boost::optional<Date_t> PhaseDuration::getStart() const {
+    return readAtomicDate(_start);
+}
+
+boost::optional<Date_t> PhaseDuration::getEnd() const {
+    return readAtomicDate(_end);
+}
+
+void PhaseDuration::setStart(Date_t date) {
+    _start.store(date);
+}
+
+void PhaseDuration::setEnd(Date_t date) {
+    _end.store(date);
+}
+
+boost::optional<Milliseconds> PhaseDuration::getElapsedMs(ClockSource* clock) const {
+    auto start = getStart();
+    if (!start) {
+        return boost::none;
+    }
+    auto end = getEnd();
+    return end.value_or_eval([=] { return clock->now(); }) - *start;
+}
 
 }  // namespace mongo

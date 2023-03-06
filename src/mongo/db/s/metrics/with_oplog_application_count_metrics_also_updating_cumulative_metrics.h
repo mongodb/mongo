@@ -29,16 +29,41 @@
 
 #pragma once
 
-#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
-#include "mongo/db/s/metrics/field_names/with_document_copy_count_field_name_overrides.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_count_metrics_field_names.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_latency_metrics_field_names.h"
+#include "mongo/db/s/metrics/with_oplog_application_count_metrics.h"
 
 namespace mongo {
 
-class MovePrimaryCumulativeMetricsFieldNameProvider
-    : public WithOplogApplicationLatencyMetricsFieldNames<
-          WithOplogApplicationCountFieldNames<WithDocumentCopyCountFieldNameOverrides<
-              ShardingDataTransformCumulativeMetricsFieldNameProvider>>> {};
+template <typename Base>
+class WithOplogApplicationCountMetricsAlsoUpdatingCumulativeMetrics : public Base {
+public:
+    template <typename... Args>
+    WithOplogApplicationCountMetricsAlsoUpdatingCumulativeMetrics(Args&&... args)
+        : Base{std::forward<Args>(args)...} {}
+
+    void onUpdateApplied() override {
+        Base::onUpdateApplied();
+        Base::getTypedCumulativeMetrics()->onUpdateApplied();
+    }
+
+    void onInsertApplied() override {
+        Base::onInsertApplied();
+        Base::getTypedCumulativeMetrics()->onInsertApplied();
+    }
+
+    void onDeleteApplied() override {
+        Base::onDeleteApplied();
+        Base::getTypedCumulativeMetrics()->onDeleteApplied();
+    }
+
+    void onOplogEntriesFetched(int64_t numEntries) override {
+        Base::onOplogEntriesFetched(numEntries);
+        Base::getTypedCumulativeMetrics()->onOplogEntriesFetched(numEntries);
+    }
+
+    void onOplogEntriesApplied(int64_t numEntries) override {
+        Base::onOplogEntriesApplied(numEntries);
+        Base::getTypedCumulativeMetrics()->onOplogEntriesApplied(numEntries);
+    }
+};
 
 }  // namespace mongo

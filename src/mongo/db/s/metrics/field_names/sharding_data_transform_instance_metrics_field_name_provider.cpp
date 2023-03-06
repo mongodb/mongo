@@ -37,9 +37,7 @@ constexpr auto kNamespace = "ns";
 constexpr auto kOp = "op";
 constexpr auto kOriginatingCommand = "originatingCommand";
 constexpr auto kOpTimeElapsed = "totalOperationTimeElapsedSecs";
-constexpr auto kCriticalSectionTimeElapsed = "totalCriticalSectionTimeElapsedSecs";
 constexpr auto kRemainingOpTimeEstimated = "remainingOperationTimeEstimatedSecs";
-constexpr auto kCopyTimeElapsed = "totalCopyTimeElapsedSecs";
 constexpr auto kCountWritesToStashCollections = "countWritesToStashCollections";
 constexpr auto kCountWritesDuringCriticalSection = "countWritesDuringCriticalSection";
 constexpr auto kCountReadsDuringCriticalSection = "countReadsDuringCriticalSection";
@@ -76,18 +74,9 @@ StringData ShardingDataTransformInstanceMetricsFieldNameProvider::getForOpTimeEl
     return kOpTimeElapsed;
 }
 
-StringData ShardingDataTransformInstanceMetricsFieldNameProvider::getForCriticalSectionTimeElapsed()
-    const {
-    return kCriticalSectionTimeElapsed;
-}
-
 StringData ShardingDataTransformInstanceMetricsFieldNameProvider::getForRemainingOpTimeEstimated()
     const {
     return kRemainingOpTimeEstimated;
-}
-
-StringData ShardingDataTransformInstanceMetricsFieldNameProvider::getForCopyTimeElapsed() const {
-    return kCopyTimeElapsed;
 }
 
 StringData

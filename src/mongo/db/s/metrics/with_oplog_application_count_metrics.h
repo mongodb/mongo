@@ -40,23 +40,23 @@ public:
     template <typename... Args>
     WithOplogApplicationCountMetrics(Args&&... args) : Base{std::forward<Args>(args)...} {}
 
-    void onInsertApplied() {
+    virtual void onInsertApplied() {
         _insertsApplied.fetchAndAdd(1);
     }
 
-    void onUpdateApplied() {
+    virtual void onUpdateApplied() {
         _updatesApplied.fetchAndAdd(1);
     }
 
-    void onDeleteApplied() {
+    virtual void onDeleteApplied() {
         _deletesApplied.fetchAndAdd(1);
     }
 
-    void onOplogEntriesFetched(int64_t numEntries) {
+    virtual void onOplogEntriesFetched(int64_t numEntries) {
         _oplogEntriesFetched.fetchAndAdd(numEntries);
     }
 
-    void onOplogEntriesApplied(int64_t numEntries) {
+    virtual void onOplogEntriesApplied(int64_t numEntries) {
         _oplogEntriesApplied.fetchAndAdd(numEntries);
     }
 
@@ -68,6 +68,7 @@ protected:
     int64_t getUpdatesApplied() const {
         return _updatesApplied.load();
     }
+
     int64_t getDeletesApplied() const {
         return _deletesApplied.load();
     }
@@ -78,6 +79,26 @@ protected:
 
     int64_t getOplogEntriesApplied() const {
         return _oplogEntriesApplied.load();
+    }
+
+    void restoreInsertsApplied(int64_t count) {
+        _insertsApplied.store(count);
+    }
+
+    void restoreUpdatesApplied(int64_t count) {
+        _updatesApplied.store(count);
+    }
+
+    void restoreDeletesApplied(int64_t count) {
+        _deletesApplied.store(count);
+    }
+
+    void restoreOplogEntriesFetched(int64_t count) {
+        _oplogEntriesFetched.store(count);
+    }
+
+    void restoreOplogEntriesApplied(int64_t count) {
+        _oplogEntriesApplied.store(count);
     }
 
     template <typename FieldNameProvider>

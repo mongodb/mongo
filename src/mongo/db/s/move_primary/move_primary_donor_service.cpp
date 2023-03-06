@@ -34,7 +34,7 @@
 namespace mongo {
 
 MovePrimaryDonorService::MovePrimaryDonorService(ServiceContext* serviceContext)
-    : PrimaryOnlyService{serviceContext} {}
+    : PrimaryOnlyService{serviceContext}, _serviceContext{serviceContext} {}
 
 StringData MovePrimaryDonorService::getServiceName() const {
     return kServiceName;
@@ -59,7 +59,7 @@ void MovePrimaryDonorService::checkIfConflictsWithOtherInstances(
         IDLParserContext("MovePrimaryDonorCheckIfConflictsWithOtherInstances"), initialState);
     const auto& newMetadata = initialDoc.getMetadata();
     for (const auto& instance : existingInstances) {
-        auto typed = checked_cast<const MovePrimaryDonorService::Instance*>(instance);
+        auto typed = checked_cast<const MovePrimaryDonor*>(instance);
         const auto& existingMetadata = typed->getMetadata();
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 str::stream() << "Existing movePrimary operation for database "
@@ -70,41 +70,45 @@ void MovePrimaryDonorService::checkIfConflictsWithOtherInstances(
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> MovePrimaryDonorService::constructInstance(
     BSONObj initialState) {
-    return std::make_shared<MovePrimaryDonorService::Instance>(MovePrimaryDonorDocument::parse(
-        IDLParserContext("MovePrimaryDonorConstructInstance"), initialState));
+    return std::make_shared<MovePrimaryDonor>(
+        _serviceContext,
+        MovePrimaryDonorDocument::parse(
+            IDLParserContext("MovePrimaryDonorServiceConstructInstance"), initialState));
 }
 
-SemiFuture<void> MovePrimaryDonorService::Instance::run(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancellationToken& token) noexcept {
+SemiFuture<void> MovePrimaryDonor::run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                       const CancellationToken& token) noexcept {
     return SemiFuture<void>(Status::OK());
 }
 
-void MovePrimaryDonorService::Instance::interrupt(Status status) {}
+void MovePrimaryDonor::interrupt(Status status) {}
 
-boost::optional<BSONObj> MovePrimaryDonorService::Instance::reportForCurrentOp(
+boost::optional<BSONObj> MovePrimaryDonor::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
     return boost::none;
 }
 
-void MovePrimaryDonorService::Instance::checkIfOptionsConflict(const BSONObj& stateDoc) const {
+void MovePrimaryDonor::checkIfOptionsConflict(const BSONObj& stateDoc) const {
     auto otherDoc = MovePrimaryDonorDocument::parse(
         IDLParserContext("MovePrimaryDonorCheckIfOptionsConflict"), stateDoc);
     const auto& otherMetadata = otherDoc.getMetadata();
     const auto& metadata = getMetadata();
-    invariant(metadata.getId() == otherMetadata.getId());
+    invariant(metadata.get_id() == otherMetadata.get_id());
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Existing movePrimary operation exists with same id, but incompatible arguments",
             metadata.getDatabaseName() == otherMetadata.getDatabaseName() &&
-                metadata.getToShard() == otherMetadata.getToShard());
+                metadata.getShardName() == otherMetadata.getShardName());
 }
 
-MovePrimaryDonorService::Instance::Instance(MovePrimaryDonorDocument initialState)
-    : _metadata{std::move(initialState.getMetadata())},
-      _mutableFields{std::move(initialState.getMutableFields())} {}
+MovePrimaryDonor::MovePrimaryDonor(ServiceContext* serviceContext,
+                                   MovePrimaryDonorDocument initialState)
+    : _serviceContext{serviceContext},
+      _metadata{std::move(initialState.getMetadata())},
+      _mutableFields{std::move(initialState.getMutableFields())},
+      _metrics{MovePrimaryMetrics::initializeFrom(initialState, _serviceContext)} {}
 
-const MovePrimaryDonorMetadata& MovePrimaryDonorService::Instance::getMetadata() const {
+const MovePrimaryCommonMetadata& MovePrimaryDonor::getMetadata() const {
     return _metadata;
 }
 

@@ -35,12 +35,21 @@
 #include "mongo/db/s/global_index/global_index_coordinator_state_enum_placeholder.h"
 #include "mongo/db/s/global_index/global_index_cumulative_metrics.h"
 #include "mongo/db/s/global_index/global_index_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/metrics_state_holder.h"
 #include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
-#include "mongo/db/s/metrics_state_holder.h"
+#include "mongo/db/s/metrics/with_phase_duration_management.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace global_index {
+
+enum TimedPhase { kCloning };
+constexpr auto kNumTimedPhase = 1;
+
+namespace detail {
+using Base =
+    WithPhaseDurationManagement<ShardingDataTransformInstanceMetrics, TimedPhase, kNumTimedPhase>;
+}
 
 // TODO: Remove when actual coordinator doc is implemented.
 class GlobalIndexCoordinatorDocument {
@@ -60,8 +69,11 @@ inline constexpr bool isStateDocument =
     std::disjunction_v<std::is_same<T, GlobalIndexClonerDoc>,
                        std::is_same<T, GlobalIndexCoordinatorDocument>>;
 
-class GlobalIndexMetrics : public ShardingDataTransformInstanceMetrics {
+class GlobalIndexMetrics : public global_index::detail::Base {
 public:
+    using Base = global_index::detail::Base;
+    using TimedPhase = global_index::TimedPhase;
+
     template <typename T>
     inline static ShardingDataTransformMetrics::Role getRoleForStateDocument() {
         static_assert(isStateDocument<T>);
@@ -126,6 +138,8 @@ public:
     }
 
     StringData getStateString() const noexcept override;
+
+    BSONObj reportForCurrentOp() const noexcept override;
 
 protected:
     boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const override;

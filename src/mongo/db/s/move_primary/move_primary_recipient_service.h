@@ -146,7 +146,7 @@ public:
 
         void checkIfOptionsConflict(const BSONObj& stateDoc) const final;
 
-        StringData getDatabaseName() const;
+        NamespaceString getDatabaseName() const;
 
         UUID getMigrationId() const;
 
@@ -186,7 +186,7 @@ public:
 
         const MovePrimaryRecipientService* _recipientService;
 
-        const MovePrimaryRecipientMetadata _metadata;
+        const MovePrimaryCommonMetadata _metadata;
 
         std::shared_ptr<MovePrimaryRecipientExternalState> _movePrimaryRecipientExternalState;
 

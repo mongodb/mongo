@@ -195,10 +195,11 @@ class MovePrimaryRecipientServiceTest : public ShardServerTestFixture {
 protected:
     MovePrimaryRecipientDocument createRecipientDoc() {
         UUID migrationId = UUID::gen();
-        MovePrimaryRecipientDocument doc(migrationId);
+        MovePrimaryCommonMetadata metadata(
+            migrationId, NamespaceString{"foo"}, kShardList.front().getName());
 
-        MovePrimaryRecipientMetadata metadata(migrationId, "foo", kShardList.front().getName());
-        doc.setMovePrimaryRecipientMetadata(metadata);
+        MovePrimaryRecipientDocument doc;
+        doc.setMetadata(metadata);
 
         return doc;
     }
@@ -241,12 +242,11 @@ TEST_F(MovePrimaryRecipientServiceTest, PersistsStateDocument) {
     movePrimaryRecipientPauseAfterInsertingStateDoc->waitForTimesEntered(timesEnteredFailPoint + 1);
 
     ASSERT(instance.get());
-    ASSERT_EQ(doc.getMigrationId(), instance->getMigrationId());
+    ASSERT_EQ(doc.get_id(), instance->getMigrationId());
     ASSERT(instance->getRecipientDocDurableFuture().isReady());
 
     auto persistedDoc = getRecipientDoc(opCtx);
-    ASSERT_BSONOBJ_EQ(persistedDoc.getMovePrimaryRecipientMetadata().toBSON(),
-                      doc.getMovePrimaryRecipientMetadata().toBSON());
+    ASSERT_BSONOBJ_EQ(persistedDoc.getMetadata().toBSON(), doc.getMetadata().toBSON());
 
     movePrimaryRecipientPauseAfterInsertingStateDoc->setMode(FailPoint::off, 0);
 }
@@ -267,7 +267,7 @@ TEST_F(MovePrimaryRecipientServiceTest, ThrowsWithConflictingOperation) {
 
     auto conflictingDoc = createRecipientDoc();
 
-    ASSERT_NE(doc.getId(), conflictingDoc.getId());
+    ASSERT_NE(doc.get_id(), conflictingDoc.get_id());
 
     // Asserts that a movePrimary op on same database fails with MovePrimaryInProgress
     ASSERT_THROWS_CODE(MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(
@@ -293,9 +293,10 @@ TEST_F(MovePrimaryRecipientServiceTest, ThrowsWithConflictingOptions) {
 
     movePrimaryRecipientPauseAfterInsertingStateDoc->waitForTimesEntered(timesEnteredFailPoint + 1);
 
-    MovePrimaryRecipientDocument conflictingDoc(doc.getMigrationId());
-    MovePrimaryRecipientMetadata metadata(doc.getMigrationId(), "bar", "second/localhost:27018");
-    conflictingDoc.setMovePrimaryRecipientMetadata(metadata);
+    MovePrimaryCommonMetadata metadata(
+        doc.get_id(), NamespaceString{"bar"}, "second/localhost:27018");
+    MovePrimaryRecipientDocument conflictingDoc;
+    conflictingDoc.setMetadata(metadata);
 
     // Asserts that a movePrimary op with a different fromShard fails with MovePrimaryInProgress
     ASSERT_THROWS_CODE(MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(

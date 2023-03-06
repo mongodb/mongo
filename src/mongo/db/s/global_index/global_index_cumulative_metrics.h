@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/db/s/cumulative_metrics_state_holder.h"
 #include "mongo/db/s/global_index/global_index_cloner_gen.h"
 #include "mongo/db/s/global_index/global_index_coordinator_state_enum_placeholder.h"
 #include "mongo/db/s/global_index/global_index_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/cumulative_metrics_state_holder.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_macros.h"
 #include "mongo/db/s/metrics/with_state_management_for_cumulative_metrics.h"

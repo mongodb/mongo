@@ -346,7 +346,7 @@ GlobalIndexCloningService::CloningStateMachine::_transitionToReadyToCommit(
         return ExecutorFuture<repl::OpTime>(**executor, repl::OpTime());
     }
 
-    _metrics->onCopyingEnd();
+    _metrics->setEndFor(GlobalIndexMetrics::TimedPhase::kCloning, now());
 
     return _retryingCancelableOpCtxFactory
         ->withAutomaticRetry([this, executor](auto& cancelableFactory) {
@@ -382,7 +382,7 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_clone(
         return ExecutorFuture<void>(**executor);
     }
 
-    _metrics->onCopyingBegin();
+    _metrics->setStartFor(GlobalIndexMetrics::TimedPhase::kCloning, now());
 
     return AsyncTry([this, executor, cancelToken, cancelableOpCtxFactory] {
                auto cancelableOpCtx =
@@ -536,6 +536,10 @@ void GlobalIndexCloningService::CloningStateMachine::_updateMutableState(
     const auto oldState = _mutableState.getState();
     _mutableState = std::move(newMutableState);
     _metrics->onStateTransition(oldState, _mutableState.getState());
+}
+
+Date_t GlobalIndexCloningService::CloningStateMachine::now() const {
+    return _serviceContext->getFastClockSource()->now();
 }
 
 }  // namespace global_index

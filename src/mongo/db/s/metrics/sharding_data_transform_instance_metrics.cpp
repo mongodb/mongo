@@ -95,16 +95,12 @@ ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
       _clockSource{clockSource},
       _observer{std::move(observer)},
       _cumulativeMetrics{cumulativeMetrics},
-      _copyingStartTime{kNoDate},
-      _copyingEndTime{kNoDate},
       _approxDocumentsToProcess{0},
       _documentsProcessed{0},
       _approxBytesToScan{0},
       _bytesWritten{0},
       _coordinatorHighEstimateRemainingTimeMillis{kNoEstimate},
       _coordinatorLowEstimateRemainingTimeMillis{kNoEstimate},
-      _criticalSectionStartTime{kNoDate},
-      _criticalSectionEndTime{kNoDate},
       _writesDuringCriticalSection{0} {}
 
 boost::optional<Milliseconds>
@@ -175,15 +171,9 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
                 _fieldNames->getForAllShardsLowestRemainingOperationTimeEstimatedSecs(),
                 getLowEstimateRemainingTimeMillis());
             builder.append(_fieldNames->getForCoordinatorState(), getStateString());
-            builder.append(_fieldNames->getForCopyTimeElapsed(),
-                           getCopyingElapsedTimeSecs().count());
-            builder.append(_fieldNames->getForCriticalSectionTimeElapsed(),
-                           getCriticalSectionElapsedTimeSecs().count());
             break;
         case Role::kDonor:
             builder.append(_fieldNames->getForDonorState(), getStateString());
-            builder.append(_fieldNames->getForCriticalSectionTimeElapsed(),
-                           getCriticalSectionElapsedTimeSecs().count());
             builder.append(_fieldNames->getForCountWritesDuringCriticalSection(),
                            _writesDuringCriticalSection.load());
             builder.append(_fieldNames->getForCountReadsDuringCriticalSection(),
@@ -191,8 +181,6 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
             break;
         case Role::kRecipient:
             builder.append(_fieldNames->getForRecipientState(), getStateString());
-            builder.append(_fieldNames->getForCopyTimeElapsed(),
-                           getCopyingElapsedTimeSecs().count());
             appendOptionalMillisecondsFieldAs<Seconds>(
                 builder,
                 _fieldNames->getForRemainingOpTimeEstimated(),
@@ -210,38 +198,6 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
     }
 
     return builder.obj();
-}
-
-void ShardingDataTransformInstanceMetrics::onCopyingBegin() {
-    _copyingStartTime.store(_clockSource->now());
-}
-
-void ShardingDataTransformInstanceMetrics::onCopyingEnd() {
-    _copyingEndTime.store(_clockSource->now());
-}
-
-void ShardingDataTransformInstanceMetrics::restoreCopyingBegin(Date_t date) {
-    _copyingStartTime.store(date);
-}
-
-void ShardingDataTransformInstanceMetrics::restoreCopyingEnd(Date_t date) {
-    _copyingEndTime.store(date);
-}
-
-Date_t ShardingDataTransformInstanceMetrics::getCopyingBegin() const {
-    return _copyingStartTime.load();
-}
-
-Date_t ShardingDataTransformInstanceMetrics::getCopyingEnd() const {
-    return _copyingEndTime.load();
-}
-
-void ShardingDataTransformInstanceMetrics::setCopyingBegin(Date_t date) {
-    _copyingStartTime.store(date);
-}
-
-void ShardingDataTransformInstanceMetrics::setCopyingEnd(Date_t date) {
-    _copyingEndTime.store(date);
 }
 
 void ShardingDataTransformInstanceMetrics::onDocumentsProcessed(int64_t documentCount,
@@ -296,24 +252,8 @@ void ShardingDataTransformInstanceMetrics::onWriteDuringCriticalSection() {
     _cumulativeMetrics->onWriteDuringCriticalSection();
 }
 
-void ShardingDataTransformInstanceMetrics::onCriticalSectionBegin() {
-    _criticalSectionStartTime.store(_clockSource->now());
-}
-
-void ShardingDataTransformInstanceMetrics::onCriticalSectionEnd() {
-    _criticalSectionEndTime.store(_clockSource->now());
-}
-
 Seconds ShardingDataTransformInstanceMetrics::getOperationRunningTimeSecs() const {
     return duration_cast<Seconds>(_clockSource->now() - _startTime);
-}
-
-Seconds ShardingDataTransformInstanceMetrics::getCopyingElapsedTimeSecs() const {
-    return getElapsed<Seconds>(_copyingStartTime, _copyingEndTime, _clockSource);
-}
-
-Seconds ShardingDataTransformInstanceMetrics::getCriticalSectionElapsedTimeSecs() const {
-    return getElapsed<Seconds>(_criticalSectionStartTime, _criticalSectionEndTime, _clockSource);
 }
 
 void ShardingDataTransformInstanceMetrics::onWriteToStashedCollections() {

@@ -36,22 +36,22 @@
 namespace mongo {
 namespace {
 
-constexpr auto kDatabaseName = "testDb";
+const auto kDatabaseName = NamespaceString{"testDb"};
 constexpr auto kNewPrimaryShardName = "newPrimaryId";
 
 class MovePrimaryDonorServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
 protected:
-    using DonorInstance = MovePrimaryDonorService::Instance;
+    using DonorInstance = MovePrimaryDonor;
 
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
         return std::make_unique<MovePrimaryDonorService>(serviceContext);
     }
 
-    MovePrimaryDonorMetadata createMetadata() const {
-        MovePrimaryDonorMetadata metadata;
-        metadata.setId(UUID::gen());
+    MovePrimaryCommonMetadata createMetadata() const {
+        MovePrimaryCommonMetadata metadata;
+        metadata.set_id(UUID::gen());
         metadata.setDatabaseName(kDatabaseName);
-        metadata.setToShard(kNewPrimaryShardName);
+        metadata.setShardName(kNewPrimaryShardName);
         return metadata;
     }
 
@@ -80,7 +80,7 @@ TEST_F(MovePrimaryDonorServiceTest, CannotCreateTwoInstancesForSameDb) {
     auto stateDoc = createStateDocument();
     auto instance = DonorInstance::getOrCreate(opCtx.get(), _service, stateDoc.toBSON());
     auto otherStateDoc = stateDoc;
-    otherStateDoc.getMetadata().setId(UUID::gen());
+    otherStateDoc.getMetadata().set_id(UUID::gen());
     ASSERT_THROWS_CODE(DonorInstance::getOrCreate(opCtx.get(), _service, otherStateDoc.toBSON()),
                        DBException,
                        ErrorCodes::ConflictingOperationInProgress);
@@ -91,7 +91,7 @@ TEST_F(MovePrimaryDonorServiceTest, SameUuidMustHaveSameDb) {
     auto stateDoc = createStateDocument();
     auto instance = DonorInstance::getOrCreate(opCtx.get(), _service, stateDoc.toBSON());
     auto otherStateDoc = stateDoc;
-    otherStateDoc.getMetadata().setDatabaseName("someOtherDb");
+    otherStateDoc.getMetadata().setDatabaseName(NamespaceString{"someOtherDb"});
     ASSERT_THROWS_CODE(DonorInstance::getOrCreate(opCtx.get(), _service, otherStateDoc.toBSON()),
                        DBException,
                        ErrorCodes::ConflictingOperationInProgress);
@@ -102,7 +102,7 @@ TEST_F(MovePrimaryDonorServiceTest, SameUuidMustHaveSameRecipient) {
     auto stateDoc = createStateDocument();
     auto instance = DonorInstance::getOrCreate(opCtx.get(), _service, stateDoc.toBSON());
     auto otherStateDoc = stateDoc;
-    otherStateDoc.getMetadata().setToShard("someOtherShard");
+    otherStateDoc.getMetadata().setShardName("someOtherShard");
     ASSERT_THROWS_CODE(DonorInstance::getOrCreate(opCtx.get(), _service, otherStateDoc.toBSON()),
                        DBException,
                        ErrorCodes::ConflictingOperationInProgress);

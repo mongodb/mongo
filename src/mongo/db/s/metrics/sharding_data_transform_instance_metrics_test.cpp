@@ -249,19 +249,6 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, DonorIncrementReadsDuringCritic
     ASSERT_EQ(report.getIntField("countReadsDuringCriticalSection"), 1);
 }
 
-TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCriticalSectionTime) {
-    runTimeReportTest<ShardingDataTransformInstanceMetricsForTest>(
-        "CurrentOpReportsCriticalSectionTime",
-        {Role::kDonor, Role::kCoordinator},
-        "totalCriticalSectionTimeElapsedSecs",
-        [](ShardingDataTransformInstanceMetricsForTest* metrics) {
-            metrics->onCriticalSectionBegin();
-        },
-        [](ShardingDataTransformInstanceMetricsForTest* metrics) {
-            metrics->onCriticalSectionEnd();
-        });
-}
-
 TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientSetsDocumentsAndBytesToCopy) {
     auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
 
@@ -291,15 +278,6 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientIncrementsDocumentsAnd
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("documentsProcessed"), 5);
     ASSERT_EQ(report.getIntField("bytesWritten"), 1000);
-}
-
-TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCopyingTime) {
-    runTimeReportTest<ShardingDataTransformInstanceMetricsForTest>(
-        "CurrentOpReportsCopyingTime",
-        {Role::kRecipient, Role::kCoordinator},
-        "totalCopyTimeElapsedSecs",
-        [](ShardingDataTransformInstanceMetricsForTest* metrics) { metrics->onCopyingBegin(); },
-        [](ShardingDataTransformInstanceMetricsForTest* metrics) { metrics->onCopyingEnd(); });
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsRunningTime) {

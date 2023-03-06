@@ -192,14 +192,14 @@ void setMeticsAfterWrite(ReshardingMetrics* metrics,
                          Date_t timestamp) {
     switch (newState) {
         case CoordinatorStateEnum::kCloning:
-            metrics->setCopyingBegin(timestamp);
+            metrics->setStartFor(ReshardingMetrics::TimedPhase::kCloning, timestamp);
             return;
         case CoordinatorStateEnum::kApplying:
-            metrics->setCopyingEnd(timestamp);
-            metrics->setApplyingBegin(timestamp);
+            metrics->setEndFor(ReshardingMetrics::TimedPhase::kCloning, timestamp);
+            metrics->setStartFor(ReshardingMetrics::TimedPhase::kApplying, timestamp);
             return;
         case CoordinatorStateEnum::kBlockingWrites:
-            metrics->setApplyingEnd(timestamp);
+            metrics->setEndFor(ReshardingMetrics::TimedPhase::kApplying, timestamp);
             return;
         default:
             return;
@@ -1504,7 +1504,8 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                    })
                    .then([this, executor] { return _awaitAllParticipantShardsDone(executor); })
                    .then([this, executor] {
-                       _metrics->onCriticalSectionEnd();
+                       _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
+                                           getCurrentTime());
 
                        // Best-effort attempt to trigger a refresh on the participant shards so
                        // they see the collection metadata without reshardingFields and no longer
@@ -2045,7 +2046,8 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
 
             this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kBlockingWrites,
                                                               _coordinatorDoc);
-            _metrics->onCriticalSectionBegin();
+            _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection,
+                                  getCurrentTime());
         })
         .then([this] { return _waitForMajority(_ctHolder->getAbortToken()); })
         .thenRunOn(**executor)

@@ -36,24 +36,7 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/s/sharding_types.idl"
     - "mongo/db/repl/replication_types.idl"
-
-structs:
-    MovePrimaryRecipientMetadata:
-        description: "Common metadata at the recipient for movePrimary op"
-        strict: false
-        inline_chained_structs: true
-        generate_comparison_operators: false
-        fields:
-            migrationId:
-                description: >-
-                    "Unique identifier for the movePrimary operation."
-                type: uuid
-            databaseName:
-                description: "The name of the database being moved as part of movePrimary."
-                type: string
-            fromShard:
-                description: "The name of the donor shard."
-                type: string
+    - "mongo/db/s/move_primary/move_primary_common_metadata.idl"
 
 commands:
     movePrimaryRecipientSyncData:
@@ -65,7 +48,7 @@ commands:
         reply_type: OkReply
         inline_chained_structs: true
         chained_structs:
-            MovePrimaryRecipientMetadata: MovePrimaryRecipientMetadata
+            MovePrimaryCommonMetadata: MovePrimaryCommonMetadata
         fields:
             returnAfterReachingDonorTimestamp:
                 description: >-
@@ -85,7 +68,7 @@ commands:
         namespace: ignored
         inline_chained_structs: true
         chained_structs:
-            MovePrimaryRecipientMetadata: MovePrimaryRecipientMetadata
+            MovePrimaryCommonMetadata: MovePrimaryCommonMetadata
 
     movePrimaryRecipientAbortMigration:
         description: "Parser for the 'movePrimaryRecipientAbortMigration' command."
@@ -96,4 +79,4 @@ commands:
         namespace: ignored
         inline_chained_structs: true
         chained_structs:
-            MovePrimaryRecipientMetadata: MovePrimaryRecipientMetadata
+            MovePrimaryCommonMetadata: MovePrimaryCommonMetadata

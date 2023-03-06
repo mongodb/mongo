@@ -29,16 +29,47 @@
 
 #pragma once
 
-#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
-#include "mongo/db/s/metrics/field_names/with_document_copy_count_field_name_overrides.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_count_metrics_field_names.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_latency_metrics_field_names.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/s/metrics/cumulative_metrics_state_holder.h"
 
 namespace mongo {
 
-class MovePrimaryCumulativeMetricsFieldNameProvider
-    : public WithOplogApplicationLatencyMetricsFieldNames<
-          WithOplogApplicationCountFieldNames<WithDocumentCopyCountFieldNameOverrides<
-              ShardingDataTransformCumulativeMetricsFieldNameProvider>>> {};
+template <typename Base, typename AnyState>
+class WithStateManagementForInstanceMetrics : public Base {
+public:
+    template <typename... Args>
+    WithStateManagementForInstanceMetrics(Args&&... args) : Base{std::forward<Args>(args)...} {}
+
+    AnyState getState() const {
+        return _state.load();
+    }
+
+    template <typename T>
+    void onStateTransition(T before, boost::none_t after) {
+        Base::getTypedCumulativeMetrics()->template onStateTransition<T>(before, boost::none);
+    }
+
+    template <typename T>
+    void onStateTransition(boost::none_t before, T after) {
+        setState(after);
+        Base::getTypedCumulativeMetrics()->template onStateTransition<T>(boost::none, after);
+    }
+
+    template <typename T>
+    void onStateTransition(T before, T after) {
+        setState(after);
+        Base::getTypedCumulativeMetrics()->template onStateTransition<T>(before, after);
+    }
+
+protected:
+    template <typename T>
+    void setState(T state) {
+        static_assert(std::is_assignable_v<AnyState, T>);
+        _state.store(state);
+    }
+
+private:
+    AtomicWord<AnyState> _state;
+};
 
 }  // namespace mongo

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/move_primary/move_primary_metrics.h"
 #include "mongo/db/s/move_primary/move_primary_state_machine_gen.h"
 
 namespace mongo {
@@ -53,27 +54,33 @@ public:
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override;
 
-    class Instance : public PrimaryOnlyService::TypedInstance<Instance> {
-    public:
-        Instance(MovePrimaryDonorDocument initialState);
+private:
+    ServiceContext* _serviceContext;
+};
 
-        SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                             const CancellationToken& token) noexcept override;
 
-        void interrupt(Status status) override;
+class MovePrimaryDonor : public repl::PrimaryOnlyService::TypedInstance<MovePrimaryDonor> {
+public:
+    MovePrimaryDonor(ServiceContext* serviceContext, MovePrimaryDonorDocument initialState);
 
-        boost::optional<BSONObj> reportForCurrentOp(
-            MongoProcessInterface::CurrentOpConnectionsMode connMode,
-            MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
+    SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                         const CancellationToken& token) noexcept override;
 
-        void checkIfOptionsConflict(const BSONObj& stateDoc) const override;
+    void interrupt(Status status) override;
 
-        const MovePrimaryDonorMetadata& getMetadata() const;
+    boost::optional<BSONObj> reportForCurrentOp(
+        MongoProcessInterface::CurrentOpConnectionsMode connMode,
+        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
-    private:
-        const MovePrimaryDonorMetadata _metadata;
-        MovePrimaryDonorMutableFields _mutableFields;
-    };
+    void checkIfOptionsConflict(const BSONObj& stateDoc) const override;
+
+    const MovePrimaryCommonMetadata& getMetadata() const;
+
+private:
+    ServiceContext* _serviceContext;
+    const MovePrimaryCommonMetadata _metadata;
+    MovePrimaryDonorMutableFields _mutableFields;
+    std::unique_ptr<MovePrimaryMetrics> _metrics;
 };
 
 }  // namespace mongo

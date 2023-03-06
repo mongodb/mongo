@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/s/cumulative_metrics_state_holder.h"
+#include "mongo/db/s/metrics/cumulative_metrics_state_holder.h"
 
 namespace mongo {
 
@@ -43,7 +43,7 @@ using StateEnumToHolderType =
 template <typename Base, template <typename> typename SizeHelper, typename... StateEnums>
 class WithStateManagementForCumulativeMetrics : public Base {
 public:
-    using AnyState = std::variant<StateEnums...>;
+    using AnyState = stdx::variant<StateEnums...>;
     using StateFieldNameMap = stdx::unordered_map<AnyState, StringData>;
 
     template <typename... Args>

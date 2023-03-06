@@ -29,16 +29,33 @@
 
 #pragma once
 
-#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
-#include "mongo/db/s/metrics/field_names/with_document_copy_count_field_name_overrides.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_count_metrics_field_names.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_latency_metrics_field_names.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-class MovePrimaryCumulativeMetricsFieldNameProvider
-    : public WithOplogApplicationLatencyMetricsFieldNames<
-          WithOplogApplicationCountFieldNames<WithDocumentCopyCountFieldNameOverrides<
-              ShardingDataTransformCumulativeMetricsFieldNameProvider>>> {};
+class PhaseDuration {
+public:
+    PhaseDuration();
+    boost::optional<Date_t> getStart() const;
+    boost::optional<Date_t> getEnd() const;
+    void setStart(Date_t date);
+    void setEnd(Date_t date);
+
+    template <typename TimeUnit>
+    boost::optional<TimeUnit> getElapsed(ClockSource* clock) const {
+        auto elapsed = getElapsedMs(clock);
+        if (!elapsed) {
+            return boost::none;
+        }
+        return duration_cast<TimeUnit>(*elapsed);
+    }
+
+private:
+    boost::optional<Milliseconds> getElapsedMs(ClockSource* clock) const;
+
+    AtomicWord<Date_t> _start;
+    AtomicWord<Date_t> _end;
+};
 
 }  // namespace mongo

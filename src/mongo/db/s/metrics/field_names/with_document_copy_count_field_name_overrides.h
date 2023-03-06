@@ -29,16 +29,24 @@
 
 #pragma once
 
-#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
-#include "mongo/db/s/metrics/field_names/with_document_copy_count_field_name_overrides.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_count_metrics_field_names.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_latency_metrics_field_names.h"
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 
-class MovePrimaryCumulativeMetricsFieldNameProvider
-    : public WithOplogApplicationLatencyMetricsFieldNames<
-          WithOplogApplicationCountFieldNames<WithDocumentCopyCountFieldNameOverrides<
-              ShardingDataTransformCumulativeMetricsFieldNameProvider>>> {};
+template <typename Base>
+class WithDocumentCopyCountFieldNameOverrides : public Base {
+public:
+    virtual StringData getForDocumentsProcessed() const override {
+        return kDocumentsCopied;
+    }
+
+    virtual StringData getForBytesWritten() const override {
+        return kBytesCopied;
+    }
+
+private:
+    static constexpr auto kDocumentsCopied = "documentsCopied";
+    static constexpr auto kBytesCopied = "bytesCopied";
+};
 
 }  // namespace mongo

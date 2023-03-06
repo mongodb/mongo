@@ -31,8 +31,13 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/metrics/metrics_state_holder.h"
 #include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
-#include "mongo/db/s/metrics_state_holder.h"
+#include "mongo/db/s/metrics/with_oplog_application_count_metrics_also_updating_cumulative_metrics.h"
+#include "mongo/db/s/metrics/with_oplog_application_latency_metrics_interface_updating_cumulative_metrics.h"
+#include "mongo/db/s/metrics/with_phase_duration_management.h"
+#include "mongo/db/s/metrics/with_state_management_for_instance_metrics.h"
+#include "mongo/db/s/metrics/with_typed_cumulative_metrics_provider.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_field_name_provider.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
@@ -41,9 +46,30 @@
 
 namespace mongo {
 
-class ReshardingMetrics : public ShardingDataTransformInstanceMetrics {
+namespace resharding_metrics {
+
+enum TimedPhase { kCloning, kApplying, kCriticalSection };
+constexpr auto kNumTimedPhase = 3;
+
+namespace detail {
+using PartialBase1 = WithTypedCumulativeMetricsProvider<ShardingDataTransformInstanceMetrics,
+                                                        ReshardingCumulativeMetrics>;
+using PartialBase2 =
+    WithStateManagementForInstanceMetrics<PartialBase1, ReshardingCumulativeMetrics::AnyState>;
+
+using PartialBaseFinal = WithPhaseDurationManagement<PartialBase2, TimedPhase, kNumTimedPhase>;
+
+using Base = WithOplogApplicationLatencyMetricsInterfaceUpdatingCumulativeMetrics<
+    WithOplogApplicationCountMetricsAlsoUpdatingCumulativeMetrics<
+        WithOplogApplicationCountMetrics<detail::PartialBaseFinal>>>;
+}  // namespace detail
+}  // namespace resharding_metrics
+
+class ReshardingMetrics : public resharding_metrics::detail::Base {
 public:
-    using State = stdx::variant<CoordinatorStateEnum, RecipientStateEnum, DonorStateEnum>;
+    using State = ReshardingCumulativeMetrics::AnyState;
+    using Base = resharding_metrics::detail::Base;
+    using TimedPhase = resharding_metrics::TimedPhase;
 
     struct ExternallyTrackedRecipientFields {
     public:
@@ -118,18 +144,6 @@ public:
             serviceContext->getFastClockSource(),
             ShardingDataTransformCumulativeMetrics::getForResharding(serviceContext));
     }
-    template <typename T>
-    void onStateTransition(T before, boost::none_t after) {
-        _stateHolder.onStateTransition(before, after);
-    }
-    template <typename T>
-    void onStateTransition(boost::none_t before, T after) {
-        _stateHolder.onStateTransition(before, after);
-    }
-    template <typename T>
-    void onStateTransition(T before, T after) {
-        _stateHolder.onStateTransition(before, after);
-    }
 
     template <typename StateOrStateVariant>
     static bool mustRestoreExternallyTrackedRecipientFields(StateOrStateVariant stateOrVariant) {
@@ -144,34 +158,11 @@ public:
 
     BSONObj reportForCurrentOp() const noexcept override;
 
-    void onUpdateApplied();
-    void onInsertApplied();
-    void onDeleteApplied();
-    void onOplogEntriesFetched(int64_t numEntries, Milliseconds elapsed);
-    void onOplogEntriesApplied(int64_t numEntries);
-    void onApplyingBegin();
-    void onApplyingEnd();
-    void setApplyingBegin(Date_t date);
-    void setApplyingEnd(Date_t date);
-    void onLocalInsertDuringOplogFetching(Milliseconds elapsed);
-    void onBatchRetrievedDuringOplogApplying(Milliseconds elapsed);
-    void onOplogLocalBatchApplied(Milliseconds elapsed);
     void restoreExternallyTrackedRecipientFields(const ExternallyTrackedRecipientFields& values);
-
-    Seconds getApplyingElapsedTimeSecs() const;
-    Date_t getApplyingBegin() const;
-    Date_t getApplyingEnd() const;
 
 protected:
     boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const override;
-    void restoreOplogEntriesFetched(int64_t numEntries);
-    void restoreOplogEntriesApplied(int64_t numEntries);
-    void restoreUpdatesApplied(int64_t count);
-    void restoreInsertsApplied(int64_t count);
-    void restoreDeletesApplied(int64_t count);
     virtual StringData getStateString() const noexcept override;
-    void restoreApplyingBegin(Date_t date);
-    void restoreApplyingEnd(Date_t date);
 
 private:
     std::string createOperationDescription() const noexcept override;
@@ -212,22 +203,22 @@ private:
         if (copyDurations) {
             auto copyingBegin = copyDurations->getStart();
             if (copyingBegin) {
-                restoreCopyingBegin(*copyingBegin);
+                setStartFor(TimedPhase::kCloning, *copyingBegin);
             }
             auto copyingEnd = copyDurations->getStop();
             if (copyingEnd) {
-                restoreCopyingEnd(*copyingEnd);
+                setEndFor(TimedPhase::kCloning, *copyingEnd);
             }
         }
         auto applyDurations = metrics->getOplogApplication();
         if (applyDurations) {
             auto applyingBegin = applyDurations->getStart();
             if (applyingBegin) {
-                restoreApplyingBegin(*applyingBegin);
+                setStartFor(TimedPhase::kApplying, *applyingBegin);
             }
             auto applyingEnd = applyDurations->getStop();
             if (applyingEnd) {
-                restoreApplyingEnd(*applyingEnd);
+                setEndFor(TimedPhase::kApplying, *applyingEnd);
             }
         }
     }
@@ -241,15 +232,7 @@ private:
     }
 
     AtomicWord<bool> _ableToEstimateRemainingRecipientTime;
-    AtomicWord<int64_t> _deletesApplied;
-    AtomicWord<int64_t> _insertsApplied;
-    AtomicWord<int64_t> _updatesApplied;
-    AtomicWord<int64_t> _oplogEntriesApplied;
-    AtomicWord<int64_t> _oplogEntriesFetched;
-    AtomicWord<Date_t> _applyingStartTime;
-    AtomicWord<Date_t> _applyingEndTime;
 
-    MetricsStateHolder<State, ReshardingCumulativeMetrics> _stateHolder;
     ShardingDataTransformInstanceMetrics::UniqueScopedObserver _scopedObserver;
     ReshardingMetricsFieldNameProvider* _reshardingFieldNames;
 };

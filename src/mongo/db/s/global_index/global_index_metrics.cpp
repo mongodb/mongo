@@ -36,6 +36,13 @@ namespace mongo {
 namespace global_index {
 namespace {
 
+using TimedPhase = GlobalIndexMetrics::TimedPhase;
+const auto kTimedPhaseNamesMap = [] {
+    return GlobalIndexMetrics::TimedPhaseNameMap{
+        {TimedPhase::kCloning, "totalCopyTimeElapsedSecs"}};
+}();
+
+
 inline GlobalIndexMetrics::State getDefaultState(GlobalIndexMetrics::Role role) {
     using Role = GlobalIndexMetrics::Role;
     switch (role) {
@@ -71,14 +78,14 @@ GlobalIndexMetrics::GlobalIndexMetrics(UUID instanceId,
                                        Date_t startTime,
                                        ClockSource* clockSource,
                                        ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
-    : ShardingDataTransformInstanceMetrics{std::move(instanceId),
-                                           std::move(originatingCommand),
-                                           std::move(nss),
-                                           role,
-                                           startTime,
-                                           clockSource,
-                                           cumulativeMetrics,
-                                           std::make_unique<GlobalIndexMetricsFieldNameProvider>()},
+    : Base{std::move(instanceId),
+           std::move(originatingCommand),
+           std::move(nss),
+           role,
+           startTime,
+           clockSource,
+           cumulativeMetrics,
+           std::make_unique<GlobalIndexMetricsFieldNameProvider>()},
       _stateHolder{getGlobalIndexCumulativeMetrics(), getDefaultState(role)},
       _scopedObserver(registerInstanceMetrics()),
       _globalIndexFieldNames{static_cast<GlobalIndexMetricsFieldNameProvider*>(_fieldNames.get())} {
@@ -118,6 +125,13 @@ StringData GlobalIndexMetrics::getStateString() const noexcept {
                                              return GlobalIndexClonerState_serializer(state);
                                          }},
                        _stateHolder.getState());
+}
+
+BSONObj GlobalIndexMetrics::reportForCurrentOp() const noexcept {
+    BSONObjBuilder builder;
+    reportDurationsForAllPhases<Seconds>(kTimedPhaseNamesMap, getClockSource(), &builder);
+    builder.appendElementsUnique(ShardingDataTransformInstanceMetrics::reportForCurrentOp());
+    return builder.obj();
 }
 
 }  // namespace global_index

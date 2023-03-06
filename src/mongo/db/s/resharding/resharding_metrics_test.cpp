@@ -43,6 +43,7 @@
 namespace mongo {
 namespace {
 
+using TimedPhase = ReshardingMetrics::TimedPhase;
 constexpr auto kRunningTime = Seconds(12345);
 constexpr auto kResharding = "resharding";
 const auto kShardKey = BSON("newKey" << 1);
@@ -425,7 +426,7 @@ TEST_F(ReshardingMetricsTest, RecipientIncrementFetchedOplogEntries) {
 
     auto report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 0);
-    metrics->onOplogEntriesFetched(50, Milliseconds(1));
+    metrics->onOplogEntriesFetched(50);
 
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 50);
@@ -458,10 +459,10 @@ TEST_F(ReshardingMetricsTest, RecipientReportsRemainingTime) {
     const auto kIncrementSecs = durationCount<Seconds>(kIncrement);
     const auto kExpectedTotal = kIncrementSecs * 8;
     metrics->setDocumentsToProcessCounts(0, kOpsPerIncrement * 4);
-    metrics->onOplogEntriesFetched(kOpsPerIncrement * 4, Milliseconds(1));
+    metrics->onOplogEntriesFetched(kOpsPerIncrement * 4);
 
     // During cloning.
-    metrics->onCopyingBegin();
+    metrics->setStartFor(TimedPhase::kCloning, getClockSource()->now());
     metrics->onDocumentsProcessed(0, kOpsPerIncrement, Milliseconds(1));
     clock->advance(kIncrement);
     auto report = metrics->reportForCurrentOp();
@@ -477,8 +478,8 @@ TEST_F(ReshardingMetricsTest, RecipientReportsRemainingTime) {
     // During applying.
     metrics->onDocumentsProcessed(0, kOpsPerIncrement, Milliseconds(1));
     clock->advance(kIncrement);
-    metrics->onCopyingEnd();
-    metrics->onApplyingBegin();
+    metrics->setEndFor(TimedPhase::kCloning, getClockSource()->now());
+    metrics->setStartFor(TimedPhase::kApplying, getClockSource()->now());
     metrics->onOplogEntriesApplied(kOpsPerIncrement);
     clock->advance(kIncrement);
     report = metrics->reportForCurrentOp();
@@ -494,7 +495,7 @@ TEST_F(ReshardingMetricsTest, RecipientReportsRemainingTime) {
     // Done.
     metrics->onOplogEntriesApplied(kOpsPerIncrement);
     clock->advance(kIncrement);
-    metrics->onApplyingEnd();
+    metrics->setEndFor(TimedPhase::kApplying, getClockSource()->now());
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"), 0);
 }
@@ -518,13 +519,43 @@ TEST_F(ReshardingMetricsTest, RecipientRestoreAppliedOplogEntries) {
     ASSERT_EQ(report.getIntField("oplogEntriesApplied"), 30);
 }
 
+TEST_F(ReshardingMetricsTest, CurrentOpReportsCopyingTime) {
+    runTimeReportTest<ReshardingMetrics>(
+        "CurrentOpReportsCopyingTime",
+        {Role::kRecipient, Role::kCoordinator},
+        "totalCopyTimeElapsedSecs",
+        [this](ReshardingMetrics* metrics) {
+            metrics->setStartFor(TimedPhase::kCloning, getClockSource()->now());
+        },
+        [this](ReshardingMetrics* metrics) {
+            metrics->setEndFor(TimedPhase::kCloning, getClockSource()->now());
+        });
+}
+
 TEST_F(ReshardingMetricsTest, CurrentOpReportsApplyingTime) {
     runTimeReportTest<ReshardingMetrics>(
         "CurrentOpReportsApplyingTime",
         {Role::kRecipient, Role::kCoordinator},
         "totalApplyTimeElapsedSecs",
-        [](ReshardingMetrics* metrics) { metrics->onApplyingBegin(); },
-        [](ReshardingMetrics* metrics) { metrics->onApplyingEnd(); });
+        [this](ReshardingMetrics* metrics) {
+            metrics->setStartFor(TimedPhase::kApplying, getClockSource()->now());
+        },
+        [this](ReshardingMetrics* metrics) {
+            metrics->setEndFor(TimedPhase::kApplying, getClockSource()->now());
+        });
+}
+
+TEST_F(ReshardingMetricsTest, CurrentOpReportsCriticalSectionTime) {
+    runTimeReportTest<ReshardingMetrics>(
+        "CurrentOpReportsCriticalSectionTime",
+        {Role::kDonor, Role::kCoordinator},
+        "totalCriticalSectionTimeElapsedSecs",
+        [this](ReshardingMetrics* metrics) {
+            metrics->setStartFor(TimedPhase::kCriticalSection, getClockSource()->now());
+        },
+        [this](ReshardingMetrics* metrics) {
+            metrics->setEndFor(TimedPhase::kCriticalSection, getClockSource()->now());
+        });
 }
 
 TEST_F(ReshardingMetricsTest, RecipientEstimatesNoneOnNewInstance) {
@@ -568,21 +599,23 @@ TEST_F(ReshardingMetricsTest, OnDeleteAppliedIncrementsCumulativeMetrics) {
 
 TEST_F(ReshardingMetricsTest, OnOplogFetchedIncrementsCumulativeMetricsFetchedCount) {
     createMetricsAndAssertIncrementsCumulativeMetricsField(
-        [](auto metrics) { metrics->onOplogEntriesFetched(1, Milliseconds{0}); },
+        [](auto metrics) { metrics->onOplogEntriesFetched(1); },
         Section::kActive,
         "oplogEntriesFetched");
 }
 
-TEST_F(ReshardingMetricsTest, OnOplogFetchedIncrementsCumulativeMetricsFetchedBatchCount) {
+TEST_F(ReshardingMetricsTest,
+       OnBatchRetrievedDuringOplogFetchingIncrementsCumulativeMetricsFetchedBatchCount) {
     createMetricsAndAssertIncrementsCumulativeMetricsField(
-        [](auto metrics) { metrics->onOplogEntriesFetched(0, Milliseconds{0}); },
+        [](auto metrics) { metrics->onBatchRetrievedDuringOplogFetching(Milliseconds{0}); },
         Section::kLatencies,
         "oplogFetchingTotalRemoteBatchesRetrieved");
 }
 
-TEST_F(ReshardingMetricsTest, OnOplogFetchedIncrementsCumulativeMetricsFetchedBatchTime) {
+TEST_F(ReshardingMetricsTest,
+       OnBatchRetrievedDuringOplogFetchingIncrementsCumulativeMetricsFetchedBatchTime) {
     createMetricsAndAssertIncrementsCumulativeMetricsField(
-        [](auto metrics) { metrics->onOplogEntriesFetched(0, Milliseconds{1}); },
+        [](auto metrics) { metrics->onBatchRetrievedDuringOplogFetching(Milliseconds{1}); },
         Section::kLatencies,
         "oplogFetchingTotalRemoteBatchRetrievalTimeMillis");
 }

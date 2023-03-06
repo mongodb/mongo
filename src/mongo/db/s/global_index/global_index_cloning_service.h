@@ -193,6 +193,8 @@ private:
     void _updateMutableState(OperationContext* opCtx,
                              GlobalIndexClonerMutableState newMutableState);
 
+    Date_t now() const;
+
     /**********************************************************************************
      * Thread safety legend
      *

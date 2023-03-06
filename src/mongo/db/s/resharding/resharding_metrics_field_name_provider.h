@@ -29,25 +29,16 @@
 
 #pragma once
 
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/metrics/field_names/sharding_data_transform_instance_metrics_field_name_provider.h"
-#include "mongo/util/duration.h"
+#include "mongo/db/s/metrics/field_names/with_document_copy_approximation_field_name_overrides.h"
+#include "mongo/db/s/metrics/field_names/with_document_copy_count_field_name_overrides.h"
+#include "mongo/db/s/metrics/field_names/with_oplog_application_count_metrics_field_names.h"
 
 namespace mongo {
 
 class ReshardingMetricsFieldNameProvider
-    : public ShardingDataTransformInstanceMetricsFieldNameProvider {
-public:
-    StringData getForDocumentsProcessed() const override;
-    StringData getForBytesWritten() const override;
-    StringData getForApproxDocumentsToProcess() const override;
-    StringData getForApproxBytesToScan() const override;
-    StringData getForInsertsApplied() const;
-    StringData getForUpdatesApplied() const;
-    StringData getForDeletesApplied() const;
-    StringData getForOplogEntriesApplied() const;
-    StringData getForOplogEntriesFetched() const;
-    StringData getForApplyTimeElapsed() const;
-};
+    : public WithOplogApplicationCountFieldNames<
+          WithDocumentCopyApproximationFieldNameOverrides<WithDocumentCopyCountFieldNameOverrides<
+              ShardingDataTransformInstanceMetricsFieldNameProvider>>> {};
 
 }  // namespace mongo

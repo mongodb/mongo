@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/field_names/sharding_data_transform_instance_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/field_names/with_document_copy_approximation_field_name_overrides.h"
 #include "mongo/db/s/metrics/field_names/with_document_copy_count_field_name_overrides.h"
 #include "mongo/db/s/metrics/field_names/with_oplog_application_count_metrics_field_names.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_latency_metrics_field_names.h"
 
 namespace mongo {
 
-class MovePrimaryCumulativeMetricsFieldNameProvider
-    : public WithOplogApplicationLatencyMetricsFieldNames<
-          WithOplogApplicationCountFieldNames<WithDocumentCopyCountFieldNameOverrides<
-              ShardingDataTransformCumulativeMetricsFieldNameProvider>>> {};
+class MovePrimaryMetricsFieldNameProvider
+    : public WithOplogApplicationCountFieldNames<
+          WithDocumentCopyApproximationFieldNameOverrides<WithDocumentCopyCountFieldNameOverrides<
+              ShardingDataTransformInstanceMetricsFieldNameProvider>>> {};
 
 }  // namespace mongo

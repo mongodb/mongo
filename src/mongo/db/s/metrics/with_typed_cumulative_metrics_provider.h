@@ -29,24 +29,18 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
-
 namespace mongo {
 
-template <typename Base>
-class WithDocumentCopyFieldNameOverrides : public Base {
+template <typename Base, typename Typed>
+class WithTypedCumulativeMetricsProvider : public Base {
 public:
-    virtual StringData getForDocumentsProcessed() const override {
-        return kDocumentsCopied;
-    }
+    template <typename... Args>
+    WithTypedCumulativeMetricsProvider(Args&&... args) : Base{std::forward<Args>(args)...} {}
 
-    virtual StringData getForBytesWritten() const override {
-        return kBytesCopied;
+protected:
+    auto getTypedCumulativeMetrics() {
+        return dynamic_cast<Typed*>(Base::getCumulativeMetrics());
     }
-
-private:
-    static constexpr auto kDocumentsCopied = "documentsCopied";
-    static constexpr auto kBytesCopied = "bytesCopied";
 };
 
 }  // namespace mongo

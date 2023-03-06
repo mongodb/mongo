@@ -29,16 +29,32 @@
 
 #pragma once
 
-#include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
-#include "mongo/db/s/metrics/field_names/with_document_copy_count_field_name_overrides.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_count_metrics_field_names.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_latency_metrics_field_names.h"
+#include "mongo/db/s/metrics/with_oplog_application_count_metrics.h"
 
 namespace mongo {
 
-class MovePrimaryCumulativeMetricsFieldNameProvider
-    : public WithOplogApplicationLatencyMetricsFieldNames<
-          WithOplogApplicationCountFieldNames<WithDocumentCopyCountFieldNameOverrides<
-              ShardingDataTransformCumulativeMetricsFieldNameProvider>>> {};
+template <typename Base>
+class WithOplogApplicationLatencyMetricsInterfaceUpdatingCumulativeMetrics : public Base {
+public:
+    template <typename... Args>
+    WithOplogApplicationLatencyMetricsInterfaceUpdatingCumulativeMetrics(Args&&... args)
+        : Base{std::forward<Args>(args)...} {}
+
+    void onBatchRetrievedDuringOplogFetching(Milliseconds elapsed) {
+        Base::getTypedCumulativeMetrics()->onBatchRetrievedDuringOplogFetching(elapsed);
+    }
+
+    void onLocalInsertDuringOplogFetching(const Milliseconds& elapsed) {
+        Base::getTypedCumulativeMetrics()->onLocalInsertDuringOplogFetching(elapsed);
+    }
+
+    void onBatchRetrievedDuringOplogApplying(const Milliseconds& elapsed) {
+        Base::getTypedCumulativeMetrics()->onBatchRetrievedDuringOplogApplying(elapsed);
+    }
+
+    void onOplogLocalBatchApplied(Milliseconds elapsed) {
+        Base::getTypedCumulativeMetrics()->onOplogLocalBatchApplied(elapsed);
+    }
+};
 
 }  // namespace mongo

@@ -393,7 +393,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                            _critSecReason,
                            ShardingCatalogClient::kLocalWriteConcern);
 
-                   _metrics->onCriticalSectionEnd();
+                   _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
+                                       getCurrentTime());
                }
 
                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
@@ -706,7 +707,7 @@ void ReshardingDonorService::DonorStateMachine::
                 _critSecReason,
                 ShardingCatalogClient::kLocalWriteConcern);
 
-        _metrics->onCriticalSectionBegin();
+        _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection, getCurrentTime());
     }
 
     {

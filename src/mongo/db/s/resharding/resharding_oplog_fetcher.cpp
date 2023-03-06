@@ -323,8 +323,9 @@ bool ReshardingOplogFetcher::consume(Client* client,
         [this, &batchesProcessed, &moreToCome, &opCtxRaii, &batchFetchTimer, factory](
             const std::vector<BSONObj>& batch,
             const boost::optional<BSONObj>& postBatchResumeToken) {
-            _env->metrics()->onOplogEntriesFetched(batch.size(),
-                                                   Milliseconds(batchFetchTimer.millis()));
+            _env->metrics()->onOplogEntriesFetched(batch.size());
+            _env->metrics()->onBatchRetrievedDuringOplogFetching(
+                Milliseconds(batchFetchTimer.millis()));
 
             ThreadClient client(fmt::format("ReshardingFetcher-{}-{}",
                                             _reshardingUUID.toString(),
@@ -407,7 +408,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
 
                     // Also include synthetic oplog in the fetched count so it can match up with the
                     // total oplog applied count in the end.
-                    _env->metrics()->onOplogEntriesFetched(1, Milliseconds(0));
+                    _env->metrics()->onOplogEntriesFetched(1);
 
                     auto [p, f] = makePromiseFuture<void>();
                     {

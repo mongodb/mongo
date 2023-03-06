@@ -170,14 +170,14 @@ void setMeticsAfterWrite(ReshardingMetrics* metrics,
                          Date_t timestamp) {
     switch (newState) {
         case RecipientStateEnum::kCloning:
-            metrics->setCopyingBegin(timestamp);
+            metrics->setStartFor(ReshardingMetrics::TimedPhase::kCloning, timestamp);
             return;
         case RecipientStateEnum::kApplying:
-            metrics->setCopyingEnd(timestamp);
-            metrics->setApplyingBegin(timestamp);
+            metrics->setEndFor(ReshardingMetrics::TimedPhase::kCloning, timestamp);
+            metrics->setStartFor(ReshardingMetrics::TimedPhase::kApplying, timestamp);
             return;
         case RecipientStateEnum::kStrictConsistency:
-            metrics->setApplyingEnd(timestamp);
+            metrics->setEndFor(ReshardingMetrics::TimedPhase::kApplying, timestamp);
             return;
         default:
             return;

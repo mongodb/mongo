@@ -386,10 +386,18 @@ TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion
         // in memory.
         auto persistedRecipientDocument = getStateDoc(opCtx.get());
 
-        Date_t copyBegin = recipient->getMetrics().getCopyingBegin();
-        Date_t copyEnd = recipient->getMetrics().getCopyingEnd();
-        Date_t applyBegin = recipient->getMetrics().getApplyingBegin();
-        Date_t applyEnd = recipient->getMetrics().getApplyingEnd();
+        Date_t copyBegin = recipient->getMetrics()
+                               .getStartFor(ReshardingMetrics::TimedPhase::kCloning)
+                               .value_or(Date_t::min());
+        Date_t copyEnd = recipient->getMetrics()
+                             .getEndFor(ReshardingMetrics::TimedPhase::kCloning)
+                             .value_or(Date_t::min());
+        Date_t applyBegin = recipient->getMetrics()
+                                .getStartFor(ReshardingMetrics::TimedPhase::kApplying)
+                                .value_or(Date_t::min());
+        Date_t applyEnd = recipient->getMetrics()
+                              .getEndFor(ReshardingMetrics::TimedPhase::kApplying)
+                              .value_or(Date_t::min());
 
         auto copyBeginDoc = persistedRecipientDocument.getMetrics()->getDocumentCopy()->getStart();
         auto copyEndDoc = persistedRecipientDocument.getMetrics()->getDocumentCopy()->getStop();

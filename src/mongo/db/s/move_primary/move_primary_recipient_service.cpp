@@ -150,7 +150,7 @@ MovePrimaryRecipientService::MovePrimaryRecipient::MovePrimaryRecipient(
     std::shared_ptr<MovePrimaryRecipientExternalState> externalState,
     ServiceContext* serviceContext)
     : _recipientService(service),
-      _metadata(recipientDoc.getMovePrimaryRecipientMetadata()),
+      _metadata(recipientDoc.getMetadata()),
       _movePrimaryRecipientExternalState(externalState),
       _serviceContext(serviceContext),
       _markKilledExecutor(std::make_shared<ThreadPool>([] {
@@ -171,7 +171,7 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::checkIfOptionsConflict(
     uassert(ErrorCodes::MovePrimaryInProgress,
             str::stream() << "Found an existing movePrimary operation in progress",
             recipientDoc.getDatabaseName() == _metadata.getDatabaseName() &&
-                recipientDoc.getFromShard() == _metadata.getFromShard());
+                recipientDoc.getShardName() == _metadata.getShardName());
 }
 
 std::vector<AsyncRequestsSender::Response>
@@ -285,9 +285,9 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_transitionStateMachine(
           "Transitioned movePrimary recipient state",
           "oldState"_attr = _parseRecipientState(newState),
           "newState"_attr = _parseRecipientState(_state),
-          "migrationId"_attr = _metadata.getMigrationId(),
+          "migrationId"_attr = _metadata.get_id(),
           "databaseName"_attr = _metadata.getDatabaseName(),
-          "fromShard"_attr = _metadata.getFromShard());
+          "fromShard"_attr = _metadata.getShardName());
 }
 
 ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_persistRecipientDoc(
@@ -304,8 +304,7 @@ ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_persist
         auto opCtx = opCtxHolder.get();
 
         MovePrimaryRecipientDocument recipientDoc;
-        recipientDoc.setMovePrimaryRecipientMetadata(_metadata);
-        recipientDoc.setId(_metadata.getMigrationId());
+        recipientDoc.setMetadata(_metadata);
         recipientDoc.setState(MovePrimaryRecipientState::kCloning);
         recipientDoc.setStartAt(_serviceContext->getPreciseClockSource()->now());
 
@@ -352,11 +351,10 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_updateRecipientDocument
         setBuilder.doneFast();
     }
 
-    store.update(
-        opCtx,
-        BSON(MovePrimaryRecipientDocument::kMigrationIdFieldName << _metadata.getMigrationId()),
-        updateBuilder.done(),
-        WriteConcerns::kMajorityWriteConcernNoTimeout);
+    store.update(opCtx,
+                 BSON(MovePrimaryRecipientDocument::k_idFieldName << _metadata.get_id()),
+                 updateBuilder.done(),
+                 WriteConcerns::kMajorityWriteConcernNoTimeout);
 }
 
 repl::OpTime MovePrimaryRecipientService::MovePrimaryRecipient::_getStartApplyingDonorOpTime(
@@ -372,9 +370,9 @@ repl::OpTime MovePrimaryRecipientService::MovePrimaryRecipient::_getStartApplyin
 
     auto rawResp = _movePrimaryRecipientExternalState->sendCommandToShards(
         opCtx,
-        _metadata.getDatabaseName(),
+        _metadata.getDatabaseName().toString(),
         findCmd.toBSON({}),
-        {ShardId(_metadata.getFromShard().toString())},
+        {ShardId(_metadata.getShardName().toString())},
         **executor);
 
     uassert(7356200, "Unable to find majority committed OpTime at donor", !rawResp.empty());
@@ -389,7 +387,7 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_getShardedCollectionsFromCon
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto shardedColls =
         catalogClient->getAllShardedCollectionsForDb(opCtx,
-                                                     _metadata.getDatabaseName(),
+                                                     _metadata.getDatabaseName().toString(),
                                                      repl::ReadConcernLevel::kMajorityReadConcern,
                                                      BSON("ns" << 1));
     return shardedColls;
@@ -403,12 +401,12 @@ boost::optional<BSONObj> MovePrimaryRecipientService::MovePrimaryRecipient::repo
     return boost::none;
 }
 
-StringData MovePrimaryRecipientService::MovePrimaryRecipient::getDatabaseName() const {
+NamespaceString MovePrimaryRecipientService::MovePrimaryRecipient::getDatabaseName() const {
     return _metadata.getDatabaseName();
 }
 
 UUID MovePrimaryRecipientService::MovePrimaryRecipient::getMigrationId() const {
-    return _metadata.getMigrationId();
+    return _metadata.get_id();
 }
 
 }  // namespace mongo
