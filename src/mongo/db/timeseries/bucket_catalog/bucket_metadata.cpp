@@ -34,13 +34,15 @@
 
 namespace mongo::timeseries::bucket_catalog {
 
-BucketMetadata::BucketMetadata(BSONElement elem, const StringData::ComparatorInterface* comparator)
+BucketMetadata::BucketMetadata(BSONElement elem,
+                               const StringData::ComparatorInterface* comparator,
+                               boost::optional<StringData> trueMetaFieldName)
     : _metadataElement(elem), _comparator(comparator) {
     if (_metadataElement) {
         BSONObjBuilder objBuilder;
         // We will get an object of equal size, just with reordered fields.
         objBuilder.bb().reserveBytes(_metadataElement.size());
-        normalizeMetadata(&objBuilder, _metadataElement, boost::none);
+        normalizeMetadata(&objBuilder, _metadataElement, trueMetaFieldName);
         _metadata = objBuilder.obj();
     }
     // Updates the BSONElement to refer to the copied BSONObj.

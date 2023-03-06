@@ -86,7 +86,7 @@ public:
     NamespaceString ns2 = NamespaceString::createNamespaceString_forTest("db.test2");
     NamespaceString ns3 = NamespaceString::createNamespaceString_forTest("db.test3");
     BSONElement elem;
-    BucketMetadata bucketMetadata{elem, nullptr};
+    BucketMetadata bucketMetadata{elem, nullptr, boost::none};
     BucketKey bucketKey1{ns1, bucketMetadata};
     BucketKey bucketKey2{ns2, bucketMetadata};
     BucketKey bucketKey3{ns3, bucketMetadata};

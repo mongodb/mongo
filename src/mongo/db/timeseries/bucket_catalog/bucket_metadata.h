@@ -41,7 +41,9 @@ namespace mongo::timeseries::bucket_catalog {
 struct BucketMetadata {
 public:
     BucketMetadata() = default;
-    BucketMetadata(BSONElement elem, const StringData::ComparatorInterface* comparator);
+    BucketMetadata(BSONElement elem,
+                   const StringData::ComparatorInterface* comparator,
+                   boost::optional<StringData> trueMetaFieldName);
 
     bool operator==(const BucketMetadata& other) const;
     bool operator!=(const BucketMetadata& other) const;
