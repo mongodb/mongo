@@ -163,6 +163,7 @@ debian/mongodb
 # Idea CLion project artifacts
 .idea
 CMakeLists.txt
+!src/third_party/abseil-cpp/**/CMakeLists.txt
 
 # XCode projects
 .xcworkspace

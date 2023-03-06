@@ -19,7 +19,7 @@ tomcryptSuffix = '-1.18.2'
 variantSuffix = '-1.4.0'
 
 thirdPartyEnvironmentModifications = {
-    'abseil-cpp': {'CPPPATH': ['#/src/third_party/abseil-cpp-master/abseil-cpp'], },
+    'abseil-cpp': {'CPPPATH': ['#/src/third_party/abseil-cpp/dist'], },
     'fmt': {'CPPPATH': ['#src/third_party/fmt/dist/include'], },
     's2': {'CPPPATH': ['#src/third_party/s2'], },
     'safeint': {
@@ -391,14 +391,17 @@ else:
 
 boostEnv.ShimLibrary(name="boost")
 
-abseilDirectory = 'abseil-cpp-master'
+abseilDirectory = 'abseil-cpp'
 abseilEnv = env.Clone()
 abseilEnv.InjectThirdParty(libraries=['abseil-cpp'])
 abseilEnv.SConscript(abseilDirectory + '/SConscript', exports={'env': abseilEnv})
 abseilEnv = abseilEnv.Clone(LIBDEPS_INTERFACE=[
-    abseilDirectory + '/absl_container',
+    abseilDirectory + '/absl_city',
     abseilDirectory + '/absl_hash',
-    abseilDirectory + '/absl_numeric',
+    abseilDirectory + '/absl_int128',
+    abseilDirectory + '/absl_raw_hash_set',
+    abseilDirectory + '/absl_throw_delegate',
+    abseilDirectory + '/absl_wyhash',
 ])
 
 abseilEnv.ShimLibrary(name="abseil")

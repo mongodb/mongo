@@ -43,7 +43,7 @@ components:
     homepage_url: https://abseil.io
     open_hub_url: N/A
     release_monitoring_id: 115295
-    local_directory_path: src/third_party/abseil-cpp-master
+    local_directory_path: src/third_party/abseil-cpp
     team_owner: "Service Architecture"
     # Note: abseil exists in Black Duck, but not OpenHub
     upgrade_suppression: TODO SERVER-58675

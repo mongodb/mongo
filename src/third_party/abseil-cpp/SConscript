@@ -1,0 +1,463 @@
+# Generated from parse_lib_from_ninja.py
+Import("env")
+env = env.Clone()
+env.InjectThirdParty(libraries=['abseil-cpp'])
+if env.ToolchainIs('msvc'):
+    env.Append(
+        CPPDEFINES=[
+            'NOMINMAX',
+        ],
+        CCFLAGS=[],
+    )
+
+if env.GetOption('sanitize') and 'undefined' in env.GetOption('sanitize').split(','):
+    # UBSAN causes the __muloti4 reference to be in the library. This is not defined in libgcc, so
+    # we will just opt out of this check in this third party library. Related issues below:
+    #
+    # abseil issue showing the commit it was introduced
+    # https://github.com/abseil/abseil-cpp/issues/841
+    #
+    # GCC bug saying the symbol is missing
+    # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=103034
+    #
+    # LLVM bug saying the symbol requires extra linkage
+    # https://bugs.llvm.org/show_bug.cgi?id=16404
+    env.Append(
+        CCFLAGS=[
+            '-fno-sanitize=signed-integer-overflow',
+        ],
+        LINKFLAGS=[
+            '-fno-sanitize=signed-integer-overflow',
+        ],
+    )
+
+# absl_throw_delegate is an explicit dependency to the server build
+env.Library(
+    target='absl_throw_delegate',
+    source=[
+        'dist/absl/base/internal/throw_delegate.cc',
+    ],
+    LIBDEPS=[
+        'absl_log_severity',
+        'absl_raw_logging_internal',
+    ],
+)
+
+# absl_raw_hash_set is an explicit dependency to the server build
+env.Library(
+    target='absl_raw_hash_set',
+    source=[
+        'dist/absl/container/internal/raw_hash_set.cc',
+    ],
+    LIBDEPS=[
+        'absl_bad_optional_access',
+        'absl_base',
+        'absl_civil_time',
+        'absl_debugging_internal',
+        'absl_demangle_internal',
+        'absl_exponential_biased',
+        'absl_graphcycles_internal',
+        'absl_hashtablez_sampler',
+        'absl_int128',
+        'absl_log_severity',
+        'absl_malloc_internal',
+        'absl_raw_logging_internal',
+        'absl_spinlock_wait',
+        'absl_stacktrace',
+        'absl_strings',
+        'absl_strings_internal',
+        'absl_symbolize',
+        'absl_synchronization',
+        'absl_throw_delegate',
+        'absl_time',
+        'absl_time_zone',
+    ],
+)
+
+# absl_hashtablez_sampler added as a dependency of other abseil libraries
+env.Library(
+    target='absl_hashtablez_sampler',
+    source=[
+        'dist/absl/container/internal/hashtablez_sampler.cc',
+        'dist/absl/container/internal/hashtablez_sampler_force_weak_definition.cc',
+    ],
+    LIBDEPS=[
+        'absl_base',
+        'absl_civil_time',
+        'absl_debugging_internal',
+        'absl_demangle_internal',
+        'absl_exponential_biased',
+        'absl_graphcycles_internal',
+        'absl_int128',
+        'absl_log_severity',
+        'absl_malloc_internal',
+        'absl_raw_logging_internal',
+        'absl_spinlock_wait',
+        'absl_stacktrace',
+        'absl_strings',
+        'absl_strings_internal',
+        'absl_symbolize',
+        'absl_synchronization',
+        'absl_throw_delegate',
+        'absl_time',
+        'absl_time_zone',
+    ],
+)
+
+# absl_stacktrace added as a dependency of other abseil libraries
+env.Library(
+    target='absl_stacktrace',
+    source=[
+        'dist/absl/debugging/stacktrace.cc',
+    ],
+    LIBDEPS=[
+        'absl_debugging_internal',
+        'absl_log_severity',
+        'absl_raw_logging_internal',
+    ],
+)
+
+# absl_symbolize added as a dependency of other abseil libraries
+env.Library(
+    target='absl_symbolize',
+    source=[
+        'dist/absl/debugging/symbolize.cc',
+    ],
+    LIBDEPS=[
+        'absl_base',
+        'absl_debugging_internal',
+        'absl_demangle_internal',
+        'absl_int128',
+        'absl_log_severity',
+        'absl_malloc_internal',
+        'absl_raw_logging_internal',
+        'absl_spinlock_wait',
+        'absl_strings',
+        'absl_strings_internal',
+        'absl_throw_delegate',
+    ],
+)
+
+# absl_demangle_internal added as a dependency of other abseil libraries
+env.Library(
+    target='absl_demangle_internal',
+    source=[
+        'dist/absl/debugging/internal/demangle.cc',
+    ],
+    LIBDEPS=[
+        'absl_base',
+        'absl_log_severity',
+        'absl_raw_logging_internal',
+        'absl_spinlock_wait',
+    ],
+)
+
+# absl_debugging_internal added as a dependency of other abseil libraries
+env.Library(
+    target='absl_debugging_internal',
+    source=[
+        'dist/absl/debugging/internal/address_is_readable.cc',
+        'dist/absl/debugging/internal/elf_mem_image.cc',
+        'dist/absl/debugging/internal/vdso_support.cc',
+    ],
+    LIBDEPS=[
+        'absl_log_severity',
+        'absl_raw_logging_internal',
+    ],
+)
+
+# absl_wyhash is an explicit dependency to the server build
+env.Library(
+    target='absl_wyhash',
+    source=[
+        'dist/absl/hash/internal/wyhash.cc',
+    ],
+    LIBDEPS=[
+        'absl_base',
+        'absl_int128',
+        'absl_log_severity',
+        'absl_raw_logging_internal',
+        'absl_spinlock_wait',
+    ],
+)
+
+# absl_city is an explicit dependency to the server build
+env.Library(
+    target='absl_city',
+    source=[
+        'dist/absl/hash/internal/city.cc',
+    ],
+    LIBDEPS=[
+        'absl_base',
+        'absl_log_severity',
+        'absl_raw_logging_internal',
+        'absl_spinlock_wait',
+    ],
+)
+
+# absl_hash is an explicit dependency to the server build
+env.Library(
+    target='absl_hash',
+    source=[
+        'dist/absl/hash/internal/hash.cc',
+    ],
+    LIBDEPS=[
+        'absl_bad_optional_access',
+        'absl_bad_variant_access',
+        'absl_base',
+        'absl_city',
+        'absl_int128',
+        'absl_log_severity',
+        'absl_raw_logging_internal',
+        'absl_spinlock_wait',
+        'absl_strings',
+        'absl_strings_internal',
+        'absl_throw_delegate',
+        'absl_wyhash',
+    ],
+)
+
+# absl_int128 is an explicit dependency to the server build
+env.Library(
+    target='absl_int128',
+    source=[
+        'dist/absl/numeric/int128.cc',
+    ],
+    LIBDEPS=[],
+)
+
+# absl_strings_internal added as a dependency of other abseil libraries
+env.Library(
+    target='absl_strings_internal',
+    source=[
+        'dist/absl/strings/internal/ostringstream.cc',
+        'dist/absl/strings/internal/utf8.cc',
+        'dist/absl/strings/internal/escaping.cc',
+    ],
+    LIBDEPS=[
+        'absl_base',
+        'absl_log_severity',
+        'absl_raw_logging_internal',
+        'absl_spinlock_wait',
+    ],
+)
+
+# absl_strings added as a dependency of other abseil libraries
+env.Library(
+    target='absl_strings',
+    source=[
+        'dist/absl/strings/ascii.cc',
+        'dist/absl/strings/charconv.cc',
+        'dist/absl/strings/escaping.cc',
+        'dist/absl/strings/internal/charconv_bigint.cc',
+        'dist/absl/strings/internal/charconv_parse.cc',
+        'dist/absl/strings/internal/memutil.cc',
+        'dist/absl/strings/match.cc',
+        'dist/absl/strings/numbers.cc',
+        'dist/absl/strings/str_cat.cc',
+        'dist/absl/strings/str_replace.cc',
+        'dist/absl/strings/str_split.cc',
+        'dist/absl/strings/string_view.cc',
+        'dist/absl/strings/substitute.cc',
+    ],
+    LIBDEPS=[
+        'absl_base',
+        'absl_int128',
+        'absl_log_severity',
+        'absl_raw_logging_internal',
+        'absl_spinlock_wait',
+        'absl_strings_internal',
+        'absl_throw_delegate',
+    ],
+)
+
+# absl_synchronization added as a dependency of other abseil libraries
+env.Library(
+    target='absl_synchronization',
+    source=[
+        'dist/absl/synchronization/barrier.cc',
+        'dist/absl/synchronization/blocking_counter.cc',
+        'dist/absl/synchronization/internal/create_thread_identity.cc',
+        'dist/absl/synchronization/internal/per_thread_sem.cc',
+        'dist/absl/synchronization/internal/waiter.cc',
+        'dist/absl/synchronization/notification.cc',
+        'dist/absl/synchronization/mutex.cc',
+    ],
+    LIBDEPS=[
+        'absl_base',
+        'absl_civil_time',
+        'absl_debugging_internal',
+        'absl_demangle_internal',
+        'absl_graphcycles_internal',
+        'absl_int128',
+        'absl_log_severity',
+        'absl_malloc_internal',
+        'absl_raw_logging_internal',
+        'absl_spinlock_wait',
+        'absl_stacktrace',
+        'absl_strings',
+        'absl_strings_internal',
+        'absl_symbolize',
+        'absl_throw_delegate',
+        'absl_time',
+        'absl_time_zone',
+    ],
+)
+
+# absl_graphcycles_internal added as a dependency of other abseil libraries
+env.Library(
+    target='absl_graphcycles_internal',
+    source=[
+        'dist/absl/synchronization/internal/graphcycles.cc',
+    ],
+    LIBDEPS=[
+        'absl_base',
+        'absl_log_severity',
+        'absl_malloc_internal',
+        'absl_raw_logging_internal',
+        'absl_spinlock_wait',
+    ],
+)
+
+# absl_time_zone added as a dependency of other abseil libraries
+env.Library(
+    target='absl_time_zone',
+    source=[
+        'dist/absl/time/internal/cctz/src/time_zone_fixed.cc',
+        'dist/absl/time/internal/cctz/src/time_zone_format.cc',
+        'dist/absl/time/internal/cctz/src/time_zone_if.cc',
+        'dist/absl/time/internal/cctz/src/time_zone_impl.cc',
+        'dist/absl/time/internal/cctz/src/time_zone_info.cc',
+        'dist/absl/time/internal/cctz/src/time_zone_libc.cc',
+        'dist/absl/time/internal/cctz/src/time_zone_lookup.cc',
+        'dist/absl/time/internal/cctz/src/time_zone_posix.cc',
+        'dist/absl/time/internal/cctz/src/zone_info_source.cc',
+    ],
+    LIBDEPS=[],
+)
+
+# absl_civil_time added as a dependency of other abseil libraries
+env.Library(
+    target='absl_civil_time',
+    source=[
+        'dist/absl/time/internal/cctz/src/civil_time_detail.cc',
+    ],
+    LIBDEPS=[],
+)
+
+# absl_time added as a dependency of other abseil libraries
+env.Library(
+    target='absl_time',
+    source=[
+        'dist/absl/time/civil_time.cc',
+        'dist/absl/time/clock.cc',
+        'dist/absl/time/duration.cc',
+        'dist/absl/time/format.cc',
+        'dist/absl/time/time.cc',
+    ],
+    LIBDEPS=[
+        'absl_base',
+        'absl_civil_time',
+        'absl_int128',
+        'absl_log_severity',
+        'absl_raw_logging_internal',
+        'absl_spinlock_wait',
+        'absl_strings',
+        'absl_strings_internal',
+        'absl_throw_delegate',
+        'absl_time_zone',
+    ],
+)
+
+# absl_bad_optional_access added as a dependency of other abseil libraries
+env.Library(
+    target='absl_bad_optional_access',
+    source=[
+        'dist/absl/types/bad_optional_access.cc',
+    ],
+    LIBDEPS=[
+        'absl_log_severity',
+        'absl_raw_logging_internal',
+    ],
+)
+
+# absl_bad_variant_access added as a dependency of other abseil libraries
+env.Library(
+    target='absl_bad_variant_access',
+    source=[
+        'dist/absl/types/bad_variant_access.cc',
+    ],
+    LIBDEPS=[
+        'absl_log_severity',
+        'absl_raw_logging_internal',
+    ],
+)
+
+# absl_spinlock_wait added as a dependency of other abseil libraries
+env.Library(
+    target='absl_spinlock_wait',
+    source=[
+        'dist/absl/base/internal/spinlock_wait.cc',
+    ],
+    LIBDEPS=[],
+)
+
+# absl_log_severity added as a dependency of other abseil libraries
+env.Library(
+    target='absl_log_severity',
+    source=[
+        'dist/absl/base/log_severity.cc',
+    ],
+    LIBDEPS=[],
+)
+
+# absl_raw_logging_internal added as a dependency of other abseil libraries
+env.Library(
+    target='absl_raw_logging_internal',
+    source=[
+        'dist/absl/base/internal/raw_logging.cc',
+    ],
+    LIBDEPS=[
+        'absl_log_severity',
+    ],
+)
+
+# absl_exponential_biased added as a dependency of other abseil libraries
+env.Library(
+    target='absl_exponential_biased',
+    source=[
+        'dist/absl/base/internal/exponential_biased.cc',
+    ],
+    LIBDEPS=[],
+)
+
+# absl_malloc_internal added as a dependency of other abseil libraries
+env.Library(
+    target='absl_malloc_internal',
+    source=[
+        'dist/absl/base/internal/low_level_alloc.cc',
+    ],
+    LIBDEPS=[
+        'absl_base',
+        'absl_log_severity',
+        'absl_raw_logging_internal',
+        'absl_spinlock_wait',
+    ],
+)
+
+# absl_base added as a dependency of other abseil libraries
+env.Library(
+    target='absl_base',
+    source=[
+        'dist/absl/base/internal/cycleclock.cc',
+        'dist/absl/base/internal/spinlock.cc',
+        'dist/absl/base/internal/sysinfo.cc',
+        'dist/absl/base/internal/thread_identity.cc',
+        'dist/absl/base/internal/unscaledcycleclock.cc',
+    ],
+    LIBDEPS=[
+        'absl_log_severity',
+        'absl_raw_logging_internal',
+        'absl_spinlock_wait',
+    ],
+)
