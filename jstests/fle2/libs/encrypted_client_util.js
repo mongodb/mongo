@@ -57,6 +57,7 @@ var EncryptedClient = class {
         var keyVault = shell.getKeyVault();
 
         this._db = conn.getDB(dbName);
+        this._admindb = conn.getDB("admin");
         this._edb = edb;
         this._keyVault = keyVault;
     }
@@ -68,6 +69,15 @@ var EncryptedClient = class {
      */
     getDB() {
         return this._edb;
+    }
+
+    /**
+     * Return an encrypted database
+     *
+     * @returns Database
+     */
+    getAdminDB() {
+        return this._admindb;
     }
 
     /**

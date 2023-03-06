@@ -340,6 +340,8 @@ last-continuous:
     ticket: SERVER-74262
   - test_file: jstests/replsets/log_ddl_ops.js
     ticket: SERVER-73601
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/collection_coll_stats.js
+    ticket: SERVER-74461
   suites: null
 last-lts:
   all:
@@ -749,4 +751,6 @@ last-lts:
     ticket: SERVER-69952
   - test_file: jstests/replsets/log_ddl_ops.js
     ticket: SERVER-73601
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/collection_coll_stats.js
+    ticket: SERVER-74461
   suites: null

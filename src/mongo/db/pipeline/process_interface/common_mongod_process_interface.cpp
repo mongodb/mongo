@@ -355,7 +355,20 @@ void CommonMongodProcessInterface::appendLatencyStats(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       bool includeHistograms,
                                                       BSONObjBuilder* builder) const {
-    Top::get(opCtx->getServiceContext()).appendLatencyStats(nss, includeHistograms, builder);
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto view = catalog->lookupView(opCtx, nss);
+    if (!view) {
+        AutoGetCollectionForRead collection(opCtx, nss);
+        bool redactForQE =
+            (collection && collection->getCollectionOptions().encryptedFieldConfig) ||
+            nss.isFLE2StateCollection();
+        if (!redactForQE) {
+            Top::get(opCtx->getServiceContext())
+                .appendLatencyStats(nss, includeHistograms, builder);
+        }
+    } else {
+        Top::get(opCtx->getServiceContext()).appendLatencyStats(nss, includeHistograms, builder);
+    }
 }
 
 Status CommonMongodProcessInterface::appendStorageStats(
@@ -382,21 +395,25 @@ Status CommonMongodProcessInterface::appendQueryExecStats(OperationContext* opCt
                 str::stream() << "Collection [" << nss.toString() << "] not found."};
     }
 
-    auto collectionScanStats =
-        CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
-            .getCollectionScanStats();
+    bool redactForQE =
+        collection->getCollectionOptions().encryptedFieldConfig || nss.isFLE2StateCollection();
+    if (!redactForQE) {
+        auto collectionScanStats =
+            CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
+                .getCollectionScanStats();
 
-    dassert(collectionScanStats.collectionScans <=
-            static_cast<unsigned long long>(std::numeric_limits<long long>::max()));
-    dassert(collectionScanStats.collectionScansNonTailable <=
-            static_cast<unsigned long long>(std::numeric_limits<long long>::max()));
-    builder->append("queryExecStats",
-                    BSON("collectionScans" << BSON(
-                             "total" << static_cast<long long>(collectionScanStats.collectionScans)
-                                     << "nonTailable"
-                                     << static_cast<long long>(
-                                            collectionScanStats.collectionScansNonTailable))));
-
+        dassert(collectionScanStats.collectionScans <=
+                static_cast<unsigned long long>(std::numeric_limits<long long>::max()));
+        dassert(collectionScanStats.collectionScansNonTailable <=
+                static_cast<unsigned long long>(std::numeric_limits<long long>::max()));
+        builder->append(
+            "queryExecStats",
+            BSON("collectionScans"
+                 << BSON("total" << static_cast<long long>(collectionScanStats.collectionScans)
+                                 << "nonTailable"
+                                 << static_cast<long long>(
+                                        collectionScanStats.collectionScansNonTailable))));
+    }
     return Status::OK();
 }
 

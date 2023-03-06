@@ -143,10 +143,14 @@ void _appendRecordStore(OperationContext* opCtx,
         result->appendNumber("maxSize", collection->getCappedMaxSize() / scale);
     }
 
-    if (numericOnly) {
-        recordStore->appendNumericCustomStats(opCtx, result, scale);
-    } else {
-        recordStore->appendAllCustomStats(opCtx, result, scale);
+    bool redactForQE = collection.get()->getCollectionOptions().encryptedFieldConfig ||
+        collection.get()->ns().isFLE2StateCollection();
+    if (!redactForQE) {
+        if (numericOnly) {
+            recordStore->appendNumericCustomStats(opCtx, result, scale);
+        } else {
+            recordStore->appendAllCustomStats(opCtx, result, scale);
+        }
     }
 }
 
