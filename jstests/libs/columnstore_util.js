@@ -41,9 +41,13 @@ function safeToCreateColumnStoreIndexInCluster(nodes) {
             continue;
         }
 
-        const createColumnIndexParameter =
-            getParameter(conn, "failpoint.createColumnIndexOnAllCollections");
-        if (createColumnIndexParameter.mode) {
+        const fpName = "failpoint.createColumnIndexOnAllCollections";
+        const getParamRes = conn.getDB("admin").runCommand({getParameter: 1, [fpName]: 1});
+        if (!getParamRes.ok) {
+            return false;
+        }
+
+        if (getParamRes[fpName].mode) {
             // Test is already configured to create column store indexes on all collections; skip
             // it so that we don't create double indexes.
             jsTestLog("Note: declining to create column store index, because they are already " +
