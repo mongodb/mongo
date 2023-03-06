@@ -80,3 +80,9 @@ feature_flags:
         description: "Enable support for streams"
         cpp_varname: gFeatureFlagStreams
         default: false
+    featureFlagUseUnreplicatedTruncatesForDeletions:
+        description: "Feature flag to enable pre-image collection and change collection maintenance
+        using unreplicated truncates instead of normal document deletions replicated from the
+        primary."
+        cpp_varname: feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions
+        default: false
