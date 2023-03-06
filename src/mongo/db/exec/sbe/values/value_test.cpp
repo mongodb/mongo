@@ -301,4 +301,22 @@ TEST_F(SbeValueTest, CompareTwoValueMapTypes) {
     valueMapTypeInequalityComparisonTestGenFn(addMultipleDecimalKeyFn, addObjectKeyFn);
 }
 
+TEST_F(SbeValueTest, ArrayMoveIsDestructive) {
+    // Test that moving one SBE Array into another destroys the contents
+    // of the first one.
+    value::Array arr1;
+    auto pushStr = [](value::Array* arr, StringData str) {
+        auto [t, v] = value::makeBigString(str);
+        arr->push_back(t, v);
+    };
+
+    pushStr(&arr1, "foo");
+    pushStr(&arr1, "bar");
+
+    value::Array arr2 = std::move(arr1);
+
+    // arr1 should not hold dangling pointers to the values now owned by arr2.
+    ASSERT_EQ(arr1.size(), 0);  // NOLINT(bugprone-use-after-move)
+}
+
 }  // namespace mongo::sbe
