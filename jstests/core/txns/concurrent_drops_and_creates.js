@@ -65,7 +65,9 @@ assert.commandWorked(testDB2.runCommand({drop: collNameB, writeConcern: {w: "maj
 
 // This test cause a StaleConfig error on sharding so even with the PointInTimeCatalogLookups flag
 // enabled no command will succeed.
-if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups") && !session.getClient().isMongos()) {
+// TODO SERVER-67289: Remove feature flag check.
+if (FeatureFlagUtil.isPresentAndEnabled(db, "PointInTimeCatalogLookups") &&
+    !session.getClient().isMongos()) {
     // We can perform reads on the dropped collection as it existed when we started the transaction.
     assert.commandWorked(sessionDB2.runCommand({find: sessionCollB.getName()}));
 
@@ -110,7 +112,8 @@ assert.commandWorked(sessionCollA.insert({}));
 sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
 assert.commandWorked(testDB2.runCommand({create: collNameB}));
 
-if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
+// TODO SERVER-67289: Remove feature flag check.
+if (FeatureFlagUtil.isPresentAndEnabled(db, "PointInTimeCatalogLookups")) {
     // We can insert to collection B in the transaction as the transaction does not have a
     // collection on this namespace (even as it exist at latest). A collection will be implicitly
     // created and we will fail to commit this transaction with a WriteConflict error.

@@ -71,7 +71,8 @@ function runTest(startChangeStream) {
     // With capped collection parameters.
     let expectedSize;
 
-    if (FeatureFlagUtil.isEnabled(testDB, "CappedCollectionsRelaxedSize")) {
+    // TODO SERVER-74653: Remove feature flag check.
+    if (FeatureFlagUtil.isPresentAndEnabled(testDB, "CappedCollectionsRelaxedSize")) {
         expectedSize = 1000;
     } else {
         expectedSize = 1024;

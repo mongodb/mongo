@@ -66,7 +66,8 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
     session.commitTransaction();
     assert.eq(sessionColl.find({}).itcount(), 1);
 
-    if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
+    // TODO SERVER-67289: Remove feature flag check.
+    if (FeatureFlagUtil.isPresentAndEnabled(db, "PointInTimeCatalogLookups")) {
         // create cannot observe the collection created in the other transaction so the command
         // will succeed and we will instead throw WCE when trying to commit the transaction.
         retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {

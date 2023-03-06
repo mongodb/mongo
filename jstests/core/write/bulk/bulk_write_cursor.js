@@ -16,7 +16,8 @@
 load("jstests/libs/feature_flag_util.js");
 
 // Skip this test if the BulkWriteCommand feature flag is not enabled.
-if (!FeatureFlagUtil.isEnabled(db, "BulkWriteCommand")) {
+// TODO SERVER-67711: Remove feature flag check.
+if (!FeatureFlagUtil.isPresentAndEnabled(db, "BulkWriteCommand")) {
     jsTestLog('Skipping test because the BulkWriteCommand feature flag is disabled.');
     return;
 }

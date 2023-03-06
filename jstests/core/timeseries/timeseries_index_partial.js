@@ -51,7 +51,8 @@ if (FixtureHelpers.isSharded(buckets)) {
     });
 }
 
-if (FeatureFlagUtil.isEnabled(db, "TimeseriesScalabilityImprovements")) {
+// TODO SERVER-66438: Remove feature flag check.
+if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesScalabilityImprovements")) {
     // When enabled, the {meta: 1, time: 1} index gets built by default on the time-series
     // bucket collection.
     extraIndexes.push({
