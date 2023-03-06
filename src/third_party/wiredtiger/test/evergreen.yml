@@ -209,7 +209,7 @@ functions:
       bucket: build_external
       permissions: public-read
       content_type: text/plain
-      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/
+      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}/
   "run data validation stress test checkpoint":
     - *fetch_artifacts
     - command: shell.exec
