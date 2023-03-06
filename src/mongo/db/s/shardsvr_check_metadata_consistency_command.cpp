@@ -29,19 +29,16 @@
 
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/metadata_consistency_types_gen.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/metadata_consistency_util.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/sharding_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/s/query/store_possible_cursor.h"
+#include "mongo/s/query/document_source_merge_cursors.h"
+#include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -109,7 +106,7 @@ public:
                 "cluster level mode must be run against the 'admin' database with {aggregate: 1}",
                 nss.isCollectionlessCursorNamespace());
 
-            std::vector<MetadataInconsistencyItem> inconsistenciesMerged;
+            std::vector<RemoteCursor> cursors;
 
             // Need to retrieve a list of databases which this shard is primary for and run the
             // command on each of them.
@@ -121,25 +118,20 @@ public:
             // primary db shard directly from configsvr.
             for (const auto& db : databases) {
                 if (db.getPrimary() == shardId) {
-                    const auto inconsistencies = _checkMetadataConsistencyOnParticipants(
+                    auto dbCursors = _establishCursorOnParticipants(
                         opCtx, NamespaceString(db.getName(), nss.coll()));
 
-                    inconsistenciesMerged.insert(inconsistenciesMerged.end(),
-                                                 std::make_move_iterator(inconsistencies.begin()),
-                                                 std::make_move_iterator(inconsistencies.end()));
+                    cursors.insert(cursors.end(),
+                                   std::make_move_iterator(dbCursors.begin()),
+                                   std::make_move_iterator(dbCursors.end()));
                 }
             }
 
-            return metadata_consistency_util::makeCursor(
-                opCtx, inconsistenciesMerged, nss, request().toBSON({}));
+            return _mergeCursors(opCtx, nss, std::move(cursors));
         }
 
         Response _runDatabaseLevel(OperationContext* opCtx, const NamespaceString& nss) {
-            return metadata_consistency_util::makeCursor(
-                opCtx,
-                _checkMetadataConsistencyOnParticipants(opCtx, nss),
-                nss,
-                request().toBSON({}));
+            return _mergeCursors(opCtx, nss, _establishCursorOnParticipants(opCtx, nss));
         }
 
         Response _runCollectionLevel(const NamespaceString& nss) {
@@ -147,108 +139,92 @@ public:
                       "collection level mode command is not implemented");
         }
 
-        // It first acquires a DDL lock on the database to prevent concurrent metadata changes, and
-        // then sends a command to all shards to check for metadata inconsistencies. The responses
-        // from all shards are merged together to produce a list of metadata inconsistencies to be
-        // returned.
-        std::vector<MetadataInconsistencyItem> _checkMetadataConsistencyOnParticipants(
-            OperationContext* opCtx, const NamespaceString& nss) {
-            const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-            std::vector<AsyncRequestsSender::Response> responses;
+        /*
+         * Forwards metadata consitency command to all participants to establish remote cursors.
+         * Forwarding is done under the DDL lock to serialize with concurrent DDL operations.
+         */
+        std::vector<RemoteCursor> _establishCursorOnParticipants(OperationContext* opCtx,
+                                                                 const NamespaceString& nss) {
+            std::vector<std::pair<ShardId, BSONObj>> requests;
 
-            {
-                // Take a DDL lock on the database
-                static constexpr StringData lockReason{"checkMetadataConsistency"_sd};
-                auto ddlLockManager = DDLLockManager::get(opCtx);
-                const auto dbDDLLock = ddlLockManager->lock(
-                    opCtx, nss.db(), lockReason, DDLLockManager::kDefaultLockTimeout);
-
-                std::vector<AsyncRequestsSender::Request> requests;
-
-                // Shard requests
-                ShardsvrCheckMetadataConsistencyParticipant participantRequest{nss};
-                participantRequest.setPrimaryShardId(primaryShardId);
-                const auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-                for (const auto& shardId : participants) {
-                    requests.emplace_back(shardId, participantRequest.toBSON({}));
-                }
-
-                // Config server request
-                ConfigsvrCheckMetadataConsistency configRequest{nss};
-                requests.emplace_back(ShardId::kConfigServerId, configRequest.toBSON({}));
-
-                responses = sharding_util::processShardResponses(
-                    opCtx,
-                    nss.db(),
-                    participantRequest.toBSON({}),
-                    requests,
-                    Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-                    true /* throwOnError */);
+            // Shard requests
+            ShardsvrCheckMetadataConsistencyParticipant participantRequest{nss};
+            participantRequest.setPrimaryShardId(ShardingState::get(opCtx)->shardId());
+            participantRequest.setCursor(request().getCursor());
+            const auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+            for (const auto& shardId : participants) {
+                requests.emplace_back(shardId, participantRequest.toBSON({}));
             }
 
-            const auto cursorManager = Grid::get(opCtx)->getCursorManager();
+            // Config server request
+            ConfigsvrCheckMetadataConsistency configRequest{nss};
+            participantRequest.setCursor(request().getCursor());
+            requests.emplace_back(ShardId::kConfigServerId, configRequest.toBSON({}));
 
-            // Merge responses
-            std::vector<MetadataInconsistencyItem> inconsistenciesMerged;
-            for (auto&& cmdResponse : responses) {
-                auto response = uassertStatusOK(std::move(cmdResponse.swResponse));
-                uassertStatusOK(getStatusFromCommandResult(response.data));
+            // Take a DDL lock on the database
+            static constexpr StringData lockReason{"checkMetadataConsistency"_sd};
+            auto ddlLockManager = DDLLockManager::get(opCtx);
+            const auto dbDDLLock = ddlLockManager->lock(
+                opCtx, nss.db(), lockReason, DDLLockManager::kDefaultLockTimeout);
 
-                auto transformedResponse = uassertStatusOK(storePossibleCursor(
-                    opCtx,
-                    cmdResponse.shardId,
-                    *cmdResponse.shardHostAndPort,
-                    response.data,
-                    nss,
-                    Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                    cursorManager,
-                    {Privilege(ResourcePattern::forClusterResource(), ActionType::internal)}));
+            return establishCursors(opCtx,
+                                    Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                                    nss,
+                                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                    requests,
+                                    false /* allowPartialResults */,
+                                    Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
+        }
 
-                auto checkMetadataConsistencyResponse = CursorInitialReply::parseOwned(
-                    IDLParserContext("checkMetadataConsistency"), std::move(transformedResponse));
-                const auto& cursor = checkMetadataConsistencyResponse.getCursor();
+        CursorInitialReply _mergeCursors(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         std::vector<RemoteCursor>&& cursors) {
 
-                auto& firstBatch = cursor->getFirstBatch();
-                for (const auto& shardInconsistency : firstBatch) {
-                    auto inconsistency = MetadataInconsistencyItem::parseOwned(
-                        IDLParserContext("MetadataInconsistencyItem"),
-                        shardInconsistency.getOwned());
-                    inconsistenciesMerged.push_back(inconsistency);
+            StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+            resolvedNamespaces[nss.coll()] = {nss, std::vector<BSONObj>{}};
+
+            auto expCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                            boost::none, /* explain */
+                                                            false,       /* fromMongos */
+                                                            false,       /* needsMerge */
+                                                            false,       /* allowDiskUse */
+                                                            false, /* bypassDocumentValidation */
+                                                            false, /* isMapReduceCommand */
+                                                            nss,
+                                                            boost::none, /* runtimeConstants */
+                                                            nullptr,     /* collator */
+                                                            MongoProcessInterface::create(opCtx),
+                                                            std::move(resolvedNamespaces),
+                                                            boost::none /* collection UUID */);
+
+            AsyncResultsMergerParams armParams{std::move(cursors), nss};
+            auto docSourceMergeStage =
+                DocumentSourceMergeCursors::create(expCtx, std::move(armParams));
+            auto pipeline = Pipeline::create({std::move(docSourceMergeStage)}, expCtx);
+            auto exec = plan_executor_factory::make(expCtx, std::move(pipeline));
+
+            const auto batchSize = [&]() -> long long {
+                const auto& cursorOpts = request().getCursor();
+                if (cursorOpts && cursorOpts->getBatchSize()) {
+                    return *cursorOpts->getBatchSize();
+                } else {
+                    return query_request_helper::kDefaultBatchSize;
                 }
+            }();
 
-                const auto authzSession = AuthorizationSession::get(opCtx->getClient());
-                const auto authChecker =
-                    [&authzSession](const boost::optional<UserName>& userName) -> Status {
-                    return authzSession->isCoauthorizedWith(userName)
-                        ? Status::OK()
-                        : Status(ErrorCodes::Unauthorized, "User not authorized to access cursor");
-                };
+            ClientCursorParams cursorParams{
+                std::move(exec),
+                nss,
+                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
+                APIParameters::get(opCtx),
+                opCtx->getWriteConcern(),
+                repl::ReadConcernArgs::get(opCtx),
+                ReadPreferenceSetting::get(opCtx),
+                request().toBSON({}),
+                {Privilege(ResourcePattern::forClusterResource(), ActionType::internal)}};
 
-                // Check out the cursor. If the cursor is not found, all data was retrieve in the
-                // first batch.
-                auto pinnedCursor =
-                    cursorManager->checkOutCursor(cursor->getCursorId(), opCtx, authChecker);
-                if (!pinnedCursor.isOK()) {
-                    continue;
-                }
-
-                // Iterate over the cursor and merge the results.
-                while (true) {
-                    auto next = pinnedCursor.getValue()->next();
-                    if (!next.isOK() || next.getValue().isEOF()) {
-                        break;
-                    }
-
-                    if (auto data = next.getValue().getResult()) {
-                        auto inconsistency = MetadataInconsistencyItem::parseOwned(
-                            IDLParserContext("MetadataInconsistencyItem"), data.get().getOwned());
-
-                        inconsistenciesMerged.push_back(inconsistency);
-                    }
-                }
-            }
-
-            return inconsistenciesMerged;
+            return metadata_consistency_util::createInitialCursorReplyMongod(
+                opCtx, std::move(cursorParams), batchSize);
         }
 
         NamespaceString ns() const override {

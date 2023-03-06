@@ -29,25 +29,30 @@
 
 #pragma once
 
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
-#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-
+#include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/s/catalog/type_collection.h"
 
 namespace mongo {
 namespace metadata_consistency_util {
 
 
 /**
- * Creates a cursor with given inconsistencies.
- *
- * The cursor is returned as a CursorInitialReply object.
+ * Creates a queued data plan executor for the given list of inconsistencies
  */
-CursorInitialReply makeCursor(OperationContext* opCtx,
-                              const std::vector<MetadataInconsistencyItem>& inconsistencies,
-                              const NamespaceString& nss,
-                              const BSONObj& cmdObj,
-                              const boost::optional<SimpleCursorOptions>& cursorOpts = boost::none);
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
+    OperationContext* opCtx,
+    const std::vector<MetadataInconsistencyItem>& inconsistencies,
+    const NamespaceString& nss);
 
+/**
+ * Construct a initial cursor reply from the given client cursor.
+ * The returned reply is populated with the first batch result.
+ */
+CursorInitialReply createInitialCursorReplyMongod(OperationContext* opCtx,
+                                                  ClientCursorParams&& cursorParams,
+                                                  long long batchSize);
 /**
  * Returns a list of inconsistencies between the collections' metadata on the shard and the
  * collections' metadata in the config server.

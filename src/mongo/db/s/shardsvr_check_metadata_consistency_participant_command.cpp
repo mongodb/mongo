@@ -30,11 +30,13 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/metadata_consistency_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -100,8 +102,31 @@ public:
                 metadata_consistency_util::checkCollectionMetadataInconsistencies(
                     opCtx, shardId, primaryShardId, catalogClientCollections, localCollection);
 
-            return metadata_consistency_util::makeCursor(
-                opCtx, std::move(inconsistencies), nss, request().toBSON({}));
+            auto exec = metadata_consistency_util::makeQueuedPlanExecutor(
+                opCtx, std::move(inconsistencies), nss);
+
+            ClientCursorParams cursorParams{
+                std::move(exec),
+                nss,
+                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
+                APIParameters::get(opCtx),
+                opCtx->getWriteConcern(),
+                repl::ReadConcernArgs::get(opCtx),
+                ReadPreferenceSetting::get(opCtx),
+                request().toBSON({}),
+                {Privilege(ResourcePattern::forClusterResource(), ActionType::internal)}};
+
+            const auto batchSize = [&]() -> long long {
+                const auto& cursorOpts = request().getCursor();
+                if (cursorOpts && cursorOpts->getBatchSize()) {
+                    return *cursorOpts->getBatchSize();
+                } else {
+                    return query_request_helper::kDefaultBatchSize;
+                }
+            }();
+
+            return metadata_consistency_util::createInitialCursorReplyMongod(
+                opCtx, std::move(cursorParams), batchSize);
         }
 
     private:

@@ -31,7 +31,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/metadata_consistency_util.h"
-
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace {
@@ -66,7 +66,11 @@ public:
         Response typedRun(OperationContext* opCtx) {
             const auto nss = ns();
 
-            return metadata_consistency_util::makeCursor(opCtx, {}, nss, request().toBSON({}));
+            CursorInitialReply resp;
+            InitialResponseCursor initRespCursor{{}};
+            initRespCursor.setResponseCursorBase({0LL /* cursorId */, nss});
+            resp.setCursor(std::move(initRespCursor));
+            return resp;
         }
 
     private:

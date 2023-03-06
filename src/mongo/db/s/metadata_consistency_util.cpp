@@ -76,18 +76,11 @@ void _appendUUIDMismatchInconsistency(const ShardId& shardId,
 }
 }  // namespace
 
-CursorInitialReply makeCursor(OperationContext* opCtx,
-                              const std::vector<MetadataInconsistencyItem>& inconsistencies,
-                              const NamespaceString& nss,
-                              const BSONObj& cmdObj,
-                              const boost::optional<SimpleCursorOptions>& cursorOpts) {
-    const auto batchSize = [&] {
-        if (cursorOpts && cursorOpts->getBatchSize()) {
-            return (long long)*cursorOpts->getBatchSize();
-        } else {
-            return std::numeric_limits<long long>::max();
-        }
-    }();
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
+    OperationContext* opCtx,
+    const std::vector<MetadataInconsistencyItem>& inconsistencies,
+    const NamespaceString& nss) {
 
     auto expCtx =
         make_intrusive<ExpressionContext>(opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
@@ -104,14 +97,22 @@ CursorInitialReply makeCursor(OperationContext* opCtx,
         root->pushBack(id);
     }
 
-    auto exec =
-        uassertStatusOK(plan_executor_factory::make(expCtx,
-                                                    std::move(ws),
-                                                    std::move(root),
-                                                    &CollectionPtr::null,
-                                                    PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                                    false, /* whether returned BSON must be owned */
-                                                    nss));
+    return uassertStatusOK(
+        plan_executor_factory::make(expCtx,
+                                    std::move(ws),
+                                    std::move(root),
+                                    &CollectionPtr::null,
+                                    PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                    false, /* whether returned BSON must be owned */
+                                    nss));
+}
+
+
+CursorInitialReply createInitialCursorReplyMongod(OperationContext* opCtx,
+                                                  ClientCursorParams&& cursorParams,
+                                                  long long batchSize) {
+    auto& exec = cursorParams.exec;
+    auto& nss = cursorParams.nss;
 
     std::vector<BSONObj> firstBatch;
     size_t bytesBuffered = 0;
@@ -145,18 +146,7 @@ CursorInitialReply makeCursor(OperationContext* opCtx,
     exec->saveState();
     exec->detachFromOperationContext();
 
-    // Global cursor registration must be done without holding any locks.
-    auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
-        opCtx,
-        {std::move(exec),
-         nss,
-         AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
-         APIParameters::get(opCtx),
-         opCtx->getWriteConcern(),
-         repl::ReadConcernArgs::get(opCtx),
-         ReadPreferenceSetting::get(opCtx),
-         cmdObj,
-         {Privilege(ResourcePattern::forClusterResource(), ActionType::internal)}});
+    auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(opCtx, std::move(cursorParams));
 
     pinnedCursor->incNBatches();
     pinnedCursor->incNReturnedSoFar(firstBatch.size());
