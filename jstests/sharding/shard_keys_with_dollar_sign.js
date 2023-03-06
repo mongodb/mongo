@@ -32,12 +32,14 @@ function testValidation(key, {isValidIndexKey, isValidShardKey}) {
         assert.commandFailedWithCode(shardCollectionRes, ErrorCodes.BadValue);
     }
 
-    assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {_id: 1}}));
-    const reshardCollectionRes = st.s.adminCommand({reshardCollection: ns2, key});
-    if (isValidShardKey) {
-        assert.commandWorked(reshardCollectionRes);
-    } else {
-        assert.commandFailedWithCode(reshardCollectionRes, ErrorCodes.BadValue);
+    if (jsTestOptions().mongosBinVersion != "last-lts") {
+        assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {_id: 1}}));
+        const reshardCollectionRes = st.s.adminCommand({reshardCollection: ns2, key});
+        if (isValidShardKey) {
+            assert.commandWorked(reshardCollectionRes);
+        } else {
+            assert.commandFailedWithCode(reshardCollectionRes, ErrorCodes.BadValue);
+        }
     }
 
     assert.commandWorked(db.dropDatabase());
