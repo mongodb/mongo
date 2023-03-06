@@ -242,9 +242,9 @@ Status BucketCatalog::reopenBucket(OperationContext* opCtx,
     BSONElement metadata;
     auto metaFieldName = options->getMetaField();
     if (metaFieldName) {
-        metadata = bucketDoc.getField(*metaFieldName);
+        metadata = bucketDoc.getField(kBucketMetaFieldName);
     }
-    auto key = BucketKey{ns, BucketMetadata{metadata, coll->getDefaultCollator()}};
+    auto key = BucketKey{ns, BucketMetadata{metadata, coll->getDefaultCollator(), metaFieldName}};
 
     // Validate the bucket document against the schema.
     auto validator = [&](OperationContext * opCtx, const BSONObj& bucketDoc) -> auto {
@@ -626,7 +626,7 @@ StatusWith<std::pair<BucketKey, Date_t>> BucketCatalog::_extractBucketingParamet
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
     // bucket to a stripe by hashing the BucketKey.
-    auto key = BucketKey{ns, BucketMetadata{metadata, comparator}};
+    auto key = BucketKey{ns, BucketMetadata{metadata, comparator, options.getMetaField()}};
 
     return {std::make_pair(key, time)};
 }
@@ -805,7 +805,7 @@ StatusWith<std::unique_ptr<Bucket>> BucketCatalog::_rehydrateBucket(
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
     // bucket to a stripe by hashing the BucketKey.
-    auto key = BucketKey{ns, BucketMetadata{metadata, comparator}};
+    auto key = BucketKey{ns, BucketMetadata{metadata, comparator, options.getMetaField()}};
     if (expectedKey.has_value() && key != expectedKey.value()) {
         return {ErrorCodes::BadValue, "Bucket metadata does not match (hash collision)"};
     }

@@ -90,7 +90,7 @@ protected:
     BucketCatalog* _bucketCatalog;
 
     StringData _timeField = "time";
-    StringData _metaField = "meta";
+    StringData _metaField = "tag";
 
     NamespaceString _ns1{"bucket_catalog_test_1", "t_1"};
     NamespaceString _ns2{"bucket_catalog_test_1", "t_2"};
@@ -1301,6 +1301,56 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
     _bucketCatalog->finish(batch, {});
 }
 
+TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurementWithMeta) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
+                                                     true};
+    // Bucket document to reopen.
+    BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a642"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "meta": 42,
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    Status status = _bucketCatalog->reopenBucket(_opCtx, autoColl.getCollection(), bucketDoc);
+    ASSERT_OK(status);
+
+    // Insert a measurement that is compatible with the reopened bucket.
+    auto result = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},"tag":42,
+                                                     "a":-100,"b":100})"),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+
+    // No buckets are closed.
+    ASSERT(result.getValue().closedBuckets.empty());
+    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumSchemaChanges));
+
+    auto batch = result.getValue().batch;
+    ASSERT(claimWriteBatchCommitRights(*batch));
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch));
+    ASSERT_EQ(batch->measurements.size(), 1);
+
+    // The reopened bucket already contains three committed measurements.
+    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 3);
+
+    // Verify that the min and max is updated correctly when inserting new measurements.
+    ASSERT_BSONOBJ_BINARY_EQ(batch->min, BSON("u" << BSON("a" << -100)));
+    ASSERT_BSONOBJ_BINARY_EQ(
+        batch->max,
+        BSON("u" << BSON("time" << Date_t::fromMillisSinceEpoch(1654529680000) << "b" << 100)));
+
+    _bucketCatalog->finish(batch, {});
+}
+
 TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertIncompatibleMeasurement) {
     RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
                                                      true};
@@ -1613,7 +1663,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
         _ns1,
         _getCollator(_ns1),
         _getTimeseriesOptions(_ns1),
-        ::mongo::fromjson(R"({"time":{"$date":"2022-06-07T15:34:40.000Z"}, "meta": "foo"})"),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-07T15:34:40.000Z"}, "tag": "foo"})"),
         BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
     ASSERT_OK(result.getStatus());
     ASSERT_EQ(1, _getExecutionStat(_ns1, kNumArchivedDueToMemoryThreshold));
