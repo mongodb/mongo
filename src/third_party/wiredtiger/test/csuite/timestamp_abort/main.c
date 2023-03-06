@@ -923,7 +923,8 @@ main(int argc, char *argv[])
             testutil_lazyfs_setup(&lazyfs, home);
 
         if (opts->tiered_storage) {
-            testutil_check(__wt_snprintf(bucket, sizeof(bucket), "%s/bucket", home));
+            testutil_check(
+              __wt_snprintf(bucket, sizeof(bucket), "%s/%s/bucket", home, WT_HOME_DIR));
             testutil_make_work_dir(bucket);
         }
 
