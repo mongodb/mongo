@@ -30,9 +30,10 @@
 
 import os, sys
 from wt_tools_common import wiredtiger_open
+from wiredtiger import WT_NOTFOUND, wiredtiger_strerror
 
 def usage_exit():
-    print('Usage: wt_cmp_uri [ -t timestamp ] [ -v ] dir1/uri1 [ -t timestamp2 ] dir2/uri2')
+    print('Usage: wt_cmp_uri.py [ -t timestamp ] [ -v ] dir1/uri1 [ -t timestamp2 ] dir2/uri2')
     print('  dir1 and dir2 are POSIX pathnames to WiredTiger home directories,')
     print('  uri1 and uri2 are WiredTiger URIs, e.g. table:foo or file:abc.wt')
     print('Options:')
@@ -282,72 +283,72 @@ def get_dir_uri(name):
     slash = name.rindex('/')
     return (name[0:slash], name[slash+1:])
 
-args = sys.argv[1:]
-timestamp1 = None
-timestamp2 = None
+def wiredtiger_compare_uri(args):
+    timestamp1 = None
+    timestamp2 = None
 
-while len(args) > 1 and args[0][0] == '-':
-    if args[0] == '-v':
-        verboseFlag = True
-        args = args[1:]
-    elif args[0] == '-t':
-        timestamp1 = args[1]
-        timestamp2 = args[1]
-        args = args[2:]
-    else:
+    while len(args) > 1 and args[0][0] == '-':
+        if args[0] == '-v':
+            global verboseFlag
+            verboseFlag = True
+            args = args[1:]
+        elif args[0] == '-t':
+            timestamp1 = args[1]
+            timestamp2 = args[1]
+            args = args[2:]
+        else:
+            usage_exit()
+
+    if len(args) < 2:
         usage_exit()
+    arg1 = args[0]
+    (wtdir1, uri1) = get_dir_uri(arg1)
+    args = args[1:]
 
-if len(args) < 2:
-    usage_exit()
-arg1 = args[0]
-(wtdir1, uri1) = get_dir_uri(arg1)
-args = args[1:]
+    # Look for a second -t argument.
+    while len(args) > 1 and args[0][0] == '-':
+        if args[0] == '-t':
+            timestamp2 = args[1]
+            args = args[2:]
 
-# Look for a second -t argument.
-while len(args) > 1 and args[0][0] == '-':
-    if args[0] == '-t':
-        timestamp2 = args[1]
-        args = args[2:]
+    if len(args) != 1:
+        usage_exit()
+    arg2 = args[0]
+    (wtdir2, uri2) = get_dir_uri(arg2)
 
-if len(args) != 1:
-    usage()
-arg2 = args[0]
-(wtdir2, uri2) = get_dir_uri(arg2)
+    # We do allow wtdir1 and wtdir2 to be the same, it is useful to compare at different
+    # timestamps. But when they are the same, we must use the same connection.
 
-# We do allow wtdir1 and wtdir2 to be the same, it is useful to compare at different timestamps.
-# But when they are the same, we must use the same connection.
+    verbose('wiredtiger_open({})'.format(wtdir1))
+    conn1 = wiredtiger_open(wtdir1, 'readonly')
 
-verbose('wiredtiger_open({})'.format(wtdir1))
-conn1 = wiredtiger_open(wtdir1, 'readonly')
+    if wtdir1 == wtdir2:
+        conn2 = conn1
+    else:
+        verbose('wiredtiger_open({})'.format(wtdir2))
+        conn2 = wiredtiger_open(wtdir2, 'readonly')
 
-# wiredtiger_open does the hard work of locating the library,
-# wait until that's done before importing from wiredtiger.
-from wiredtiger import WT_NOTFOUND, wiredtiger_strerror
+    try:
+        cc1 = get_compare_cursor(conn1, timestamp1, uri1, arg1)
+    except:
+        print('Failed opening {} in {} at timestamp {}'.format(uri1, wtdir1, timestamp1))
+        raise
+    try:
+        cc2 = get_compare_cursor(conn2, timestamp2, uri2, arg2)
+    except:
+        print('Failed opening {} in {} at timestamp {}'.format(uri2, wtdir2, timestamp2))
+        raise
 
-if wtdir1 == wtdir2:
-    conn2 = conn1
-else:
-    verbose('wiredtiger_open({})'.format(wtdir2))
-    conn2 = wiredtiger_open(wtdir2, 'readonly')
+    # Not running with version cursors, it's not quite ready for prime time.
+    ecode = compare_cursors(cc1, cc2, False)
 
-try:
-    cc1 = get_compare_cursor(conn1, timestamp1, uri1, arg1)
-except:
-    print('Failed opening {} in {} at timestamp {}'.format(uri1, wtdir1, timestamp1))
-    raise
-try:
-    cc2 = get_compare_cursor(conn2, timestamp2, uri2, arg2)
-except:
-    print('Failed opening {} in {} at timestamp {}'.format(uri2, wtdir2, timestamp2))
-    raise
+    cc1.close()
+    cc2.close()
+    conn1.close()
+    if conn2 != conn1:
+        conn2.close()
 
-# Not running with version cursors, it's not quite ready for prime time.
-ecode = compare_cursors(cc1, cc2, False)
+    sys.exit(ecode)
 
-cc1.close()
-cc2.close()
-conn1.close()
-if conn2 != conn1:
-    conn2.close()
-
-sys.exit(ecode)
+if __name__ == "__main__":
+    wiredtiger_compare_uri(sys.argv[1:])

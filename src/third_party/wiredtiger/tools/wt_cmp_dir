@@ -140,7 +140,7 @@ if [ "$files1" != "$files2" ]; then
 fi
 
 # Get the script to run
-cmp_uri_script=$(dirname "$0")/wt_cmp_uri
+cmp_uri_script=$(dirname "$0")/wt_cmp_uri.py
 
 ecode=0
 for f in $files1; do
