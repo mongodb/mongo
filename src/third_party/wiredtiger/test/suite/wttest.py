@@ -734,8 +734,11 @@ class WiredTigerTestCase(unittest.TestCase):
         # In addition, check to make sure exc_info is "clean", because
         # the ConcurrencyTestSuite in Python2 indicates failures using that.
         if hasattr(self, '_outcome'):  # Python 3.4+
-            result = self.defaultTestResult()  # these 2 methods have no side effects
-            self._feedErrorsToResult(result, self._outcome.errors)
+            if hasattr(self._outcome, 'errors'):  # Python 3.4 - 3.10
+                result = self.defaultTestResult()  # these 2 methods have no side effects
+                self._feedErrorsToResult(result, self._outcome.errors)
+            else:  # Python 3.11+
+                result = self._outcome.result
         else:  # Python 3.2 - 3.3 or 3.0 - 3.1 and 2.7
             result = getattr(self, '_outcomeForDoCleanups', self._resultForDoCleanups)
         error = self.list2reason(result, 'errors')
