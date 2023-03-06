@@ -2001,7 +2001,6 @@ void WiredTigerKVEngine::_checkpoint(OperationContext* opCtx, WT_SESSION* sessio
                            2,
                            "Completed unstable checkpoint.",
                            "initialDataTimestamp"_attr = initialDataTimestamp.toString());
-        clearIndividuallyCheckpointedIndexes();
     } else if (stableTimestamp < initialDataTimestamp) {
         LOGV2_FOR_RECOVERY(
             23985,
@@ -2018,10 +2017,7 @@ void WiredTigerKVEngine::_checkpoint(OperationContext* opCtx, WT_SESSION* sessio
                            "stableTimestamp"_attr = stableTimestamp,
                            "oplogNeededForRollback"_attr = toString(oplogNeededForRollback));
 
-        {
-            invariantWTOK(session->checkpoint(session, "use_timestamp=true"), session);
-            clearIndividuallyCheckpointedIndexes();
-        }
+        invariantWTOK(session->checkpoint(session, "use_timestamp=true"), session);
 
         if (oplogNeededForRollback.isOK()) {
             // Now that the checkpoint is durable, publish the oplog needed to recover from it.

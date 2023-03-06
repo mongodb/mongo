@@ -218,13 +218,6 @@ void ValidateState::_yieldCursors(OperationContext* opCtx) {
             _seekRecordStoreCursor->restore());
 }
 
-bool ValidateState::_isIndexDataCheckpointed(OperationContext* opCtx,
-                                             const IndexCatalogEntry* entry) {
-    return isBackground() &&
-        opCtx->getServiceContext()->getStorageEngine()->isInIndividuallyCheckpointedIndexes(
-            entry->getIdent());
-}
-
 void ValidateState::initializeCursors(OperationContext* opCtx) {
     invariant(!_traverseRecordStoreCursor && !_seekRecordStoreCursor && _indexCursors.size() == 0 &&
               _columnStoreIndexCursors.size() == 0 && _indexes.size() == 0);
@@ -315,21 +308,6 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
             _columnStoreIndexCursors.emplace(
                 desc->indexName(),
                 static_cast<ColumnStoreAccessMethod*>(iam)->storage()->newCursor(opCtx));
-
-            // Skip any newly created indexes that, because they were built with a WT bulk loader,
-            // are checkpoint'ed but not yet consistent with the rest of checkpoint's PIT view of
-            // the data.
-            if (_isIndexDataCheckpointed(opCtx, entry)) {
-                _columnStoreIndexCursors.erase(desc->indexName());
-                LOGV2(
-                    7106110,
-                    "Skipping background validation on the index because the index data is not yet "
-                    "consistent in the checkpoint.",
-                    "desc_indexName"_attr = desc->indexName(),
-                    "nss"_attr = _nss);
-                _skippedIndexes.emplace(desc->indexName());
-                continue;
-            }
         } else {
             const auto iam = entry->accessMethod()->asSortedData();
             if (!iam) {
@@ -343,21 +321,6 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
             _indexCursors.emplace(
                 desc->indexName(),
                 std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_dataThrottle));
-
-            // Skip any newly created indexes that, because they were built with a WT bulk loader,
-            // are checkpoint'ed but not yet consistent with the rest of checkpoint's PIT view of
-            // the data.
-            if (_isIndexDataCheckpointed(opCtx, entry)) {
-                _indexCursors.erase(desc->indexName());
-                LOGV2(
-                    6868903,
-                    "Skipping background validation on the index because the index data is not yet "
-                    "consistent in the checkpoint.",
-                    "desc_indexName"_attr = desc->indexName(),
-                    "nss"_attr = _nss);
-                _skippedIndexes.emplace(desc->indexName());
-                continue;
-            }
         }
 
         _indexes.push_back(indexCatalog->getEntryShared(desc));

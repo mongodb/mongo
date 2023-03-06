@@ -681,12 +681,6 @@ public:
     virtual DurableCatalog* getCatalog() = 0;
     virtual const DurableCatalog* getCatalog() const = 0;
 
-    virtual void addIndividuallyCheckpointedIndex(const std::string& ident) = 0;
-
-    virtual void clearIndividuallyCheckpointedIndexes() = 0;
-
-    virtual bool isInIndividuallyCheckpointedIndexes(const std::string& ident) const = 0;
-
     /**
      * A service that would like to pin the oldest timestamp registers its request here. If the
      * request can be satisfied, OK is returned with the oldest timestamp the caller can

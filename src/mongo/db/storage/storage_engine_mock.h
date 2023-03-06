@@ -207,11 +207,6 @@ public:
     const DurableCatalog* getCatalog() const final {
         return nullptr;
     }
-    void addIndividuallyCheckpointedIndex(const std::string& ident) final {}
-    void clearIndividuallyCheckpointedIndexes() final {}
-    bool isInIndividuallyCheckpointedIndexes(const std::string& ident) const final {
-        return false;
-    }
 
     StatusWith<Timestamp> pinOldestTimestamp(OperationContext* opCtx,
                                              const std::string& requestingServiceName,

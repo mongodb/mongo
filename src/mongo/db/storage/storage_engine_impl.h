@@ -339,18 +339,6 @@ public:
 
     const DurableCatalog* getCatalog() const override;
 
-    void addIndividuallyCheckpointedIndex(const std::string& ident) override {
-        return _engine->addIndividuallyCheckpointedIndex(ident);
-    }
-
-    void clearIndividuallyCheckpointedIndexes() override {
-        return _engine->clearIndividuallyCheckpointedIndexes();
-    }
-
-    bool isInIndividuallyCheckpointedIndexes(const std::string& ident) const override {
-        return _engine->isInIndividuallyCheckpointedIndexes(ident);
-    }
-
     /**
      * When loading after an unclean shutdown, this performs cleanup on the DurableCatalogImpl.
      */

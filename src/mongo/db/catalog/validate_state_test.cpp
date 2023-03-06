@@ -280,50 +280,6 @@ TEST_F(ValidateStateDiskTest, OpenCursorsOnCheckpointedIndexes) {
     ASSERT_EQ(validateState.getIndexes().size(), 3);
 }
 
-// Only open cursors against indexes that are consistent with the rest of the checkpoint'ed data.
-TEST_F(ValidateStateDiskTest, OpenCursorsOnConsistentlyCheckpointedIndexes) {
-    auto opCtx = operationContext();
-    createCollectionAndPopulateIt(opCtx, kNss);
-
-    // Disable periodic checkpoint'ing thread so we can control when checkpoints occur.
-    FailPointEnableBlock failPoint("pauseCheckpointThread");
-
-    // Create several indexes.
-    createIndex(opCtx, kNss, BSON("a" << 1));
-    createIndex(opCtx, kNss, BSON("b" << 1));
-    createIndex(opCtx, kNss, BSON("c" << 1));
-    createIndex(opCtx, kNss, BSON("d" << 1));
-
-    // Checkpoint the indexes.
-    opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx, /*stableCheckpoint*/ false);
-
-    {
-        // Artificially set two indexes as inconsistent with the checkpoint.
-        AutoGetCollection autoColl(opCtx, kNss, MODE_IS);
-        auto indexIdentA =
-            opCtx->getServiceContext()->getStorageEngine()->getCatalog()->getIndexIdent(
-                opCtx, autoColl.getCollection()->getCatalogId(), "a_1");
-        auto indexIdentB =
-            opCtx->getServiceContext()->getStorageEngine()->getCatalog()->getIndexIdent(
-                opCtx, autoColl.getCollection()->getCatalogId(), "b_1");
-        opCtx->getServiceContext()->getStorageEngine()->addIndividuallyCheckpointedIndex(
-            indexIdentA);
-        opCtx->getServiceContext()->getStorageEngine()->addIndividuallyCheckpointedIndex(
-            indexIdentB);
-    }
-
-    // The two inconsistent indexes should not be found.
-    // (Note the _id index was create with collection creation, so we have 3 indexes.)
-    CollectionValidation::ValidateState validateState(
-        opCtx,
-        kNss,
-        CollectionValidation::ValidateMode::kBackground,
-        CollectionValidation::RepairMode::kNone,
-        /*logDiagnostics=*/false);
-    validateState.initializeCursors(opCtx);
-    ASSERT_EQ(validateState.getIndexes().size(), 3);
-}
-
 // Indexes in the checkpoint that were dropped in the present should not have cursors opened against
 // them.
 TEST_F(ValidateStateDiskTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatWereLaterDropped) {
