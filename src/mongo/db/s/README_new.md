@@ -3,7 +3,7 @@
 > This is work in progress and some sections are incomplete
 
 # Sharding Architecture Guide
-This page contains details of the code architecture of the MongoDB Sharding system. It is intended to be used by engineers on the core server, with some sections being more appropriate for sharding engineers.
+This page contains details of the source code architecture of the MongoDB Sharding system. It is intended to be used by engineers working on the core server, with some sections containing low-level details which are most appropriate for new engineers on the sharding team.
 
 It is not intended to be a tutorial on how to operate sharding as a user and it requires that the reader is already familiar with the general concepts of [sharding](https://docs.mongodb.com/manual/sharding/#sharding), the
 [architecture of a MongoDB sharded cluster](https://docs.mongodb.com/manual/sharding/#sharded-cluster),
