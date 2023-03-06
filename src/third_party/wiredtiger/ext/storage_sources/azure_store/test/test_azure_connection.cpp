@@ -137,7 +137,6 @@ TEST_CASE("Testing Azure Connection Class", "azure-connection")
         // List single. Object size should be 1.
         REQUIRE(conn.list_objects(object_name, objects, true) == 0);
         REQUIRE(objects.size() == 1);
-
         objects.clear();
     }
 

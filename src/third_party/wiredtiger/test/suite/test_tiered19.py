@@ -160,7 +160,7 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
 
 
         # Test directory list is able to find the file.
-        self.assertEquals(fs.fs_directory_list(session, '', ''), [prefix + local_file_name])
+        self.assertEquals(fs.fs_directory_list(session, '', ''), [local_file_name])
 
         # File handle lock call not used in GCP implementation.
         self.assertEqual(fh_1.fh_lock(session, True), 0)
@@ -290,7 +290,7 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.assertEqual(ss.ss_flush_finish(session, azure_fs, 'foobar', 'foobar', None), 0)
 
         # The object exists now.
-        self.assertEquals(azure_fs.fs_directory_list(session, None, None), [prefix_1 + 'foobar'])
+        self.assertEquals(azure_fs.fs_directory_list(session, None, None), ['foobar'])
         try:
             exists = azure_fs.fs_exist(session, 'foobar')
         except:
@@ -348,18 +348,18 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.ignoreStderrPatternIfExists('does not exist in Azure')
 
         # Test that the no new objects exist after failed flush.
-        self.assertEquals(azure_fs.fs_directory_list(session, None, None), [prefix_1 + 'foobar'])
+        self.assertEquals(azure_fs.fs_directory_list(session, None, None), ['foobar'])
 
         err_msg = '/Exception: Operation not supported/'
 
         # Test that POSIX Remove and Rename are not supported.
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda: azure_fs.fs_remove(session, 'foobar', 0), err_msg)
-        self.assertEquals(azure_fs.fs_directory_list(session, None, None), [prefix_1 + 'foobar'])
+        self.assertEquals(azure_fs.fs_directory_list(session, None, None), ['foobar'])
 
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda: azure_fs.fs_rename(session, 'foobar', 'foobar2', 0), err_msg)
-        self.assertEquals(azure_fs.fs_directory_list(session, None, None), [prefix_1 + 'foobar'])
+        self.assertEquals(azure_fs.fs_directory_list(session, None, None), ['foobar'])
 
         # Flush second valid file into Azure.
         self.assertEqual(ss.ss_flush(session, azure_fs, 'foobar', 'foobar2', None), 0)
@@ -368,10 +368,10 @@ class test_tiered19(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.assertEqual(ss.ss_flush_finish(session, azure_fs, 'foobar', 'foobar2', None), 0)
 
         # Directory list should show 2 objects in Azure.
-        self.assertEquals(azure_fs.fs_directory_list(session, None, None), [prefix_1 + 'foobar', prefix_1 + 'foobar2'])
+        self.assertEquals(azure_fs.fs_directory_list(session, None, None), ['foobar', 'foobar2'])
 
         # Directory list single should show 1 object.
-        self.assertEquals(azure_fs.fs_directory_list_single(session, None, None), [prefix_1 + 'foobar'])
+        self.assertEquals(azure_fs.fs_directory_list_single(session, None, None), ['foobar'])
 
         # Verify that file system size returns the size in bytes of the 'foobar' object.
         self.assertEquals(azure_fs.fs_size(session, 'foobar'), len(outbytes))
