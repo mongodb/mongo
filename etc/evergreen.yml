@@ -3220,6 +3220,7 @@ buildvariants:
     <<: *linux_x86_generic_expansions
     scons_cache_scope: shared
     scons_cache_mode: all
+    commit_queue_alternate_cache: linux-x86-dynamic-compile-required
     has_packages: false
     compile_flags: >-
       --ssl
