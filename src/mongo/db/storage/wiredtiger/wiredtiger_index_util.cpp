@@ -86,10 +86,6 @@ Status WiredTigerIndexUtil::compact(OperationContext* opCtx, const std::string& 
     if (!cache->isEphemeral()) {
         WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
         opCtx->recoveryUnit()->abandonSnapshot();
-        // WT compact prompts WT to take checkpoints, so we need to take the checkpoint lock around
-        // WT compact calls.
-        auto checkpointLock = opCtx->getServiceContext()->getStorageEngine()->getCheckpointLock(
-            opCtx, StorageEngine::CheckpointLock::Mode::kExclusive);
         int ret = s->compact(s, uri.c_str(), "timeout=0");
         if (MONGO_unlikely(WTCompactIndexEBUSY.shouldFail())) {
             ret = EBUSY;

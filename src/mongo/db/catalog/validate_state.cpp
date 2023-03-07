@@ -238,13 +238,6 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
         _dataThrottle.turnThrottlingOff();
     }
 
-    // Acquire the checkpoint lock to prevent a checkpoint from being taken while we are opening our
-    // checkpoint cursors. This ensures all cursors are reading from the same point in time.
-    auto checkpointLock = isBackground()
-        ? opCtx->getServiceContext()->getStorageEngine()->getCheckpointLock(
-              opCtx, StorageEngine::CheckpointLock::Mode::kShared)
-        : nullptr;
-
     // For background validation, keep retrying if any table's cursor is opened on a different
     // checkpoint due to the background system-wide checkpoint happens during opening the cursors.
     // The retry should happen at most once since the checkpoint happens every 60 seconds.

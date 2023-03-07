@@ -131,9 +131,6 @@ public:
 
     void checkpoint(OperationContext* opCtx) override;
 
-    std::unique_ptr<StorageEngine::CheckpointLock> getCheckpointLock(
-        OperationContext* opCtx, StorageEngine::CheckpointLock::Mode mode) override;
-
     bool isEphemeral() const override {
         return _ephemeral;
     }
@@ -529,6 +526,8 @@ private:
     // Pins the oplog so that OplogTruncateMarkers will not truncate oplog history equal or newer to
     // this timestamp.
     AtomicWord<std::uint64_t> _pinnedOplogTimestamp;
+
+    Mutex _checkpointMutex = MONGO_MAKE_LATCH("WiredTigerKVEngine::_checkpointMutex");
 
     // The amount of memory alloted for the WiredTiger cache.
     size_t _cacheSizeMB;

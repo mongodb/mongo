@@ -325,9 +325,6 @@ public:
 
     void checkpoint(OperationContext* opCtx) override;
 
-    std::unique_ptr<CheckpointLock> getCheckpointLock(OperationContext* opCtx,
-                                                      CheckpointLock::Mode mode) override;
-
     StatusWith<ReconcileResult> reconcileCatalogAndIdents(
         OperationContext* opCtx, Timestamp stableTs, LastShutdownState lastShutdownState) override;
 
