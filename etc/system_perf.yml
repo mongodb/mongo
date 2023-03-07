@@ -1680,96 +1680,109 @@ buildvariants:
   #     - name: column_store_index_charts_events_1G
   #     - name: ssb_column_store_comparison
 
-  # - name: linux-standalone-classic-query-engine
-  #   display_name: Linux Standalone (Classic Query Engine) Legacy
-  #   # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-  #   cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
-  #   modules: *modules
-  #   expansions:
-  #     mongodb_setup: standalone-classic-query-engine
-  #     infrastructure_provisioning: single
-  #     platform: linux
-  #     project_dir: *project_dir
-  #     authentication: enabled
-  #     storageEngine: wiredTiger
-  #   run_on:
-  #     - "rhel70-perf-single"
-  #   depends_on: *_compile_amazon2
-  #   tasks: &classic_engine_tasks
-  #     - name: schedule_patch_auto_tasks
-  #     - name: schedule_variant_auto_tasks
-  #     - name: industry_benchmarks
-  #     - name: ycsb_60GB
-  #     - name: ycsb_60GB.long
-  #     - name: crud_workloads
-  #     - name: bestbuy_agg
-  #     - name: bestbuy_agg_merge_different_db
-  #     - name: bestbuy_agg_merge_same_db
-  #     - name: bestbuy_agg_merge_wordcount
-  #     - name: bestbuy_query
-  #     - name: cursor_manager
-  #     - name: map_reduce_workloads
-  #     - name: tpcc
-  #     - name: tpch_1_normalized
-  #     - name: tpch_1_denormalized
-  #     - name: tpch_10_normalized
-  #     - name: tpch_10_denormalized
+  - name: linux-intel-standalone-classic-query-engine
+    display_name: Linux Intel Standalone (Classic Query Engine)
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-classic-query-engine
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: &classic_engine_tasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: crud_workloads_majority
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: cursor_manager
+      - name: map_reduce_workloads
+      - name: tpcc
+      - name: tpcc_majority
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
 
-  # - name: linux-standalone-sbe
-  #   display_name: Linux Standalone (SBE) Legacy
-  #   # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-  #   cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
-  #   modules: *modules
-  #   expansions:
-  #     mongodb_setup: standalone-sbe
-  #     infrastructure_provisioning: single
-  #     platform: linux
-  #     project_dir: *project_dir
-  #     authentication: enabled
-  #     storageEngine: wiredTiger
-  #   run_on:
-  #     - "rhel70-perf-single"
-  #   depends_on: *_compile_amazon2
-  #   tasks: *classic_engine_tasks
+  - name: linux-intel-standalone-sbe
+    display_name: Linux Intel Standalone (SBE)
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-sbe
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *classic_engine_tasks
 
-  # - name: linux-1-node-replSet-classic-query-engine
-  #   display_name: Linux 1-Node ReplSet (Classic Query Engine) Legacy
-  #   # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-  #   cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
-  #   modules: *modules
-  #   expansions:
-  #     mongodb_setup: single-replica-classic-query-engine
-  #     infrastructure_provisioning: single
-  #     platform: linux
-  #     project_dir: *project_dir
-  #     authentication: enabled
-  #     storageEngine: wiredTiger
-  #   run_on:
-  #     - "rhel70-perf-single"
-  #   depends_on: *_compile_amazon2
-  #   tasks: &classic_engine_1nodereplset_tasks
-  #     - name: schedule_patch_auto_tasks
-  #     - name: schedule_variant_auto_tasks
-  #     - name: linkbench
-  #     - name: linkbench2
-  #     - name: snapshot_reads
+  - name: linux-intel-1-node-replSet-classic-query-engine
+    display_name: Linux Intel 1-Node ReplSet (Classic Query Engine)
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-classic-query-engine
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: &classic_engine_1nodereplset_tasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: linkbench
+      - name: linkbench2
+      - name: snapshot_reads
 
-  # - name: linux-1-node-replSet-sbe
-  #   display_name: Linux 1-Node ReplSet (SBE) Legacy
-  #   # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-  #   cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
-  #   modules: *modules
-  #   expansions:
-  #     mongodb_setup: single-replica-sbe
-  #     infrastructure_provisioning: single
-  #     platform: linux
-  #     project_dir: *project_dir
-  #     authentication: enabled
-  #     storageEngine: wiredTiger
-  #   run_on:
-  #     - "rhel70-perf-single"
-  #   depends_on: *_compile_amazon2
-  #   tasks: *classic_engine_1nodereplset_tasks
+  - name: linux-intel-1-node-replSet-sbe
+    display_name: Linux Intel 1-Node ReplSet (SBE)
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-sbe
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *classic_engine_1nodereplset_tasks
 
   # - name: linux-1-node-replSet-all-feature-flags
   #   display_name: Linux 1-Node ReplSet (all feature flags) Legacy
@@ -2880,26 +2893,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks: &classic_engine_tasks
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: ycsb_60GB
-      - name: ycsb_60GB.long
-      - name: crud_workloads_majority
-      - name: bestbuy_agg
-      - name: bestbuy_agg_merge_different_db
-      - name: bestbuy_agg_merge_same_db
-      - name: bestbuy_agg_merge_wordcount
-      - name: bestbuy_query
-      - name: cursor_manager
-      - name: map_reduce_workloads
-      - name: tpcc
-      - name: tpcc_majority
-      - name: tpch_1_normalized
-      - name: tpch_1_denormalized
-      - name: tpch_10_normalized
-      - name: tpch_10_denormalized
+    tasks: *classic_engine_tasks
 
   - name: linux-standalone-sbe.2022-11
     display_name: Linux Standalone (SBE) 2022-11
@@ -2941,12 +2935,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks: &classic_engine_1nodereplset_tasks
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: linkbench
-      - name: linkbench2
-      - name: snapshot_reads
+    tasks: *classic_engine_1nodereplset_tasks
 
   - name: linux-1-node-replSet-sbe.2022-11
     display_name: Linux 1-Node ReplSet (SBE) 2022-11
