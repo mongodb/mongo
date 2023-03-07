@@ -605,6 +605,27 @@ boost::optional<MemoLogicalNodeId> Memo::findNode(const GroupIdVector& groups, c
     return boost::none;
 }
 
+// Returns true if n is a sargable node with exactly one predicate on _id.
+static bool isSimpleIdLookup(ABT::reference_type n) {
+    const SargableNode* node = n.cast<SargableNode>();
+    if (!node || node->getReqMap().numConjuncts() != 1) {
+        return false;
+    }
+    const auto& [key, req] = *node->getReqMap().conjuncts().begin();
+    if (const auto interval = IntervalReqExpr::getSingularDNF(req.getIntervals());
+        !interval || !interval->isEquality()) {
+        return false;
+    }
+    if (const PathGet* getPtr = key._path.cast<PathGet>(); getPtr && getPtr->name() == "_id") {
+        if (getPtr->getPath().is<PathIdentity>()) {
+            return true;
+        } else if (const PathTraverse* traversePtr = getPtr->getPath().cast<PathTraverse>()) {
+            return traversePtr->getPath().is<PathIdentity>();
+        }
+    }
+    return false;
+}
+
 void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
     // If inserted into a new group, derive logical properties, and cardinality estimation
     // for the new group.
@@ -616,8 +637,11 @@ void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
         ctx._logicalPropsDerivation->deriveProps(*ctx._metadata, nodeRef, nullptr, this, groupId);
     props.merge(logicalProps);
 
-    const CEType estimate =
-        ctx._cardinalityEstimator->deriveCE(*ctx._metadata, *this, props, nodeRef);
+    const bool simpleIdLookup = isSimpleIdLookup(nodeRef);
+    const CEType estimate = simpleIdLookup
+        ? CEType{1.0}
+        : ctx._cardinalityEstimator->deriveCE(*ctx._metadata, *this, props, nodeRef);
+
     auto ceProp = properties::CardinalityEstimate(estimate);
 
     if (auto sargablePtr = nodeRef.cast<SargableNode>(); sargablePtr != nullptr) {
@@ -630,8 +654,10 @@ void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
                                                  ScanParams{},
                                                  sargablePtr->getTarget(),
                                                  sargablePtr->getChild());
-            const CEType singularEst = ctx._cardinalityEstimator->deriveCE(
-                *ctx._metadata, *this, props, singularReq.ref());
+            const CEType singularEst = simpleIdLookup
+                ? CEType{1.0}
+                : ctx._cardinalityEstimator->deriveCE(
+                      *ctx._metadata, *this, props, singularReq.ref());
             partialSchemaKeyCE.emplace_back(key, singularEst);
         }
     }

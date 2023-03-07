@@ -1146,6 +1146,51 @@ TEST(LogicalRewriter, SargableCE) {
         phaseManager.getMemo());
 }
 
+TEST(LogicalRewriter, SargableCEWithIdEq) {
+    using namespace unit_test_abt_literals;
+    using namespace properties;
+    auto prefixId = PrefixId::createForTests();
+
+    // Construct a query which tests coll.find({_id: 1})
+    ABT rootNode = NodeBuilder{}
+                       .root("root")
+                       .filter(_evalf(_get("_id", _cmp("Eq", "1"_cint64)), "root"_var))
+                       .finish(_scan("root", "test"));
+
+    auto phaseManager =
+        makePhaseManager({OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
+                         prefixId,
+                         {{{"test", createScanDef({}, {})}}},
+                         boost::none /*costModel*/,
+                         DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    CardinalityEstimate ceProperty =
+        getPropertyConst<CardinalityEstimate>(phaseManager.getMemo().getLogicalProps(1));
+
+    // Assert that the cost estimate of a simple _id lookup is 1.
+    ASSERT_EQ(1.0, ceProperty.getEstimate()._value);
+    ASSERT_EQ(1, ceProperty.getPartialSchemaKeyCE().size());
+    ASSERT_EQ(1.0, ceProperty.getPartialSchemaKeyCE().front().second._value);
+
+    // Construct a query which tests a traverse.
+    ABT rootNode1 = NodeBuilder{}
+                        .root("root")
+                        .filter(_evalf(_get("_id", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
+                        .finish(_scan("root", "test"));
+
+    latest = std::move(rootNode1);
+    phaseManager.optimize(latest);
+
+    ceProperty = getPropertyConst<CardinalityEstimate>(phaseManager.getMemo().getLogicalProps(1));
+
+    // Assert that the cost estimate of a traverse into a simple _id lookup is 1.
+    ASSERT_EQ(1.0, ceProperty.getEstimate()._value);
+    ASSERT_EQ(1, ceProperty.getPartialSchemaKeyCE().size());
+    ASSERT_EQ(1.0, ceProperty.getPartialSchemaKeyCE().front().second._value);
+}
+
 TEST(LogicalRewriter, RemoveNoopFilter) {
     using namespace properties;
     auto prefixId = PrefixId::createForTests();
