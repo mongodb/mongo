@@ -46,12 +46,12 @@ var FeatureFlagUtil = (function() {
         } catch (err) {
             // Some db-like objects (e.g. ShardingTest.shard0) aren't supported by FixtureHelpers,
             // but we can replace it with an object that should work and try again.
-            if (db.getDB === undefined) {
+            if (typeof db.getDB === typeof Function) {
+                setConn(db.getDB(db.defaultDB));
+            } else {
                 // Some db-like objects (e.g ShardedClusterFixture) have a getSiblingDB method
                 // instead of getDB, use that here to avoid an undefined error.
                 setConn(db.getSiblingDB(db.defaultDB));
-            } else {
-                setConn(db.getDB(db.defaultDB));
             }
         }
 
