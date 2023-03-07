@@ -64,7 +64,7 @@ gcp_connection::list_objects(
                 "' failed: " + object_metadata.status().message());
         }
 
-        objects.push_back(object_metadata->name().substr(_bucket_prefix.length()));
+        objects.push_back(object_metadata->name());
 
         if (list_single)
             break;

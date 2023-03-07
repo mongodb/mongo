@@ -71,9 +71,9 @@ azure_connection::list_objects(
 
     auto list_blobs_response = _azure_client.ListBlobs(blob_parameters);
 
-    for (const auto blob_item : list_blobs_response.Blobs)
-        objects.push_back(blob_item.Name.substr(_bucket_prefix.length()));
-
+    for (const auto blob_item : list_blobs_response.Blobs) {
+        objects.push_back(blob_item.Name);
+    }
     return 0;
 }
 
