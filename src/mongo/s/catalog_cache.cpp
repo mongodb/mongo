@@ -71,9 +71,6 @@ const int kIndexCacheSize = 10000;
 const OperationContext::Decoration<bool> operationShouldBlockBehindCatalogCacheRefresh =
     OperationContext::declareDecoration<bool>();
 
-const OperationContext::Decoration<bool> operationBlockedBehindCatalogCacheRefresh =
-    OperationContext::declareDecoration<bool>();
-
 std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -381,9 +378,6 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
         }
 
         // From this point we can guarantee that allowLocks is false
-
-        operationBlockedBehindCatalogCacheRefresh(opCtx) = true;
-
         size_t acquireTries = 0;
         Timer t;
 
@@ -502,8 +496,6 @@ boost::optional<ShardingIndexesCatalogCache> CatalogCache::_getCollectionIndexIn
 
     // From this point we can guarantee that allowLocks is false
     size_t acquireTries = 0;
-
-    operationBlockedBehindCatalogCacheRefresh(opCtx) = true;
 
     while (true) {
         try {
@@ -742,37 +734,6 @@ void CatalogCache::report(BSONObjBuilder* builder) const {
     _collectionCache.reportStats(&cacheStatsBuilder);
 }
 
-void CatalogCache::checkAndRecordOperationBlockedByRefresh(OperationContext* opCtx,
-                                                           mongo::LogicalOp opType) {
-    if (!isMongos() || !operationBlockedBehindCatalogCacheRefresh(opCtx)) {
-        return;
-    }
-
-    auto& opsBlockedByRefresh = _stats.operationsBlockedByRefresh;
-
-    opsBlockedByRefresh.countAllOperations.fetchAndAddRelaxed(1);
-
-    switch (opType) {
-        case LogicalOp::opInsert:
-            opsBlockedByRefresh.countInserts.fetchAndAddRelaxed(1);
-            break;
-        case LogicalOp::opQuery:
-            opsBlockedByRefresh.countQueries.fetchAndAddRelaxed(1);
-            break;
-        case LogicalOp::opUpdate:
-            opsBlockedByRefresh.countUpdates.fetchAndAddRelaxed(1);
-            break;
-        case LogicalOp::opDelete:
-            opsBlockedByRefresh.countDeletes.fetchAndAddRelaxed(1);
-            break;
-        case LogicalOp::opCommand:
-            opsBlockedByRefresh.countCommands.fetchAndAddRelaxed(1);
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
 void CatalogCache::invalidateDatabaseEntry_LINEARIZABLE(const StringData& dbName) {
     _databaseCache.invalidateKey(dbName);
 }
@@ -791,26 +752,6 @@ void CatalogCache::Stats::report(BSONObjBuilder* builder) const {
     builder->append("countStaleConfigErrors", countStaleConfigErrors.load());
 
     builder->append("totalRefreshWaitTimeMicros", totalRefreshWaitTimeMicros.load());
-
-    if (isMongos()) {
-        BSONObjBuilder operationsBlockedByRefreshBuilder(
-            builder->subobjStart("operationsBlockedByRefresh"));
-
-        operationsBlockedByRefreshBuilder.append(
-            "countAllOperations", operationsBlockedByRefresh.countAllOperations.load());
-        operationsBlockedByRefreshBuilder.append("countInserts",
-                                                 operationsBlockedByRefresh.countInserts.load());
-        operationsBlockedByRefreshBuilder.append("countQueries",
-                                                 operationsBlockedByRefresh.countQueries.load());
-        operationsBlockedByRefreshBuilder.append("countUpdates",
-                                                 operationsBlockedByRefresh.countUpdates.load());
-        operationsBlockedByRefreshBuilder.append("countDeletes",
-                                                 operationsBlockedByRefresh.countDeletes.load());
-        operationsBlockedByRefreshBuilder.append("countCommands",
-                                                 operationsBlockedByRefresh.countCommands.load());
-
-        operationsBlockedByRefreshBuilder.done();
-    }
 }
 
 CatalogCache::DatabaseCache::DatabaseCache(ServiceContext* service,

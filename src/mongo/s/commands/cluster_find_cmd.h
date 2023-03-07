@@ -209,11 +209,6 @@ public:
 
             Impl::checkCanRunHere(opCtx);
 
-            ON_BLOCK_EXIT([opCtx] {
-                Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(
-                    opCtx, mongo::LogicalOp::opQuery);
-            });
-
             auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
 
             const boost::intrusive_ptr<ExpressionContext> expCtx;

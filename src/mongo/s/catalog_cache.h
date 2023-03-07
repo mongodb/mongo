@@ -293,13 +293,6 @@ public:
     void report(BSONObjBuilder* builder) const;
 
     /**
-     * Checks if the current operation was ever marked as needing refresh. If the curent operation
-     * was marked as needing refresh, updates the relevant counters inside the Stats struct.
-     */
-    void checkAndRecordOperationBlockedByRefresh(OperationContext* opCtx, mongo::LogicalOp opType);
-
-
-    /**
      * Non-blocking method that marks the current database entry for the dbName as needing
      * refresh. Will cause all further targetting attempts to block on a catalog cache refresh,
      * even if they do not require causal consistency.
@@ -424,18 +417,6 @@ private:
         // Cumulative, always-increasing counter of how much time threads waiting for refresh
         // combined
         AtomicWord<long long> totalRefreshWaitTimeMicros{0};
-
-        // Cumulative, always-increasing counter of how many operations have been blocked by a
-        // catalog cache refresh. Broken down by operation type to match the operations tracked
-        // by the OpCounters class.
-        struct OperationsBlockedByRefresh {
-            AtomicWord<long long> countAllOperations{0};
-            AtomicWord<long long> countInserts{0};
-            AtomicWord<long long> countQueries{0};
-            AtomicWord<long long> countUpdates{0};
-            AtomicWord<long long> countDeletes{0};
-            AtomicWord<long long> countCommands{0};
-        } operationsBlockedByRefresh;
 
         /**
          * Reports the accumulated statistics for serverStatus.
