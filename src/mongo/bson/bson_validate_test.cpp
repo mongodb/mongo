@@ -903,4 +903,13 @@ TEST(BSONValidateExtended, BSONEncryptedValue) {
     }
 }
 
+TEST(BSONValidateExtended, UnknownBinDataType) {
+    BSONObj obj = BSON("unknownBinData" << BSONBinData("", 0, static_cast<BinDataType>(42)));
+
+    Status status = validateBSON(obj, BSONValidateMode::kExtended);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    status = validateBSON(obj, BSONValidateMode::kFull);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+}
+
 }  // namespace

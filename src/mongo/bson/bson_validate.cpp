@@ -126,6 +126,11 @@ public:
                 auto binData = bsonElemVal.BinData();
                 auto subtype = binData.type;
                 switch (subtype) {
+                    case BinDataType::BinDataGeneral:
+                    case BinDataType::Function:
+                    case BinDataType::Column:  // Validates in FullValidator.
+                    case BinDataType::bdtCustom:
+                        break;
                     case BinDataType::ByteArrayDeprecated:
                     case BinDataType::bdtUUID:
                         uasserted(
@@ -154,7 +159,8 @@ public:
                         break;
                     }
                     default:
-                        break;
+                        uasserted(ErrorCodes::NonConformantBSON,
+                                  fmt::format("Unknown BSON Binary Data Type {}", subtype));
                 }
                 break;
             }
