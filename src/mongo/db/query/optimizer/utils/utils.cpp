@@ -42,14 +42,6 @@
 
 namespace mongo::optimizer {
 
-ProjectionNameOrderedSet convertToOrderedSet(ProjectionNameSet unordered) {
-    ProjectionNameOrderedSet ordered;
-    for (const ProjectionName& projection : unordered) {
-        ordered.emplace(projection);
-    }
-    return ordered;
-}
-
 void combineLimitSkipProperties(properties::LimitSkipRequirement& aboveProp,
                                 const properties::LimitSkipRequirement& belowProp) {
     using namespace properties;

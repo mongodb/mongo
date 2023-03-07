@@ -91,13 +91,14 @@ size_t PhysNodes::PhysPropsHasher::operator()(const properties::PhysProps& physP
 }
 
 static ABT createBinderMap(const properties::LogicalProps& logicalProperties) {
-    const properties::ProjectionAvailability& projSet =
-        properties::getPropertyConst<properties::ProjectionAvailability>(logicalProperties);
-
     ProjectionNameVector projectionVector;
     ABTVector expressions;
 
-    ProjectionNameOrderedSet ordered = convertToOrderedSet(projSet.getProjections());
+    const auto& projSet =
+        properties::getPropertyConst<properties::ProjectionAvailability>(logicalProperties)
+            .getProjections();
+    ProjectionNameOrderedSet ordered{projSet.cbegin(), projSet.cend()};
+
     for (const ProjectionName& projection : ordered) {
         projectionVector.push_back(projection);
         expressions.emplace_back(make<Source>());

@@ -171,8 +171,6 @@ private:
 
 using SpoolIdGenerator = IdGenerator<int64_t>;
 
-ProjectionNameOrderedSet convertToOrderedSet(ProjectionNameSet unordered);
-
 void combineLimitSkipProperties(properties::LimitSkipRequirement& aboveProp,
                                 const properties::LimitSkipRequirement& belowProp);
 

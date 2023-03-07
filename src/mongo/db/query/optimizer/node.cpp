@@ -54,7 +54,7 @@ static ABT buildSimpleBinder(const ProjectionNameVector& names) {
  */
 static ABT buildReferences(const ProjectionNameSet& projections) {
     ABTVector variables;
-    ProjectionNameOrderedSet ordered = convertToOrderedSet(projections);
+    ProjectionNameOrderedSet ordered{projections.cbegin(), projections.cend()};
     for (const ProjectionName& projection : ordered) {
         variables.emplace_back(make<Variable>(projection));
     }

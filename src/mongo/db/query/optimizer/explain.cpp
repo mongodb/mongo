@@ -775,7 +775,7 @@ public:
 
     template <class T>
     static void printProjectionsOrdered(ExplainPrinter& printer, const T& projections) {
-        ProjectionNameOrderedSet projectionSet(projections.begin(), projections.end());
+        ProjectionNameOrderedSet projectionSet(projections.cbegin(), projections.cend());
         printProjectionsUnordered(printer, projectionSet);
     }
 
@@ -2136,10 +2136,8 @@ public:
 
         void operator()(const properties::LogicalProperty&,
                         const properties::ProjectionAvailability& prop) {
-            ProjectionNameOrderedSet ordered;
-            for (const ProjectionName& projection : prop.getProjections()) {
-                ordered.insert(projection);
-            }
+            const auto& propProj = prop.getProjections();
+            ProjectionNameOrderedSet ordered(propProj.cbegin(), propProj.cend());
 
             std::vector<ExplainPrinter> printers;
             for (const ProjectionName& projection : ordered) {
@@ -2202,10 +2200,8 @@ public:
             printer.separator("]");
 
             if (!prop.getSatisfiedPartialIndexes().empty()) {
-                std::set<std::string> ordered;
-                for (const auto& indexName : prop.getSatisfiedPartialIndexes()) {
-                    ordered.insert(indexName);
-                }
+                const auto& satisfiedIndexes = prop.getSatisfiedPartialIndexes();
+                std::set<std::string> ordered{satisfiedIndexes.cbegin(), satisfiedIndexes.cend()};
 
                 std::vector<ExplainPrinter> printers;
                 for (const auto& indexName : ordered) {
@@ -2221,10 +2217,8 @@ public:
 
         void operator()(const properties::LogicalProperty&,
                         const properties::CollectionAvailability& prop) {
-            std::set<std::string> orderedSet;
-            for (const std::string& scanDef : prop.getScanDefSet()) {
-                orderedSet.insert(scanDef);
-            }
+            const auto& scanDefSet = prop.getScanDefSet();
+            std::set<std::string> orderedSet{scanDefSet.cbegin(), scanDefSet.cend()};
 
             std::vector<ExplainPrinter> printers;
             for (const std::string& scanDef : orderedSet) {
@@ -2260,10 +2254,9 @@ public:
                 }
             };
 
-            std::set<properties::DistributionRequirement, Comparator> ordered;
-            for (const auto& distributionProp : prop.getDistributionSet()) {
-                ordered.insert(distributionProp);
-            }
+            const auto& distribSet = prop.getDistributionSet();
+            std::set<properties::DistributionRequirement, Comparator> ordered{distribSet.cbegin(),
+                                                                              distribSet.cend()};
 
             std::vector<ExplainPrinter> printers;
             for (const auto& distributionProp : ordered) {
