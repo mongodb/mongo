@@ -34,12 +34,18 @@ function checkValidate(maxMemoryUsage, {minMissingKeys, maxMissingKeys}) {
     assert.lte(res.missingIndexEntries.length, maxMissingKeys, tojson(res));
 }
 
+function checkValidateLogs() {
+    assert(checkLog.checkContainsOnceJson(
+        conn, 7463100, {"spec": {"v": 2, "key": {"_id": 1}, "name": "_id_"}}));
+}
+
 // Insert a document with a key larger than maxValidateMemoryUsageMB and test that we still report
 // at least one inconsistency.
 const indexKey = "a".repeat(kIndexKeyLength);
 assert.commandWorked(coll.insert({_id: indexKey}));
 corruptIndex();
 checkValidate(1, {minMissingKeys: 1, maxMissingKeys: 1});
+checkValidateLogs();
 
 // Clear collection between tests.
 coll.drop();
@@ -56,6 +62,7 @@ corruptIndex();
 // each key is counted twice, so realistically we only expect to track 2 of them. However, there's
 // a small chance we could get hash collisions that would lead to us reporting only 1.
 checkValidate(1, {minMissingKeys: 1, maxMissingKeys: 2});
+checkValidateLogs();
 
 MongoRunner.stopMongod(conn, null, {skipValidation: true});
 })();
