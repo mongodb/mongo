@@ -105,6 +105,9 @@ public:
     BSONObj reportForCurrentOp() const noexcept override;
     boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const override;
 
+protected:
+    virtual StringData getStateString() const noexcept override;
+
 private:
 };
 

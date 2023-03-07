@@ -43,6 +43,9 @@ public:
     virtual StringData getForApproxBytesToScan() const = 0;
     virtual StringData getForBytesWritten() const = 0;
     virtual StringData getForDocumentsProcessed() const = 0;
+    virtual StringData getForCoordinatorState() const;
+    virtual StringData getForDonorState() const;
+    virtual StringData getForRecipientState() const;
     StringData getForType() const;
     StringData getForDescription() const;
     StringData getForNamespace() const;
@@ -53,9 +56,6 @@ public:
     StringData getForCountWritesDuringCriticalSection() const;
     StringData getForCountWritesToStashCollections() const;
     StringData getForCountReadsDuringCriticalSection() const;
-    StringData getForCoordinatorState() const;
-    StringData getForDonorState() const;
-    StringData getForRecipientState() const;
     StringData getForAllShardsLowestRemainingOperationTimeEstimatedSecs() const;
     StringData getForAllShardsHighestRemainingOperationTimeEstimatedSecs() const;
 };

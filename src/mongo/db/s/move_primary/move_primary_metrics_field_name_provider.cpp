@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/s/metrics/field_names/sharding_data_transform_instance_metrics_field_name_provider.h"
-#include "mongo/db/s/metrics/field_names/with_document_copy_approximation_field_name_overrides.h"
-#include "mongo/db/s/metrics/field_names/with_document_copy_count_field_name_overrides.h"
-#include "mongo/db/s/metrics/field_names/with_oplog_application_count_metrics_field_names.h"
+#include "mongo/db/s/move_primary/move_primary_metrics_field_name_provider.h"
 
 namespace mongo {
+namespace {
+constexpr auto kState = "state";
+}
 
-class MovePrimaryMetricsFieldNameProvider
-    : public WithOplogApplicationCountFieldNames<
-          WithDocumentCopyApproximationFieldNameOverrides<WithDocumentCopyCountFieldNameOverrides<
-              ShardingDataTransformInstanceMetricsFieldNameProvider>>> {
-public:
-    StringData getForCoordinatorState() const override;
-    StringData getForDonorState() const override;
-    StringData getForRecipientState() const override;
-};
+StringData MovePrimaryMetricsFieldNameProvider::getForCoordinatorState() const {
+    return kState;
+}
+
+StringData MovePrimaryMetricsFieldNameProvider::getForDonorState() const {
+    return kState;
+}
+
+StringData MovePrimaryMetricsFieldNameProvider::getForRecipientState() const {
+    return kState;
+}
 
 }  // namespace mongo

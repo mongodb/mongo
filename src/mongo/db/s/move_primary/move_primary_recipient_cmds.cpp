@@ -206,7 +206,7 @@ public:
             MovePrimaryRecipientDocument recipientDoc(std::move(cmd.getMigrationId()),
                                                       cmd.getDatabaseName().toString(),
                                                       cmd.getFromShard().toString());
-            recipientDoc.setState(MovePrimaryRecipientState::kAborted);
+            recipientDoc.setState(MovePrimaryRecipientStateEnum::kAborted);
 
             auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
             auto service = registry->lookupServiceByName(

@@ -63,39 +63,9 @@ MONGO_FAIL_POINT_DEFINE(movePrimaryRecipientPauseAfterTransitionToCloningState);
 
 namespace {
 
-constexpr StringData kUninitialized = "uninitialized"_sd;
-constexpr StringData kCloning = "cloning"_sd;
-constexpr StringData kApplying = "applying"_sd;
-constexpr StringData kBlocking = "blocking"_sd;
-constexpr StringData kPrepared = "prepared"_sd;
-constexpr StringData kAborted = "aborted"_sd;
-constexpr StringData kDone = "done"_sd;
-
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 }  // namespace
-
-StringData MovePrimaryRecipientService::MovePrimaryRecipient::_parseRecipientState(
-    MovePrimaryRecipientState value) {
-    switch (value) {
-        case MovePrimaryRecipientState::kUninitialized:
-            return kUninitialized;
-        case MovePrimaryRecipientState::kCloning:
-            return kCloning;
-        case MovePrimaryRecipientState::kApplying:
-            return kApplying;
-        case MovePrimaryRecipientState::kBlocking:
-            return kBlocking;
-        case MovePrimaryRecipientState::kPrepared:
-            return kPrepared;
-        case MovePrimaryRecipientState::kAborted:
-            return kAborted;
-        case MovePrimaryRecipientState::kDone:
-            return kDone;
-        default:
-            MONGO_UNREACHABLE
-    }
-}
 
 MovePrimaryRecipientService::MovePrimaryRecipientService(ServiceContext* serviceContext)
     : repl::PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
@@ -225,15 +195,13 @@ ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_transit
                 {
                     stdx::lock_guard<Latch> lg(_mutex);
 
-                    if (_state > MovePrimaryRecipientState::kUninitialized) {
+                    if (_state > MovePrimaryRecipientStateEnum::kUninitialized) {
                         return;
                     }
 
-                    _transitionStateMachine(lg, MovePrimaryRecipientState::kCloning);
+                    _transitionStateMachine(lg, MovePrimaryRecipientStateEnum::kCloning);
                 }
-                _updateRecipientDocument(opCtx.get(),
-                                         MovePrimaryRecipientDocument::kStateFieldName,
-                                         MovePrimaryRecipientState::kCloning);
+                _updateRecipientDocumentState(opCtx.get(), MovePrimaryRecipientStateEnum::kCloning);
             });
         })
         .onTransientError([](const Status& status) {})
@@ -257,14 +225,12 @@ ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_transit
             {
                 stdx::lock_guard<Latch> lg(_mutex);
 
-                if (_state > MovePrimaryRecipientState::kCloning) {
+                if (_state > MovePrimaryRecipientStateEnum::kCloning) {
                     return;
                 }
-                _transitionStateMachine(lg, MovePrimaryRecipientState::kApplying);
+                _transitionStateMachine(lg, MovePrimaryRecipientStateEnum::kApplying);
             }
-            _updateRecipientDocument(opCtx.get(),
-                                     MovePrimaryRecipientDocument::kStateFieldName,
-                                     MovePrimaryRecipientState::kApplying);
+            _updateRecipientDocumentState(opCtx.get(), MovePrimaryRecipientStateEnum::kApplying);
         })
         .onTransientError([](const Status& status) {})
         .onUnrecoverableError([](const Status& status) {})
@@ -273,7 +239,7 @@ ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_transit
 }
 
 void MovePrimaryRecipientService::MovePrimaryRecipient::_transitionStateMachine(
-    WithLock, MovePrimaryRecipientState newState) {
+    WithLock, MovePrimaryRecipientStateEnum newState) {
     // This can happen during a retry of AsyncTry loop.
     if (newState == _state) {
         return;
@@ -283,8 +249,8 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_transitionStateMachine(
     std::swap(_state, newState);
     LOGV2(7271201,
           "Transitioned movePrimary recipient state",
-          "oldState"_attr = _parseRecipientState(newState),
-          "newState"_attr = _parseRecipientState(_state),
+          "oldState"_attr = MovePrimaryRecipientState_serializer(newState),
+          "newState"_attr = MovePrimaryRecipientState_serializer(_state),
           "migrationId"_attr = _metadata.get_id(),
           "databaseName"_attr = _metadata.getDatabaseName(),
           "fromShard"_attr = _metadata.getShardName());
@@ -296,7 +262,7 @@ ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_persist
         {
             stdx::lock_guard<Latch> lg(_mutex);
 
-            if (_state > MovePrimaryRecipientState::kUninitialized) {
+            if (_state > MovePrimaryRecipientStateEnum::kUninitialized) {
                 return;
             }
         }
@@ -305,7 +271,7 @@ ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_persist
 
         MovePrimaryRecipientDocument recipientDoc;
         recipientDoc.setMetadata(_metadata);
-        recipientDoc.setState(MovePrimaryRecipientState::kCloning);
+        recipientDoc.setState(MovePrimaryRecipientStateEnum::kCloning);
         recipientDoc.setStartAt(_serviceContext->getPreciseClockSource()->now());
 
         PersistentTaskStore<MovePrimaryRecipientDocument> store(
@@ -355,6 +321,13 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_updateRecipientDocument
                  BSON(MovePrimaryRecipientDocument::k_idFieldName << _metadata.get_id()),
                  updateBuilder.done(),
                  WriteConcerns::kMajorityWriteConcernNoTimeout);
+}
+
+void MovePrimaryRecipientService::MovePrimaryRecipient::_updateRecipientDocumentState(
+    OperationContext* opCtx, MovePrimaryRecipientStateEnum state) {
+    _updateRecipientDocument(opCtx,
+                             MovePrimaryRecipientDocument::kStateFieldName,
+                             MovePrimaryRecipientState_serializer(state));
 }
 
 repl::OpTime MovePrimaryRecipientService::MovePrimaryRecipient::_getStartApplyingDonorOpTime(

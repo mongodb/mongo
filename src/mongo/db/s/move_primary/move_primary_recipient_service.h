@@ -170,14 +170,14 @@ public:
         std::vector<NamespaceString> _getShardedCollectionsFromConfigSvr(
             OperationContext* opCtx) const;
 
-        void _transitionStateMachine(WithLock, MovePrimaryRecipientState newState);
+        void _transitionStateMachine(WithLock, MovePrimaryRecipientStateEnum newState);
 
         template <class T>
         void _updateRecipientDocument(OperationContext* opCtx,
                                       const StringData& fieldName,
                                       T value);
-
-        StringData _parseRecipientState(MovePrimaryRecipientState value);
+        void _updateRecipientDocumentState(OperationContext* opCtx,
+                                           MovePrimaryRecipientStateEnum state);
 
         repl::OpTime _getStartApplyingDonorOpTime(
             OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
@@ -206,7 +206,7 @@ public:
         // To synchronize operations on mutable states below.
         Mutex _mutex = MONGO_MAKE_LATCH("MovePrimaryRecipient::_mutex");
 
-        MovePrimaryRecipientState _state;
+        MovePrimaryRecipientStateEnum _state;
 
         // Promise that is resolved when the recipient doc is persisted on disk
         SharedPromise<void> _recipientDocDurablePromise;

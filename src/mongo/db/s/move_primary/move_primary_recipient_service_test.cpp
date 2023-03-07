@@ -332,7 +332,7 @@ TEST_F(MovePrimaryRecipientServiceTest, CanTransitionTokCloningState) {
     ASSERT(instance->getRecipientDataClonedFuture().isReady());
 
     auto persistedDoc = getRecipientDoc(opCtx);
-    ASSERT_EQ(persistedDoc.getState(), MovePrimaryRecipientState::kCloning);
+    ASSERT_EQ(persistedDoc.getState(), MovePrimaryRecipientStateEnum::kCloning);
     ASSERT(persistedDoc.getStartApplyingDonorOpTime().is_initialized());
 
     movePrimaryRecipientPauseAfterTransitionToCloningState->setMode(FailPoint::off, 0);

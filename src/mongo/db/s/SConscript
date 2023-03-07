@@ -187,6 +187,7 @@ env.Library(
         'move_primary/move_primary_cumulative_metrics.cpp',
         'move_primary/move_primary_donor_service.cpp',
         'move_primary/move_primary_metrics.cpp',
+        'move_primary/move_primary_metrics_field_name_provider.cpp',
         'move_primary/move_primary_recipient_cmds.idl',
         'move_primary/move_primary_server_parameters.idl',
         'move_primary/move_primary_state_machine.idl',

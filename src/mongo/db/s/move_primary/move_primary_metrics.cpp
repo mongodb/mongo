@@ -89,4 +89,14 @@ boost::optional<Milliseconds> MovePrimaryMetrics::getRecipientHighEstimateRemain
     return boost::none;
 }
 
+StringData MovePrimaryMetrics::getStateString() const noexcept {
+    return stdx::visit(OverloadedVisitor{[](MovePrimaryRecipientStateEnum state) {
+                                             return MovePrimaryRecipientState_serializer(state);
+                                         },
+                                         [](MovePrimaryDonorStateEnum state) {
+                                             return MovePrimaryDonorState_serializer(state);
+                                         }},
+                       getState());
+}
+
 }  // namespace mongo

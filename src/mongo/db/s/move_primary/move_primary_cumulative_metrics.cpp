@@ -36,19 +36,19 @@ constexpr auto kMovePrimary = "movePrimary";
 
 const auto kReportedStateFieldNamesMap = [] {
     return MovePrimaryCumulativeMetrics::StateFieldNameMap{
-        {MovePrimaryDonorState::kInitializing, "countInstancesInDonorState1Initializing"},
-        {MovePrimaryDonorState::kCloning, "countInstancesInDonorState2Cloning"},
-        {MovePrimaryDonorState::kWaitingToBlockWrites,
+        {MovePrimaryDonorStateEnum::kInitializing, "countInstancesInDonorState1Initializing"},
+        {MovePrimaryDonorStateEnum::kCloning, "countInstancesInDonorState2Cloning"},
+        {MovePrimaryDonorStateEnum::kWaitingToBlockWrites,
          "countInstancesInDonorState3WaitingToBlockWrites"},
-        {MovePrimaryDonorState::kBlockingWrites, "countInstancesInDonorState4BlockingWrites"},
-        {MovePrimaryDonorState::kPrepared, "countInstancesInDonorState5Prepared"},
-        {MovePrimaryDonorState::kAborted, "countInstancesInDonorState6Aborted"},
-        {MovePrimaryRecipientState::kCloning, "countInstancesInRecipientState1Cloning"},
-        {MovePrimaryRecipientState::kApplying, "countInstancesInRecipientState2Applying"},
-        {MovePrimaryRecipientState::kBlocking, "countInstancesInRecipientState3Blocking"},
-        {MovePrimaryRecipientState::kPrepared, "countInstancesInRecipientState4Prepared"},
-        {MovePrimaryRecipientState::kAborted, "countInstancesInRecipientState5Aborted"},
-        {MovePrimaryRecipientState::kDone, "countInstancesInRecipientState6Done"}};
+        {MovePrimaryDonorStateEnum::kBlockingWrites, "countInstancesInDonorState4BlockingWrites"},
+        {MovePrimaryDonorStateEnum::kPrepared, "countInstancesInDonorState5Prepared"},
+        {MovePrimaryDonorStateEnum::kAborted, "countInstancesInDonorState6Aborted"},
+        {MovePrimaryRecipientStateEnum::kCloning, "countInstancesInRecipientState1Cloning"},
+        {MovePrimaryRecipientStateEnum::kApplying, "countInstancesInRecipientState2Applying"},
+        {MovePrimaryRecipientStateEnum::kBlocking, "countInstancesInRecipientState3Blocking"},
+        {MovePrimaryRecipientStateEnum::kPrepared, "countInstancesInRecipientState4Prepared"},
+        {MovePrimaryRecipientStateEnum::kAborted, "countInstancesInRecipientState5Aborted"},
+        {MovePrimaryRecipientStateEnum::kDone, "countInstancesInRecipientState6Done"}};
 }();
 
 }  // namespace

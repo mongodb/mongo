@@ -42,13 +42,13 @@ namespace mongo {
 
 namespace move_primary_cumulative_metrics {
 DEFINE_IDL_ENUM_SIZE_TEMPLATE_HELPER(MovePrimaryMetrics,
-                                     MovePrimaryDonorState,
-                                     MovePrimaryRecipientState)
+                                     MovePrimaryDonorStateEnum,
+                                     MovePrimaryRecipientStateEnum)
 using Base = WithOplogApplicationLatencyMetrics<WithOplogApplicationCountMetrics<
     WithStateManagementForCumulativeMetrics<ShardingDataTransformCumulativeMetrics,
                                             MovePrimaryMetricsEnumSizeTemplateHelper,
-                                            MovePrimaryDonorState,
-                                            MovePrimaryRecipientState>>>;
+                                            MovePrimaryDonorStateEnum,
+                                            MovePrimaryRecipientStateEnum>>>;
 }  // namespace move_primary_cumulative_metrics
 
 class MovePrimaryCumulativeMetrics : public move_primary_cumulative_metrics::Base {

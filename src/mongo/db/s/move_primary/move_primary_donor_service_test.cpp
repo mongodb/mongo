@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/s/move_primary/move_primary_donor_service.h"
 #include "mongo/logv2/log.h"
@@ -59,6 +60,70 @@ protected:
         MovePrimaryDonorDocument doc;
         doc.setMetadata(createMetadata());
         return doc;
+    }
+
+    MovePrimaryDonorDocument getStateDocumentOnDisk(OperationContext* opCtx) {
+        DBDirectClient client(opCtx);
+        auto doc = client.findOne(NamespaceString::kMovePrimaryDonorNamespace, BSONObj{});
+        IDLParserContext errCtx("MovePrimaryDonorServiceTest::getStateDocumentOnDisk()");
+        return MovePrimaryDonorDocument::parse(errCtx, doc);
+    }
+
+    static constexpr auto kBefore = "before";
+    static constexpr auto kPartial = "partial";
+    static constexpr auto kAfter = "after";
+
+    auto pauseStateTransitionImpl(const std::string& progress,
+                                  MovePrimaryDonorStateEnum state,
+                                  const std::string& failpointName) {
+        auto fp = globalFailPointRegistry().find(failpointName);
+        auto count = fp->setMode(FailPoint::alwaysOn,
+                                 0,
+                                 fromjson(fmt::format("{{progress: '{}', state: '{}'}}",
+                                                      progress,
+                                                      MovePrimaryDonorState_serializer(state))));
+        return std::tuple{fp, count};
+    }
+
+    auto pauseStateTransition(const std::string& progress, MovePrimaryDonorStateEnum state) {
+        return pauseStateTransitionImpl(
+            progress, state, "pauseDuringMovePrimaryDonorStateEnumTransition");
+    }
+
+    auto pauseStateTransitionAlternate(const std::string& progress,
+                                       MovePrimaryDonorStateEnum state) {
+        return pauseStateTransitionImpl(
+            progress, state, "pauseDuringMovePrimaryDonorStateEnumTransitionAlternate");
+    }
+
+    auto failCrudOpsOn(NamespaceString nss) {
+        auto fp = globalFailPointRegistry().find("failCommand");
+        auto count =
+            fp->setMode(FailPoint::alwaysOn,
+                        0,
+                        fromjson(fmt::format("{{failCommands:['insert', 'update', 'delete'], "
+                                             "namespace: '{}', failLocalClients: true, "
+                                             "failInternalCommands: true, errorCode: {}}}",
+                                             nss.toString(),
+                                             ErrorCodes::Interrupted)));
+        return std::tuple{fp, count};
+    }
+
+    BSONObj getMetrics(const std::shared_ptr<DonorInstance>& instance) {
+        auto currentOp = instance->reportForCurrentOp(
+            MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
+            MongoProcessInterface::CurrentOpSessionsMode::kExcludeIdle);
+        ASSERT_TRUE(currentOp);
+        return *currentOp;
+    }
+
+    std::shared_ptr<DonorInstance> getExistingInstance(OperationContext* opCtx, const UUID& id) {
+        auto instanceId = BSON(MovePrimaryDonorDocument::k_idFieldName << id);
+        auto instance = DonorInstance::lookup(opCtx, _service, instanceId);
+        if (!instance) {
+            return nullptr;
+        }
+        return *instance;
     }
 };
 
@@ -106,6 +171,76 @@ TEST_F(MovePrimaryDonorServiceTest, SameUuidMustHaveSameRecipient) {
     ASSERT_THROWS_CODE(DonorInstance::getOrCreate(opCtx.get(), _service, otherStateDoc.toBSON()),
                        DBException,
                        ErrorCodes::ConflictingOperationInProgress);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, StateDocumentIsPersistedAfterInitializing) {
+    auto opCtx = makeOperationContext();
+    auto stateDoc = createStateDocument();
+    auto [fp, count] = pauseStateTransition(kAfter, MovePrimaryDonorStateEnum::kInitializing);
+    auto instance = DonorInstance::getOrCreate(opCtx.get(), _service, stateDoc.toBSON());
+    fp->waitForTimesEntered(count + 1);
+    auto onDiskState = getStateDocumentOnDisk(opCtx.get());
+    ASSERT_EQ(onDiskState.getMutableFields().getState(), MovePrimaryDonorStateEnum::kInitializing);
+    fp->setMode(FailPoint::off);
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(MovePrimaryDonorServiceTest, StateDocumentInsertionRetriesIfWriteFails) {
+    auto opCtx = makeOperationContext();
+    auto stateDoc = createStateDocument();
+    auto [beforeFp, beforeCount] =
+        pauseStateTransition(kBefore, MovePrimaryDonorStateEnum::kInitializing);
+    auto [afterFp, afterCount] =
+        pauseStateTransitionAlternate(kAfter, MovePrimaryDonorStateEnum::kInitializing);
+    auto instance = DonorInstance::getOrCreate(opCtx.get(), _service, stateDoc.toBSON());
+    beforeFp->waitForTimesEntered(beforeCount + 1);
+
+    auto [failCrud, crudCount] = failCrudOpsOn(NamespaceString::kMovePrimaryDonorNamespace);
+    beforeFp->setMode(FailPoint::off);
+    failCrud->waitForTimesEntered(crudCount + 1);
+    failCrud->setMode(FailPoint::off);
+
+    afterFp->waitForTimesEntered(afterCount + 1);
+    auto onDiskState = getStateDocumentOnDisk(opCtx.get());
+    ASSERT_EQ(onDiskState.getMutableFields().getState(), MovePrimaryDonorStateEnum::kInitializing);
+    afterFp->setMode(FailPoint::off);
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(MovePrimaryDonorServiceTest, InitializingUpdatesInMemoryState) {
+    auto opCtx = makeOperationContext();
+    auto stateDoc = createStateDocument();
+    auto [fp, count] = pauseStateTransition(kAfter, MovePrimaryDonorStateEnum::kInitializing);
+    auto instance = DonorInstance::getOrCreate(opCtx.get(), _service, stateDoc.toBSON());
+    fp->waitForTimesEntered(count + 1);
+
+    ASSERT_EQ(getMetrics(instance).getStringField("state"), "initializing");
+
+    fp->setMode(FailPoint::off);
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(MovePrimaryDonorServiceTest, FailoverInInitializing) {
+    auto opCtx = makeOperationContext();
+    auto stateDoc = createStateDocument();
+
+    {
+        auto [fp, count] = pauseStateTransition(kAfter, MovePrimaryDonorStateEnum::kInitializing);
+        auto instance = DonorInstance::getOrCreate(opCtx.get(), _service, stateDoc.toBSON());
+        fp->waitForTimesEntered(count + 1);
+
+        stepDown();
+        fp->setMode(FailPoint::off);
+        ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
+    }
+
+    auto fp = globalFailPointRegistry().find("pauseBeforeBeginningMovePrimaryDonorWorkflow");
+    auto count = fp->setMode(FailPoint::alwaysOn);
+    stepUp(opCtx.get());
+    auto instance = getExistingInstance(opCtx.get(), stateDoc.get_id());
+    fp->waitForTimesEntered(count + 1);
+    fp->setMode(FailPoint::off);
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
 }  // namespace

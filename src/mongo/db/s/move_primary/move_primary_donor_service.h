@@ -32,6 +32,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/move_primary/move_primary_metrics.h"
 #include "mongo/db/s/move_primary/move_primary_state_machine_gen.h"
+#include "mongo/db/s/resharding/resharding_future_util.h"
 
 namespace mongo {
 
@@ -58,13 +59,75 @@ private:
     ServiceContext* _serviceContext;
 };
 
+class MovePrimaryDonorCancelState {
+public:
+    MovePrimaryDonorCancelState(const CancellationToken& stepdownToken);
+    const CancellationToken& getStepdownToken();
+    const CancellationToken& getAbortToken();
+
+private:
+    CancellationToken _stepdownToken;
+    CancellationSource _abortSource;
+    CancellationToken _abortToken;
+};
+
+class MovePrimaryDonorRetryHelper {
+public:
+    MovePrimaryDonorRetryHelper(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                MovePrimaryDonorCancelState* cancelState);
+
+    template <typename Fn>
+    auto untilStepdownOrSuccess(Fn&& fn) {
+        return untilImpl(
+            std::forward<Fn>(fn), _cancelOnStepdownFactory, _cancelState->getStepdownToken());
+    }
+
+    template <typename Fn>
+    auto untilAbortOrSuccess(Fn&& fn) {
+        return untilImpl(
+            std::forward<Fn>(fn), _cancelOnAbortFactory, _cancelState->getAbortToken());
+    }
+
+private:
+    template <typename Fn>
+    using FuturizedResultType =
+        FutureContinuationResult<Fn, const CancelableOperationContextFactory&>;
+
+    template <typename Fn>
+    using StatusifiedResultType =
+        decltype(std::declval<Future<FuturizedResultType<Fn>>>().getNoThrow());
+
+    template <typename Fn>
+    auto untilImpl(Fn&& fn,
+                   const resharding::RetryingCancelableOperationContextFactory& factory,
+                   const CancellationToken& token) {
+        return factory.withAutomaticRetry(std::forward<Fn>(fn))
+            .onTransientError([this](const Status& status) { handleTransientError(status); })
+            .onUnrecoverableError(
+                [this](const Status& status) { handleUnrecoverableError(status); })
+            .template until<StatusifiedResultType<Fn>>(
+                [](const auto& statusLike) { return statusLike.isOK(); })
+            .on(**_taskExecutor, token);
+    }
+
+    void handleTransientError(const Status& status);
+    void handleUnrecoverableError(const Status& status);
+
+    std::shared_ptr<executor::ScopedTaskExecutor> _taskExecutor;
+    std::shared_ptr<ThreadPool> _markKilledExecutor;
+    MovePrimaryDonorCancelState* _cancelState;
+    resharding::RetryingCancelableOperationContextFactory _cancelOnStepdownFactory;
+    resharding::RetryingCancelableOperationContextFactory _cancelOnAbortFactory;
+};
 
 class MovePrimaryDonor : public repl::PrimaryOnlyService::TypedInstance<MovePrimaryDonor> {
 public:
-    MovePrimaryDonor(ServiceContext* serviceContext, MovePrimaryDonorDocument initialState);
+    MovePrimaryDonor(ServiceContext* serviceContext,
+                     MovePrimaryDonorService* donorService,
+                     MovePrimaryDonorDocument initialState);
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                         const CancellationToken& token) noexcept override;
+                         const CancellationToken& stepdownToken) noexcept override;
 
     void interrupt(Status status) override;
 
@@ -76,11 +139,40 @@ public:
 
     const MovePrimaryCommonMetadata& getMetadata() const;
 
+    SharedSemiFuture<void> getCompletionFuture() const;
+
 private:
+    MovePrimaryDonorStateEnum getCurrentState() const;
+    MovePrimaryDonorMutableFields getMutableFields() const;
+    MovePrimaryDonorDocument buildCurrentStateDocument() const;
+
+    void initializeRun(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                       const CancellationToken& stepdownToken);
+    ExecutorFuture<void> runDonorWorkflow();
+    ExecutorFuture<void> transitionToState(MovePrimaryDonorStateEnum state);
+    ExecutorFuture<void> doInitializing();
+    void updateOnDiskState(OperationContext* opCtx,
+                           const MovePrimaryDonorDocument& newStateDocument);
+    void updateInMemoryState(const MovePrimaryDonorDocument& newStateDocument);
+
+    template <typename Fn>
+    auto runOnTaskExecutor(Fn&& fn) {
+        return ExecutorFuture(**_taskExecutor).then(std::forward<Fn>(fn));
+    }
+
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("MovePrimaryDonor::_mutex");
     ServiceContext* _serviceContext;
+    MovePrimaryDonorService* const _donorService;
     const MovePrimaryCommonMetadata _metadata;
+
     MovePrimaryDonorMutableFields _mutableFields;
     std::unique_ptr<MovePrimaryMetrics> _metrics;
+
+    std::shared_ptr<executor::ScopedTaskExecutor> _taskExecutor;
+    boost::optional<MovePrimaryDonorCancelState> _cancelState;
+    boost::optional<MovePrimaryDonorRetryHelper> _retry;
+
+    SharedPromise<void> _completionPromise;
 };
 
 }  // namespace mongo
