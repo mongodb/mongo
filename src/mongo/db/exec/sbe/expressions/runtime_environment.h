@@ -65,32 +65,34 @@ public:
         Accessor(RuntimeEnvironment* env, size_t index) : _env{env}, _index{index} {}
 
         std::pair<value::TypeTags, value::Value> getViewOfValue() const override {
-            return {_env->_state->typeTags[_index], _env->_state->vals[_index]};
+            auto [owned, tag, val] = _env->_state->values[_index];
+            return {tag, val};
         }
 
         std::pair<value::TypeTags, value::Value> copyOrMoveValue() override {
             // Always make a copy.
-            return copyValue(_env->_state->typeTags[_index], _env->_state->vals[_index]);
+            auto [owned, tag, val] = _env->_state->values[_index];
+            return copyValue(tag, val);
         }
 
         std::pair<value::TypeTags, value::Value> copyOrMoveValue() const {
             // Always make a copy.
-            return copyValue(_env->_state->typeTags[_index], _env->_state->vals[_index]);
+            auto [owned, tag, val] = _env->_state->values[_index];
+            return copyValue(tag, val);
         }
 
         void reset(bool owned, value::TypeTags tag, value::Value val) {
             release();
 
-            _env->_state->typeTags[_index] = tag;
-            _env->_state->vals[_index] = val;
-            _env->_state->owned[_index] = owned;
+            _env->_state->values[_index] = {owned, tag, val};
         }
 
     private:
         void release() {
-            if (_env->_state->owned[_index]) {
-                releaseValue(_env->_state->typeTags[_index], _env->_state->vals[_index]);
-                _env->_state->owned[_index] = false;
+            auto [owned, tag, val] = _env->_state->values[_index];
+            if (owned) {
+                releaseValue(tag, val);
+                _env->_state->values[_index] = {false, value::TypeTags::Nothing, 0};
             }
         }
 
@@ -180,11 +182,9 @@ private:
 
     struct State {
         size_t pushSlot(value::SlotId slot) {
-            auto index = vals.size();
+            auto index = values.size();
 
-            typeTags.push_back(value::TypeTags::Nothing);
-            vals.push_back(0);
-            owned.push_back(false);
+            values.push_back({false, value::TypeTags::Nothing, 0});
 
             auto [_, inserted] = slots.emplace(slot, index);
             uassert(4946302, str::stream() << "duplicate environment slot: " << slot, inserted);
@@ -202,10 +202,13 @@ private:
             state->namedSlots = namedSlots;
             state->slots = slots;
 
+            state->values.resize(values.size());
+
             // Populate slot values with default value.
-            state->typeTags.resize(typeTags.size(), value::TypeTags::Nothing);
-            state->vals.resize(vals.size(), 0);
-            state->owned.resize(owned.size(), false);
+            std::fill(
+                state->values.begin(),
+                state->values.end(),
+                FastTuple<bool, value::TypeTags, value::Value>{false, value::TypeTags::Nothing, 0});
 
             return state;
         }
@@ -213,9 +216,7 @@ private:
         StringMap<value::SlotId> namedSlots;
         value::SlotMap<size_t> slots;
 
-        std::vector<value::TypeTags> typeTags;
-        std::vector<value::Value> vals;
-        std::vector<bool> owned;
+        std::vector<FastTuple<bool, value::TypeTags, value::Value>> values;
     };
 
     void emplaceAccessor(value::SlotId slot, size_t index) {

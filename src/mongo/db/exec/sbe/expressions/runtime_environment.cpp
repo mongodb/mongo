@@ -39,9 +39,10 @@ RuntimeEnvironment::RuntimeEnvironment(const RuntimeEnvironment& other)
 
 RuntimeEnvironment::~RuntimeEnvironment() {
     if (_state.use_count() == 1) {
-        for (size_t idx = 0; idx < _state->vals.size(); ++idx) {
-            if (_state->owned[idx]) {
-                releaseValue(_state->typeTags[idx], _state->vals[idx]);
+        for (size_t idx = 0; idx < _state->values.size(); ++idx) {
+            auto [owned, tag, val] = _state->values[idx];
+            if (owned) {
+                releaseValue(tag, val);
             }
         }
     }
