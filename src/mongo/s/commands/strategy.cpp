@@ -426,14 +426,6 @@ public:
 
     explicit RunInvocation(ParseAndRunCommand* parc) : _parc(parc) {}
 
-    ~RunInvocation() {
-        if (!_shouldAffectCommandCounter)
-            return;
-        auto opCtx = _parc->_rec->getOpCtx();
-        Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(
-            opCtx, mongo::LogicalOp::opCommand);
-    }
-
     Future<void> run();
 
 private:
@@ -442,7 +434,6 @@ private:
     ParseAndRunCommand* const _parc;
 
     boost::optional<RouterOperationContextSession> _routerSession;
-    bool _shouldAffectCommandCounter = false;
 };
 
 /*
@@ -898,7 +889,6 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
     if (command->shouldAffectCommandCounter()) {
         globalOpCounters.gotCommand();
-        _shouldAffectCommandCounter = true;
     }
 
     return Status::OK();
